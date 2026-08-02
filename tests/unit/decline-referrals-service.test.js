@@ -11,6 +11,7 @@
 const findByRequest = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: (...a) => findByRequest(...a),
+  dismissLegacyDeclineReferral: jest.fn(),
 }));
 
 const queryReviewers = jest.fn();
@@ -28,6 +29,7 @@ function suggestion(overrides = {}) {
     _wmkf_potentialreviewer_value: 'pr-1',
     wmkf_accepted: false,
     wmkf_declined: false,
+    wmkf_selected: false,
     wmkf_declinereferral: null,
     wmkf_responsereceivedat: null,
     ...overrides,
@@ -63,6 +65,7 @@ test('returns declined rows that carry a non-empty referral, with decliner name 
       {
         referralId: 'sug-decl',
         suggestionId: 'sug-decl',
+        referralIndex: 0,
         reviewerName: 'Dr. Alan Decliner',
         referralName: null,
         institution: null,
@@ -73,6 +76,184 @@ test('returns declined rows that carry a non-empty referral, with decliner name 
       },
     ],
   });
+});
+
+test('omits a structured referral after an exact referred candidate is durably selected', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  const stored = normalizeDeclineReferrals([
+    { name: 'Sarah Chen', institution: 'Stanford', email: 'chen@example.edu' },
+    { name: 'Alex Rivera', institution: 'UCLA', email: '' },
+  ]).storedValue;
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-decliner',
+      _wmkf_potentialreviewer_value: 'pr-decliner',
+      wmkf_declined: true,
+      wmkf_declinereferral: stored,
+    }),
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-sarah',
+      _wmkf_potentialreviewer_value: 'pr-sarah',
+      wmkf_sources: 'staff_manual,referred',
+      wmkf_selected: true,
+    }),
+  ]);
+  queryReviewers.mockResolvedValue({
+    records: [
+      { wmkf_potentialreviewersid: 'pr-decliner', wmkf_name: 'Alan Decliner' },
+      {
+        wmkf_potentialreviewersid: 'pr-sarah',
+        wmkf_name: 'Sarah Chen',
+        wmkf_emailaddress: 'CHEN@example.edu',
+      },
+    ],
+  });
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-decliner:1',
+    referralIndex: 1,
+    referralName: 'Alex Rivera',
+  });
+});
+
+test('keeps a structured referral when the same-name candidate has a different supplied email', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-decliner',
+      _wmkf_potentialreviewer_value: 'pr-decliner',
+      wmkf_declined: true,
+      wmkf_declinereferral: normalizeDeclineReferrals([
+        { name: 'Sarah Chen', email: 'right@example.edu' },
+      ]).storedValue,
+    }),
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-sarah',
+      _wmkf_potentialreviewer_value: 'pr-sarah',
+      wmkf_sources: 'referred',
+      wmkf_selected: true,
+    }),
+  ]);
+  queryReviewers.mockResolvedValue({
+    records: [
+      { wmkf_potentialreviewersid: 'pr-decliner', wmkf_name: 'Alan Decliner' },
+      {
+        wmkf_potentialreviewersid: 'pr-sarah',
+        wmkf_name: 'Sarah Chen',
+        wmkf_emailaddress: 'wrong@example.edu',
+      },
+    ],
+  });
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0].referralName).toBe('Sarah Chen');
+});
+
+test('keeps a structured referral when an exact selected candidate lacks referred provenance', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-decliner',
+      _wmkf_potentialreviewer_value: 'pr-decliner',
+      wmkf_declined: true,
+      wmkf_declinereferral: normalizeDeclineReferrals([{ name: 'Sarah Chen' }]).storedValue,
+    }),
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-sarah',
+      _wmkf_potentialreviewer_value: 'pr-sarah',
+      wmkf_sources: 'proposal_named',
+      wmkf_selected: true,
+    }),
+  ]);
+  queryReviewers.mockResolvedValue({
+    records: [
+      { wmkf_potentialreviewersid: 'pr-decliner', wmkf_name: 'Alan Decliner' },
+      { wmkf_potentialreviewersid: 'pr-sarah', wmkf_name: 'Sarah Chen' },
+    ],
+  });
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0].referralName).toBe('Sarah Chen');
+});
+
+test('omits a referred candidate that is already engaged even if it is no longer selected', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-decliner',
+      _wmkf_potentialreviewer_value: 'pr-decliner',
+      wmkf_declined: true,
+      wmkf_declinereferral: normalizeDeclineReferrals([{ name: 'Sarah Chen' }]).storedValue,
+    }),
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-sarah',
+      _wmkf_potentialreviewer_value: 'pr-sarah',
+      wmkf_sources: 'staff_manual,referred',
+      wmkf_selected: false,
+      wmkf_invited: true,
+    }),
+  ]);
+  queryReviewers.mockResolvedValue({
+    records: [
+      { wmkf_potentialreviewersid: 'pr-decliner', wmkf_name: 'Alan Decliner' },
+      { wmkf_potentialreviewersid: 'pr-sarah', wmkf_name: 'Sarah Chen' },
+    ],
+  });
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toEqual([]);
+});
+
+test('keeps a structured referral when the matching referred candidate still needs restore', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-decliner',
+      _wmkf_potentialreviewer_value: 'pr-decliner',
+      wmkf_declined: true,
+      wmkf_declinereferral: normalizeDeclineReferrals([{ name: 'Sarah Chen' }]).storedValue,
+    }),
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-sarah',
+      _wmkf_potentialreviewer_value: 'pr-sarah',
+      wmkf_sources: 'referred',
+      wmkf_selected: false,
+      wmkf_declined: true,
+    }),
+  ]);
+  queryReviewers.mockResolvedValue({
+    records: [
+      { wmkf_potentialreviewersid: 'pr-decliner', wmkf_name: 'Alan Decliner' },
+      { wmkf_potentialreviewersid: 'pr-sarah', wmkf_name: 'Sarah Chen' },
+    ],
+  });
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0].referralName).toBe('Sarah Chen');
+});
+
+test('omits a legacy note after it is explicitly resolved', async () => {
+  const { resolveLegacyDeclineReferral } = require('../../shared/utils/decline-referrals');
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_declined: true,
+      wmkf_declinereferral: resolveLegacyDeclineReferral('Try Jane Smith').storedValue,
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toEqual([]);
 });
 
 test('expands a structured memo into one actionable DTO per referred person', async () => {

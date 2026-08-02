@@ -951,8 +951,14 @@ an unmeasured slice implemented.
 
 ### F1.1 Staff referral loop — shipped
 
-**[VERIFIED]** The workbench surfaces decline referrals and pre-fills the normal
-Add-or-Refer flow. Do not rebuild it. M1.3 now provides the first observational
+**[VERIFIED]** The workbench surfaces structured decline referrals as individual
+people and routes each through the normal identity-safe manual-add service.
+The existing durable `referred` candidate row closes an exact structured person
+after selection/engagement; failed identity work and promotion/restore remedies
+stay visible. Legacy prose remains readable, is never submitted as a person
+name, and can be dismissed only after staff resolves its people separately. No
+operational marker is written into the provenance field. Do not rebuild this
+loop. M1.3 now provides the first observational
 source/referral baseline; future refreshes and any interpretation remain
 observational. Separately, an **[OWNER-GATE]** remains on whether an external
 decline-acknowledgment email is worthwhile.

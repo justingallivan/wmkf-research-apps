@@ -3,6 +3,7 @@ import {
   normalizeDeclineReferrals,
   parseStoredDeclineReferral,
   referralDisplayText,
+  resolveLegacyDeclineReferral,
 } from '../../shared/utils/decline-referrals';
 
 test('normalizes and round-trips structured referral rows through the memo envelope', () => {
@@ -36,11 +37,48 @@ test('preserves legacy free text and malformed envelopes as legacy display-only 
       email: null,
       legacyText: 'Try Dr. Jane Smith at MIT',
       structured: false,
+      resolved: false,
     },
   ]);
   expect(parseStoredDeclineReferral('wmkf-referrals:v1:not-json')[0]).toMatchObject({
     legacyText: 'wmkf-referrals:v1:not-json',
     structured: false,
+  });
+});
+
+test('archives a legacy note in place while preserving its original text', () => {
+  const resolved = resolveLegacyDeclineReferral('  Try Dr. Jane Smith at MIT  ');
+  expect(resolved).toMatchObject({ ok: true, alreadyResolved: false });
+  expect(resolved.storedValue).toBe('wmkf-referral-resolved:v1:Try Dr. Jane Smith at MIT');
+  expect(parseStoredDeclineReferral(resolved.storedValue)).toEqual([
+    {
+      name: null,
+      institution: null,
+      email: null,
+      legacyText: 'Try Dr. Jane Smith at MIT',
+      structured: false,
+      resolved: true,
+    },
+  ]);
+  expect(resolveLegacyDeclineReferral(resolved.storedValue)).toEqual({
+    ok: true,
+    storedValue: resolved.storedValue,
+    alreadyResolved: true,
+  });
+});
+
+test('never allows structured referrals to be dismissed as legacy prose', () => {
+  const stored = normalizeDeclineReferrals([{ name: 'Sarah Chen' }]).storedValue;
+  expect(resolveLegacyDeclineReferral(stored)).toEqual({
+    ok: false,
+    reason: 'structured_decline_referral_not_dismissible',
+  });
+});
+
+test('rejects legacy resolution when the preserved value would exceed the memo limit', () => {
+  expect(resolveLegacyDeclineReferral('x'.repeat(2000))).toEqual({
+    ok: false,
+    reason: 'resolved_legacy_decline_referral_too_long',
   });
 });
 

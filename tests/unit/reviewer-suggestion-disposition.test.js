@@ -28,6 +28,7 @@ const {
   updateLifecycle,
   selectIfUnengaged,
   ensureApplicantRecommended,
+  dismissLegacyDeclineReferral,
   restore,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
@@ -101,6 +102,96 @@ describe('disposition optionset + helpers', () => {
     expect(isExcluded({ wmkf_applicantdisposition: null })).toBe(false);
     expect(isExcluded({})).toBe(false);
     expect(isExcluded(null)).toBe(false);
+  });
+});
+
+describe('legacy decline-referral dismissal', () => {
+  test('preserves the original text behind an ETag-guarded resolved marker', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      _etag: 'W/"7"',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_declined: true,
+      wmkf_declinereferral: 'Ada Lovelace, Example University',
+    });
+
+    const result = await dismissLegacyDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+    }, { actingUserSystemId: 'user-1' });
+
+    expect(result).toEqual({ dismissed: true, alreadyDismissed: false });
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_declinereferral: 'wmkf-referral-resolved:v1:Ada Lovelace, Example University' },
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"7"' },
+    );
+  });
+
+  test('is idempotent and refuses a referral from another request', async () => {
+    DynamicsService.getRecord.mockResolvedValueOnce({
+      _etag: 'W/"8"',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_declined: true,
+      wmkf_declinereferral: 'wmkf-referral-resolved:v1:Ada Lovelace',
+    });
+    await expect(dismissLegacyDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+    })).resolves.toEqual({ dismissed: true, alreadyDismissed: true });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+
+    DynamicsService.getRecord.mockResolvedValueOnce({
+      _etag: 'W/"9"',
+      _wmkf_request_value: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+      wmkf_declined: true,
+      wmkf_declinereferral: 'Ada Lovelace',
+    });
+    await expect(dismissLegacyDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+    })).rejects.toMatchObject({ code: 'decline_referral_request_mismatch', status: 409 });
+  });
+
+  test('rejects structured rows and retries one ETag race with a fresh read', async () => {
+    DynamicsService.getRecord.mockResolvedValueOnce({
+      _etag: 'W/"9"',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_declined: true,
+      wmkf_declinereferral: 'wmkf-referrals:v1:[{"n":"Ada Lovelace"}]',
+    });
+    await expect(dismissLegacyDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+    })).rejects.toMatchObject({ code: 'structured_decline_referral_not_dismissible', status: 409 });
+
+    DynamicsService.getRecord
+      .mockResolvedValueOnce({
+        _etag: 'W/"10"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: 'Grace Hopper',
+      })
+      .mockResolvedValueOnce({
+        _etag: 'W/"11"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: 'Grace Hopper',
+      });
+    DynamicsService.updateRecord
+      .mockRejectedValueOnce(Object.assign(new Error('race'), { status: 412 }))
+      .mockResolvedValueOnce({});
+
+    await expect(dismissLegacyDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+    })).resolves.toEqual({ dismissed: true, alreadyDismissed: false });
+    expect(DynamicsService.updateRecord).toHaveBeenLastCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_declinereferral: 'wmkf-referral-resolved:v1:Grace Hopper' },
+      { actingUserSystemId: undefined, ifMatch: 'W/"11"' },
+    );
   });
 });
 

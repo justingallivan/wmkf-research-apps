@@ -74,7 +74,15 @@ export default async function handler(req, res) {
   return withDalContext('workbench-manual-reviewer', async () => {
     try {
       const result = await addManualReviewer({
-        requestId, name, email, affiliation, note, referredBy, orcid, resolution, actingUserSystemId,
+        requestId,
+        name,
+        email,
+        affiliation,
+        note,
+        referredBy,
+        orcid,
+        resolution,
+        actingUserSystemId,
       });
       return res.status(200).json(result);
     } catch (error) {

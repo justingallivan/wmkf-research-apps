@@ -130,11 +130,23 @@ earlier in error. **This resolver change was merged and deployed through PR
   expanding to four) now replace the two prose textareas on
   `codex/structured-decline-referrals`. The server validates the structured
   rows and stores a versioned envelope in the existing memo; legacy free-text
-  referrals remain readable. This branch is not yet merged or deployed.
+  referrals remain readable. Structured rows now close from the existing
+  durable candidate evidence: an exact-name `referred` candidate (plus exact
+  email when supplied) that is selected or engaged. No operational token is
+  written into `wmkf_sources`; failed/ambiguous adds and promotion/restore
+  remedies remain visible. Legacy prose is display-only and has a **Dismiss
+  resolved note** action that preserves the original text behind a versioned
+  prefix in `wmkf_declinereferral`. This branch is not yet merged or deployed.
+- Request `1002912`: the production person-data repair discussed earlier is
+  complete — the duplicate Chris Lima record was deactivated, the canonical
+  Christopher Lima record was corrected, and Kylie Walters was added
+  separately. Cynthia Wolberger's historical legacy memo still contains both
+  names; after this branch deploys, staff can dismiss that already-resolved
+  note. No further Lima/Walters person-record repair is pending here.
 - The reviewer-facing wording asks for the name as published and explicitly
   says not to include degrees or titles.
-- Data repair for legacy twins/orphans — hygiene **after** the runtime fix, not
-  a correctness gate, and requires explicit Production-write authorization.
+- Any unrelated legacy twin/orphan cleanup remains separate hygiene and
+  requires explicit Production-write authorization.
 
 ## Gates and Definition of Done
 

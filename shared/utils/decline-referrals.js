@@ -15,6 +15,7 @@ export const DECLINE_REFERRAL_LIMITS = Object.freeze({
 });
 
 const STORED_PREFIX = 'wmkf-referrals:v1:';
+const RESOLVED_LEGACY_PREFIX = 'wmkf-referral-resolved:v1:';
 const MAX_STORED_LENGTH = 2000;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+$/;
 const FIELDS = ['name', 'institution', 'email'];
@@ -85,6 +86,17 @@ export function parseStoredDeclineReferral(value) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return [];
 
+  if (text.startsWith(RESOLVED_LEGACY_PREFIX)) {
+    return [{
+      name: null,
+      institution: null,
+      email: null,
+      legacyText: text.slice(RESOLVED_LEGACY_PREFIX.length),
+      structured: false,
+      resolved: true,
+    }];
+  }
+
   if (text.startsWith(STORED_PREFIX)) {
     try {
       const compact = JSON.parse(text.slice(STORED_PREFIX.length));
@@ -110,10 +122,35 @@ export function parseStoredDeclineReferral(value) {
     email: null,
     legacyText: text,
     structured: false,
+    resolved: false,
   }];
 }
 
 export function referralDisplayText(referral) {
   if (!referral?.structured) return referral?.legacyText || '';
   return [referral.name, referral.institution, referral.email].filter(Boolean).join(' · ');
+}
+
+/**
+ * Archive a legacy prose note in place after staff confirms that its people
+ * were handled outside the structured one-click flow. The original trimmed
+ * text remains byte-for-byte after the version marker, and the referral field
+ * remains the sole owner of referral content/state. Structured rows are never
+ * accepted here: their resolved state is derived from the existing durable
+ * `referred` candidate provenance instead.
+ */
+export function resolveLegacyDeclineReferral(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return { ok: false, reason: 'missing_legacy_decline_referral' };
+  if (text.startsWith(RESOLVED_LEGACY_PREFIX)) {
+    return { ok: true, storedValue: text, alreadyResolved: true };
+  }
+  if (parseStoredDeclineReferral(text).some((row) => row.structured)) {
+    return { ok: false, reason: 'structured_decline_referral_not_dismissible' };
+  }
+  const storedValue = `${RESOLVED_LEGACY_PREFIX}${text}`;
+  if (storedValue.length > MAX_STORED_LENGTH) {
+    return { ok: false, reason: 'resolved_legacy_decline_referral_too_long' };
+  }
+  return { ok: true, storedValue, alreadyResolved: false };
 }

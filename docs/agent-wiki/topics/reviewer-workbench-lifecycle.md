@@ -158,14 +158,18 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   Reads selected and archived suggestions, then returns declined rows with a
   non-empty referral, each with the decliner's `wmkf_name` resolved. Structured
   envelopes expand to one DTO per referred person; legacy text remains one
-  display-only DTO.
+  display-only DTO. A structured item is omitted only when an existing
+  request-scoped candidate carries `referred` provenance, exactly matches the
+  normalized name (and email too when supplied), and is selected or engaged.
+  Resolved legacy notes are also omitted, so the Track badge represents
+  unresolved referral work rather than the lifetime count of decline responses.
   **Deliberately independent of
   `review-manager/reviewers-service.js`**, which filters to accepted reviewers
   and early-returns when none are accepted — so referrals surface even when
   every invitee declined before anyone accepted.
-- **Surface:** `ReviewersTab` fetches it and passes `declineReferrals` +
-  `onAddReferral` to `ReviewerManagePanel`, which renders an amber callout at
-  the top of the **Track Reviewers** sub-tab only.
+- **Surface:** `ReviewersTab` fetches it and passes `declineReferrals`,
+  `onAddReferral`, and `onResolveLegacyReferral` to `ReviewerManagePanel`, which
+  renders an amber callout at the top of the **Track Reviewers** sub-tab only.
 - **One-click "Add as candidate" (in-place, S354):** does NOT bypass identity
   resolution. The button POSTs the suggested name, optional email/institution,
   and decliner straight to
@@ -182,7 +186,14 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   chosen `resolution`), so a referral never auto-resolves to a
   namesake (memory `project-reviewer-verify-fail-dangerous`); **other error**
   (incl. `applicant_excluded`) → inline message + "Try again". Lands `referred`
-  provenance exactly as the S249 manual-referral path. Before S354 the button
+  provenance exactly as the S249 manual-referral path. On reload the referral
+  reader derives closure from that durable candidate row; it does not add an
+  operational source token. Failed/ambiguous adds remain visible, as do remedy
+  outcomes that still require promotion or restore. Legacy prose is never
+  submitted wholesale as a reviewer name; staff add its people separately and
+  then use **Dismiss resolved note**. That PATCH is legacy-only, request-scoped,
+  ETag-guarded, retry-safe, and preserves the original note after a compact
+  resolved prefix in `wmkf_declinereferral`. Before S354 the button
   pre-filled the Find-tab Add-or-Refer form and routed there via
   `router.push({sub:'find'})` (the `ReviewerFindPanel` `prefill` prop, now
   unused) — a colleague reported it "did nothing" (the tab hop was unreliable /

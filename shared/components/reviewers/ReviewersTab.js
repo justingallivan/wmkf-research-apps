@@ -64,9 +64,9 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const currentRequestIdRef = useRef(requestId);
   currentRequestIdRef.current = requestId;
   // Per-referral inline action state for the Track Reviewers decline-referral
-  // callout, keyed by suggestionId: { status: 'adding'|'confirm'|'added'|'error',
-  // lookup?, error?, addedName?, invitable? }. Drives the one-click add + inline
-  // identity-confirm UX without leaving the Track sub-tab.
+  // callout, keyed by the per-item referralId (with suggestionId as a legacy
+  // fallback). Drives structured add/identity confirmation and legacy-note
+  // dismissal without conflating those two workflows.
   const [referralActions, setReferralActions] = useState({});
 
   const reviewers = proposal?.reviewers || [];
@@ -199,14 +199,16 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // resolves identity itself — a confident match or a clearly-new person is
   // added immediately; an ambiguous/conflicting identity returns 409 + `lookup`,
   // which we surface as an inline picker on the referral row (staff confirm → we
-  // re-POST with the chosen resolution). Legacy free-text suggestions remain
-  // reviewable, while new structured rows carry identity anchors separately.
+  // re-POST with the chosen resolution). Legacy free-text suggestions are never
+  // submitted as one person's name; an already-resolved legacy note has its own
+  // narrow dismissal action.
   // On success we refresh both lists and land on
   // the Invite Reviewers sub-tab where the new candidate now appears.
   const addReferralCandidate = async (referral, resolution) => {
     const sid = referral?.suggestionId;
     const actionKey = referral?.referralId || sid;
-    const name = (referral?.referralName || referral?.referralText || '').trim();
+    if (referral?.legacy) return;
+    const name = (referral?.referralName || '').trim();
     if (!sid || !name || !requestId) return;
     const rid = requestId;
     setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'adding' } }));
@@ -219,7 +221,10 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           name,
           email: referral?.email || undefined,
           affiliation: referral?.institution || undefined,
-          referredBy: referral?.reviewerName || undefined,
+          // The source row is known to be a reviewer decline even if its linked
+          // person display-name read failed. Keep durable `referred` provenance
+          // in that rare case instead of silently downgrading to staff_manual.
+          referredBy: referral?.reviewerName || 'Declining reviewer',
           resolution: resolution || undefined,
         }),
       });
@@ -263,6 +268,45 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     } catch (e) {
       if (rid !== currentRequestIdRef.current) return;
       setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'error', error: e.message } }));
+    }
+  };
+
+  const dismissLegacyReferral = async (referral) => {
+    const sid = referral?.suggestionId;
+    const actionKey = referral?.referralId || sid;
+    if (!referral?.legacy || !sid || !requestId) return;
+    const rid = requestId;
+    setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'dismissing' } }));
+    try {
+      const res = await fetch('/api/workbench/decline-referrals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: rid,
+          suggestionId: sid,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (rid !== currentRequestIdRef.current) return;
+      if (!res.ok || !data.success) {
+        setReferralActions((prev) => ({
+          ...prev,
+          [actionKey]: {
+            status: 'error',
+            operation: 'dismiss',
+            error: data.error || `Couldn’t dismiss the resolved note (${res.status}).`,
+          },
+        }));
+        return;
+      }
+      setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'dismissed' } }));
+      loadDeclineReferrals();
+    } catch (error) {
+      if (rid !== currentRequestIdRef.current) return;
+      setReferralActions((prev) => ({
+        ...prev,
+        [actionKey]: { status: 'error', operation: 'dismiss', error: error.message },
+      }));
     }
   };
 
@@ -401,6 +445,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}
+          onResolveLegacyReferral={dismissLegacyReferral}
           onGoToInvite={() => selectSub('candidates')}
           onNavigate={selectSub}
           onDismissReferral={dismissReferralAction}

@@ -21,16 +21,25 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => functio
   return (
     <div data-testid="manage-panel" data-actions={JSON.stringify(props.referralActions || {})}>
       {(props.declineReferrals || []).map((r) => (
-        <button
-          key={r.referralId || r.suggestionId}
-          data-testid={`add-${r.referralId || r.suggestionId}`}
-          onClick={() => props.onAddReferral(r)}
-        >add</button>
+        <div key={r.referralId || r.suggestionId}>
+          {!r.legacy && (
+            <button
+              data-testid={`add-${r.referralId || r.suggestionId}`}
+              onClick={() => props.onAddReferral(r)}
+            >add</button>
+          )}
+          {r.legacy && (
+            <button
+              data-testid={`dismiss-${r.referralId || r.suggestionId}`}
+              onClick={() => props.onResolveLegacyReferral(r)}
+            >dismiss</button>
+          )}
+        </div>
       ))}
       <button
         data-testid="choose-create-new"
         onClick={() => props.onAddReferral(
-          { referralId: 's-a:0', suggestionId: 's-a', referralName: 'Oleg Butovsky', referralText: 'Oleg Butovsky', reviewerName: 'Decliner A' },
+          { referralId: 's-a:0', suggestionId: 's-a', referralIndex: 0, referralName: 'Oleg Butovsky', referralText: 'Oleg Butovsky', reviewerName: 'Decliner A' },
           { mode: 'create_new' },
         )}
       >choose</button>
@@ -61,19 +70,34 @@ const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
 const REFERRALS = [{
   referralId: 's-a:0',
   suggestionId: 's-a',
+  referralIndex: 0,
   reviewerName: 'Decliner A',
   referralName: 'Oleg Butovsky',
   institution: 'Weill Cornell Medicine',
   email: 'oleg@example.edu',
   referralText: 'Oleg Butovsky · Weill Cornell Medicine · oleg@example.edu',
   declinedAt: null,
+  legacy: false,
+}];
+
+const LEGACY_REFERRALS = [{
+  referralId: 's-legacy',
+  suggestionId: 's-legacy',
+  referralIndex: 0,
+  reviewerName: 'Decliner B',
+  referralName: null,
+  institution: null,
+  email: null,
+  referralText: 'Chris Lima, MSK\nKylie Walters, NCI',
+  declinedAt: null,
+  legacy: true,
 }];
 
 function actionsOf() {
   return JSON.parse(screen.getByTestId('manage-panel').getAttribute('data-actions'));
 }
 
-function baseFetch(manualReviewerResponder) {
+function baseFetch(manualReviewerResponder, referrals = REFERRALS) {
   return jest.fn((url, opts) => {
     const u = String(url);
     if (u.includes('/api/review-manager/reviewers')) {
@@ -83,7 +107,10 @@ function baseFetch(manualReviewerResponder) {
       return Promise.resolve({ ok: true, json: async () => ({ proposals: [] }) });
     }
     if (u.includes('/api/workbench/decline-referrals')) {
-      return Promise.resolve({ ok: true, json: async () => ({ referrals: REFERRALS }) });
+      if (opts?.method === 'PATCH') {
+        return Promise.resolve({ ok: true, json: async () => ({ success: true, dismissed: true }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ referrals }) });
     }
     if (u.includes('/api/workbench/manual-reviewer')) {
       return manualReviewerResponder(opts);
@@ -126,6 +153,26 @@ test('a confident/new add posts name+referredBy, marks the row added, and lands 
     undefined,
     { shallow: true },
   );
+});
+
+test('legacy dismissal PATCHes the exact source note and clears its work state', async () => {
+  global.fetch = baseFetch(
+    () => Promise.reject(new Error('manual add should not run')),
+    LEGACY_REFERRALS,
+  );
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByTestId('dismiss-s-legacy')).toBeInTheDocument());
+  await act(async () => { screen.getByTestId('dismiss-s-legacy').click(); });
+
+  await waitFor(() => expect(actionsOf()['s-legacy']?.status).toBe('dismissed'));
+  const patchCall = global.fetch.mock.calls.find(([url, opts]) => (
+    String(url).includes('/api/workbench/decline-referrals') && opts?.method === 'PATCH'
+  ));
+  expect(JSON.parse(patchCall[1].body)).toEqual({
+    requestId: REQ,
+    suggestionId: 's-legacy',
+  });
 });
 
 test('an ambiguous identity (409 + lookup) switches the row to confirm; choosing a resolution re-posts it', async () => {

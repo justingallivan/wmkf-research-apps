@@ -27,7 +27,7 @@ Suggestion content:
 - `wmkf_programarea` (String)
 - `wmkf_relevancescore` (Double, MinValue 0, MaxValue 100, Precision 4) — stores the 0-100 composite `relevanceScore` used for ranking. The save adapter clamps writes to `[0,100]`; the one-time metadata widen artifact is `scripts/widen-relevancescore-max.mjs`.
 - `wmkf_matchreason` (Memo)
-- `wmkf_sources` (String, comma-joined provenance)
+- `wmkf_sources` (String, comma-joined provenance only; referral closure reuses the existing `referred` token on the candidate row rather than adding operational state here)
 - `wmkf_notes` (Memo)
 
 ### Additive identity-COI currency — deployed, not authoritative
@@ -110,7 +110,7 @@ drive mismatch/operations handling rather than silently overwriting the contact.
 Decline structured capture:
 - `wmkf_declinereasonpicklist` (Picklist: `too-busy=100000000 | conflict-of-interest=100000001 | outside-expertise=100000002 | bad-timing=100000003 | other=100000004`)
 - `wmkf_declinereason` (String/Memo, max 2000) — legacy free-text follow-up; no longer solicited by the current portal
-- `wmkf_declinereferral` (String/Memo, max 2000) — current portal writes a `wmkf-referrals:v1:` JSON envelope containing up to four `{name,institution,email}` rows. The staff reader expands those rows and treats non-envelope values as legacy display-only text. This is a runtime encoding contract, not a schema change.
+- `wmkf_declinereferral` (String/Memo, max 2000) — current portal writes a `wmkf-referrals:v1:` JSON envelope containing up to four `{name,institution,email}` rows. The staff reader expands those rows and treats non-envelope values as legacy display-only text. Staff acknowledgement never mutates this memo: the exact parsed index is marked in `wmkf_sources`, preserving what the reviewer submitted. This is a runtime encoding contract, not a schema change.
 
 Stage 2a state stamps:
 - `wmkf_honorariumoptout` (Boolean, default false) — captured at accept
@@ -147,6 +147,7 @@ Methods:
   provenance union may require the current suggestion ETag; a missing/stale
   value forces a re-plan. Returns `{ id, created, selected }`.
 - `ensureStaffManualCandidate({ potentialReviewerId, requestId, … })` — **Workbench manual reviewer add**. Idempotently materializes/reselects a non-excluded staff-added row, **unions** `staff_manual` into existing `wmkf_sources` (no clobber), preserves applicant recommendation state when an existing row already has it, honors "excluded wins" (`{ skippedExcluded: true }`), and catches a lost alternate-key create race. Unlike lazy applicant ingestion, this is an explicit staff action, so an existing soft-deleted non-excluded row is re-selected. **Re-add fresh start (S343):** when the re-selected row was *removed* (`wmkf_selected===false`), `ENGAGEMENT_STAMP_RESET` clears the stale engagement stamps (`wmkf_invited=false`; `wmkf_emailsentat`, `wmkf_respondremindersentat`, `wmkf_remindersentat`, `wmkf_remindercount`, `wmkf_materialssentat`, `wmkf_reviewreceivedat`, `wmkf_responsereceivedat`, `wmkf_thankyousentat`, `wmkf_completedat`, `wmkf_withdrawnsufficientat`, `wmkf_proposalfirstaccessed` = `null`) so the row returns to a clean engagement lifecycle; an already-active row's stamps are left untouched. The re-select PATCHes are ETag-guarded from the fetched row; on 412 they re-fetch, source-union without reset if the row is now active, or retry the reset if it is still removed.
+- `dismissLegacyDeclineReferral({ suggestionId, requestId })` — validates the exact declined source row and rejects structured envelopes, then ETag-conditionally stores a compact resolved prefix before the original legacy text. Request-scoped, idempotent, and retries one 412. Structured closure is derived read-side from exact existing `referred` candidate evidence.
 - `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt`. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
 - `applyStaffReviewerWithdrawal(id, { ifMatch, actingUserSystemId, deleteHonorariumRequestId })` — PD-recorded post-accept withdrawal. Requires the fresh row ETag; atomically writes `accepted=false`, `declined=true`, declined response metadata, `reviewStatus=withdrew`, and token revocation while deleting the exact server-read linked honorarium `akoya_request` in one changeset. Without an honorarium link, performs the same ETag-guarded row correction as one PATCH.
 - `softDelete(id)` — sets `wmkf_selected = false`
@@ -209,7 +210,8 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   Only after selection succeeds does the server finalize the exact roster key
   as `saved`; missing contact, identity conflict, absent roster authority, or
   roster-finalization failure never reports a clean promotion.
-- `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through `potential-reviewer.upsertByEmail`, stamps any staff-entered email as `wmkf_emailsource=manual` through `researcher.updateById`, then writes/reselects the per-request suggestion with `staff_manual` in `wmkf_sources`.
+- `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through the identity-safe manual-add path, then writes/reselects the per-request suggestion with `staff_manual` and, for reviewer referrals, `referred` in `wmkf_sources`. It does not carry or mutate decline-referral indexes.
+- `pages/api/workbench/decline-referrals.js` — GET expands unresolved referral items. Structured rows are omitted when exact request-scoped `referred` candidate evidence proves selection/engagement; legacy rows carrying the resolved memo prefix are omitted. PATCH calls `dismissLegacyDeclineReferral` and rejects structured rows.
 - `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection
   and v3/staff-confirmation authority are checked before person/suggestion
   writes. Adapter `upsert` creates/converges the per-(reviewer,request)
