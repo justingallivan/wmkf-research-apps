@@ -8,7 +8,7 @@ const now = Date.parse('2026-08-01T00:00:00.000Z');
 const versions = Object.fromEntries(STAGES.map((stage) => [stage, `${stage}:v1`]));
 function candidate(overrides = {}) {
   return {
-    candidateKey: 'suggestion:abc', warmCacheVersion: 1,
+    candidateKey: 'suggestion:11111111-1111-1111-1111-111111111111', warmCacheVersion: 1,
     applicantInputVersion: 'input:v1', proposalContentVersion: 'proposal:v1',
     stageFreshness: Object.fromEntries(STAGES.map((stage) => [stage, {
       state: 'current', contractVersion: CONTRACT_VERSIONS[stage], sourceVersion: versions[stage], completedAt: '2026-07-31T00:00:00.000Z',
@@ -61,7 +61,10 @@ test('planner accepts only canonical anchors and rejects normalized/client candi
   expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'candidate:normalized-name' }), authoritative: authoritative(), now }).candidateKey).toBeNull();
   expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'client:forged' }), authoritative: authoritative(), now }).candidateKey).toBeNull();
   expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'unknown:x' }), authoritative: authoritative(), now }).candidateKey).toBeNull();
-  expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'candidate:x', suggestionId: 'ABC' }), authoritative: authoritative(), now }).candidateKey).toBe('suggestion:abc');
+  expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'suggestion:', suggestionId: '11111111-1111-1111-1111-111111111111' }), authoritative: authoritative(), now }).candidateKey).toBeNull();
+  expect(planCandidateFreshness({ candidate: candidate({ candidateKey: 'candidate:x', suggestionId: '11111111-1111-1111-1111-111111111111' }), authoritative: authoritative(), now }).candidateKey).toBeNull();
+  expect(planCandidateFreshness({ candidate: { ...candidate(), candidateKey: undefined, suggestionId: '11111111-1111-1111-1111-111111111111' }, authoritative: authoritative(), now }).candidateKey).toBe('suggestion:11111111-1111-1111-1111-111111111111');
+  expect(planCandidateFreshness({ candidate: { ...candidate(), candidateKey: undefined, suggestionId: 'not-guid' }, authoritative: authoritative(), now }).candidateKey).toBeNull();
 });
 
 test('default policy does not age-expire; injected time-sensitive policy does not age-expire identity or coauthor', () => {
