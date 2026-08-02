@@ -3,15 +3,16 @@
  * (tier-3), Phase 3.
  *
  * This is the applicant-reviewer ingestion surface. On open it:
- *   1. Runs `/api/workbench/applicant-reviewers` (idempotent) to materialize the
- *      request's legacy `wmkf_potentialreviewer1..5` slots into
- *      `disposition=recommended` candidate rows and to parse the free-text
- *      `wmkf_excludedreviewers` into clean names.
- *   2. Auto-loads the request's exact canonical reviewer proposal via
- *      `/api/reviewer-finder/load-proposal`, or replays a deliberate dropdown
- *      override from validated `?proposalFile=` navigation state (no PDF-upload
- *      entry in the Workbench and no filename-heuristic fallback).
- *   3. Surfaces the applicant RECOMMENDED set (badged, now candidates), the
+ *   1. Reads only the persisted reviewer roster. Proposal preparation and
+ *      applicant-input materialization are deliberate staff actions, so a warm
+ *      revisit never downloads a PDF, creates a Blob copy, or writes candidate
+ *      rows just to reconstruct the screen.
+ *   2. On explicit preparation, loads the request's exact canonical reviewer
+ *      proposal via `/api/reviewer-finder/load-proposal`, or uses a deliberate
+ *      dropdown override from validated `?proposalFile=` navigation state (no
+ *      PDF-upload entry in the Workbench and no filename-heuristic fallback).
+ *   3. On explicit applicant-input refresh, materializes the applicant
+ *      RECOMMENDED set (badged, now candidates), the
  *      applicant EXCLUDED set (per-request soft-block, badged), and the loaded
  *      proposal — and pre-computes the exclude list staff carry into a search.
  *
@@ -24,7 +25,8 @@
  * reuses the proposal loaded here + the applicant exclude list and chains the
  * reviewer-finder endpoints (analyze → discover → enrich → save), so saved
  * candidates land in this request's pool alongside the applicant recommendations.
- * (`summaryPages`/PDF-upload are not used — the proposal is auto-loaded.)
+ * (`summaryPages`/PDF-upload are not used — staff explicitly prepare the
+ * server-selected proposal when they are ready to search.)
  *
  * Props:
  *   - requestId      : the akoya_request GUID (always present)
@@ -50,6 +52,23 @@ function fileKeyOf(f) {
   return `${f.library}::${f.folder}::${f.name}`;
 }
 
+const idleIngest = (requestId = null) => ({
+  requestId,
+  attempted: false,
+  loading: false,
+  data: null,
+  error: null,
+});
+
+const idleDoc = (requestId = null) => ({
+  requestId,
+  loading: false,
+  data: null,
+  error: null,
+  allFiles: null,
+  requestedFileKey: null,
+});
+
 export default function ReviewerFindPanel({
   requestId,
   savedPoolNames = [],
@@ -65,12 +84,13 @@ export default function ReviewerFindPanel({
   const requestIdRef = useRef(requestId);
   requestIdRef.current = requestId;
   const proposalLoadGenerationRef = useRef(0);
-  const lastProposalLoadRef = useRef({ requestId: null, fileKey: undefined });
+  const proposalAbortRef = useRef(null);
+  const ingestionAbortRef = useRef(null);
   const rosterGenerationRef = useRef(0);
   const [rosterRetryNonce, setRosterRetryNonce] = useState(0);
   const manualCardRef = useRef(null);
-  const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
-  const [doc, setDoc] = useState({ loading: true, data: null, error: null });
+  const [ingest, setIngest] = useState(() => idleIngest(requestId));
+  const [doc, setDoc] = useState(() => idleDoc(requestId));
   // Parent-owned warm bootstrap. The child receives this snapshot and never
   // starts a second mount-time roster request when embedded here.
   const [warmRoster, setWarmRoster] = useState({
@@ -141,19 +161,27 @@ export default function ReviewerFindPanel({
   const runIngestion = useCallback(async () => {
     if (!requestId) return;
     const submittedRequestId = requestId;
-    setIngest({ loading: true, data: null, error: null });
+    ingestionAbortRef.current?.abort();
+    const controller = new AbortController();
+    ingestionAbortRef.current = controller;
+    setIngest({ requestId: submittedRequestId, attempted: true, loading: true, data: null, error: null });
     try {
-      const res = await fetch(`/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(submittedRequestId)}`);
+      const res = await fetch(`/api/workbench/applicant-reviewers?requestId=${encodeURIComponent(submittedRequestId)}`, {
+        signal: controller.signal,
+      });
       if (requestIdRef.current !== submittedRequestId) return;
       const data = await res.json().catch(() => ({}));
       if (requestIdRef.current !== submittedRequestId) return;
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Ingestion failed (${res.status})`);
       }
-      setIngest({ loading: false, data, error: null });
+      setIngest({ requestId: submittedRequestId, attempted: true, loading: false, data, error: null });
     } catch (e) {
+      if (controller.signal.aborted) return;
       if (requestIdRef.current !== submittedRequestId) return;
-      setIngest({ loading: false, data: null, error: e.message });
+      setIngest({ requestId: submittedRequestId, attempted: true, loading: false, data: null, error: e.message });
+    } finally {
+      if (ingestionAbortRef.current === controller) ingestionAbortRef.current = null;
     }
   }, [requestId]);
 
@@ -167,12 +195,22 @@ export default function ReviewerFindPanel({
     const submittedRequestId = requestId;
     const requestedFileKey = fileKey || null;
     const myGeneration = ++proposalLoadGenerationRef.current;
-    lastProposalLoadRef.current = { requestId: submittedRequestId, fileKey: requestedFileKey };
-    setDoc({ loading: true, data: null, error: null, requestedFileKey });
+    proposalAbortRef.current?.abort();
+    const controller = new AbortController();
+    proposalAbortRef.current = controller;
+    setDoc({
+      requestId: submittedRequestId,
+      loading: true,
+      data: null,
+      error: null,
+      allFiles: null,
+      requestedFileKey,
+    });
     try {
       const res = await fetch('/api/reviewer-finder/load-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify(requestedFileKey
           ? { requestId: submittedRequestId, fileKey: requestedFileKey }
           : { requestId: submittedRequestId }),
@@ -189,31 +227,56 @@ export default function ReviewerFindPanel({
         err.allFiles = data.allFiles || null;
         throw err;
       }
-      setDoc({ loading: false, data, error: null, requestedFileKey });
+      setDoc({
+        requestId: submittedRequestId,
+        loading: false,
+        data,
+        error: null,
+        allFiles: null,
+        requestedFileKey,
+      });
       if (persist && data.picked) onProposalFileKeyChange?.(data.picked);
     } catch (e) {
+      if (controller.signal.aborted) return;
       if (
         requestIdRef.current !== submittedRequestId
         || proposalLoadGenerationRef.current !== myGeneration
       ) return;
       setDoc({
+        requestId: submittedRequestId,
         loading: false,
         data: null,
         error: e.message,
         allFiles: e.allFiles || null,
         requestedFileKey,
       });
+    } finally {
+      if (proposalAbortRef.current === controller) proposalAbortRef.current = null;
     }
   }, [requestId, onProposalFileKeyChange]);
 
-  useEffect(() => { runIngestion(); }, [runIngestion]);
   useEffect(() => {
+    // A navigation invalidates every explicit proposal/applicant operation and
+    // clears its visible result before the new request can render it. The
+    // request-id and generation checks in each callback are a second guard for
+    // transports that settle after abort.
+    proposalLoadGenerationRef.current += 1;
+    proposalAbortRef.current?.abort();
+    ingestionAbortRef.current?.abort();
+    setDoc(idleDoc(requestId));
+    setIngest(idleIngest(requestId));
+    return () => {
+      proposalAbortRef.current?.abort();
+      ingestionAbortRef.current?.abort();
+    };
+  }, [requestId]);
+
+  const prepareSearch = useCallback(() => {
     if (!proposalBindingReady) return;
-    const desiredFileKey = proposalFileKey || null;
-    const previous = lastProposalLoadRef.current;
-    if (previous.requestId === requestId && previous.fileKey === desiredFileKey) return;
-    loadProposal(desiredFileKey);
-  }, [requestId, proposalFileKey, proposalBindingReady, loadProposal]);
+    // A saved URL binding represents a past deliberate picker choice, but
+    // still requires this explicit preparation click before a PDF is fetched.
+    loadProposal(proposalFileKey || null);
+  }, [proposalBindingReady, proposalFileKey, loadProposal]);
 
   // Phase A: this is deliberately independent of proposal/blob state. A request
   // change or explicit retry starts a fresh generation and aborts the prior read.
@@ -597,7 +660,11 @@ export default function ReviewerFindPanel({
 
   const lookupDecision = manual.lookupResult;
 
-  const data = ingest.data;
+  // A request change can render once before its reset effect. Never pass a
+  // prior request's applicant/proposal state through that render.
+  const currentIngest = ingest.requestId === requestId ? ingest : idleIngest(requestId);
+  const currentDoc = doc.requestId === requestId ? doc : idleDoc(requestId);
+  const data = currentIngest.data;
   const recommended = data?.recommended || [];
   const recommendedFailed = data?.recommendedFailed || [];
   const knownLookupFailed = data?.knownLookupFailed || [];
@@ -611,13 +678,13 @@ export default function ReviewerFindPanel({
   // File list for the deliberate historical/ad-hoc override picker — present
   // on a successful load and, via the carried error, when the canonical file
   // is absent. Proposal-classified files sort first.
-  const rawFiles = doc.data?.allFiles || doc.allFiles || [];
+  const rawFiles = currentDoc.data?.allFiles || currentDoc.allFiles || [];
   const availableFiles = [...rawFiles].sort((a, b) => {
     const ap = a.classification === 'proposal' ? 0 : 1;
     const bp = b.classification === 'proposal' ? 0 : 1;
     return ap - bp || String(a.name).localeCompare(String(b.name));
   });
-  const pickedKey = doc.data?.picked || null;
+  const pickedKey = currentDoc.data?.picked || null;
 
   // Manual reviewer add — rendered (by ReviewerSearchSection) BELOW the search and
   // ABOVE the optional verify card. State lives here; the JSX is passed down as a
@@ -858,47 +925,56 @@ export default function ReviewerFindPanel({
           exclusion text is shown as a disclosure under that box (ReviewerSearchSection).
           exclusionsUnavailable surfaces the parse-fail / load-fail case there. */}
 
-      {/* Proposal document (auto-loaded, with manual override) */}
+      {/* Proposal document (explicitly prepared, with manual override) */}
       <Card hover={false}>
         <div className="flex items-center justify-between mb-2">
           <p className="font-medium text-gray-900">Proposal document</p>
-          {doc.loading && <Spinner />}
+          {currentDoc.loading && <Spinner />}
         </div>
-        {doc.error ? (
+        {currentDoc.error ? (
           <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
             {availableFiles.length > 0
-              ? (doc.requestedFileKey
+              ? (currentDoc.requestedFileKey
                 ? 'The saved proposal selection could not be loaded. Choose the proposal document below.'
                 : 'The standard reviewer proposal was not found. Choose the proposal document below.')
-              : doc.error}{' '}
+              : currentDoc.error}{' '}
             <button
               type="button"
-              onClick={() => loadProposal(doc.requestedFileKey || proposalFileKey || null)}
+              onClick={prepareSearch}
               className="underline font-medium"
-            >Retry</button>
+            >Retry preparation</button>
           </div>
-        ) : doc.loading ? (
-          <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
-        ) : doc.data ? (
+        ) : currentDoc.loading ? (
+          <p className="text-sm text-gray-500">Preparing the request’s proposal from SharePoint…</p>
+        ) : currentDoc.data ? (
           <p className="text-sm text-gray-700">
-            Loaded {doc.requestedFileKey ? 'selected' : 'canonical reviewer'} proposal{' '}
-            <span className="font-medium">{doc.data.filename}</span>.
+            Prepared {currentDoc.requestedFileKey ? 'selected' : 'canonical reviewer'} proposal{' '}
+            <span className="font-medium">{currentDoc.data.filename}</span>.
           </p>
         ) : (
-          <p className="text-sm text-gray-600">No proposal document found for this request.</p>
+          <p className="text-sm text-gray-600">Prepare a proposal only when you are ready to search for reviewers. Opening this request does not download or analyze a file.</p>
         )}
+
+        <button
+          type="button"
+          onClick={prepareSearch}
+          disabled={!requestId || !proposalBindingReady || currentDoc.loading}
+          className="mt-3 px-3 py-1.5 bg-gray-900 text-white rounded text-sm disabled:opacity-50"
+        >
+          {currentDoc.loading ? 'Preparing…' : currentDoc.data ? 'Prepare again' : 'Prepare search'}
+        </button>
 
         {/* Deliberate override for historical/ad-hoc analysis. allFiles is
             present on success and when the canonical file is absent. */}
         {availableFiles.length > 0 && (
           <div className="mt-3">
             <label className="block text-xs text-gray-500 mb-1">
-              {doc.error ? 'Choose the proposal document' : 'Use a different proposal document'}
+              {currentDoc.error ? 'Choose the proposal document' : 'Use a different proposal document'}
             </label>
             <select
               className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
               value={pickedKey || ''}
-              disabled={doc.loading}
+              disabled={currentDoc.loading}
               onChange={(ev) => {
                 if (ev.target.value) loadProposal(ev.target.value, { persist: true });
               }}
@@ -925,18 +1001,19 @@ export default function ReviewerFindPanel({
           search and ABOVE the optional verify card. */}
       <ReviewerSearchSection
         requestId={requestId}
-        blobUrl={doc.data?.blobUrl || null}
-        proposalKey={doc.data?.picked || null}
+        blobUrl={currentDoc.data?.blobUrl || null}
+        proposalKey={currentDoc.data?.picked || null}
         cycleCode={data?.cycleCode || null}
         excludedNames={data?.excludedNames || []}
-        exclusionsUnavailable={!!ingest.error || excludedParseFailed}
+        exclusionsUnavailable={!!currentIngest.error || excludedParseFailed}
         excludedRaw={excludedRaw}
         recommended={recommended}
         recommendedFailed={recommendedFailed}
         knownLookupFailed={knownLookupFailed}
         slotsPopulated={slotsPopulated}
-        ingestLoading={ingest.loading}
-        ingestError={ingest.error}
+        ingestLoading={currentIngest.loading}
+        ingestError={currentIngest.error}
+        ingestAttempted={currentIngest.attempted}
         onRetryIngestion={runIngestion}
         savedPoolNames={savedPoolNames}
         onSaved={onSaved}

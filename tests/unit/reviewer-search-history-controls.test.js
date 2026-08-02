@@ -81,6 +81,37 @@ afterEach(() => {
   global.fetch = jest.fn();
 });
 
+test('a warm applicant roster card remains visible before any proposal is prepared', async () => {
+  global.fetch = jest.fn(() => {
+    throw new Error('a parent-owned warm roster must not issue its own roster or provider request');
+  });
+
+  render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl={null}
+      proposalKey={null}
+      displayOnly
+      rosterSnapshot={{
+        requestId: REQ,
+        authorityState: 'cached',
+        data: {
+          active: [applicantCandidate],
+          excluded: [],
+          ineligible: [],
+          blocked: [],
+          handled: [],
+          savedKeys: [],
+          allNames: [applicantCandidate.name],
+        },
+      }}
+    />,
+  );
+
+  expect(await screen.findByText(applicantCandidate.name)).toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
 test('restored incomplete PubMed COI checks remain selectable but show one compact warning', async () => {
   const incompleteCandidate = {
     ...generatedCandidate,
@@ -218,6 +249,7 @@ test('a completed unresolved applicant run offers a manual applicant-suggestion 
     identityStatus: 'unresolved',
     verificationStatus: 'unresolved',
     needsIdentification: true,
+    applicantEnrichmentCacheVersion: null,
   };
   const resolvedApplicant = {
     ...unresolvedApplicant,
@@ -255,7 +287,11 @@ test('a completed unresolved applicant run offers a manual applicant-suggestion 
     />,
   );
 
-  const retry = await screen.findByRole('button', { name: 'Update applicant suggestions' });
+  const retry = await screen.findByRole('button', { name: 'Verify applicant suggestions' });
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    '/api/workbench/enrich-recommended',
+    expect.objectContaining({ method: 'POST' }),
+  );
   fireEvent.click(retry);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(

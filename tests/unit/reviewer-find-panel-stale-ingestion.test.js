@@ -15,6 +15,7 @@ jest.mock('../../shared/components/reviewers/ReviewerSearchSection', () => funct
   rosterSnapshot,
   displayOnly,
   onRetryRoster,
+  onRetryIngestion,
 }) {
   return (
     <>
@@ -30,6 +31,7 @@ jest.mock('../../shared/components/reviewers/ReviewerSearchSection', () => funct
       data-display-only={String(!!displayOnly)}
     />
     <button type="button" onClick={onRetryRoster}>Retry warm roster</button>
+    <button type="button" onClick={onRetryIngestion}>Load applicant input</button>
     </>
   );
 });
@@ -83,107 +85,71 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-test('late successful ingestion for request A cannot overwrite request B', async () => {
-  const ingestA = deferred();
+test('warm revisit renders its cached roster with zero proposal, applicant, or provider work', async () => {
   global.fetch = jest.fn((url) => {
     const target = String(url);
-    if (target.includes('/api/workbench/applicant-reviewers')) {
-      if (target.includes(REQ_A)) return ingestA.promise;
-      return Promise.resolve(response({
-        success: true,
-        recommended: [{ suggestionId: 's-b', name: 'Reviewer B' }],
-        slotsPopulated: 1,
-      }));
-    }
-    if (target === '/api/reviewer-finder/load-proposal') {
-      return Promise.resolve(response({ success: true, blobUrl: null, allFiles: [] }));
-    }
+    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
     throw new Error(`Unexpected fetch ${target}`);
   });
 
-  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
-  await act(async () => {
-    rerender(<ReviewerFindPanel requestId={REQ_B} />);
-  });
-  await waitFor(() => expect(renderedRecommendations()).toEqual([
-    { suggestionId: 's-b', name: 'Reviewer B' },
-  ]));
+  render(<ReviewerFindPanel requestId={REQ_A} />);
 
-  await act(async () => {
-    ingestA.resolve(response({
-      success: true,
-      recommended: [{ suggestionId: 's-a', name: 'Reviewer A' }],
-      slotsPopulated: 1,
-    }));
-    await ingestA.promise;
-  });
-
-  expect(renderedRecommendations()).toEqual([
-    { suggestionId: 's-b', name: 'Reviewer B' },
-  ]);
+  await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'current', names: 'Cached Reviewer' })));
+  const targets = global.fetch.mock.calls.map(([url]) => String(url));
+  expect(targets).toHaveLength(2);
+  expect(targets.every((target) => target.includes('/api/workbench/reviewer-roster?') && target.includes('mode='))).toBe(true);
+  expect(targets.some((target) => /load-proposal|applicant-reviewers|analyze|discover|enrich|coauthor|material/i.test(target))).toBe(false);
 });
 
-test('late failed ingestion for request A cannot paint an error onto request B', async () => {
-  const ingestA = deferred();
+test('no-history mount is idle and performs only the cached/reconciled roster reads', async () => {
   global.fetch = jest.fn((url) => {
     const target = String(url);
-    if (target.includes('/api/workbench/applicant-reviewers')) {
-      if (target.includes(REQ_A)) return ingestA.promise;
-      return Promise.resolve(response({
-        success: true,
-        recommended: [{ suggestionId: 's-b', name: 'Reviewer B' }],
-        slotsPopulated: 1,
-      }));
-    }
-    if (target === '/api/reviewer-finder/load-proposal') {
-      return Promise.resolve(response({ success: true, blobUrl: null, allFiles: [] }));
-    }
+    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'empty', active: [], allNames: [] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'empty', active: [], allNames: [] }));
     throw new Error(`Unexpected fetch ${target}`);
   });
 
-  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
-  await act(async () => {
-    rerender(<ReviewerFindPanel requestId={REQ_B} />);
-  });
-  await waitFor(() => expect(renderedRecommendations()).toHaveLength(1));
+  render(<ReviewerFindPanel requestId={REQ_A} />);
 
-  await act(async () => {
-    ingestA.reject(new Error('request A failed'));
-    await ingestA.promise.catch(() => {});
-  });
-
-  expect(screen.getByTestId('search')).toHaveAttribute('data-error', '');
-  expect(renderedRecommendations()[0].suggestionId).toBe('s-b');
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+  expect(screen.getByRole('button', { name: 'Prepare search' })).toBeEnabled();
+  expect(global.fetch.mock.calls).toHaveLength(2);
+  expect(renderedRecommendations()).toEqual([]);
 });
 
-test('a validated proposal override from navigation state is replayed on initial load', async () => {
+test('explicit preparation and applicant input refresh call only their intended endpoints', async () => {
   const fileKey = 'akoya_request::REQ/Phase I::ProjectDescription.pdf';
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
-    if (target.includes('/api/workbench/applicant-reviewers')) {
-      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
-    }
-    if (target === '/api/reviewer-finder/load-proposal') {
-      return Promise.resolve(response({
-        success: true,
-        blobUrl: 'https://blob.example/project-description.pdf',
-        filename: 'ProjectDescription.pdf',
-        picked: fileKey,
-        allFiles: [],
-      }));
-    }
+    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v1', active: [] }));
+    if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({
+      success: true,
+      blobUrl: 'https://blob.example/project-description.pdf',
+      filename: 'ProjectDescription.pdf',
+      picked: fileKey,
+      allFiles: [],
+    }));
+    if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({
+      success: true,
+      recommended: [{ suggestionId: 's-a', name: 'Applicant Reviewer' }],
+      slotsPopulated: 1,
+    }));
     throw new Error(`Unexpected fetch ${target}`);
   });
 
   render(<ReviewerFindPanel requestId={REQ_A} proposalFileKey={fileKey} />);
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare search' }));
+  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: fileKey, blobUrl: 'https://blob.example/project-description.pdf' }));
+  expect(global.fetch.mock.calls.filter(([url]) => url === '/api/reviewer-finder/load-proposal')).toHaveLength(1);
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/api/workbench/applicant-reviewers'))).toBe(false);
 
-  await waitFor(() => expect(proposalBinding()).toEqual({
-    proposalKey: fileKey,
-    blobUrl: 'https://blob.example/project-description.pdf',
-  }));
-  const loadCall = global.fetch.mock.calls.find(([url]) => url === '/api/reviewer-finder/load-proposal');
-  expect(JSON.parse(loadCall[1].body)).toEqual({ requestId: REQ_A, fileKey });
-  expect(screen.getByText(/Loaded selected proposal/i)).toHaveTextContent('ProjectDescription.pdf');
+  fireEvent.click(screen.getByRole('button', { name: 'Load applicant input' }));
+  await waitFor(() => expect(renderedRecommendations()).toEqual([{ suggestionId: 's-a', name: 'Applicant Reviewer' }]));
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('/api/workbench/applicant-reviewers'))).toHaveLength(1);
+  expect(global.fetch.mock.calls.filter(([url]) => url === '/api/reviewer-finder/load-proposal')).toHaveLength(1);
 });
 
 test('a deliberate dropdown selection persists only after server validation and does not reload when navigation state catches up', async () => {
@@ -228,6 +194,7 @@ test('a deliberate dropdown selection persists only after server validation and 
     />,
   );
 
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare search' }));
   const picker = await screen.findByRole('combobox');
   await act(async () => {
     picker.value = fileKey;
@@ -247,12 +214,17 @@ test('a deliberate dropdown selection persists only after server validation and 
   expect(proposalLoads).toBe(2);
 });
 
-test('late proposal success for request A cannot overwrite request B', async () => {
+test('late explicit proposal and applicant results for request A cannot overwrite request B', async () => {
   const proposalA = deferred();
+  const ingestionA = deferred();
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
+    if (target.includes('mode=cached') && target.includes(REQ_A)) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v-a', active: [] }));
+    if (target.includes('mode=cached') && target.includes(REQ_B)) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v-b', active: [] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: target.includes(REQ_A) ? 'v-a' : 'v-b', active: [] }));
     if (target.includes('/api/workbench/applicant-reviewers')) {
-      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+      if (target.includes(REQ_A)) return ingestionA.promise;
+      return Promise.resolve(response({ success: true, recommended: [{ suggestionId: 's-b', name: 'Reviewer B' }], slotsPopulated: 1 }));
     }
     if (target === '/api/reviewer-finder/load-proposal') {
       const body = JSON.parse(options.body);
@@ -269,55 +241,21 @@ test('late proposal success for request A cannot overwrite request B', async () 
   });
 
   const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load applicant input' }));
   rerender(<ReviewerFindPanel requestId={REQ_B} />);
-  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' }));
+  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: '', blobUrl: '' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load applicant input' }));
+  await waitFor(() => expect(renderedRecommendations()).toEqual([{ suggestionId: 's-b', name: 'Reviewer B' }]));
 
   await act(async () => {
-    proposalA.resolve(response({
-      success: true,
-      blobUrl: 'blob-a',
-      picked: 'key-a',
-      filename: 'Proposal A.pdf',
-      allFiles: [],
-    }));
-    await proposalA.promise;
+    ingestionA.resolve(response({ success: true, recommended: [{ suggestionId: 's-a', name: 'Reviewer A' }], slotsPopulated: 1 }));
+    proposalA.resolve(response({ success: true, blobUrl: 'blob-a', picked: 'key-a', filename: 'Proposal A.pdf', allFiles: [] }));
+    await Promise.all([ingestionA.promise, proposalA.promise]);
   });
-
-  expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' });
-});
-
-test('late proposal failure for request A cannot replace request B with an error', async () => {
-  const proposalA = deferred();
-  global.fetch = jest.fn((url, options = {}) => {
-    const target = String(url);
-    if (target.includes('/api/workbench/applicant-reviewers')) {
-      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
-    }
-    if (target === '/api/reviewer-finder/load-proposal') {
-      const body = JSON.parse(options.body);
-      if (body.requestId === REQ_A) return proposalA.promise;
-      return Promise.resolve(response({
-        success: true,
-        blobUrl: 'blob-b',
-        picked: 'key-b',
-        filename: 'Proposal B.pdf',
-        allFiles: [],
-      }));
-    }
-    throw new Error(`Unexpected fetch ${target}`);
-  });
-
-  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
-  rerender(<ReviewerFindPanel requestId={REQ_B} />);
-  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' }));
-
-  await act(async () => {
-    proposalA.reject(new Error('request A proposal failed'));
-    await proposalA.promise.catch(() => {});
-  });
-
-  expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' });
-  expect(screen.queryByText('request A proposal failed')).not.toBeInTheDocument();
+  expect(proposalBinding()).toEqual({ proposalKey: '', blobUrl: '' });
+  expect(renderedRecommendations()).toEqual([{ suggestionId: 's-b', name: 'Reviewer B' }]);
 });
 
 test('parent bootstrap renders the cached roster before reconciliation and reaches current without a default roster GET', async () => {

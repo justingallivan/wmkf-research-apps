@@ -887,6 +887,7 @@ export default function ReviewerSearchSection({
   slotsPopulated = null,
   ingestLoading = false,
   ingestError = null,
+  ingestAttempted = false,
   onRetryIngestion,
   savedPoolNames = [],
   onSaved,
@@ -902,6 +903,16 @@ export default function ReviewerSearchSection({
     rosterSnapshot?.reconciliationStopped === true
     || ['stale', 'error'].includes(rosterSnapshot?.authorityState)
   );
+  // Standalone/test callers historically supply the already-materialized rows
+  // without the parent panel's explicit-attempt bit. Treat concrete row/error
+  // data as an attempted load while keeping a truly empty parent bootstrap idle.
+  const applicantInputAvailable = ingestAttempted
+    || ingestLoading
+    || !!ingestError
+    || recommended.length > 0
+    || recommendedFailed.length > 0
+    || knownLookupFailed.length > 0
+    || slotsPopulated !== null;
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
   const [progress, setProgress] = useState([]);
@@ -1117,7 +1128,10 @@ export default function ReviewerSearchSection({
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (displayOnly || !blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    // This explicit action is allowed in the display-only rollout: it may show
+    // ephemeral results, but the persistence block below remains closed until
+    // roster actions are re-enabled in their own reviewed slice.
+    if (!blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
     // Exclude set = the manual/applicant box + everything already surfaced for
@@ -1318,7 +1332,7 @@ export default function ReviewerSearchSection({
       // it as deduped — a slow POST must not clobber a newer search's roster
       // (S224). Verified (Claude) + database discoveries only; unverified stay
       // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
-      if (dedupedEnriched.length > 0 && requestId) {
+      if (!displayOnly && dedupedEnriched.length > 0 && requestId) {
         try {
           const pruned = dedupedEnriched.map(pruneCandidateForRoster);
           const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
@@ -1412,10 +1426,10 @@ export default function ReviewerSearchSection({
     }
   }, [blobUrl, proposalKey, requestId, analysis]);
 
-  // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
-  // ingested recommendations are ready. Runs independently of the Claude search —
-  // enrichment uses blobUrl directly for COI if no prior analysis result exists.
-  // Defined after enrichRecommended to avoid a temporal dead zone reference error.
+  // A valid cached applicant result is only a display-state transition. A
+  // missing/stale cache stays idle until staff explicitly choose to update it;
+  // warm revisits and newly prepared proposal blobs must never launch the
+  // provider/COI pipeline by themselves.
   const terminalApplicantKeys = useMemo(
     () => applicantTerminalSuggestionKeys(visibleRosterExcluded, visibleRosterSavedKeys),
     [visibleRosterExcluded, visibleRosterSavedKeys],
@@ -1431,16 +1445,11 @@ export default function ReviewerSearchSection({
     terminalApplicantKeys,
   );
   useEffect(() => {
-    const selectableCount = actionableRecommended.length;
     if (recPhase !== 'idle' || recRunningRef.current) return;
     if (rosterLoaded && haveValidCache) {
       setRecPhase('done');
-      return;
     }
-    if (blobUrl && proposalKey && selectableCount > 0 && rosterLoaded && !haveValidCache) {
-      enrichRecommended();
-    }
-  }, [blobUrl, proposalKey, actionableRecommended, recPhase, rosterLoaded, haveValidCache, enrichRecommended]);
+  }, [recPhase, rosterLoaded, haveValidCache]);
 
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
@@ -1448,7 +1457,9 @@ export default function ReviewerSearchSection({
   // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
   const displayRosterActive = useMemo(() => visibleRosterActive.filter((c) => (
-    !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
+    !isApplicantOriginCandidate(c)
+      || !proposalKey
+      || c.enrichedProposalKey === proposalKey
   )), [visibleRosterActive, proposalKey]);
   const currentVisibleRecCandidates = useMemo(() => visibleRecCandidates.filter((candidate) => (
     !terminalApplicantKeys.has(candKey(candidate))
@@ -2593,7 +2604,6 @@ export default function ReviewerSearchSection({
                       key={key}
                       type="button"
                       onClick={() => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
-                      disabled={displayOnly}
                       aria-pressed={searchSources[key]}
                       className={`px-3 py-1.5 rounded-lg border text-xs transition-colors flex flex-col items-center min-w-[80px] ${
                         searchSources[key]
@@ -2625,7 +2635,6 @@ export default function ReviewerSearchSection({
                     step="1"
                     value={reviewerCount}
                     onChange={(e) => setReviewerCount(parseInt(e.target.value, 10))}
-                    disabled={displayOnly}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <span className="text-xs text-gray-400 w-6 text-right">25</span>
@@ -2641,7 +2650,6 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
-                  disabled={displayOnly}
                   placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
                 />
               </div>
@@ -2656,7 +2664,6 @@ export default function ReviewerSearchSection({
                     rows={2}
                   value={referredSeedsText}
                   onChange={(e) => setReferredSeedsText(e.target.value)}
-                  disabled={displayOnly}
                     placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
                   />
                 </div>
@@ -2670,7 +2677,6 @@ export default function ReviewerSearchSection({
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
                   value={referredBy}
                   onChange={(e) => setReferredBy(e.target.value)}
-                  disabled={displayOnly}
                     placeholder="Reviewer name"
                   />
                 </div>
@@ -2684,7 +2690,6 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={excludeText}
                   onChange={onExcludeChange}
-                  disabled={displayOnly}
                   placeholder="e.g. Thomas K. Wood, Jens Hör"
                 />
                 {exclusionsUnavailable && (
@@ -2724,7 +2729,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-                disabled={!rosterLoadFailed && (displayOnly || noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {rosterLoadFailed
@@ -2926,7 +2931,7 @@ export default function ReviewerSearchSection({
                         >
                           {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
                         </button>
-                        <button type="button" onClick={runSearch} disabled={displayOnly || !blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
+                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       {exportError && (
                         <p className="text-sm text-amber-700">Export failed: {exportError}</p>
@@ -3111,11 +3116,8 @@ export default function ReviewerSearchSection({
       </Card>
     )}
 
-    {/* Applicant-referred reviewer status card — ingestion + enrichment state.
-        Enriched candidates surface in the Applicant-referred provenance section
-        of the main candidate list above; this card is a status surface only.
-        Enrichment fires automatically when both the proposal and the ingested
-        recommendations are ready (no manual trigger required). */}
+    {/* Applicant-referred reviewer status card — both materialization and the
+        expensive verification/COI pipeline are explicit staff actions. */}
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-gray-900">Applicant-referred reviewers</p>
@@ -3125,7 +3127,19 @@ export default function ReviewerSearchSection({
       {ingestError ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn't ingest applicant reviewers: {ingestError}{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
+        </div>
+      ) : !applicantInputAvailable ? (
+        <div className="space-y-2 text-sm text-gray-600">
+          <p>Applicant recommendations have not been loaded. Loading them can materialize the request’s recommended-reviewer records; it does not begin verification.</p>
+          <button
+            type="button"
+            onClick={onRetryIngestion}
+            disabled={!onRetryIngestion}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Load applicant suggestions
+          </button>
         </div>
       ) : ingestLoading ? (
         <p className="text-sm text-gray-500">Materializing the applicant's recommended reviewers…</p>
@@ -3134,7 +3148,7 @@ export default function ReviewerSearchSection({
       ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn't confirm the applicant's recommended reviewers.{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -3146,7 +3160,7 @@ export default function ReviewerSearchSection({
                 <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
               )}
               . They are <span className="font-medium">not</span> saved as candidates.{' '}
-              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
             </div>
           )}
           {knownLookupFailed.length > 0 && (
@@ -3182,10 +3196,22 @@ export default function ReviewerSearchSection({
               })}
             </ul>
           )}
-          {recPhase === 'idle' && !blobUrl && recCount > 0 && (
-            <p className="text-sm text-gray-500">
-              {recCount} applicant-referred reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
-            </p>
+          {recPhase === 'idle' && recCount > 0 && (
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>
+                {!blobUrl
+                  ? `${recCount} applicant-referred reviewer${recCount === 1 ? '' : 's'} ingested. Prepare a proposal before verifying them.`
+                  : 'Applicant suggestions have not been verified against this prepared proposal.'}
+              </p>
+              <button
+                type="button"
+                onClick={enrichRecommended}
+                disabled={!blobUrl || !proposalKey || recRunningRef.current}
+                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Verify applicant suggestions
+              </button>
+            </div>
           )}
           {recPhase === 'running' && (
             <div className="space-y-2">
@@ -3212,7 +3238,7 @@ export default function ReviewerSearchSection({
                 <button
                   type="button"
                   onClick={() => enrichRecommended()}
-                  disabled={displayOnly || !blobUrl || !proposalKey}
+                  disabled={!blobUrl || !proposalKey || recRunningRef.current}
                   className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Update applicant suggestions
@@ -3226,7 +3252,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={() => enrichRecommended()}
-                disabled={displayOnly || !blobUrl || !proposalKey}
+                  disabled={!blobUrl || !proposalKey || recRunningRef.current}
                 className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Try again
