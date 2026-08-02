@@ -13,6 +13,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
+import ReviewerStatusIndicator from '../shared/components/workbench/ReviewerStatusIndicator';
 import { TRIAGE_STATUS } from '../shared/config/triageStatus';
 
 const STAGE_META = {
@@ -288,10 +289,7 @@ function WorkbenchDashboard() {
                     </div>
                     <div className="text-right shrink-0">
                       <StageChip stage={p.workRemaining} />
-                      <div className="text-xs text-gray-500 mt-1.5">
-                        {p.reviewers.accepted}/{p.reviewers.needed} accepted
-                        {p.reviewers.candidates ? ` · ${p.reviewers.candidates} found` : ''}
-                      </div>
+                      <ReviewerStatusIndicator reviewers={p.reviewers} />
                       {p.canManage && (
                         <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
                       )}

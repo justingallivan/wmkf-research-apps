@@ -2,8 +2,8 @@
  * API: GET /api/workbench/reviewer-rollup?requestId=<guid>
  *
  * Lightweight per-request reviewer-stage rollup for the Workbench Overview tab.
- * Counts `wmkf_appreviewersuggestion` rows directly (selected + not applicant-
- * excluded) with NO person/researcher fan-out — unlike `/api/review-manager/
+ * Counts `wmkf_appreviewersuggestion` rows directly (active or declined + not
+ * applicant-excluded) with NO person/researcher fan-out — unlike `/api/review-manager/
  * reviewers`, which builds full reviewer objects. Overview is the default tab, so
  * it uses this cheaper path (Codex review S260). Same rollup the tier-2 dashboard
  * computes per row — shared via lib/services/reviewer-rollup.js.
