@@ -101,6 +101,8 @@ A panel open is warm when the Postgres roster has any request-scoped history (`a
 
 Warm does **not** mean authoritative. It means there is useful persisted display state.
 
+A panel with **no roster history** is neither permission nor an implicit request to perform cold work. It renders an empty, idle, read-only Find state with an explicit `Run search` action. Proposal download, applicant materialization/enrichment, model calls, publication/COI discovery, and contact discovery begin only after that action (or a future separately authorized autonomous trigger).
+
 On a warm open:
 
 1. fetch Postgres-only roster state;
@@ -202,6 +204,18 @@ Proposal validation uses Graph metadata (`driveId`, item ID, eTag/version ID, la
 
 Applicant input validation reads the current request's five recommended slots and exclusion text without materializing rows or invoking a model. It returns an opaque set/slot fingerprint and a normalized read projection needed for the refresh planner.
 
+### Route security and restriction invariants
+
+[VERIFIED via `pages/api/workbench/reviewer-roster.js`] the current route calls `requireAppAccess(req, res, 'reviewer-finder', 'reviewers')` before method dispatch, validates the request GUID, and establishes `withDalContext(...)` around Dataverse reconciliation. Both new GET modes must preserve that boundary:
+
+- `mode=cached` is still authenticated by the same app-key tuple before its Postgres-only read;
+- `mode=reconciled` uses the same authentication and executes every Dataverse read/write through the existing DAL/restriction context;
+- Dataverse target/write interlock enforcement remains at the existing service/HTTP seams wherever an operation can write; a mode branch cannot bypass or weaken it;
+- the server allowlists `cached` and `reconciled`; missing mode follows the temporary compatibility contract, and unknown/repeated/conflicting mode input returns `400`; and
+- mode, snapshot token, or client-supplied authority fields never grant broader request, record, app, or mutation authorization.
+
+Tests must prove unauthenticated/unauthorized requests fail identically in both modes, request-scope validation cannot be bypassed by mode, reconciled Dataverse access enters the trusted DAL context, cached mode makes no Dataverse call, and an unknown mode fails closed.
+
 ### Panel ownership change
 
 P0 moves warm bootstrap ownership into `ReviewerFindPanel` (or one request-scoped hook owned by it) because the panel must decide whether to suppress proposal load and applicant ingestion before `ReviewerSearchSection` mounts its expensive effects.
@@ -258,6 +272,31 @@ Stages are independently versioned:
 - roster persistence.
 
 `state` is an allowlisted cache state: `current`, `stale`, `refreshing`, `incomplete`, `failed`, or `not_applicable`. Unknown/missing values are stale and non-authoritative.
+
+### Stage dependency and invalidation matrix
+
+The planner derives this graph server-side. The client may request a candidate/stage refresh but cannot declare inputs current, omit prerequisites, or broaden/narrow invalidation. “Invalidate” means mark the named stage non-authoritative and schedule it according to policy; it does not erase its last display evidence.
+
+| Stage | Input/version dependencies | Stages invalidated when this stage/input changes |
+|---|---|---|
+| Applicant materialization / anchor | Request ID; canonical Dataverse suggestion ID; normalized recommended-slot fingerprint (name, institution, supplied contact/identifier); applicant-materialization contract version | Identity, institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
+| Identity | Current applicant/candidate input fingerprint; canonical anchor/candidate key; identity evidence/receipt source version; identity contract version | Institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
+| Institution COI | Current identity and reviewer-institution fingerprint; request PI/applicant-organization fingerprint; institution-COI contract/source version | Roster persistence only |
+| Coauthor COI | Current identity/researcher identifiers and name variants; proposal-author fingerprint; proposal content version; publication-source and coauthor-COI contract versions | Roster persistence only |
+| Eligibility check | Current identity/canonical-person anchor; eligibility evidence source/version or expiry; eligibility contract version | Roster persistence only |
+| Contact projection | Current identity; canonical Dataverse reviewer/person ID and ETag/version; allowed contact-source versions; contact-projection contract version | Address trust, roster persistence |
+| Address trust | Current identity and contact/address fingerprint; canonical person ID and ETag/version; staff confirmation/receipt version; address-trust contract version | Roster persistence only |
+| Roster persistence | Candidate key; current upstream stage receipt versions; pruning/projection contract version; expected roster snapshot/`updatedAt` | None; it is the terminal persisted projection |
+
+Invalidation is dependency-specific:
+
+- a proposal path/eTag/content change invalidates coauthor COI and any separately tracked proposal-relevance evidence, **not** applicant materialization, identity, eligibility, contact, or address trust;
+- a recommended-slot identity/input change starts at applicant materialization and therefore invalidates all candidate-dependent stages;
+- a request PI/applicant-organization change invalidates institution COI, not unrelated identity/contact/eligibility stages;
+- a canonical person/contact ETag change invalidates contact projection and address trust without repeating proposal or publication work; and
+- a stage contract/source-version change invalidates that stage plus only the downstream stages named in the matrix.
+
+Planner tests must exercise every matrix row, the proposal-change non-invalidation complement, transitive invalidation from applicant/identity changes, and unknown dependency versions failing closed as `stage_contract_changed` or `unclassified_miss`.
 
 Dataverse engagement authority is deliberately **not** a persisted reusable stage receipt: it is reconciled for the current panel generation and represented by response/client `authorityState`. Promotion services still re-read/enforce engagement at mutation time.
 
@@ -398,13 +437,15 @@ Touch:
 - `lib/services/reviewer-roster-store.js`
 - `lib/services/workbench/reviewer-roster-projection-service.js`
 
-Add `mode=cached|reconciled`, snapshot-version conflict handling, parent-owned bootstrap state, and cached/read-only rendering. Keep the current default response temporarily for compatibility; caller search must precede removing it.
+Add `mode=cached|reconciled`, snapshot-version conflict handling, parent-owned bootstrap state, and cached/read-only rendering. Keep the current default response temporarily for compatibility; caller search must precede removing it. The first shippable UI state is deliberately **display-only**: all selection, add, save, and promotion controls remain disabled even after reconciliation until 0.3–0.5 are complete and enabled.
 
 #### 0.2 Stop mount-time cold work
 
 Change `ReviewerFindPanel` so `runIngestion` and `loadProposal` do not auto-run merely to render a warm roster. Split applicant input **read** from materialization/write/model parsing. Add a metadata-only proposal resolver that returns the exact binding and opaque Graph content version without downloading bytes.
 
 Cold proposal load occurs only after explicit new search, targeted proposal-dependent refresh, or deliberate file selection.
+
+This slice has a hard flag dependency on 0.3 and 0.4. Do not disable the existing automatic enrichment path where it is still the only repair mechanism for legacy/stale roster rows until the targeted planner, per-stage persistence, and retry path are deployed and verified. Before that dependency is satisfied, cached first paint may ship display-only, but the old background behavior remains behind its existing flag and authority-dependent actions remain disabled.
 
 #### 0.3 Per-candidate/stage refresh planner
 
@@ -521,6 +562,9 @@ Retain search-click → first grounded, first actionable, and background-complet
 
 ### Warm route/service
 
+- both `mode=cached` and `mode=reconciled` retain `requireAppAccess` and request GUID validation; neither mode accepts client authority or weakens record/app scope.
+- reconciled Dataverse work enters `withDalContext` and preserves restriction/interlock behavior at the existing seams; cached mode performs no Dataverse work.
+- unknown/repeated/conflicting mode input fails closed; the temporary missing-mode compatibility behavior is explicit and tested.
 - `mode=cached` makes no Dataverse/Graph/provider calls.
 - `mode=reconciled` returns cached rows plus current engagement and reason-coded validation.
 - roster snapshot conflict returns 409 + fresh snapshot.
@@ -528,6 +572,8 @@ Retain search-click → first grounded, first actionable, and background-complet
 - unchanged revisit invokes no expensive providers.
 - one stale candidate/stage calls only its targeted service.
 - refresh start/success/failure/lease-expiry preserves prior evidence and CAS semantics.
+- no-history panel remains idle/read-only and makes no proposal/applicant/model/provider calls until explicit `Run search`.
+- proposal-content change invalidates coauthor/proposal-relevance evidence but leaves identity, eligibility, contact, and address stages current when their own dependencies are unchanged.
 
 ### Gate and fan-out
 
@@ -555,18 +601,22 @@ Use independent flags for:
 - Postgres-first cached roster response/UI;
 - reason-coded warm revalidation;
 - targeted applicant stage refresh;
+- suppression of legacy mount-time cold work, with a hard dependency on targeted refresh/persistence;
 - explicit promotion-gate alignment; and
 - later cold progressive events.
 
+“Independent” means each behavior can be rolled back separately; it does not remove safety dependencies. The suppression flag must refuse to enable unless targeted refresh/persistence is enabled, and reconciled authority-dependent controls must refuse to enable unless promotion-gate alignment and stage freshness are enabled.
+
 Rollout order:
 
-1. Add shadow telemetry and reason classification without changing UI behavior.
+1. Add shadow telemetry, authenticated `mode=cached|reconciled`, snapshot handling, and reason classification without changing UI behavior.
 2. Align server promotion gates, including applicant institution COI and separate eligibility completeness; recommended coauthor policy is fail closed/no waiver.
-3. Enable cached read-only roster first paint for staff canary.
-4. Suppress warm mount proposal/applicant cold work and assert zero expensive calls.
-5. Enable per-candidate/stage refresh planning, first manual then automatic only for approved cheap stages.
-6. Expand warm P0 after 1003046-like revisit tests and telemetry review.
-7. Implement cold progressive delivery separately.
+3. Enable cached roster first paint for staff canary in the safe intermediate **display-only** state: all authority-dependent controls stay disabled, regardless of a reconciled response.
+4. Deploy per-candidate/stage dependency planning, stage receipts, stale-safe persistence, and manual targeted refresh/retry. Keep the legacy automatic enrichment path available while it remains the only stale-row repair path.
+5. Suppress warm mount proposal/applicant cold work only under a dependent flag that requires step 4. Verify legacy/stale rows can be repaired through the targeted path and that no-history panels remain idle until explicit search.
+6. Enable reconciled selection/add/save/promotion controls only after steps 2 and 4 are live and every candidate's required authority/stage receipts are current. Then allow automatic refresh only for separately approved cheap stages.
+7. Expand warm P0 after 1003046-like revisit, security-mode, invalidation-matrix, and zero-expensive-call telemetry review.
+8. Implement cold progressive delivery separately.
 
 Rollback cached UI without restoring automatic expensive work: fall back to the reconciled roster response, keep reason telemetry and corrected server gates, and retain targeted-refresh persistence. Never roll back only one side of a promotion gate.
 
@@ -620,6 +670,8 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 3. **VERIFIED — Applicant freshness is batch-global.** Evidence: `hasValidApplicantEnrichmentCache` returns one boolean only after every expected row passes; caller refreshes all actionable recommendations. Residual risk: stage dependency graph must be explicit so a narrow refresh does not omit prerequisites.
 4. **VERIFIED — Promotion authority is asymmetric.** Evidence: generic save recomputes institution COI; applicant promotion has no institution/coauthor symbol checks; neither path distinguishes eligibility check completeness. Residual risk: P0 gate alignment can expose legacy rows needing targeted refresh.
 5. **READY WITH NAMED CHANGES — Postgres-first rendering is safe only as display state.** Required changes: cached authority label, disabled promotion, snapshot/version reconciliation, per-stage freshness, server rechecks, and unknown-status fail-closed behavior.
+6. **READY WITH NAMED CHANGES — Cold-work suppression must follow targeted stale-row repair.** Required changes: explicit flag dependency, legacy/stale repair coverage, and an idle/no-history contract; cached first paint may ship earlier only with all authority-dependent controls disabled.
+7. **READY WITH NAMED CHANGES — Roster modes must preserve the route's security boundary.** Required changes: shared authentication/request validation, reconciled DAL context, existing interlock behavior where applicable, a server mode allowlist, and negative tests proving mode cannot weaken authorization.
 
 ### New issues
 
@@ -627,28 +679,32 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 - **HIGH — Eligibility result does not prove eligibility check completion.** Required change: add and enforce separate completeness state across all fan-out consumers.
 - **HIGH — Coauthor incomplete/missing state is not enforced by either promotion service.** Required change: P0 fail closed/no waiver unless Justin chooses and separately specifies a server-recorded exception.
 - **MEDIUM — Legacy roster rows will lack new stage receipts.** Required change: show them cached/read-only, assign `stage_missing`/`warm_cache_version_changed`, and refresh only missing stages; do not silently grandfather or discard them.
+- **HIGH — Suppressing legacy automatic enrichment before targeted refresh exists removes the only repair path for stale rows.** Required change: gate suppression on deployed per-stage planning/persistence/retry, and keep the interim cached UI display-only.
+- **MEDIUM — A client-selectable roster mode could become an authorization bypass if auth/context handling diverges.** Required change: authenticate before mode dispatch, allowlist mode, preserve DAL/restriction/interlock seams, and test both positive and negative complements.
 
 ### Recommendation evidence
 
 | Recommendation | Current prerequisite | Available at execution point | Evidence tested | Disconfirming check | Status |
 |---|---|---|---|---|---|
 | Render Postgres roster before Dataverse | `listForRequest` returns render DTO | Yes, inside roster GET before reconciliation | Source trace; not performance-tested | Shadow measure may show Postgres itself is slow | VERIFIED |
+| Preserve auth/restriction boundary in both modes | Existing route authenticates before dispatch; reconciliation enters DAL context | Yes, at the common handler and reconciled service boundary | Source trace; new modes NOT TESTED | A future early mode return placed before `requireAppAccess` would violate it | VERIFIED |
 | Skip proposal/applicant cold work on unchanged revisit | Persisted roster + metadata fingerprints | Roster exists; stable content/input fingerprints are planned | NOT TESTED | Content/input may change between opens | ASSUMED |
+| Suppress legacy automatic enrichment | Targeted stage planner, stale-safe persistence, and a working repair/retry path | Only after PR/rollout step 4; not available today | NOT TESTED | Legacy stage-missing row cannot be repaired without the old path | ASSUMED |
 | Refresh one candidate/stage | Canonical key + stage receipt/dependencies | Candidate key exists; stage receipt/planner is planned | NOT TESTED | Shared proposal-context invalidation may legitimately affect many candidates | ASSUMED |
 | Zero expensive calls on unchanged revisit | Cache hit proven by authority/content/input versions | Planned at reconciled warm response | NOT TESTED | Hidden mount effect/provider call remains | ASSUMED |
 | Future autonomous search | Durable trigger/run/idempotency contract | Not present today | NOT TESTED | Duplicate lifecycle events/restarts | ASSUMED |
 
 ### Seven-audit disposition
 
-1. **Whole flow:** caller → cached client state → roster cached/reconciled modes → Postgres/Dataverse/Graph metadata → response → render/actions → promotion is traced.
+1. **Whole flow:** caller → common route authentication/validation → cached client state → roster cached/reconciled modes → Postgres/Dataverse/Graph metadata → response → display-only intermediate state → freshness/gate-qualified actions → promotion is traced. No-history remains idle until explicit search.
 2. **Partial success:** unit is candidate/stage; identifiers and outcomes replace counts; failed stages remain retryable.
 3. **Async/stale:** request generation, roster snapshot version, AbortController, monotonic stage attempts, and CAS protect every post-await path.
-4. **Helper semantics:** search suppression, display dedup, identity aliasing, freshness, and persistence sanitization remain distinct.
+4. **Helper semantics:** search suppression, display dedup, identity aliasing, dependency-scoped freshness, and persistence sanitization remain distinct. Proposal changes do not invalidate unrelated identity/contact/eligibility stages.
 5. **Durable surface:** P0 reuses roster JSONB; any autonomous job/metrics table requires migration/manifest/Atlas/security/cleanup review.
-6. **Doc reconcile:** this document replaces the cold-first priority throughout summary, slices, metrics, rollout, decisions, and PR order; catalog summary must regenerate.
-7. **Fan-out:** new status/read surfaces are enumerated above; implementation must raw-symbol grep before completion.
+6. **Doc reconcile:** this document replaces the cold-first priority throughout summary, slices, metrics, rollout, decisions, and PR order; the generated catalog summary is current and must remain synchronized.
+7. **Fan-out:** new status/read surfaces are enumerated above; route mode/auth tests and every dependency-matrix complement are required; implementation must raw-symbol grep before completion.
 
-**Final verdict:** READY WITH NAMED CHANGES. Warm two-phase bootstrap is the correct P0. Required named changes are the authority matrix alignment, separate eligibility completeness, fail-closed coauthor completeness, per-candidate/stage freshness, reason-coded misses, and stale-safe refresh persistence.
+**Final verdict:** READY WITH NAMED CHANGES. Warm two-phase bootstrap is the correct P0. Required named changes are the authority matrix alignment, separate eligibility completeness, fail-closed coauthor completeness, explicit dependency-scoped invalidation, per-candidate/stage freshness, reason-coded misses, stale-safe refresh persistence, authenticated/fail-closed mode handling, an idle no-history state, and suppression of legacy automatic enrichment only after targeted repair is available. Cached first paint is safe before the full stack only as display-only UI with every authority-dependent control disabled.
 
 ## Decisions required from Justin
 
@@ -661,12 +717,12 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 
 ## Recommended PR sequence
 
-1. **Warm telemetry + route split:** `mode=cached|reconciled`, snapshot token, no UI behavior change.
-2. **Cached first paint:** parent-owned bootstrap, read-only cached cards, delayed authority state, no duplicate roster fetch.
-3. **Suppress warm cold-work:** metadata-only proposal/input validation; no mount-time download/analyze/provider/full enrichment.
-4. **Freshness planner:** per candidate/stage receipts, reason codes, legacy handling, targeted refresh APIs.
-5. **Authority alignment:** applicant institution COI, coauthor completeness, eligibility completeness, UI + both promotion services.
-6. **Stale-safe persistence:** stage attempt/lease/CAS and detailed per-row outcomes.
+1. **Warm telemetry + secure route split:** authenticated `mode=cached|reconciled`, mode allowlist, unchanged DAL/restriction/interlock boundaries, snapshot token, no UI behavior change.
+2. **Authority alignment:** applicant institution COI, coauthor completeness, eligibility completeness, UI state model, and both promotion services; keep current UI behavior until gates are ready.
+3. **Display-only cached first paint:** parent-owned bootstrap, cached cards, delayed authority state, no duplicate roster fetch, and every selection/add/save/promotion control disabled.
+4. **Freshness planner + stale-safe persistence:** dependency matrix, per-candidate/stage receipts, reason codes, legacy handling, stage attempt/lease/CAS, detailed per-row outcomes, and manual targeted refresh/retry APIs.
+5. **Suppress warm cold-work behind the step-4 dependency flag:** metadata-only proposal/input validation; no mount-time download/analyze/provider/full enrichment; no-history panels remain idle. Do not enable this flag until legacy/stale repair succeeds through the targeted path.
+6. **Enable reconciled actions:** only after #2 and #4, enable controls candidate-by-candidate when current panel authority and every required stage receipt are current; add approved cheap automatic targeted refreshes separately.
 7. **Cold progressive search:** candidate events and partial persistence after warm P0 is stable.
 8. **Autonomous-search design/build:** separate future plan after trigger authority is chosen.
 
