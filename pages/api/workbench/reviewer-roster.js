@@ -18,6 +18,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { createHash } from 'crypto';
 import {
   recordSurfaced,
   setExcluded,
@@ -50,6 +51,7 @@ const MAX_CANDIDATES_PER_POST = 100;
 // The store retains up to 300 active/saved rows per request. A single removal
 // action must therefore be able to carry every visible prior-result key.
 const MAX_PREVIOUS_RESULT_KEYS = 300;
+const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -224,11 +226,187 @@ async function handleGet(req, res) {
   if (!validRequestId(requestId)) {
     return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
   }
+
+  // The request scope must be established before the client-selectable mode is
+  // considered. Missing mode intentionally retains the original blocking GET
+  // contract until the Find UI migrates to the two-phase bootstrap.
+  const modeResult = parseRosterGetMode(req.query);
+  if (!modeResult.valid) {
+    return res.status(400).json({ error: modeResult.error, code: 'invalid_roster_mode' });
+  }
+
+  const startedAt = Date.now();
   const roster = await listForRequest(requestId);
+  const rosterReadMs = elapsedMs(startedAt);
+
+  if (modeResult.mode === 'cached') {
+    const rosterVersion = createRosterVersion(requestId, roster);
+    const telemetry = warmTelemetry({
+      mode: 'cached',
+      authorityState: 'cached',
+      reasonCode: 'cached_snapshot',
+      rosterReadMs,
+      startedAt,
+    });
+    emitWarmTelemetry(telemetry);
+    return res.status(200).json({
+      success: true,
+      authorityState: 'cached',
+      rosterVersion,
+      ...roster,
+      warmTelemetry: telemetry,
+    });
+  }
+
+  if (modeResult.mode === 'reconciled') {
+    const versionResult = parseRosterVersion(req.query);
+    if (!versionResult.valid) {
+      return res.status(400).json({ error: versionResult.error, code: 'invalid_roster_version' });
+    }
+    const rosterVersion = createRosterVersion(requestId, roster);
+    if (versionResult.rosterVersion !== rosterVersion) {
+      const telemetry = warmTelemetry({
+        mode: 'reconciled',
+        authorityState: 'cached',
+        reasonCode: 'roster_snapshot_changed',
+        rosterReadMs,
+        startedAt,
+      });
+      emitWarmTelemetry(telemetry);
+      return res.status(409).json({
+        success: false,
+        code: 'roster_snapshot_changed',
+        error: 'Reviewer roster changed; reload the cached snapshot before reconciling.',
+        authorityState: 'cached',
+        rosterVersion,
+        ...roster,
+        warmTelemetry: telemetry,
+      });
+    }
+
+    try {
+      const reconciliationStartedAt = Date.now();
+      const reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
+        reconcileRosterEngagement({ requestId, roster })
+      ));
+      const reconciledAuthorityState = reconciled?.authorityState;
+      // The current projection service emits no authority state; reserve stale
+      // and error for a future bounded reconciliation result. An unrecognized
+      // service value fails closed to stale rather than becoming a new client
+      // authority state by accident.
+      const authorityState = reconciledAuthorityState === undefined || reconciledAuthorityState === 'current'
+        ? 'current'
+        : reconciledAuthorityState === 'error'
+        ? 'error'
+        : 'stale';
+      const { authorityState: _serviceAuthorityState, ...reconciledRoster } = reconciled || {};
+      const telemetry = warmTelemetry({
+        mode: 'reconciled',
+        authorityState,
+        reasonCode: authorityState === 'current'
+          ? 'authority_current'
+          : authorityState === 'error'
+          ? 'authority_reconciliation_failed'
+          : 'authority_stale',
+        rosterReadMs,
+        reconciliationMs: elapsedMs(reconciliationStartedAt),
+        startedAt,
+      });
+      emitWarmTelemetry(telemetry);
+      // `current` is deliberately limited to this request's engagement
+      // reconciliation. It does not represent candidate evidence freshness.
+      return res.status(authorityState === 'error' ? 503 : 200).json({
+        success: authorityState !== 'error',
+        authorityState,
+        rosterVersion,
+        ...reconciledRoster,
+        warmTelemetry: telemetry,
+      });
+    } catch (error) {
+      const telemetry = warmTelemetry({
+        mode: 'reconciled',
+        authorityState: 'error',
+        reasonCode: 'authority_reconciliation_failed',
+        rosterReadMs,
+        startedAt,
+      });
+      emitWarmTelemetry(telemetry);
+      console.error('reviewer-roster reconciliation error:', error.message);
+      return res.status(503).json({
+        success: false,
+        code: 'authority_reconciliation_failed',
+        error: 'Reviewer authority could not be reconciled; retry before taking action.',
+        authorityState: 'error',
+        rosterVersion,
+        ...roster,
+        warmTelemetry: telemetry,
+      });
+    }
+  }
+
+  // Temporary compatibility response for current callers which do not send a
+  // mode. Keep this exact response shape until the client migration lands.
   const reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
     reconcileRosterEngagement({ requestId, roster })
   ));
   return res.status(200).json({ success: true, ...reconciled });
+}
+
+function parseRosterGetMode(query = {}) {
+  const rawMode = query?.mode;
+  if (rawMode === undefined) return { valid: true, mode: 'compatibility' };
+  if (Array.isArray(rawMode)) {
+    return { valid: false, error: 'mode must be supplied once as cached or reconciled' };
+  }
+  if (rawMode === 'cached' || rawMode === 'reconciled') {
+    return { valid: true, mode: rawMode };
+  }
+  return { valid: false, error: 'mode must be cached or reconciled' };
+}
+
+function parseRosterVersion(query = {}) {
+  const rawVersion = query?.rosterVersion;
+  if (Array.isArray(rawVersion) || typeof rawVersion !== 'string' || !ROSTER_VERSION_RE.test(rawVersion)) {
+    return { valid: false, error: 'A single valid rosterVersion is required for reconciled mode' };
+  }
+  return { valid: true, rosterVersion: rawVersion };
+}
+
+function createRosterVersion(requestId, roster) {
+  return createHash('sha256')
+    .update(`${String(requestId).toLowerCase()}\n${stableStringify(roster)}`)
+    .digest('hex');
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => (
+      `${JSON.stringify(key)}:${stableStringify(value[key])}`
+    )).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function elapsedMs(startedAt) {
+  return Math.min(600000, Math.max(0, Date.now() - startedAt));
+}
+
+function warmTelemetry({ mode, authorityState, reasonCode, rosterReadMs, reconciliationMs = null, startedAt }) {
+  return {
+    mode,
+    authorityState,
+    reasonCode,
+    rosterReadMs,
+    reconciliationMs,
+    totalMs: elapsedMs(startedAt),
+  };
+}
+
+function emitWarmTelemetry(telemetry) {
+  // Bounded mode/state/timing metadata only: no candidate, proposal, provider,
+  // or request data is emitted here.
+  console.info('reviewer-roster-warm-telemetry', telemetry);
 }
 
 async function handlePost(req, res) {

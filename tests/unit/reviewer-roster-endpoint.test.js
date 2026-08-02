@@ -6,6 +6,9 @@
  * runs for real (pure) so we also confirm the route prunes server-side.
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 5 })) }));
+jest.mock('../../lib/dataverse/core/context', () => ({
+  withDalContext: jest.fn(async (_label, operation) => operation()),
+}));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => {
   const actual = jest.requireActual('../../lib/services/reviewer-candidate-attestation');
   return {
@@ -43,6 +46,7 @@ jest.mock('../../lib/services/workbench/reviewer-roster-projection-service', () 
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
+import { withDalContext } from '../../lib/dataverse/core/context';
 import {
   hasServerIdentityDecisionReceipt,
   verifyAutomatedIdentityAttestation,
@@ -64,6 +68,11 @@ beforeEach(() => {
   store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
   mockValidateRosterPromotionEngagement.mockResolvedValue({ allowed: true });
+  jest.spyOn(console, 'info').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('auth', () => {
@@ -73,6 +82,18 @@ describe('auth', () => {
     await handler({ method: 'GET', query: { requestId: REQ } }, r);
     expect(store.listForRequest).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { mode: 'cached' },
+    { mode: 'reconciled', rosterVersion: 'a'.repeat(64) },
+  ])('denies $mode requests before mode dispatch or roster reads', async (query) => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const r = res();
+    await handler({ method: 'GET', query: { requestId: REQ, ...query } }, r);
+    expect(store.listForRequest).not.toHaveBeenCalled();
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.any(Object), r, 'reviewer-finder', 'reviewers');
+  });
 });
 
 describe('GET', () => {
@@ -81,6 +102,18 @@ describe('GET', () => {
     await handler({ method: 'GET', query: { requestId: 'not-a-guid' } }, r);
     expect(r.statusCode).toBe(400);
     expect(store.listForRequest).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { mode: 'cached' },
+    { mode: 'reconciled', rosterVersion: 'a'.repeat(64) },
+  ])('validates request scope before dispatching $mode mode', async (query) => {
+    const r = res();
+    await handler({ method: 'GET', query: { requestId: 'not-a-guid', ...query } }, r);
+    expect(r.statusCode).toBe(400);
+    expect(store.listForRequest).not.toHaveBeenCalled();
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(withDalContext).not.toHaveBeenCalled();
   });
 
   it('lists the roster for a valid requestId', async () => {
@@ -94,6 +127,119 @@ describe('GET', () => {
       roster: { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] },
     });
     expect(r.body.active).toEqual([{ name: 'Ann' }]);
+  });
+
+  it('keeps the missing-mode compatibility response on the reconciled path', async () => {
+    store.listForRequest.mockResolvedValueOnce({ active: [{ name: 'Ann' }], excluded: [] });
+    const r = res();
+    await handler({ method: 'GET', query: { requestId: REQ } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toEqual({ success: true, active: [{ name: 'Ann' }], excluded: [] });
+    expect(mockReconcileRosterEngagement).toHaveBeenCalledTimes(1);
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+  });
+
+  it('returns a Postgres-only cached snapshot and never enters Dataverse reconciliation', async () => {
+    const roster = { active: [{ name: 'Ann', rosterUpdatedAt: '2026-08-01T00:00:00.000Z' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValueOnce(roster);
+    const r = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toMatchObject({
+      success: true,
+      authorityState: 'cached',
+      rosterVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
+      active: roster.active,
+      warmTelemetry: expect.objectContaining({ mode: 'cached', reasonCode: 'cached_snapshot' }),
+    });
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(withDalContext).not.toHaveBeenCalled();
+  });
+
+  it('uses the same opaque roster version for the same persisted snapshot', async () => {
+    const roster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValue(roster);
+    const first = res();
+    const second = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, first);
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, second);
+
+    expect(first.body.rosterVersion).toBe(second.body.rosterVersion);
+  });
+
+  it('rejects unknown, repeated, and conflicting roster modes before reads', async () => {
+    for (const mode of ['unknown', ['cached', 'cached'], ['cached', 'reconciled']]) {
+      const r = res();
+      await handler({ method: 'GET', query: { requestId: REQ, mode } }, r);
+      expect(r.statusCode).toBe(400);
+      expect(r.body.code).toBe('invalid_roster_mode');
+    }
+    expect(store.listForRequest).not.toHaveBeenCalled();
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+  });
+
+  it('reconciles only the supplied cached snapshot inside the trusted DAL context', async () => {
+    const roster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValue(roster);
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(200);
+    expect(reconciled.body).toMatchObject({
+      success: true,
+      authorityState: 'current',
+      rosterVersion: cached.body.rosterVersion,
+      active: roster.active,
+      warmTelemetry: expect.objectContaining({ mode: 'reconciled', reasonCode: 'authority_current' }),
+    });
+    expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({ requestId: REQ, roster });
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+  });
+
+  it('returns a fresh cached snapshot on roster-version conflict without Dataverse work', async () => {
+    const cachedRoster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    const changedRoster = { active: [{ name: 'Beth' }], excluded: [], allNames: ['Beth'] };
+    store.listForRequest.mockResolvedValueOnce(cachedRoster).mockResolvedValueOnce(changedRoster);
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(409);
+    expect(reconciled.body).toMatchObject({
+      success: false,
+      code: 'roster_snapshot_changed',
+      authorityState: 'cached',
+      active: changedRoster.active,
+      rosterVersion: expect.not.stringMatching(new RegExp(`^${cached.body.rosterVersion}$`)),
+    });
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(withDalContext).not.toHaveBeenCalled();
+  });
+
+  it('requires one well-formed roster version for reconciled mode', async () => {
+    for (const rosterVersion of [undefined, 'not-a-token', ['a'.repeat(64), 'a'.repeat(64)]]) {
+      const r = res();
+      await handler({ method: 'GET', query: { requestId: REQ, mode: 'reconciled', rosterVersion } }, r);
+      expect(r.statusCode).toBe(400);
+      expect(r.body.code).toBe('invalid_roster_version');
+    }
+    // Version validation occurs after the scoped Postgres snapshot read, but
+    // before any trusted Dataverse work.
+    expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(withDalContext).not.toHaveBeenCalled();
   });
 });
 

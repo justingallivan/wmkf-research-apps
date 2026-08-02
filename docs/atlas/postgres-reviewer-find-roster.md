@@ -122,17 +122,24 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   read for ineligible state. The roster GET is consumed by
   `ReviewerSearchSection` for active/excluded/ineligible/blocked rendering,
   exact saved keys, and the dedup name union. `coi_dropped` contributes only
-  through `allNames`. On the branch implementation, the roster GET then makes
-  one complete request-scoped
+  through `allNames`. Its temporary missing-mode compatibility GET performs
+  the existing complete request-scoped
   `findByRequest(..., { selectedOnly:false, requireComplete:true })` read for
-  every suggestion-anchored visible roster row. Rows with authoritative
-  engagement are removed from their working-state bucket and returned as
-  compact `handled` entries; a missing Dataverse anchor fails closed rather
-  than becoming actionable. Promotion from `excluded` revalidates the stored
-  suggestion anchor against Dataverse before changing the Postgres row.
-  Unanchored search results retain their Postgres working-state behavior. **[VERIFIED via
-  source + `workbench-reviewer-roster-projection-service.test.js`, 2026-08-01;
-  not deployed]**
+  every suggestion-anchored visible roster row. The additive `mode=cached`
+  GET instead returns the Postgres projection only with an opaque deterministic
+  snapshot token; it does not enter Dataverse. `mode=reconciled` requires that
+  exact token and returns `409 roster_snapshot_changed` plus a fresh cached
+  projection if the Postgres snapshot changed before trusted-context Dataverse
+  reconciliation. Rows with authoritative engagement are removed from their
+  working-state bucket and returned as compact `handled` entries; a missing
+  Dataverse anchor fails closed rather than becoming actionable. Reconciled
+  `authorityState:'current'` is limited to engagement reconciliation and does
+  not certify candidate-stage evidence. Promotion from `excluded` revalidates
+  the stored suggestion anchor against Dataverse before changing the Postgres
+  row. Unanchored search results retain their Postgres working-state behavior.
+  **[VERIFIED via source + `workbench-reviewer-roster-projection-service.test.js`
+  and `reviewer-roster-endpoint.test.js`, 2026-08-01; feature branch only, not
+  deployed]**
 
 ## Write paths
 
