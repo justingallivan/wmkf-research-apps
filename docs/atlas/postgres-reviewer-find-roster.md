@@ -126,8 +126,10 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   callers retain their internal roster read. On that embedded warm path, panel
   mount performs neither proposal preparation nor applicant-input
   materialization; staff explicitly prepare the canonical/manual proposal and
-  explicitly load applicant suggestions. A missing applicant-enrichment cache
-  remains visible and idle until staff choose its verification action. The
+  explicitly load applicant suggestions. The embedded cold-search control fails
+  closed until that materialization succeeds and its exclusion parse is
+  available, so a search cannot silently omit applicant exclusions. A missing
+  applicant-enrichment cache remains visible and idle until staff choose its verification action. The
   request/generation and AbortController guards prevent an explicit operation
   for the prior request from painting the next request. `coi_dropped` contributes only
   through `allNames`. Its temporary missing-mode compatibility GET performs

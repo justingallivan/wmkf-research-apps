@@ -888,6 +888,10 @@ export default function ReviewerSearchSection({
   ingestLoading = false,
   ingestError = null,
   ingestAttempted = false,
+  // Embedded Workbench callers must explicitly materialize applicant inputs
+  // before cold search so request exclusions are not silently omitted.
+  // Standalone callers preserve their historical contract by defaulting ready.
+  applicantInputsReady = true,
   onRetryIngestion,
   savedPoolNames = [],
   onSaved,
@@ -1131,7 +1135,7 @@ export default function ReviewerSearchSection({
     // This explicit action is allowed in the display-only rollout: it may show
     // ephemeral results, but the persistence block below remains closed until
     // roster actions are re-enabled in their own reviewed slice.
-    if (!blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    if (!blobUrl || !applicantInputsReady || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
     // Exclude set = the manual/applicant box + everything already surfaced for
@@ -1375,7 +1379,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
+  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, applicantInputsReady, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -2726,16 +2730,23 @@ export default function ReviewerSearchSection({
                   )}
                 </div>
               )}
+              {!applicantInputsReady && (
+                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+                  Load applicant suggestions before running a search so applicant-referred exclusions are included. This is required even when no reviewers were listed.
+                </div>
+              )}
               <button
                 type="button"
                 onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+                disabled={!rosterLoadFailed && (!applicantInputsReady || noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {rosterLoadFailed
                   ? 'Retry reviewer state'
                   : !rosterLoaded
                   ? 'Loading existing candidates…'
+                  : !applicantInputsReady
+                    ? 'Load applicant suggestions first'
                   : errorMeta?.status === 'analysis_refused'
                     ? 'Alternate analysis required'
                     : phase === 'error' ? 'Try again' : 'Run reviewer search'}
@@ -2931,7 +2942,7 @@ export default function ReviewerSearchSection({
                         >
                           {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
                         </button>
-                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
+                        <button type="button" onClick={runSearch} disabled={!blobUrl || !applicantInputsReady || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       {exportError && (
                         <p className="text-sm text-amber-700">Export failed: {exportError}</p>

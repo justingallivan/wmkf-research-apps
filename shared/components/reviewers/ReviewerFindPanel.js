@@ -1014,6 +1014,7 @@ export default function ReviewerFindPanel({
         ingestLoading={currentIngest.loading}
         ingestError={currentIngest.error}
         ingestAttempted={currentIngest.attempted}
+        applicantInputsReady={!!currentIngest.data && !excludedParseFailed}
         onRetryIngestion={runIngestion}
         savedPoolNames={savedPoolNames}
         onSaved={onSaved}

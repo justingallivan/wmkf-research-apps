@@ -112,6 +112,54 @@ test('a warm applicant roster card remains visible before any proposal is prepar
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test('an embedded cold search fails closed until applicant inputs are explicitly ready', async () => {
+  const rosterSnapshot = {
+    requestId: REQ,
+    authorityState: 'current',
+    data: {
+      active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [],
+    },
+  };
+  global.fetch = jest.fn((url) => {
+    if (String(url) === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  const { rerender } = render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob"
+      proposalKey="proposal"
+      rosterSnapshot={rosterSnapshot}
+      applicantInputsReady={false}
+    />,
+  );
+
+  const blocked = await screen.findByRole('button', { name: 'Load applicant suggestions first' });
+  expect(blocked).toBeDisabled();
+  expect(screen.getByText(/Load applicant suggestions before running a search/i)).toBeInTheDocument();
+  fireEvent.click(blocked);
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    '/api/reviewer-finder/analyze',
+    expect.objectContaining({ method: 'POST' }),
+  );
+
+  rerender(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob"
+      proposalKey="proposal"
+      rosterSnapshot={rosterSnapshot}
+      applicantInputsReady
+    />,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/reviewer-finder/analyze',
+    expect.objectContaining({ method: 'POST' }),
+  ));
+});
+
 test('restored incomplete PubMed COI checks remain selectable but show one compact warning', async () => {
   const incompleteCandidate = {
     ...generatedCandidate,
