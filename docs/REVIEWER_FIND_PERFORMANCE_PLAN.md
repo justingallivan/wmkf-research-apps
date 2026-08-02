@@ -30,7 +30,16 @@ related:
 |---|---|---|
 | **Warm/revisit** | Open a request that already has Reviewer Find history | Render the Postgres roster first as cached/read-only; reconcile current Dataverse authority in the background; refresh only stale candidate stages; make zero expensive-provider calls on an unchanged revisit. |
 | **Cold/new search** | Explicitly ask the system to find new reviewers | Load the selected proposal, run Claude and evidence providers, show honest stage progress, publish partial candidates progressively, and persist each candidate independently. The user expects this to take time. |
-| **Future autonomous search** | A request advances into a configured reviewer-search stage | A durable, auditable run starts only inside an approved trigger boundary; its result is roster candidates, never an automatic invitation or reviewer promotion unless separately authorized. |
+| **Future autonomous search** | A request advances into a future configured reviewer-search stage | **DEFERRED:** design a durable, auditable run only after staff settle the authoritative lifecycle event and approval level. Its result is roster candidates, never an automatic invitation or reviewer promotion unless separately authorized. |
+
+Settled operating decisions from Justin and the primary agent on 2026-08-01:
+
+- **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Coauthor completeness:** fail closed by default and retry the failed candidate/author queries first. After retries are exhausted, a narrow audited staff override may permit an invitation only through a **[PLANNED]** reviewer COI-attestation-before-acceptance and possible-conflict hold flow; provider failure never becomes a clean negative.
+- **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Eligibility:** `eligibilityCheckStatus=complete` with `eligibilityStatus=unknown` may proceed subject to every other gate. Incomplete/error/missing blocks; deceased or authoritative ineligible blocks; emeritus is informational under current policy.
+- **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Warm refresh:** automatic background work is limited to inexpensive authoritative roster/Dataverse/Graph/canonical-version revalidation. Proposal download/parse, Claude, publication/coauthor discovery, uncertain external identity resolution, and contact discovery require explicit staff action in the warm UI.
+- **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Legacy evidence:** use a reviewed compatibility mapper. Promote only evidence demonstrably equivalent to the new receipt contract; ambiguous/missing evidence becomes `stage_missing`/`incomplete` and receives targeted refresh, never blanket grandfathering or mass recompute.
+- **[VERIFIED via the primary agent's 2026-08-01 decision] Warm measurement ownership:** the primary agent owns the measurement decision. Zero expensive calls, unsafe actions, stale overwrite, and full-batch refresh from one stale stage remain hard contracts; latency values remain hypotheses until shadow data supports SLOs.
+- **[VERIFIED via Justin, the primary agent, and current planning sources on 2026-08-01] Autonomous trigger:** `wmkf_triagestatus=Advancing` is a current-cycle visibility/routing patch, not the future trigger. Prior direction points to an authoritative internal Phase I→II/phase-advanced Dataverse event, but the exact event and autonomy level remain open.
 
 P0 is therefore a **warm-bootstrap and cache-correctness release**:
 
@@ -110,7 +119,7 @@ On a warm open:
 3. start Dataverse engagement/identity authority reconciliation and lightweight proposal/input metadata comparison;
 4. classify every candidate/stage as current, stale, refreshing, failed, or not applicable;
 5. enable only actions whose target candidate has current required authority; and
-6. schedule only the stale stage/candidate work permitted by the refresh policy.
+6. automatically run only inexpensive authoritative revalidation; present explicit staff actions for every expensive or uncertain stale stage.
 
 An unchanged warm open must not:
 
@@ -121,6 +130,8 @@ An unchanged warm open must not:
 - rewrite current roster rows just to renew timestamps.
 
 It may perform bounded metadata/authority reads: Postgres roster, Dataverse engagement/request inputs, and Graph file metadata without content download.
+
+Automatic warm work is allowlisted to Postgres roster reads, Dataverse engagement/input/version reads, Graph metadata/content-version reads without download, and canonical record/version comparisons. Proposal download/parse, Claude, publication or coauthor discovery, uncertain external identity resolution, and contact discovery require an explicit staff action in the warm UI. Future authorized autonomous runs are a separate contract and cannot widen this warm allowlist.
 
 ### Cold/new-search classification
 
@@ -298,6 +309,21 @@ Invalidation is dependency-specific:
 
 Planner tests must exercise every matrix row, the proposal-change non-invalidation complement, transitive invalidation from applicant/identity changes, and unknown dependency versions failing closed as `stage_contract_changed` or `unclassified_miss`.
 
+### Legacy evidence compatibility and age review
+
+Legacy rows pass through a reviewed, versioned compatibility mapper; they are neither blanket-grandfathered nor mass-recomputed. The mapper may mint a new stage receipt only when the stored evidence is demonstrably equivalent to the new stage's identity, dependency, completeness, and source contract. Ambiguous, missing, or non-equivalent evidence becomes `stage_missing` or `incomplete`, remains visible/read-only, and is queued for targeted staff-initiated refresh when the stage is expensive.
+
+The UI says **`Evidence checked as of <date>`**, with per-stage checked dates in details. It must not say the stronger `information current as of`, because a receipt records when and against which dependencies evidence was checked, not that every real-world fact remains current.
+
+Freshness combines hard dependency/version invalidation with age-based review:
+
+- candidate/identity anchors do not expire solely because time passed when their stable identifiers and dependencies are unchanged;
+- affiliation, contact, address trust, and eligibility are time-sensitive and use stage-specific review thresholds;
+- proposal relevance and coauthor COI bind to the current request, proposal-author fingerprint, and proposal content version regardless of age; and
+- thresholds are configurable/versioned per stage and are not hard-coded to one global TTL.
+
+[VERIFIED via Justin's 2026-08-01 operating principle] roughly six-month-old evidence is probably acceptable when its dependencies are unchanged, while six-year-old evidence requires more validation. This is a review principle, not a locked TTL. Arbitrary intermediate thresholds remain **[PLANNED]** until stage-specific measurements and operational review justify them.
+
 Dataverse engagement authority is deliberately **not** a persisted reusable stage receipt: it is reconciled for the current panel generation and represented by response/client `authorityState`. Promotion services still re-read/enforce engagement at mutation time.
 
 ### Eligibility completeness is separate from result
@@ -307,12 +333,13 @@ Current `eligibilityStatus` conflates result with whether the check completed. T
 - `eligibilityCheckStatus`: `complete`, `not_applicable`, `pending`, `incomplete`, or `error`;
 - `eligibilityStatus`: existing result semantics (`deceased`, `emeritus`, or `unknown`; add `eligible` only if the evidence contract can actually prove it).
 
-P0 recommendation:
+Locked P0 policy:
 
 - promotion requires `eligibilityCheckStatus === 'complete'` or a documented server-issued `not_applicable`;
-- `eligibilityStatus === 'deceased'` blocks;
-- `emeritus` and a completed `unknown` retain the existing product policy unless Justin changes it; and
-- pending/incomplete/error/missing check status blocks even when `eligibilityStatus` is not `deceased`.
+- `eligibilityCheckStatus === 'complete'` with `eligibilityStatus === 'unknown'` may proceed subject to every other gate;
+- `eligibilityStatus === 'deceased'` or an authoritative ineligible disposition blocks;
+- `emeritus` is informational under the current policy; and
+- pending/incomplete/error/missing check status blocks even when the result is not `deceased`.
 
 ### Refresh persistence
 
@@ -380,9 +407,9 @@ The target server checks are required even when the UI reports `authorityState: 
 | Dataverse engagement | Creates/reuses the candidate/suggestion under generic save's current contract. | Reads suggestion, rejects handled, and finishes with `selectIfUnengaged` concurrency enforcement. | Applicant path retains both checks. Generic path retains its create/reuse contract. Neither trusts cached engagement. |
 | Identity | Valid automated attestation or matching request-scoped staff confirmation; unresolved blocks. | `requiresIdentityConfirmation` + stored server confirmation. | Preserve. Stage receipt must also be current for the candidate/input contract version. |
 | Institution COI | Recomputes from trusted request/PI context and fails closed on screening failure/conflict. | [VERIFIED via symbol search] no explicit institution-COI gate in the promotion service. | Add equivalent authoritative institution screening to applicant promotion; pending/unavailable/conflict blocks both. |
-| Coauthor COI | [VERIFIED via symbol search] no explicit completeness gate. | [VERIFIED via symbol search] no explicit completeness gate. | P0 recommendation: allow only `complete` or justified `not_applicable`; block `incomplete`, error, pending, missing, and conflict. No waiver in P0 unless Justin explicitly chooses one. |
+| Coauthor COI | [VERIFIED via symbol search] no explicit completeness gate. | [VERIFIED via symbol search] no explicit completeness gate. | Default: allow only a clean `complete` or justified `not_applicable`; retry failed candidate/author queries, and keep provider failure distinct from a clean negative. After retries exhaust, a structured staff override may permit invitation only if its audit record is complete and the **[PLANNED]** accept-time reviewer attestation/possible-conflict hold dependency is live. A possible conflict is held for staff disposition; it is never treated as clear. |
 | Eligibility check completeness | No separate field; roster lookup failure logs fail-open, and non-deceased/unknown can proceed. | Roster read failure blocks, but completed-vs-unchecked `unknown` is not distinguished. | Require `eligibilityCheckStatus` complete/not-applicable, then apply result policy. Provider/read failure blocks. |
-| Eligibility result | Direct or stored `deceased` blocks. | Roster ineligible/deceased blocks. | Preserve deceased block; keep emeritus/completed-unknown policy explicit and identical. |
+| Eligibility result | Direct or stored `deceased` blocks. | Roster ineligible/deceased blocks. | Completed `unknown` may proceed subject to all other gates; deceased or authoritative ineligible blocks; emeritus is informational under current policy. |
 | Contact/email | Computes authoritative contact projection; missing/ambiguous/conflicting contact blocks. | Re-reads known reviewer/person, resolves writes, then requires canonical contact `ready`. | Preserve; a current contact stage may avoid provider work but never skips the server's canonical person/email check. |
 | Address trust | Requires current server roster/address receipt where applicable. | Re-reads address trust/conflict, requires matching receipt, uses ETag on person write. | Preserve; stale/missing address receipt blocks. |
 | Persistence completion | Per-candidate save results exist, but roster write helper can collapse failures to counts. | Dataverse selection may succeed while roster finalization is non-fatal partial success. | Return/persist exact per-candidate outcomes. A pending/failed roster finalization is reason-coded and repaired without redoing evidence stages. |
@@ -410,7 +437,9 @@ Minimum coauthor-status fan-out:
 - cached refresh planner;
 - card/selectability UI;
 - both promotion services; and
-- tests for complete, not-applicable, incomplete, provider error, missing, and unknown values.
+- tests for complete, not-applicable, incomplete, provider error, missing, unknown, retries exhausted, override pending attestation, attested clear, and possible-conflict hold values.
+
+The narrow coauthor override audit record must include staff actor, timestamp, reason, failed proposal authors/queries, proposal and candidate versions, and the evidence successfully checked. It preserves the provider-failure state; it does not rewrite it as a clean negative. **[PLANNED]** The reviewer acceptance flow must require a structured COI attestation before acceptance and route any possible conflict to a staff hold/disposition state. Until that end-to-end dependency and its persistence/security/fan-out are implemented and verified, the override path remains disabled and provider failure stays fail-closed.
 
 Minimum `stageFreshness` fan-out:
 
@@ -420,6 +449,14 @@ Minimum `stageFreshness` fan-out:
 - warm revalidation response projection;
 - card badges, selectability, save payload construction, and both promotion services; and
 - export/other candidate-JSON consumers found by raw-field grep, plus tests for every complement/fall-through value.
+
+Minimum legacy-compatibility/evidence-date fan-out:
+
+- versioned mapper input/output and equivalence-reason allowlist;
+- roster sanitizer/persistence and per-stage `completedAt`/checked-date projection;
+- card summary (`Evidence checked as of`) and per-stage detail dates;
+- selection/promotion gates for mapped-current versus missing/incomplete evidence; and
+- fixtures spanning equivalent legacy evidence, ambiguous evidence, missing provenance, recent unchanged dependencies, old time-sensitive evidence, and current-request/content mismatch.
 
 `authorityState` is response/client state, not persisted candidate authority. `current` requires all bounded authority/input reads for that panel generation to succeed; partial or failed reads must produce `stale`/`error`, never a partial `current`. Its fan-out is roster route → panel bootstrap → search section → select/save/promote controls → tests. Unknown values render cached/read-only and block promotion. Miss reason codes fan out through planner, response, retry UI, telemetry aggregation, and fixtures; an unknown reason remains `unclassified_miss`, never a hit.
 
@@ -469,7 +506,7 @@ P0 uses the existing JSONB candidate column and requires no schema migration. If
 
 Implement the matrix across `isCandidateSelectable`, `lib/services/reviewer-finder/save-candidates-service.js`, and `lib/services/workbench/promote-applicant-reviewer-service.js`.
 
-Recommendation for P0: fail closed on incomplete coauthor and eligibility checks, with no waiver. Justin may choose a waiver later, but it must be server-recorded, actor-bound, reasoned, and added in a separate fan-out review.
+Locked P0 behavior: fail closed on incomplete/error/missing coauthor and eligibility checks and run targeted retries first. A coauthor provider-failure override is a separate, default-off path: it requires the complete audit record above and cannot ship until the **[PLANNED]** reviewer attestation-before-acceptance and possible-conflict hold flow is implemented across persistence, external acceptance, staff disposition, security, UI, and tests. Eligibility does not use this override.
 
 #### 0.6 Warm telemetry
 
@@ -517,9 +554,10 @@ There is no reliable warm browser baseline. Run telemetry in shadow before enfor
 
 - `warm_panel_mounted`
 - `warm_cached_roster_visible` — after React commits the Postgres snapshot
-- `warm_authority_reconciled`
-- `warm_candidate_interactive` — required authority current for at least one eligible action
-- `warm_refresh_complete`
+- `warm_first_candidate_interactive` — the first candidate whose panel authority and required stage receipts permit an eligible action
+- `warm_full_reconciliation_complete` — all bounded authority reads and permitted warm revalidation/refresh work reached a terminal state
+
+These are separate distributions. Cached-visible must not be reported as interaction-ready, and first-candidate-interactive must not be reported as full reconciliation complete.
 
 ### Warm correctness and cost metrics
 
@@ -534,10 +572,12 @@ There is no reliable warm browser baseline. Run telemetry in shadow before enfor
 
 ### Warm latency target process
 
-1. Collect at least 30 qualifying warm opens over at least 48 hours with the feature disabled/shadowed; call p50/p90 baselines `B_cached` and `B_authority`.
-2. Canary must improve cached-visible p90 materially without regressing reconciliation or safety. Initial evidence-based gate: p90 ≤ 0.5 × `B_cached`; revise after the sample is reviewed.
-3. Provisional product hypotheses—not release promises—are cached roster visible ≤2s and authoritative interaction ≤5s on an unchanged healthy revisit. Promote them to SLOs only if the shadow/canary distribution and Dataverse availability support them.
-4. Report errors, stale conflicts, navigation cancels, and zero-row requests separately; do not remove them to improve percentiles.
+[VERIFIED via the primary agent's 2026-08-01 ownership decision] the primary agent owns the sample size, observation window, baseline, canary threshold, and decision to promote a hypothesis to an SLO.
+
+1. Shadow-measure the three milestone distributions separately and retain errors, stale conflicts, navigation cancels, and zero-row requests as named cohorts rather than removing them to improve percentiles.
+2. Keep cached roster visible ≤2s and first qualified interaction ≤5s as provisional product hypotheses—not release promises. Full reconciliation complete has no invented latency target.
+3. Promote either hypothesis to an SLO only after the primary agent reviews sufficient shadow/canary data and Dataverse availability. This plan does not lock a sample count, observation window, or percentile gate.
+4. Regardless of latency, zero expensive calls on an unchanged revisit, zero unsafe actions, zero stale overwrite, and zero full-batch applicant refresh caused by one stale candidate/stage remain hard release contracts.
 
 ### Cold metrics
 
@@ -551,6 +591,7 @@ Retain search-click → first grounded, first actionable, and background-complet
 | Dataverse unavailable | Cached cards remain with explicit error | Promotion disabled | Retry authority only; no evidence providers |
 | One candidate stage stale | That card/stage marked stale | Only dependent actions blocked | Refresh that ID/stage |
 | One stage refresh fails | Prior evidence remains visible as stale | Stage stays non-authoritative | Store failure/reason; targeted retry |
+| Coauthor provider retries exhausted | Successfully checked evidence remains visible; provider failure remains explicit | Default fail-closed; optional invitation override stays disabled unless the audited attestation/hold dependency is live | Record actor/time/reason, failed authors/queries, proposal/candidate versions, and checked evidence; possible conflict is held for staff disposition |
 | Refresh process dies | `refreshing` persists until lease expiry | Non-authoritative | Map to `prior_refresh_incomplete`; resume one stage |
 | Roster CAS loses | Newer row wins | Reload current authority | Return `skipped_stale`; never overwrite |
 | Proposal metadata changed | Prior cards visible/read-only | Proposal-dependent promotion gates block | Explicit targeted refresh or new search; no automatic cold run |
@@ -570,29 +611,36 @@ Retain search-click → first grounded, first actionable, and background-complet
 - roster snapshot conflict returns 409 + fresh snapshot.
 - metadata-only proposal resolution never downloads or uploads content.
 - unchanged revisit invokes no expensive providers.
+- automatic warm revalidation invokes only the bounded Postgres/Dataverse/Graph/canonical-version allowlist; proposal download/parse, Claude, publication/coauthor discovery, uncertain external identity resolution, and contact discovery require an explicit staff action.
 - one stale candidate/stage calls only its targeted service.
 - refresh start/success/failure/lease-expiry preserves prior evidence and CAS semantics.
 - no-history panel remains idle/read-only and makes no proposal/applicant/model/provider calls until explicit `Run search`.
 - proposal-content change invalidates coauthor/proposal-relevance evidence but leaves identity, eligibility, contact, and address stages current when their own dependencies are unchanged.
+- the legacy compatibility mapper promotes only fixtures demonstrably equivalent to the new receipt contract; ambiguous/missing fixtures become `stage_missing`/`incomplete` without full-batch recompute.
+- age review is stage-specific: unchanged identity anchors do not expire from age alone; time-sensitive stages use configurable/versioned thresholds; request/proposal-bound stages reject mismatched content even when recent.
 
 ### Gate and fan-out
 
 - Both promotion services exercise every matrix row with current, pending, incomplete, error, missing, unknown, stale, and not-applicable inputs.
 - Negative tests contain evidence that would pass if the guard were deleted.
 - `eligibilityCheckStatus=complete` with `eligibilityStatus=unknown` is distinct from missing/pending/incomplete.
+- completed eligibility `unknown` can proceed subject to other gates; deceased/authoritative-ineligible and incomplete/error/missing block; emeritus alone does not block under current policy.
 - Unknown enum/status values fail closed in UI, sanitizer, attestation, roster, and promotion.
 - Applicant institution COI is recomputed/validated server-side.
-- Incomplete coauthor check blocks both promotion paths under the recommended P0 policy.
+- Incomplete/error/missing coauthor check blocks both promotion paths by default and triggers targeted retries, never a clean-negative projection.
+- **[PLANNED]** Dependency tests prove an exhausted-provider staff override cannot be used without the complete audit fields; reviewer acceptance is blocked until structured COI attestation; an attested possible conflict enters staff hold/disposition instead of acceptance.
 
 ### React and end to end
 
 - Prior request cards render before delayed Dataverse reconciliation.
+- Cards use `Evidence checked as of <date>` plus per-stage dates and never claim `information current as of`.
 - Cached cards cannot be selected/promoted.
 - Authority-current response enables only candidates whose stage receipts are current.
 - Request/proposal switch ignores every old success/error/finally update.
 - Request 1003046-like history revisits without proposal download, model call, PubMed, contact discovery, or full applicant enrichment.
 - Same-name distinct anchored candidates remain separate.
 - A changed proposal under the same path produces `proposal_content_changed` through eTag/version comparison.
+- telemetry distinguishes cached visible, first candidate interactive, and full reconciliation complete; no event substitutes for a later milestone.
 
 ## Rollout and rollback
 
@@ -603,6 +651,7 @@ Use independent flags for:
 - targeted applicant stage refresh;
 - suppression of legacy mount-time cold work, with a hard dependency on targeted refresh/persistence;
 - explicit promotion-gate alignment; and
+- the audited coauthor provider-failure override, default off and dependent on the **[PLANNED]** external attestation/hold flow; and
 - later cold progressive events.
 
 “Independent” means each behavior can be rolled back separately; it does not remove safety dependencies. The suppression flag must refuse to enable unless targeted refresh/persistence is enabled, and reconciled authority-dependent controls must refuse to enable unless promotion-gate alignment and stage freshness are enabled.
@@ -610,11 +659,11 @@ Use independent flags for:
 Rollout order:
 
 1. Add shadow telemetry, authenticated `mode=cached|reconciled`, snapshot handling, and reason classification without changing UI behavior.
-2. Align server promotion gates, including applicant institution COI and separate eligibility completeness; recommended coauthor policy is fail closed/no waiver.
+2. Align server promotion gates, including applicant institution COI, separate eligibility completeness, and default fail-closed coauthor completeness with targeted retries. Keep the provider-failure override off until its audited accept-time attestation/hold dependency is live.
 3. Enable cached roster first paint for staff canary in the safe intermediate **display-only** state: all authority-dependent controls stay disabled, regardless of a reconciled response.
-4. Deploy per-candidate/stage dependency planning, stage receipts, stale-safe persistence, and manual targeted refresh/retry. Keep the legacy automatic enrichment path available while it remains the only stale-row repair path.
+4. Deploy per-candidate/stage dependency planning, stage receipts, the reviewed legacy compatibility mapper, evidence-checked dates, stale-safe persistence, and manual targeted refresh/retry. Keep the legacy automatic enrichment path available while it remains the only stale-row repair path.
 5. Suppress warm mount proposal/applicant cold work only under a dependent flag that requires step 4. Verify legacy/stale rows can be repaired through the targeted path and that no-history panels remain idle until explicit search.
-6. Enable reconciled selection/add/save/promotion controls only after steps 2 and 4 are live and every candidate's required authority/stage receipts are current. Then allow automatic refresh only for separately approved cheap stages.
+6. Enable reconciled selection/add/save/promotion controls only after steps 2 and 4 are live and every candidate's required authority/stage receipts are current. Automatic warm work remains limited to the locked inexpensive authoritative allowlist; all expensive/uncertain stages stay explicit staff actions.
 7. Expand warm P0 after 1003046-like revisit, security-mode, invalidation-matrix, and zero-expensive-call telemetry review.
 8. Implement cold progressive delivery separately.
 
@@ -628,11 +677,15 @@ Stop canary for any unsafe action, unreasoned miss, expensive call on unchanged 
 
 This is a staged future extension, not P0.
 
-### Trigger and approval boundary
+### Trigger and approval boundary — DEFERRED
 
-- A named request lifecycle transition and feature policy creates an eligible run.
-- Initial rollout is shadow-only, then staff approval-to-start; unattended start requires separate authorization.
-- Autonomous search may write/find roster candidates. It does not select, invite, email, or promote reviewers without a separately approved contract.
+[VERIFIED via `.claude-memory/project-reviewer-apps-redesign-direction.md`] `wmkf_triagestatus=Advancing` was introduced as the D26 dashboard visibility/routing patch while leaving `akoya_requeststatus` untouched. It must not be assumed to be the future autonomous Reviewer Find trigger.
+
+[VERIFIED via `.claude-memory/project-grant-phasing-evolution.md`] prior planning direction treats an authoritative internal Phase I→II/phase-advanced Dataverse transition—current notes mention `akoya_requeststatus='Phase II Pending'` or a live successor—as the conceptual handoff to reviewer finding. This is planning context, not a bound implementation field.
+
+**DEFERRED for deeper staff discussion.** The exact field/value, group-versus-row transition, writer authority, existing Power Automate consumers, separation between search and proposal-release consumers, and shadow/approval/unattended level remain open. Do not bind implementation, idempotency keys, or subscriptions to a field until those questions are source- and live-state-verified.
+
+Whatever is later approved, autonomous search may write/find roster candidates only. It does not select, invite, email, or promote reviewers without a separately approved contract.
 
 ### Durable run ownership
 
@@ -668,17 +721,19 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 1. **VERIFIED — Warm display is unnecessarily coupled to authoritative reconciliation.** Evidence: roster GET awaits Postgres then Dataverse before returning; the client already renders roster independently of search phase. Residual risk: cached rows may briefly be engagement-stale, so the target keeps them read-only.
 2. **VERIFIED — Mount effects initiate cold work without a search action.** Evidence: panel mount effects call applicant ingestion and proposal load; applicant cache miss auto-calls full enrichment. Residual risk: splitting read/materialize changes service contracts and needs focused tests.
 3. **VERIFIED — Applicant freshness is batch-global.** Evidence: `hasValidApplicantEnrichmentCache` returns one boolean only after every expected row passes; caller refreshes all actionable recommendations. Residual risk: stage dependency graph must be explicit so a narrow refresh does not omit prerequisites.
-4. **VERIFIED — Promotion authority is asymmetric.** Evidence: generic save recomputes institution COI; applicant promotion has no institution/coauthor symbol checks; neither path distinguishes eligibility check completeness. Residual risk: P0 gate alignment can expose legacy rows needing targeted refresh.
+4. **VERIFIED — Promotion authority is asymmetric.** Evidence: generic save recomputes institution COI; applicant promotion has no institution/coauthor symbol checks; neither path distinguishes eligibility check completeness. Residual risk: P0 gate alignment exposes legacy rows needing compatibility mapping or targeted refresh, and the optional coauthor override depends on a not-yet-built attestation/hold flow.
 5. **READY WITH NAMED CHANGES — Postgres-first rendering is safe only as display state.** Required changes: cached authority label, disabled promotion, snapshot/version reconciliation, per-stage freshness, server rechecks, and unknown-status fail-closed behavior.
 6. **READY WITH NAMED CHANGES — Cold-work suppression must follow targeted stale-row repair.** Required changes: explicit flag dependency, legacy/stale repair coverage, and an idle/no-history contract; cached first paint may ship earlier only with all authority-dependent controls disabled.
 7. **READY WITH NAMED CHANGES — Roster modes must preserve the route's security boundary.** Required changes: shared authentication/request validation, reconciled DAL context, existing interlock behavior where applicable, a server mode allowlist, and negative tests proving mode cannot weaken authorization.
+8. **READY WITH NAMED CHANGES — Settled freshness decisions narrow automatic work.** Required changes: an allowlist for inexpensive authoritative warm revalidation, explicit staff actions for expensive/uncertain stages, a reviewed legacy compatibility mapper, per-stage evidence-checked dates, and configurable/versioned stage age review.
+9. **DEFERRED — Autonomous trigger identity is not settled.** `wmkf_triagestatus=Advancing` is a current-cycle visibility/routing patch; Phase I→II/phase-advanced status is direction only. No field subscription or trigger implementation is ready for review.
 
 ### New issues
 
 - **HIGH — Applicant promotion lacks an explicit server institution-COI gate.** Required change: add the same trusted-context screening semantics as generic save before mutation.
 - **HIGH — Eligibility result does not prove eligibility check completion.** Required change: add and enforce separate completeness state across all fan-out consumers.
-- **HIGH — Coauthor incomplete/missing state is not enforced by either promotion service.** Required change: P0 fail closed/no waiver unless Justin chooses and separately specifies a server-recorded exception.
-- **MEDIUM — Legacy roster rows will lack new stage receipts.** Required change: show them cached/read-only, assign `stage_missing`/`warm_cache_version_changed`, and refresh only missing stages; do not silently grandfather or discard them.
+- **HIGH — Coauthor incomplete/missing state is not enforced by either promotion service.** Required change: default fail closed with targeted retries. A provider-failure override remains disabled until its complete audit record and **[PLANNED]** reviewer attestation-before-acceptance/possible-conflict hold dependency exist; provider failure must remain distinct from a clean negative.
+- **MEDIUM — Legacy roster rows will lack new stage receipts.** Required change: run a reviewed compatibility mapper, promote only demonstrably equivalent evidence, show ambiguous/missing evidence cached/read-only as `stage_missing`/`incomplete`, and target only required refreshes; do not blanket-grandfather, discard, or mass-recompute.
 - **HIGH — Suppressing legacy automatic enrichment before targeted refresh exists removes the only repair path for stale rows.** Required change: gate suppression on deployed per-stage planning/persistence/retry, and keep the interim cached UI display-only.
 - **MEDIUM — A client-selectable roster mode could become an authorization bypass if auth/context handling diverges.** Required change: authenticate before mode dispatch, allowlist mode, preserve DAL/restriction/interlock seams, and test both positive and negative complements.
 
@@ -690,9 +745,12 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 | Preserve auth/restriction boundary in both modes | Existing route authenticates before dispatch; reconciliation enters DAL context | Yes, at the common handler and reconciled service boundary | Source trace; new modes NOT TESTED | A future early mode return placed before `requireAppAccess` would violate it | VERIFIED |
 | Skip proposal/applicant cold work on unchanged revisit | Persisted roster + metadata fingerprints | Roster exists; stable content/input fingerprints are planned | NOT TESTED | Content/input may change between opens | ASSUMED |
 | Suppress legacy automatic enrichment | Targeted stage planner, stale-safe persistence, and a working repair/retry path | Only after PR/rollout step 4; not available today | NOT TESTED | Legacy stage-missing row cannot be repaired without the old path | ASSUMED |
+| Map legacy evidence without mass recompute | Stored evidence contains enough dependency/source/completeness provenance to prove equivalence | Per row/stage; mapper and fixtures are planned | NOT TESTED | Ambiguous evidence must become missing/incomplete, not current | ASSUMED |
+| Limit automatic warm refresh to authoritative cheap reads | Server-side stage/action allowlist | Planned in reconciled response/planner | NOT TESTED | A hidden effect could still call an expensive provider | ASSUMED |
+| Allow audited coauthor provider-failure exception | Retries exhausted; complete override audit; accept-time attestation and hold are implemented | Not available today; attestation/hold is PLANNED | NOT TESTED | Provider failure or possible conflict is accidentally projected as clear | ASSUMED |
 | Refresh one candidate/stage | Canonical key + stage receipt/dependencies | Candidate key exists; stage receipt/planner is planned | NOT TESTED | Shared proposal-context invalidation may legitimately affect many candidates | ASSUMED |
 | Zero expensive calls on unchanged revisit | Cache hit proven by authority/content/input versions | Planned at reconciled warm response | NOT TESTED | Hidden mount effect/provider call remains | ASSUMED |
-| Future autonomous search | Durable trigger/run/idempotency contract | Not present today | NOT TESTED | Duplicate lifecycle events/restarts | ASSUMED |
+| Future autonomous search | Authoritative trigger and durable run/idempotency contract | Trigger field/event and autonomy level are deferred | NOT TESTED | `wmkf_triagestatus=Advancing` is incorrectly reused as the trigger | ASSUMED |
 
 ### Seven-audit disposition
 
@@ -700,30 +758,38 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 2. **Partial success:** unit is candidate/stage; identifiers and outcomes replace counts; failed stages remain retryable.
 3. **Async/stale:** request generation, roster snapshot version, AbortController, monotonic stage attempts, and CAS protect every post-await path.
 4. **Helper semantics:** search suppression, display dedup, identity aliasing, dependency-scoped freshness, and persistence sanitization remain distinct. Proposal changes do not invalidate unrelated identity/contact/eligibility stages.
-5. **Durable surface:** P0 reuses roster JSONB; any autonomous job/metrics table requires migration/manifest/Atlas/security/cleanup review.
-6. **Doc reconcile:** this document replaces the cold-first priority throughout summary, slices, metrics, rollout, decisions, and PR order; the generated catalog summary is current and must remain synchronized.
-7. **Fan-out:** new status/read surfaces are enumerated above; route mode/auth tests and every dependency-matrix complement are required; implementation must raw-symbol grep before completion.
+5. **Durable surface:** P0 reuses roster JSONB. The optional override's audit/attestation/hold state and any autonomous job/metrics table are **[PLANNED]** durable surfaces requiring migration/manifest/Atlas/security/cleanup review before implementation claims.
+6. **Doc reconcile:** this document replaces the cold-first priority throughout summary, slices, metrics, rollout, decisions, and PR order; the generated catalog summary is current and must remain synchronized. [VERIFIED via scoped 2026-08-01 durable-restatement search] the settled coauthor/eligibility/evidence-date/latency/autonomous-trigger phrases occur only in this plan; the cited triage and phase-planning memories agree with the recorded historical/current distinction.
+7. **Fan-out:** new status/read surfaces are enumerated above; compatibility provenance, per-stage checked dates, override/attestation/hold states, route mode/auth tests, and every dependency-matrix complement are required; implementation must raw-symbol grep before completion.
 
-**Final verdict:** READY WITH NAMED CHANGES. Warm two-phase bootstrap is the correct P0. Required named changes are the authority matrix alignment, separate eligibility completeness, fail-closed coauthor completeness, explicit dependency-scoped invalidation, per-candidate/stage freshness, reason-coded misses, stale-safe refresh persistence, authenticated/fail-closed mode handling, an idle no-history state, and suppression of legacy automatic enrichment only after targeted repair is available. Cached first paint is safe before the full stack only as display-only UI with every authority-dependent control disabled.
+**Final verdict:** READY WITH NAMED CHANGES. Warm two-phase bootstrap is the correct P0. Required named changes are the authority matrix alignment; locked eligibility semantics; default fail-closed coauthor completeness with targeted retries; a separately gated **[PLANNED]** audited attestation/hold override; explicit dependency- and age-scoped freshness; reviewed legacy compatibility mapping; per-stage `Evidence checked as of` dates; reason-coded misses; stale-safe refresh persistence; authenticated/fail-closed mode handling; an idle no-history state; the inexpensive-authoritative automatic-work allowlist; and suppression of legacy automatic enrichment only after targeted repair is available. Cached first paint is safe before the full stack only as display-only UI with every authority-dependent control disabled. Autonomous trigger implementation is explicitly deferred.
 
-## Decisions required from Justin
+## Locked decisions and remaining open work
 
-1. Confirm P0 coauthor policy: recommendation is fail closed on incomplete/missing/error with no waiver. A waiver is deferred unless operations demonstrate a need.
-2. Confirm completed `eligibilityStatus: unknown` remains promotable when `eligibilityCheckStatus: complete`; recommendation is yes, preserving current result policy while fixing completeness.
-3. Confirm which targeted refresh stages may auto-run after warm reconciliation. Recommendation: auto-run cheap authoritative reads; require explicit action for proposal download, Claude, publication/COI search, or paid contact work.
-4. Confirm legacy stage-missing rows remain visible/read-only until targeted refresh rather than being grandfathered. Recommendation: yes.
-5. After shadow measurement, approve or revise the provisional ≤2s cached-visible / ≤5s authoritative-interaction hypotheses.
-6. For next cycle, define the lifecycle trigger and whether autonomous runs are shadow-only, approval-to-start, or unattended. Recommendation: shadow → approval-to-start before any unattended operation.
+### Locked
+
+1. Coauthor provider failures default fail-closed with targeted retries; an exhausted-provider exception is narrow, audited, and conditional on the **[PLANNED]** reviewer attestation-before-acceptance/possible-conflict hold flow.
+2. Completed eligibility `unknown` may proceed subject to other gates; incomplete/error/missing and deceased/authoritative-ineligible block; emeritus is informational under current policy.
+3. Automatic warm work is limited to inexpensive authoritative Postgres/Dataverse/Graph/canonical-version revalidation. Expensive or uncertain stages require explicit staff action.
+4. Legacy evidence uses a reviewed compatibility mapper plus per-stage `Evidence checked as of` dates. No blanket grandfathering or mass recompute.
+5. Hard warm contracts remain zero expensive calls on unchanged revisit, zero unsafe actions/stale overwrite, and zero full-batch refresh caused by one stale candidate/stage. The ≤2s cached-visible and ≤5s first-qualified-interaction values remain hypotheses.
+
+### Genuinely open
+
+1. **[PLANNED]** Specify and implement the coauthor override audit persistence, reviewer COI attestation, accept-time block, possible-conflict staff hold/disposition, security, retention, and fan-out before enabling the override.
+2. **[PLANNED]** The primary agent chooses the shadow sample, observation window, percentile/canary method, stage-specific age thresholds, and whether latency hypotheses become SLOs. No arbitrary intermediate TTL is locked.
+3. **DEFERRED for staff discussion.** Resolve the future autonomous trigger's exact field/value, group-versus-row transition, writer authority, existing Power Automate consumers, search-versus-proposal-release consumers, and shadow/approval/unattended level. Do not bind code to `wmkf_triagestatus` or `akoya_requeststatus` yet.
 
 ## Recommended PR sequence
 
 1. **Warm telemetry + secure route split:** authenticated `mode=cached|reconciled`, mode allowlist, unchanged DAL/restriction/interlock boundaries, snapshot token, no UI behavior change.
-2. **Authority alignment:** applicant institution COI, coauthor completeness, eligibility completeness, UI state model, and both promotion services; keep current UI behavior until gates are ready.
+2. **Authority alignment:** applicant institution COI, default fail-closed coauthor completeness with targeted retries, locked eligibility semantics, UI state model, and both promotion services; keep the optional provider-failure override off and current UI behavior until gates are ready.
 3. **Display-only cached first paint:** parent-owned bootstrap, cached cards, delayed authority state, no duplicate roster fetch, and every selection/add/save/promotion control disabled.
-4. **Freshness planner + stale-safe persistence:** dependency matrix, per-candidate/stage receipts, reason codes, legacy handling, stage attempt/lease/CAS, detailed per-row outcomes, and manual targeted refresh/retry APIs.
-5. **Suppress warm cold-work behind the step-4 dependency flag:** metadata-only proposal/input validation; no mount-time download/analyze/provider/full enrichment; no-history panels remain idle. Do not enable this flag until legacy/stale repair succeeds through the targeted path.
-6. **Enable reconciled actions:** only after #2 and #4, enable controls candidate-by-candidate when current panel authority and every required stage receipt are current; add approved cheap automatic targeted refreshes separately.
-7. **Cold progressive search:** candidate events and partial persistence after warm P0 is stable.
-8. **Autonomous-search design/build:** separate future plan after trigger authority is chosen.
+4. **Freshness planner + stale-safe persistence:** dependency matrix, per-candidate/stage receipts and checked dates, versioned compatibility mapper, reason codes, stage-specific configurable age review, stage attempt/lease/CAS, detailed per-row outcomes, and manual targeted refresh/retry APIs.
+5. **Suppress warm cold-work behind the step-4 dependency flag:** metadata-only proposal/input validation; automatically run only the inexpensive authoritative allowlist; keep proposal download/parse, Claude, publication/coauthor discovery, uncertain identity resolution, and contact discovery behind explicit staff actions; no-history panels remain idle. Do not enable this flag until legacy/stale repair succeeds through the targeted path.
+6. **Enable reconciled actions:** only after #2 and #4, enable controls candidate-by-candidate when current panel authority and every required stage receipt are current; automatic work stays within the locked inexpensive authoritative allowlist.
+7. **Optional audited coauthor override:** separate reviewed change only after audit persistence and the reviewer attestation/possible-conflict hold dependency are designed, built, and verified end to end.
+8. **Cold progressive search:** candidate events and partial persistence after warm P0 is stable.
+9. **Autonomous-search design/build:** deferred separate future plan only after trigger authority and autonomy level are settled with staff.
 
 This order produces the warm-user benefit before changing cold-search provider behavior and keeps future autonomy from expanding P0 scope.
