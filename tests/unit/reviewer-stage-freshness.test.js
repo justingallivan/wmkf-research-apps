@@ -46,9 +46,22 @@ test('unknown/missing states, contracts, and reasons fail closed', () => {
   expect(planCandidateFreshness({ candidate: badVersion, authoritative: authoritative(), now }).refreshes).toContainEqual({ stage: 'contact', reason: 'stage_contract_changed' });
 });
 
-test('identity does not age-expire, but configurable time-sensitive stages do', () => {
+test('missing versions and refresh leases never create authority or duplicate refresh work', () => {
+  const missing = candidate(); delete missing.stageFreshness.contact.sourceVersion;
+  expect(planCandidateFreshness({ candidate: missing, authoritative: authoritative(), now }).refreshes).toContainEqual({ stage: 'contact', reason: 'stage_contract_changed' });
+  const refreshing = candidate(); refreshing.stageFreshness.contact = { ...refreshing.stageFreshness.contact, state: 'refreshing', refreshStartedAt: '2026-08-01T00:00:00.000Z' };
+  const pending = planCandidateFreshness({ candidate: refreshing, authoritative: authoritative(), now: now + 10, policy: { version: 1, stages: {}, leaseMs: 1000 } });
+  expect(pending.pendingStages).toContain('contact'); expect(pending.refreshes.map((entry) => entry.stage)).not.toContain('contact');
+  const expired = planCandidateFreshness({ candidate: refreshing, authoritative: authoritative(), now: now + 2000, policy: { version: 1, stages: {}, leaseMs: 1000 } });
+  expect(expired.refreshes).toContainEqual({ stage: 'contact', reason: 'prior_refresh_incomplete' });
+  expect(expired.promotionAuthority).toBe('blocked_refresh_required');
+});
+
+test('default policy does not age-expire; injected time-sensitive policy does not age-expire identity or coauthor', () => {
   const old = candidate(); old.stageFreshness.identity.completedAt = '2010-01-01T00:00:00.000Z'; old.stageFreshness.contact.completedAt = '2010-01-01T00:00:00.000Z';
-  const plan = planCandidateFreshness({ candidate: old, authoritative: authoritative(), now, policy: DEFAULT_AGE_POLICY });
+  expect(planCandidateFreshness({ candidate: old, authoritative: authoritative(), now, policy: DEFAULT_AGE_POLICY }).refreshes).toEqual([]);
+  old.stageFreshness.coauthor_coi.completedAt = '2010-01-01T00:00:00.000Z';
+  const plan = planCandidateFreshness({ candidate: old, authoritative: authoritative(), now, policy: { version: 1, stages: { contact: { maxAgeMs: 1 } } } });
   expect(plan.refreshes).toContainEqual({ stage: 'contact', reason: 'stage_incomplete' });
   expect(plan.refreshes.map((entry) => entry.stage)).not.toContain('identity');
 });

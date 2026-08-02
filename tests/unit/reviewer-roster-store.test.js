@@ -60,7 +60,7 @@ describe('stage refresh CAS', () => {
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('attempt-1'))).toBe(true);
 
     sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'version-2', 'contact', 'wrong-attempt', {})).resolves.toMatchObject({ outcome: 'skipped_stale' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'version-2', 'contact', 'wrong-attempt', {})).resolves.toMatchObject({ outcome: 'rejected' });
   });
 
   test('failure and lease recovery preserve the existing stage evidence via JSONB merge', async () => {
