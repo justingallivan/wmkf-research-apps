@@ -104,6 +104,8 @@ const EVIDENCE_STAGE_LABELS = Object.freeze({
 const EVIDENCE_STAGE_ORDER = Object.freeze(Object.keys(EVIDENCE_STAGE_LABELS));
 const CANONICAL_CANDIDATE_KEY = /^(?:suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/;
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
 
 function canonicalCandidateKey(value) {
   const key = typeof value === 'string' ? value.trim() : '';
@@ -117,6 +119,52 @@ function canonicalEvidenceDate(value) {
   } catch {
     return null;
   }
+}
+
+function canonicalSuggestionCandidateKey(suggestionId) {
+  return typeof suggestionId === 'string' && GUID.test(suggestionId)
+    ? `suggestion:${suggestionId.toLowerCase()}`
+    : null;
+}
+
+function serverRosterUpdatedAt(value) {
+  return typeof value === 'string'
+    && value.trim().length > 0
+    && value.trim().length <= 128
+    && !/[\u0000-\u001f\u007f]/.test(value)
+    ? value.trim()
+    : null;
+}
+
+// The plan map is request-bound and rejects duplicate keys. This additional
+// target check deliberately requires the stored applicant suggestion spine as
+// well, so a same-name row or a browser-generated fallback key cannot start a
+// repair. `pendingStages` is the server planner's active-refresh signal; a
+// second repair must wait for that attempt to resolve.
+export function applicantAnchorRepairTarget(candidate, plan) {
+  const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
+  const suggestionId = typeof candidate?.suggestionId === 'string' && GUID.test(candidate.suggestionId)
+    ? candidate.suggestionId.toLowerCase()
+    : null;
+  const expectedUpdatedAt = serverRosterUpdatedAt(candidate?.rosterUpdatedAt);
+  const planKey = canonicalCandidateKey(plan?.candidateKey);
+  const isApplicantCandidate = candidate?.isApplicantRecommended === true
+    || candidate?.provenance?.kind === 'applicant_suggested';
+  const hasApplicantAnchorRefresh = Array.isArray(plan?.refreshes)
+    && plan.refreshes.some((refresh) => refresh?.stage === APPLICANT_ANCHOR_STAGE);
+  const refreshInProgress = Array.isArray(plan?.pendingStages)
+    && plan.pendingStages.includes(APPLICANT_ANCHOR_STAGE);
+  if (
+    !candidateKey
+    || !suggestionId
+    || !expectedUpdatedAt
+    || !isApplicantCandidate
+    || candidateKey !== planKey
+    || candidateKey !== canonicalSuggestionCandidateKey(suggestionId)
+    || !hasApplicantAnchorRefresh
+    || refreshInProgress
+  ) return null;
+  return { candidateKey, suggestionId, expectedUpdatedAt };
 }
 
 // The warm plan is server-derived display data. A duplicate or malformed key is
@@ -281,7 +329,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true, evidenceCheck = null }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshApplicantAnchor, onReloadRoster, applicantAnchorRepair = null, canManage = true, evidenceCheck = null }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -371,6 +419,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
   const needsRecordRepair = promotionDecision?.decision === 'needs_record_repair';
   const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
+  const applicantAnchorRefreshing = applicantAnchorRepair?.status === 'refreshing';
+  const applicantAnchorReloadRequired = applicantAnchorRepair?.reloadRequired === true;
+  const applicantAnchorRecorded = applicantAnchorRepair?.status === 'recorded';
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
   // could belong to a namesake while keeping the row actionable in Find.
@@ -544,6 +595,43 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           )}
 
           <EvidenceCheck evidenceCheck={evidenceCheck} />
+
+          {applicantAnchorRepair && (
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <p>
+                Applicant input evidence needs a server refresh. This repairs evidence only; it does not select or promote this reviewer.
+              </p>
+              {applicantAnchorReloadRequired ? (
+                <p className="mt-1" role="status">
+                  {applicantAnchorRepair.message || 'The roster changed while refreshing evidence. Reload reviewer status before trying again.'}
+                  {onReloadRoster && (
+                    <button type="button" onClick={onReloadRoster} className="ml-2 font-medium underline">
+                      Reload reviewer status
+                    </button>
+                  )}
+                </p>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onRefreshApplicantAnchor?.(candidate)}
+                    disabled={!onRefreshApplicantAnchor || applicantAnchorRefreshing || applicantAnchorRecorded}
+                    aria-busy={applicantAnchorRefreshing}
+                    className="mt-1 font-medium underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {applicantAnchorRefreshing
+                      ? 'Refreshing applicant input evidence…'
+                      : applicantAnchorRecorded
+                        ? 'Applicant input evidence refreshed'
+                        : 'Refresh applicant input evidence'}
+                  </button>
+                  {applicantAnchorRepair.message && (
+                    <p className="mt-1" role="status">{applicantAnchorRepair.message}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Why: </span>{reason}</p>}
 
@@ -999,6 +1087,9 @@ export default function ReviewerSearchSection({
   displayOnly = false,
 }) {
   const parentOwnsRoster = rosterSnapshot !== undefined;
+  const applicantAnchorRepairSnapshotVersion = parentOwnsRoster
+    ? rosterSnapshot?.rosterVersion || null
+    : null;
   const rosterRetryRequired = (
     rosterSnapshot?.reconciliationStopped === true
     || ['stale', 'error'].includes(rosterSnapshot?.authorityState)
@@ -1042,6 +1133,7 @@ export default function ReviewerSearchSection({
   const [rosterLoaded, setRosterLoaded] = useState(false);
   const [rosterLoadFailed, setRosterLoadFailed] = useState(false);
   const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
+  const [applicantAnchorRepairStates, setApplicantAnchorRepairStates] = useState({});
   const [removingPrevious, setRemovingPrevious] = useState(false);
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
@@ -1120,6 +1212,8 @@ export default function ReviewerSearchSection({
   const savingRef = useRef(null);
   const genRef = useRef(0);
   const excludeEditedRef = useRef(false);
+  const applicantAnchorRefreshesRef = useRef(new Set());
+  const applicantAnchorRefreshControllersRef = useRef(new Set());
 
   const applyRosterSnapshot = useCallback((data) => {
     setRosterActive(Array.isArray(data?.active) ? data.active : []);
@@ -1153,6 +1247,112 @@ export default function ReviewerSearchSection({
     );
     return data;
   }, [requestId, applyRosterSnapshot, parentOwnsRoster]);
+
+  const reloadAfterApplicantAnchorRepair = useCallback((expectedGeneration) => {
+    if (onRetryRoster) {
+      onRetryRoster();
+      return;
+    }
+    void reloadRoster(expectedGeneration);
+  }, [onRetryRoster, reloadRoster]);
+
+  const refreshApplicantAnchor = useCallback(async (candidate) => {
+    const target = applicantAnchorRepairTarget(
+      candidate,
+      serverPromotionPlanForCandidate(candidate),
+    );
+    if (!target || applicantAnchorRefreshesRef.current.has(target.candidateKey)) return;
+
+    const expectedGeneration = genRef.current;
+    const controller = new AbortController();
+    applicantAnchorRefreshesRef.current.add(target.candidateKey);
+    applicantAnchorRefreshControllersRef.current.add(controller);
+    setApplicantAnchorRepairStates((previous) => ({
+      ...previous,
+      [target.candidateKey]: { status: 'refreshing', message: null, reloadRequired: false },
+    }));
+
+    const stillCurrent = () => (
+      !controller.signal.aborted && genRef.current === expectedGeneration
+    );
+    const requireReload = (message) => {
+      setApplicantAnchorRepairStates((previous) => ({
+        ...previous,
+        [target.candidateKey]: { status: 'stale', message, reloadRequired: true },
+      }));
+    };
+
+    try {
+      const response = await fetch('/api/workbench/reviewer-stage-refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          suggestionId: target.suggestionId,
+          stage: APPLICANT_ANCHOR_STAGE,
+          expectedUpdatedAt: target.expectedUpdatedAt,
+        }),
+        signal: controller.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!stillCurrent()) return;
+
+      if (response.ok && data?.outcome === 'recorded') {
+        setApplicantAnchorRepairStates((previous) => ({
+          ...previous,
+          [target.candidateKey]: {
+            status: 'recorded',
+            message: 'Evidence refresh recorded. Reloading reviewer status.',
+            reloadRequired: false,
+          },
+        }));
+        reloadAfterApplicantAnchorRepair(expectedGeneration);
+        return;
+      }
+      if (data?.outcome === 'skipped_stale') {
+        requireReload('The reviewer roster changed before this evidence refresh completed. Reload reviewer status before trying again.');
+        return;
+      }
+      requireReload('The evidence refresh did not complete. Reload reviewer status before trying again; existing evidence remains visible.');
+    } catch {
+      if (!stillCurrent()) return;
+      requireReload('The evidence refresh result is unknown. Reload reviewer status before trying again; existing evidence remains visible.');
+    } finally {
+      applicantAnchorRefreshesRef.current.delete(target.candidateKey);
+      applicantAnchorRefreshControllersRef.current.delete(controller);
+    }
+  }, [requestId, serverPromotionPlanForCandidate, reloadAfterApplicantAnchorRepair]);
+
+  const applicantAnchorRepairPropsForCandidate = useCallback((candidate) => {
+    const target = applicantAnchorRepairTarget(
+      candidate,
+      serverPromotionPlanForCandidate(candidate),
+    );
+    if (!target) return {};
+    const state = applicantAnchorRepairStates[target.candidateKey] || null;
+    return {
+      applicantAnchorRepair: state || { status: 'ready', message: null, reloadRequired: false },
+      onRefreshApplicantAnchor: refreshApplicantAnchor,
+      onReloadRoster: state?.reloadRequired ? () => reloadAfterApplicantAnchorRepair(genRef.current) : undefined,
+    };
+  }, [serverPromotionPlanForCandidate, applicantAnchorRepairStates, refreshApplicantAnchor, reloadAfterApplicantAnchorRepair]);
+
+  // This action remains available while the P0 panel is display-only: it
+  // repairs a server-derived evidence receipt and never selects, saves, or
+  // promotes the reviewer. Abort old request attempts before any post-await UI
+  // update; the generation check in refreshApplicantAnchor is the second guard.
+  useEffect(() => {
+    for (const controller of applicantAnchorRefreshControllersRef.current) controller.abort();
+    applicantAnchorRefreshControllersRef.current.clear();
+    applicantAnchorRefreshesRef.current.clear();
+    setApplicantAnchorRepairStates({});
+  }, [requestId, parentOwnsRoster, applicantAnchorRepairSnapshotVersion]);
+
+  useEffect(() => () => {
+    for (const controller of applicantAnchorRefreshControllersRef.current) controller.abort();
+    applicantAnchorRefreshControllersRef.current.clear();
+    applicantAnchorRefreshesRef.current.clear();
+  }, []);
 
   // The parent owns warm cached→reconciled bootstrap for the Workbench panel.
   // Standalone callers retain the original internal roster fetch contract.
@@ -3036,11 +3236,11 @@ export default function ReviewerSearchSection({
                                     || promotionDecision?.decision === 'missing_email'
                                   );
                                 if (selectableNow && !readOnlySection) {
-                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} {...applicantAnchorRepairPropsForCandidate(c)} />;
                                 }
                                 if (selectableNow && readOnlySection) {
                                   // needs-review row the PD just confirmed → selectable + editable.
-                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} {...applicantAnchorRepairPropsForCandidate(c)} />;
                                 }
                                 return <CandidateCard
                                   key={candKey(c)}
@@ -3059,6 +3259,7 @@ export default function ReviewerSearchSection({
                                   onRetryAddressCheck={displayOnly ? undefined : retryAddressCheck}
                                   onConfirmIdentity={canConfirmForPromotion && !displayOnly ? (cand) => setConfirmingContact(cand) : undefined}
                                   canManage={canManage && !displayOnly}
+                                  {...applicantAnchorRepairPropsForCandidate(c)}
                                 />;
                               })}
                             </div>
