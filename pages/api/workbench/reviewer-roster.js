@@ -53,6 +53,48 @@ const MAX_CANDIDATES_PER_POST = 100;
 // action must therefore be able to carry every visible prior-result key.
 const MAX_PREVIOUS_RESULT_KEYS = 300;
 const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/;
+const ELIGIBILITY_STATUSES = new Set(['unknown', 'emeritus', 'deceased']);
+const ELIGIBILITY_CHECK_STATUSES = new Set([
+  'complete', 'not_applicable', 'pending', 'incomplete', 'error',
+]);
+
+// These values decide whether a candidate can be promoted, or describe the
+// server work that made that decision. A browser may display a prior response,
+// but it must not be able to persist one as a new receipt or overwrite a
+// stored receipt during POST/PATCH. Receipt-bound eligibility is restored by
+// the route below; every other member is restored only from the stored row.
+const CLIENT_ROSTER_AUTHORITY_FIELDS = [
+  'warmCacheVersion',
+  'proposalContentVersion',
+  'applicantInputVersion',
+  'stageFreshness',
+  'legacyStageReceipts',
+  'eligibilityStatus',
+  'eligibilityCheckStatus',
+  'eligibilityReason',
+  'eligibilityEvidence',
+  'hasInstitutionCOI',
+  'institutionCOIDetails',
+  'coiRecomputed',
+  'hasCoauthorCOI',
+  'coauthorCheckStatus',
+  'coauthorCheckFailures',
+  'coauthorships',
+  'coauthorCOIStrength',
+  'coauthorSharedPaperTotal',
+  'coauthorMaxWithOneAuthor',
+  'addressTrustReceipt',
+  'addressConflictPending',
+  'conflictRecordUnavailable',
+  'addressVerificationRequired',
+  'serverIdentityReviewReason',
+];
+const RECEIPT_BOUND_ELIGIBILITY_FIELDS = new Set([
+  'eligibilityStatus',
+  'eligibilityCheckStatus',
+  'eligibilityReason',
+  'eligibilityEvidence',
+]);
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -113,8 +155,97 @@ function stripClientRosterAuthority(candidate) {
     pdIdentityConfirmed: _pdIdentityConfirmed,
     pdIdentityConfirmationId: _pdIdentityConfirmationId,
     serverIdentityDecisionReceipt: _serverIdentityDecisionReceipt,
-    ...safe
+    ...withoutStaffAuthority
   } = candidate;
+  const safe = { ...withoutStaffAuthority };
+  for (const field of CLIENT_ROSTER_AUTHORITY_FIELDS) delete safe[field];
+  if (safe.contactEnrichment && typeof safe.contactEnrichment === 'object'
+    && !Array.isArray(safe.contactEnrichment)) {
+    const contactEnrichment = { ...safe.contactEnrichment };
+    for (const field of CLIENT_ROSTER_AUTHORITY_FIELDS) delete contactEnrichment[field];
+    safe.contactEnrichment = contactEnrichment;
+  }
+  return safe;
+}
+
+function valueFromCandidateOrEnrichment(candidate, field) {
+  if (candidate && Object.prototype.hasOwnProperty.call(candidate, field)) {
+    return { present: true, value: candidate[field] };
+  }
+  if (candidate?.contactEnrichment
+    && Object.prototype.hasOwnProperty.call(candidate.contactEnrichment, field)) {
+    return { present: true, value: candidate.contactEnrichment[field] };
+  }
+  return { present: false, value: undefined };
+}
+
+function restoreStoredRosterAuthority(candidate, stored, {
+  allowReceiptBoundEligibility = false,
+} = {}) {
+  if (!stored || !candidate || typeof candidate !== 'object') return candidate;
+  const restored = { ...candidate };
+  const contactEnrichment = candidate.contactEnrichment
+    && typeof candidate.contactEnrichment === 'object'
+    && !Array.isArray(candidate.contactEnrichment)
+    ? { ...candidate.contactEnrichment }
+    : {};
+  for (const field of CLIENT_ROSTER_AUTHORITY_FIELDS) {
+    if (allowReceiptBoundEligibility && RECEIPT_BOUND_ELIGIBILITY_FIELDS.has(field)) continue;
+    const storedValue = valueFromCandidateOrEnrichment(stored, field);
+    if (!storedValue.present) continue;
+    restored[field] = storedValue.value;
+    contactEnrichment[field] = storedValue.value;
+  }
+  return { ...restored, contactEnrichment };
+}
+
+function receiptBoundEligibility(candidate, receipt) {
+  const bound = receipt?.valid === true && receipt.eligibilityEvidenceBound === true;
+  const eligibilityStatus = bound && ELIGIBILITY_STATUSES.has(receipt.eligibilityStatus)
+    ? receipt.eligibilityStatus
+    : 'unknown';
+  const eligibilityCheckStatus = bound && ELIGIBILITY_CHECK_STATUSES.has(receipt.eligibilityCheckStatus)
+    ? receipt.eligibilityCheckStatus
+    : null;
+  const eligibilityReason = bound
+    ? (candidate?.eligibilityReason ?? candidate?.contactEnrichment?.eligibilityReason ?? null)
+    : null;
+  const eligibilityEvidence = bound
+    ? (candidate?.eligibilityEvidence ?? candidate?.contactEnrichment?.eligibilityEvidence ?? null)
+    : null;
+  return {
+    bound,
+    eligibilityStatus,
+    eligibilityCheckStatus,
+    eligibilityReason,
+    eligibilityEvidence,
+  };
+}
+
+function withReceiptBoundEligibility(candidate, eligibility) {
+  return {
+    ...candidate,
+    eligibilityStatus: eligibility.eligibilityStatus,
+    eligibilityCheckStatus: eligibility.eligibilityCheckStatus,
+    eligibilityReason: eligibility.eligibilityReason,
+    eligibilityEvidence: eligibility.eligibilityEvidence,
+    contactEnrichment: {
+      ...(candidate.contactEnrichment || {}),
+      eligibilityStatus: eligibility.eligibilityStatus,
+      eligibilityCheckStatus: eligibility.eligibilityCheckStatus,
+      eligibilityReason: eligibility.eligibilityReason,
+      eligibilityEvidence: eligibility.eligibilityEvidence,
+    },
+  };
+}
+
+function isReceiptBoundEligibilityCandidate(candidate) {
+  return candidate?.receiptBoundEligibility === true;
+}
+
+function removeReceiptBoundEligibilityMarker(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const { receiptBoundEligibility: _receiptBoundEligibility, ...safe } = candidate;
   return safe;
 }
 
@@ -141,21 +272,30 @@ function hasStoredStaffAuthority(candidate) {
     && candidate.staffIdentityConfirmation.confirmationId === confirmationId;
 }
 
-async function preserveStoredRosterAuthority(requestId, candidates) {
+async function preserveStoredRosterAuthority(requestId, candidates, {
+  storedRows: suppliedStoredRows = null,
+} = {}) {
   const list = Array.isArray(candidates) ? candidates : [];
-  const storedRows = await findCandidatesByKeys(
-    requestId,
-    list.map((candidate) => candidate?.candidateKey).filter(Boolean),
-  );
+  const storedRows = Array.isArray(suppliedStoredRows)
+    ? suppliedStoredRows
+    : await findCandidatesByKeys(
+      requestId,
+      list.map((candidate) => candidate?.candidateKey).filter(Boolean),
+    );
   const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
-  return list.map((candidate) => {
+  return list.map((markedCandidate) => {
+    const allowReceiptBoundEligibility = isReceiptBoundEligibilityCandidate(markedCandidate);
+    const candidate = removeReceiptBoundEligibilityMarker(markedCandidate);
     const stored = storedByKey.get(candidate?.candidateKey);
-    const freshIdentityReceipt = hasServerIdentityDecisionReceipt(candidate)
-      ? candidate.serverIdentityDecisionReceipt
+    const withStoredAuthority = restoreStoredRosterAuthority(candidate, stored, {
+      allowReceiptBoundEligibility,
+    });
+    const freshIdentityReceipt = hasServerIdentityDecisionReceipt(withStoredAuthority)
+      ? withStoredAuthority.serverIdentityDecisionReceipt
       : null;
     const candidateWithStoredReceipt = stored?.serverIdentityDecisionReceipt
-      ? { ...candidate, serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
-      : candidate;
+      ? { ...withStoredAuthority, serverIdentityDecisionReceipt: stored.serverIdentityDecisionReceipt }
+      : withStoredAuthority;
     const storedIdentityReceipt = !freshIdentityReceipt
       && !!stored
       && hasServerIdentityDecisionReceipt(stored)
@@ -164,8 +304,8 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
       : null;
     const identityReceipt = freshIdentityReceipt || storedIdentityReceipt;
     const withIdentityReceipt = identityReceipt
-      ? { ...candidate, serverIdentityDecisionReceipt: identityReceipt }
-      : candidate;
+      ? { ...withStoredAuthority, serverIdentityDecisionReceipt: identityReceipt }
+      : withStoredAuthority;
     const preserveStoredTrue = (field) => {
       const incoming = withIdentityReceipt?.[field]
         ?? withIdentityReceipt?.contactEnrichment?.[field];
@@ -191,7 +331,7 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
     const email = confirmation.email || null;
     const website = confirmation.website || null;
     const affiliation = confirmation.affiliation || null;
-    return {
+    return restoreStoredRosterAuthority({
       ...pruneCandidateForRoster({
         ...withAddressAuthority,
         name: stored.name || withAddressAuthority.name,
@@ -218,8 +358,30 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
-    };
+    }, stored, { allowReceiptBoundEligibility });
   });
+}
+
+// Non-applicant staff corrections carry a browser-supplied contact, but never a
+// browser-supplied candidate blob. Resolve the opaque key to the exact active
+// roster row first, then pass only that server row through the same authority
+// restoration used by resurfacing/exclude. Besides retaining nested receipts,
+// this prevents a candidate key for one row from being combined with another
+// row's name or promotion evidence before `confirmIdentity` writes it.
+async function authoritativeNonApplicantCandidate(requestId, candidate) {
+  const candidateKey = typeof candidate?.candidateKey === 'string'
+    ? candidate.candidateKey.trim()
+    : '';
+  if (!candidateKey) return null;
+  const storedRows = await findCandidatesByKeys(requestId, [candidateKey]);
+  const stored = storedRows.find((row) => (
+    row?.candidateKey === candidateKey && row.rosterStatus === 'active'
+  ));
+  if (!stored) return null;
+  const [authoritative] = await preserveStoredRosterAuthority(requestId, [
+    stripClientRosterAuthority(pruneCandidateForRoster(stored)),
+  ], { storedRows: [stored] });
+  return authoritative?.candidateKey === candidateKey ? authoritative : null;
 }
 
 async function handleGet(req, res) {
@@ -540,35 +702,28 @@ async function handlePost(req, res) {
   // client sent them. Eligibility is server-issued evidence: overwrite the
   // browser's fields from the request/candidate-bound receipt, or clear them.
   const pruned = (await Promise.all(candidates.map(async (candidate) => {
-    const compact = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
-    if (!compact?.name) return null;
+    const submitted = pruneCandidateForRoster(candidate);
+    if (!submitted?.name) return null;
+    // Verify the signed candidate projection before stripping authority fields.
+    // The receipt is the one browser-carried authority that is safe to consume;
+    // all non-receipt fields are removed immediately afterward.
     const receipt = await verifyAutomatedIdentityAttestation(
-      compact.automatedIdentityAttestation,
-      { requestId, candidate: compact },
+      submitted.automatedIdentityAttestation,
+      { requestId, candidate: submitted },
     );
-    const eligibilityStatus = receipt.valid && receipt.eligibilityEvidenceBound
-      && (receipt.eligibilityStatus === 'deceased' || receipt.eligibilityStatus === 'emeritus')
-      ? receipt.eligibilityStatus
-      : 'unknown';
-    const preserveEvidence = eligibilityStatus !== 'unknown';
+    const compact = stripClientRosterAuthority(submitted);
+    if (!compact?.name) return null;
+    const eligibility = receiptBoundEligibility(submitted, receipt);
     const bound = bindServerRosterCandidateKey(compact, receipt);
     const identityReceipt = receipt.valid && receipt.identityDecisionBound === true
       ? createServerIdentityDecisionReceipt(bound)
       : null;
     return {
-      ...bound,
+      ...withReceiptBoundEligibility(bound, eligibility),
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
-      eligibilityStatus,
-      eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
-      eligibilityEvidence: preserveEvidence ? compact.eligibilityEvidence : null,
-      contactEnrichment: {
-        ...compact.contactEnrichment,
-        eligibilityStatus,
-        eligibilityReason: preserveEvidence ? compact.contactEnrichment?.eligibilityReason : null,
-        eligibilityEvidence: preserveEvidence ? compact.contactEnrichment?.eligibilityEvidence : null,
-      },
+      receiptBoundEligibility: eligibility.bound,
     };
   }))).filter(Boolean);
   const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);
@@ -652,6 +807,14 @@ async function handlePatch(req, res, access) {
           code: 'applicant_hydration_required',
         });
       }
+    } else {
+      authoritativeCandidate = await authoritativeNonApplicantCandidate(requestId, candidate);
+      if (!authoritativeCandidate) {
+        return res.status(409).json({
+          error: 'Candidate is no longer active or does not match this roster row; reload before confirming identity.',
+          code: 'candidate_not_active',
+        });
+      }
     }
     const manualCandidate = {
       ...authoritativeCandidate,
@@ -671,7 +834,20 @@ async function handlePatch(req, res, access) {
         affiliationSource: 'staff_manual',
       },
     };
-    const confirmed = await confirmIdentity(requestId, pruneCandidateForRoster(manualCandidate), {
+    // The display DTO pruner intentionally omits server-only freshness/COI
+    // evidence. Restore it from the already canonical roster row after pruning
+    // so the store's shallow confirmation merge cannot erase nested authority.
+    const prunedManualCandidate = pruneCandidateForRoster(manualCandidate);
+    const candidateForConfirmation = restoreStoredRosterAuthority(
+      authoritativeCandidate.serverIdentityDecisionReceipt
+        ? {
+            ...prunedManualCandidate,
+            serverIdentityDecisionReceipt: authoritativeCandidate.serverIdentityDecisionReceipt,
+          }
+        : prunedManualCandidate,
+      authoritativeCandidate,
+    );
+    const confirmed = await confirmIdentity(requestId, candidateForConfirmation, {
       actorProfileId: access?.profileId || null,
       actorSystemUserId: access?.session?.user?.dynamicsSystemuserId || null,
     });

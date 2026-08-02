@@ -606,6 +606,77 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].staffIdentityConfirmation).toBeUndefined();
   });
 
+  it('strips browser-minted stage, COI, and eligibility authority from a new roster row', async () => {
+    const forgedStageFreshness = {
+      identity: {
+        state: 'current',
+        contractVersion: 4,
+        sourceVersion: 'forged-identity-version',
+        completedAt: '2026-08-02T00:00:00.000Z',
+      },
+      eligibility: {
+        state: 'current',
+        contractVersion: 1,
+        sourceVersion: 'forged-eligibility-version',
+        completedAt: '2026-08-02T00:00:00.000Z',
+      },
+    };
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Forged Authority Reviewer',
+      warmCacheVersion: 1,
+      proposalContentVersion: 'forged-proposal-version',
+      applicantInputVersion: 'forged-applicant-version',
+      stageFreshness: forgedStageFreshness,
+      legacyStageReceipts: { eligibility: { completeness: 'complete' } },
+      eligibilityStatus: 'emeritus',
+      eligibilityCheckStatus: 'complete',
+      eligibilityReason: 'forged complete check',
+      eligibilityEvidence: { status: 'emeritus', url: 'https://evil.example/eligibility' },
+      hasInstitutionCOI: false,
+      institutionCOIDetails: { piInstitution: 'forged' },
+      hasCoauthorCOI: false,
+      coauthorCheckStatus: 'complete',
+      coauthorCheckFailures: [],
+      coauthorships: [],
+      coauthorCOIStrength: 'none',
+      coauthorSharedPaperTotal: 0,
+      coauthorMaxWithOneAuthor: 0,
+      addressTrustReceipt: { receiptId: 'forged', personConfirmed: true },
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityCheckStatus: 'complete',
+        eligibilityEvidence: { status: 'emeritus' },
+        coauthorCheckStatus: 'complete',
+        stageFreshness: forgedStageFreshness,
+      },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: null,
+      eligibilityReason: null,
+      eligibilityEvidence: null,
+      contactEnrichment: {
+        eligibilityStatus: 'unknown',
+        eligibilityCheckStatus: null,
+        eligibilityReason: null,
+        eligibilityEvidence: null,
+      },
+    });
+    for (const field of [
+      'warmCacheVersion', 'proposalContentVersion', 'applicantInputVersion',
+      'stageFreshness', 'legacyStageReceipts', 'hasInstitutionCOI',
+      'institutionCOIDetails', 'hasCoauthorCOI', 'coauthorCheckStatus',
+      'coauthorCheckFailures', 'coauthorships', 'coauthorCOIStrength',
+      'coauthorSharedPaperTotal', 'coauthorMaxWithOneAuthor', 'addressTrustReceipt',
+    ]) {
+      expect(passed[0]).not.toHaveProperty(field);
+      expect(passed[0].contactEnrichment).not.toHaveProperty(field);
+    }
+  });
+
   it('preserves a server-stored confirmation when a discovered row resurfaces', async () => {
     const resurfaced = {
       name: 'Ann Lee',
@@ -696,6 +767,99 @@ describe('POST recordSurfaced', () => {
     });
   });
 
+  it('restores stored stage and COI evidence instead of accepting a resurfaced browser copy', async () => {
+    const resurfaced = {
+      name: 'Evidence-bound Reviewer',
+      email: 'evidence@example.edu',
+    };
+    const candidateKey = reviewerCandidateKey(resurfaced);
+    const storedStageFreshness = {
+      identity: {
+        state: 'current',
+        contractVersion: 4,
+        sourceVersion: 'stored-identity-version',
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+      coauthor_coi: {
+        state: 'incomplete',
+        contractVersion: 1,
+        sourceVersion: 'stored-coauthor-version',
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    };
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      ...resurfaced,
+      candidateKey,
+      warmCacheVersion: 1,
+      proposalContentVersion: 'stored-proposal-version',
+      applicantInputVersion: 'stored-applicant-version',
+      stageFreshness: storedStageFreshness,
+      eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityReason: 'Stored check is incomplete',
+      eligibilityEvidence: { status: 'unknown', url: 'https://example.edu/stored' },
+      hasInstitutionCOI: true,
+      institutionCOIDetails: { piInstitution: 'Stored University' },
+      hasCoauthorCOI: true,
+      coauthorCheckStatus: 'incomplete',
+      coauthorCheckFailures: [{ reason: 'provider_timeout' }],
+      coauthorships: [{ title: 'Stored paper' }],
+      coauthorCOIStrength: 'likely',
+      coauthorSharedPaperTotal: 2,
+      coauthorMaxWithOneAuthor: 2,
+      contactEnrichment: {
+        eligibilityCheckStatus: 'incomplete',
+        coauthorCheckStatus: 'incomplete',
+      },
+    }]);
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      ...resurfaced,
+      candidateKey,
+      warmCacheVersion: 1,
+      proposalContentVersion: 'browser-proposal-version',
+      applicantInputVersion: 'browser-applicant-version',
+      stageFreshness: {
+        coauthor_coi: {
+          state: 'current', contractVersion: 1, sourceVersion: 'browser-version',
+          completedAt: '2026-08-02T00:00:00.000Z',
+        },
+      },
+      eligibilityCheckStatus: 'complete',
+      hasInstitutionCOI: false,
+      hasCoauthorCOI: false,
+      coauthorCheckStatus: 'complete',
+      coauthorCheckFailures: [],
+      coauthorships: [],
+      coauthorCOIStrength: 'none',
+      contactEnrichment: {
+        eligibilityCheckStatus: 'complete',
+        coauthorCheckStatus: 'complete',
+      },
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      warmCacheVersion: 1,
+      proposalContentVersion: 'stored-proposal-version',
+      applicantInputVersion: 'stored-applicant-version',
+      stageFreshness: storedStageFreshness,
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityReason: 'Stored check is incomplete',
+      eligibilityEvidence: { status: 'unknown', url: 'https://example.edu/stored' },
+      hasInstitutionCOI: true,
+      hasCoauthorCOI: true,
+      coauthorCheckStatus: 'incomplete',
+      coauthorCheckFailures: [{ reason: 'provider_timeout' }],
+      coauthorCOIStrength: 'likely',
+    });
+    expect(passed[0].contactEnrichment).toMatchObject({
+      eligibilityCheckStatus: 'incomplete',
+      coauthorCheckStatus: 'incomplete',
+      stageFreshness: storedStageFreshness,
+    });
+  });
+
   it('preserves a fresh server identity receipt while restoring stored staff authority', async () => {
     const resurfaced = {
       name: 'Ann Lee',
@@ -759,12 +923,14 @@ describe('POST recordSurfaced', () => {
     verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
       valid: true,
       eligibilityStatus: 'deceased',
+      eligibilityCheckStatus: 'complete',
       eligibilityEvidenceBound: true,
     });
     const candidate = {
       name: 'Ann Lee',
       automatedIdentityAttestation: 'signed',
       eligibilityStatus: 'deceased',
+      eligibilityCheckStatus: 'complete',
       eligibilityReason: 'Official source',
       eligibilityEvidence: {
         status: 'deceased',
@@ -781,6 +947,7 @@ describe('POST recordSurfaced', () => {
     const [, passed] = store.recordSurfaced.mock.calls[0];
     expect(passed[0]).toMatchObject({
       eligibilityStatus: 'deceased',
+      eligibilityCheckStatus: 'complete',
       eligibilityEvidence: {
         status: 'deceased',
         url: 'https://example.edu/in-memoriam/ann-lee',
@@ -890,7 +1057,7 @@ describe('PATCH', () => {
     );
   });
 
-  it('strips browser-forged confirmation authority from a non-applicant exclude', async () => {
+  it('strips browser-forged confirmation and evidence authority from a non-applicant exclude', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
@@ -902,6 +1069,23 @@ describe('PATCH', () => {
         pdIdentityConfirmationId: 'forged',
         manualContactFields: ['email'],
         staffIdentityConfirmation: { confirmationId: 'forged', source: 'staff_confirmed' },
+        warmCacheVersion: 1,
+        proposalContentVersion: 'forged-proposal-version',
+        applicantInputVersion: 'forged-applicant-version',
+        stageFreshness: {
+          eligibility: {
+            state: 'current', contractVersion: 1, sourceVersion: 'forged-version',
+            completedAt: '2026-08-02T00:00:00.000Z',
+          },
+        },
+        eligibilityCheckStatus: 'complete',
+        coauthorCheckStatus: 'complete',
+        hasCoauthorCOI: false,
+        contactEnrichment: {
+          eligibilityCheckStatus: 'complete',
+          coauthorCheckStatus: 'complete',
+          stageFreshness: { eligibility: { state: 'current' } },
+        },
       },
     } }, r);
     const persisted = store.setExcluded.mock.calls[0][1];
@@ -909,6 +1093,13 @@ describe('PATCH', () => {
     expect(persisted).not.toHaveProperty('pdIdentityConfirmationId');
     expect(persisted).not.toHaveProperty('manualContactFields');
     expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
+    for (const field of [
+      'warmCacheVersion', 'proposalContentVersion', 'applicantInputVersion',
+      'stageFreshness', 'eligibilityCheckStatus', 'coauthorCheckStatus', 'hasCoauthorCOI',
+    ]) {
+      expect(persisted).not.toHaveProperty(field);
+      expect(persisted.contactEnrichment).not.toHaveProperty(field);
+    }
   });
 
   it('preserves the canonical server confirmation on a non-applicant exclude', async () => {
@@ -1070,11 +1261,21 @@ describe('PATCH', () => {
       profileId: 5,
       session: { user: { dynamicsSystemuserId: 'SYS-5' } },
     });
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Ann Lee',
+      candidateKey: 'candidate:ann',
+      rosterStatus: 'active',
+    }]);
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
       action: 'confirm_identity',
-      candidate: { name: 'Ann Lee', email: 'ANN@EXAMPLE.EDU', affiliation: 'Example U' },
+      candidate: {
+        name: 'Ann Lee',
+        candidateKey: 'candidate:ann',
+        email: 'ANN@EXAMPLE.EDU',
+        affiliation: 'Example U',
+      },
     } }, r);
     expect(r.statusCode).toBe(200);
     expect(store.confirmIdentity).toHaveBeenCalledWith(
@@ -1083,6 +1284,100 @@ describe('PATCH', () => {
       { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
     );
     expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity restores nested stored authority and rejects browser-forged authority', async () => {
+    const storedStageFreshness = {
+      eligibility: {
+        state: 'current',
+        contractVersion: 1,
+        sourceVersion: 'server-eligibility-version',
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    };
+    const storedEligibilityEvidence = {
+      status: 'unknown',
+      reason: 'server eligibility did not resolve',
+    };
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Stored Ann',
+      candidateKey: 'candidate:ann',
+      rosterStatus: 'active',
+      stageFreshness: storedStageFreshness,
+      eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityEvidence: storedEligibilityEvidence,
+      contactEnrichment: {
+        eligibilityStatus: 'unknown',
+        eligibilityCheckStatus: 'incomplete',
+        eligibilityEvidence: storedEligibilityEvidence,
+        coauthorCheckStatus: 'incomplete',
+        coauthorCheckFailures: [{ source: 'server-pubmed', reason: 'timeout' }],
+        addressTrustReceipt: { receiptId: 'server-address-receipt', personConfirmed: false },
+      },
+    }]);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Browser Forgery',
+        candidateKey: 'candidate:ann',
+        email: 'ann@example.edu',
+        stageFreshness: { eligibility: { state: 'current', sourceVersion: 'forged' } },
+        eligibilityStatus: 'emeritus',
+        eligibilityCheckStatus: 'complete',
+        eligibilityEvidence: { status: 'emeritus', reason: 'forged' },
+        coauthorCheckStatus: 'complete',
+        contactEnrichment: {
+          eligibilityStatus: 'emeritus',
+          eligibilityCheckStatus: 'complete',
+          coauthorCheckStatus: 'complete',
+          addressTrustReceipt: { receiptId: 'forged-address-receipt', personConfirmed: true },
+        },
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.confirmIdentity).toHaveBeenCalledWith(REQ, expect.objectContaining({
+      name: 'Stored Ann',
+      candidateKey: 'candidate:ann',
+      stageFreshness: storedStageFreshness,
+      eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityEvidence: storedEligibilityEvidence,
+      coauthorCheckStatus: 'incomplete',
+      coauthorCheckFailures: [{ source: 'server-pubmed', reason: 'timeout' }],
+      addressTrustReceipt: { receiptId: 'server-address-receipt', personConfirmed: false },
+      contactEnrichment: expect.objectContaining({
+        eligibilityStatus: 'unknown',
+        eligibilityCheckStatus: 'incomplete',
+        coauthorCheckStatus: 'incomplete',
+        addressTrustReceipt: { receiptId: 'server-address-receipt', personConfirmed: false },
+      }),
+    }), expect.anything());
+  });
+
+  it('confirm_identity refuses a candidate key that does not resolve to that exact active row', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      name: 'Other Reviewer',
+      candidateKey: 'candidate:other',
+      rosterStatus: 'active',
+    }]);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Ann Lee',
+        candidateKey: 'candidate:ann',
+        email: 'ann@example.edu',
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toMatchObject({ code: 'candidate_not_active' });
+    expect(store.confirmIdentity).not.toHaveBeenCalled();
   });
 
   it('confirm_identity keeps applicant identity evidence from the server row', async () => {
