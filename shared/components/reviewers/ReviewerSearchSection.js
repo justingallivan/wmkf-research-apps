@@ -89,6 +89,100 @@ const BLOCKED_REFERRAL_REASON = {
   institution_coi: 'PI institution conflict',
 };
 
+// These labels are deliberately bounded. The browser receives a server-owned
+// freshness plan but must not turn an unknown stage into a staff-facing claim.
+const EVIDENCE_STAGE_LABELS = Object.freeze({
+  applicant_anchor: 'Applicant input',
+  identity: 'Identity',
+  institution_coi: 'Institution COI',
+  coauthor_coi: 'Coauthor COI',
+  eligibility: 'Eligibility',
+  contact: 'Contact',
+  address_trust: 'Address trust',
+  roster_persistence: 'Roster persistence',
+});
+const EVIDENCE_STAGE_ORDER = Object.freeze(Object.keys(EVIDENCE_STAGE_LABELS));
+const CANONICAL_CANDIDATE_KEY = /^(?:suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/;
+const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
+
+function canonicalCandidateKey(value) {
+  const key = typeof value === 'string' ? value.trim() : '';
+  return CANONICAL_CANDIDATE_KEY.test(key) ? key : null;
+}
+
+function canonicalEvidenceDate(value) {
+  if (typeof value !== 'string' || !CANONICAL_ISO_DATE.test(value)) return null;
+  try {
+    return new Date(value).toISOString() === value ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+// The warm plan is server-derived display data. A duplicate or malformed key is
+// ambiguous, so this projection omits it rather than associating it by name or
+// by a client-generated fallback key.
+export function buildEvidencePlansByCandidateKey(rosterSnapshot, requestId) {
+  if (rosterSnapshot?.requestId !== requestId) return new Map();
+  const plans = rosterSnapshot?.data?.warmValidation?.candidatePlans;
+  if (!Array.isArray(plans)) return new Map();
+  const byKey = new Map();
+  const ambiguous = new Set();
+  for (const plan of plans) {
+    const key = canonicalCandidateKey(plan?.candidateKey);
+    if (!key || ambiguous.has(key)) continue;
+    if (byKey.has(key)) {
+      byKey.delete(key);
+      ambiguous.add(key);
+      continue;
+    }
+    byKey.set(key, plan);
+  }
+  return byKey;
+}
+
+// Only current/not-applicable stages are represented in `currentStages` by the
+// server planner. Do not inspect candidate receipts here: that would let stale
+// roster JSON create an evidence-date claim outside the warm-plan contract.
+export function projectEvidenceCheck(candidate, plansByCandidateKey) {
+  const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
+  const plan = candidateKey ? plansByCandidateKey?.get(candidateKey) : null;
+  const currentStages = Array.isArray(plan?.currentStages) ? new Set(plan.currentStages) : null;
+  const checkedDates = plan?.evidenceCheckedDates;
+  if (!currentStages || !checkedDates || typeof checkedDates !== 'object' || Array.isArray(checkedDates)) return null;
+
+  const stages = EVIDENCE_STAGE_ORDER.flatMap((stage) => {
+    if (!currentStages.has(stage)) return [];
+    const date = canonicalEvidenceDate(checkedDates[stage]);
+    return date ? [{ stage, label: EVIDENCE_STAGE_LABELS[stage], date }] : [];
+  });
+  if (stages.length === 0) return null;
+  const summaryDate = stages.reduce((oldest, stage) => (stage.date < oldest ? stage.date : oldest), stages[0].date);
+  return { summaryDate, stages };
+}
+
+function EvidenceCheck({ evidenceCheck }) {
+  if (!evidenceCheck) return null;
+  return (
+    <div className="mt-2 text-xs text-gray-600">
+      <p>
+        Evidence checked as of <time dateTime={evidenceCheck.summaryDate}>{evidenceCheck.summaryDate}</time>
+      </p>
+      <details className="mt-1">
+        <summary className="cursor-pointer text-gray-500">Evidence checked by stage</summary>
+        <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-2 gap-y-0.5 pl-2">
+          {evidenceCheck.stages.map(({ stage, label, date }) => (
+            <div key={stage} className="contents">
+              <dt>{label}</dt>
+              <dd><time dateTime={date}>{date}</time></dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+    </div>
+  );
+}
+
 export function addressTrustFailureMessage(data, fallback) {
   const base = data?.message || data?.error || fallback;
   const actions = Array.isArray(data?.remediation) ? data.remediation : [];
@@ -187,7 +281,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true, evidenceCheck = null }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -448,6 +542,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               Add or verify an email before promoting this reviewer to Invite.
             </div>
           )}
+
+          <EvidenceCheck evidenceCheck={evidenceCheck} />
 
           {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Why: </span>{reason}</p>}
 
@@ -987,6 +1083,17 @@ export default function ReviewerSearchSection({
   const visibleRecCandidates = parentRosterSnapshotCurrent ? recCandidates : [];
   const visibleRecHandled = parentRosterSnapshotCurrent ? recHandled : [];
   const visibleUnverified = parentRosterSnapshotCurrent ? unverified : [];
+  // Keep the request match in this derivation as a render-time guard. React can
+  // render once with the prior prop before the request-reset effect clears its
+  // local lists; old warm-plan dates must not paint in that window.
+  const evidencePlansByCandidateKey = useMemo(
+    () => buildEvidencePlansByCandidateKey(rosterSnapshot, requestId),
+    [rosterSnapshot, requestId],
+  );
+  const evidenceCheckForCandidate = useCallback(
+    (candidate) => projectEvidenceCheck(candidate, evidencePlansByCandidateKey),
+    [evidencePlansByCandidateKey],
+  );
 
   // Per-user prompt-override editor toggle (S222).
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -2893,15 +3000,16 @@ export default function ReviewerSearchSection({
                                     || promotionDecision?.decision === 'missing_email'
                                   );
                                 if (selectableNow && !readOnlySection) {
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
                                 }
                                 if (selectableNow && readOnlySection) {
                                   // needs-review row the PD just confirmed → selectable + editable.
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
                                 }
                                 return <CandidateCard
                                   key={candKey(c)}
                                   candidate={c}
+                                  evidenceCheck={evidenceCheckForCandidate(c)}
                                   previousResult={previousSearchKeys.has(candKey(c))}
                                   readOnly
                                   onExclude={displayOnly ? undefined : excludeCandidate}
@@ -2967,7 +3075,7 @@ export default function ReviewerSearchSection({
                       </summary>
                       <div className="space-y-2 mt-2">
                         {visibleRosterExcluded.map((c) => (
-                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={displayOnly ? undefined : promoteCandidate} />
+                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} readOnly onPromote={displayOnly ? undefined : promoteCandidate} />
                         ))}
                       </div>
                     </details>
@@ -3015,6 +3123,7 @@ export default function ReviewerSearchSection({
                           <CandidateCard
                             key={`blocked-${candKey(candidate)}`}
                             candidate={candidate}
+                            evidenceCheck={evidenceCheckForCandidate(candidate)}
                             readOnly
                           />
                         ))}
@@ -3029,7 +3138,7 @@ export default function ReviewerSearchSection({
                       </summary>
                       <div className="space-y-2 mt-2">
                         {unverifiedToShow.map((c, i) => (
-                          <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} readOnly />
+                          <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} readOnly />
                         ))}
                       </div>
                     </details>
