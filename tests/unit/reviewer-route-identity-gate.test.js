@@ -22,7 +22,10 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {} }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PID-1' })),
-  getById: jest.fn(async () => ({ wmkf_primaryaffiliation: 'MIT' })),
+  getById: jest.fn(async () => ({
+    wmkf_primaryaffiliation: 'MIT',
+    _etag: 'W/"test-person"',
+  })),
   getByEmail: jest.fn(async () => null),
   findByEmailCandidates: jest.fn(async () => []),
   update: jest.fn(async () => undefined),
@@ -80,6 +83,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findIdentityConfirmation: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
+  promotionSnapshotIsCurrent: jest.fn(async () => true),
   findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
     candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
   )),
@@ -100,6 +104,11 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
     contactAuthorityBound: true,
     ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
   })),
+}));
+const mockGetCandidatePromotionAuthority = jest.fn();
+jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
+  ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
+  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -126,6 +135,8 @@ const { verifyAutomatedIdentityAttestation } = require('../../lib/services/revie
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
 const NotificationService = require('../../lib/services/notification-service').default;
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
+const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+const { ContactParser } = require('../../lib/utils/contact-parser');
 
 function mockRes() {
   const res = {};
@@ -152,18 +163,58 @@ const enrichmentFor = (identity) => ({
 const readyCandidate = (name, email, extra = {}) => ({
   name,
   email,
-  emailSource: 'pubmed',
+  // Keep generic persistence tests on the high-confidence path. Individual
+  // low-confidence-address tests below supply their source + current server
+  // receipt explicitly, so they exercise the address-trust transition rather
+  // than accidentally changing unrelated assertions to staff-verified.
+  emailSource: 'orcid',
   emailPersistAllowed: true,
   identityStatus: 'probable',
   ...extra,
 });
 
+const testRosterEmails = new Map();
+
+function withCurrentRosterAuthority(candidate) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
+  const candidateKey = candidate.candidateKey || reviewerSaveKey(candidate);
+  const email = candidate.email
+    || candidate.contactEnrichment?.email
+    || ContactParser.extractPrimaryEmail(candidate.affiliation)
+    || null;
+  if (candidateKey && email) testRosterEmails.set(candidateKey, String(email).toLowerCase());
+  return {
+    ...candidate,
+    candidateKey,
+    automatedIdentityAttestation: candidate.automatedIdentityAttestation || 'test-signed-attestation',
+  };
+}
+
+function withCurrentRosterAuthorityRequest(req) {
+  if (!Array.isArray(req?.body?.candidates)) return req;
+  return {
+    ...req,
+    body: {
+      ...req.body,
+      candidates: req.body.candidates.map(withCurrentRosterAuthority),
+    },
+  };
+}
+
 // ── /api/reviewer-finder/save-candidates ──────────────────────────────────────
 describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   let handler;
-  beforeAll(() => { handler = require('../../pages/api/reviewer-finder/save-candidates').default; });
+  let rawHandler;
+  beforeAll(() => {
+    rawHandler = require('../../pages/api/reviewer-finder/save-candidates').default;
+    handler = (req, res) => rawHandler(withCurrentRosterAuthorityRequest(req), res);
+  });
   beforeEach(() => {
     jest.clearAllMocks();
+    testRosterEmails.clear();
+    mockGetCandidatePromotionAuthority.mockReturnValue({
+      decision: 'ready', code: null, stage: null, reason: null,
+    });
     reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
     contactAdapter.getInstitutionById.mockResolvedValue(null);
     accountAdapter.getById.mockResolvedValue(null);
@@ -177,6 +228,19 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
     }));
     rosterStore.findIdentityConfirmation.mockResolvedValue(null);
+    rosterStore.findAddressTrustReceipt.mockImplementation(async (_requestId, candidateKey) => {
+      const email = testRosterEmails.get(candidateKey);
+      return email ? {
+        receiptId: `test-address-receipt:${candidateKey}`,
+        requestId: 'REQ-1',
+        candidateKey,
+        personConfirmed: true,
+        email,
+        evidenceType: 'institution_page',
+        evidenceUrl: 'https://example.edu/reviewer',
+        attestedAt: '2026-08-02T00:00:00.000Z',
+      } : null;
+    });
     rosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
       candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
     ));
@@ -212,12 +276,13 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('legacy receipt keeps its bound metrics but cannot authorize an identity decision write', async () => {
-    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    verifyAutomatedIdentityAttestation.mockImplementationOnce(async (_token, { candidate } = {}) => ({
       valid: true,
       source: 'automated_resolver',
       identityDecisionBound: false,
       contactAuthorityBound: true,
-    });
+      rosterCandidateKey: candidate?.candidateKey,
+    }));
 
     await run({
       status: 'probable',
@@ -478,7 +543,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
-  test('ambiguous identity candidates outcome → saves authoritative contact unlinked and alerts staff review', async () => {
+  test('ambiguous identity candidates outcome → withholds a roster-managed promotion before writes', async () => {
     const candidates = [{ source: 'reviewer', reviewerId: 'PID-EXISTING', contactId: null, matchKey: 'name', context: { name: 'Dr Name' } }];
     lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'candidates', candidates });
     const req = {
@@ -488,26 +553,21 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.savedCount).toBe(1);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      errors: [expect.objectContaining({
+        code: 'ambiguous_or_name_mismatch',
+        outcome: 'withheld',
+        decision: 'identity_choice_required',
+      })],
+    });
     expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'reviewer_contact_match_needs_review',
-      severity: 'warning',
-      category: 'reviewers',
-      autoResolveKey: 'reviewer-contact-match:PID-1:REQ-1',
-      metadata: expect.objectContaining({
-        requestId: 'REQ-1',
-        potentialReviewerId: 'PID-1',
-        candidateName: 'Dr Name',
-        lookupOutcome: 'candidates',
-        candidates,
-        policyDecision: 'save_unlinked_staff_review',
-      }),
-    }));
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
-  test('conflict outcome → saves unlinked and alerts with conflict reason/details', async () => {
+  test('conflict outcome → withholds a roster-managed promotion before writes', async () => {
     const details = { emailContactId: 'C-EMAIL', orcidContactId: 'C-ORCID' };
     lookupReviewerIdentity.mockResolvedValueOnce({ outcome: 'conflict', reason: 'orcid_email_split', details });
     const req = {
@@ -520,18 +580,18 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      errors: [expect.objectContaining({
+        code: 'orcid_email_split',
+        outcome: 'withheld',
+        decision: 'identity_choice_required',
+      })],
+    });
     expect(potentialReviewerAdapter.setContactLink).not.toHaveBeenCalled();
-    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'reviewer_contact_match_needs_review',
-      message: expect.stringContaining('conflict (orcid_email_split)'),
-      metadata: expect.objectContaining({
-        lookupOutcome: 'conflict',
-        conflictReason: 'orcid_email_split',
-        conflictDetails: details,
-        candidates: [],
-      }),
-    }));
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(NotificationService.notify).not.toHaveBeenCalled();
   });
 
   test('lookup none → saves without link or alert', async () => {
@@ -724,7 +784,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('correct@uni.edu');
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.email).toBe('correct@uni.edu');
-    expect(payload.emailSource).toBe('manual');
+    expect(payload.emailSource).toBe('staff_verified');
   });
 
   test('PD override: contact lookup receives manual email but no ORCID', async () => {
@@ -743,7 +803,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     });
   });
 
-  test('PD override: emailSource is FORCED manual server-side (forged source ignored)', async () => {
+  test('PD override: emailSource is FORCED staff_verified after exact address attestation', async () => {
     rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
       source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
       website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
@@ -753,7 +813,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     await handler(pdConfirmedReq({ emailSource: 'orcid' }), res);
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(payload.email).toBe('correct@uni.edu');
-    expect(payload.emailSource).toBe('manual');
+    expect(payload.emailSource).toBe('staff_verified');
   });
 
   test('PD override: auto-fetched ORCID / Scholar / metrics are NULLED (never blessed)', async () => {
@@ -811,16 +871,17 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   });
 
-  test('client confirmed status without a valid server receipt cannot persist automated identity fields', async () => {
+  test('client confirmed status without a valid server receipt is withheld before any write', async () => {
     verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'no_token' });
     const res = await run({ status: 'confirmed' });
-    expect(res.statusCode).toBe(200);
-    const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
-    expect(payload.orcid).toBeNull();
-    expect(payload.googleScholarId).toBeNull();
-    expect(payload.hIndex).toBeNull();
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({
+      savedCount: 0,
+      errors: [expect.objectContaining({ code: 'identity_attestation_required' })],
+    });
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
     expect(researcherAdapter.writeIdentityDecision).not.toHaveBeenCalled();
-    expect(researcherAdapter.clearIdentityFields).toHaveBeenCalled();
+    expect(researcherAdapter.clearIdentityFields).not.toHaveBeenCalled();
   });
 
   test('explicit contact persist flags false → promotion is withheld before person writes', async () => {
@@ -1037,10 +1098,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(res.body.savedCount).toBe(1);
     // Email is extracted from the affiliation and persisted...
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('christopher.walsh@childrens.harvard.edu');
-    // ...stamped as affiliation-sourced (trusted; not 'manual'/paid-search).
+    // ...recorded as staff_verified because affiliation is a quick-check
+    // source and this fixture supplies an exact server address attestation.
     const researcherPayload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
     expect(researcherPayload.email).toBe('christopher.walsh@childrens.harvard.edu');
-    expect(researcherPayload.emailSource).toBe('affiliation');
+    expect(researcherPayload.emailSource).toBe('staff_verified');
     // The identity lookup also sees the rescued email.
     expect(lookupReviewerIdentity).toHaveBeenCalledWith(expect.objectContaining({ email: 'christopher.walsh@childrens.harvard.edu' }));
   });
@@ -1064,7 +1126,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
 
     expect(res.statusCode).toBe(200);
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('primary@uni.edu');
-    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBe('pubmed');
+    expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1].emailSource).toBe('staff_verified');
   });
 
   test('no rescue when the affiliation has no email → promotion is withheld', async () => {
@@ -1142,7 +1204,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     expect(potentialReviewerAdapter.upsertByEmail.mock.calls[0][0].email).toBe('maybe@plausible.edu');
     expect(researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1]).toMatchObject({
       email: 'maybe@plausible.edu',
-      emailSource: 'search_contested',
+      emailSource: 'staff_verified',
     });
   });
 

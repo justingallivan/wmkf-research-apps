@@ -19,6 +19,26 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
     saved: true,
     candidateKey: candidate.candidateKey,
   })),
+  promotionSnapshotIsCurrent: jest.fn(async () => true),
+}));
+const mockGetCandidatePromotionAuthority = jest.fn();
+jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
+  ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
+  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
+}));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: jest.fn(async () => ({
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
+jest.mock('../../lib/services/deduplication-service', () => ({
+  DeduplicationService: {
+    institutionCOIResolution: jest.fn(async () => ({ status: 'clear', decision: null })),
+    institutionCOIDecisionResolved: jest.fn(async () => null),
+  },
+}));
+jest.mock('../../lib/services/institution-identity-resolver', () => ({
+  createInstitutionIdentityResolver: jest.fn(() => ({})),
 }));
 
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
@@ -69,6 +89,9 @@ function post(body) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetCandidatePromotionAuthority.mockReturnValue({
+    decision: 'ready', code: null, stage: null, reason: null,
+  });
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: 'u-1' } } });
   findById.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUGGESTION_ID,

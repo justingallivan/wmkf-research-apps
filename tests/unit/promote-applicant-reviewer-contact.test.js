@@ -52,6 +52,26 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: jest.fn(async () => null), // no roster row by default → no backfill
   finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
   findAddressTrustReceipt: jest.fn(async () => null),
+  promotionSnapshotIsCurrent: jest.fn(async () => true),
+}));
+const mockGetCandidatePromotionAuthority = jest.fn();
+jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
+  ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
+  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
+}));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: jest.fn(async () => ({
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+  })),
+}));
+jest.mock('../../lib/services/deduplication-service', () => ({
+  DeduplicationService: {
+    institutionCOIResolution: jest.fn(async () => ({ status: 'clear', decision: null })),
+    institutionCOIDecisionResolved: jest.fn(async () => null),
+  },
+}));
+jest.mock('../../lib/services/institution-identity-resolver', () => ({
+  createInstitutionIdentityResolver: jest.fn(() => ({})),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
@@ -104,6 +124,9 @@ describe('promote-applicant-reviewer — persist hand-corrections', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCandidatePromotionAuthority.mockReturnValue({
+      decision: 'ready', code: null, stage: null, reason: null,
+    });
     mockPersonEmail = 'existing@example.org';
     mockPersonEmailSource = 'scholarly_multi';
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
@@ -228,6 +251,9 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   beforeAll(() => { handler = require('../../pages/api/workbench/promote-applicant-reviewer').default; });
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCandidatePromotionAuthority.mockReturnValue({
+      decision: 'ready', code: null, stage: null, reason: null,
+    });
     // Restore clean adapter defaults — clearAllMocks clears calls but NOT the throwing
     // mockImplementation the describe-1 collision test installs, which would leak here.
     mockPersonEmail = null;

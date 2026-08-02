@@ -403,6 +403,7 @@ describe('happy path (progress ordering + full card payload)', () => {
       hIndex: null,
       totalCitations: null,
       eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: null,
       eligibilityReason: null,
       eligibilityEvidence: null,
       isApplicantRecommended: true,
