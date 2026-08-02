@@ -183,14 +183,29 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   confirmed Dataverse suggestion success, followed by best-effort retirement
   of active aliases carrying the same checksum-valid ORCID), `markPromotionBlocked`
   (server-only exact-key `active`→`blocked` with decision/code/reason), and
-  `removePreviousActiveSearchResults`. Terminal states are monotonic against
-  ordinary result refreshes.
+  `removePreviousActiveSearchResults`, plus the stage-local
+  `startStageRefresh`/`completeStageRefresh`/`failStageRefresh`/
+  `recoverExpiredStageRefresh` CAS helpers. The refresh helpers mutate only
+  one named stage under `candidate.stageFreshness`, bind every write to the
+  canonical candidate key + expected `updated_at` + refresh-attempt lease, and
+  JSONB-merge rather than erasing prior display evidence. Terminal states are
+  monotonic against ordinary result refreshes.
 - `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
   Promote, authenticated identity confirmation, and scoped removal. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
   saved/blocked authority. Browser-authored blobs have staff authority stripped
   and eligibility reconstructed only from a valid bound receipt.
 - `pages/api/workbench/enrich-recommended.js` snapshots each canonical suggestion row and its roster `updated_at`, preserves complete actor-bound staff confirmations through the bounded prune, and records applicant-suggested output via concurrency-guarded `recordSurfaced` as `active` or direct-deceased `ineligible`, stamped with `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`. A row confirmed, excluded, saved, or otherwise changed while enrichment is running is left unchanged and reported in progress; a suggestion with no row at snapshot may still insert normally. Deceased rows skip Dataverse contact/identity/metric writeback.
+- `pages/api/workbench/reviewer-stage-refresh.js` is the explicit manual
+  targeted-refresh surface. Its closed body schema accepts only the request
+  GUID, suggestion GUID, allowlisted stage, and server-issued roster version;
+  it derives `suggestion:<id>`, validates the exact canonical active roster
+  row against the exact Dataverse suggestion/request/person/applicant anchor,
+  then updates only `applicant_anchor`. The stage starts with a CAS-bound
+  `refreshAttemptId`, completes/fails with that same lease, and retains prior
+  evidence on failure. It performs no name-based lookup, provider/model call,
+  proposal/Blob operation, or batch applicant enrichment. All other planned
+  stages remain rejected until each has a reviewed executor.
 - `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
 
 ## Cross-system

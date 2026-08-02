@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 import {
+  buildApplicantAnchorRefreshReceipt,
   projectApplicantWarmInputs,
   readReviewerWarmValidation,
   resolveReviewerProposalMetadata,
@@ -344,6 +345,84 @@ test('uses an exact applicant slot fingerprint without granting unrelated stage 
   expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
     expect.objectContaining({ stage: 'identity', reason: 'stage_missing' }),
   ]));
+});
+
+test('projects only allowlisted canonical evidence dates and derives the applicant refresh receipt from the exact slot', async () => {
+  const slotVersion = opaqueVersion('reviewer-warm-applicant-slot:v1', {
+    requestId: REQUEST_ID,
+    personId: '22222222-2222-2222-2222-222222222222',
+    slots: [1],
+  });
+  const validCandidate = {
+    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    isApplicantRecommended: true,
+    potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+    name: 'Private Candidate Name',
+    email: 'private-candidate@example.edu',
+    warmCacheVersion: 1,
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion: slotVersion,
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const invalidDateCandidate = {
+    ...validCandidate,
+    candidateKey: 'suggestion:66666666-6666-6666-6666-666666666666',
+    stageFreshness: {
+      applicant_anchor: {
+        ...validCandidate.stageFreshness.applicant_anchor,
+        completedAt: 'not-an-iso-date',
+      },
+    },
+  };
+  const invalidKeyCandidate = {
+    ...validCandidate,
+    candidateKey: 'legacy row without a canonical key',
+  };
+  const receipt = buildApplicantAnchorRefreshReceipt({
+    request: request(),
+    candidate: validCandidate,
+    completedAt: '2026-08-02T12:00:00.000Z',
+  });
+  expect(receipt).toEqual({
+    state: 'current',
+    contractVersion: 1,
+    sourceVersion: slotVersion,
+    completedAt: '2026-08-02T12:00:00.000Z',
+  });
+
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [validCandidate, invalidDateCandidate, invalidKeyCandidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result.candidatePlans).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      candidateKey: validCandidate.candidateKey,
+      evidenceCheckedDates: { applicant_anchor: '2026-08-01T00:00:00.000Z' },
+    }),
+    expect.objectContaining({
+      candidateKey: invalidDateCandidate.candidateKey,
+      evidenceCheckedDates: {},
+    }),
+  ]));
+  expect(result.candidatePlans).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ candidateKey: null }),
+    expect.objectContaining({ candidateKey: invalidKeyCandidate.candidateKey }),
+  ]));
+  const responseText = JSON.stringify(result);
+  expect(responseText).not.toContain('Private Candidate Name');
+  expect(responseText).not.toContain('private-candidate@example.edu');
 });
 
 test('keeps a general-search applicant anchor not applicable when the proposal panel is stale', async () => {

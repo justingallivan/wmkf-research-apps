@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-02
 owner: product-engineering
 related:
   - lib/services/
@@ -138,6 +138,12 @@ If you're touching a service or utility, read its header before this catalog. If
   suggestions, parses exclusions, or calls evidence/model providers. A
   historical manual file binding is stale when it cannot be recovered from
   authoritative request persistence.
+- **`workbench/reviewer-stage-refresh-service.js`** — Explicit one-candidate,
+  one-stage staff repair for the executable `applicant_anchor` receipt. It
+  derives the canonical suggestion key and input dependency from server-read
+  roster, suggestion, and request records; candidate-key/updated-at/attempt
+  CAS preserves prior evidence on failed refreshes. It never accepts
+  name/receipt/dependency authority or calls the full applicant batch.
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
   request/candidate receipt. Projection v3 binds the exact canonical contact
   projection in addition to identity/eligibility; v1/v2 remain verifiable
