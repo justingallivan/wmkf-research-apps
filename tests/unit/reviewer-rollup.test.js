@@ -27,26 +27,62 @@ describe('fetchReviewerRollup (characterization)', () => {
   test('golden path: aggregates counts per request from the queried rows', async () => {
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
-        { _wmkf_request_value: REQUEST_A, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000004 },
-        { _wmkf_request_value: REQUEST_A, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: true, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewstatus: null },
-        { _wmkf_request_value: REQUEST_B, wmkf_invited: false, wmkf_accepted: false, wmkf_declined: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_reviewstatus: null },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000004 },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: true, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewstatus: null },
+        { _wmkf_request_value: REQUEST_B, wmkf_selected: true, wmkf_invited: false, wmkf_accepted: false, wmkf_declined: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_reviewstatus: null },
       ],
     });
 
     const out = await fetchReviewerRollup([REQUEST_A, REQUEST_B]);
 
-    expect(out[REQUEST_A]).toEqual({ candidates: 2, invited: 2, accepted: 1, declined: 1, held: 0, completed: 1 });
-    expect(out[REQUEST_B]).toEqual({ ...emptyCounts(), candidates: 1 });
+    expect(out[REQUEST_A]).toEqual({
+      candidates: 1,
+      invited: 1,
+      accepted: 1,
+      declined: 1,
+      held: 0,
+      completed: 1,
+      progress: { total: 2, accepted: 1, pending: 0, declined: 1, uninvited: 0 },
+    });
+    expect(out[REQUEST_B]).toEqual({
+      ...emptyCounts(),
+      candidates: 1,
+      progress: { total: 1, accepted: 0, pending: 0, declined: 0, uninvited: 1 },
+    });
 
     // Byte-mirror guard: entity set, select list, and filter shape (OR-chain +
-    // selected-only + not-excluded) must survive the adapter conversion unchanged.
+    // active-or-declined + not-excluded) must survive the adapter conversion.
     expect(spy).toHaveBeenCalledTimes(1);
     const [entitySet, opts] = spy.mock.calls[0];
     expect(entitySet).toBe('wmkf_appreviewersuggestions');
-    expect(opts.select).toBe('_wmkf_request_value,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus');
+    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus');
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_A}`);
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_B}`);
-    expect(opts.filter).toContain('wmkf_selected eq true');
+    expect(opts.filter).toContain('(wmkf_selected eq true or wmkf_declined eq true or wmkf_responsetype eq 100000001)');
+  });
+
+  test('progress buckets are exclusive and preserve active lifecycle counts', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted },
+        // Decline wins in the exclusive progress display if legacy flags conflict.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted },
+      ],
+    });
+
+    const out = await fetchReviewerRollup([REQUEST_A]);
+
+    expect(out[REQUEST_A].progress).toEqual({
+      total: 4,
+      accepted: 1,
+      pending: 1,
+      declined: 1,
+      uninvited: 1,
+    });
+    expect(Object.values(out[REQUEST_A].progress).slice(1).reduce((sum, value) => sum + value, 0)).toBe(4);
+    expect(out[REQUEST_A]).toMatchObject({ candidates: 3, invited: 2, accepted: 1, declined: 1 });
   });
 
   test('chunks requestIds at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {

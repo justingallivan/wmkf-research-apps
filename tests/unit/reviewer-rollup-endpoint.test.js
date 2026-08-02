@@ -53,6 +53,14 @@ it('returns empty counts (not an error) when the request has no suggestion rows'
   const r = res();
   await handler({ method: 'GET', query: { requestId: GUID_LOWER } }, r);
   expect(r.statusCode).toBe(200);
-  expect(r.body.counts).toEqual({ candidates: 0, invited: 0, accepted: 0, declined: 0, held: 0, completed: 0 });
+  expect(r.body.counts).toEqual({
+    candidates: 0,
+    invited: 0,
+    accepted: 0,
+    declined: 0,
+    held: 0,
+    completed: 0,
+    progress: { total: 0, accepted: 0, pending: 0, declined: 0, uninvited: 0 },
+  });
   expect(r.body.workRemaining).toBe('find');
 });
