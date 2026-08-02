@@ -99,6 +99,7 @@ const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
 const { createConflictPendingState } = require('../../lib/utils/reviewer-address-trust');
+const { canonicalManualConfirmation } = require('../../lib/utils/reviewer-manual-confirmation');
 const {
   verifyAutomatedIdentityAttestation,
   hasServerIdentityDecisionReceipt,
@@ -137,16 +138,35 @@ const authorityRow = (candidateKey, extra = {}) => ({
   ...extra,
 });
 const rosterRowsByKey = new Map();
+const staffConfirmations = new Map();
 const saveCandidates = (args) => {
-  const candidates = (args.candidates || []).map((candidate, index) => ({
-    candidateKey: `test:${index}`,
-    automatedIdentityAttestation: 'server-signed-test-token',
-    email: `ready-${index}@example.edu`,
-    emailSource: 'pubmed',
-    emailPersistAllowed: true,
-    identityStatus: 'probable',
-    ...candidate,
-  }));
+  const candidates = (args.candidates || []).map((rawCandidate, index) => {
+    const { __testStaffConfirmed, ...candidate } = rawCandidate || {};
+    const preparedCandidate = {
+      candidateKey: `test:${index}`,
+      automatedIdentityAttestation: 'server-signed-test-token',
+      email: `ready-${index}@example.edu`,
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      ...candidate,
+    };
+    if (__testStaffConfirmed) {
+      const confirmationId = `test-confirmation:${index}`;
+      preparedCandidate.pdIdentityConfirmed = true;
+      preparedCandidate.pdIdentityConfirmationId = confirmationId;
+      // This represents the request-scoped server record created by the
+      // authenticated staff-confirmation endpoint. It is intentionally not a
+      // browser claim: the service obtains it only through the roster-store
+      // mock, while the subsequent COI/contact assertions remain real.
+      staffConfirmations.set(confirmationId, {
+        source: 'staff_confirmed',
+        ...canonicalManualConfirmation(preparedCandidate),
+        rosterCandidateKey: preparedCandidate.candidateKey,
+      });
+    }
+    return preparedCandidate;
+  });
   for (const [index, candidate] of candidates.entries()) {
     const serverKey = candidate.candidateKey || `test:${index}`;
     rosterRowsByKey.set(serverKey, authorityRow(serverKey, {
@@ -168,6 +188,7 @@ const saveCandidates = (args) => {
 beforeEach(() => {
   jest.clearAllMocks();
   rosterRowsByKey.clear();
+  staffConfirmations.clear();
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' });
   potentialReviewerAdapter.getByIdForMerge.mockResolvedValue({
@@ -191,6 +212,9 @@ beforeEach(() => {
   }));
   reviewerRosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
     candidateKeys.map((candidateKey) => rosterRowsByKey.get(candidateKey) || authorityRow(candidateKey))
+  ));
+  reviewerRosterStore.findIdentityConfirmation.mockImplementation(async (_requestId, confirmationId) => (
+    staffConfirmations.get(confirmationId) || null
   ));
   reviewerRosterStore.findAddressTrustReceipt.mockImplementation(async (_requestId, candidateKey) => (
     rosterRowsByKey.get(candidateKey)?.addressTrustReceipt || null
@@ -355,6 +379,11 @@ test('server roster snapshot change withholds generic promotion before Dataverse
 });
 
 test('durable eligibility authority uses the signed pre-enrichment roster key', async () => {
+  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
+    decision: 'blocked',
+    code: 'candidate_ineligible',
+    stage: 'eligibility',
+  });
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,
     source: 'automated_resolver',
@@ -592,7 +621,7 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
   expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
 });
 
-test('ordinary saving refreshes verification when the authoritative roster row is missing', async () => {
+test('ordinary saving withholds promotion when the authoritative roster row is missing', async () => {
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,
     source: 'automated_resolver',
@@ -615,11 +644,10 @@ test('ordinary saving refreshes verification when the authoritative roster row i
   expect(error.httpStatus).toBe(422);
   expect(error.body.errors).toEqual([
     expect.objectContaining({
-      code: 'identity_attestation_required',
+      code: 'promotion_authority_missing',
       remediation: expect.arrayContaining([
         expect.objectContaining({ action: 'retry_check' }),
-        expect.objectContaining({ action: 'verify_person_and_address' }),
-        expect.objectContaining({ action: 'set_aside' }),
+        expect.objectContaining({ action: 'create_repair_request' }),
       ]),
     }),
   ]);
@@ -861,6 +889,7 @@ test('trusted ORCID match reuses the stable person and requires attestation befo
     statecode: 0,
     _etag: 'W/"stable"',
   });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce(null);
 
   const err = await saveCandidates({
     ...BASE,
@@ -1674,7 +1703,12 @@ test('name-only namesake at the applicant institution does NOT block a distinct 
 
   const out = await saveCandidates({
     ...BASE,
-    candidates: [{ name: 'Dr Namesake', email: 'new@safe.edu', affiliation: 'Safe University' }],
+    candidates: [{
+      name: 'Dr Namesake',
+      email: 'new@safe.edu',
+      affiliation: 'Safe University',
+      __testStaffConfirmed: true,
+    }],
   });
 
   expect(out.success).toBe(true);
@@ -1682,7 +1716,7 @@ test('name-only namesake at the applicant institution does NOT block a distinct 
   expect(out.savedNames).toEqual(['Dr Namesake']);
   expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledTimes(1);
   // The weak namesake id is not a reuse/link target — it was never read by id.
-  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalledWith('PID-NAMESAKE');
 });
 
 test('an EXACT (viaNameMatch:false) referenced reviewer at the applicant institution still fails COI even with no email reuse target', async () => {
@@ -1702,7 +1736,12 @@ test('an EXACT (viaNameMatch:false) referenced reviewer at the applicant institu
 
   const err = await saveCandidates({
     ...BASE,
-    candidates: [{ name: 'Dr Strong', email: 'strong@example.edu', affiliation: 'Safe University' }],
+    candidates: [{
+      name: 'Dr Strong',
+      email: 'strong@example.edu',
+      affiliation: 'Safe University',
+      __testStaffConfirmed: true,
+    }],
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
@@ -1868,6 +1907,7 @@ test('email-mismatch conflict contact at the applicant institution fails COI bef
       name: 'Dr Conflict Contact Applicant',
       email: 'conflict-contact@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -1911,6 +1951,7 @@ test('email-mismatch conflict contact at a different institution saves without l
       name: 'Dr Conflict Contact Safe',
       email: 'conflict-safe@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   });
 
@@ -1943,6 +1984,7 @@ test('conflict contact institution lookup failure rejects fail-closed before wri
       email: 'conflict-down@example.edu',
       orcid: '0000-0002-1825-0097',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -1992,6 +2034,7 @@ test('confident contact with no CRM institution signal saves and links', async (
       name: 'Dr Contact No Institution',
       email: 'contact-none@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   });
 
@@ -2032,6 +2075,7 @@ test('confident contact with parent-account institution at the applicant institu
       name: 'Dr Contact Parent',
       email: 'contact-parent@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2071,6 +2115,7 @@ test('confident reviewer+contact linked match also screens divergent contact ins
       name: 'Dr Divergent Contact',
       email: 'divergent@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2111,7 +2156,11 @@ test('non-confident lookup shape (linked/conflict/none) still fails COI via the 
     ...BASE,
     // No COI flags, payload affiliation deliberately omitted — only the trusted
     // reused-reviewer CRM row exposes the same-institution conflict.
-    candidates: [{ name: 'Dr Ambiguous', email: 'ambiguous@example.edu' }],
+    candidates: [{
+      name: 'Dr Ambiguous',
+      email: 'ambiguous@example.edu',
+      __testStaffConfirmed: true,
+    }],
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
@@ -2150,7 +2199,12 @@ test('email-less candidate with linked ORCID candidate at applicant institution 
 
   const err = await saveCandidates({
     ...BASE,
-    candidates: [{ name: 'Dr Linked NoEmail', email: null, orcid: '0000-0002-1825-0097' }],
+    candidates: [{
+      name: 'Dr Linked NoEmail',
+      email: null,
+      orcid: '0000-0002-1825-0097',
+      __testStaffConfirmed: true,
+    }],
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
@@ -2189,7 +2243,12 @@ test('email-less candidate with conflict reviewerId at applicant institution fai
 
   const err = await saveCandidates({
     ...BASE,
-    candidates: [{ name: 'Dr Conflict NoEmail', email: null, orcid: '0000-0002-1825-0097' }],
+    candidates: [{
+      name: 'Dr Conflict NoEmail',
+      email: null,
+      orcid: '0000-0002-1825-0097',
+      __testStaffConfirmed: true,
+    }],
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
@@ -2335,7 +2394,12 @@ test('email-less candidate with conflict reviewerId getById failure fails closed
 
   const err = await saveCandidates({
     ...BASE,
-    candidates: [{ name: 'Dr Conflict Lookup Down', email: null, orcid: '0000-0002-1825-0097' }],
+    candidates: [{
+      name: 'Dr Conflict Lookup Down',
+      email: null,
+      orcid: '0000-0002-1825-0097',
+      __testStaffConfirmed: true,
+    }],
   }).catch((e) => e);
 
   expect(err).toBeInstanceOf(SaveCandidatesError);
@@ -2416,6 +2480,7 @@ test('email candidate with ORCID/email split conflict resolves every referenced 
       email: 'split@example.edu',
       orcid: '0000-0002-1825-0097',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2468,6 +2533,7 @@ test('finding 7 save regression: exact email contact declared beside non-confide
       email: 'finding-seven@example.edu',
       orcid: '0000-0002-1825-0097',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2518,6 +2584,7 @@ test('finding B save regression: email ambiguity cannot drop a same-institution 
       email: 'finding-b@example.edu',
       orcid: '0000-0002-1825-0097',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2559,6 +2626,7 @@ test('finding C save regression: exact reviewer declared beside ambiguous contac
       name: 'Dr Finding C',
       email: 'finding-c@example.edu',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
@@ -2603,6 +2671,7 @@ test('finding D save regression: email_mismatch conflict screens the ORCID revie
       email: 'new@example.edu',
       orcid: '0000-0002-1825-0097',
       affiliation: 'Different University',
+      __testStaffConfirmed: true,
     }],
   }).catch((e) => e);
 
