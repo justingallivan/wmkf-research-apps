@@ -13,6 +13,8 @@
  */
 
 // ── shared adapter / infra mocks ──────────────────────────────────────────────
+const mockRosterCandidates = new Map();
+
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 'P1', session: { user: { dynamicsSystemuserId: 'SYS-1' } } })),
 }));
@@ -79,13 +81,20 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(async () => 1),
+  recordSurfacedWithStageEvidence: jest.fn(async (_requestId, entries) => (
+    entries.map((entry) => ({
+      candidateKey: entry.candidate?.candidateKey || null,
+      outcome: 'recorded',
+      updatedAt: 'cold-v2',
+    }))
+  )),
   findCandidateBySuggestion: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findIdentityConfirmation: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
   promotionSnapshotIsCurrent: jest.fn(async () => true),
   findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
-    candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
+    candidateKeys.map((candidateKey) => mockRosterCandidates.get(candidateKey)).filter(Boolean)
   )),
   finalizeCandidatePromotion: jest.fn(async (_requestId, candidate, anchors) => ({
     saved: true,
@@ -120,6 +129,17 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   })),
 }));
+const mockGetRequestById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  getById: (...args) => mockGetRequestById(...args),
+}));
+const mockBuildApplicantAnchorRefreshReceipt = jest.fn();
+const mockResolveReviewerProposalMetadata = jest.fn();
+jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
+  REQUEST_SELECT: 'akoya_requestid,akoya_requestnum',
+  buildApplicantAnchorRefreshReceipt: (...args) => mockBuildApplicantAnchorRefreshReceipt(...args),
+  resolveReviewerProposalMetadata: (...args) => mockResolveReviewerProposalMetadata(...args),
+}));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
@@ -133,6 +153,7 @@ const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer
 const rosterStore = require('../../lib/services/reviewer-roster-store');
 const { verifyAutomatedIdentityAttestation } = require('../../lib/services/reviewer-candidate-attestation');
 const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity-lookup');
+const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const NotificationService = require('../../lib/services/notification-service').default;
 const { RESOLVER_SOURCED_FIELDS } = require('../../lib/services/reviewer-identity-resolver');
 const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
@@ -183,6 +204,14 @@ function withCurrentRosterAuthority(candidate) {
     || ContactParser.extractPrimaryEmail(candidate.affiliation)
     || null;
   if (candidateKey && email) testRosterEmails.set(candidateKey, String(email).toLowerCase());
+  // The POST body is only a selection target. Model the server-re-read roster
+  // row separately so every mutation test exercises the target-only contract.
+  mockRosterCandidates.set(candidateKey, {
+    ...candidate,
+    candidateKey,
+    rosterStatus: 'active',
+    rosterUpdatedAt: '2026-08-02 00:00:00+00',
+  });
   return {
     ...candidate,
     candidateKey,
@@ -212,6 +241,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     testRosterEmails.clear();
+    mockRosterCandidates.clear();
     mockGetCandidatePromotionAuthority.mockReturnValue({
       decision: 'ready', code: null, stage: null, reason: null,
     });
@@ -242,7 +272,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       } : null;
     });
     rosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
-      candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
+      candidateKeys.map((candidateKey) => mockRosterCandidates.get(candidateKey)).filter(Boolean)
     ));
   });
 
@@ -348,6 +378,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         candidateKey: 'candidate:anchor-row',
         suggestionId: 'SUG-ANCHOR',
         potentialReviewerId: 'PID-ANCHOR',
+        expectedUpdatedAt: '2026-08-02 00:00:00+00',
       },
     );
   });
@@ -431,6 +462,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         candidateKey: 'person:pid-seed',
         suggestionId: 'SUG-SEED',
         potentialReviewerId: 'PID-SEED',
+        expectedUpdatedAt: '2026-08-02 00:00:00+00',
       },
     );
   });
@@ -670,6 +702,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('partial batch still preserves saved rows when one later Dataverse write fails', async () => {
+    loadCoiContext.mockResolvedValueOnce({
+      applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+      institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+      requestContext: { title: 'Proposal' },
+    });
     lookupReviewerIdentity
       .mockResolvedValueOnce({
         outcome: 'confident',
@@ -725,6 +762,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
       requestId: 'REQ-1',
       candidates: [{
         name: 'Dr Real Person',
+        candidateKey: 'suggestion:pd-real-person',
         pdIdentityConfirmed: true,
         pdIdentityConfirmationId: 'confirm-1',
         needsIdentification: true,                 // would normally hard-reject
@@ -735,6 +773,22 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         ...extra,
       }],
     },
+  });
+
+  const staffConfirmation = (overrides = {}) => ({
+    confirmationId: 'confirm-1',
+    source: 'staff_confirmed',
+    state: 'confirmed',
+    canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+    canonicalPersonEtag: 'W/"staff-confirmed-person"',
+    actorId: 'staff-1',
+    confirmedAt: '2026-08-02T00:00:00.000Z',
+    rosterCandidateKey: 'suggestion:pd-real-person',
+    normalizedName: 'real person',
+    email: 'correct@uni.edu',
+    website: 'https://correct.uni.edu/faculty',
+    affiliation: 'Right University',
+    ...overrides,
   });
 
   test('bare client pdIdentityConfirmed flag is rejected before any write', async () => {
@@ -748,10 +802,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('mismatched server confirmation is rejected before any write', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'other@uni.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation({ email: 'other@uni.edu' }));
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     expect(res.statusCode).toBe(422);
@@ -770,13 +821,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: unresolved row is SAVED (not hard-rejected) with the manual email', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed',
-      normalizedName: 'real person',
-      email: 'correct@uni.edu',
-      website: 'https://correct.uni.edu/faculty',
-      affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation());
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     expect(res.statusCode).toBe(200);
@@ -788,10 +833,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: contact lookup receives manual email but no ORCID', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'pd@example.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation({ email: 'pd@example.edu' }));
     const res = mockRes();
     await handler(pdConfirmedReq({ email: 'pd@example.edu', orcid: '0000-0002-1825-0097' }), res);
 
@@ -804,10 +846,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: emailSource is FORCED staff_verified after exact address attestation', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation());
     const res = mockRes();
     // A forged/stale payload claims a high-confidence source — must be overridden.
     await handler(pdConfirmedReq({ emailSource: 'orcid' }), res);
@@ -817,10 +856,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: auto-fetched ORCID / Scholar / metrics are NULLED (never blessed)', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation());
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     const payload = researcherAdapter.upsertByPotentialReviewer.mock.calls[0][1];
@@ -836,20 +872,14 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override: a "[Identity confirmed by PD]" audit note is stamped on the suggestion', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation());
     const res = mockRes();
     await handler(pdConfirmedReq(), res);
     expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].matchReason).toMatch(/Identity confirmed by PD/);
   });
 
   test('PD override: blanked website does NOT fall back to the wrong enrichment website', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
-      website: '', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation({ website: '' }));
     const res = mockRes();
     // PD corrected the email but cleared the (wrong) website entirely.
     await handler(pdConfirmedReq({ website: '', websiteSource: 'manual', websitePersistAllowed: false }), res);
@@ -859,10 +889,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('PD override does NOT waive institution-COI (still hard-rejected)', async () => {
-    rosterStore.findIdentityConfirmation.mockResolvedValueOnce({
-      source: 'staff_confirmed', normalizedName: 'real person', email: 'correct@uni.edu',
-      website: 'https://correct.uni.edu/faculty', affiliation: 'Right University',
-    });
+    rosterStore.findIdentityConfirmation.mockResolvedValueOnce(staffConfirmation());
     const res = mockRes();
     await handler(pdConfirmedReq({ hasInstitutionCOI: true }), res);
     expect(res.statusCode).toBe(422);
@@ -1044,6 +1071,11 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
   });
 
   test('partial-failure response includes failed candidate names and error text', async () => {
+    loadCoiContext.mockResolvedValueOnce({
+      applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+      institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+      requestContext: { title: 'Proposal' },
+    });
     reviewerSuggestionAdapter.upsert.mockImplementation(async ({ suggestionLabel }) => {
       if (suggestionLabel?.includes('Failing Candidate')) {
         throw new Error('Dataverse write failed');
@@ -1249,6 +1281,26 @@ describe('enrich-recommended route — applicant identity gate', () => {
   });
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetRequestById.mockResolvedValue({
+      akoya_requestid: GUID,
+      akoya_requestnum: '1000001',
+      _akoya_applicantid_value: '22222222-2222-4222-8222-222222222222',
+      _akoya_applicantid_value_formatted: 'Applicant University',
+      _wmkf_projectleader_value: '33333333-3333-4333-8333-333333333333',
+      _wmkf_projectleader_value_formatted: 'Principal Investigator',
+    });
+    mockBuildApplicantAnchorRefreshReceipt.mockImplementation(({ candidate }) => (
+      candidate?.potentialReviewerId === 'PID-1'
+        ? {
+            state: 'current',
+            contractVersion: 1,
+            sourceVersion: 'a'.repeat(64),
+            resultVersion: 'a'.repeat(64),
+            completedAt: '2026-08-02T00:00:00.000Z',
+          }
+        : null
+    ));
+    mockResolveReviewerProposalMetadata.mockResolvedValue({ state: 'missing' });
     // one applicant-recommended junction row pointing at PID-1
     reviewerSuggestionAdapter.findApplicantRecommendedByRequest.mockResolvedValue([{
       wmkf_applicantdisposition: 100000000,
@@ -1306,17 +1358,20 @@ describe('enrich-recommended route — applicant identity gate', () => {
   test('records enriched applicant candidates to roster before complete event', async () => {
     const res = await run({ status: 'probable' }, { proposalKey: 'Library::Folder::Proposal.pdf' });
 
-    expect(rosterStore.recordSurfaced).toHaveBeenCalledWith(GUID, [
+    expect(rosterStore.recordSurfacedWithStageEvidence).toHaveBeenCalledWith(GUID, [
       expect.objectContaining({
-        name: 'Dr X',
-        suggestionId: 'SUG-1',
-        enrichedProposalKey: 'Library::Folder::Proposal.pdf',
-        isApplicantRecommended: true,
+        candidate: expect.objectContaining({
+          name: 'Dr X',
+          suggestionId: 'SUG-1',
+          enrichedProposalKey: 'Library::Folder::Proposal.pdf',
+          isApplicantRecommended: true,
+        }),
+        stageEvidence: expect.objectContaining({ applicant_anchor: expect.any(Object) }),
       }),
-    ], { expectedUpdatedAt: null });
+    ]);
     const completeCall = res.write.mock.calls.find((call) => call[0] === 'event: complete\n');
     expect(completeCall).toBeTruthy();
-    expect(rosterStore.recordSurfaced.mock.invocationCallOrder[0])
+    expect(rosterStore.recordSurfacedWithStageEvidence.mock.invocationCallOrder[0])
       .toBeLessThan(res.write.mock.invocationCallOrder[res.write.mock.calls.indexOf(completeCall)]);
   });
 

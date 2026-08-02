@@ -5,9 +5,14 @@ const getById = jest.fn();
 const update = jest.fn();
 const attestAddress = jest.fn();
 const clearAddressTrustBlocks = jest.fn();
+const completeStructuredAddressVerification = jest.fn();
+const confirmIdentity = jest.fn();
+const findCandidateByKey = jest.fn();
 const findCandidatesByKeys = jest.fn();
 const recordSurfaced = jest.fn();
 const resolveTrustedReviewerPerson = jest.fn();
+const getRequestById = jest.fn();
+const buildReviewerStageDependencySnapshot = jest.fn();
 
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...args) => findById(...args),
@@ -19,8 +24,25 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   attestAddress: (...args) => attestAddress(...args),
   clearAddressTrustBlocks: (...args) => clearAddressTrustBlocks(...args),
+  completeStructuredAddressVerification: (...args) => completeStructuredAddressVerification(...args),
+  confirmIdentity: (...args) => confirmIdentity(...args),
+  findCandidateByKey: (...args) => findCandidateByKey(...args),
   findCandidatesByKeys: (...args) => findCandidatesByKeys(...args),
   recordSurfaced: (...args) => recordSurfaced(...args),
+}));
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  getById: (...args) => getRequestById(...args),
+}));
+jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
+  REQUEST_SELECT: 'akoya_requestid,akoya_requestnum',
+  projectApplicantWarmInputs: () => ({ state: 'current' }),
+  resolveReviewerProposalMetadata: async () => ({ state: 'current', proposalContentVersion: 'd'.repeat(64) }),
+  buildApplicantAnchorRefreshReceipt: jest.fn(),
+}));
+jest.mock('../../lib/services/workbench/reviewer-stage-source-versions', () => ({
+  CONTRACT_VERSIONS: { identity: 4 },
+  buildRequestCoiContextVersion: () => 'e'.repeat(64),
+  buildReviewerStageDependencySnapshot: (...args) => buildReviewerStageDependencySnapshot(...args),
 }));
 jest.mock('../../lib/services/reviewer-contact-reconciliation', () => ({
   resolveTrustedReviewerPerson: (...args) => resolveTrustedReviewerPerson(...args),
@@ -33,6 +55,7 @@ jest.mock('../../lib/services/notification-service', () => ({
 const {
   getAddressConflict,
   retryAddressCheck,
+  confirmStructuredRosterIdentity,
   verifyPersonAndAddress,
 } = require('../../lib/services/reviewer-address-trust-service');
 const {
@@ -90,8 +113,27 @@ beforeEach(() => {
   update.mockResolvedValue(undefined);
   findCandidatesByKeys.mockResolvedValue([]);
   clearAddressTrustBlocks.mockResolvedValue(null);
+  completeStructuredAddressVerification.mockResolvedValue({ outcome: 'recorded', candidate: { candidateKey: 'person:row' }, updatedAt: 'row-version-3' });
+  confirmIdentity.mockResolvedValue({
+    confirmationId: 'confirm-1',
+    candidate: { candidateKey: `person:${PERSON_ID}`, name: 'Reviewer Name' },
+  });
+  findCandidateByKey.mockResolvedValue(null);
   recordSurfaced.mockResolvedValue(1);
   resolveTrustedReviewerPerson.mockResolvedValue(null);
+  getRequestById.mockResolvedValue({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1000001' });
+  buildReviewerStageDependencySnapshot.mockImplementation(({ candidate }) => ({
+    applicantInputVersion: null,
+    proposalContentVersion: 'd'.repeat(64),
+    requestCoiContextVersion: 'e'.repeat(64),
+    stageInputVersions: {
+      identity: 'a'.repeat(64),
+      contact: 'b'.repeat(64),
+      address_trust: candidate?.stageFreshness?.contact?.sourceVersion === 'b'.repeat(64)
+        ? 'c'.repeat(64)
+        : null,
+    },
+  }));
 });
 
 test('already-promoted verification binds evidence to the exact current person address atomically', async () => {
@@ -156,54 +198,19 @@ test('already-ready provenance is preserved instead of being relabeled staff_ver
   expect(update).not.toHaveBeenCalled();
 });
 
-test('roster verification carries the complete verified contact into the atomic attestation write', async () => {
-  const candidateKey = 'candidate:tatiana';
-  const verifiedContact = {
-    website: 'https://example.edu/current-profile',
-    affiliation: 'Current Department',
-  };
-  findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey,
-    name: 'Tatiana Kutateladze',
-    email: 'tatiana@example.edu',
-    rosterStatus: 'active',
-  }]);
-  attestAddress.mockResolvedValueOnce({
-    receiptId: 'receipt-current',
-    candidate: {
-      candidateKey,
-      name: 'Tatiana Kutateladze',
-      email: 'tatiana@example.edu',
-      ...verifiedContact,
-      pdIdentityConfirmationId: 'confirmation-current',
-    },
-  });
-
+test('verification without either accepted reviewer identifier fails closed before any read or write', async () => {
   const result = await verifyPersonAndAddress({
     requestId: REQUEST_ID,
-    candidateKey,
-    email: 'tatiana@example.edu',
-    verifiedContact,
+    email: 'reviewer@example.edu',
     evidenceType: 'institution_page',
-    evidenceUrl: verifiedContact.website,
-    actorProfileId: 'profile-1',
-    actorSystemUserId: 'system-1',
+    evidenceUrl: 'https://example.edu/profile',
   });
 
-  expect(attestAddress).toHaveBeenCalledWith(REQUEST_ID, candidateKey, {
-    email: 'tatiana@example.edu',
-    evidenceType: 'institution_page',
-    evidenceUrl: verifiedContact.website,
-    note: undefined,
-    verifiedContact,
-    actorProfileId: 'profile-1',
-    actorSystemUserId: 'system-1',
-  });
-  expect(result).toMatchObject({
-    success: true,
-    decision: 'attested_pending_promotion',
-    candidate: { pdIdentityConfirmationId: 'confirmation-current' },
-  });
+  expect(result).toMatchObject({ success: false, decision: 'blocked', code: 'candidate_stale' });
+  expect(findById).not.toHaveBeenCalled();
+  expect(findCandidateByKey).not.toHaveBeenCalled();
+  expect(attestAddress).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
 });
 
 test('ordinary roster conflict discloses only the current address pair', async () => {
@@ -237,105 +244,6 @@ test('ordinary roster conflict discloses only the current address pair', async (
       reason: 'email_mismatch',
     },
   });
-});
-
-test('ordinary roster conflict can choose the newly found address with fresh evidence', async () => {
-  const candidateKey = 'suggestion:row';
-  const conflict = createConflictPendingState({
-    email: 'reviewer@example.edu',
-    foundEmail: 'found@example.edu',
-    reason: 'email_mismatch',
-    requestId: REQUEST_ID,
-    candidateKey,
-    detectedAt: '2020-01-01T00:00:00.000Z',
-  });
-  findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey,
-    suggestionId: SUGGESTION_ID,
-    addressConflictPending: true,
-    conflictRecordUnavailable: true,
-    rosterStatus: 'active',
-  }]);
-  getById.mockResolvedValueOnce({
-    wmkf_emailaddress: 'reviewer@example.edu',
-    wmkf_addresstruststatejson: JSON.stringify(conflict),
-    _etag: 'W/"person"',
-  });
-  attestAddress.mockResolvedValueOnce({
-    receiptId: 'receipt-1',
-    receipt: {
-      receiptId: 'receipt-1',
-      email: 'found@example.edu',
-      personConfirmed: true,
-      actorProfileId: 'profile-1',
-      actorSystemUserId: 'system-1',
-      requestId: REQUEST_ID,
-      candidateKey,
-      evidenceType: 'institution_page',
-      evidenceUrl: 'https://example.edu/profile',
-      note: null,
-      attestedAt: '2026-07-31T22:00:00.000Z',
-    },
-    candidate: { rosterUpdatedAt: 'row-version-2' },
-  });
-  clearAddressTrustBlocks.mockResolvedValueOnce({
-    candidateKey,
-    email: 'found@example.edu',
-    addressConflictPending: false,
-  });
-
-  const result = await verifyPersonAndAddress({
-    requestId: REQUEST_ID,
-    candidateKey,
-    email: 'found@example.edu',
-    evidenceType: 'institution_page',
-    evidenceUrl: 'https://example.edu/profile',
-    actorProfileId: 'profile-1',
-    actorSystemUserId: 'system-1',
-  });
-
-  expect(result).toMatchObject({ success: true, decision: 'address_conflict_resolved' });
-  expect(update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
-    email: 'found@example.edu',
-    emailSource: 'staff_verified',
-  }), expect.objectContaining({ ifMatch: 'W/"person"' }));
-  const bundle = JSON.parse(update.mock.calls[0][1].addressTrustStateJson);
-  expect(bundle.resolution).toMatchObject({ decision: 'use_found' });
-  expect(clearAddressTrustBlocks).toHaveBeenCalledWith(REQUEST_ID, candidateKey, {
-    receiptId: 'receipt-1',
-    expectedUpdatedAt: 'row-version-2',
-  });
-});
-
-test('ordinary verification cannot create a receipt while a failed conflict write has no durable bundle', async () => {
-  const candidate = failedWriteCandidate();
-  findCandidatesByKeys.mockResolvedValueOnce([candidate]);
-  getById.mockResolvedValueOnce({
-    wmkf_emailaddress: 'stored@example.edu',
-    wmkf_addresstruststatejson: null,
-    statecode: 0,
-    _etag: 'W/"person"',
-  });
-
-  const result = await verifyPersonAndAddress({
-    requestId: REQUEST_ID,
-    candidateKey: candidate.candidateKey,
-    email: 'found@example.edu',
-    evidenceType: 'institution_page',
-    evidenceUrl: 'https://example.edu/profile',
-  });
-
-  expect(result).toMatchObject({
-    success: false,
-    code: 'conflict_record_unavailable',
-    remediation: expect.arrayContaining([
-      expect.objectContaining({ action: 'retry_check' }),
-      expect.objectContaining({ action: 'create_repair_request' }),
-      expect.objectContaining({ action: 'set_aside' }),
-    ]),
-  });
-  expect(attestAddress).not.toHaveBeenCalled();
-  expect(update).not.toHaveBeenCalled();
 });
 
 test('retry_check actually retries the failed person conflict write before clearing the failure flag', async () => {
@@ -665,166 +573,24 @@ test.each([
   );
 });
 
-test('a Dataverse failure after roster attestation returns explicit partial success and the authoritative candidate', async () => {
-  const candidateKey = 'suggestion:row';
-  const conflict = createConflictPendingState({
-    email: 'stored@example.edu',
-    foundEmail: 'found@example.edu',
-    reason: 'email_mismatch',
-    requestId: REQUEST_ID,
-    candidateKey,
-    detectedAt: '2026-07-31T20:00:00.000Z',
-  });
-  findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey,
-    suggestionId: SUGGESTION_ID,
-    rosterStatus: 'active',
-    addressConflictPending: true,
-  }]);
-  getById.mockResolvedValueOnce({
-    wmkf_emailaddress: 'stored@example.edu',
-    wmkf_addresstruststatejson: JSON.stringify(conflict),
-    statecode: 0,
-    _etag: 'W/"person"',
-  });
-  attestAddress.mockResolvedValueOnce({
-    receiptId: 'receipt-1',
-    receipt: {
-      receiptId: 'receipt-1',
-      email: 'found@example.edu',
-      personConfirmed: true,
-      requestId: REQUEST_ID,
-      candidateKey,
-      evidenceType: 'institution_page',
-      evidenceUrl: 'https://example.edu/profile',
-      attestedAt: '2026-07-31T21:00:00.000Z',
-    },
-    candidate: { candidateKey, rosterUpdatedAt: 'row-version-2' },
-  });
-  update.mockRejectedValueOnce(new Error('Dataverse unavailable'));
+test('canonical roster actions require an existing current identity receipt before any address mutation', async () => {
+  const candidate = structuredCandidate({ stageFreshness: {} });
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson();
 
   const result = await verifyPersonAndAddress({
     requestId: REQUEST_ID,
-    candidateKey,
-    email: 'found@example.edu',
+    candidateKey: candidate.candidateKey,
+    email: 'verified@example.edu',
     evidenceType: 'institution_page',
-    evidenceUrl: 'https://example.edu/profile',
+    evidenceUrl: 'https://example.edu/reviewer',
+    actorSystemUserId: 'system-1',
   });
 
-  expect(result).toMatchObject({
-    success: false,
-    code: 'conflict_record_unavailable',
-    partialSuccess: true,
-    receiptRecorded: true,
-    receiptId: 'receipt-1',
-    candidate: { rosterUpdatedAt: 'row-version-2' },
-  });
-  expect(result.remediation).not.toHaveLength(0);
-});
-
-test('verification records partial success but does not update a pending person conflict without an ETag', async () => {
-  const candidateKey = 'suggestion:row';
-  const conflict = createConflictPendingState({
-    email: 'stored@example.edu',
-    foundEmail: 'found@example.edu',
-    reason: 'email_mismatch',
-    requestId: REQUEST_ID,
-    candidateKey,
-    detectedAt: '2026-07-31T20:00:00.000Z',
-  });
-  findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey,
-    suggestionId: SUGGESTION_ID,
-    rosterStatus: 'active',
-    addressConflictPending: true,
-  }]);
-  getById.mockResolvedValueOnce({
-    wmkf_emailaddress: 'stored@example.edu',
-    wmkf_addresstruststatejson: JSON.stringify(conflict),
-    statecode: 0,
-  });
-  attestAddress.mockResolvedValueOnce({
-    receiptId: 'receipt-1',
-    receipt: {
-      receiptId: 'receipt-1',
-      email: 'found@example.edu',
-      personConfirmed: true,
-      requestId: REQUEST_ID,
-      candidateKey,
-      evidenceType: 'institution_page',
-      evidenceUrl: 'https://example.edu/profile',
-      attestedAt: '2026-07-31T21:00:00.000Z',
-    },
-    candidate: { candidateKey, rosterUpdatedAt: 'row-version-2' },
-  });
-
-  const result = await verifyPersonAndAddress({
-    requestId: REQUEST_ID,
-    candidateKey,
-    email: 'found@example.edu',
-    evidenceType: 'institution_page',
-    evidenceUrl: 'https://example.edu/profile',
-  });
-
-  expect(result).toMatchObject({
-    success: false,
-    code: 'candidate_stale',
-    partialSuccess: true,
-    receiptRecorded: true,
-  });
+  expect(result).toMatchObject({ success: false, code: 'identity_verification_required' });
   expect(update).not.toHaveBeenCalled();
-});
-
-test('a concurrent person edit after roster attestation is a retryable stale 409 result, not a generic failure', async () => {
-  const candidateKey = 'suggestion:row';
-  const conflict = createConflictPendingState({
-    email: 'stored@example.edu',
-    foundEmail: 'found@example.edu',
-    reason: 'email_mismatch',
-    requestId: REQUEST_ID,
-    candidateKey,
-    detectedAt: '2026-07-31T20:00:00.000Z',
-  });
-  findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey,
-    suggestionId: SUGGESTION_ID,
-    rosterStatus: 'active',
-    addressConflictPending: true,
-  }]);
-  getById.mockResolvedValueOnce({
-    wmkf_emailaddress: 'stored@example.edu',
-    wmkf_addresstruststatejson: JSON.stringify(conflict),
-    statecode: 0,
-    _etag: 'W/"person"',
-  });
-  attestAddress.mockResolvedValueOnce({
-    receiptId: 'receipt-1',
-    receipt: {
-      receiptId: 'receipt-1', email: 'stored@example.edu', personConfirmed: true,
-      requestId: REQUEST_ID, candidateKey, evidenceType: 'institution_page',
-      evidenceUrl: 'https://example.edu/profile', attestedAt: '2026-07-31T21:00:00.000Z',
-    },
-    candidate: { candidateKey, rosterUpdatedAt: 'row-version-2' },
-  });
-  update.mockRejectedValueOnce(Object.assign(new Error('Precondition Failed'), { status: 412 }));
-
-  const result = await verifyPersonAndAddress({
-    requestId: REQUEST_ID,
-    candidateKey,
-    email: 'stored@example.edu',
-    evidenceType: 'institution_page',
-    evidenceUrl: 'https://example.edu/profile',
-  });
-
-  expect(result).toMatchObject({
-    success: false,
-    code: 'candidate_stale',
-    partialSuccess: true,
-    receiptRecorded: true,
-  });
-  expect(result.remediation).toEqual(expect.arrayContaining([
-    expect.objectContaining({ action: 'retry_check' }),
-  ]));
+  expect(attestAddress).not.toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
 });
 
 test('inactive people cannot be relabeled staff_verified', async () => {
@@ -949,4 +715,451 @@ test('resolved retry projection derives readiness from the actual person provena
       emailReadiness: expect.objectContaining({ action: 'quick_check' }),
     }),
   })], { expectedUpdatedAt: 'row-version-1' });
+});
+
+function structuredCandidate(overrides = {}) {
+  return {
+    candidateKey: `person:${PERSON_ID}`,
+    potentialReviewerId: PERSON_ID,
+    name: 'Reviewer Name',
+    affiliation: 'Example University',
+    identityDecision: 'confirmed',
+    rosterStatus: 'active',
+    rosterUpdatedAt: 'row-version-1',
+    stageFreshness: {
+      identity: {
+        state: 'current', contractVersion: 4,
+        sourceVersion: 'a'.repeat(64), resultVersion: 'identity-result',
+        completedAt: '2026-08-02T12:00:00.000Z', reasonCode: null, failureCode: null,
+      },
+    },
+    ...overrides,
+  };
+}
+
+test('structured identity confirmation atomically binds a server-read canonical person, ETag, actor, and receipt', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON_ID,
+    wmkf_emailaddress: 'server@example.edu',
+    statecode: 0,
+    _etag: 'W/"identity-v1"',
+  });
+
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: {
+      email: 'staff@example.edu',
+      website: 'https://example.edu/staff',
+      affiliation: 'Staff-confirmed Institute',
+      // Browser-shaped authority is deliberately ignored.
+      canonicalPersonId: '99999999-9999-4999-8999-999999999999',
+      canonicalPersonEtag: 'W/"forged"',
+      actorId: 'forged-user',
+    },
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({ success: true, code: 'identity_confirmed', confirmationId: 'confirm-1' });
+  expect(confirmIdentity).toHaveBeenCalledWith(
+    REQUEST_ID,
+    expect.objectContaining({
+      candidateKey: candidate.candidateKey,
+      name: 'Reviewer Name',
+      email: 'staff@example.edu',
+      affiliation: 'Staff-confirmed Institute',
+    }),
+    expect.objectContaining({
+      actorProfileId: 'profile-1',
+      actorSystemUserId: 'system-1',
+      expectedUpdatedAt: 'row-version-1',
+      canonicalPerson: expect.objectContaining({
+        canonicalPersonId: PERSON_ID,
+        canonicalPersonEtag: 'W/"identity-v1"',
+        actorId: 'system-1',
+        confirmedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+      }),
+      identityEnvelope: expect.objectContaining({
+        outcome: 'current',
+        receipt: expect.objectContaining({ sourceVersion: 'a'.repeat(64) }),
+        evidencePatch: expect.objectContaining({
+          staffIdentityConfirmation: expect.objectContaining({
+            canonicalPersonId: PERSON_ID,
+            canonicalPersonEtag: 'W/"identity-v1"',
+            actorId: 'system-1',
+          }),
+        }),
+      }),
+    }),
+  );
+});
+
+test('structured identity confirmation fails closed without an authenticated system actor', async () => {
+  const candidate = structuredCandidate();
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: null,
+  });
+  expect(result).toMatchObject({ success: false, code: 'invalid_identity_confirmation' });
+  expect(findCandidateByKey).not.toHaveBeenCalled();
+  expect(confirmIdentity).not.toHaveBeenCalled();
+});
+
+test('structured identity confirmation rejects a noncanonical browser candidate key before any read', async () => {
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: 'candidate:legacy-browser-key',
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({ success: false, code: 'candidate_stale' });
+  expect(findCandidateByKey).not.toHaveBeenCalled();
+  expect(confirmIdentity).not.toHaveBeenCalled();
+});
+
+test('structured identity confirmation fails closed when the canonical person cannot be re-established', async () => {
+  const candidate = structuredCandidate({ potentialReviewerId: null });
+  findCandidateByKey.mockResolvedValue(candidate);
+  resolveTrustedReviewerPerson.mockResolvedValue(null);
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({ success: false, code: 'candidate_stale' });
+  expect(confirmIdentity).not.toHaveBeenCalled();
+});
+
+test('structured identity confirmation rejects a person ETag change before the roster CAS', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  getById
+    .mockResolvedValueOnce({
+      wmkf_potentialreviewersid: PERSON_ID,
+      wmkf_emailaddress: 'server@example.edu', statecode: 0, _etag: 'W/"before"',
+    })
+    .mockResolvedValueOnce({
+      wmkf_potentialreviewersid: PERSON_ID,
+      wmkf_emailaddress: 'server@example.edu', statecode: 0, _etag: 'W/"after"',
+    });
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({ success: false, code: 'candidate_stale' });
+  expect(confirmIdentity).not.toHaveBeenCalled();
+});
+
+test('structured identity confirmation reports a stale roster CAS without issuing a usable confirmation', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  getById.mockResolvedValue({
+    wmkf_potentialreviewersid: PERSON_ID,
+    wmkf_emailaddress: 'server@example.edu', statecode: 0, _etag: 'W/"identity-v1"',
+  });
+  confirmIdentity.mockResolvedValueOnce(null);
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({ success: false, code: 'candidate_stale' });
+  expect(confirmIdentity).toHaveBeenCalledWith(
+    REQUEST_ID,
+    expect.any(Object),
+    expect.objectContaining({ expectedUpdatedAt: 'row-version-1' }),
+  );
+});
+
+function installStructuredPerson({ changedBeforeCas = false, emailChangedBeforeCas = false, personId = PERSON_ID } = {}) {
+  let current = {
+    wmkf_potentialreviewersid: personId,
+    wmkf_emailaddress: 'old@example.edu',
+    wmkf_emailsource: 'research_only',
+    statecode: 0,
+    _etag: 'W/"before"',
+    wmkf_addresstruststatejson: null,
+  };
+  update.mockImplementation(async (_id, patch) => {
+    current = {
+      ...current,
+      wmkf_emailaddress: patch.email,
+      wmkf_emailsource: patch.emailSource,
+      wmkf_addresstruststatejson: patch.addressTrustStateJson,
+      _etag: 'W/"after"',
+    };
+  });
+  let readsAfterUpdate = 0;
+  getById.mockImplementation(async () => {
+    if (current._etag === 'W/"after"') {
+      readsAfterUpdate += 1;
+      if (changedBeforeCas && readsAfterUpdate >= 2) return { ...current, _etag: 'W/"concurrent"' };
+      if (emailChangedBeforeCas && readsAfterUpdate >= 2) return { ...current, wmkf_emailaddress: 'changed@example.edu' };
+    }
+    return { ...current };
+  });
+}
+
+test('structured address verification atomically projects server-read contact + address stages with the post-action person binding', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson();
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    email: 'verified@example.edu',
+    verifiedContact: { website: 'https://example.edu/reviewer', affiliation: 'Example University' },
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/reviewer',
+    actorProfileId: 'profile-1',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({ success: true, code: 'address_attested', rosterVersion: 'row-version-3' });
+  expect(attestAddress).not.toHaveBeenCalled();
+  expect(clearAddressTrustBlocks).not.toHaveBeenCalled();
+  expect(update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+    email: 'verified@example.edu', emailSource: 'staff_verified', addressTrustStateJson: expect.any(String),
+  }), { actingUserSystemId: 'system-1', ifMatch: 'W/"before"' });
+  expect(completeStructuredAddressVerification).toHaveBeenCalledWith(
+    REQUEST_ID,
+    candidate.candidateKey,
+    'row-version-1',
+    expect.objectContaining({
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      contactEnvelope: expect.objectContaining({
+        outcome: 'current',
+        receipt: expect.objectContaining({ sourceVersion: 'b'.repeat(64) }),
+        evidencePatch: expect.objectContaining({
+          email: 'verified@example.edu', emailSource: 'staff_verified',
+          canonicalPersonId: PERSON_ID, canonicalPersonEtag: 'W/"after"', personEtag: 'W/"after"',
+        }),
+      }),
+      addressTrustEnvelope: expect.objectContaining({
+        outcome: 'current',
+        receipt: expect.objectContaining({ sourceVersion: 'c'.repeat(64) }),
+        evidencePatch: expect.objectContaining({
+          addressTrustEmail: 'verified@example.edu', addressTrustSource: 'staff_verified',
+          addressTrustEvidence: expect.objectContaining({
+            canonicalPersonId: PERSON_ID, canonicalPersonEtag: 'W/"after"', actorId: 'system-1',
+          }),
+        }),
+      }),
+    }),
+  );
+});
+
+test('reports Dataverse-success/roster-CAS-loss as explicit partial success, never a completed address action', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  completeStructuredAddressVerification.mockResolvedValueOnce({ outcome: 'skipped_stale' });
+  installStructuredPerson();
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(update).toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).toHaveBeenCalled();
+  expect(result).toMatchObject({ success: false, partialSuccess: true, personUpdated: true, retryable: true });
+  expect(result.decision).not.toBe('attested_pending_promotion');
+});
+
+test('retains administrator-only lease repair guidance when the structured roster store reports a malformed lease', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  completeStructuredAddressVerification.mockResolvedValueOnce({
+    outcome: 'lease_repair_required',
+    leaseStage: 'contact',
+  });
+  installStructuredPerson();
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({
+    success: false,
+    partialSuccess: true,
+    personUpdated: true,
+    code: 'lease_repair_required',
+    leaseStage: 'contact',
+    retryable: false,
+  });
+  expect(result.message).toMatch(/Do not retry automatically.*Workbench administrator/i);
+  expect(result.remediation).toEqual([{ action: 'create_repair_request', label: 'Create repair request' }]);
+});
+
+test('requires an authenticated system actor before any structured address mutation', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson();
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer', actorSystemUserId: null,
+  });
+
+  expect(result).toMatchObject({ success: false, code: 'invalid_address_attestation' });
+  expect(update).not.toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['live', '2099-08-02T12:00:00.000Z', 'refresh_in_progress'],
+  ['expired', '2020-08-02T12:00:00.000Z', 'lease_recovery_required'],
+])('refuses a %s unrelated stage lease before the person or roster write', async (_label, refreshStartedAt, code) => {
+  const candidate = structuredCandidate({
+    stageRefresh: {
+      eligibility: {
+        refreshAttemptId: 'eligibility-attempt',
+        refreshStartedAt,
+      },
+    },
+  });
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson();
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer', actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({ success: false, decision: 'blocked', code, leaseStage: 'eligibility' });
+  expect(update).not.toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
+});
+
+test('structured identity confirmation treats a malformed lease as administrator repair, not a running refresh', async () => {
+  const candidate = structuredCandidate({
+    stageRefresh: {
+      contact: { refreshAttemptId: '', refreshStartedAt: '2026-08-02T12:00:00.000Z' },
+    },
+  });
+  findCandidateByKey.mockResolvedValue(candidate);
+
+  const result = await confirmStructuredRosterIdentity({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    manualContact: { email: 'staff@example.edu' },
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({
+    success: false,
+    decision: 'blocked',
+    code: 'lease_repair_required',
+    leaseStage: 'contact',
+    retryable: false,
+  });
+  expect(result.message).toMatch(/cannot be treated as running.*Workbench administrator/i);
+  expect(result.remediation).toEqual([{ action: 'create_repair_request', label: 'Create repair request' }]);
+  expect(confirmIdentity).not.toHaveBeenCalled();
+  expect(getById).not.toHaveBeenCalled();
+});
+
+test('structured address verification treats a malformed lease as administrator repair before any write', async () => {
+  const candidate = structuredCandidate({
+    stageRefresh: {
+      eligibility: { refreshAttemptId: '', refreshStartedAt: '2026-08-02T12:00:00.000Z' },
+    },
+  });
+  findCandidateByKey.mockResolvedValue(candidate);
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    email: 'verified@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/reviewer',
+    actorSystemUserId: 'system-1',
+  });
+
+  expect(result).toMatchObject({
+    success: false,
+    decision: 'blocked',
+    code: 'lease_repair_required',
+    leaseStage: 'eligibility',
+    retryable: false,
+  });
+  expect(result.message).toMatch(/cannot be treated as running.*Workbench administrator/i);
+  expect(result.remediation).toEqual([{ action: 'create_repair_request', label: 'Create repair request' }]);
+  expect(update).not.toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
+});
+
+test('rejects a changed person ETag before projecting the roster pair', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson({ changedBeforeCas: true });
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer', actorSystemUserId: 'system-1',
+  });
+
+  expect(update).toHaveBeenCalled();
+  expect(result).toMatchObject({ success: false, partialSuccess: true, code: 'candidate_stale' });
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
+});
+
+test('rejects a changed person email before projecting the roster pair', async () => {
+  const candidate = structuredCandidate();
+  findCandidateByKey.mockResolvedValue(candidate);
+  installStructuredPerson({ emailChangedBeforeCas: true });
+
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey: candidate.candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer', actorSystemUserId: 'system-1',
+  });
+
+  expect(update).toHaveBeenCalled();
+  expect(result).toMatchObject({ success: false, partialSuccess: true, code: 'candidate_stale' });
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['missing roster candidate', () => {
+    findCandidateByKey.mockResolvedValueOnce(null);
+    return `person:${PERSON_ID}`;
+  }],
+  ['wrong request suggestion', () => {
+    const candidate = structuredCandidate({ candidateKey: `suggestion:${SUGGESTION_ID}`, suggestionId: SUGGESTION_ID });
+    findCandidateByKey.mockResolvedValue(candidate);
+    findById.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: '44444444-4444-4444-8444-444444444444',
+      _wmkf_potentialreviewer_value: PERSON_ID,
+    });
+    return candidate.candidateKey;
+  }],
+  ['wrong canonical person', () => {
+    const candidate = structuredCandidate();
+    findCandidateByKey.mockResolvedValue(candidate);
+    installStructuredPerson({ personId: '44444444-4444-4444-8444-444444444444' });
+    return candidate.candidateKey;
+  }],
+])('fails closed for %s before the person write', async (_label, arrange) => {
+  const candidateKey = arrange();
+  const result = await verifyPersonAndAddress({
+    requestId: REQUEST_ID, candidateKey, email: 'verified@example.edu',
+    evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/reviewer', actorSystemUserId: 'system-1',
+  });
+  expect(result).toMatchObject({ success: false, code: 'candidate_stale' });
+  expect(update).not.toHaveBeenCalled();
+  expect(completeStructuredAddressVerification).not.toHaveBeenCalled();
 });

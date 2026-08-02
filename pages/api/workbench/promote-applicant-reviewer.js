@@ -1,12 +1,13 @@
 /**
  * API: /api/workbench/promote-applicant-reviewer
  *
- * POST { requestId, suggestionId, contact? }
+ * POST { requestId, suggestionId }
  *
  * Explicitly promotes one applicant-recommended reviewer into the request's
- * candidate pool (flips wmkf_selected=true), persists PD hand-corrections,
- * and backfills the vetted enrichment email (B1, S317). Partial success is a
- * 200 with { partialSuccess, contactError, savedFields }.
+ * candidate pool (flips wmkf_selected=true), after rechecking the server-held
+ * roster contact and address evidence.  Contact corrections are their own
+ * authenticated, server-attested workflow. Partial success is a 200 with
+ * { partialSuccess, contactError, savedFields }.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
  * dispatch → auth guard → GUID validation → withDalContext → one service
@@ -43,7 +44,6 @@ export default async function handler(req, res) {
       const body = await promoteApplicantReviewer({
         requestId: requestGuid,
         suggestionId: suggestionGuid,
-        contact: req.body?.contact,
         actingUserSystemId,
       });
       return res.status(200).json(body);

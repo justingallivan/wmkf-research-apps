@@ -33,12 +33,8 @@ export default async function handler(req, res) {
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
   const {
-    proposalTitle,
-    programArea,
     requestId,
-    grantCycleCode,
     candidates,
-    summaryBlobUrl,
   } = req.body;
 
   if (!requestId) {
@@ -53,12 +49,8 @@ export default async function handler(req, res) {
   return withDalContext('save-candidates', async () => {
     try {
       const result = await saveCandidates({
-        proposalTitle,
-        programArea,
         requestId,
-        grantCycleCode,
         candidates,
-        summaryBlobUrl,
         actingUserSystemId,
       });
       return res.status(200).json(result);

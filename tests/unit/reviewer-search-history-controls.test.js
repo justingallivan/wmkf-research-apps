@@ -58,7 +58,15 @@ const applicantCandidate = {
 };
 
 const CURRENT_PROMOTION_STAGES = [
-  'identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust',
+  'applicant_anchor',
+  'identity',
+  'institution_domains',
+  'institution_coi',
+  'coauthor_coi',
+  'eligibility',
+  'contact',
+  'address_trust',
+  'roster_persistence',
 ];
 
 function currentServerPromotionPlan(candidateKey) {

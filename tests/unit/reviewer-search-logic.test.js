@@ -30,12 +30,15 @@ const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelFo
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
 
 const CURRENT_STAGE_FRESHNESS = {
+  applicant_anchor: { state: 'current', contractVersion: 1, sourceVersion: 'applicant-anchor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   identity: { state: 'current', contractVersion: 4, sourceVersion: 'identity-v4', completedAt: '2026-08-02T00:00:00.000Z' },
+  institution_domains: { state: 'current', contractVersion: 1, sourceVersion: 'institution-domains-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   institution_coi: { state: 'current', contractVersion: 1, sourceVersion: 'institution-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   coauthor_coi: { state: 'current', contractVersion: 1, sourceVersion: 'coauthor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   eligibility: { state: 'current', contractVersion: 1, sourceVersion: 'eligibility-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   contact: { state: 'current', contractVersion: 1, sourceVersion: 'contact-v1', completedAt: '2026-08-02T00:00:00.000Z' },
   address_trust: { state: 'current', contractVersion: 1, sourceVersion: 'address-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  roster_persistence: { state: 'current', contractVersion: 1, sourceVersion: 'roster-persistence-v1', completedAt: '2026-08-02T00:00:00.000Z' },
 };
 const withCurrentPromotionAuthority = (candidate) => ({
   candidateKey: candidate.candidateKey || 'suggestion:test-candidate',
@@ -1277,6 +1280,10 @@ describe('pruneCandidateForRoster — server identity confirmation survives relo
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
+        state: 'confirmed',
+        canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+        canonicalPersonEtag: 'W/"ann-v1"',
+        actorId: 'system-5',
         normalizedName: 'ann lee',
         email: 'ann@example.edu',
         website: 'https://example.edu/ann',
@@ -1293,6 +1300,10 @@ describe('pruneCandidateForRoster — server identity confirmation survives relo
     expect(pruned.staffIdentityConfirmation).toEqual({
       confirmationId: 'confirm-1',
       source: 'staff_confirmed',
+      state: 'confirmed',
+      canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+      canonicalPersonEtag: 'W/"ann-v1"',
+      actorId: 'system-5',
       normalizedName: 'ann lee',
       email: 'ann@example.edu',
       website: 'https://example.edu/ann',

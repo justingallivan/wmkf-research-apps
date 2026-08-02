@@ -13,6 +13,8 @@
  * depend on these exact shapes (plan warning for save-candidates.js).
  */
 
+const mockRosterCandidates = new Map();
+
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({
     profileId: 'P1', session: { user: { dynamicsSystemuserId: 'SYS-1' } },
@@ -47,7 +49,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
-    candidateKeys.map((candidateKey) => ({ candidateKey, rosterStatus: 'active' }))
+    candidateKeys.map((candidateKey) => mockRosterCandidates.get(candidateKey)).filter(Boolean)
   )),
   findIdentityConfirmation: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
@@ -110,9 +112,18 @@ beforeAll(() => {
 
 function withCurrentRosterAuthority(candidate) {
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
+  const candidateKey = candidate.candidateKey || reviewerSaveKey(candidate);
+  // Mirror the server-read roster row independently of the client selection
+  // DTO. The route must use this row, not the posted candidate fields.
+  mockRosterCandidates.set(candidateKey, {
+    ...candidate,
+    candidateKey,
+    rosterStatus: 'active',
+    rosterUpdatedAt: '2026-08-02 00:00:00+00',
+  });
   return {
     ...candidate,
-    candidateKey: candidate.candidateKey || reviewerSaveKey(candidate),
+    candidateKey,
     automatedIdentityAttestation: candidate.automatedIdentityAttestation || 'test-signed-attestation',
   };
 }
@@ -130,6 +141,7 @@ function withCurrentRosterAuthorityRequest(req) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRosterCandidates.clear();
   mockGetCandidatePromotionAuthority.mockReturnValue({
     decision: 'ready', code: null, stage: null, reason: null,
   });

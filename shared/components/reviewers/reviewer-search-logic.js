@@ -21,6 +21,7 @@ import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import { REQUIRED_STAGES } from '../../../lib/services/reviewer-promotion-authority';
+import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
 import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
@@ -104,7 +105,7 @@ export function getCandidatePromotionDecision(candidate) {
     'contact_linked_elsewhere',
     'identity_conflict',
   ]).has(dataverseReason);
-  if (candidate?.pdIdentityConfirmed !== true && dataverseNeedsIdentityChoice) {
+  if (!hasCandidateStaffIdentityConfirmation(candidate) && dataverseNeedsIdentityChoice) {
     return {
       decision: 'needs_identity_confirmation',
       reason: dataverseReason,
@@ -112,7 +113,7 @@ export function getCandidatePromotionDecision(candidate) {
     };
   }
   const shared = projectReviewerContact(candidate, {
-    staffConfirmed: candidate?.pdIdentityConfirmed === true,
+    staffConfirmed: hasCandidateStaffIdentityConfirmation(candidate),
   });
   if (!candidate?.isApplicantRecommended || !candidate?.applicantKnownReviewer) {
     return shared;
@@ -483,7 +484,7 @@ function exactAddressReceiptMatches(candidate) {
 
 function candidateAuthorityScore(candidate) {
   let score = 0;
-  if (candidate?.pdIdentityConfirmed === true && candidate?.pdIdentityConfirmationId) score += 100;
+  if (hasCandidateStaffIdentityConfirmation(candidate)) score += 100;
   if (exactAddressReceiptMatches(candidate)) score += 50;
   if (candidate?.serverIdentityDecisionReceipt?.source === 'automated_resolver') score += 20;
   const emailSource = candidate?.emailSource || candidate?.contactEnrichment?.emailSource;
@@ -591,7 +592,7 @@ export function hasValidApplicantEnrichmentCache(
   // complete batch.
   return Array.from(canonicalRowsByKey.values()).every((c) => (
     c?.eligibilityStatus === 'deceased'
-      || c?.pdIdentityConfirmed === true
+      || hasCandidateStaffIdentityConfirmation(c)
       || c?.identityStatus === 'confirmed'
       || c?.identityStatus === 'probable'
       || c?.identityStatus === 'unresolved'
@@ -761,6 +762,10 @@ function pruneStaffIdentityConfirmation(confirmation) {
   return {
     confirmationId,
     source: 'staff_confirmed',
+    state: boundedText(confirmation.state, 40),
+    canonicalPersonId: boundedText(confirmation.canonicalPersonId, 80),
+    canonicalPersonEtag: boundedText(confirmation.canonicalPersonEtag, 240),
+    actorId: boundedText(confirmation.actorId, 120),
     normalizedName: boundedText(confirmation.normalizedName, 300),
     email: boundedText(confirmation.email, 320),
     website: boundedText(confirmation.website, 500),

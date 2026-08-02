@@ -23,13 +23,13 @@ import {
   recordSurfaced,
   setExcluded,
   promote,
-  confirmIdentity,
   listForRequest,
   findCandidateBySuggestionAnchor,
   findCandidatesByKeys,
   removePreviousActiveSearchResults,
 } from '../../../lib/services/reviewer-roster-store';
 import { withDalContext } from '../../../lib/dataverse/core/context';
+import { confirmStructuredRosterIdentity } from '../../../lib/services/reviewer-address-trust-service';
 import {
   reconcileRosterEngagement,
   validateRosterPromotionEngagement,
@@ -44,6 +44,7 @@ import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
+import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -281,12 +282,7 @@ function bindServerRosterCandidateKey(candidate, receipt) {
 }
 
 function hasStoredStaffAuthority(candidate) {
-  const confirmationId = candidate?.pdIdentityConfirmationId;
-  return candidate?.pdIdentityConfirmed === true
-    && typeof confirmationId === 'string'
-    && confirmationId.length > 0
-    && candidate?.staffIdentityConfirmation?.source === 'staff_confirmed'
-    && candidate.staffIdentityConfirmation.confirmationId === confirmationId;
+  return hasCandidateStaffIdentityConfirmation(candidate);
 }
 
 async function preserveStoredRosterAuthority(requestId, candidates, {
@@ -815,8 +811,8 @@ async function handlePatch(req, res, access) {
 
   if (action === 'confirm_identity') {
     const { candidate } = req.body;
-    if (!candidate?.name || !candidate?.email) {
-      return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
+    if (!candidate?.email) {
+      return res.status(400).json({ error: 'candidate email is required to confirm identity' });
     }
     let authoritativeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
     if (isServerManagedApplicantCandidate(candidate)) {
@@ -839,45 +835,29 @@ async function handlePatch(req, res, access) {
         });
       }
     }
-    const manualCandidate = {
-      ...authoritativeCandidate,
-      email: candidate.email,
-      emailSource: 'manual',
-      website: candidate.website || null,
-      websiteSource: candidate.website ? 'manual' : null,
-      affiliation: candidate.affiliation || null,
-      affiliationSource: 'staff_manual',
-      contactEnrichment: {
-        ...(authoritativeCandidate.contactEnrichment || {}),
-        email: candidate.email,
-        emailSource: 'manual',
-        website: candidate.website || null,
-        websiteSource: candidate.website ? 'manual' : null,
-        affiliation: candidate.affiliation || null,
-        affiliationSource: 'staff_manual',
-      },
-    };
-    // The display DTO pruner intentionally omits server-only freshness/COI
-    // evidence. Restore it from the already canonical roster row after pruning
-    // so the store's shallow confirmation merge cannot erase nested authority.
-    const prunedManualCandidate = pruneCandidateForRoster(manualCandidate);
-    const candidateForConfirmation = restoreStoredRosterAuthority(
-      authoritativeCandidate.serverIdentityDecisionReceipt
-        ? {
-            ...prunedManualCandidate,
-            serverIdentityDecisionReceipt: authoritativeCandidate.serverIdentityDecisionReceipt,
-          }
-        : prunedManualCandidate,
-      authoritativeCandidate,
-    );
-    const confirmed = await confirmIdentity(requestId, candidateForConfirmation, {
-      actorProfileId: access?.profileId || null,
-      actorSystemUserId: access?.session?.user?.dynamicsSystemuserId || null,
-    });
-    if (!confirmed) {
-      return res.status(409).json({ error: 'Candidate is no longer active; reload before confirming identity.' });
+    const confirmed = await withDalContext('workbench-reviewer-roster-confirm-identity', () => (
+      confirmStructuredRosterIdentity({
+        requestId,
+        // This is the server-resolved row, not the browser candidate. The
+        // service re-reads it once more before calculating the confirmation.
+        candidateKey: authoritativeCandidate.candidateKey,
+        manualContact: {
+          email: candidate.email,
+          website: candidate.website,
+          affiliation: candidate.affiliation,
+        },
+        actorProfileId: access?.profileId || null,
+        actorSystemUserId: access?.session?.user?.dynamicsSystemuserId || null,
+      })
+    ));
+    if (!confirmed?.success) {
+      return res.status(409).json(confirmed || {
+        success: false,
+        code: 'candidate_stale',
+        error: 'Candidate is no longer active; reload before confirming identity.',
+      });
     }
-    return res.status(200).json({ success: true, ...confirmed });
+    return res.status(200).json(confirmed);
   }
 
   if (action === 'remove_previous_results') {

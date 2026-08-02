@@ -4,7 +4,7 @@
  * Explicit staff-only repair of one canonical Reviewer Find candidate stage.
  * This is intentionally separate from the batch applicant-enrichment route:
  * it accepts no display name, client receipt, dependency version, candidate
- * key, proposal binding, or provider result. The service derives all of those
+ * key authority, proposal binding, or provider result. The service derives all of those
  * from the request-scoped roster and authoritative Dataverse reads.
  */
 
@@ -16,7 +16,8 @@ import {
 } from '../../../lib/services/workbench/reviewer-stage-refresh-service';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const REQUEST_FIELDS = new Set(['requestId', 'suggestionId', 'stage', 'expectedUpdatedAt']);
+const CANDIDATE_KEY_RE = /^(suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/i;
+const REQUEST_FIELDS = new Set(['requestId', 'candidateKey', 'stage', 'expectedUpdatedAt']);
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16kb' } },
@@ -33,6 +34,13 @@ function validExpectedUpdatedAt(value) {
     && !/[\u0000-\u001f\u007f]/.test(value);
 }
 
+function validCandidateKey(value) {
+  return typeof value === 'string'
+    && value.trim().length > 0
+    && value.trim().length <= 560
+    && CANDIDATE_KEY_RE.test(value.trim());
+}
+
 function parseRefreshRequest(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { valid: false, code: 'invalid_refresh_request', error: 'A refresh request body is required' };
@@ -41,17 +49,20 @@ function parseRefreshRequest(body) {
     return {
       valid: false,
       code: 'client_authority_claim_rejected',
-      error: 'Only requestId, suggestionId, stage, and expectedUpdatedAt are accepted',
+      error: 'Only requestId, candidateKey, stage, and expectedUpdatedAt are accepted',
     };
   }
   const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : '';
-  const suggestionId = typeof body.suggestionId === 'string' ? body.suggestionId.trim() : '';
+  const candidateKey = typeof body.candidateKey === 'string' ? body.candidateKey.trim() : '';
   const stage = typeof body.stage === 'string' ? body.stage.trim() : '';
   const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string'
     ? body.expectedUpdatedAt.trim()
     : '';
-  if (!isGuid(requestId) || !isGuid(suggestionId)) {
-    return { valid: false, code: 'invalid_refresh_target', error: 'requestId and suggestionId must be GUIDs' };
+  if (!isGuid(requestId) || !validCandidateKey(candidateKey)) {
+    return { valid: false, code: 'invalid_refresh_target', error: 'requestId and candidateKey are required' };
+  }
+  if (stage === 'address_trust') {
+    return { valid: false, code: 'dedicated_address_action', error: 'address trust must use the dedicated staff action' };
   }
   if (!EXECUTABLE_REVIEWER_REFRESH_STAGES.includes(stage)) {
     return { valid: false, code: 'stage_not_executable', error: 'stage is not executable' };
@@ -61,14 +72,17 @@ function parseRefreshRequest(body) {
   }
   return {
     valid: true,
-    value: { requestId, suggestionId, stage, expectedUpdatedAt },
+    value: { requestId, candidateKey, stage, expectedUpdatedAt },
   };
 }
 
 function httpStatusForOutcome(refreshOutcome) {
-  if (refreshOutcome === 'recorded') return 200;
-  if (refreshOutcome === 'skipped_stale' || refreshOutcome === 'rejected') return 409;
-  if (refreshOutcome === 'failed_terminal') return 422;
+  if (refreshOutcome === 'recorded' || refreshOutcome === 'not_required') return 200;
+  if (refreshOutcome === 'skipped_stale'
+    || refreshOutcome === 'refresh_in_progress'
+    || refreshOutcome === 'lease_recovery_required'
+    || refreshOutcome === 'lease_repair_required') return 409;
+  if (refreshOutcome === 'rejected' || refreshOutcome === 'failed_terminal') return 422;
   return 503;
 }
 
@@ -95,7 +109,6 @@ export default async function handler(req, res) {
     try {
       const result = await refreshReviewerCandidateStage(parsed.value);
       return res.status(httpStatusForOutcome(result.outcome)).json({
-        success: result.outcome === 'recorded',
         ...result,
       });
     } catch (error) {

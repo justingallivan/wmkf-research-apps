@@ -2,13 +2,23 @@
 
 import {
   buildApplicantAnchorRefreshReceipt,
+  deriveReviewerPromotionAuthoritySnapshot,
   projectApplicantWarmInputs,
   readReviewerWarmValidation,
   resolveReviewerProposalMetadata,
   opaqueVersion,
 } from '../../lib/services/workbench/reviewer-warm-validation-service';
 import { CONTRACT_VERSIONS, STAGES } from '../../lib/services/reviewer-stage-freshness';
+import {
+  applicantAnchorSourceVersion,
+  buildReviewerStageDependencySnapshot,
+  buildRosterPersistenceReceipt,
+} from '../../lib/services/workbench/reviewer-stage-source-versions';
+import { getCandidatePromotionAuthority } from '../../lib/services/reviewer-promotion-authority';
 import { GraphService } from '../../lib/services/graph-service';
+import { ReviewerIdentityRuntime } from '../../lib/services/reviewer-identity-runtime';
+import * as coauthorCoi from '../../lib/services/discovery/coauthor-coi';
+import * as reviewerRosterStore from '../../lib/services/reviewer-roster-store';
 import fs from 'fs';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
@@ -53,6 +63,131 @@ function metadataDeps({ entries = new Map(), bucketList = buckets() } = {}) {
     getFileMetadataByPath,
   };
 }
+
+function currentReceipt(stage, sourceVersion, index, overrides = {}) {
+  return {
+    state: 'current',
+    contractVersion: CONTRACT_VERSIONS[stage],
+    sourceVersion,
+    resultVersion: index.toString(16).repeat(64),
+    completedAt: '2026-08-02T00:00:00.000Z',
+    reasonCode: null,
+    failureCode: null,
+    ...overrides,
+  };
+}
+
+function completePromotionCandidate({ proposalContentVersion, requestCoiContextVersion }) {
+  const candidate = {
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    rosterStatus: 'active',
+    rosterUpdatedAt: 'roster-v1',
+    provenance: { kind: 'proposal_named' },
+    name: 'Dr. Complete Reviewer',
+    affiliation: 'Example University',
+    canonicalPersonId: '55555555-5555-4555-8555-555555555555',
+    personEtag: 'W/"person-v1"',
+    proposalContentVersion,
+    proposalAuthorVersion: 'a'.repeat(64),
+    identityDecision: 'confirmed',
+    institutionDomainEvidence: { inputFingerprint: 'd'.repeat(64), anchoredDomains: ['example.edu'] },
+    trustedInstitutionDomains: ['example.edu'],
+    coauthorCheckStatus: 'complete',
+    coauthorCheckFailures: [],
+    eligibilityCheckStatus: 'complete',
+    eligibilityStatus: 'unknown',
+    email: 'reviewer@example.edu',
+    emailSource: 'faculty_page',
+    emailAction: 'ready',
+    addressTrustStatus: 'quick_check',
+    warmCacheVersion: 1,
+    stageFreshness: {},
+  };
+  const anchorVersion = applicantAnchorSourceVersion({ candidate });
+  candidate.stageFreshness.applicant_anchor = currentReceipt('applicant_anchor', anchorVersion, 1, {
+    state: 'not_applicable', reasonCode: 'server_not_applicable',
+  });
+  let snapshot = buildReviewerStageDependencySnapshot({
+    candidate,
+    requestId: REQUEST_ID,
+    proposalContentVersion,
+    requestCoiContextVersion,
+  });
+  candidate.stageFreshness.identity = currentReceipt('identity', snapshot.versions.identity, 2);
+  snapshot = buildReviewerStageDependencySnapshot({ candidate, requestId: REQUEST_ID, proposalContentVersion, requestCoiContextVersion });
+  candidate.stageFreshness.institution_domains = currentReceipt('institution_domains', snapshot.versions.institution_domains, 3);
+  snapshot = buildReviewerStageDependencySnapshot({ candidate, requestId: REQUEST_ID, proposalContentVersion, requestCoiContextVersion });
+  candidate.stageFreshness.institution_coi = currentReceipt('institution_coi', snapshot.versions.institution_coi, 4);
+  candidate.stageFreshness.coauthor_coi = currentReceipt('coauthor_coi', snapshot.versions.coauthor_coi, 5);
+  snapshot = buildReviewerStageDependencySnapshot({ candidate, requestId: REQUEST_ID, proposalContentVersion, requestCoiContextVersion });
+  candidate.stageFreshness.eligibility = currentReceipt('eligibility', snapshot.versions.eligibility, 6);
+  candidate.stageFreshness.contact = currentReceipt('contact', snapshot.versions.contact, 7);
+  snapshot = buildReviewerStageDependencySnapshot({ candidate, requestId: REQUEST_ID, proposalContentVersion, requestCoiContextVersion });
+  candidate.stageFreshness.address_trust = currentReceipt('address_trust', snapshot.versions.address_trust, 8);
+  candidate.stageFreshness.roster_persistence = buildRosterPersistenceReceipt({
+    candidateKey: candidate.candidateKey,
+    stageFreshness: candidate.stageFreshness,
+    completedAt: '2026-08-02T00:00:00.000Z',
+  });
+  return candidate;
+}
+
+test('promotion authority rejects a non-GUID request before any authority read', async () => {
+  const getRequestById = jest.fn();
+  const result = await deriveReviewerPromotionAuthoritySnapshot({
+    requestId: 'not-a-request-guid',
+    candidate: { candidateKey: 'person:canonical-reviewer' },
+    deps: { getRequestById },
+  });
+
+  expect(result).toEqual({
+    authorityState: 'stale', requestId: null, candidateKey: null, versions: {},
+  });
+  expect(getRequestById).not.toHaveBeenCalled();
+});
+
+test('a non-stage malformed lease makes an otherwise current promotion snapshot unavailable', async () => {
+  const deps = {
+    ...metadataDeps({ entries: new Map([[
+      'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+    ]]) }),
+    getRequestById: jest.fn(async () => request()),
+  };
+  const seed = await deriveReviewerPromotionAuthoritySnapshot({
+    requestId: REQUEST_ID,
+    candidate: {
+      candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+      provenance: { kind: 'proposal_named' },
+      name: 'Dr. Complete Reviewer',
+      affiliation: 'Example University',
+    },
+    deps,
+  });
+  const candidate = completePromotionCandidate({
+    proposalContentVersion: seed.proposalContentVersion,
+    requestCoiContextVersion: seed.requestCoiContextVersion,
+  });
+  const current = await deriveReviewerPromotionAuthoritySnapshot({ requestId: REQUEST_ID, candidate, deps });
+  expect(current).toMatchObject({ authorityState: 'current', plan: { cacheOutcome: 'hit' } });
+
+  const malformedLeaseCandidate = { ...candidate, stageRefresh: { historical: 'corrupt-lease' } };
+  const blocked = await deriveReviewerPromotionAuthoritySnapshot({
+    requestId: REQUEST_ID,
+    candidate: malformedLeaseCandidate,
+    deps,
+  });
+
+  expect(blocked).toMatchObject({
+    authorityState: 'stale',
+    plan: { leaseRepairRequired: true, promotionAuthority: 'blocked_refresh_required' },
+  });
+  expect(blocked.plan.cacheOutcome).not.toBe('hit');
+  expect(getCandidatePromotionAuthority(malformedLeaseCandidate, {
+    serverAuthoritative: true,
+    requestId: REQUEST_ID,
+    authoritative: blocked,
+  })).toMatchObject({ decision: 'blocked', code: 'promotion_authority_unavailable' });
+});
 
 test('uses the exact canonical reviewer path before the current-cycle fallback', async () => {
   const canonicalPath = 'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf';
@@ -239,6 +374,7 @@ test('keeps panel state current without fabricating a full candidate-stage cache
       state: 'current',
       contractVersion: CONTRACT_VERSIONS[stage],
       sourceVersion: `legacy-${stage}`,
+      resultVersion: `legacy-${stage}-result`,
       completedAt: '2026-08-01T00:00:00.000Z',
     }])),
   };
@@ -263,11 +399,127 @@ test('keeps panel state current without fabricating a full candidate-stage cache
   expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
     expect.objectContaining({ stage: 'identity', reason: 'stage_contract_changed' }),
   ]));
-  expect(result.candidatePlans[0].currentStages).toEqual(['applicant_anchor']);
+  expect(result.candidatePlans[0].currentStages).toEqual([]);
   const responseText = JSON.stringify(result);
   expect(responseText).not.toContain('Secret Candidate');
   expect(responseText).not.toContain('secret@example.edu');
   expect(responseText).not.toContain('Jane Example');
+});
+
+test('warm validation never runs evidence providers or roster writers for a provider-ready cached row', async () => {
+  const identity = jest.spyOn(ReviewerIdentityRuntime, 'evaluateSuggestion');
+  const coauthor = jest.spyOn(coauthorCoi, 'checkCoauthorHistory');
+  const download = jest.spyOn(GraphService, 'downloadFileByPath');
+  const stageWrite = jest.spyOn(reviewerRosterStore, 'completeStageRefreshWithEvidence');
+  const coldWrite = jest.spyOn(reviewerRosterStore, 'recordSurfacedWithStageEvidence');
+  const candidate = {
+    candidateKey: 'person:55555555-5555-5555-5555-555555555555',
+    provenance: { kind: 'proposal_named' },
+    name: 'Provider-ready Reviewer',
+    affiliation: 'Example University',
+    email: 'reviewer@example.edu',
+    identityDecision: 'confirmed',
+    proposalAuthorVersion: 'proposal-authors:v1',
+    warmCacheVersion: 1,
+    stageFreshness: {},
+  };
+  try {
+    await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(identity).not.toHaveBeenCalled();
+    expect(coauthor).not.toHaveBeenCalled();
+    expect(download).not.toHaveBeenCalled();
+    expect(stageWrite).not.toHaveBeenCalled();
+    expect(coldWrite).not.toHaveBeenCalled();
+  } finally {
+    identity.mockRestore();
+    coauthor.mockRestore();
+    download.mockRestore();
+    stageWrite.mockRestore();
+    coldWrite.mockRestore();
+  }
+});
+
+test('warm validation surfaces an expired lease owner before ordinary upstream refreshes', async () => {
+  const candidate = {
+    candidateKey: 'person:55555555-5555-5555-5555-555555555555',
+    provenance: { kind: 'proposal_named' },
+    name: 'Expired Lease Reviewer',
+    warmCacheVersion: 1,
+    stageFreshness: {},
+    stageRefresh: {
+      contact: {
+        refreshAttemptId: 'expired-contact-attempt',
+        refreshStartedAt: '2020-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result.candidatePlans[0].refreshes[0]).toMatchObject({
+    stage: 'contact',
+    reason: 'prior_refresh_incomplete',
+    action: 'recover_expired_lease',
+  });
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor' }),
+  ]));
+});
+
+test('warm validation projects a malformed lease as an operator-only repair', async () => {
+  const candidate = {
+    candidateKey: 'person:56565656-5656-5656-5656-565656565656',
+    provenance: { kind: 'proposal_named' },
+    name: 'Malformed Lease Reviewer',
+    warmCacheVersion: 1,
+    stageFreshness: {},
+    stageRefresh: {
+      contact: {
+        refreshAttemptId: '',
+        refreshStartedAt: '2026-08-02T12:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result.candidatePlans[0]).toMatchObject({
+    candidateKey: candidate.candidateKey,
+    leaseRepairRequired: true,
+  });
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      stage: 'contact',
+      reason: 'stage_incomplete',
+      action: 'operator_repair_required',
+    }),
+  ]));
 });
 
 test('marks an applicant-lane candidate missing when its exact potential reviewer id is not a current slot', async () => {
@@ -298,7 +550,7 @@ test('marks an applicant-lane candidate missing when its exact potential reviewe
   ]));
 });
 
-test('treats a general-search candidate applicant anchor as not applicable, not as a request-wide applicant slot', async () => {
+test('does not mint a current general-search applicant anchor during warm validation', async () => {
   const candidate = {
     candidateKey: 'orcid:0000-0002-1825-0097',
     warmCacheVersion: 1,
@@ -310,6 +562,7 @@ test('treats a general-search candidate applicant anchor as not applicable, not 
         state: 'current',
         contractVersion: CONTRACT_VERSIONS.applicant_anchor,
         sourceVersion: 'old-request-wide-input-version',
+        resultVersion: 'old-request-wide-result',
         completedAt: '2026-08-01T00:00:00.000Z',
       },
     },
@@ -326,11 +579,45 @@ test('treats a general-search candidate applicant anchor as not applicable, not 
   });
 
   expect(result).toMatchObject({ state: 'current' });
+  expect(result.candidatePlans[0].currentStages).not.toContain('applicant_anchor');
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor', reason: 'stage_contract_changed' }),
+  ]));
+  expect(result.candidatePlans[0].cacheOutcome).toBe('miss');
+});
+
+test('accepts only a producer-written canonical general-search applicant N/A receipt', async () => {
+  const candidateKey = 'orcid:0000-0002-1825-0097';
+  const sourceVersion = opaqueVersion('reviewer-warm-applicant-anchor-not-applicable:v1', { candidateKey });
+  const candidate = {
+    candidateKey,
+    warmCacheVersion: 1,
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'not_applicable',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion,
+        resultVersion: sourceVersion,
+        completedAt: '2026-08-01T00:00:00.000Z',
+        reasonCode: 'server_not_applicable',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
   expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
   expect(result.candidatePlans[0].refreshes).not.toEqual(expect.arrayContaining([
     expect.objectContaining({ stage: 'applicant_anchor' }),
   ]));
-  expect(result.candidatePlans[0].cacheOutcome).toBe('partial_hit');
 });
 
 test('uses an exact applicant slot fingerprint without granting unrelated stage authority', async () => {
@@ -349,6 +636,7 @@ test('uses an exact applicant slot fingerprint without granting unrelated stage 
         state: 'current',
         contractVersion: CONTRACT_VERSIONS.applicant_anchor,
         sourceVersion: slotVersion,
+        resultVersion: 'slot-result-version',
         completedAt: '2026-08-01T00:00:00.000Z',
       },
     },
@@ -390,6 +678,7 @@ test('projects only allowlisted canonical evidence dates and derives the applica
         state: 'current',
         contractVersion: CONTRACT_VERSIONS.applicant_anchor,
         sourceVersion: slotVersion,
+        resultVersion: 'slot-result-version',
         completedAt: '2026-08-01T00:00:00.000Z',
       },
     },
@@ -417,6 +706,7 @@ test('projects only allowlisted canonical evidence dates and derives the applica
     state: 'current',
     contractVersion: 1,
     sourceVersion: slotVersion,
+    resultVersion: slotVersion,
     completedAt: '2026-08-02T12:00:00.000Z',
   });
 
@@ -469,9 +759,9 @@ test('keeps a general-search applicant anchor not applicable when the proposal p
     candidateKey: candidate.candidateKey,
     promotionAuthority: 'blocked_refresh_required',
   });
-  expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
-  expect(result.candidatePlans[0].refreshes).not.toEqual(expect.arrayContaining([
-    expect.objectContaining({ stage: 'applicant_anchor' }),
+  expect(result.candidatePlans[0].currentStages).not.toContain('applicant_anchor');
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor', reason: 'stage_missing' }),
   ]));
 });
 
@@ -491,6 +781,7 @@ test('keeps an exact applicant-slot comparison when the proposal panel is stale'
         state: 'current',
         contractVersion: CONTRACT_VERSIONS.applicant_anchor,
         sourceVersion: slotVersion,
+        resultVersion: 'slot-result-version',
         completedAt: '2026-08-01T00:00:00.000Z',
       },
     },
@@ -518,6 +809,7 @@ test('fails closed for an ambiguous suggestion row without applicant or non-appl
         state: 'current',
         contractVersion: CONTRACT_VERSIONS.applicant_anchor,
         sourceVersion: 'legacy-applicant-anchor',
+        resultVersion: 'legacy-applicant-result',
         completedAt: '2026-08-01T00:00:00.000Z',
       },
     },

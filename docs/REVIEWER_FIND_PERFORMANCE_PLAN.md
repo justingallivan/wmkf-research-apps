@@ -5,7 +5,7 @@ kind: plan
 status: active
 summary: "Implementation plan for instant cached Reviewer Find revisits, narrow authoritative revalidation, and explicit cold-search behavior."
 canonical: false
-cataloged: 2026-08-01
+cataloged: 2026-08-02
 owner: product-engineering
 related:
   - docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md
@@ -19,7 +19,11 @@ related:
 
 # Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 
-> **Status:** Active implementation plan. A partial, non-deployed implementation exists on `codex/reviewer-find-performance-build`; the production behavior is unchanged.
+> **Status (2026-08-02):** [VERIFIED via source/tests] the feature branch now
+> implements the manual-stage, cold applicant receipt, warm-read, and promotion
+> snapshot contracts summarized below. This document records branch/source
+> state only; it does not claim merge, deployment, production enablement, or an
+> authenticated production-browser exercise.
 >
 > **Primary objective:** returning to a previously searched request should show its persisted candidates promptly and should not repeat proposal, model, publication, or contact work merely to reconstruct the screen.
 
@@ -55,39 +59,37 @@ Cold-search progressive delivery remains important, but it follows the warm-path
 
 ## Implementation snapshot — 2026-08-02
 
-[VERIFIED via source, focused route/component tests, the full Jest suite, TypeScript, and the production Webpack build on `codex/reviewer-find-performance-build`] the feature branch currently implements:
+[VERIFIED via source/tests] Current branch behavior is:
 
-- authenticated Postgres-first `cached` roster reads followed by request-bound `reconciled` authority reads;
-- request-generation, abort, snapshot-conflict, and request-switch guards that prevent stale responses and exports from crossing requests;
-- an idle warm/cold split that suppresses mount-time proposal download, Blob copy, applicant enrichment, and provider/model work;
-- metadata-only, exact-request proposal validation and server-generated warm candidate plans;
-- strict legacy receipt mapping, per-stage freshness planning, and `Evidence checked as of <date>` presentation;
-- fail-closed applicant and generic promotion authority checks, including institution COI, eligibility completeness, coauthor completeness, and server-owned receipt preservation across roster mutations; and
-- one exact-candidate, exact-stage manual repair path for `applicant_anchor`, protected by request binding, canonical candidate keys, roster compare-and-swap, and stale/error reload guidance.
+| Contract surface | Implemented branch behavior |
+|---|---|
+| Manual producers | The authenticated target-only stage route accepts `{ requestId, candidateKey, stage, expectedUpdatedAt }` and executes `applicant_anchor`, `identity`, `institution_domains`, `institution_coi`, `coauthor_coi`, `eligibility`, `contact`, and `roster_persistence`. Browser authority, evidence, provider, source, proposal/version, and plan fields are rejected. |
+| Proposal-dependent authority | Connected applicant cold enrichment and manual `identity`/`coauthor_coi` bind their work to exact Graph metadata before and after proposal analysis. A changed binding/content version discards the result as `authority_changed`; legacy/public-Blob display fallback does not grant proposal-dependent authority. |
+| Candidate concurrency | Stage start and completion use an exact roster-token CAS plus a **candidate-wide** lease. A competing live stage returns `refresh_in_progress`; a valid expired owner is persisted as a retryable recovery outcome before a new attempt. `recover_expired_lease` always carries reason `prior_refresh_incomplete`; if normal inputs are temporarily underivable, its incomplete receipt uses the opaque server-derived `reviewer-stage-expired-lease-recovery:v1` request/candidate/stage marker, so normal planning is still required. Malformed, foreign, or live leases return `lease_repair_required` and are operator-repair-only. |
+| Cold applicant receipt accounting | `enrich-recommended-service` projects the evidence it already performed through `recordSurfacedWithStageEvidence` and returns per-candidate recorded, partial, or skipped outcomes. It does not treat an incomplete/changed authority result as current evidence. |
+| Structured staff actions | `confirm_identity` derives the canonical identity from the authoritative roster/Dataverse row. The separate address action re-reads server identity/person ETags and atomically writes the matching `contact` and `address_trust` projections; neither trusts a client authority assertion. |
+| Terminal persistence | Cold upsert, manual stage completion, and provider-free terminal repair all apply `roster_persistence` within the same candidate write. A losing CAS claims neither requested-stage nor terminal success. |
+| Warm reads and display | Cached/reconciled warm reads perform zero evidence-provider and proposal-byte work. The client uses only returned target/stage state and displays each receipt's server-supplied “Evidence checked as of” value. |
+| Promotion | Both generic save and applicant promotion derive a server promotion-authority snapshot immediately before the fail-closed promotion gate; a cached receipt does not replace that fresh server decision. |
 
-This is a safe intermediate **display-only** implementation, not a deployable completion of P0. Selection and promotion remain disabled in Reviewer Find because only `applicant_anchor` has an executable targeted refresh producer. The remaining identity, institution-domain, institution COI, coauthor COI, eligibility, contact, address, and proposal-dependent stage producers do not yet emit a complete server-owned authoritative version snapshot. Both promotion services therefore continue to fail closed when that snapshot is absent or stale. Unsupported targeted stages never fall back to a full batch, proposal download, or paid/provider work.
+**Intentionally unwired boundary.** [VERIFIED via source/tests] standalone
+generic explicit-cold attestation/coordinator helpers and their tests exist,
+but no HTTP route adapter invokes them. Connecting that path would retain or
+redesign existing public-Blob behavior in `load-proposal`; that retention or
+redesign was not authorized. This branch therefore makes no claim that generic
+explicit cold search has the new attestation/coordinator contract.
 
-The branch has not been merged to `main`, deployed, exercised through an authenticated browser, used to write production Dataverse/Postgres state, or used to send reviewer email. A fresh Claude Opus adversarial review first returned **NEEDS REWORK** and identified one convergence defect plus promotion-authority coverage and receipt-compatibility/documentation gaps. The branch now stamps `warmCacheVersion` atomically only when a validated stage refresh completes, covers both promotion callers with the real fail-closed policy, preserves stored `eligibilityCheckStatus` when accepting a valid legacy v3 receipt, and documents token-bound roster-finalization partial success. A second, source-tracing Claude Opus review returned **SHIP** on 2026-08-02; the full Jest suite (566 suites / 6,889 tests), TypeScript, scoped ESLint, production Webpack build, and applicable repository gates passed independently in the worktree.
+The branch has not been merged to `main`, deployed, used for production
+Dataverse/Postgres writes, used to send reviewer email, or exercised through an
+authenticated production browser. Any enablement decision remains separate from
+this source/test reconciliation.
 
-That **SHIP** verdict applies to this safe intermediate branch, not to completed P0. The implemented targeted producer converges the `applicant_anchor` receipt and cache-format stamp, but the current authoritative planner does not yet supply proposal-content authority or executable producers for every required stage. No roster row can therefore reach an end-to-end `cacheOutcome: "hit"` yet, and selection/promotion correctly remain fail-closed. The next release decision still requires the remaining authoritative stage work plus an authenticated browser exercise on dummy request `1002788`.
+## Historical baseline — Contract-reconcile Mode A: Step 0
 
-The implementation contract for that remaining work is
-`docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`. It defines the common
-candidate/stage executor, dependency snapshots, evidence projectors, cold-path
-receipt emission, stage-specific inputs/results/failures, terminal
-`roster_persistence` convergence, complement tests, and the boundary that keeps
-a targeted contact refresh from rerunning identity, eligibility, or the full
-enrichment batch.
-
-Claude Fable reviewed the producer specification read-only on 2026-08-02. The
-first draft returned **NEEDS REWORK**; the accepted findings and two closure
-passes are recorded in
-`docs/audits/reviewer-warm-stage-producer-fable-review-2026-08-02.md`. After the
-terminal-writer, proposal-version, identity-authority, institution-domain,
-address-action, state-vocabulary, matrix, and reason-code corrections, the final
-Fable closure pass returned **READY FOR IMPLEMENTATION** with no P0/P1 blockers.
-
-## Contract-reconcile Mode A: Step 0
+The following baseline trace and planning findings were recorded before the
+branch implementation summarized above. They explain the original scope, but
+are not assertions of current branch behavior; current status is the
+**Implementation snapshot — 2026-08-02** and the source/tests it cites.
 
 - **Change surface:** Reviewer Workbench Find behavior from panel mount through cached roster display, authoritative revalidation, targeted refresh, explicit new search, and promotion.
 - **Entry points:** `ReviewerFindPanel`, `ReviewerSearchSection`, `reviewer-roster`, `applicant-reviewers`, `enrich-recommended`, proposal-load, analyze/discover/enrich routes, and both promotion services.
@@ -95,7 +97,7 @@ Fable closure pass returned **READY FOR IMPLEMENTATION** with no P0/P1 blockers.
 - **Consumers:** Find grouping/counts/cards/actions, Invite and Track after promotion, later searches' exclusion/dedup inputs, reload restoration, tests, Atlas/docs, and operational telemetry.
 - **Prior findings verified:** mount-time proposal and applicant work; roster reconciliation blocking cached display; all-or-nothing applicant cache; serial/whole-batch cold stages; count-only roster writes; name-based display dedup; missing explicit coauthor and eligibility-completeness promotion gates.
 
-## Current warm-path evidence
+## Historical warm-path evidence
 
 ### Mount work happens before the user asks for a search
 
@@ -463,22 +465,21 @@ Failures add bounded provider/infrastructure codes but do not replace the invali
 
 Content or input changes do not automatically launch a full cold search. They keep cached cards visible/read-only, identify affected candidates/stages, and require the explicit targeted refresh or new-search action defined by policy.
 
-## Current → target promotion authority matrix
+## Promotion authority matrix — branch source state
 
-The target server checks are required even when the UI reports `authorityState: current`. The client never grants authority.
+[VERIFIED via source/tests] both promotion entry points derive
+`deriveReviewerPromotionAuthoritySnapshot(...)` from the authoritative roster
+candidate immediately before calling the shared, fail-closed promotion gate.
+The UI's `authorityState` and any cached receipt remain display/eligibility
+inputs; neither is client-granted mutation authority.
 
-| Gate | Current generic save (`lib/services/reviewer-finder/save-candidates-service.js`) | Current applicant promotion (`lib/services/workbench/promote-applicant-reviewer-service.js`) | P0 target for both paths |
+| Gate | Generic save (`lib/services/reviewer-finder/save-candidates-service.js`) | Applicant promotion (`lib/services/workbench/promote-applicant-reviewer-service.js`) | Shared branch rule |
 |---|---|---|---|
-| Current roster row | Re-reads roster-managed candidates and validates server/staff receipts; missing/unavailable blocks. | Requires canonical suggestion-anchored roster candidate. | Require current candidate key, expected roster version, and allowed roster status. Cached-only/stale/refreshing blocks. |
-| Dataverse engagement | Creates/reuses the candidate/suggestion under generic save's current contract. | Reads suggestion, rejects handled, and finishes with `selectIfUnengaged` concurrency enforcement. | Applicant path retains both checks. Generic path retains its create/reuse contract. Neither trusts cached engagement. |
-| Identity | Valid automated attestation or matching request-scoped staff confirmation; unresolved blocks. | `requiresIdentityConfirmation` + stored server confirmation. | Preserve. Stage receipt must also be current for the candidate/input contract version. |
-| Institution COI | Recomputes from trusted request/PI context and fails closed on screening failure/conflict. | [VERIFIED via symbol search] no explicit institution-COI gate in the promotion service. | Add equivalent authoritative institution screening to applicant promotion; pending/unavailable/conflict blocks both. |
-| Coauthor COI | [VERIFIED via symbol search] no explicit completeness gate. | [VERIFIED via symbol search] no explicit completeness gate. | Default: allow only a clean `complete` or justified `not_applicable`; retry failed candidate/author queries, and keep provider failure distinct from a clean negative. After retries exhaust, a structured staff override may permit invitation only if its audit record is complete and the **[PLANNED]** accept-time reviewer attestation/possible-conflict hold dependency is live. A possible conflict is held for staff disposition; it is never treated as clear. |
-| Eligibility check completeness | No separate field; roster lookup failure logs fail-open, and non-deceased/unknown can proceed. | Roster read failure blocks, but completed-vs-unchecked `unknown` is not distinguished. | Require `eligibilityCheckStatus` complete/not-applicable, then apply result policy. Provider/read failure blocks. |
-| Eligibility result | Direct or stored `deceased` blocks. | Roster ineligible/deceased blocks. | Completed `unknown` may proceed subject to all other gates; deceased or authoritative ineligible blocks; emeritus is informational under current policy. |
-| Contact/email | Computes authoritative contact projection; missing/ambiguous/conflicting contact blocks. | Re-reads known reviewer/person, resolves writes, then requires canonical contact `ready`. | Preserve; a current contact stage may avoid provider work but never skips the server's canonical person/email check. |
-| Address trust | Requires current server roster/address receipt where applicable. | Re-reads address trust/conflict, requires matching receipt, uses ETag on person write. | Preserve; stale/missing address receipt blocks. |
-| Persistence completion | Per-candidate save results exist, but roster write helper can collapse failures to counts. | Dataverse selection may succeed while roster finalization is non-fatal partial success. | Return/persist exact per-candidate outcomes. A pending/failed roster finalization is reason-coded and repaired without redoing evidence stages. |
+| Candidate and current inputs | Derives the server snapshot from the authoritative roster candidate. | Derives the same class of server snapshot from the authoritative applicant roster candidate. | Missing, stale, refreshing, incomplete, failed, or unknown required receipt/input fails closed. |
+| Dataverse engagement | Uses its server-side create/reuse path. | Re-reads the suggestion, rejects handled state, and retains `selectIfUnengaged` concurrency enforcement. | Cached engagement never overrides a current server/Dataverse decision. |
+| Identity, institution COI, coauthor COI, and eligibility | Passes the current snapshot through the shared gate before mutation. | Passes the current snapshot through the shared gate before mutation. | A clean result requires the relevant current server-authoritative stage outcome; provider/error/unknown complements do not become clean negatives. |
+| Contact and address trust | Performs its canonical server contact/address enforcement. | Re-reads canonical reviewer/person and address state before promotion. | A receipt can avoid recomputation but cannot skip the canonical server contact/address check. |
+| Persistence outcome | Consumes an exact candidate outcome rather than treating a count as authority. | Consumes the same current candidate state before selection/promotion. | `roster_persistence` is projected atomically with the completed stage or cold write; a pending/failed terminal state blocks authority. |
 
 ## New-status fan-out requirements
 
@@ -526,7 +527,12 @@ Minimum legacy-compatibility/evidence-date fan-out:
 
 `authorityState` is response/client state, not persisted candidate authority. `current` requires all bounded authority/input reads for that panel generation to succeed; partial or failed reads must produce `stale`/`error`, never a partial `current`. Its fan-out is roster route → panel bootstrap → search section → select/save/promote controls → tests. Unknown values render cached/read-only and block promotion. Miss reason codes fan out through planner, response, retry UI, telemetry aggregation, and fixtures; an unknown reason remains `unclassified_miss`, never a hit.
 
-## Implementation slices
+## Historical implementation slices
+
+The slices below are the original delivery plan. They are retained for decision
+rationale; implemented branch state is recorded in the snapshot above, and the
+only intentionally unwired portion is generic explicit-cold
+attestation/coordinator routing.
 
 ### P0 — warm revisit first
 
@@ -785,7 +791,11 @@ An exact idempotency key is derived from request + content version + curated inc
 
 Improved models, references, and curation may improve recall/reasoning, but deterministic identity/COI/contact gates, authoritative Dataverse checks, versioned inputs, and idempotent persistence must remain correct if model quality does not improve—or regresses.
 
-## Contract-reconcile Mode A review
+## Historical Contract-reconcile Mode A review
+
+This review is the pre-implementation finding record. Its “current,” “planned,”
+and verdict labels are historical and must not override the verified branch
+state above.
 
 ### Findings
 
@@ -851,7 +861,10 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 2. **[PLANNED]** The primary agent chooses the shadow sample, observation window, percentile/canary method, stage-specific age thresholds, and whether latency hypotheses become SLOs. No arbitrary intermediate TTL is locked.
 3. **DEFERRED for staff discussion.** Resolve the future autonomous trigger's exact field/value, group-versus-row transition, writer authority, existing Power Automate consumers, search-versus-proposal-release consumers, and shadow/approval/unattended level. Do not bind code to `wmkf_triagestatus` or `akoya_requeststatus` yet.
 
-## Recommended PR sequence
+## Historical recommended PR sequence
+
+This is retained as the original sequencing rationale, not a statement that
+the listed completed branch work remains pending.
 
 1. **Warm telemetry + secure route split:** authenticated `mode=cached|reconciled`, mode allowlist, unchanged DAL/restriction/interlock boundaries, snapshot token, no UI behavior change.
 2. **Authority alignment:** applicant institution COI, default fail-closed coauthor completeness with targeted retries, locked eligibility semantics, UI state model, and both promotion services; keep the optional provider-failure override off and current UI behavior until gates are ready.

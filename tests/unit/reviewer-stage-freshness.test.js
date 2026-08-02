@@ -3,6 +3,7 @@ const {
   STAGES, CONTRACT_VERSIONS, DOWNSTREAM, DEFAULT_AGE_POLICY,
   planCandidateFreshness, mapLegacyStage,
 } = require('../../lib/services/reviewer-stage-freshness');
+const { expiredLeaseRecoverySourceVersion } = require('../../lib/services/workbench/reviewer-stage-source-versions');
 
 const now = Date.parse('2026-08-01T00:00:00.000Z');
 const versions = Object.fromEntries(STAGES.map((stage) => [stage, `${stage}:v1`]));
@@ -11,7 +12,8 @@ function candidate(overrides = {}) {
     candidateKey: 'suggestion:11111111-1111-1111-1111-111111111111', warmCacheVersion: 1,
     applicantInputVersion: 'input:v1', proposalContentVersion: 'proposal:v1',
     stageFreshness: Object.fromEntries(STAGES.map((stage) => [stage, {
-      state: 'current', contractVersion: CONTRACT_VERSIONS[stage], sourceVersion: versions[stage], completedAt: '2026-07-31T00:00:00.000Z',
+      state: 'current', contractVersion: CONTRACT_VERSIONS[stage], sourceVersion: versions[stage],
+      resultVersion: `${stage}:result-v1`, completedAt: '2026-07-31T00:00:00.000Z',
     }])),
     ...overrides,
   };
@@ -49,12 +51,138 @@ test('unknown/missing states, contracts, and reasons fail closed', () => {
 test('missing versions and refresh leases never create authority or duplicate refresh work', () => {
   const missing = candidate(); delete missing.stageFreshness.contact.sourceVersion;
   expect(planCandidateFreshness({ candidate: missing, authoritative: authoritative(), now }).refreshes).toContainEqual({ stage: 'contact', reason: 'stage_contract_changed' });
-  const refreshing = candidate(); refreshing.stageFreshness.contact = { ...refreshing.stageFreshness.contact, state: 'refreshing', refreshStartedAt: '2026-08-01T00:00:00.000Z' };
+  const refreshing = candidate(); refreshing.stageRefresh = {
+    contact: { refreshAttemptId: 'attempt-1', refreshStartedAt: '2026-08-01T00:00:00.000Z' },
+  };
   const pending = planCandidateFreshness({ candidate: refreshing, authoritative: authoritative(), now: now + 10, policy: { version: 1, stages: {}, leaseMs: 1000 } });
   expect(pending.pendingStages).toContain('contact'); expect(pending.refreshes.map((entry) => entry.stage)).not.toContain('contact');
   const expired = planCandidateFreshness({ candidate: refreshing, authoritative: authoritative(), now: now + 2000, policy: { version: 1, stages: {}, leaseMs: 1000 } });
-  expect(expired.refreshes).toContainEqual({ stage: 'contact', reason: 'prior_refresh_incomplete' });
+  expect(expired.refreshes).toContainEqual({
+    stage: 'contact', reason: 'prior_refresh_incomplete', action: 'recover_expired_lease',
+  });
   expect(expired.promotionAuthority).toBe('blocked_refresh_required');
+
+  const upstreamChanged = candidate({
+    applicantInputVersion: 'input:changed',
+    stageRefresh: {
+      contact: { refreshAttemptId: 'attempt-2', refreshStartedAt: '2026-08-01T00:00:00.000Z' },
+    },
+  });
+  const recoveryFirst = planCandidateFreshness({
+    candidate: upstreamChanged,
+    authoritative: authoritative(),
+    now: now + 2000,
+    policy: { version: 1, stages: {}, leaseMs: 1000 },
+  });
+  expect(recoveryFirst.refreshes[0]).toEqual({
+    stage: 'contact', reason: 'prior_refresh_incomplete', action: 'recover_expired_lease',
+  });
+  expect(recoveryFirst.refreshes).toContainEqual({ stage: 'applicant_anchor', reason: 'candidate_input_changed' });
+});
+
+test('a valid expired owner canonicalizes recovery reason ahead of an earlier warm-cache invalidation', () => {
+  const withExpiredContact = candidate({
+    stageRefresh: {
+      contact: {
+        refreshAttemptId: 'contact-attempt',
+        refreshStartedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  });
+  delete withExpiredContact.warmCacheVersion;
+
+  const plan = planCandidateFreshness({
+    candidate: withExpiredContact,
+    authoritative: authoritative(),
+    now: now + 2_000,
+    policy: { version: 1, stages: {}, leaseMs: 1_000 },
+  });
+
+  expect(plan.refreshes[0]).toEqual({
+    stage: 'contact',
+    reason: 'prior_refresh_incomplete',
+    action: 'recover_expired_lease',
+  });
+  expect(plan.leaseRepairRequired).toBe(false);
+});
+
+test('a malformed lease is operator-repair-only and is never advertised as expired-lease recovery', () => {
+  const malformed = candidate({
+    stageRefresh: {
+      // Historical aliases are not canonical recovery authority.
+      contact: { attemptId: 'legacy-attempt', startedAt: '2020-08-01T00:00:00.000Z' },
+    },
+  });
+  const plan = planCandidateFreshness({ candidate: malformed, authoritative: authoritative(), now });
+
+  expect(plan.leaseRepairRequired).toBe(true);
+  expect(plan.refreshes).toContainEqual({
+    stage: 'contact', reason: 'stage_incomplete', action: 'operator_repair_required',
+  });
+  expect(plan.refreshes).not.toContainEqual(expect.objectContaining({ action: 'recover_expired_lease' }));
+});
+
+test('a non-stage malformed lease blocks promotion even when every real stage is current', () => {
+  const malformed = candidate({ stageRefresh: { historical: 'corrupt-lease' } });
+  const plan = planCandidateFreshness({ candidate: malformed, authoritative: authoritative(), now });
+
+  expect(plan.refreshes).toEqual([]);
+  expect(plan.pendingStages).toEqual([]);
+  expect(plan.leaseRepairRequired).toBe(true);
+  expect(plan.cacheOutcome).not.toBe('hit');
+  expect(plan.promotionAuthority).toBe('blocked_refresh_required');
+});
+
+test.each(['  ', 'a'.repeat(129)])('invalid per-stage attempt IDs never appear pending: %p', (refreshAttemptId) => {
+  const malformed = candidate({
+    stageRefresh: {
+      contact: { refreshAttemptId, refreshStartedAt: '2026-08-01T00:00:00.000Z' },
+    },
+  });
+  const plan = planCandidateFreshness({
+    candidate: malformed,
+    authoritative: authoritative(),
+    now: now + 10,
+    policy: { version: 1, stages: {}, leaseMs: 1000 },
+  });
+
+  expect(plan.pendingStages).not.toContain('contact');
+  expect(plan.leaseRepairRequired).toBe(true);
+  expect(plan.refreshes).toContainEqual({
+    stage: 'contact', reason: 'stage_incomplete', action: 'operator_repair_required',
+  });
+});
+
+test('an expired-lease recovery receipt remains incomplete so ordinary planning resumes when authority returns', () => {
+  const recovered = candidate();
+  recovered.stageFreshness.contact = {
+    state: 'incomplete',
+    contractVersion: CONTRACT_VERSIONS.contact,
+    sourceVersion: expiredLeaseRecoverySourceVersion({
+      requestId: '11111111-1111-1111-1111-111111111111',
+      candidateKey: recovered.candidateKey,
+      stage: 'contact',
+    }),
+    resultVersion: 'f'.repeat(64),
+    completedAt: null,
+    reasonCode: null,
+    failureCode: 'retryable_failure',
+  };
+  // Recovery deletes the matching lease.  Once the normal snapshot is
+  // available again, the next plan is a standard contact refresh rather than
+  // a false cache hit or another recovery action.
+  const plan = planCandidateFreshness({ candidate: recovered, authoritative: authoritative(), now });
+
+  expect(plan.refreshes).toContainEqual({ stage: 'contact', reason: 'stage_incomplete' });
+  expect(plan.refreshes).not.toContainEqual(expect.objectContaining({ action: 'recover_expired_lease' }));
+  expect(plan.promotionAuthority).toBe('blocked_refresh_required');
+});
+
+test('a completed receipt without its sealed result version fails closed', () => {
+  const missingResult = candidate();
+  delete missingResult.stageFreshness.identity.resultVersion;
+  expect(planCandidateFreshness({ candidate: missingResult, authoritative: authoritative(), now }).refreshes)
+    .toContainEqual({ stage: 'identity', reason: 'stage_contract_changed' });
 });
 
 test('planner accepts only canonical anchors and rejects normalized/client candidate keys', () => {
@@ -77,14 +205,23 @@ test('default policy does not age-expire; injected time-sensitive policy does no
 });
 
 test('legacy compatibility requires explicit equivalent provenance and never creates automatic current evidence from ambiguity', () => {
-  const identityDependencies = { candidateKey: 'suggestion:11111111-1111-1111-1111-111111111111' };
+  const identityDependencies = {
+    candidateKey: 'suggestion:11111111-1111-1111-1111-111111111111',
+    applicantAnchorResultVersion: 'applicant-anchor-result:v1',
+    proposalContentVersion: 'proposal:v1',
+  };
   const equivalent = candidate({
     stageFreshness: {},
     legacyStageReceipts: {
       identity: {
         mapperVersion: 1, stage: 'identity', identity: identityDependencies,
         dependencies: identityDependencies, completeness: 'complete',
-        source: { contractVersion: 4, sourceVersion: versions.identity },
+        state: 'current',
+        source: {
+          contractVersion: 4,
+          sourceVersion: versions.identity,
+          resultVersion: 'a'.repeat(64),
+        },
         checkedAt: '2026-07-31T00:00:00.000Z',
       },
     },

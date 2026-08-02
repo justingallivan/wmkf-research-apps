@@ -11,7 +11,13 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 import { sql } from '@vercel/postgres';
 
 const store = require('../../lib/services/reviewer-roster-store');
-const { planCandidateFreshness } = require('../../lib/services/reviewer-stage-freshness');
+const {
+  STAGES,
+  CONTRACT_VERSIONS,
+  planCandidateFreshness,
+} = require('../../lib/services/reviewer-stage-freshness');
+const { projectStaffConfirmedIdentityEvidence } = require('../../lib/services/workbench/reviewer-stage-producers/identity');
+const { expiredLeaseRecoverySourceVersion } = require('../../lib/services/workbench/reviewer-stage-source-versions');
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
@@ -27,6 +33,39 @@ function allInterpolations() {
 function queryTextOf(callIndex) {
   const frags = sql.mock.calls[callIndex][0];
   return Array.isArray(frags) ? frags.join(' ') : '';
+}
+function hasJavaScriptLineComment(sqlText) {
+  return sqlText.includes('//');
+}
+function jsonInterpolations() {
+  return allInterpolations().flatMap((value) => {
+    if (typeof value !== 'string' || !value.trim().startsWith('{')) return [];
+    try { return [JSON.parse(value)]; } catch { return []; }
+  });
+}
+
+const TERMINAL_STAGES = STAGES.filter((stage) => stage !== 'roster_persistence');
+const SOURCE_VERSION = 'a'.repeat(64);
+function currentReceipt(stage, suffix = stage) {
+  return {
+    state: 'current',
+    contractVersion: CONTRACT_VERSIONS[stage],
+    sourceVersion: SOURCE_VERSION,
+    resultVersion: `${suffix}:result`,
+    completedAt: '2026-08-02T12:01:00.000Z',
+    reasonCode: null,
+    failureCode: null,
+  };
+}
+function allCurrentUpstreams() {
+  return Object.fromEntries(TERMINAL_STAGES.map((stage) => [stage, currentReceipt(stage)]));
+}
+function coldEnvelope(stage, suffix = stage, evidencePatch = {}) {
+  return {
+    outcome: 'current',
+    evidencePatch,
+    receipt: currentReceipt(stage, suffix),
+  };
 }
 
 describe('listForRequest', () => {
@@ -56,7 +95,8 @@ describe('stage refresh CAS', () => {
     const started = await store.startStageRefresh(REQ, 'candidate:ann', 'version-1', 'contact', { attemptId: 'attempt-1' });
     expect(started.outcome).toBe('recorded');
     expect(queryTextOf(0)).toMatch(/updated_at::text/);
-    expect(queryTextOf(0)).toMatch(/refreshAttemptId/);
+    expect(queryTextOf(0)).toMatch(/stageRefresh/);
+    expect(queryTextOf(0)).toMatch(/status\s*=\s*'active'/);
     expect(allInterpolations()).toEqual(expect.arrayContaining(['candidate:ann', 'version-1']));
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('attempt-1'))).toBe(true);
     expect(allInterpolations()).not.toContain(JSON.stringify({ warmCacheVersion: 1 }));
@@ -65,25 +105,191 @@ describe('stage refresh CAS', () => {
     await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'version-2', 'contact', 'wrong-attempt', {})).resolves.toMatchObject({ outcome: 'rejected' });
   });
 
-  test('failure and lease recovery preserve the existing stage evidence via JSONB merge', async () => {
-    sql.mockResolvedValue({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
-    await expect(store.failStageRefresh(REQ, 'candidate:ann', 'v1', 'coauthor_coi', 'attempt-1')).resolves.toMatchObject({ outcome: 'failed_retryable' });
-    await expect(store.recoverExpiredStageRefresh(REQ, 'candidate:ann', 'v2', 'coauthor_coi', 'attempt-2')).resolves.toMatchObject({ outcome: 'failed_retryable' });
-    expect(queryTextOf(0)).toMatch(/COALESCE\(candidate->'stageFreshness'->/);
-    expect(queryTextOf(1)).toMatch(/CASE WHEN.*refreshStartedAt.*timestamptz/s);
-    expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('prior_refresh_incomplete'))).toBe(true);
-    expect(allInterpolations()).not.toContain(JSON.stringify({ warmCacheVersion: 1 }));
+  test('a second stage cannot advance the row token or strand the first candidate-wide lease', async () => {
+    const candidateKey = 'person:ann';
+    const leasedCandidate = {
+      candidateKey,
+      name: 'Ann',
+      stageRefresh: {
+        contact: {
+          refreshAttemptId: 'contact-attempt',
+          refreshStartedAt: '2099-08-02T12:00:00.000Z',
+        },
+      },
+      stageFreshness: {},
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate: leasedCandidate, updated_at_token: 'version-2' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateKey, status: 'active', candidate: leasedCandidate,
+        source_kind: 'literature_retrieved', updated_at_token: 'version-2',
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateKey, status: 'active', candidate: leasedCandidate,
+        source_kind: 'literature_retrieved', updated_at_token: 'version-2',
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { ...leasedCandidate, stageRefresh: {} }, updated_at_token: 'version-3' }], rowCount: 1 });
+
+    await expect(store.startStageRefresh(
+      REQ, candidateKey, 'version-1', 'contact', {
+        attemptId: 'contact-attempt', startedAt: '2099-08-02T12:00:00.000Z',
+      },
+    )).resolves.toMatchObject({ outcome: 'recorded', updatedAt: 'version-2' });
+    await expect(store.startStageRefresh(
+      REQ, candidateKey, 'version-2', 'eligibility', {
+        attemptId: 'eligibility-attempt', startedAt: '2099-08-02T12:00:01.000Z',
+      },
+    )).resolves.toMatchObject({ outcome: 'refresh_in_progress', leaseStage: 'contact' });
+    await expect(store.completeStageRefreshWithEvidence(
+      REQ, candidateKey, 'version-2', 'contact', 'contact-attempt', coldEnvelope('contact'),
+    )).resolves.toMatchObject({ outcome: 'recorded', updatedAt: 'version-3' });
+
+    expect(queryTextOf(1)).toMatch(/stageRefresh.*=\s*'\{\}'/s);
+    expect(allInterpolations()).toContain('version-2');
+  });
+
+  test('an expired lease owned by another stage requires named recovery and is never overwritten', async () => {
+    const candidateKey = 'person:ann';
+    sql
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateKey,
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: 'version-2',
+        candidate: {
+          candidateKey,
+          name: 'Ann',
+          stageRefresh: {
+            contact: {
+              refreshAttemptId: 'expired-contact',
+              refreshStartedAt: '2020-01-01T00:00:00.000Z',
+            },
+          },
+        },
+      }], rowCount: 1 });
+
+    await expect(store.startStageRefresh(
+      REQ, candidateKey, 'version-2', 'eligibility', {
+        attemptId: 'eligibility-attempt', startedAt: '2026-08-02T12:00:01.000Z',
+      },
+    )).resolves.toMatchObject({
+      outcome: 'lease_recovery_required',
+      code: 'lease_recovery_required',
+      leaseStage: 'contact',
+    });
+    expect(sql).toHaveBeenCalledTimes(2);
+  });
+
+  test('failure and lease recovery write sealed nonterminal receipts without replacing other evidence', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'v1',
+        candidate: { name: 'Ann', stageRefresh: { coauthor_coi: { refreshAttemptId: 'attempt-1' } }, keep: 'existing' },
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next-1' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'v2',
+        candidate: { name: 'Ann', stageRefresh: { coauthor_coi: { refreshAttemptId: 'attempt-2', refreshStartedAt: '2020-01-01T00:00:00.000Z' } } },
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next-2' }], rowCount: 1 });
+
+    await expect(store.failStageRefresh(REQ, 'person:ann', 'v1', 'coauthor_coi', 'attempt-1', {
+      expectedSourceVersion: 'a'.repeat(64),
+    }))
+      .resolves.toMatchObject({ outcome: 'failed_retryable' });
+    await expect(store.recoverExpiredStageRefresh(REQ, 'person:ann', 'v2', 'coauthor_coi', 'attempt-2', {
+      expectedSourceVersion: 'b'.repeat(64),
+    }))
+      .resolves.toMatchObject({ outcome: 'failed_retryable' });
+
+    const firstFailureWrite = JSON.parse(allInterpolations().find((value) => (
+      typeof value === 'string' && value.includes('retryable_failure')
+    )));
+    expect(firstFailureWrite).toMatchObject({
+      keep: 'existing',
+      stageFreshness: {
+        coauthor_coi: {
+          state: 'incomplete',
+          contractVersion: CONTRACT_VERSIONS.coauthor_coi,
+          sourceVersion: 'a'.repeat(64),
+          completedAt: null,
+          reasonCode: null,
+          failureCode: 'retryable_failure',
+        },
+      },
+    });
+    expect(queryTextOf(2)).toMatch(/stageRefresh.*stageFreshness/s);
+    expect(queryTextOf(3)).toMatch(/updated_at::text/);
+  });
+
+  test('rejects a failure write without the shared opaque expected source before any roster read', async () => {
+    await expect(store.failStageRefresh(REQ, 'person:ann', 'v1', 'coauthor_coi', 'attempt-1'))
+      .resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.recoverExpiredStageRefresh(REQ, 'person:ann', 'v1', 'coauthor_coi', 'attempt-1', {
+      expectedSourceVersion: 'source_version_missing',
+    })).resolves.toEqual({ outcome: 'rejected' });
+    expect(sql).not.toHaveBeenCalled();
+  });
+
+  test('expired-lease recovery cannot clear a live or foreign-stage owner even with an exact target attempt', async () => {
+    const candidateKey = 'person:ann';
+    const recoverySource = expiredLeaseRecoverySourceVersion({
+      requestId: REQ,
+      candidateKey,
+      stage: 'contact',
+    });
+    const foreignLive = {
+      candidateKey,
+      stageRefresh: {
+        identity: {
+          refreshAttemptId: 'live-identity',
+          refreshStartedAt: '2099-08-02T12:00:00.000Z',
+        },
+        contact: {
+          refreshAttemptId: 'expired-contact',
+          refreshStartedAt: '2020-08-02T12:00:00.000Z',
+        },
+      },
+    };
+    const sameStageLive = {
+      candidateKey,
+      stageRefresh: {
+        contact: {
+          refreshAttemptId: 'live-contact',
+          refreshStartedAt: '2099-08-02T12:00:00.000Z',
+        },
+      },
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateKey, status: 'active', candidate: foreignLive, updated_at_token: 'v1',
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateKey, status: 'active', candidate: sameStageLive, updated_at_token: 'v2',
+      }], rowCount: 1 });
+
+    await expect(store.recoverExpiredStageRefresh(REQ, candidateKey, 'v1', 'contact', 'expired-contact', {
+      expectedSourceVersion: recoverySource,
+    })).resolves.toEqual({ outcome: 'skipped_stale' });
+    await expect(store.recoverExpiredStageRefresh(REQ, candidateKey, 'v2', 'contact', 'live-contact', {
+      expectedSourceVersion: recoverySource,
+    })).resolves.toEqual({ outcome: 'skipped_stale' });
+
+    // Each call only reads its exact active-row/CAS/attempt snapshot. Neither
+    // path emits the replacement UPDATE that would clear a lease.
+    expect(sql).toHaveBeenCalledTimes(2);
   });
 
   test('a successful server stage completion atomically stamps the warm cache version for the next planner read', async () => {
     const candidateBeforeCompletion = {
       candidateKey: 'suggestion:aaaaaaaa-1111-1111-1111-111111111111',
       isApplicantRecommended: true,
-      applicantInputVersion: 'applicant-input-v1',
-      proposalContentVersion: 'proposal-v1',
-      stageFreshness: {
+      applicantInputVersion: SOURCE_VERSION,
+      proposalContentVersion: 'b'.repeat(64),
+      stageRefresh: {
         applicant_anchor: {
-          state: 'refreshing',
           refreshAttemptId: 'attempt-1',
           refreshStartedAt: '2026-08-02T12:00:00.000Z',
         },
@@ -92,27 +298,24 @@ describe('stage refresh CAS', () => {
     const receipt = {
       state: 'current',
       contractVersion: 1,
-      sourceVersion: 'applicant-anchor-v1',
+      sourceVersion: SOURCE_VERSION,
+      resultVersion: 'applicant-anchor-result-v1',
       completedAt: '2026-08-02T12:01:00.000Z',
     };
-    // Model the row returned by production's single UPDATE. The input row has
-    // no warmCacheVersion; the persisted shape comes from the completion patch
-    // that this test also requires the SQL call to carry.
-    sql.mockImplementationOnce(async (_fragments, ...values) => {
-      const cacheVersionPatch = values.find((value) => value === JSON.stringify({ warmCacheVersion: 1 }));
-      expect(cacheVersionPatch).toBe(JSON.stringify({ warmCacheVersion: 1 }));
-      return {
-        rows: [{
-          candidate: {
-            ...candidateBeforeCompletion,
-            ...JSON.parse(cacheVersionPatch),
-            stageFreshness: { applicant_anchor: receipt },
-          },
-          updated_at_token: 'version-2',
-        }],
-        rowCount: 1,
-      };
-    });
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: candidateBeforeCompletion.candidateKey,
+        status: 'active', candidate: candidateBeforeCompletion, updated_at_token: 'version-1',
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate: {
+          ...candidateBeforeCompletion,
+          stageRefresh: {},
+          warmCacheVersion: 1,
+          stageFreshness: { applicant_anchor: receipt },
+        },
+        updated_at_token: 'version-2',
+      }], rowCount: 1 });
 
     const completed = await store.completeStageRefresh(
       REQ,
@@ -124,14 +327,15 @@ describe('stage refresh CAS', () => {
     );
 
     expect(completed).toMatchObject({ outcome: 'recorded', candidate: { warmCacheVersion: 1 } });
-    expect(queryTextOf(0)).toMatch(/candidate = candidate \|\|/);
+    expect(queryTextOf(0)).toMatch(/stageRefresh/);
+    expect(queryTextOf(1)).toMatch(/updated_at::text/);
     const plan = planCandidateFreshness({
       candidate: completed.candidate,
       authoritative: {
         authorityState: 'current',
-        applicantInputVersion: 'applicant-input-v1',
-        proposalContentVersion: 'proposal-v1',
-        versions: { applicant_anchor: 'applicant-anchor-v1' },
+        applicantInputVersion: SOURCE_VERSION,
+        proposalContentVersion: 'b'.repeat(64),
+        versions: { applicant_anchor: SOURCE_VERSION },
       },
     });
     expect(plan.currentStages).toContain('applicant_anchor');
@@ -147,10 +351,364 @@ describe('stage refresh CAS', () => {
   test('rejects malformed stage contracts before issuing SQL', async () => {
     await expect(store.startStageRefresh(REQ, 'candidate:ann', 'v', 'contact', { attemptId: 'x'.repeat(101) })).resolves.toEqual({ outcome: 'rejected' });
     await expect(store.startStageRefresh(REQ, 'candidate:ann', 'v', 'contact', { attemptId: 'a', startedAt: 'not-a-date' })).resolves.toEqual({ outcome: 'rejected' });
-    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'failed', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toEqual({ outcome: 'rejected' });
-    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'not_applicable', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toEqual({ outcome: 'rejected' });
-    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { contractVersion: 99, sourceVersion: '', completedAt: 'bad' })).resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'failed', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toMatchObject({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'not_applicable', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toMatchObject({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { contractVersion: 99, sourceVersion: '', completedAt: 'bad' })).resolves.toMatchObject({ outcome: 'rejected' });
     expect(sql).not.toHaveBeenCalled();
+  });
+
+  test('uses the common projector and one lease-guarded CAS for evidence plus terminal convergence', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+        candidate: { name: 'Ann', stageRefresh: { applicant_anchor: { refreshAttemptId: 'attempt-1' } }, stageFreshness: {} },
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
+    const result = await store.completeStageRefreshWithEvidence(
+      REQ,
+      'person:ann',
+      'version-1',
+      'applicant_anchor',
+      'attempt-1',
+      {
+        outcome: 'current',
+        evidencePatch: { applicantInputVersion: 'input:v1' },
+        receipt: {
+          state: 'current', contractVersion: 1, sourceVersion: SOURCE_VERSION,
+          resultVersion: 'anchor-result:v1', completedAt: '2026-08-02T00:00:00.000Z',
+          reasonCode: null, failureCode: null,
+        },
+      },
+    );
+    expect(result.outcome).toBe('recorded');
+    expect(queryTextOf(0)).toMatch(/stageRefresh/);
+    expect(queryTextOf(1)).toMatch(/stageRefresh/);
+    const persisted = JSON.parse(allInterpolations().find((value) => (
+      typeof value === 'string' && value.includes('anchor-result:v1')
+    )));
+    expect(persisted.stageFreshness.applicant_anchor).toMatchObject({ state: 'current' });
+    expect(persisted.stageFreshness.roster_persistence).toBeUndefined();
+    expect(allInterpolations()).toContain('attempt-1');
+    expect(allInterpolations()).toContain('version-1');
+  });
+
+  test('accepts a sealed incomplete producer result, preserves display evidence, and invalidates the terminal receipt', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+        candidate: {
+          name: 'Ann', oldDisplayEvidence: 'keep',
+          stageRefresh: { applicant_anchor: { refreshAttemptId: 'attempt-1' } },
+          stageFreshness: { ...allCurrentUpstreams(), roster_persistence: currentReceipt('roster_persistence') },
+        },
+      }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
+
+    const result = await store.completeStageRefreshWithEvidence(
+      REQ, 'person:ann', 'version-1', 'applicant_anchor', 'attempt-1', {
+        outcome: 'incomplete',
+        evidencePatch: { applicantInputVersion: 'input:v2' },
+        receipt: {
+          state: 'incomplete', contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+          sourceVersion: SOURCE_VERSION, resultVersion: 'anchor-result:v2',
+          completedAt: null, reasonCode: null, failureCode: 'partial_coverage',
+        },
+      },
+    );
+
+    expect(result.outcome).toBe('failed_retryable');
+    const persisted = JSON.parse(allInterpolations().find((value) => (
+      typeof value === 'string' && value.includes('partial_coverage')
+    )));
+    expect(persisted).toMatchObject({
+      oldDisplayEvidence: 'keep',
+      stageFreshness: {
+        applicant_anchor: expect.objectContaining({ state: 'incomplete', completedAt: null }),
+      },
+    });
+    expect(persisted.stageFreshness.roster_persistence).toBeUndefined();
+  });
+
+  test('the legacy completion wrapper preserves null completedAt for a terminal failure', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+        candidate: { name: 'Ann', stageRefresh: { coauthor_coi: { refreshAttemptId: 'attempt-1' } } },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'version-2' }], rowCount: 1 });
+    await expect(store.completeStageRefresh(
+      REQ, 'person:ann', 'version-1', 'coauthor_coi', 'attempt-1', {
+        state: 'failed', contractVersion: CONTRACT_VERSIONS.coauthor_coi,
+        sourceVersion: SOURCE_VERSION, resultVersion: 'coauthor-result:v1',
+        completedAt: null, reasonCode: null, failureCode: 'terminal_failure',
+      },
+    )).resolves.toMatchObject({ outcome: 'failed_terminal' });
+    const persisted = jsonInterpolations().find((value) => (
+      value?.stageFreshness?.coauthor_coi?.state === 'failed'
+    ));
+    expect(persisted.stageFreshness.coauthor_coi.completedAt).toBeNull();
+  });
+
+  test('has a provider-free, CAS-bound terminal repair and never accepts a terminal cold receipt', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+        candidate: { name: 'Ann', stageFreshness: allCurrentUpstreams() },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
+    await expect(store.finalizeCachedRosterEvidence(REQ, 'person:ann', 'version-1'))
+      .resolves.toMatchObject({ outcome: 'recorded' });
+    expect(queryTextOf(1)).toMatch(/updated_at::text/);
+    const finalized = JSON.parse(allInterpolations().find((value) => (
+      typeof value === 'string' && value.includes('roster_persistence')
+    )));
+    expect(finalized.stageFreshness.roster_persistence).toMatchObject({ state: 'current' });
+    expect(finalized).not.toHaveProperty('rosterStatus');
+    expect(finalized).not.toHaveProperty('rosterUpdatedAt');
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+      stageEvidence: { roster_persistence: {} },
+    }]);
+    expect(outcomes).toEqual([{
+      candidateKey: 'candidate:ann', outcome: 'rejected', code: 'terminal_receipt_server_owned',
+    }]);
+  });
+
+  test('cold, manual, and explicit-finalize writes derive identical terminal source/result versions for the same upstream receipt set', async () => {
+    const applicantReceipt = currentReceipt('applicant_anchor', 'anchor');
+    const completeUpstreams = { ...allCurrentUpstreams(), applicant_anchor: applicantReceipt };
+    const manualPrerequisites = { ...completeUpstreams };
+    delete manualPrerequisites.applicant_anchor;
+
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'manual-v1',
+        candidate: { name: 'Ann', stageFreshness: manualPrerequisites, stageRefresh: { applicant_anchor: { refreshAttemptId: 'attempt-1' } } },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'manual-v2' }], rowCount: 1 });
+    await store.completeStageRefreshWithEvidence(
+      REQ, 'person:ann', 'manual-v1', 'applicant_anchor', 'attempt-1', {
+        outcome: 'current', evidencePatch: {}, receipt: applicantReceipt,
+      },
+    );
+    const manualTerminal = jsonInterpolations().find((value) => (
+      value?.stageFreshness?.roster_persistence
+    )).stageFreshness.roster_persistence;
+
+    sql.mockReset();
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'cold-v2' }], rowCount: 1 });
+    const coldStageEvidence = Object.fromEntries(TERMINAL_STAGES.map((stage) => [
+      stage,
+      coldEnvelope(stage, stage === 'applicant_anchor' ? 'anchor' : stage),
+    ]));
+    await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      stageEvidence: coldStageEvidence,
+    }]);
+    const coldTerminal = jsonInterpolations().find((value) => (
+      value?.stageFreshness?.roster_persistence
+    )).stageFreshness.roster_persistence;
+
+    sql.mockReset();
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'final-v1',
+        candidate: { name: 'Ann', stageFreshness: completeUpstreams },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'final-v2' }], rowCount: 1 });
+    await store.finalizeCachedRosterEvidence(REQ, 'person:ann', 'final-v1');
+    const finalTerminal = jsonInterpolations().find((value) => (
+      value?.stageFreshness?.roster_persistence
+    )).stageFreshness.roster_persistence;
+
+    expect([coldTerminal, manualTerminal, finalTerminal].map((receipt) => ({
+      sourceVersion: receipt.sourceVersion,
+      resultVersion: receipt.resultVersion,
+    }))).toEqual([
+      expect.objectContaining({ sourceVersion: expect.any(String), resultVersion: expect.any(String) }),
+      expect.objectContaining({ sourceVersion: expect.any(String), resultVersion: expect.any(String) }),
+      expect.objectContaining({ sourceVersion: expect.any(String), resultVersion: expect.any(String) }),
+    ]);
+    expect(coldTerminal.sourceVersion).toBe(manualTerminal.sourceVersion);
+    expect(coldTerminal.resultVersion).toBe(manualTerminal.resultVersion);
+    expect(coldTerminal.sourceVersion).toBe(finalTerminal.sourceVersion);
+    expect(coldTerminal.resultVersion).toBe(finalTerminal.resultVersion);
+  });
+
+  function structuredEnvelope(stage, sourceVersion, evidencePatch) {
+    return {
+      outcome: 'current',
+      evidencePatch,
+      receipt: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS[stage],
+        sourceVersion,
+        resultVersion: `${stage}-result`,
+        completedAt: '2026-08-02T12:02:00.000Z',
+        reasonCode: null,
+        failureCode: null,
+      },
+    };
+  }
+
+  function structuredAddressReceipt(candidateKey = 'person:ann') {
+    return {
+      receiptId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      email: 'ann@example.edu',
+      personConfirmed: true,
+      actorProfileId: 'profile-1',
+      actorSystemUserId: 'actor-1',
+      requestId: REQ,
+      candidateKey,
+      evidenceType: 'institution_page',
+      evidenceUrl: 'https://example.edu/ann',
+      note: null,
+      attestedAt: '2026-08-02T12:02:00.000Z',
+      canonicalPersonId: '33333333-3333-4333-8333-333333333333',
+      canonicalPersonEtag: 'W/"post-action"',
+    };
+  }
+
+  function structuredContactEnvelope(sourceVersion = 'b'.repeat(64)) {
+    return structuredEnvelope('contact', sourceVersion, {
+      email: 'ann@example.edu', emailSource: 'staff_verified', emailPersistAllowed: true,
+      emailEvidence: null, emailAction: 'ready', emailActionReason: null,
+      website: null, websiteSource: null, websitePersistAllowed: false,
+      facultyPageUrl: null, affiliation: null, affiliationSource: null, affiliationPersistAllowed: false,
+      contactStatus: null, contactStatusReason: null, contactLeads: [], contactTierSummary: { tiersUsed: [], providerError: false },
+      canonicalPersonId: '33333333-3333-4333-8333-333333333333',
+      canonicalPersonEtag: 'W/"post-action"', personEtag: 'W/"post-action"',
+    });
+  }
+
+  function structuredAddressEnvelope(sourceVersion = 'c'.repeat(64)) {
+    return structuredEnvelope('address_trust', sourceVersion, {
+      addressTrustStatus: 'staff_verified', addressTrustReason: null,
+      addressTrustEmail: 'ann@example.edu', addressTrustSource: 'staff_verified',
+      addressTrustEvidence: {
+        canonicalPersonId: '33333333-3333-4333-8333-333333333333',
+        canonicalPersonEtag: 'W/"post-action"', actorId: 'actor-1',
+        attestedAt: '2026-08-02T12:02:00.000Z', evidenceType: 'institution_page',
+        evidenceUrl: 'https://example.edu/ann',
+      },
+    });
+  }
+
+  test('atomically publishes structured contact + address receipts and terminal convergence', async () => {
+    const candidateKey = 'person:ann';
+    const candidate = {
+      name: 'Ann', candidateKey,
+      stageFreshness: { ...allCurrentUpstreams(), roster_persistence: currentReceipt('roster_persistence', 'old-terminal') },
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate_key: candidateKey, status: 'active', candidate, updated_at_token: 'version-1' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate: { ...candidate, warmCacheVersion: 1 }, updated_at_token: 'version-2' }], rowCount: 1 });
+
+    const result = await store.completeStructuredAddressVerification(REQ, candidateKey, 'version-1', {
+      contactEnvelope: structuredContactEnvelope(),
+      addressTrustEnvelope: structuredAddressEnvelope(),
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      legacyAddressReceipt: structuredAddressReceipt(candidateKey),
+    });
+
+    expect(result).toMatchObject({ outcome: 'recorded', updatedAt: 'version-2' });
+    expect(sql).toHaveBeenCalledTimes(2);
+    expect(queryTextOf(1)).toMatch(/updated_at::text/);
+    const persisted = jsonInterpolations().find((value) => value?.addressTrustReceipt?.receiptId);
+    expect(persisted).toMatchObject({
+      email: 'ann@example.edu',
+      canonicalPersonId: '33333333-3333-4333-8333-333333333333',
+      stageFreshness: {
+        contact: expect.objectContaining({ sourceVersion: 'b'.repeat(64) }),
+        address_trust: expect.objectContaining({ sourceVersion: 'c'.repeat(64) }),
+        roster_persistence: expect.objectContaining({ state: 'current' }),
+      },
+      addressTrustReceipt: expect.objectContaining({ canonicalPersonEtag: 'W/"post-action"', actorSystemUserId: 'actor-1' }),
+    });
+  });
+
+  test('a lost structured CAS preserves prior evidence and never reports either stage recorded', async () => {
+    const candidateKey = 'person:ann';
+    const candidate = { name: 'Ann', candidateKey, oldEvidence: 'keep', stageFreshness: allCurrentUpstreams() };
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate_key: candidateKey, status: 'active', candidate, updated_at_token: 'version-1' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await expect(store.completeStructuredAddressVerification(REQ, candidateKey, 'version-1', {
+      contactEnvelope: structuredContactEnvelope(),
+      addressTrustEnvelope: structuredAddressEnvelope(),
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      legacyAddressReceipt: structuredAddressReceipt(candidateKey),
+    })).resolves.toEqual({ outcome: 'skipped_stale' });
+    expect(sql).toHaveBeenCalledTimes(2);
+  });
+
+  test('structured completion refuses an unrelated candidate lease before advancing the row token', async () => {
+    const candidateKey = 'person:ann';
+    const candidate = {
+      name: 'Ann', candidateKey,
+      stageRefresh: {
+        eligibility: {
+          refreshAttemptId: 'eligibility-attempt',
+          refreshStartedAt: '2099-08-02T12:00:00.000Z',
+        },
+      },
+      stageFreshness: allCurrentUpstreams(),
+    };
+    sql.mockResolvedValueOnce({
+      rows: [{ candidate_key: candidateKey, status: 'active', candidate, updated_at_token: 'version-1' }],
+      rowCount: 1,
+    });
+
+    await expect(store.completeStructuredAddressVerification(REQ, candidateKey, 'version-1', {
+      contactEnvelope: structuredContactEnvelope(),
+      addressTrustEnvelope: structuredAddressEnvelope(),
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      legacyAddressReceipt: structuredAddressReceipt(candidateKey),
+    })).resolves.toMatchObject({
+      outcome: 'refresh_in_progress',
+      leaseStage: 'eligibility',
+    });
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+
+  test('rejects an invalid member of the structured pair before any write', async () => {
+    const invalidContact = structuredContactEnvelope();
+    invalidContact.evidencePatch.unexpected = 'browser-injected';
+    await expect(store.completeStructuredAddressVerification(REQ, 'person:ann', 'version-1', {
+      contactEnvelope: invalidContact,
+      addressTrustEnvelope: structuredAddressEnvelope(),
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      legacyAddressReceipt: structuredAddressReceipt(),
+    })).resolves.toMatchObject({ outcome: 'rejected', code: 'invalid_structured_stage_evidence' });
+    expect(sql).not.toHaveBeenCalled();
+  });
+
+  test('invalidates terminal convergence when another upstream receipt is stale', async () => {
+    const candidateKey = 'person:ann';
+    const candidate = {
+      name: 'Ann', candidateKey,
+      stageFreshness: {
+        ...allCurrentUpstreams(),
+        coauthor_coi: { ...currentReceipt('coauthor_coi'), state: 'incomplete', completedAt: null, failureCode: 'partial_coverage' },
+        roster_persistence: currentReceipt('roster_persistence', 'old-terminal'),
+      },
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate_key: candidateKey, status: 'active', candidate, updated_at_token: 'version-1' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ candidate, updated_at_token: 'version-2' }], rowCount: 1 });
+
+    await expect(store.completeStructuredAddressVerification(REQ, candidateKey, 'version-1', {
+      contactEnvelope: structuredContactEnvelope(),
+      addressTrustEnvelope: structuredAddressEnvelope(),
+      expectedSourceVersions: { contact: 'b'.repeat(64), address_trust: 'c'.repeat(64) },
+      legacyAddressReceipt: structuredAddressReceipt(candidateKey),
+    })).resolves.toMatchObject({ outcome: 'recorded' });
+    const persisted = jsonInterpolations().find((value) => value?.addressTrustReceipt?.receiptId);
+    expect(persisted.stageFreshness.roster_persistence).toBeUndefined();
   });
 });
 
@@ -182,6 +740,21 @@ describe('findCandidateBySuggestion', () => {
   test('still requires the canonical key, not just the anchor', async () => {
     await store.findCandidateBySuggestion(REQ, 'SUG-1');
     expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+  });
+});
+
+describe('findCandidateByKey', () => {
+  test('uses only the exact request/key correlation and returns the server row', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:ann', status: 'active', display_name: 'Ann Lee',
+      candidate: { name: 'Ann Lee' }, source_kind: 'literature_retrieved',
+      updated_at_token: 'version-1',
+    }] });
+    await expect(store.findCandidateByKey(REQ, 'candidate:ann')).resolves.toMatchObject({
+      candidateKey: 'candidate:ann', rosterStatus: 'active', rosterUpdatedAt: 'version-1',
+    });
+    expect(queryTextOf(0)).toMatch(/candidate_key\s*=/);
+    expect(allInterpolations()).toContain('candidate:ann');
   });
 });
 
@@ -332,6 +905,19 @@ describe('recordSurfaced', () => {
     expect(interps).toContain('bob');
   });
 
+  test('emits PostgreSQL-safe template text without JavaScript line comments', async () => {
+    await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
+    const insertCall = sql.mock.calls.findIndex((call) => (
+      Array.isArray(call[0]) && call[0].join(' ').includes('INSERT INTO reviewer_find_roster')
+    ));
+
+    // PostgreSQL recognizes -- and /* */ comments, not JavaScript // lines.
+    // Keep a negative fixture so the gate proves it catches the production bug.
+    expect(hasJavaScriptLineComment('SELECT 1\n  // invalid PostgreSQL comment')).toBe(true);
+    expect(insertCall).toBeGreaterThanOrEqual(0);
+    expect(hasJavaScriptLineComment(queryTextOf(insertCall))).toBe(false);
+  });
+
   test('the conflict update guards against downgrading excluded/saved (never-downgrade)', async () => {
     await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
     // The INSERT ... ON CONFLICT DO UPDATE must only run WHERE status='active',
@@ -394,6 +980,143 @@ describe('recordSurfaced', () => {
     expect(n).toBe(1);
     expect(queryTextOf(0)).toMatch(/INSERT INTO reviewer_find_roster/);
     expect(allInterpolations()).toEqual(expect.arrayContaining([false, '']));
+  });
+
+  test('invalidates roster persistence whenever a generic evidence replacement wins', async () => {
+    await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
+    expect(queryTextOf(0)).toMatch(/stageFreshness'.*\- 'roster_persistence'/s);
+  });
+});
+
+describe('recordSurfacedWithStageEvidence', () => {
+  test('merges CAS-valid cold receipts with stored receipts and computes terminal from the actual merged receipt set', async () => {
+    const existingAnchor = currentReceipt('applicant_anchor', 'anchor');
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+        candidate: { name: 'Ann', stageFreshness: { applicant_anchor: existingAnchor } },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'version-2' }], rowCount: 1 });
+
+    const downstreamEvidence = Object.fromEntries(TERMINAL_STAGES
+      .filter((stage) => stage !== 'applicant_anchor')
+      .map((stage) => [stage, coldEnvelope(stage)]));
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      expectedUpdatedAt: 'version-1',
+      stageEvidence: downstreamEvidence,
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ candidateKey: 'person:ann', outcome: 'recorded' })]);
+    const persisted = jsonInterpolations().find((value) => (
+      value?.stageFreshness?.roster_persistence
+    ));
+    expect(persisted.stageFreshness.applicant_anchor).toEqual(existingAnchor);
+    expect(persisted.stageFreshness.identity).toMatchObject({ state: 'current' });
+    expect(persisted.stageFreshness.roster_persistence).toEqual(store.rosterPersistenceReceipt(
+      'person:ann',
+      Object.fromEntries(TERMINAL_STAGES.map((stage) => [stage, persisted.stageFreshness[stage]])),
+      persisted.stageFreshness.roster_persistence.completedAt,
+    ));
+    expect(queryTextOf(1)).toMatch(/updated_at::text/);
+    expect(allInterpolations()).toContain('version-1');
+  });
+
+  test('a stale per-entry token leaves the stored row untouched and returns skipped_stale', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'person:ann', status: 'active', updated_at_token: 'newer-token',
+      candidate: { name: 'Ann', stageFreshness: { applicant_anchor: currentReceipt('applicant_anchor') } },
+    }] });
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      expectedUpdatedAt: 'stale-token',
+      stageEvidence: { identity: coldEnvelope('identity') },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'skipped_stale' })]);
+    expect(sql).toHaveBeenCalledTimes(2); // snapshot + cap; no candidate mutation
+    expect(queryTextOf(0)).toMatch(/SELECT candidate_key/);
+  });
+
+  test('discards forged candidate receipt/version/evidence fields and persists only projector output', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'version-2' }], rowCount: 1 });
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: {
+        name: 'Ann', candidateKey: 'person:ann', warmCacheVersion: 999,
+        proposalContentVersion: 'forged-proposal', applicantInputVersion: 'forged-input',
+        proposalAuthorVersion: 'b'.repeat(64),
+        canonicalPersonId: 'forged-person', personEtag: 'forged-etag',
+        identityDecision: 'forged-identity', email: 'forged@example.edu',
+        addressTrustReceipt: { forged: true },
+        stageFreshness: allCurrentUpstreams(),
+        contactEnrichment: {
+          identity: { status: 'confirmed' },
+          email: 'nested-forged@example.edu',
+          eligibilityStatus: 'eligible',
+          affiliation: 'Nested forged institution',
+        },
+      },
+      stageEvidence: {
+        applicant_anchor: coldEnvelope('applicant_anchor', 'server-anchor', { applicantInputVersion: 'server-input' }),
+      },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'recorded' })]);
+    const persisted = JSON.parse(allInterpolations().find((value) => (
+      typeof value === 'string' && value.includes('server-input')
+    )));
+    expect(persisted).toMatchObject({ warmCacheVersion: 1, applicantInputVersion: 'server-input' });
+    expect(persisted.identityDecision).toBeUndefined();
+    expect(persisted.email).toBeUndefined();
+    expect(persisted.addressTrustReceipt).toBeUndefined();
+    expect(persisted.proposalContentVersion).toBeUndefined();
+    expect(persisted.proposalAuthorVersion).toBeUndefined();
+    expect(persisted.canonicalPersonId).toBeUndefined();
+    expect(persisted.personEtag).toBeUndefined();
+    expect(persisted.contactEnrichment).toBeUndefined();
+    expect(persisted.stageFreshness).toEqual({ applicant_anchor: expect.any(Object) });
+  });
+
+  test('uses each entry’s own token in a mixed new, current, and stale cold batch', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'New' }, updated_at_token: 'new-v2' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:existing', status: 'active', updated_at_token: 'existing-v1', candidate: { name: 'Existing' },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Existing' }, updated_at_token: 'existing-v2' }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:stale', status: 'active', updated_at_token: 'newer-v1', candidate: { name: 'Stale' },
+      }] });
+    const stageEvidence = { applicant_anchor: coldEnvelope('applicant_anchor') };
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [
+      { candidate: { name: 'New', candidateKey: 'person:new' }, stageEvidence },
+      { candidate: { name: 'Existing', candidateKey: 'person:existing' }, expectedUpdatedAt: 'existing-v1', stageEvidence },
+      { candidate: { name: 'Stale', candidateKey: 'person:stale' }, expectedUpdatedAt: 'stale-v1', stageEvidence },
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.outcome)).toEqual(['recorded', 'recorded', 'skipped_stale']);
+    expect(allInterpolations()).toEqual(expect.arrayContaining(['existing-v1']));
+    expect(allInterpolations()).not.toContain('stale-v1');
+  });
+
+  test('leaves a fully complete legacy key partial rather than minting terminal authority', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Legacy' }, updated_at_token: 'legacy-v2' }], rowCount: 1 });
+    const stageEvidence = Object.fromEntries(TERMINAL_STAGES.map((stage) => [stage, coldEnvelope(stage)]));
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Legacy', candidateKey: 'candidate:legacy' },
+      stageEvidence,
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'partial', code: 'canonical_candidate_unavailable' })]);
+    const persisted = jsonInterpolations().find((value) => value?.candidateKey === 'candidate:legacy');
+    expect(persisted.stageFreshness.roster_persistence).toBeUndefined();
   });
 });
 
@@ -464,12 +1187,37 @@ describe('promote', () => {
 describe('staff identity confirmation', () => {
   test('stores an actor/time/contact-bound confirmation only on an active request row', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate: { name: 'Dr Ann Lee' } }], rowCount: 1 });
+    const canonicalPerson = {
+      canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+      canonicalPersonEtag: 'W/"ann-v1"',
+      actorId: 'SYS-7',
+      confirmedAt: '2026-08-02T12:01:00.000Z',
+    };
+    const identityEnvelope = projectStaffConfirmedIdentityEvidence({
+      candidate: {
+        candidateKey: 'candidate:ann',
+        name: 'Dr Ann Lee',
+        affiliation: 'Example University',
+      },
+      proposalContentVersion: SOURCE_VERSION,
+      confirmation: { authority: 'server_loaded', ...canonicalPerson },
+      completedAt: canonicalPerson.confirmedAt,
+      expectedSourceVersion: SOURCE_VERSION,
+    });
     const out = await store.confirmIdentity(REQ, {
       name: 'Dr Ann Lee',
       email: ' ANN@Example.edu ',
       website: 'https://example.edu/ann',
       affiliation: 'Example University',
-    }, { actorProfileId: 7, actorSystemUserId: 'SYS-7' });
+      rosterStatus: 'active',
+      rosterUpdatedAt: '2026-08-02 12:00:00+00',
+    }, {
+      actorProfileId: 7,
+      actorSystemUserId: 'SYS-7',
+      canonicalPerson,
+      identityEnvelope,
+      expectedUpdatedAt: '2026-08-02 12:00:00+00',
+    });
 
     expect(out.confirmationId).toEqual(expect.any(String));
     const text = queryTextOf(0);
@@ -486,12 +1234,19 @@ describe('staff identity confirmation', () => {
       pdIdentityConfirmationId: out.confirmationId,
       staffIdentityConfirmation: {
         source: 'staff_confirmed',
+        state: 'confirmed',
+        canonicalPersonId: canonicalPerson.canonicalPersonId,
+        canonicalPersonEtag: canonicalPerson.canonicalPersonEtag,
+        actorId: 'SYS-7',
+        confirmedAt: canonicalPerson.confirmedAt,
         normalizedName: 'ann lee',
         email: 'ann@example.edu',
         actorProfileId: 7,
         actorSystemUserId: 'SYS-7',
       },
     });
+    expect(stored).not.toHaveProperty('rosterStatus');
+    expect(stored).not.toHaveProperty('rosterUpdatedAt');
   });
 
   test('findIdentityConfirmation is request + opaque-id scoped', async () => {

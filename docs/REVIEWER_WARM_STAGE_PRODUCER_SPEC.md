@@ -20,13 +20,15 @@ related:
 
 # Reviewer Find Authoritative Warm-Stage Producer Specification
 
-> **Status:** Implementation-ready specification for the normal fail-closed
-> path on `codex/reviewer-find-performance-build`. Only `applicant_anchor` has
-> an executable targeted producer today. Everything labeled **[PLANNED]** below
-> is design, not current behavior or production state.
+> **Status (2026-08-02):** [VERIFIED via source/tests] the branch implements
+> the authenticated manual producer path, cold applicant receipt emission, and
+> provider-free warm validation described here. This is branch/source truth,
+> not a claim that the feature is merged, deployed, or enabled in production.
+> The generic explicit-cold-search attestation/coordinator route remains
+> intentionally unwired; see **Implemented boundary and remaining work**.
 >
-> **Objective:** an explicit cold search emits reusable authoritative receipts
-> for work it already performs; a later warm revisit reads those receipts
+> **Objective:** connected cold applicant enrichment emits reusable
+> authoritative receipts for work it already performs; a later warm revisit reads those receipts
 > without provider work; and a stale legacy or changed stage can be refreshed
 > for exactly one canonical candidate without rerunning unrelated stages or a
 > full applicant/search batch.
@@ -41,41 +43,42 @@ related:
   no new table or migration in this specification.
 - **Consumers:** warm planner, Find cards and action states, both promotion
   services, roster export/dedup, enforcement/Atlas docs, and tests.
-- **Prior finding:** [VERIFIED via source] the current targeted service executes
-  only `applicant_anchor`; [VERIFIED via source] the existing contact-enrichment
-  finalizer also resolves identity, builds institution domains, checks
-  eligibility, and optionally persists, so it is not a valid targeted contact
-  producer as-is.
+- **Current implementation:** [VERIFIED via source/tests]
+  `reviewer-stage-refresh-service` executes `applicant_anchor`, `identity`,
+  `institution_domains`, `institution_coi`, `coauthor_coi`, `eligibility`,
+  `contact`, and `roster_persistence`; `address_trust` remains the dedicated
+  structured address action. The targeted contact producer is isolated from
+  identity and eligibility work.
 
 ## Locked boundary
 
 This specification does not change the previously settled product policy:
 
-1. **[PLANNED] Cold emission is free of duplicate work.** When an explicit cold
-   search already completes a stage, it emits that stage's receipt and bounded
-   evidence before publishing the candidate. It does not call the provider a
-   second time to make the receipt.
-2. **[PLANNED] Warm mount performs no evidence producers.** It may read
+1. **[VERIFIED via source/tests] Cold emission is free of duplicate work.** The
+   connected applicant cold-enrichment path emits the bounded stage receipts it
+   has already produced, before publishing the candidate; it does not make a
+   second provider call merely to create evidence.
+2. **[VERIFIED via source/tests] Warm mount performs no evidence producers.** It may read
    Postgres, Dataverse, and Graph metadata and compute freshness. It never
    invokes Claude, proposal parsing, PubMed, OpenAlex, ORCID, Europe PMC, Serp,
    contact discovery, or uncertain identity resolution.
-3. **[PLANNED] Expensive or uncertain refresh is staff-initiated.** Identity,
+3. **[VERIFIED via source/tests] Expensive or uncertain refresh is staff-initiated.** Identity,
    institution COI, coauthor COI, eligibility, and contact refreshes require an
    explicit action. Cheap pure reconciliation may decide that an existing
    receipt is still current, but warm mount neither recomputes evidence nor
    renews its timestamp. Address trust requiring human evidence remains a
    deliberate address action.
-4. **[PLANNED] One request means one candidate and one requested stage.** A
+4. **[VERIFIED via source/tests] One request means one candidate and one requested stage.** A
    producer may complete the requested stage and the cheap terminal
    `roster_persistence` receipt. It may not silently launch prerequisite or
    sibling evidence producers. The sole two-evidence-receipt exception is the
    dedicated structured address action, which must replace contact and exact
    address trust atomically as specified below; the generic stage route cannot
    invoke that exception.
-5. **[PLANNED] Missing prerequisites fail closed.** The response identifies the
+5. **[VERIFIED via source/tests] Missing prerequisites fail closed.** The response identifies the
    stale prerequisite stages; the UI offers them in dependency order. No
    provider failure, absent result, or unknown value becomes a clean negative.
-6. **[PLANNED] Promotion remains a fresh server decision.** Current receipts
+6. **[VERIFIED via source/tests] Promotion remains a fresh server decision.** Current receipts
    make a row eligible for promotion checks; they never replace the promotion
    services' current Dataverse engagement, identity, COI, eligibility, contact,
    or address enforcement.
@@ -94,17 +97,37 @@ the default fail-closed path.
 | A targeted contact refresh does not rerun identity or eligibility | extracted contact-only producer | positive spies for contact tiers; negative spies for identity/eligibility |
 | A producer cannot use stale prerequisites | server planner before lease acquisition | each missing/stale prerequisite returns `prerequisite_stale` and makes zero provider calls |
 | A concurrent edit/navigation cannot overwrite a newer row | `expectedUpdatedAt` + refresh lease + final CAS | losing writer returns `skipped_stale`; prior evidence remains |
+| An upstream invalidation strands an expired same-stage lease | server-derived request/candidate/stage recovery marker + owner/attempt/expiry CAS | recovery writes only an incomplete retryable receipt; live or foreign-stage leases remain non-mutating and normal planning must still run |
 | Provider failure is not a clean result | producer result validator | incomplete/error receipt and bounded failure code; promotion stays blocked |
 | Cold work and targeted work emit the same canonical stage projection | shared pure projector per stage | fixture parity tests over both call paths |
 | Proposal-dependent evidence binds the exact content version | Graph metadata version before and after explicit proposal work | changed version discards output as stale |
 | Only a complete upstream set can complete roster persistence | server terminal projector | every missing/incomplete/unknown upstream state blocks terminal receipt |
 | Unknown stage, state, result, or failure code fails closed | allowlists with final reject branch | complement tests for unrecognized values |
 
+### Expired-lease recovery boundary
+
+`recover_expired_lease` is a server-planned, same-stage cleanup action, not a
+normal producer retry. It is offered only when the candidate-wide owner has an
+allowlisted stage, a bounded attempt ID, a canonical `refreshStartedAt`, and is
+past the configured minimum lease age. Its reason is always canonicalized to
+`prior_refresh_incomplete`, even if an earlier broad invalidation also affected
+the stage. If normal source inputs are temporarily underivable, the server may
+write only an **incomplete** receipt using the opaque
+`reviewer-stage-expired-lease-recovery:v1` request/candidate/stage namespace;
+that marker is never a normal input source and cannot make evidence current.
+
+Malformed, missing, non-canonical, live, foreign-stage, or unrecognized leases
+are never recovered. They return/plan `lease_repair_required` with the UI's
+operator-repair-only state; the browser makes no retry POST and the row remains
+blocked until an administrator repairs the durable lease.
+
 ## Common producer architecture
 
 ### 1. Target request
 
-**[PLANNED]** Extend the existing route body to the following closed shape:
+**[VERIFIED via source/tests]** The existing route accepts only the following
+target-selection shape; the browser cannot supply evidence, authority, source,
+proposal/version, provider, or plan fields:
 
 ```json
 {
@@ -268,12 +291,15 @@ invalidates every dependent N/A receipt.
 
 ## Proposal and candidate version propagation
 
-**[PLANNED]** Proposal identity is a cross-stage dependency, not a separate
-refresh stage.
+**[VERIFIED via source/tests]** Proposal identity is a cross-stage dependency,
+not a separate refresh stage. The connected applicant cold-enrichment path and
+the proposal-dependent manual `identity`/`coauthor_coi` producers use the
+following Graph-bound authority sequence; the unwired generic explicit-cold
+route does not claim this behavior.
 
-- Before an explicit cold search or proposal-dependent manual refresh, resolve
-  the exact canonical/fallback Graph item and capture its opaque metadata
-  content version.
+- Before connected applicant cold enrichment or a proposal-dependent manual
+  refresh, resolve the exact canonical/fallback Graph item and capture its
+  opaque metadata content version.
 - After downloading/parsing/analyzing proposal bytes, resolve the same item
   again. If the version changed, discard the analysis and return
   `authority_changed`.
@@ -547,7 +573,9 @@ General-search candidates use a server-issued `applicant_anchor` receipt with
 
 ## Persistence changes
 
-**[PLANNED]** Extend the roster store with one internal operation:
+**[VERIFIED via source/tests]** The roster store exposes the following internal
+operation and applies its stage-specific projector/allowlist before its exact
+candidate-key + roster-token + candidate-wide-lease CAS:
 
 ```js
 completeStageRefreshWithEvidence(
@@ -579,7 +607,10 @@ candidate as partial rather than silently choosing a winner.
 
 ## API response and UI behavior
 
-**[PLANNED]** Successful or failed manual refresh responses use a closed shape:
+**[VERIFIED via source/tests]** Successful or failed manual refresh responses
+use a closed shape. The manual route accepts target fields only, and the UI
+renders server-returned freshness with its current-as-of timestamp rather than
+accepting a client assertion of freshness:
 
 ```json
 {
@@ -627,31 +658,22 @@ AbortController. Every success, error, and `finally` state update checks the
 current request generation. Navigation cannot attach a late result to another
 request.
 
-## Implementation order
+## Implemented boundary and remaining work
 
-1. **Common contract:** candidate-key route target, dependency snapshot,
-   evidence projector registry, evidence+receipt CAS, closed response, and
-   complement tests. Keep only `applicant_anchor` executable.
-2. **Cold emission adapters:** stamp proposal/candidate input versions and emit
-   receipts from existing identity, institution-domain, institution COI,
-   coauthor COI, eligibility, contact, and address work without new calls.
-3. **Cheap terminal producer:** implement `roster_persistence`, invalidation on
-   `recordSurfaced`, explicit provider-free legacy repair, and a real
-   end-to-end warm-hit fixture.
-4. **Manual identity + institution domains + institution COI:** add
-   single-candidate executors and prerequisites; keep UI promotion disabled
-   until all stages exist.
-5. **Manual coauthor + eligibility:** add explicit provider actions, proposal
-   pre/post version check, failed-author retry, and first-party eligibility
-   evidence handling.
-6. **Manual contact extraction:** extract and characterize the contact-only
-   producer before enabling it; prove it cannot invoke identity, eligibility,
-   persistence, or paid tiers not explicitly configured by server policy.
-7. **Address-trust integration:** complete/invalidate the stage from the
-   existing address action and canonical person ETag path.
-8. **Enable candidate actions:** only after cold emission and every applicable
-   manual repair path can converge a fixture to a real warm hit and both
-   promotion callers independently re-verify current authority.
+| Surface | Branch state |
+|---|---|
+| Manual repair | [VERIFIED via source/tests] The stage route exposes the eight executable stages named above. It uses a candidate-wide lease and exact CAS; another live stage lease returns `refresh_in_progress`, while an expired owner is durably recovered to the retryable outcome before a new attempt. |
+| Cold applicant persistence | [VERIFIED via source/tests] `enrich-recommended-service` binds proposal-dependent work to Graph metadata before and after analysis, emits projected receipts through `recordSurfacedWithStageEvidence`, and returns per-candidate recorded/partial/skipped accounting. An authority/version change is not recorded as current evidence. |
+| Identity and address actions | [VERIFIED via source/tests] `confirm_identity` derives canonical identity server-side from the exact row; the structured address route re-reads identity/person ETags and atomically projects `contact` plus `address_trust`. Neither action accepts client authority. |
+| Terminal receipt | [VERIFIED via source/tests] Cold upsert, manual stage completion, and provider-free terminal repair use the terminal projector in the same candidate write. A successful stage write cannot separately fail to claim its matching `roster_persistence` receipt. |
+| Promotion | [VERIFIED via source/tests] Both reviewer-promotion callers derive a server promotion-authority snapshot immediately before the fresh promotion gate. Receipts inform eligibility but do not replace current server authority. |
+| Warm rendering | [VERIFIED via source/tests] The cached/reconciled read path performs zero evidence-provider or proposal-byte work. Cards show each stage's server-supplied “Evidence checked as of” time. |
+| Intentionally unwired | [VERIFIED via source/tests] Standalone generic explicit-cold attestation/coordinator helpers and tests exist, but no route adapter reaches them. Wiring them would require retaining or redesigning the existing `load-proposal` public-Blob behavior; that work was not authorized, so this branch makes no generic explicit-cold attestation claim. |
+
+The future autonomous-search trigger, approval level, durable job model, and
+stage-specific six-month/six-year evidence-age thresholds remain deferred
+product-policy decisions. They are not inferred from a manual repair, receipt,
+or warm display hit.
 
 ## Required tests
 
@@ -732,11 +754,12 @@ These do not block implementation of the normal fail-closed producer path:
 
 ## Release boundary
 
-The producer implementation is not ready to enable promotion merely because
-individual executors exist. The release gate is one authenticated dummy-request
-flow that proves:
+[VERIFIED via source/tests] implementation and focused tests do not authorize
+a merge, deployment, promotion enablement, send, or production mutation. Any
+future enablement still requires an authorized authenticated dummy-request flow
+that proves:
 
-1. explicit cold search emits a fully current candidate without duplicate
+1. connected cold applicant enrichment emits a fully current candidate without duplicate
    provider work;
 2. reload renders cached evidence before Dataverse reconciliation;
 3. unchanged revisit makes zero expensive calls and reaches a real warm hit;

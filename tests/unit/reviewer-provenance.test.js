@@ -19,7 +19,7 @@ const { isCandidateSelectable } = require('../../shared/components/reviewers/rev
 const currentServerPromotionPlan = (candidateKey) => ({
   candidateKey,
   cacheOutcome: 'hit',
-  currentStages: ['identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust'],
+  currentStages: ['applicant_anchor', 'identity', 'institution_domains', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust', 'roster_persistence'],
   pendingStages: [],
   refreshes: [],
   promotionAuthority: 'requires_promotion_checks',
@@ -228,6 +228,20 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
     expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
   });
 
+  test('a legacy marker without canonical person/version/actor evidence stays in identity review', () => {
+    const candidate = applicant({
+      institutionMismatch: true,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'legacy-confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'legacy-confirm-1', source: 'staff_confirmed',
+      },
+    });
+    expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
+    expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
+    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(false);
+  });
+
   test('a resolved applicant row stays selectable in its own group', () => {
     for (const identityStatus of ['confirmed', 'probable']) {
       const candidate = applicant({ identityStatus });
@@ -238,7 +252,17 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
   });
 
   test('a staff-confirmed applicant row becomes selectable again', () => {
-    const candidate = applicant({ institutionMismatch: true, pdIdentityConfirmed: true });
+    const candidate = applicant({
+      institutionMismatch: true,
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'confirm-1',
+      staffIdentityConfirmation: {
+        confirmationId: 'confirm-1', source: 'staff_confirmed', state: 'confirmed',
+        canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+        canonicalPersonEtag: 'W/"person-v1"', actorId: 'system-1',
+        confirmedAt: '2026-08-02T00:00:00.000Z',
+      },
+    });
     expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
     expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
     expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);

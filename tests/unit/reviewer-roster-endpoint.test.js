@@ -59,6 +59,15 @@ const mockReadReviewerWarmValidation = jest.fn(async () => ({
 jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
   readReviewerWarmValidation: (...args) => mockReadReviewerWarmValidation(...args),
 }));
+const mockConfirmStructuredRosterIdentity = jest.fn(async () => ({
+  success: true,
+  confirmationId: 'confirm-1',
+  candidate: { name: 'Ann Lee' },
+  remediation: [],
+}));
+jest.mock('../../lib/services/reviewer-address-trust-service', () => ({
+  confirmStructuredRosterIdentity: (...args) => mockConfirmStructuredRosterIdentity(...args),
+}));
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -71,6 +80,13 @@ import * as store from '../../lib/services/reviewer-roster-store';
 import { reviewerCandidateKey } from '../../shared/components/reviewers/reviewer-search-logic';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
+const SERVER_STAFF_IDENTITY_AUTHORITY = {
+  state: 'confirmed',
+  canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+  canonicalPersonEtag: 'W/"person-v1"',
+  actorId: 'system-5',
+  confirmedAt: '2026-08-02T00:00:00.000Z',
+};
 
 function res() {
   return { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
@@ -83,6 +99,12 @@ beforeEach(() => {
   store.findCandidateBySuggestion.mockResolvedValue(null);
   store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
+  mockConfirmStructuredRosterIdentity.mockResolvedValue({
+    success: true,
+    confirmationId: 'confirm-1',
+    candidate: { name: 'Ann Lee' },
+    remediation: [],
+  });
   mockValidateRosterPromotionEngagement.mockResolvedValue({ allowed: true });
   jest.spyOn(console, 'info').mockImplementation(() => {});
 });
@@ -692,6 +714,7 @@ describe('POST recordSurfaced', () => {
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
+        ...SERVER_STAFF_IDENTITY_AUTHORITY,
         normalizedName: 'ann lee',
         email: 'verified@example.edu',
         website: 'https://example.edu/ann',
@@ -946,6 +969,7 @@ describe('POST recordSurfaced', () => {
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
+        ...SERVER_STAFF_IDENTITY_AUTHORITY,
         normalizedName: 'ann lee',
         email: 'verified@example.edu',
       },
@@ -1086,6 +1110,7 @@ describe('PATCH', () => {
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
+        ...SERVER_STAFF_IDENTITY_AUTHORITY,
         normalizedName: 'applicant reviewer',
         email: 'verified@example.edu',
       },
@@ -1173,6 +1198,7 @@ describe('PATCH', () => {
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
+        ...SERVER_STAFF_IDENTITY_AUTHORITY,
         normalizedName: 'bob roe',
         email: 'verified@example.edu',
         website: '',
@@ -1339,11 +1365,14 @@ describe('PATCH', () => {
       },
     } }, r);
     expect(r.statusCode).toBe(200);
-    expect(store.confirmIdentity).toHaveBeenCalledWith(
-      REQ,
-      expect.objectContaining({ name: 'Ann Lee', email: 'ANN@EXAMPLE.EDU' }),
-      { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
-    );
+    expect(mockConfirmStructuredRosterIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: REQ,
+      candidateKey: 'candidate:ann',
+      manualContact: { email: 'ANN@EXAMPLE.EDU', website: undefined, affiliation: 'Example U' },
+      actorProfileId: 5,
+      actorSystemUserId: 'SYS-5',
+    }));
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-confirm-identity', expect.any(Function));
     expect(r.body.confirmationId).toBe('confirm-1');
   });
 
@@ -1400,23 +1429,11 @@ describe('PATCH', () => {
     } }, r);
 
     expect(r.statusCode).toBe(200);
-    expect(store.confirmIdentity).toHaveBeenCalledWith(REQ, expect.objectContaining({
-      name: 'Stored Ann',
+    expect(mockConfirmStructuredRosterIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: REQ,
       candidateKey: 'candidate:ann',
-      stageFreshness: storedStageFreshness,
-      eligibilityStatus: 'unknown',
-      eligibilityCheckStatus: 'incomplete',
-      eligibilityEvidence: storedEligibilityEvidence,
-      coauthorCheckStatus: 'incomplete',
-      coauthorCheckFailures: [{ source: 'server-pubmed', reason: 'timeout' }],
-      addressTrustReceipt: { receiptId: 'server-address-receipt', personConfirmed: false },
-      contactEnrichment: expect.objectContaining({
-        eligibilityStatus: 'unknown',
-        eligibilityCheckStatus: 'incomplete',
-        coauthorCheckStatus: 'incomplete',
-        addressTrustReceipt: { receiptId: 'server-address-receipt', personConfirmed: false },
-      }),
-    }), expect.anything());
+      manualContact: { email: 'ann@example.edu', website: undefined, affiliation: undefined },
+    }));
   });
 
   it('confirm_identity refuses a candidate key that does not resolve to that exact active row', async () => {
@@ -1438,7 +1455,7 @@ describe('PATCH', () => {
 
     expect(r.statusCode).toBe(409);
     expect(r.body).toMatchObject({ code: 'candidate_not_active' });
-    expect(store.confirmIdentity).not.toHaveBeenCalled();
+    expect(mockConfirmStructuredRosterIdentity).not.toHaveBeenCalled();
   });
 
   it('confirm_identity keeps applicant identity evidence from the server row', async () => {
@@ -1473,17 +1490,11 @@ describe('PATCH', () => {
     } }, r);
 
     expect(r.statusCode).toBe(200);
-    expect(store.confirmIdentity).toHaveBeenCalledWith(
-      REQ,
-      expect.objectContaining({
-        suggestionId,
-        identityStatus: 'unresolved',
-        verificationStatus: 'unresolved',
-        needsIdentification: true,
-        email: 'verified@example.edu',
-      }),
-      expect.anything(),
-    );
+    expect(mockConfirmStructuredRosterIdentity).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: REQ,
+      candidateKey: `suggestion:${suggestionId}`,
+      manualContact: { email: 'verified@example.edu', website: undefined, affiliation: undefined },
+    }));
   });
 
   it('confirm_identity rejects an applicant row whose exact person hydration is unavailable', async () => {
@@ -1516,16 +1527,21 @@ describe('PATCH', () => {
 
     expect(r.statusCode).toBe(422);
     expect(r.body).toMatchObject({ code: 'applicant_hydration_required' });
-    expect(store.confirmIdentity).not.toHaveBeenCalled();
+    expect(mockConfirmStructuredRosterIdentity).not.toHaveBeenCalled();
   });
 
   it('confirm_identity returns 409 when the active roster row is gone', async () => {
-    store.confirmIdentity.mockResolvedValueOnce(null);
+    mockConfirmStructuredRosterIdentity.mockResolvedValueOnce({
+      success: false,
+      code: 'candidate_stale',
+      message: 'Candidate is no longer active; reload before confirming identity.',
+      remediation: [],
+    });
     const r = res();
     await handler({ method: 'PATCH', body: {
       requestId: REQ,
       action: 'confirm_identity',
-      candidate: { name: 'Ann Lee', email: 'ann@example.edu' },
+      candidate: { name: 'Ann Lee', candidateKey: 'candidate:ann', email: 'ann@example.edu' },
     } }, r);
     expect(r.statusCode).toBe(409);
   });

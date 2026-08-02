@@ -35,7 +35,7 @@ function response() {
 function body(overrides = {}) {
   return {
     requestId: REQUEST_ID,
-    suggestionId: SUGGESTION_ID,
+    candidateKey: CANDIDATE_KEY,
     stage: 'applicant_anchor',
     expectedUpdatedAt: '2026-08-02 12:00:00+00',
     ...overrides,
@@ -48,7 +48,6 @@ beforeEach(() => {
   refreshReviewerCandidateStage.mockResolvedValue({
     outcome: 'recorded',
     requestId: REQUEST_ID,
-    suggestionId: SUGGESTION_ID,
     candidateKey: CANDIDATE_KEY,
     stage: 'applicant_anchor',
   });
@@ -70,7 +69,11 @@ test('rejects a name-only request, client evidence, and an unknown stage before 
     body({ receipt: { state: 'current' } }),
     body({ dependencies: { applicantInputVersion: 'claimed' } }),
     body({ stage: 'coauthor_coi' }),
-    body({ suggestionId: 'not-a-guid' }),
+    body({ stage: 'address_trust' }),
+    body({ stage: 'address_trust' }),
+    body({ candidateKey: 'not-a-canonical-key' }),
+    body({ candidateKey: 'client:browser-supplied' }),
+    body({ candidateKey: 'candidate:legacy-generic' }),
   ]) {
     const res = response();
     await handler({ method: 'POST', body: invalid }, res);
@@ -81,6 +84,13 @@ test('rejects a name-only request, client evidence, and an unknown stage before 
   expect(withDalContext).not.toHaveBeenCalled();
 });
 
+test('rejects address trust at the generic route in favor of its dedicated action', () => {
+  expect(parseRefreshRequest(body({ stage: 'address_trust' }))).toMatchObject({
+    valid: false,
+    code: 'dedicated_address_action',
+  });
+});
+
 test('runs the sole executable stage inside the trusted DAL context and returns its full outcome', async () => {
   expect(parseRefreshRequest(body())).toMatchObject({ valid: true });
   const res = response();
@@ -89,10 +99,8 @@ test('runs the sole executable stage inside the trusted DAL context and returns 
 
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({
-    success: true,
     outcome: 'recorded',
     requestId: REQUEST_ID,
-    suggestionId: SUGGESTION_ID,
     candidateKey: CANDIDATE_KEY,
     stage: 'applicant_anchor',
   });
@@ -113,5 +121,45 @@ test('maps a lost CAS to a stale conflict without inventing success', async () =
   await handler({ method: 'POST', body: body() }, res);
 
   expect(res.statusCode).toBe(409);
-  expect(res.body).toMatchObject({ success: false, outcome: 'skipped_stale' });
+  expect(res.body).toMatchObject({ outcome: 'skipped_stale' });
+});
+
+test('maps another stage\'s expired lease to a named recovery conflict', async () => {
+  refreshReviewerCandidateStage.mockResolvedValueOnce({
+    outcome: 'lease_recovery_required',
+    code: 'lease_recovery_required',
+    requestId: REQUEST_ID,
+    candidateKey: CANDIDATE_KEY,
+    stage: 'applicant_anchor',
+    leaseStage: 'contact',
+  });
+  const res = response();
+
+  await handler({ method: 'POST', body: body() }, res);
+
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toMatchObject({
+    outcome: 'lease_recovery_required',
+    leaseStage: 'contact',
+  });
+});
+
+test('maps malformed lease repair-required to a non-mutating conflict', async () => {
+  refreshReviewerCandidateStage.mockResolvedValueOnce({
+    outcome: 'lease_repair_required',
+    code: 'lease_repair_required',
+    requestId: REQUEST_ID,
+    candidateKey: CANDIDATE_KEY,
+    stage: 'applicant_anchor',
+    leaseStage: 'contact',
+  });
+  const res = response();
+
+  await handler({ method: 'POST', body: body() }, res);
+
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toMatchObject({
+    outcome: 'lease_repair_required',
+    leaseStage: 'contact',
+  });
 });

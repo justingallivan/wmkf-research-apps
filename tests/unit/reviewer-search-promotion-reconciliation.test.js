@@ -36,7 +36,17 @@ function currentServerPromotionPlan(candidateKey) {
   return {
     candidateKey,
     cacheOutcome: 'hit',
-    currentStages: ['identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust'],
+    currentStages: [
+      'applicant_anchor',
+      'identity',
+      'institution_domains',
+      'institution_coi',
+      'coauthor_coi',
+      'eligibility',
+      'contact',
+      'address_trust',
+      'roster_persistence',
+    ],
     pendingStages: [],
     refreshes: [],
     promotionAuthority: 'requires_promotion_checks',

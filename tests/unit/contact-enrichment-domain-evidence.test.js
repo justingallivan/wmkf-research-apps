@@ -11,6 +11,7 @@
 
 const { ContactEnrichmentService: S } = require('../../lib/services/contact-enrichment-service');
 const { OpenAlexService } = require('../../lib/services/openalex-service');
+const { projectInstitutionDomainsEvidence } = require('../../lib/services/workbench/reviewer-stage-producers/institution-domains');
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -167,6 +168,142 @@ describe('ContactEnrichmentService domain-evidence cluster (characterization)', 
         .toEqual(expect.arrayContaining(['usask.ca', 'iastate.edu']));
       expect(result.contactEnrichment.plausibleInstitutionDomains)
         .toEqual(expect.arrayContaining(['usask.ca', 'iastate.edu']));
+      expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(3);
+      expect(result.contactEnrichment.institutionDomainEvidence).toMatchObject({
+        outcome: 'current',
+        lookups: expect.arrayContaining([
+          expect.objectContaining({ kind: 'name', key: 'Ames Laboratory', state: 'no_domain' }),
+          expect.objectContaining({ kind: 'name', key: 'Iowa State University', state: 'resolved' }),
+          expect.objectContaining({ kind: 'name', key: 'University of Saskatchewan', state: 'resolved' }),
+        ]),
+      });
+    });
+
+    it('records an existing failed lookup as incomplete without retrying it', async () => {
+      const getInstitution = jest.spyOn(OpenAlexService, 'getInstitution')
+        .mockRejectedValue(Object.assign(new Error('upstream unavailable'), { code: 'openalex_error' }));
+      const searchInstitutions = jest.spyOn(OpenAlexService, 'searchInstitutions')
+        .mockResolvedValue([{ displayName: 'Example University', domain: 'example.edu' }]);
+      const result = {
+        contactEnrichment: {
+          identity: { status: 'probable' },
+          tierResults: {
+            orcid: {
+              affiliations: [{
+                current: true,
+                organization: 'Example University',
+                disambiguatedOrganizationId: 'https://ror.org/01abc1234',
+                disambiguationSource: 'ROR',
+              }],
+            },
+          },
+        },
+      };
+
+      await S._buildInstitutionDomainEvidence({}, result);
+
+      expect(getInstitution).toHaveBeenCalledTimes(1);
+      expect(searchInstitutions).toHaveBeenCalledTimes(1);
+      expect(result.contactEnrichment.institutionDomainEvidence).toMatchObject({
+        outcome: 'incomplete',
+        reasonCode: 'institution_lookup_failed',
+        lookups: expect.arrayContaining([
+          { kind: 'ror', key: 'https://ror.org/01abc1234', state: 'error' },
+          { kind: 'name', key: 'Example University', state: 'resolved' },
+        ]),
+      });
+    });
+
+    it('seals a completed zero-domain lookup set as current', async () => {
+      const searchInstitutions = jest.spyOn(OpenAlexService, 'searchInstitutions')
+        .mockResolvedValue([{ displayName: 'Unrelated Organization', domain: 'elsewhere.example' }]);
+      const result = {
+        contactEnrichment: {
+          identity: { status: 'probable' },
+          openAlexAffiliation: 'No Domain Institute',
+        },
+      };
+
+      await S._buildInstitutionDomainEvidence({}, result);
+
+      expect(searchInstitutions).toHaveBeenCalledTimes(1);
+      expect(result.contactEnrichment.institutionDomainEvidence).toEqual({
+        outcome: 'current',
+        reasonCode: 'no_trusted_domains',
+        anchoredDomains: [],
+        plausibleDomains: [],
+        institutions: ['Unrelated Organization'],
+        lookups: [{ kind: 'name', key: 'No Domain Institute', state: 'no_domain' }],
+        lookupCount: 1,
+        coverageTruncated: false,
+      });
+    });
+
+    it('keeps the ninth batch lookup but closes the bounded receipt coverage', async () => {
+      const names = [
+        'Current One University',
+        'Current Two University',
+        'Current Three University',
+        'Current Four University',
+        'ORCID Affiliation University',
+        'OpenAlex Affiliation University',
+        'Candidate Affiliation University',
+        'Candidate Institution University',
+        'Candidate Primary University',
+      ];
+      const searchInstitutions = jest.spyOn(OpenAlexService, 'searchInstitutions')
+        .mockImplementation(async (name) => {
+          if (name === names[8]) throw Object.assign(new Error('late provider failure'), { code: 'openalex_error' });
+          return [{ displayName: name, domain: null }];
+        });
+      const result = {
+        contactEnrichment: {
+          identity: { status: 'probable' },
+          orcidAffiliation: names[4],
+          openAlexAffiliation: names[5],
+          tierResults: {
+            orcid: {
+              affiliations: names.slice(0, 4).map((organization) => ({ current: true, organization })),
+            },
+          },
+        },
+      };
+
+      await S._buildInstitutionDomainEvidence({
+        affiliation: names[6],
+        institution: names[7],
+        primaryAffiliation: names[8],
+      }, result);
+
+      expect(searchInstitutions).toHaveBeenCalledTimes(9);
+      expect(result.contactEnrichment.institutionDomainEvidence).toMatchObject({
+        outcome: 'incomplete',
+        reasonCode: 'institution_lookup_failed',
+        lookupCount: 9,
+        coverageTruncated: true,
+      });
+      expect(result.contactEnrichment.institutionDomainEvidence.lookups).toHaveLength(9);
+      expect(result.contactEnrichment.institutionDomainEvidence.lookups[8]).toEqual({
+        kind: 'name', key: names[8], state: 'error',
+      });
+      expect(result.contactEnrichment.institutionDomainEvidence.lookups.every((lookup) => lookup.state !== 'started')).toBe(true);
+
+      const domainEnvelope = projectInstitutionDomainsEvidence({
+        candidate: {
+          candidateKey: 'suggestion:33333333-3333-3333-3333-333333333333',
+          contactEnrichment: result.contactEnrichment,
+        },
+        identityReceipt: { state: 'current', contractVersion: 4, resultVersion: 'a'.repeat(64) },
+        identityEvidence: { status: 'probable' },
+        identityResult: { status: 'probable' },
+        domainResult: result.contactEnrichment.institutionDomainEvidence,
+        expectedSourceVersion: 'b'.repeat(64),
+        completedAt: '2026-08-02T12:00:00.000Z',
+      });
+      expect(domainEnvelope).toMatchObject({
+        outcome: 'incomplete',
+        receipt: { state: 'incomplete' },
+      });
     });
   });
 });

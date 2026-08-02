@@ -61,6 +61,16 @@ const mockGetCandidatePromotionAuthority = jest.fn();
 jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
   getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
 }));
+const deriveReviewerPromotionAuthoritySnapshot = jest.fn(async ({ requestId, candidate }) => ({
+  authorityState: 'current', requestId, candidateKey: candidate?.candidateKey,
+  versions: Object.fromEntries([
+    'applicant_anchor', 'identity', 'institution_domains', 'institution_coi', 'coauthor_coi',
+    'eligibility', 'contact', 'address_trust', 'roster_persistence',
+  ].map((stage) => [stage, `${stage}-source-v1`])),
+}));
+jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
+  deriveReviewerPromotionAuthoritySnapshot: (...args) => deriveReviewerPromotionAuthoritySnapshot(...args),
+}));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async (_token, { candidate } = {}) => ({
     valid: true,
@@ -164,6 +174,11 @@ const saveCandidates = (args) => {
       // mock, while the subsequent COI/contact assertions remain real.
       staffConfirmations.set(confirmationId, {
         source: 'staff_confirmed',
+        state: 'confirmed',
+        canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+        canonicalPersonEtag: 'W/"staff-confirmed"',
+        actorId: 'SYS-TEST',
+        confirmedAt: '2026-08-02T00:00:00.000Z',
         ...canonicalManualConfirmation(preparedCandidate),
         rosterCandidateKey: preparedCandidate.candidateKey,
       });
@@ -172,7 +187,13 @@ const saveCandidates = (args) => {
   });
   for (const [index, candidate] of candidates.entries()) {
     const serverKey = candidate.candidateKey || `test:${index}`;
+    // The promotion service now discards the submitted DTO after it binds the
+    // signed key to this request-scoped roster row.  Mirror the durable row a
+    // real warm search would have produced, rather than letting tests rely on
+    // browser fields surviving into the mutation path.
     rosterRowsByKey.set(serverKey, authorityRow(serverKey, {
+      ...candidate,
+      candidateKey: serverKey,
       addressTrustReceipt: {
         receiptId: `receipt:${candidate.candidateKey}`,
         requestId: args.requestId,
@@ -237,6 +258,7 @@ beforeEach(() => {
   loadCoiContext.mockResolvedValue({
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
     piResolution: { state: 'ok', reason: null },
+    requestContext: { title: 'Server Request Title', programArea: 'Server Program Area' },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   });
 });
@@ -381,6 +403,62 @@ test('server roster snapshot change withholds generic promotion before Dataverse
   );
 });
 
+test('promotion writes only the freshly loaded roster candidate and server request metadata', async () => {
+  const key = 'person:server-truth';
+  rosterRowsByKey.set(key, authorityRow(key, {
+    name: 'Server Truth',
+    email: 'server.truth@example.edu',
+    emailSource: 'pubmed',
+    emailPersistAllowed: true,
+    affiliation: 'Server University',
+    identityStatus: 'probable',
+    contactEnrichment: {
+      identity: { status: 'probable' },
+      email: 'server.truth@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+    },
+    addressTrustReceipt: {
+      receiptId: 'receipt:server-truth', requestId: BASE.requestId,
+      candidateKey: key, personConfirmed: true, email: 'server.truth@example.edu',
+      evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/staff',
+      attestedAt: '2026-08-02T00:00:00.000Z',
+    },
+  }));
+
+  const out = await saveCandidatesImpl({
+    ...BASE,
+    proposalTitle: 'Attacker Proposal Title',
+    programArea: 'Attacker Program',
+    grantCycleCode: 'X99',
+    summaryBlobUrl: 'https://attacker.invalid/malicious-summary.pdf',
+    candidates: [{
+      candidateKey: key,
+      automatedIdentityAttestation: 'server-signed-test-token',
+      name: 'Attacker Name', email: 'attacker@example.invalid', affiliation: 'Attacker Institute',
+      identityStatus: 'unresolved', hasInstitutionCOI: true,
+      contactEnrichment: { identity: { status: 'unresolved' }, email: 'attacker@example.invalid' },
+    }],
+  });
+
+  expect(out).toMatchObject({ success: true, savedCount: 1, savedNames: ['Server Truth'] });
+  expect(potentialReviewerAdapter.upsertByEmail).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: 'Server Truth', email: 'server.truth@example.edu',
+    }),
+    expect.any(Object),
+  );
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledWith(
+    expect.objectContaining({
+      suggestionLabel: 'Server Request Title — Server Truth',
+      programArea: 'Server Program Area',
+      grantCycleCode: null,
+      summaryBlobUrl: null,
+    }),
+    expect.any(Object),
+  );
+});
+
 test('durable eligibility authority uses the signed pre-enrichment roster key', async () => {
   mockGetCandidatePromotionAuthority.mockReturnValueOnce({
     decision: 'blocked',
@@ -395,6 +473,9 @@ test('durable eligibility authority uses the signed pre-enrichment roster key', 
   });
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([
     authorityRow('candidate:pre-enrichment', {
+      name: 'Dr Changed',
+      email: 'new.email@example.edu',
+      affiliation: 'New University',
       rosterStatus: 'ineligible',
       eligibilityStatus: 'deceased',
     }),
@@ -457,6 +538,17 @@ test('server-owned identity and exact-address receipts recover a roster row whos
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:ellen', {
     name: 'Ellen Zhong',
     email: 'zhonge@cs.princeton.edu',
+    emailSource: 'staff_verified',
+    emailPersistAllowed: true,
+    affiliation: 'Princeton University',
+    identityStatus: 'probable',
+    contactEnrichment: {
+      identity: { status: 'probable' },
+      email: 'zhonge@cs.princeton.edu',
+      emailSource: 'staff_verified',
+      emailPersistAllowed: true,
+      orcidId: '0000-0001-6345-1907',
+    },
     serverIdentityDecisionReceipt: {
       version: 1,
       source: 'automated_resolver',
@@ -543,6 +635,17 @@ test('server-owned identity receipt alone cannot authorize contact after an auto
   });
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:no-address-receipt', {
     name: 'Dr No Address Receipt',
+    email: 'new@example.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    identityStatus: 'probable',
+    contactEnrichment: {
+      identity: { status: 'probable' },
+      email: 'new@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      orcidId: '0000-0002-1825-0097',
+    },
     serverIdentityDecisionReceipt: {
       version: 1,
       source: 'automated_resolver',
@@ -590,6 +693,7 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
     rosterCandidateKey: 'candidate:blocked-address',
   });
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:blocked-address', {
+    name: 'Dr Blocked Address',
     conflictRecordUnavailable: true,
     addressTrustReceipt: {
       receiptId: 'old-receipt',
@@ -680,7 +784,7 @@ test('a fully populated stored roster row still fails closed when no authoritati
   expect(error).toBeInstanceOf(SaveCandidatesError);
   expect(error.httpStatus).toBe(422);
   expect(error.body.errors).toEqual([
-    expect.objectContaining({ code: 'promotion_authority_unavailable', outcome: 'withheld' }),
+    expect.objectContaining({ code: 'stage_authority_stale', stage: 'identity', outcome: 'withheld' }),
   ]);
   expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -692,7 +796,10 @@ test('a fully populated stored roster row still fails closed when no authoritati
     }),
     expect.objectContaining({ serverAuthoritative: true, checkInstitution: false }),
   );
-  expect(mockGetCandidatePromotionAuthority.mock.calls[0][1]).not.toHaveProperty('authoritative');
+  expect(mockGetCandidatePromotionAuthority.mock.calls[0][1]).toMatchObject({
+    requestId: BASE.requestId,
+    authoritative: expect.objectContaining({ authorityState: 'current' }),
+  });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
@@ -701,6 +808,11 @@ test('stored staff confirmation supplies the authoritative roster key when the a
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({ valid: false, reason: 'expired' });
   reviewerRosterStore.findIdentityConfirmation.mockResolvedValueOnce({
     source: 'staff_confirmed',
+    state: 'confirmed',
+    canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+    canonicalPersonEtag: 'W/"staff-confirmed"',
+    actorId: 'SYS-TEST',
+    confirmedAt: '2026-08-02T00:00:00.000Z',
     normalizedName: 'ann lee',
     email: 'ann@example.edu',
     website: '',
@@ -746,6 +858,11 @@ test('staff and automated roster bindings that disagree fail closed before write
   });
   reviewerRosterStore.findIdentityConfirmation.mockResolvedValueOnce({
     source: 'staff_confirmed',
+    state: 'confirmed',
+    canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+    canonicalPersonEtag: 'W/"staff-confirmed"',
+    actorId: 'SYS-TEST',
+    confirmedAt: '2026-08-02T00:00:00.000Z',
     normalizedName: 'ann lee',
     email: 'ann@example.edu',
     website: '',
@@ -773,7 +890,7 @@ test('staff and automated roster bindings that disagree fail closed before write
     rejectedInvalid: 1,
     errors: [expect.objectContaining({
       code: 'invalid_candidate',
-      error: expect.stringMatching(/different roster candidates/i),
+      error: expect.stringMatching(/does not match its server-issued identity receipt/i),
     })],
   });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
@@ -2337,6 +2454,7 @@ test('applicant-excluded suggestion collision becomes a terminal blocked roster 
     candidates: [{
       name: 'Dr Applicant Excluded',
       clientCandidateId: 'applicant-excluded',
+      candidateKey: 'suggestion:authoritative-excluded',
       automatedIdentityAttestation: 'signed-v3',
       email: 'excluded@example.edu',
       emailSource: 'scholarly_multi',
@@ -2347,6 +2465,8 @@ test('applicant-excluded suggestion collision becomes a terminal blocked roster 
   expect(err.httpStatus).toBe(422);
   expect(err.body.results).toEqual([
     expect.objectContaining({
+      // The browser keeps its correlation ID even though the durable state
+      // transition uses the receipt-bound server roster key.
       candidateKey: 'client:applicant-excluded',
       outcome: 'failed',
       code: 'applicant_excluded',

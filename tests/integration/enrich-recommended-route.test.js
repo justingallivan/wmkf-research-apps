@@ -134,10 +134,27 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
 }));
 
 const recordSurfaced = jest.fn(async () => 1);
+const recordSurfacedWithStageEvidence = jest.fn(async (_requestId, entries) => (
+  entries.map((entry) => ({ candidateKey: entry.candidate.candidateKey, outcome: 'recorded' }))
+));
 const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
+  recordSurfacedWithStageEvidence: (...a) => recordSurfacedWithStageEvidence(...a),
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
+}));
+
+const getRequestById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  getById: (...a) => getRequestById(...a),
+}));
+
+const buildApplicantAnchorRefreshReceipt = jest.fn();
+const resolveReviewerProposalMetadata = jest.fn();
+jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
+  REQUEST_SELECT: 'akoya_requestid,akoya_requestnum',
+  buildApplicantAnchorRefreshReceipt: (...a) => buildApplicantAnchorRefreshReceipt(...a),
+  resolveReviewerProposalMetadata: (...a) => resolveReviewerProposalMetadata(...a),
 }));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
@@ -152,6 +169,20 @@ import { requireAppAccess } from '../../lib/utils/auth';
 const REQ = '11111111-1111-1111-1111-111111111111';
 const PR = '22222222-2222-2222-2222-222222222222';
 const SUG = '33333333-3333-3333-3333-333333333333';
+const APPLICANT_INPUT_VERSION = 'a'.repeat(64);
+const PROPOSAL_CONTENT_VERSION = 'b'.repeat(64);
+
+function authoritativeRequest() {
+  return {
+    akoya_requestid: REQ,
+    akoya_requestnum: '1002788',
+    _akoya_applicantid_value: '44444444-4444-4444-4444-444444444444',
+    _akoya_applicantid_value_formatted: 'Applicant University',
+    _wmkf_projectleader_value: '55555555-5555-5555-5555-555555555555',
+    _wmkf_projectleader_value_formatted: 'Principal Investigator',
+    _wmkf_potentialreviewer1_value: PR,
+  };
+}
 
 function sseRes() {
   const res = {
@@ -187,6 +218,20 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: 'u-1' } } });
   limiter.mockResolvedValue(true);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
+  getRequestById.mockResolvedValue(authoritativeRequest());
+  buildApplicantAnchorRefreshReceipt.mockImplementation(({ candidate }) => (
+    candidate?.potentialReviewerId === PR
+      ? {
+          state: 'current', contractVersion: 1,
+          sourceVersion: APPLICANT_INPUT_VERSION,
+          resultVersion: APPLICANT_INPUT_VERSION,
+          completedAt: '2026-08-02T12:00:00.000Z',
+        }
+      : null
+  ));
+  resolveReviewerProposalMetadata.mockResolvedValue({
+    state: 'current', proposalContentVersion: PROPOSAL_CONTENT_VERSION,
+  });
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
@@ -430,10 +475,12 @@ describe('happy path (progress ordering + full card payload)', () => {
 
     // Writeback + roster persistence happened (id-keyed, best-effort).
     expect(upsertByPotentialReviewer).toHaveBeenCalledWith(PR, expect.objectContaining({ email: 'rec.one@rec.edu' }), { actingUserSystemId: 'u-1' });
-    expect(recordSurfaced).toHaveBeenCalledWith(
+    expect(recordSurfacedWithStageEvidence).toHaveBeenCalledWith(
       REQ,
-      [expect.objectContaining({ name: 'Dr. Rec One' })],
-      { expectedUpdatedAt: null },
+      [expect.objectContaining({
+        candidate: expect.objectContaining({ name: 'Dr. Rec One', candidateKey: `suggestion:${SUG}` }),
+        stageEvidence: expect.objectContaining({ applicant_anchor: expect.any(Object), identity: expect.any(Object) }),
+      })],
     );
     expect(res.ended).toBe(true);
   });

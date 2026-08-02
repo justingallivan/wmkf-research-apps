@@ -2,8 +2,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-08-02 in source on branch
-`codex/reviewer-find-performance-build` (not deployed). Migration 029 adds the
+**Last verified:** 2026-08-02 in source/tests on the current feature branch
+(not deployed). Migration 029 adds the
 durable `blocked` status; migration 027 adds `ineligible`; migration 025 keeps
 mutations keyed by `candidate_key`. The live row-count note below predates
 migration 029 and is not a deployment claim. **Time-bounded incident supplement observed
@@ -108,6 +108,18 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 **Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
+**Branch-only stage-evidence overlay (2026-08-02):** [VERIFIED via
+source/tests] `candidate` also carries bounded `stageFreshness` evidence and
+receipts for `applicant_anchor`, `identity`, `institution_domains`,
+`institution_coi`, `coauthor_coi`, `eligibility`, `contact`, `address_trust`,
+and `roster_persistence`. The terminal receipt is valid only for its exact
+applicable upstream set. The stored stage state is render/cache eligibility,
+not client authority or a replacement for current promotion enforcement. Cards
+display the server-supplied per-stage “Evidence checked as of” time. The
+standalone generic explicit-cold attestation/coordinator helpers are not route
+connected; this row format must not be read as proof that generic explicit
+cold search emitted the new authority envelope.
+
 ## Read paths
 
 - `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the
@@ -176,44 +188,61 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 ## Write paths
 
-- `lib/services/reviewer-roster-store.js` only: `recordSurfaced`
-  (candidate-keyed upsert `active`/`ineligible`), `recordCoiDropped`,
-  `setExcluded`, `promote`, `confirmIdentity`,
-  `finalizeCandidatePromotion` (server-only exact-key `active`→`saved` after a
-  confirmed Dataverse suggestion success; current promotion callers bind that
-  write to the server-issued `updated_at` token, so a changed/evicted row is
-  never recreated after the Dataverse mutation and is reported as partial
-  success, followed by best-effort retirement of active aliases carrying the
-  same checksum-valid ORCID), `markPromotionBlocked`
-  (server-only exact-key `active`→`blocked` with decision/code/reason), and
-  `removePreviousActiveSearchResults`, plus the stage-local
-  `startStageRefresh`/`completeStageRefresh`/`failStageRefresh`/
-  `recoverExpiredStageRefresh` CAS helpers. The refresh helpers mutate only
-  one named stage under `candidate.stageFreshness`, bind every write to the
-  canonical candidate key + expected `updated_at` + refresh-attempt lease, and
-  JSONB-merge rather than erasing prior display evidence. Terminal states are
-  monotonic against ordinary result refreshes. A validated
-  `completeStageRefresh` atomically stamps `candidate.warmCacheVersion=1` with
-  the completed receipt; start, failure, and lease recovery never stamp it.
-  This row-level value means the row has entered the current cache envelope,
-  not that every stage is current. Each stage still fails closed independently
-  unless its own contract version and authoritative source version match.
+- `lib/services/reviewer-roster-store.js` is the only roster JSONB mutation
+  surface. [VERIFIED via source/tests] Its cold path is
+  `recordSurfacedWithStageEvidence`, which validates bounded projected stage
+  evidence and returns per-candidate `recorded`, `partial`, or `skipped`
+  outcomes rather than a count. Its manual path is
+  `startStageRefresh`/`completeStageRefreshWithEvidence`/
+  `failStageRefresh`/`recoverExpiredStageRefresh`; it also has the provider-free
+  `finalizeCachedRosterEvidence` terminal repair and
+  `completeStructuredAddressVerification` for the paired staff action.
+  Every stage write is an exact `(request_id, candidate_key, updated_at)` CAS
+  under a **candidate-wide** refresh lease, not a per-stage lease. A second
+  active stage reports `refresh_in_progress`; an expired owner is persisted as
+  an incomplete retryable outcome before a retry can start. If upstream
+  invalidation temporarily leaves that exact owner's normal source hash
+  underivable, recovery uses only the opaque
+  `reviewer-stage-expired-lease-recovery:v1` server-derived
+  request/candidate/stage marker and still writes an incomplete receipt. The
+  planner exposes it only as `recover_expired_lease` with canonical reason
+  `prior_refresh_incomplete`. A missing/non-canonical attempt or start time,
+  non-allowlisted stage, live owner, or foreign-stage owner is never recovered:
+  it is `lease_repair_required` and the UI provides an operator-repair-only
+  state. Neither branch can make evidence current or authorize promotion. JSONB projectors
+  retain prior display evidence on failure and reject arbitrary browser patches.
+  Successful cold/manual writes apply the requested projected stage and
+  `roster_persistence` atomically when the upstream set is complete; a lost CAS
+  records neither as successful. `warmCacheVersion` denotes only the current
+  cache envelope, never that every stage or promotion condition is current.
 - `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
   Promote, authenticated identity confirmation, and scoped removal. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
   saved/blocked authority. Browser-authored blobs have staff authority stripped
   and eligibility reconstructed only from a valid bound receipt.
-- `pages/api/workbench/enrich-recommended.js` snapshots each canonical suggestion row and its roster `updated_at`, preserves complete actor-bound staff confirmations through the bounded prune, and records applicant-suggested output via concurrency-guarded `recordSurfaced` as `active` or direct-deceased `ineligible`, stamped with `candidate.enrichedProposalKey` and the current `candidate.applicantEnrichmentCacheVersion`. A row confirmed, excluded, saved, or otherwise changed while enrichment is running is left unchanged and reported in progress; a suggestion with no row at snapshot may still insert normally. Deceased rows skip Dataverse contact/identity/metric writeback.
+- `pages/api/workbench/enrich-recommended.js` is the connected cold applicant
+  producer. [VERIFIED via source/tests] it obtains Graph proposal binding
+  metadata before and after proposal-dependent analysis, discards a changed
+  authority/version, builds bounded applicant cold-stage evidence, and passes
+  it to `recordSurfacedWithStageEvidence` for per-candidate outcome accounting.
+  A display-only public-Blob fallback cannot authorize proposal-dependent
+  identity/coauthor evidence.
 - `pages/api/workbench/reviewer-stage-refresh.js` is the explicit manual
-  targeted-refresh surface. Its closed body schema accepts only the request
-  GUID, suggestion GUID, allowlisted stage, and server-issued roster version;
-  it derives `suggestion:<id>`, validates the exact canonical active roster
-  row against the exact Dataverse suggestion/request/person/applicant anchor,
-  then updates only `applicant_anchor`. The stage starts with a CAS-bound
-  `refreshAttemptId`, completes/fails with that same lease, and retains prior
-  evidence on failure. It performs no name-based lookup, provider/model call,
-  proposal/Blob operation, or batch applicant enrichment. All other planned
-  stages remain rejected until each has a reviewed executor.
+  targeted-refresh surface. [VERIFIED via source/tests] its closed body accepts
+  only `{ requestId, candidateKey, stage, expectedUpdatedAt }`; it rejects
+  client evidence, authority, source/provider, proposal/version, and plan
+  fields. It dispatches the eight executable stages (`applicant_anchor`,
+  `identity`, `institution_domains`, `institution_coi`, `coauthor_coi`,
+  `eligibility`, `contact`, and `roster_persistence`). `address_trust` is
+  deliberately rejected here and routed only through the structured action.
+  The server re-reads the exact canonical row and derives all authority; it
+  never selects by name or launches a batch repair.
+- `pages/api/workbench/reviewer-roster.js` `confirm_identity` re-resolves the
+  authoritative roster/Dataverse identity and derives the canonical candidate
+  key server-side before persistence. The dedicated structured address route
+  accepts target/action input only; its server service
+  re-reads identity/person ETags, then atomically projects matching `contact`
+  and `address_trust` receipts in one roster CAS.
 - `pages/api/reviewer-finder/discover.js` records institution-COI candidates hard-dropped by Track A verified discovery and referred-seed discovery as `status='coi_dropped'`. `lib/services/discovery-service.js` returns Track B institution-COI hard drops to the route for the same request-scoped write. Phase-C flag-not-drop candidates flow through the existing `recordSurfaced` active-row path instead.
 
 ## Cross-system
@@ -223,6 +252,10 @@ No Dataverse equivalent for the operational roster itself. Crossing points:
 then finalizes the exact roster key as `saved` and best-effort retires active
 same-ORCID aliases; applicant promotion selects the existing suggestion, then
 performs the same server-owned finalization.
+[VERIFIED via source/tests] both callers first derive a server-side
+promotion-authority snapshot from the authoritative roster candidate and pass
+it to the shared fail-closed gate immediately before mutation. A warm-plan
+state, browser payload, or existing receipt cannot replace that current check.
 Dataverse and Postgres are not one transaction, so a finalization failure or
 lost roster CAS is explicit partial success: it emits an operational alert, the
 canonical Dataverse row remains authoritative, and the current promotion path
