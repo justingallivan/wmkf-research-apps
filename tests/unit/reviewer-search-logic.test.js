@@ -1390,7 +1390,7 @@ describe('mergeReferredProvenance — unit safety', () => {
   });
 });
 
-test('pruneCandidateForRoster keeps bounded warm freshness metadata and strips unknown stage fields', () => {
+test('pruneCandidateForRoster strips forged browser warm authority metadata', () => {
   const pruned = pruneCandidateForRoster({
     name: 'Fresh Person', candidateKey: 'suggestion:fresh', warmCacheVersion: 1,
     proposalContentVersion: 'p'.repeat(300), applicantInputVersion: 'a'.repeat(300),
@@ -1399,9 +1399,8 @@ test('pruneCandidateForRoster keeps bounded warm freshness metadata and strips u
       unknown_stage: { state: 'current', contractVersion: 1 },
     },
   });
-  expect(pruned.warmCacheVersion).toBe(1);
-  expect(pruned.proposalContentVersion).toHaveLength(160);
-  expect(pruned.applicantInputVersion).toHaveLength(160);
-  expect(pruned.stageFreshness).toEqual({ identity: expect.objectContaining({ state: 'current', sourceVersion: 's'.repeat(160) }) });
-  expect(pruned.stageFreshness.identity.rawProviderBody).toBeUndefined();
+  expect(pruned).not.toHaveProperty('warmCacheVersion');
+  expect(pruned).not.toHaveProperty('proposalContentVersion');
+  expect(pruned).not.toHaveProperty('applicantInputVersion');
+  expect(pruned).not.toHaveProperty('stageFreshness');
 });

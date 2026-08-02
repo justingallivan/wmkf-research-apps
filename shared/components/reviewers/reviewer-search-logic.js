@@ -894,11 +894,6 @@ export function pruneCandidateForRoster(c) {
     applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
       ? c.applicantEnrichmentCacheVersion
       : null,
-    warmCacheVersion: Number.isInteger(c.warmCacheVersion) && c.warmCacheVersion >= 0 && c.warmCacheVersion <= 100
-      ? c.warmCacheVersion : null,
-    proposalContentVersion: boundedText(c.proposalContentVersion, 160),
-    applicantInputVersion: boundedText(c.applicantInputVersion, 160),
-    stageFreshness: pruneStageFreshness(c.stageFreshness),
     suggestionId: c.suggestionId || null,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,

@@ -71,6 +71,15 @@ describe('stage refresh CAS', () => {
     expect(queryTextOf(1)).toMatch(/refreshStartedAt.*interval '1 millisecond'/);
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('prior_refresh_incomplete'))).toBe(true);
   });
+
+  test('rejects malformed stage contracts before issuing SQL', async () => {
+    await expect(store.startStageRefresh(REQ, 'candidate:ann', 'v', 'contact', { attemptId: 'x'.repeat(101) })).resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.startStageRefresh(REQ, 'candidate:ann', 'v', 'contact', { attemptId: 'a', startedAt: 'not-a-date' })).resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'failed', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { state: 'not_applicable', contractVersion: 1, sourceVersion: 'v', completedAt: '2026-08-01T00:00:00.000Z' })).resolves.toEqual({ outcome: 'rejected' });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'v', 'contact', 'a', { contractVersion: 99, sourceVersion: '', completedAt: 'bad' })).resolves.toEqual({ outcome: 'rejected' });
+    expect(sql).not.toHaveBeenCalled();
+  });
 });
 
 describe('findCandidateBySuggestion', () => {
