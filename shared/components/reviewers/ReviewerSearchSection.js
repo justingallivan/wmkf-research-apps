@@ -898,6 +898,10 @@ export default function ReviewerSearchSection({
   displayOnly = false,
 }) {
   const parentOwnsRoster = rosterSnapshot !== undefined;
+  const rosterRetryRequired = (
+    rosterSnapshot?.reconciliationStopped === true
+    || ['stale', 'error'].includes(rosterSnapshot?.authorityState)
+  );
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
   const [progress, setProgress] = useState([]);
@@ -951,6 +955,24 @@ export default function ReviewerSearchSection({
   const [recError, setRecError] = useState(null);
   const recRunningRef = useRef(false);
 
+  // Do not let an old parent snapshot paint during the render that switches
+  // requests. The effect below clears the stored projections as well; these
+  // derived views close the before-effect paint window.
+  const parentRosterSnapshotCurrent = !parentOwnsRoster || (
+    rosterSnapshot?.requestId === requestId && !!rosterSnapshot?.data
+  );
+  const visibleRosterActive = parentRosterSnapshotCurrent ? rosterActive : [];
+  const visibleRosterExcluded = parentRosterSnapshotCurrent ? rosterExcluded : [];
+  const visibleRosterIneligible = parentRosterSnapshotCurrent ? rosterIneligible : [];
+  const visibleRosterBlocked = parentRosterSnapshotCurrent ? rosterBlocked : [];
+  const visibleRosterHandled = parentRosterSnapshotCurrent ? rosterHandled : [];
+  const visibleRosterSavedKeys = parentRosterSnapshotCurrent ? rosterSavedKeys : [];
+  const visibleRosterNames = parentRosterSnapshotCurrent ? rosterNames : [];
+  const visibleCandidates = parentRosterSnapshotCurrent ? candidates : [];
+  const visibleRecCandidates = parentRosterSnapshotCurrent ? recCandidates : [];
+  const visibleRecHandled = parentRosterSnapshotCurrent ? recHandled : [];
+  const visibleUnverified = parentRosterSnapshotCurrent ? unverified : [];
+
   // Per-user prompt-override editor toggle (S222).
   const [showPromptEditor, setShowPromptEditor] = useState(false);
 
@@ -990,12 +1012,18 @@ export default function ReviewerSearchSection({
   // Standalone callers retain the original internal roster fetch contract.
   useEffect(() => {
     if (!parentOwnsRoster) return;
-    if (rosterSnapshot?.requestId !== requestId) {
+    const snapshotMatchesRequest = rosterSnapshot?.requestId === requestId;
+    if (!snapshotMatchesRequest || !rosterSnapshot?.data) {
+      // The child retains same-request cached data during a parent retry, but
+      // must never render a prior request's projection while the new cached
+      // read is pending (or if a late prior snapshot arrives).
+      applyRosterSnapshot(null);
       setRosterLoaded(false);
-      setRosterLoadFailed(false);
+      setRosterLoadFailed(snapshotMatchesRequest && rosterSnapshot?.authorityState === 'error');
+      setRosterNote(snapshotMatchesRequest ? (rosterSnapshot?.error || null) : null);
       return;
     }
-    if (rosterSnapshot?.data) applyRosterSnapshot(rosterSnapshot.data);
+    applyRosterSnapshot(rosterSnapshot.data);
     setRosterLoaded(Boolean(rosterSnapshot?.data) && rosterSnapshot.authorityState !== 'error');
     setRosterLoadFailed(rosterSnapshot?.authorityState === 'error');
     setRosterNote(rosterSnapshot?.error || null);
@@ -1098,7 +1126,7 @@ export default function ReviewerSearchSection({
     // same set (S224).
     const effectiveExcluded = Array.from(new Set([
       ...parseExcludeList(excludeText),
-      ...rosterNames,
+      ...visibleRosterNames,
       ...(savedPoolNames || []),
     ]));
     const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
@@ -1333,7 +1361,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
+  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -1389,15 +1417,15 @@ export default function ReviewerSearchSection({
   // enrichment uses blobUrl directly for COI if no prior analysis result exists.
   // Defined after enrichRecommended to avoid a temporal dead zone reference error.
   const terminalApplicantKeys = useMemo(
-    () => applicantTerminalSuggestionKeys(rosterExcluded, rosterSavedKeys),
-    [rosterExcluded, rosterSavedKeys],
+    () => applicantTerminalSuggestionKeys(visibleRosterExcluded, visibleRosterSavedKeys),
+    [visibleRosterExcluded, visibleRosterSavedKeys],
   );
   const actionableRecommended = useMemo(
     () => recommended.filter((row) => !reviewerEngagementProjection(row).handled),
     [recommended],
   );
   const haveValidCache = hasValidApplicantEnrichmentCache(
-    [...rosterActive, ...rosterIneligible],
+    [...visibleRosterActive, ...visibleRosterIneligible],
     proposalKey,
     actionableRecommended,
     terminalApplicantKeys,
@@ -1419,15 +1447,15 @@ export default function ReviewerSearchSection({
   // independent of `phase` so the roster shows on reload without a fresh search.
   // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
-  const displayRosterActive = useMemo(() => rosterActive.filter((c) => (
+  const displayRosterActive = useMemo(() => visibleRosterActive.filter((c) => (
     !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
-  )), [rosterActive, proposalKey]);
-  const visibleRecCandidates = useMemo(() => recCandidates.filter((candidate) => (
+  )), [visibleRosterActive, proposalKey]);
+  const currentVisibleRecCandidates = useMemo(() => visibleRecCandidates.filter((candidate) => (
     !terminalApplicantKeys.has(candKey(candidate))
-  )), [recCandidates, terminalApplicantKeys]);
+  )), [visibleRecCandidates, terminalApplicantKeys]);
   const currentRunKeys = useMemo(() => new Set(
-    [...visibleRecCandidates, ...candidates].map(candKey).filter(Boolean)
-  ), [visibleRecCandidates, candidates]);
+    [...currentVisibleRecCandidates, ...visibleCandidates].map(candKey).filter(Boolean)
+  ), [currentVisibleRecCandidates, visibleCandidates]);
   const previousSearchCandidates = useMemo(() => (
     displayRosterActive
       .filter((c) => !isApplicantOriginCandidate(c) && !currentRunKeys.has(candKey(c)))
@@ -1443,10 +1471,10 @@ export default function ReviewerSearchSection({
       candidateKey: candKey(candidate),
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
-  const displayCandidates = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  const displayCandidates = dedupeByName([...currentVisibleRecCandidates, ...visibleCandidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
   const handledReviewers = useMemo(() => dedupeByName([
-    ...recHandled,
-    ...rosterHandled,
+    ...visibleRecHandled,
+    ...visibleRosterHandled,
     ...recommended
       .filter((row) => reviewerEngagementProjection(row).handled)
       .map((row) => ({
@@ -1455,8 +1483,8 @@ export default function ReviewerSearchSection({
         name: row.applicantKnownReviewer?.name || row.name || 'Applicant-recommended reviewer',
         stage: reviewerEngagementProjection(row).stage,
       })),
-  ]), [recHandled, rosterHandled, recommended]);
-  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
+  ]), [visibleRecHandled, visibleRosterHandled, recommended]);
+  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...visibleRosterIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
   const incompleteCoiLabel = incompleteCoiNames.length === 0
@@ -1487,9 +1515,9 @@ export default function ReviewerSearchSection({
   // verified row always wins over its unverified twin. Excluded names drop too —
   // they already have their own collapsed section.
   const knownNameKeys = new Set(
-    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey), ...rosterIneligible.map(candKey)].filter(Boolean)
+    [...displayCandidates.map(candKey), ...visibleRosterExcluded.map(candKey), ...visibleRosterIneligible.map(candKey)].filter(Boolean)
   );
-  const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
+  const unverifiedToShow = visibleUnverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
   const toggle = (key) => {
     if (displayOnly) return;
@@ -2537,12 +2565,16 @@ export default function ReviewerSearchSection({
 
       {displayOnly && (
         <div role="status" className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-          {rosterSnapshot?.authorityState === 'error'
+          {rosterSnapshot?.reconciliationStopped
+            ? (rosterSnapshot?.error || 'Reviewer roster changed repeatedly while status was being checked. Retry to check the latest snapshot.')
+            : rosterSnapshot?.authorityState === 'stale'
+              ? (rosterSnapshot?.error || 'Reviewer status is stale. Retry to check the latest snapshot before taking action.')
+            : rosterSnapshot?.authorityState === 'error'
             ? 'Reviewer status could not be checked. Cached candidates remain visible but all roster actions are disabled.'
             : rosterSnapshot?.authorityState === 'current'
               ? 'Reviewer status is current. Roster actions remain disabled in this rollout.'
               : 'Cached reviewer candidates are display-only while current status is checked. Roster actions remain disabled in this rollout.'}
-          {rosterSnapshot?.authorityState === 'error' && onRetryRoster && (
+          {rosterRetryRequired && onRetryRoster && (
             <button type="button" onClick={onRetryRoster} className="ml-2 underline font-medium">Retry reviewer status</button>
           )}
         </div>
@@ -2718,7 +2750,7 @@ export default function ReviewerSearchSection({
           {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
               so the per-request candidate list (active + the collapsed Excluded
               set) shows on reload and even when no proposal is loaded. */}
-          {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
+          {(rosterNote || displayCandidates.length > 0 || visibleRosterExcluded.length > 0 || visibleRosterIneligible.length > 0 || visibleRosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
               {incompleteCoiCandidates.length > 0 && (
@@ -2763,7 +2795,7 @@ export default function ReviewerSearchSection({
                   </ul>
                 </div>
               )}
-              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && rosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
+              {displayCandidates.length === 0 && visibleRosterExcluded.length === 0 && visibleRosterIneligible.length === 0 && visibleRosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
@@ -2906,26 +2938,26 @@ export default function ReviewerSearchSection({
                   )}
 
                   {/* Collapsed, recoverable Excluded set (durable per request). */}
-                  {rosterExcluded.length > 0 && (
+                  {visibleRosterExcluded.length > 0 && (
                     <details open={excludedOpen} onToggle={(e) => setExcludedOpen(e.currentTarget.open)} className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
+                        Excluded ({visibleRosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
                       </summary>
                       <div className="space-y-2 mt-2">
-                        {rosterExcluded.map((c) => (
+                        {visibleRosterExcluded.map((c) => (
                           <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={displayOnly ? undefined : promoteCandidate} />
                         ))}
                       </div>
                     </details>
                   )}
 
-                  {rosterIneligible.length > 0 && (
+                  {visibleRosterIneligible.length > 0 && (
                     <details className="border border-red-200 bg-red-50 rounded-lg p-2">
                       <summary className="text-xs font-medium text-red-800 cursor-pointer">
-                        Not eligible ({rosterIneligible.length}) — official institutional evidence reports these people are deceased
+                        Not eligible ({visibleRosterIneligible.length}) — official institutional evidence reports these people are deceased
                       </summary>
                       <ul className="mt-2 space-y-1 text-xs text-red-800">
-                        {rosterIneligible.map((candidate) => {
+                        {visibleRosterIneligible.map((candidate) => {
                           const evidence = candidate.eligibilityEvidence
                             || candidate.contactEnrichment?.eligibilityEvidence;
                           return (
@@ -2951,13 +2983,13 @@ export default function ReviewerSearchSection({
                     </details>
                   )}
 
-                  {rosterBlocked.length > 0 && (
+                  {visibleRosterBlocked.length > 0 && (
                     <details className="border border-amber-200 bg-amber-50 rounded-lg p-2">
                       <summary className="text-xs font-medium text-amber-900 cursor-pointer">
-                        Promotion blocked ({rosterBlocked.length}) — applicant-excluded for this request
+                        Promotion blocked ({visibleRosterBlocked.length}) — applicant-excluded for this request
                       </summary>
                       <div className="space-y-2 mt-2">
-                        {rosterBlocked.map((candidate) => (
+                        {visibleRosterBlocked.map((candidate) => (
                           <CandidateCard
                             key={`blocked-${candKey(candidate)}`}
                             candidate={candidate}

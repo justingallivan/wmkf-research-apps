@@ -164,6 +164,67 @@ test('a parent-owned warm snapshot is display-only and does not issue a second r
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+test('a parent-owned request change clears old roster cards before its cached snapshot arrives', async () => {
+  const snapshotA = {
+    requestId: REQ_A,
+    authorityState: 'current',
+    rosterVersion: 'v-a',
+    data: { active: [CANDIDATE_A], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [CANDIDATE_A.name] },
+  };
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" displayOnly rosterSnapshot={snapshotA} />,
+  );
+  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
+
+  rerender(
+    <ReviewerSearchSection
+      requestId={REQ_B}
+      blobUrl="blob-b"
+      proposalKey="proposal-b"
+      displayOnly
+      rosterSnapshot={{ requestId: REQ_B, authorityState: 'refreshing', data: null }}
+    />,
+  );
+  await waitFor(() => expect(screen.queryByText(CANDIDATE_A.name)).not.toBeInTheDocument());
+
+  // A late parent snapshot for request A is ignored while request B is active.
+  rerender(
+    <ReviewerSearchSection requestId={REQ_B} blobUrl="blob-b" proposalKey="proposal-b" displayOnly rosterSnapshot={snapshotA} />,
+  );
+  await waitFor(() => expect(screen.queryByText(CANDIDATE_A.name)).not.toBeInTheDocument());
+});
+
+test('stopped or stale reconciliation exposes the display-only retry control', async () => {
+  const onRetryRoster = jest.fn();
+  const snapshot = {
+    requestId: REQ_A,
+    authorityState: 'cached',
+    reconciliationStopped: true,
+    error: 'Reviewer roster changed again while checking current status.',
+    data: { active: [CANDIDATE_A], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [CANDIDATE_A.name] },
+  };
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" displayOnly rosterSnapshot={snapshot} onRetryRoster={onRetryRoster} />,
+  );
+  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent(snapshot.error);
+  fireEvent.click(screen.getByRole('button', { name: /retry reviewer status/i }));
+  expect(onRetryRoster).toHaveBeenCalledTimes(1);
+
+  rerender(
+    <ReviewerSearchSection
+      requestId={REQ_A}
+      blobUrl="blob-a"
+      proposalKey="proposal-a"
+      displayOnly
+      rosterSnapshot={{ ...snapshot, authorityState: 'stale', reconciliationStopped: false, error: 'Dataverse status is stale.' }}
+      onRetryRoster={onRetryRoster}
+    />,
+  );
+  expect(screen.getByRole('status')).toHaveTextContent('Dataverse status is stale.');
+  expect(screen.getByRole('button', { name: /retry reviewer status/i })).toBeEnabled();
+});
+
 test('promotion progress and completion stay in a live status beside the action', async () => {
   const save = deferred();
   global.fetch = jest.fn((url) => {

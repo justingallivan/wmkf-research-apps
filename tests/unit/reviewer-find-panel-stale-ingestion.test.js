@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -347,6 +347,8 @@ test('parent bootstrap renders the cached roster before reconciliation and reach
 });
 
 test('one snapshot conflict restarts reconciliation with the fresh cached version, but a repeated conflict stops cached', async () => {
+  const retryCached = deferred();
+  let cachedReads = 0;
   const reconciledResponses = [
     response({ success: false, code: 'roster_snapshot_changed', authorityState: 'cached', rosterVersion: 'v2', active: [{ name: 'Fresh Reviewer' }] }, { ok: false, status: 409 }),
     response({ success: false, code: 'roster_snapshot_changed', authorityState: 'cached', rosterVersion: 'v3', active: [{ name: 'Freshest Reviewer' }] }, { ok: false, status: 409 }),
@@ -355,7 +357,12 @@ test('one snapshot conflict restarts reconciliation with the fresh cached versio
     const target = String(url);
     if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
     if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({ success: true, allFiles: [] }));
-    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    if (target.includes('mode=cached')) {
+      cachedReads += 1;
+      return cachedReads === 1
+        ? Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }))
+        : retryCached.promise;
+    }
     if (target.includes('mode=reconciled')) return Promise.resolve(reconciledResponses.shift());
     throw new Error(`Unexpected fetch ${target}`);
   });
@@ -363,6 +370,9 @@ test('one snapshot conflict restarts reconciliation with the fresh cached versio
   render(<ReviewerFindPanel requestId={REQ_A} />);
   await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'cached', names: 'Freshest Reviewer', error: expect.stringMatching(/changed again while checking current status/i), displayOnly: 'true' })));
   expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('mode=reconciled'))).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Retry warm roster' }));
+  await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('mode=cached'))).toHaveLength(2));
+  expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'refreshing', names: 'Freshest Reviewer', displayOnly: 'true' }));
 });
 
 test('reconciliation failure retains cached cards and exposes error state', async () => {

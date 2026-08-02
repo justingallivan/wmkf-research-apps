@@ -219,6 +219,19 @@ export default function ReviewerFindPanel({
   // change or explicit retry starts a fresh generation and aborts the prior read.
   useEffect(() => {
     const generation = ++rosterGenerationRef.current;
+    if (!requestId) {
+      setWarmRoster({
+        requestId: null,
+        authorityState: 'refreshing',
+        data: null,
+        rosterVersion: null,
+        restartCount: 0,
+        reconcileKey: null,
+        reconciliationStopped: false,
+        error: null,
+      });
+      return undefined;
+    }
     const controller = new AbortController();
     setWarmRoster((previous) => ({
       requestId,
