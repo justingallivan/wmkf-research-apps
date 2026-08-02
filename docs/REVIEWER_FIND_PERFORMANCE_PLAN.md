@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-01
 owner: product-engineering
 related:
+  - docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md
   - docs/REVIEWER_ANALYZE_CONTRACT_SPEC.md
   - docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md
   - docs/REVIEWER_CONTACT_LEADS_SPEC.md
@@ -64,11 +65,27 @@ Cold-search progressive delivery remains important, but it follows the warm-path
 - fail-closed applicant and generic promotion authority checks, including institution COI, eligibility completeness, coauthor completeness, and server-owned receipt preservation across roster mutations; and
 - one exact-candidate, exact-stage manual repair path for `applicant_anchor`, protected by request binding, canonical candidate keys, roster compare-and-swap, and stale/error reload guidance.
 
-This is a safe intermediate **display-only** implementation, not a deployable completion of P0. Selection and promotion remain disabled in Reviewer Find because only `applicant_anchor` has an executable targeted refresh producer. The remaining identity, institution COI, coauthor COI, eligibility, contact, address, and proposal-dependent stage producers do not yet emit a complete server-owned authoritative version snapshot. Both promotion services therefore continue to fail closed when that snapshot is absent or stale. Unsupported targeted stages never fall back to a full batch, proposal download, or paid/provider work.
+This is a safe intermediate **display-only** implementation, not a deployable completion of P0. Selection and promotion remain disabled in Reviewer Find because only `applicant_anchor` has an executable targeted refresh producer. The remaining identity, institution-domain, institution COI, coauthor COI, eligibility, contact, address, and proposal-dependent stage producers do not yet emit a complete server-owned authoritative version snapshot. Both promotion services therefore continue to fail closed when that snapshot is absent or stale. Unsupported targeted stages never fall back to a full batch, proposal download, or paid/provider work.
 
 The branch has not been merged to `main`, deployed, exercised through an authenticated browser, used to write production Dataverse/Postgres state, or used to send reviewer email. A fresh Claude Opus adversarial review first returned **NEEDS REWORK** and identified one convergence defect plus promotion-authority coverage and receipt-compatibility/documentation gaps. The branch now stamps `warmCacheVersion` atomically only when a validated stage refresh completes, covers both promotion callers with the real fail-closed policy, preserves stored `eligibilityCheckStatus` when accepting a valid legacy v3 receipt, and documents token-bound roster-finalization partial success. A second, source-tracing Claude Opus review returned **SHIP** on 2026-08-02; the full Jest suite (566 suites / 6,889 tests), TypeScript, scoped ESLint, production Webpack build, and applicable repository gates passed independently in the worktree.
 
 That **SHIP** verdict applies to this safe intermediate branch, not to completed P0. The implemented targeted producer converges the `applicant_anchor` receipt and cache-format stamp, but the current authoritative planner does not yet supply proposal-content authority or executable producers for every required stage. No roster row can therefore reach an end-to-end `cacheOutcome: "hit"` yet, and selection/promotion correctly remain fail-closed. The next release decision still requires the remaining authoritative stage work plus an authenticated browser exercise on dummy request `1002788`.
+
+The implementation contract for that remaining work is
+`docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`. It defines the common
+candidate/stage executor, dependency snapshots, evidence projectors, cold-path
+receipt emission, stage-specific inputs/results/failures, terminal
+`roster_persistence` convergence, complement tests, and the boundary that keeps
+a targeted contact refresh from rerunning identity, eligibility, or the full
+enrichment batch.
+
+Claude Fable reviewed the producer specification read-only on 2026-08-02. The
+first draft returned **NEEDS REWORK**; the accepted findings and two closure
+passes are recorded in
+`docs/audits/reviewer-warm-stage-producer-fable-review-2026-08-02.md`. After the
+terminal-writer, proposal-version, identity-authority, institution-domain,
+address-action, state-vocabulary, matrix, and reason-code corrections, the final
+Fable closure pass returned **READY FOR IMPLEMENTATION** with no P0/P1 blockers.
 
 ## Contract-reconcile Mode A: Step 0
 
@@ -293,6 +310,7 @@ Stages are independently versioned:
 
 - applicant materialization/anchor;
 - identity;
+- institution-domain evidence;
 - institution COI;
 - coauthor COI;
 - eligibility check;
@@ -300,7 +318,14 @@ Stages are independently versioned:
 - address trust; and
 - roster persistence.
 
-`state` is an allowlisted cache state: `current`, `stale`, `refreshing`, `incomplete`, `failed`, or `not_applicable`. Unknown/missing values are stale and non-authoritative.
+A completed persisted receipt `state` is allowlisted to `current`,
+`incomplete`, `failed`, or `not_applicable`. A separate persisted
+`stageRefresh` object holds `refreshing` attempt/lease metadata while retaining
+the last completed receipt. `stale` is planner-derived from missing,
+dependency-mismatched, expired, or unknown receipt data and is never persisted
+as a completed receipt state. The planner/UI cache-state view may therefore use
+the six-value vocabulary `current`, `stale`, `refreshing`, `incomplete`,
+`failed`, or `not_applicable`; unknown values fail closed as stale.
 
 ### Stage dependency and invalidation matrix
 
@@ -308,24 +333,40 @@ The planner derives this graph server-side. The client may request a candidate/s
 
 | Stage | Input/version dependencies | Stages invalidated when this stage/input changes |
 |---|---|---|
-| Applicant materialization / anchor | Request ID; canonical Dataverse suggestion ID; normalized recommended-slot fingerprint (name, institution, supplied contact/identifier); applicant-materialization contract version | Identity, institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
-| Identity | Current applicant/candidate input fingerprint; canonical anchor/candidate key; identity evidence/receipt source version; identity contract version | Institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
+| Applicant materialization / anchor | Request ID; canonical Dataverse suggestion ID; normalized recommended-slot fingerprint (name, institution, supplied contact/identifier); applicant-materialization contract version | Identity, institution-domain evidence, institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
+| Identity | Current applicant/candidate input fingerprint; canonical anchor/candidate key; proposal content version used by bounded proposal-field context; identity evidence/receipt source version; identity contract version | Institution-domain evidence, institution COI, coauthor COI, eligibility check, contact projection, address trust, roster persistence |
+| Institution-domain evidence | Current identity result version (identity authority is required to execute provider resolution; nonauthoritative identity yields server-issued `not_applicable`); current-affiliation and ORCID/ROR institution fingerprint; domain-resolution source/contract version | Eligibility check, contact projection, address trust, roster persistence |
 | Institution COI | Current identity and reviewer-institution fingerprint; request PI/applicant-organization fingerprint; institution-COI contract/source version | Roster persistence only |
 | Coauthor COI | Current identity/researcher identifiers and name variants; proposal-author fingerprint; proposal content version; publication-source and coauthor-COI contract versions | Roster persistence only |
-| Eligibility check | Current identity/canonical-person anchor; eligibility evidence source/version or expiry; eligibility contract version | Roster persistence only |
-| Contact projection | Current identity; canonical Dataverse reviewer/person ID and ETag/version; allowed contact-source versions; contact-projection contract version | Address trust, roster persistence |
+| Eligibility check | Current authoritative identity/canonical-person anchor; current institution-domain result/trusted-domain fingerprint; eligibility evidence source/version or expiry; eligibility contract version | Roster persistence only |
+| Contact projection | Current authoritative identity; current institution-domain result; canonical Dataverse reviewer/person ID and ETag/version; allowed contact-source versions; contact-projection contract version | Address trust, roster persistence |
 | Address trust | Current identity and contact/address fingerprint; canonical person ID and ETag/version; staff confirmation/receipt version; address-trust contract version | Roster persistence only |
 | Roster persistence | Candidate key; current upstream stage receipt versions; pruning/projection contract version; expected roster snapshot/`updatedAt` | None; it is the terminal persisted projection |
 
+Identity stage freshness and identity authority are separate. A complete
+`ambiguous`/`unresolved`/`abstain` decision may remain current cache evidence,
+but only `confirmed`, `probable`, or an exact valid staff confirmation satisfies
+identity-sensitive producer and promotion prerequisites. While identity is
+current but nonauthoritative, dependent stages may be server-issued
+`not_applicable` with reason `identity_not_authoritative`; no downstream
+provider runs, promotion remains blocked, and a later staff confirmation
+invalidates those N/A receipts.
+
+`roster_persistence` has three server-owned writers only: the atomic cold
+candidate upsert, the same CAS that completes a manual upstream stage, and an
+explicit provider-free terminal repair for a legacy row whose upstream set is
+already complete. Warm GET/mount never writes or renews it.
+
 Invalidation is dependency-specific:
 
-- a proposal path/eTag/content change invalidates coauthor COI and any separately tracked proposal-relevance evidence, **not** applicant materialization, identity, eligibility, contact, or address trust;
+- a proposal path/eTag/content change invalidates identity (because the existing verifier consumes bounded proposal-field context), all identity-dependent stages, coauthor COI, and any separately tracked proposal-relevance evidence; it does **not** invalidate applicant materialization;
 - a recommended-slot identity/input change starts at applicant materialization and therefore invalidates all candidate-dependent stages;
 - a request PI/applicant-organization change invalidates institution COI, not unrelated identity/contact/eligibility stages;
-- a canonical person/contact ETag change invalidates contact projection and address trust without repeating proposal or publication work; and
+- a canonical person/contact ETag change invalidates contact projection and address trust without repeating proposal or publication work;
+- an institution-domain result change invalidates eligibility, contact, address trust, and roster persistence; and
 - a stage contract/source-version change invalidates that stage plus only the downstream stages named in the matrix.
 
-Planner tests must exercise every matrix row, the proposal-change non-invalidation complement, transitive invalidation from applicant/identity changes, and unknown dependency versions failing closed as `stage_contract_changed` or `unclassified_miss`.
+Planner tests must exercise every matrix row, proposal-driven identity invalidation, transitive invalidation from applicant/identity/domain changes, and unknown dependency versions failing closed as `stage_contract_changed` or `unclassified_miss`.
 
 ### Legacy evidence compatibility and age review
 
@@ -337,7 +378,7 @@ Freshness combines hard dependency/version invalidation with age-based review:
 
 - candidate/identity anchors do not expire solely because time passed when their stable identifiers and dependencies are unchanged;
 - affiliation, contact, address trust, and eligibility are time-sensitive and use stage-specific review thresholds;
-- proposal relevance and coauthor COI bind to the current request, proposal-author fingerprint, and proposal content version regardless of age; and
+- identity proposal context, proposal relevance, and coauthor COI bind to the current request and proposal content version regardless of age; coauthor COI additionally binds the proposal-author fingerprint; and
 - thresholds are configurable/versioned per stage and are not hard-coded to one global TTL.
 
 [VERIFIED via Justin's 2026-08-01 operating principle] roughly six-month-old evidence is probably acceptable when its dependencies are unchanged, while six-year-old evidence requires more validation. This is a review principle, not a locked TTL. Arbitrary intermediate thresholds remain **[PLANNED]** until stage-specific measurements and operational review justify them.
@@ -363,11 +404,18 @@ Locked P0 policy:
 
 Starting a refresh atomically updates only that candidate/stage metadata using `expectedUpdatedAt`:
 
-- set stage state to `refreshing` with `refreshAttemptId`, `refreshStartedAt`, and reason;
-- retain the last completed display result/evidence, but mark it cached and non-authoritative for promotion;
+- set the separate `stageRefresh` metadata to `refreshing` with
+  `refreshAttemptId`, `refreshStartedAt`, and reason;
+- retain the last completed receipt and display result/evidence, while the
+  planner marks it cached and non-authoritative for promotion;
 - never erase a prior complete result merely because a refresh began.
 
-Success atomically replaces only the stage result/receipt and marks it `current`. Failure preserves prior evidence and writes `incomplete` or `failed` plus a bounded error code. A process death leaves `refreshing`; after the configured lease window, the next revisit maps it to `prior_refresh_incomplete` and retries only that candidate/stage.
+Success atomically replaces only the stage result/receipt, writes `current`, and
+clears its lease metadata. Failure preserves prior display evidence, writes a
+completed `incomplete` or `failed` receipt plus a bounded error code, and clears
+the live lease. A process death leaves only `stageRefresh.state=refreshing`;
+after the configured lease window, the next revisit maps it to
+`prior_refresh_incomplete` and retries only that candidate/stage.
 
 All writes use candidate key + expected roster version. A stale writer returns `skipped_stale`; it does not overwrite a newer projection.
 
@@ -515,7 +563,7 @@ Extend roster store operations with:
 - candidate-key + `expectedUpdatedAt` compare-and-swap;
 - stage-level `refreshing/current/incomplete/failed` metadata;
 - `refreshAttemptId`/lease recovery;
-- full per-row outcomes (`recorded`, `skipped_stale`, `rejected`, `failed_retryable`, `failed_terminal`); and
+- full per-row outcomes (`recorded`, `not_required`, `skipped_stale`, `refresh_in_progress`, `rejected`, `failed_retryable`, `failed_terminal`); and
 - detailed applicant terminal frames rather than `count/skipped`.
 
 P0 uses the existing JSONB candidate column and requires no schema migration. If query/index needs later justify extracted columns, that is a separately reviewed migration.
@@ -553,7 +601,10 @@ After warm P0 is stable:
 - persist each candidate independently with detailed outcomes; and
 - show grounded/read-only candidates before all contact stages finish.
 
-Cold progress is honest: proposal loading, analysis, database discovery, identity, institution COI, coauthor COI, eligibility, contact, and roster persistence each have visible state. Stream close without a terminal event is unknown, not success.
+Cold progress is honest: proposal loading, analysis, database discovery,
+identity, institution-domain evidence, institution COI, coauthor COI,
+eligibility, contact, and roster persistence each have visible state. Stream
+close without a terminal event is unknown, not success.
 
 ### P2 — measured operational optimization
 
@@ -610,7 +661,7 @@ Retain search-click → first grounded, first actionable, and background-complet
 | One candidate stage stale | That card/stage marked stale | Only dependent actions blocked | Refresh that ID/stage |
 | One stage refresh fails | Prior evidence remains visible as stale | Stage stays non-authoritative | Store failure/reason; targeted retry |
 | Coauthor provider retries exhausted | Successfully checked evidence remains visible; provider failure remains explicit | Default fail-closed; optional invitation override stays disabled unless the audited attestation/hold dependency is live | Record actor/time/reason, failed authors/queries, proposal/candidate versions, and checked evidence; possible conflict is held for staff disposition |
-| Refresh process dies | `refreshing` persists until lease expiry | Non-authoritative | Map to `prior_refresh_incomplete`; resume one stage |
+| Refresh process dies | Separate `stageRefresh` metadata persists as `refreshing` until lease expiry while prior completed evidence remains visible | Non-authoritative | Map to `prior_refresh_incomplete`; resume one stage |
 | Roster CAS loses | Newer row wins | Reload current authority | Return `skipped_stale`; never overwrite |
 | Proposal metadata changed | Prior cards visible/read-only | Proposal-dependent promotion gates block | Explicit targeted refresh or new search; no automatic cold run |
 | Applicant slot changed | Unchanged candidates remain current | Changed slot blocks/refreshes only | Materialize/refresh that slot |
@@ -633,7 +684,9 @@ Retain search-click → first grounded, first actionable, and background-complet
 - one stale candidate/stage calls only its targeted service.
 - refresh start/success/failure/lease-expiry preserves prior evidence and CAS semantics.
 - no-history panel remains idle/read-only and makes no proposal/applicant/model/provider calls until explicit `Run search`.
-- proposal-content change invalidates coauthor/proposal-relevance evidence but leaves identity, eligibility, contact, and address stages current when their own dependencies are unchanged.
+- proposal-content change invalidates identity, every identity-dependent stage,
+  and coauthor/proposal-relevance evidence because the current verifier consumes
+  bounded proposal-field context.
 - the legacy compatibility mapper promotes only fixtures demonstrably equivalent to the new receipt contract; ambiguous/missing fixtures become `stage_missing`/`incomplete` without full-batch recompute.
 - age review is stage-specific: unchanged identity anchors do not expire from age alone; time-sensitive stages use configurable/versioned thresholds; request/proposal-bound stages reject mismatched content even when recent.
 
@@ -804,7 +857,14 @@ Improved models, references, and curation may improve recall/reasoning, but dete
 2. **Authority alignment:** applicant institution COI, default fail-closed coauthor completeness with targeted retries, locked eligibility semantics, UI state model, and both promotion services; keep the optional provider-failure override off and current UI behavior until gates are ready.
 3. **Display-only cached first paint:** parent-owned bootstrap, cached cards, delayed authority state, no duplicate roster fetch, and every selection/add/save/promotion control disabled.
 4. **Freshness planner + stale-safe persistence:** dependency matrix, per-candidate/stage receipts and checked dates, versioned compatibility mapper, reason codes, stage-specific configurable age review, stage attempt/lease/CAS, detailed per-row outcomes, and manual targeted refresh/retry APIs.
-5. **Suppress warm cold-work behind the step-4 dependency flag:** metadata-only proposal/input validation; automatically run only the inexpensive authoritative allowlist; keep proposal download/parse, Claude, publication/coauthor discovery, uncertain identity resolution, and contact discovery behind explicit staff actions; no-history panels remain idle. Do not enable this flag until legacy/stale repair succeeds through the targeted path.
+5. **Suppress warm cold-work behind the step-4 dependency flag:** metadata-only
+   proposal/input validation; automatically reconcile only the inexpensive
+   authoritative read allowlist and do not execute/write evidence producers on
+   mount; keep proposal download/parse, Claude, publication/coauthor discovery,
+   uncertain identity resolution, institution-domain resolution, and contact
+   discovery behind explicit staff actions; no-history panels remain idle. Do
+   not enable this flag until legacy/stale repair succeeds through the targeted
+   path.
 6. **Enable reconciled actions:** only after #2 and #4, enable controls candidate-by-candidate when current panel authority and every required stage receipt are current; automatic work stays within the locked inexpensive authoritative allowlist.
 7. **Optional audited coauthor override:** separate reviewed change only after audit persistence and the reviewer attestation/possible-conflict hold dependency are designed, built, and verified end to end.
 8. **Cold progressive search:** candidate events and partial persistence after warm P0 is stable.

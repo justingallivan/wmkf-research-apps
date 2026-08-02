@@ -387,6 +387,16 @@ SSRF-bound to the **anchored** set only (fallback: the single `verifiedInstituti
 the anchored set is empty — today's bound). Design + review history:
 `docs/REVIEWER_GATING_STRATEGY_REDESIGN.md`.
 
+**[PLANNED, not current enforcement]** The warm-stage producer design in
+`docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md` assigns this bounded anchored/
+plausible domain resolution to a separate `institution_domains` receipt. Cold
+enrichment will emit the evidence it already computes; an explicit targeted
+producer will expose per-lookup completeness instead of the current helper's
+best-effort error swallowing. Eligibility and contact then consume the current
+receipt rather than rebuilding the domain set independently. This paragraph is
+not authorization to bypass the verified current `_finalize` guard before that
+producer is implemented and parity-tested.
+
 **Enforcement points.** `lib/utils/safe-fetch.js`
 (`safeFetchInstitutionPage`, `hostWithinDomain`, `isPrivateAddress`) ·
 `lib/services/contact-enrichment/page-email.js`

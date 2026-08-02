@@ -346,6 +346,7 @@ related:
 | [REVIEWER_STAGE_2A_BUILD_PLAN.md](REVIEWER_STAGE_2A_BUILD_PLAN.md) | plan | historical |  | Shipped early Stage 2a interaction build; retained as historical implementation record. | 2026-07-02 |
 | [REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md](REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md) | plan | historical |  | Completed board-writeup identity capture; retained as the historical build plan. | 2026-07-02 |
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | historical |  | Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record. | 2026-07-02 |
+| [REVIEWER_WARM_STAGE_PRODUCER_SPEC.md](REVIEWER_WARM_STAGE_PRODUCER_SPEC.md) | spec | active |  | Contracts for emitting and selectively refreshing authoritative Reviewer Find stage evidence and receipts. | 2026-08-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
 | [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis reliability are proven; lifecycle readiness/currentness is deployed disabled, pending signed-in verification and bounded smoke. | 2026-07-03 |
 
