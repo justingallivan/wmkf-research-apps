@@ -255,17 +255,18 @@ against the baseline before implementation.
 - Prove both confirmation-before-enrichment and confirmation-during-enrichment
   races preserve the staff decision.
 
-#### C. Proposal document selector fallback — explicit todo
+#### C. Proposal document selector fallback
 
-**Partial branch implementation (2026-08-01; not deployed):** branch
-`codex/reviewer-proposal-binding-refresh` closes items 6–7 for deliberate
-dropdown overrides. After a server-validated selection, Find stores the exact
-`library::folder::filename` in `?proposalFile=`, replays it on reload, and the
-route revalidates it against the current request's server-listed files. A new
-random-suffixed Blob URL for that same key does not invalidate a complete
-applicant-enrichment cache. The automatic exact current-cycle
-`Phase I/ProjectDescription.pdf` fallback in items 2–5 remains unimplemented;
-the canonical default and external reviewer-materials rules are unchanged.
+**Branch implementation (2026-08-01; not deployed):** branch
+`codex/reviewer-proposal-binding-refresh` closes items 1–7. Reviewer Finder now
+selects the exact active canonical package first, falls back only to the exact
+active current-cycle `Phase I/ProjectDescription.pdf`, and returns the
+server-listed picker when neither exists. After a server-validated deliberate
+selection, Find stores the exact `library::folder::filename` in
+`?proposalFile=`, replays it on reload, and the route revalidates it against the
+current request's server-listed files. A new random-suffixed Blob URL for that
+same key does not invalidate a complete applicant-enrichment cache. The
+external reviewer-materials rules remain unchanged.
 
 Implement this precedence for **Reviewer Finder proposal ingestion only**:
 

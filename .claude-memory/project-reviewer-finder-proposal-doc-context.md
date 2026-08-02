@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Reviewer Finder currently defaults to the exact canonical Reviewer Materials proposal; the proposed stabilization plan adds one exact current-cycle Phase I/ProjectDescription.pdf fallback before the next combined grant cycle.
+description: Reviewer Finder prefers the exact canonical Reviewer Materials proposal and falls back to the exact active current-cycle Phase I/ProjectDescription.pdf before requiring a manual picker.
 metadata:
   type: project
   status: active
@@ -27,12 +27,14 @@ publishes one clean proposal package at exactly:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
 
-Reviewer Finder's default load now requires that exact file in the active
-Dynamics-associated request folder. It does not use `classifyFile`, best-guess
-selection, the Proposal tab's `Phase I/ProjectDescription.pdf`, archive files,
-or neighboring PDFs. Missing or duplicate active canonical files fail before
-download/Blob write. An explicit authenticated `fileKey` remains available
-only for deliberate historical/ad-hoc staff analysis.
+Reviewer Finder's default load prefers that exact file in the active
+Dynamics-associated request folder. When it is absent, the current-cycle
+compatibility rule selects exactly one active `Phase I/ProjectDescription.pdf`.
+It does not use `classifyFile`, best-guess selection, archive files, or
+neighboring PDFs. A duplicate canonical file remains an error; a missing or
+ambiguous fallback returns the server-listed picker before download/Blob write.
+An explicit authenticated `fileKey` remains available only for deliberate
+historical/ad-hoc staff analysis.
 
 **Current branch status (2026-08-01; not deployed):**
 `codex/reviewer-proposal-binding-refresh` persists a deliberate authenticated
@@ -40,17 +42,12 @@ dropdown choice in validated `?proposalFile=` navigation state. Refresh replays
 the exact file key, the server re-lists the request's files before accepting it,
 and the existing cache contract prevents a new random Blob URL for the same key
 from rerunning applicant enrichment. A stale or cross-request key fails closed
-and returns to the picker. [VERIFIED via source + focused tests]
-
-The automatic fallback proposal remains open: preserve the canonical reviewer
-package as first priority, then (if separately implemented before the next
-grant cycle) select exactly one server-listed file at
-`Phase I/ProjectDescription.pdf`. A duplicate canonical file must remain an
-error. This is not permission to restore `classifyFile`, best-guess PDFs, or
-broad filename heuristics. Request `1003010` currently has no canonical package
-and does have that exact Phase I file, so it continues through the deliberate
-picker whose validated binding now survives reload. [VERIFIED 2026-08-01 via
-owner correction + read-only Dataverse/SharePoint probe]
+and returns to the picker. The same branch now implements the automatic exact
+fallback while preserving canonical-first precedence. Request `1003010` has no
+canonical package and does have that exact Phase I file, so the patched resolver
+selects it without staff input. [VERIFIED via source + focused tests; request
+file availability verified 2026-08-01 via owner correction + read-only
+Dataverse/SharePoint probe]
 
 The next cycle combines Phase I + Phase II into a single submission with richer
 proposal text and a separate bibliography. Power Automate should still
@@ -66,8 +63,8 @@ Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin
   the same exact canonical path; the temporary Phase I fallback does not change
   the outbound package contract.
 - Preserve the dedicated exact Reviewer Finder selector; do not reintroduce
-  cross-purpose `classifyFile` or heuristic selection. The only proposed
-  automatic compatibility fallback is the exact current-cycle
+  cross-purpose `classifyFile` or heuristic selection. The only automatic
+  compatibility fallback is the exact current-cycle
   `Phase I/ProjectDescription.pdf` rule above; other files remain deliberate,
   server-validated dropdown choices. `Project Narrative.pdf` was an owner-
   corrected naming mistake and is not the current-cycle fallback.

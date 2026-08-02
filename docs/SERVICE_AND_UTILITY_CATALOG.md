@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-31
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - lib/services/
@@ -91,10 +91,13 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Reviewer Finder pipeline
 
 - **`reviewer-finder/load-proposal-service.js`** — Default proposal ingestion
-  requires the exact active
-  `Reviewer Materials/Proposal_{Request#}.pdf`; zero or multiple matches fail
-  before download/Blob write. An explicit authenticated, server-listed
-  `fileKey` remains for deliberate historical/ad-hoc staff overrides.
+  prefers exactly one active `Reviewer Materials/Proposal_{Request#}.pdf`, then
+  falls back only to exactly one active current-cycle
+  `Phase I/ProjectDescription.pdf`; neither/ambiguity fails before
+  download/Blob write and returns the server-listed picker data. An explicit
+  authenticated, server-listed `fileKey` remains for deliberate
+  historical/ad-hoc staff overrides. This compatibility fallback is confined
+  to Reviewer Finder ingestion.
 - **`discovery-service.js`** — Multi-database literature search orchestration.
 - **`deduplication-service.js`** — Name matching, duplicate merge, COI filtering, ranking.
 - **`institution-identity-resolver.js`** — W0 OpenAlex institution resolver with per-run settled caching, unique-strongest name/country selection, structured associated-institution output, and `null` on ambiguity or provider failure. W1 callers use it to narrow pre-existing COI matches and corroborate affiliation consistency.

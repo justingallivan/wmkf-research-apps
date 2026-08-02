@@ -117,9 +117,11 @@ restore to the current expected suggestion set. **Branch-only follow-up,
 reload-stable proposal override as validated `?proposalFile=` navigation state;
 the route still re-lists the request's server-owned SharePoint files before
 accepting that opaque key, and same-key Blob refresh remains cache-stable.
-**Still deferred and explicitly not implemented:** the automatic exact
-current-cycle fallback to `Phase I/ProjectDescription.pdf`. Owner correction
-2026-08-01: `Project Narrative.pdf` was named earlier in error.
+The same branch now also implements the automatic two-path default: exact
+`Reviewer Materials/Proposal_{Request#}.pdf` first, then exact active
+current-cycle `Phase I/ProjectDescription.pdf`; only neither/ambiguity requires
+the picker. Owner correction 2026-08-01: `Project Narrative.pdf` was named
+earlier in error. **This branch remains not deployed.**
 
 ## Also Deferred (owner-aware, not this session)
 

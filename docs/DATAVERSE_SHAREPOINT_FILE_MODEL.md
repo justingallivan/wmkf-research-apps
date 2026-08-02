@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -120,9 +120,8 @@ hood.
 
 ### Automated proposal input contract
 
-The default proposal source for Initial Assessment, Workbench Field Primer
-request mode, and Reviewer Finder analysis is the one exact active request
-file:
+The default proposal source for Initial Assessment and Workbench Field Primer
+request mode is the one exact active request file:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
 
@@ -131,9 +130,13 @@ SharePoint folder. An archive-only match, multiple active exact matches, a raw
 application export, or `Phase I/ProjectDescription.pdf` does not satisfy the
 contract; default automation fails before the model and before result
 persistence. Reviewer Finder's authenticated explicit `fileKey` remains a
-deliberate historical/ad-hoc staff override, not a default-selection fallback.
-The Workbench Proposal tab separately continues to display the D26 Phase I
-document slots.
+deliberate historical/ad-hoc staff override. Separately, Reviewer Finder's
+current-cycle default loader prefers the canonical file and falls back only to
+exactly one active `Phase I/ProjectDescription.pdf`; neither or ambiguity
+returns the server-listed picker before download/Blob write. This bounded
+staff-discovery compatibility rule does not change the governed writeup input
+or external reviewer visibility. The Workbench Proposal tab separately
+continues to display the D26 Phase I document slots.
 
 **[VERIFIED 2026-07-30 via live read-only Graph/Dataverse probe]** Request
 `1003109` has the exact active file

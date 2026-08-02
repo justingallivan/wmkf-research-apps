@@ -6,6 +6,7 @@ status: canonical
 summary: "Canonical outbound reviewer package: Reviewer Materials/Proposal_{Request#}.pdf; every other request file remains internal."
 canonical: true
 cataloged: 2026-07-02
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -14,8 +15,10 @@ related:
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)
-**Status:** Owner-confirmed 2026-07-30. External delivery and automated
-proposal-analysis code are aligned to this exact folder/file contract.
+**Status:** Owner-confirmed 2026-07-30. External delivery, Workbench Field
+Primer request mode, and Initial Assessment generation are aligned to this
+exact folder/file contract. Reviewer Finder alone has the bounded current-cycle
+compatibility fallback documented below.
 **Related:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` (file storage architecture)
 
 ---
@@ -133,13 +136,20 @@ For reference — you don't need to build any of this; it's already in place.
    submit writes structured `wmkf_appreviewanswer` snapshots to Dataverse; no
    reviewer PDF is required. Retained legacy upload infrastructure is outside
    this outbound-materials contract.
-5. **Automated proposal analysis** — Reviewer Finder's default proposal load,
-   Workbench Field Primer request mode, and Initial Assessment generation all
-   read this same exact file from the active `akoya_request` library. They do
-   not fall back to `Phase I/ProjectDescription.pdf`, a raw application export,
-   an archive library, or another PDF. Missing or duplicate active canonical
-   files stop before the model call and before any Blob, artifact, or Dataverse
-   result write.
+5. **Governed proposal analysis** — Workbench Field Primer request mode and
+   Initial Assessment generation read this same exact file from the active
+   `akoya_request` library. They do not fall back to
+   `Phase I/ProjectDescription.pdf`, a raw application export, an archive
+   library, or another PDF. Missing or duplicate active canonical files stop
+   before the model call and before any artifact or Dataverse result write.
+6. **Reviewer Finder current-cycle compatibility** — Reviewer Finder prefers
+   this same exact active canonical file. Only when it is absent, its default
+   loader falls back to exactly one active
+   `Phase I/ProjectDescription.pdf`. If neither exact path exists, or either
+   applicable path is ambiguous, it returns the server-listed picker before
+   download or Blob write. This staff-only ingestion rule does not widen the
+   external reviewer package and does not apply to Field Primer or Initial
+   Assessment generation.
 
 Reviewer Finder retains an explicit authenticated `fileKey` override for
 deliberate staff analysis of a historical or ad-hoc source. That manual action

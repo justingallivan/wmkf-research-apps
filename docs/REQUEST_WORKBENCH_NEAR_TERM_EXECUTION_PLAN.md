@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -260,11 +260,15 @@ Initial Assessment. Each is a one-page Word document with this sequence:
 
 The approved automated proposal input is exactly
 `Reviewer Materials/Proposal_{Request#}.pdf` in the active request's
-Dynamics-associated `akoya_request` SharePoint folder. Initial Assessment,
-Workbench Field Primer request mode, and Reviewer Finder's default loader
-share that contract. They must fail before any model or result write when the
-exact active file is missing or ambiguous; they must not silently fall back to
-the D26 Proposal-tab `Phase I/ProjectDescription.pdf` display bridge.
+Dynamics-associated `akoya_request` SharePoint folder. Initial Assessment and
+Workbench Field Primer request mode share that strict contract. They must fail
+before any model or result write when the exact active file is missing or
+ambiguous; they must not silently fall back to the D26 Proposal-tab
+`Phase I/ProjectDescription.pdf` display bridge. Reviewer Finder is a separate
+staff discovery surface: for the current cycle only, its default loader first
+prefers the same exact canonical file and then falls back to exactly one active
+`Phase I/ProjectDescription.pdf`. That bounded compatibility rule does not
+change the approved governed-artifact input or external reviewer visibility.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a

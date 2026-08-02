@@ -3,9 +3,10 @@
  *
  * Unit tests for lib/services/reviewer-finder/load-proposal-service.js
  * (Route→Service Consolidation Plan, Stage 3 wave) — logic-level coverage
- * with adapters/Graph/Blob mocked: exact canonical selection, explicit
- * historical override, bucket dedupe, per-bucket listing failure tolerance,
- * and each LoadProposalError with its pinned httpStatus/body.
+ * with adapters/Graph/Blob mocked: exact canonical selection, the exact
+ * current-cycle Phase I fallback, explicit historical override, bucket
+ * dedupe, per-bucket listing failure tolerance, and each LoadProposalError
+ * with its pinned httpStatus/body.
  */
 
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
@@ -99,27 +100,61 @@ test('400 with { error, allFiles } body when an explicit fileKey is not found', 
   expect(err.body.allFiles).toHaveLength(1);
 });
 
-test('default fails closed when only an old Phase I proposal is present', async () => {
+test('default falls back to the exact active Phase I ProjectDescription PDF', async () => {
   listFiles.mockResolvedValue([
     file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+  ]);
+  const out = await loadProposal({ requestId: REQ });
+  expect(out.picked).toBe('akoya_request::F/Phase I::ProjectDescription.pdf');
+  expect(downloadFileByPath).toHaveBeenCalledWith(
+    'akoya_request',
+    'F/Phase I',
+    'ProjectDescription.pdf',
+  );
+});
+
+test('default prefers the exact active canonical proposal over the Phase I fallback', async () => {
+  listFiles.mockResolvedValue([
+    file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+    file('Proposal_1002836.pdf'),
+  ]);
+  const out = await loadProposal({ requestId: REQ });
+  expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
+});
+
+test('default fails closed and returns the picker list when neither automatic path exists', async () => {
+  listFiles.mockResolvedValue([
+    file('Project Narrative.pdf', { folder: 'F/Phase I' }),
   ]);
   const err = await loadProposal({ requestId: REQ }).catch((e) => e);
   expect(err.httpStatus).toBe(404);
   expect(err.body.error).toBe(
-    'Canonical reviewer proposal not found at Reviewer Materials/Proposal_1002836.pdf. Pass fileKey to override.',
+    'Reviewer proposal not found at Reviewer Materials/Proposal_1002836.pdf or Phase I/ProjectDescription.pdf. Choose a request file to override.',
   );
   expect(err.body.allFiles).toHaveLength(1);
   expect(downloadFileByPath).not.toHaveBeenCalled();
   expect(put).not.toHaveBeenCalled();
 });
 
-test('default selects the exact active canonical proposal, not a better-named legacy file', async () => {
-  listFiles.mockResolvedValue([
-    file('Project Narrative.pdf', { folder: 'F/Phase I' }),
-    file('Proposal_1002836.pdf'),
+test('fallback excludes archive, wrong-folder, and wrong-case lookalikes', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([
+    { library: 'akoya_request', folder: 'F', source: 'dynamics' },
+    { library: 'RequestArchive1', folder: 'A', source: 'archive' },
   ]);
-  const out = await loadProposal({ requestId: REQ });
-  expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
+  listFiles.mockImplementation(async (library) => (
+    library === 'akoya_request'
+      ? [
+        file('ProjectDescription.pdf', { folder: 'F/Phase II' }),
+        file('projectdescription.pdf', { folder: 'F/Phase I' }),
+      ]
+      : [file('ProjectDescription.pdf', { folder: 'A/Phase I' })]
+  ));
+
+  const err = await loadProposal({ requestId: REQ }).catch((e) => e);
+  expect(err.httpStatus).toBe(404);
+  expect(err.body.allFiles).toHaveLength(3);
+  expect(downloadFileByPath).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
 });
 
 test('duplicate library::folder::name entries across buckets are deduped in allFiles', async () => {
@@ -179,6 +214,24 @@ test('multiple active canonical matches fail closed before download or Blob uplo
   expect(err.httpStatus).toBe(409);
   expect(err.body.error).toBe(
     'Multiple active canonical reviewer proposals were found for request 1002836.',
+  );
+  expect(downloadFileByPath).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('multiple active Phase I fallbacks fail closed before download or Blob upload', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([
+    { library: 'akoya_request', folder: 'F1', source: 'dynamics' },
+    { library: 'akoya_request', folder: 'F2', source: 'dynamics' },
+  ]);
+  listFiles.mockImplementation(async (_library, folder) => [
+    file('ProjectDescription.pdf', { folder: `${folder}/Phase I` }),
+  ]);
+
+  const err = await loadProposal({ requestId: REQ }).catch((e) => e);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body.error).toBe(
+    'Multiple active Phase I/ProjectDescription.pdf fallback proposals were found for request 1002836.',
   );
   expect(downloadFileByPath).not.toHaveBeenCalled();
   expect(put).not.toHaveBeenCalled();
