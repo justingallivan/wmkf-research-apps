@@ -77,9 +77,30 @@ test('default policy does not age-expire; injected time-sensitive policy does no
 });
 
 test('legacy compatibility requires explicit equivalent provenance and never creates automatic current evidence from ambiguity', () => {
-  const equivalent = candidate({ stageFreshness: {}, legacyStageReceipts: { identity: { equivalenceVersion: 1, stage: 'identity', contractVersion: 4, sourceVersion: versions.identity, completedAt: '2026-07-31T00:00:00.000Z' } } });
-  expect(mapLegacyStage(equivalent, 'identity', authoritative())).toMatchObject({ state: 'current', mappedFromLegacy: true });
-  const ambiguous = candidate({ stageFreshness: {}, legacyStageReceipts: { identity: { equivalenceVersion: 1, stage: 'identity', contractVersion: 4, completedAt: '2026-07-31T00:00:00.000Z' } } });
-  expect(mapLegacyStage(ambiguous, 'identity', authoritative())).toBeNull();
-  expect(planCandidateFreshness({ candidate: ambiguous, authoritative: authoritative(), now }).refreshes).toContainEqual({ stage: 'identity', reason: 'stage_missing' });
+  const identityDependencies = { candidateKey: 'suggestion:11111111-1111-1111-1111-111111111111' };
+  const equivalent = candidate({
+    stageFreshness: {},
+    legacyStageReceipts: {
+      identity: {
+        mapperVersion: 1, stage: 'identity', identity: identityDependencies,
+        dependencies: identityDependencies, completeness: 'complete',
+        source: { contractVersion: 4, sourceVersion: versions.identity },
+        checkedAt: '2026-07-31T00:00:00.000Z',
+      },
+    },
+  });
+  const withDependencies = authoritative({ legacyEvidenceDependencies: { identity: identityDependencies } });
+  expect(mapLegacyStage(equivalent, 'identity', withDependencies)).toMatchObject({ state: 'current', mappedFromLegacy: true });
+  const ambiguous = candidate({
+    stageFreshness: {},
+    legacyStageReceipts: {
+      identity: {
+        mapperVersion: 1, stage: 'identity', identity: identityDependencies,
+        dependencies: identityDependencies, completeness: 'complete',
+        checkedAt: '2026-07-31T00:00:00.000Z',
+      },
+    },
+  });
+  expect(mapLegacyStage(ambiguous, 'identity', withDependencies)).toMatchObject({ state: 'incomplete' });
+  expect(planCandidateFreshness({ candidate: ambiguous, authoritative: withDependencies, now }).refreshes).toContainEqual({ stage: 'identity', reason: 'stage_incomplete' });
 });
