@@ -32,6 +32,12 @@ related:
 > authorized.
 > Every production repair still requires an explicit reviewed allowlist and
 > separate execute authorization.
+>
+> **Feature-branch update 2026-08-02:** `codex/reviewer-find-performance-build`
+> mints projection v4 and accepts v1-v4 against their own historical
+> projections. V4 retains v3 contact authority and additionally binds
+> `eligibilityCheckStatus`. The v3 sections below remain the production record
+> of the 2026-07-29 deployment, not the current mint-version description.
 
 ## Evidence labels
 
@@ -189,7 +195,7 @@ The browser may render this decision but may not supply it as authority.
 Proposal/cited/referred provenance may influence what remains visible, but it
 does not bypass this promotion matrix.
 
-### 3. Attestation v3 binds contact authority
+### 3. Attestation v3 introduced contact authority; v4 also binds check completion
 
 **[DEPLOYED TO PRODUCTION 2026-07-29]** Projection v3 binds:
 
@@ -208,12 +214,13 @@ different address after verification; a later server rescue must mint a fresh
 v3 receipt or route through staff confirmation.
 
 Any mismatch returns `identity_attestation_required` or `claim_mismatch` before
-writes. Verification becomes explicitly per-version: v1, v2, and v3 tokens are
+writes. Verification is explicitly per-version: v1, v2, v3, and v4 tokens are
 accepted against their own projection functions. V1/v2 receipts may continue
 to prove the exact legacy identity claims they originally bound, but they are
 never contact-authoritative. This avoids invalidating in-flight v2 receipts
-during their 14-day TTL. To promote contact from a legacy receipt, the server
-must re-enrich/re-attest or use an exact staff confirmation.
+during their 14-day TTL. V3 remains contact-authoritative but does not bind
+`eligibilityCheckStatus`; v4 does. To promote contact from a legacy v1/v2
+receipt, the server must re-enrich/re-attest or use an exact staff confirmation.
 
 ### 4. Staff confirmation reuses the existing exact-value contract
 

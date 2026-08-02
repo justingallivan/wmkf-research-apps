@@ -33,6 +33,35 @@ const CANDIDATE = {
   contactEnrichment: { identity: { status: 'probable' } },
 };
 
+function eligibilityProjectionForVersion(candidate, projectionVersion) {
+  const enrichment = candidate.contactEnrichment && typeof candidate.contactEnrichment === 'object'
+    ? candidate.contactEnrichment
+    : {};
+  const evidence = candidate.eligibilityEvidence || enrichment.eligibilityEvidence;
+  const normalized = (value) => (value === undefined || value === '' ? null : value);
+  return {
+    status: normalized(candidate.eligibilityStatus || enrichment.eligibilityStatus || 'unknown'),
+    ...(projectionVersion >= 4
+      ? { checkStatus: normalized(candidate.eligibilityCheckStatus || enrichment.eligibilityCheckStatus) }
+      : {}),
+    reason: normalized(candidate.eligibilityReason || enrichment.eligibilityReason),
+    evidence: evidence && typeof evidence === 'object' && !Array.isArray(evidence)
+      ? {
+          status: normalized(evidence.status),
+          url: normalized(evidence.url),
+          title: normalized(evidence.title),
+          snippet: normalized(evidence.snippet),
+          sourceDomain: normalized(evidence.sourceDomain),
+          checkedAt: normalized(evidence.checkedAt),
+        }
+      : null,
+  };
+}
+
+function digest(value) {
+  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('base64url');
+}
+
 let priorSecret;
 
 beforeEach(() => {
@@ -322,6 +351,58 @@ test('v3 binds the exact email, source, and persist flags', async () => {
       candidate,
     })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
   }
+});
+
+test('v4 rejects a changed eligibility check status', async () => {
+  const candidate = {
+    ...CANDIDATE,
+    eligibilityStatus: 'unknown',
+    eligibilityCheckStatus: 'complete',
+    eligibilityReason: 'No ineligibility evidence found',
+  };
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate });
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: { ...candidate, eligibilityCheckStatus: 'incomplete' },
+  })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
+});
+
+test('v3 remains valid when only eligibility check status changes', async () => {
+  const candidate = {
+    ...CANDIDATE,
+    eligibilityStatus: 'unknown',
+    eligibilityCheckStatus: 'complete',
+    eligibilityReason: 'No ineligibility evidence found',
+  };
+  const identityProjection = identityAttestationProjection(candidate);
+  const legacyProjection = legacyIdentityAttestationProjection(candidate);
+  const token = await new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId: REQUEST,
+    candidateKey: identityProjection.candidateKey,
+    projectionVersion: 3,
+    baseIdentityDigest: digest(legacyProjection),
+    identityDigest: digest(identityProjection),
+    contactDigest: digest(contactAttestationProjection(candidate)),
+    eligibilityStatus: candidate.eligibilityStatus,
+    eligibilityCheckStatus: candidate.eligibilityCheckStatus,
+    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 3)),
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + TTL_SECONDS)
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+
+  await expect(verifyAutomatedIdentityAttestation(token, {
+    requestId: REQUEST,
+    candidate: { ...candidate, eligibilityCheckStatus: 'incomplete' },
+  })).resolves.toMatchObject({
+    valid: true,
+    contactAuthorityBound: true,
+    eligibilityEvidenceBound: true,
+    projectionVersion: 3,
+  });
 });
 
 test('contact changes invalidate a receipt bound to the submitted candidate key', async () => {

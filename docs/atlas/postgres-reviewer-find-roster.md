@@ -195,6 +195,9 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   monotonic against ordinary result refreshes. A validated
   `completeStageRefresh` atomically stamps `candidate.warmCacheVersion=1` with
   the completed receipt; start, failure, and lease recovery never stamp it.
+  This row-level value means the row has entered the current cache envelope,
+  not that every stage is current. Each stage still fails closed independently
+  unless its own contract version and authoritative source version match.
 - `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
   Promote, authenticated identity confirmation, and scoped removal. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
