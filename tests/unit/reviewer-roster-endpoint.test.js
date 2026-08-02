@@ -43,6 +43,22 @@ jest.mock('../../lib/services/workbench/reviewer-roster-projection-service', () 
   reconcileRosterEngagement: (...args) => mockReconcileRosterEngagement(...args),
   validateRosterPromotionEngagement: (...args) => mockValidateRosterPromotionEngagement(...args),
 }));
+const mockReadReviewerWarmValidation = jest.fn(async () => ({
+  state: 'current',
+  reasonCode: null,
+  proposalContentVersion: 'p'.repeat(64),
+  applicantInputVersion: 'a'.repeat(64),
+  inputSummary: {
+    recommendationSlotCount: 0,
+    hasExclusions: false,
+    hasPi: false,
+    hasApplicantOrganization: false,
+  },
+  candidatePlans: [],
+}));
+jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
+  readReviewerWarmValidation: (...args) => mockReadReviewerWarmValidation(...args),
+}));
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -113,6 +129,7 @@ describe('GET', () => {
     expect(r.statusCode).toBe(400);
     expect(store.listForRequest).not.toHaveBeenCalled();
     expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
+    expect(mockReadReviewerWarmValidation).not.toHaveBeenCalled();
     expect(withDalContext).not.toHaveBeenCalled();
   });
 
@@ -202,6 +219,86 @@ describe('GET', () => {
     });
     expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({ requestId: REQ, roster });
     expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-warm-validation', expect.any(Function));
+    expect(mockReadReviewerWarmValidation).toHaveBeenCalledWith({ requestId: REQ, roster });
+    expect(reconciled.body.warmValidation).toMatchObject({
+      state: 'current',
+      candidatePlans: [],
+    });
+  });
+
+  it('never forwards a client navigation fileKey into metadata warm validation', async () => {
+    const roster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValue(roster);
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+      fileKey: 'akoya_request::Historical::Narrative.pdf',
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(200);
+    expect(mockReadReviewerWarmValidation).toHaveBeenCalledWith({ requestId: REQ, roster });
+    expect(mockReadReviewerWarmValidation.mock.calls[0][0]).not.toHaveProperty('fileKey');
+  });
+
+  it('keeps the roster displayable but stale when proposal/input warm validation is incomplete', async () => {
+    const roster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValue(roster);
+    mockReadReviewerWarmValidation.mockResolvedValueOnce({
+      state: 'stale',
+      reasonCode: 'proposal_binding_changed',
+      proposalContentVersion: null,
+      applicantInputVersion: 'a'.repeat(64),
+      inputSummary: { recommendationSlotCount: 1, hasExclusions: true, hasPi: true, hasApplicantOrganization: true },
+      candidatePlans: [],
+    });
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(200);
+    expect(reconciled.body).toMatchObject({
+      success: true,
+      authorityState: 'stale',
+      warmValidation: { state: 'stale', reasonCode: 'proposal_binding_changed' },
+    });
+  });
+
+  it('fails closed when warm validation has an authoritative read error', async () => {
+    const roster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    store.listForRequest.mockResolvedValue(roster);
+    mockReadReviewerWarmValidation.mockResolvedValueOnce({
+      state: 'error',
+      reasonCode: 'authority_stale',
+      proposalContentVersion: null,
+      applicantInputVersion: null,
+      inputSummary: null,
+      candidatePlans: [],
+    });
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(503);
+    expect(reconciled.body).toMatchObject({
+      success: false,
+      authorityState: 'error',
+      warmValidation: { state: 'error', reasonCode: 'authority_stale' },
+    });
   });
 
   it('returns a fresh cached snapshot on roster-version conflict without Dataverse work', async () => {
@@ -262,6 +359,43 @@ describe('GET', () => {
     expect(reconciled.body.handled).toBeUndefined();
     expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({ requestId: REQ, roster: cachedRoster });
     expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+    expect(store.listForRequest).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails closed when the roster changes while metadata-only warm validation is in flight', async () => {
+    const cachedRoster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    const changedRoster = { active: [{ name: 'Beth' }], excluded: [], allNames: ['Beth'] };
+    // Cached request, reconciled preflight, then the final recheck after the
+    // metadata/applicant reads. The validator is deliberately the mutation
+    // window in this fixture.
+    store.listForRequest
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(changedRoster);
+    mockReadReviewerWarmValidation.mockImplementationOnce(async () => ({
+      state: 'current',
+      reasonCode: null,
+      proposalContentVersion: 'p'.repeat(64),
+      applicantInputVersion: 'a'.repeat(64),
+      inputSummary: { recommendationSlotCount: 0, hasExclusions: false, hasPi: false, hasApplicantOrganization: false },
+      candidatePlans: [],
+    }));
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(409);
+    expect(reconciled.body).toMatchObject({
+      code: 'roster_snapshot_changed',
+      authorityState: 'cached',
+      active: changedRoster.active,
+    });
+    expect(mockReadReviewerWarmValidation).toHaveBeenCalledWith({ requestId: REQ, roster: cachedRoster });
     expect(store.listForRequest).toHaveBeenCalledTimes(3);
   });
 

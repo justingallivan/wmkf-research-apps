@@ -34,6 +34,7 @@ import {
   reconcileRosterEngagement,
   validateRosterPromotionEngagement,
 } from '../../../lib/services/workbench/reviewer-roster-projection-service';
+import { readReviewerWarmValidation } from '../../../lib/services/workbench/reviewer-warm-validation-service';
 import {
   createServerIdentityDecisionReceipt,
   hasServerIdentityDecisionReceipt,
@@ -295,13 +296,29 @@ async function handleGet(req, res) {
       reconciliationError = error;
     }
 
-    // Dataverse reconciliation is read-only but can outlive a roster mutation.
-    // Recheck the same Postgres projection before returning any authority result;
-    // a concurrent change wins over both a successful and failed reconciliation.
+    // Warm validation is a separate, metadata-only authoritative read. It is
+    // deliberately still attempted after an engagement failure so the cached
+    // panel can distinguish a proposal/input problem from an engagement outage;
+    // neither partial success is enough to make the panel current.
+    const validationStartedAt = Date.now();
+    let warmValidation;
+    let validationError = null;
+    try {
+      warmValidation = await withDalContext('workbench-reviewer-roster-warm-validation', () => (
+        readReviewerWarmValidation({ requestId, roster })
+      ));
+    } catch (error) {
+      validationError = error;
+    }
+
+    // Every bounded authoritative read above is read-only but can outlive a
+    // roster mutation. Recheck only after all of them complete; a concurrent
+    // change wins over success and failure alike.
     const snapshotVerificationStartedAt = Date.now();
     const latestRoster = await listForRequest(requestId);
     const latestRosterVersion = createRosterVersion(requestId, latestRoster);
     const reconciliationMs = elapsedMs(reconciliationStartedAt);
+    const validationMs = elapsedMs(validationStartedAt);
     const snapshotVerificationMs = elapsedMs(snapshotVerificationStartedAt);
     if (latestRosterVersion !== rosterVersion) {
       const telemetry = warmTelemetry({
@@ -310,6 +327,7 @@ async function handleGet(req, res) {
         reasonCode: 'roster_snapshot_changed',
         rosterReadMs,
         reconciliationMs,
+        validationMs,
         snapshotVerificationMs,
         startedAt,
       });
@@ -332,6 +350,7 @@ async function handleGet(req, res) {
         reasonCode: 'authority_reconciliation_failed',
         rosterReadMs,
         reconciliationMs,
+        validationMs,
         snapshotVerificationMs,
         startedAt,
       });
@@ -344,6 +363,32 @@ async function handleGet(req, res) {
         authorityState: 'error',
         rosterVersion,
         ...latestRoster,
+        warmValidation: warmValidation || null,
+        warmTelemetry: telemetry,
+      });
+    }
+
+    if (validationError) {
+      const telemetry = warmTelemetry({
+        mode: 'reconciled',
+        authorityState: 'error',
+        reasonCode: 'authority_reconciliation_failed',
+        rosterReadMs,
+        reconciliationMs,
+        validationMs,
+        snapshotVerificationMs,
+        startedAt,
+      });
+      emitWarmTelemetry(telemetry);
+      console.error('reviewer-roster warm validation error:', validationError.message);
+      return res.status(503).json({
+        success: false,
+        code: 'authority_reconciliation_failed',
+        error: 'Reviewer authority could not be reconciled; retry before taking action.',
+        authorityState: 'error',
+        rosterVersion,
+        ...latestRoster,
+        warmValidation: null,
         warmTelemetry: telemetry,
       });
     }
@@ -353,11 +398,21 @@ async function handleGet(req, res) {
     // and error for a future bounded reconciliation result. An unrecognized
     // service value fails closed to stale rather than becoming a new client
     // authority state by accident.
-    const authorityState = reconciledAuthorityState === undefined || reconciledAuthorityState === 'current'
+    const engagementAuthorityState = reconciledAuthorityState === undefined || reconciledAuthorityState === 'current'
       ? 'current'
       : reconciledAuthorityState === 'error'
       ? 'error'
       : 'stale';
+    const validationAuthorityState = warmValidation?.state === 'current'
+      ? 'current'
+      : warmValidation?.state === 'error'
+        ? 'error'
+        : 'stale';
+    const authorityState = engagementAuthorityState === 'error' || validationAuthorityState === 'error'
+      ? 'error'
+      : engagementAuthorityState === 'current' && validationAuthorityState === 'current'
+        ? 'current'
+        : 'stale';
     const { authorityState: _serviceAuthorityState, ...reconciledRoster } = reconciled || {};
     const telemetry = warmTelemetry({
       mode: 'reconciled',
@@ -369,17 +424,21 @@ async function handleGet(req, res) {
         : 'authority_stale',
       rosterReadMs,
       reconciliationMs,
+      validationMs,
       snapshotVerificationMs,
       startedAt,
     });
     emitWarmTelemetry(telemetry);
-    // `current` is deliberately limited to this request's engagement
-    // reconciliation. It does not represent candidate evidence freshness.
+    // `current` means this panel generation completed engagement, proposal
+    // metadata, and applicant-input reads. It is never candidate-stage or
+    // promotion authority; `warmValidation.candidatePlans` remains the
+    // server-derived receipt freshness projection.
     return res.status(authorityState === 'error' ? 503 : 200).json({
       success: authorityState !== 'error',
       authorityState,
       rosterVersion,
       ...reconciledRoster,
+      warmValidation,
       warmTelemetry: telemetry,
     });
   }
@@ -438,6 +497,7 @@ function warmTelemetry({
   reasonCode,
   rosterReadMs,
   reconciliationMs = null,
+  validationMs = null,
   snapshotVerificationMs = null,
   startedAt,
 }) {
@@ -447,6 +507,7 @@ function warmTelemetry({
     reasonCode,
     rosterReadMs,
     reconciliationMs,
+    validationMs,
     snapshotVerificationMs,
     totalMs: elapsedMs(startedAt),
   };

@@ -135,12 +135,24 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   trusted-context Dataverse reconciliation. Rows with authoritative engagement are removed from their
   working-state bucket and returned as compact `handled` entries; a missing
   Dataverse anchor fails closed rather than becoming actionable. Reconciled
-  `authorityState:'current'` is limited to engagement reconciliation and does
-  not certify candidate-stage evidence. Promotion from `excluded` revalidates
-  the stored suggestion anchor against Dataverse before changing the Postgres
-  row. Unanchored search results retain their Postgres working-state behavior.
-  **[VERIFIED via source + `workbench-reviewer-roster-projection-service.test.js`
-  and `reviewer-roster-endpoint.test.js`, 2026-08-01; feature branch only, not
+  `authorityState:'current'` requires both that engagement overlay and the
+  read-only `reviewer-warm-validation-service` proposal/input generation to
+  succeed; it does not certify candidate-stage evidence or promotion. Warm
+  validation reads no proposal bytes: it uses only server-owned request
+  context, Graph item metadata for exact canonical
+  `Reviewer Materials/Proposal_{requestNumber}.pdf`, then the exact current
+  cycle `Phase I/ProjectDescription.pdf` fallback, and derives opaque content
+  and applicant-input versions plus bounded non-PII stage plans. Missing or
+  duplicate bindings stay stale/read-only. A historical manual file override
+  is never guessed from query/navigation state; when its authoritative binding
+  cannot be recovered, the roster stays stale. The final Postgres snapshot
+  comparison happens after both engagement and metadata/input reads, so a
+  concurrent roster change still returns `409` with a fresh cached projection.
+  Promotion from `excluded` revalidates the stored suggestion anchor against
+  Dataverse before changing the Postgres row. Unanchored search results retain
+  their Postgres working-state behavior. **[VERIFIED via source +
+  `reviewer-warm-validation-service.test.js` and
+  `reviewer-roster-endpoint.test.js`, 2026-08-01; feature branch only, not
   deployed]**
 
 ## Write paths

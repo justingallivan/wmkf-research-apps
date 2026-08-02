@@ -119,6 +119,16 @@ If you're touching a service or utility, read its header before this catalog. If
   through Dataverse, removes already-engaged rows from working-state buckets,
   emits compact `handled` stage entries, and validates excluded→active
   promotion; missing suggestion anchors fail closed.
+- **`workbench/reviewer-warm-validation-service.js`** — Read-only warm-revisit
+  validator for the roster's reconciled mode. It reads only server-owned
+  request inputs and exact Graph metadata for
+  `Reviewer Materials/Proposal_{requestNumber}.pdf`, falling back only to
+  `Phase I/ProjectDescription.pdf`; it returns opaque content/input versions,
+  bounded non-PII input counts, and server-derived stage plans. It never
+  accepts a browser file key, downloads/uploads proposal content, materializes
+  suggestions, parses exclusions, or calls evidence/model providers. A
+  historical manual file binding is stale when it cannot be recovered from
+  authoritative request persistence.
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
   request/candidate receipt. Projection v3 binds the exact canonical contact
   projection in addition to identity/eligibility; v1/v2 remain verifiable
