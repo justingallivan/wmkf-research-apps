@@ -284,64 +284,104 @@ async function handleGet(req, res) {
       });
     }
 
+    const reconciliationStartedAt = Date.now();
+    let reconciled;
+    let reconciliationError = null;
     try {
-      const reconciliationStartedAt = Date.now();
-      const reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
+      reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
         reconcileRosterEngagement({ requestId, roster })
       ));
-      const reconciledAuthorityState = reconciled?.authorityState;
-      // The current projection service emits no authority state; reserve stale
-      // and error for a future bounded reconciliation result. An unrecognized
-      // service value fails closed to stale rather than becoming a new client
-      // authority state by accident.
-      const authorityState = reconciledAuthorityState === undefined || reconciledAuthorityState === 'current'
-        ? 'current'
-        : reconciledAuthorityState === 'error'
-        ? 'error'
-        : 'stale';
-      const { authorityState: _serviceAuthorityState, ...reconciledRoster } = reconciled || {};
+    } catch (error) {
+      reconciliationError = error;
+    }
+
+    // Dataverse reconciliation is read-only but can outlive a roster mutation.
+    // Recheck the same Postgres projection before returning any authority result;
+    // a concurrent change wins over both a successful and failed reconciliation.
+    const snapshotVerificationStartedAt = Date.now();
+    const latestRoster = await listForRequest(requestId);
+    const latestRosterVersion = createRosterVersion(requestId, latestRoster);
+    const reconciliationMs = elapsedMs(reconciliationStartedAt);
+    const snapshotVerificationMs = elapsedMs(snapshotVerificationStartedAt);
+    if (latestRosterVersion !== rosterVersion) {
       const telemetry = warmTelemetry({
         mode: 'reconciled',
-        authorityState,
-        reasonCode: authorityState === 'current'
-          ? 'authority_current'
-          : authorityState === 'error'
-          ? 'authority_reconciliation_failed'
-          : 'authority_stale',
+        authorityState: 'cached',
+        reasonCode: 'roster_snapshot_changed',
         rosterReadMs,
-        reconciliationMs: elapsedMs(reconciliationStartedAt),
+        reconciliationMs,
+        snapshotVerificationMs,
         startedAt,
       });
       emitWarmTelemetry(telemetry);
-      // `current` is deliberately limited to this request's engagement
-      // reconciliation. It does not represent candidate evidence freshness.
-      return res.status(authorityState === 'error' ? 503 : 200).json({
-        success: authorityState !== 'error',
-        authorityState,
-        rosterVersion,
-        ...reconciledRoster,
+      return res.status(409).json({
+        success: false,
+        code: 'roster_snapshot_changed',
+        error: 'Reviewer roster changed; reload the cached snapshot before reconciling.',
+        authorityState: 'cached',
+        rosterVersion: latestRosterVersion,
+        ...latestRoster,
         warmTelemetry: telemetry,
       });
-    } catch (error) {
+    }
+
+    if (reconciliationError) {
       const telemetry = warmTelemetry({
         mode: 'reconciled',
         authorityState: 'error',
         reasonCode: 'authority_reconciliation_failed',
         rosterReadMs,
+        reconciliationMs,
+        snapshotVerificationMs,
         startedAt,
       });
       emitWarmTelemetry(telemetry);
-      console.error('reviewer-roster reconciliation error:', error.message);
+      console.error('reviewer-roster reconciliation error:', reconciliationError.message);
       return res.status(503).json({
         success: false,
         code: 'authority_reconciliation_failed',
         error: 'Reviewer authority could not be reconciled; retry before taking action.',
         authorityState: 'error',
         rosterVersion,
-        ...roster,
+        ...latestRoster,
         warmTelemetry: telemetry,
       });
     }
+
+    const reconciledAuthorityState = reconciled?.authorityState;
+    // The current projection service emits no authority state; reserve stale
+    // and error for a future bounded reconciliation result. An unrecognized
+    // service value fails closed to stale rather than becoming a new client
+    // authority state by accident.
+    const authorityState = reconciledAuthorityState === undefined || reconciledAuthorityState === 'current'
+      ? 'current'
+      : reconciledAuthorityState === 'error'
+      ? 'error'
+      : 'stale';
+    const { authorityState: _serviceAuthorityState, ...reconciledRoster } = reconciled || {};
+    const telemetry = warmTelemetry({
+      mode: 'reconciled',
+      authorityState,
+      reasonCode: authorityState === 'current'
+        ? 'authority_current'
+        : authorityState === 'error'
+        ? 'authority_reconciliation_failed'
+        : 'authority_stale',
+      rosterReadMs,
+      reconciliationMs,
+      snapshotVerificationMs,
+      startedAt,
+    });
+    emitWarmTelemetry(telemetry);
+    // `current` is deliberately limited to this request's engagement
+    // reconciliation. It does not represent candidate evidence freshness.
+    return res.status(authorityState === 'error' ? 503 : 200).json({
+      success: authorityState !== 'error',
+      authorityState,
+      rosterVersion,
+      ...reconciledRoster,
+      warmTelemetry: telemetry,
+    });
   }
 
   // Temporary compatibility response for current callers which do not send a
@@ -392,13 +432,22 @@ function elapsedMs(startedAt) {
   return Math.min(600000, Math.max(0, Date.now() - startedAt));
 }
 
-function warmTelemetry({ mode, authorityState, reasonCode, rosterReadMs, reconciliationMs = null, startedAt }) {
+function warmTelemetry({
+  mode,
+  authorityState,
+  reasonCode,
+  rosterReadMs,
+  reconciliationMs = null,
+  snapshotVerificationMs = null,
+  startedAt,
+}) {
   return {
     mode,
     authorityState,
     reasonCode,
     rosterReadMs,
     reconciliationMs,
+    snapshotVerificationMs,
     totalMs: elapsedMs(startedAt),
   };
 }

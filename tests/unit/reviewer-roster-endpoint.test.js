@@ -229,6 +229,70 @@ describe('GET', () => {
     expect(withDalContext).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the roster changes during trusted reconciliation', async () => {
+    const cachedRoster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    const changedRoster = { active: [{ name: 'Beth' }], excluded: [], allNames: ['Beth'] };
+    // Cached request, reconciled preflight, then the post-Dataverse re-read.
+    store.listForRequest
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(changedRoster);
+    mockReconcileRosterEngagement.mockResolvedValueOnce({
+      ...cachedRoster,
+      handled: [{ candidateKey: 'suggestion:handled', stage: 'invited' }],
+    });
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(409);
+    expect(reconciled.body).toMatchObject({
+      success: false,
+      code: 'roster_snapshot_changed',
+      authorityState: 'cached',
+      active: changedRoster.active,
+      rosterVersion: expect.not.stringMatching(new RegExp(`^${cached.body.rosterVersion}$`)),
+      warmTelemetry: expect.objectContaining({ snapshotVerificationMs: expect.any(Number) }),
+    });
+    expect(reconciled.body.handled).toBeUndefined();
+    expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({ requestId: REQ, roster: cachedRoster });
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+    expect(store.listForRequest).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns snapshot conflict over a Dataverse error when the roster changed concurrently', async () => {
+    const cachedRoster = { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] };
+    const changedRoster = { active: [{ name: 'Beth' }], excluded: [], allNames: ['Beth'] };
+    store.listForRequest
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(cachedRoster)
+      .mockResolvedValueOnce(changedRoster);
+    mockReconcileRosterEngagement.mockRejectedValueOnce(new Error('Dataverse unavailable'));
+    const cached = res();
+    await handler({ method: 'GET', query: { requestId: REQ, mode: 'cached' } }, cached);
+    const reconciled = res();
+    await handler({ method: 'GET', query: {
+      requestId: REQ,
+      mode: 'reconciled',
+      rosterVersion: cached.body.rosterVersion,
+    } }, reconciled);
+
+    expect(reconciled.statusCode).toBe(409);
+    expect(reconciled.body).toMatchObject({
+      code: 'roster_snapshot_changed',
+      authorityState: 'cached',
+      active: changedRoster.active,
+    });
+    expect(reconciled.body.code).not.toBe('authority_reconciliation_failed');
+    expect(withDalContext).toHaveBeenCalledWith('workbench-reviewer-roster-get', expect.any(Function));
+    expect(store.listForRequest).toHaveBeenCalledTimes(3);
+  });
+
   it('requires one well-formed roster version for reconciled mode', async () => {
     for (const rosterVersion of [undefined, 'not-a-token', ['a'.repeat(64), 'a'.repeat(64)]]) {
       const r = res();

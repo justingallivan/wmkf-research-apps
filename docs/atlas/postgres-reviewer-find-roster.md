@@ -129,8 +129,8 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   GET instead returns the Postgres projection only with an opaque deterministic
   snapshot token; it does not enter Dataverse. `mode=reconciled` requires that
   exact token and returns `409 roster_snapshot_changed` plus a fresh cached
-  projection if the Postgres snapshot changed before trusted-context Dataverse
-  reconciliation. Rows with authoritative engagement are removed from their
+  projection if the Postgres snapshot changes either before or after
+  trusted-context Dataverse reconciliation. Rows with authoritative engagement are removed from their
   working-state bucket and returned as compact `handled` entries; a missing
   Dataverse anchor fails closed rather than becoming actionable. Reconciled
   `authorityState:'current'` is limited to engagement reconciliation and does
