@@ -137,13 +137,22 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   Dataverse anchor fails closed rather than becoming actionable. Reconciled
   `authorityState:'current'` requires both that engagement overlay and the
   read-only `reviewer-warm-validation-service` proposal/input generation to
-  succeed; it does not certify candidate-stage evidence or promotion. Warm
+  succeed; it is a bounded panel-read state, not candidate-stage evidence or
+  promotion authority. Candidate plans intentionally invalidate any stage for
+  which this request/metadata read did not obtain that stage's own
+  person/institution/proposal-author dependency; no global placeholder version
+  can make those stages current. An applicant anchor is candidate-specific only
+  for an exact stored potential-reviewer id matching a current recommendation
+  slot; general-search candidates receive a server-issued `not_applicable`
+  anchor so another applicant-slot edit cannot invalidate them. Warm
   validation reads no proposal bytes: it uses only server-owned request
   context, Graph item metadata for exact canonical
   `Reviewer Materials/Proposal_{requestNumber}.pdf`, then the exact current
   cycle `Phase I/ProjectDescription.pdf` fallback, and derives opaque content
-  and applicant-input versions plus bounded non-PII stage plans. Missing or
-  duplicate bindings stay stale/read-only. A historical manual file override
+  and applicant-input versions plus bounded non-PII invalidation plans. A
+  binding is current only with bounded Graph drive/item identifiers and at
+  least one stable eTag/version/last-modified token. Missing, duplicate, or
+  incomplete bindings stay stale/read-only. A historical manual file override
   is never guessed from query/navigation state; when its authoritative binding
   cannot be recovered, the roster stays stale. The final Postgres snapshot
   comparison happens after both engagement and metadata/input reads, so a

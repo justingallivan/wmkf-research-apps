@@ -123,8 +123,15 @@ If you're touching a service or utility, read its header before this catalog. If
   validator for the roster's reconciled mode. It reads only server-owned
   request inputs and exact Graph metadata for
   `Reviewer Materials/Proposal_{requestNumber}.pdf`, falling back only to
-  `Phase I/ProjectDescription.pdf`; it returns opaque content/input versions,
-  bounded non-PII input counts, and server-derived stage plans. It never
+  `Phase I/ProjectDescription.pdf`; a binding is current only when Graph
+  returns bounded drive/item identifiers plus a stable change token. It returns
+  opaque content/input versions, bounded non-PII input counts, and
+  server-derived invalidation plans. Its `current` state certifies only those
+  bounded panel reads: it does not fabricate or certify candidate identity,
+  COI, eligibility, contact, address, persistence, or promotion receipts.
+  Applicant-anchor freshness is candidate-specific when an exact stored person
+  id matches a current request slot; ordinary search candidates are explicitly
+  not applicable to that stage. It never
   accepts a browser file key, downloads/uploads proposal content, materializes
   suggestions, parses exclusions, or calls evidence/model providers. A
   historical manual file binding is stale when it cannot be recovered from

@@ -4,7 +4,7 @@ import {
   projectApplicantWarmInputs,
   readReviewerWarmValidation,
   resolveReviewerProposalMetadata,
-  warmAuthorityVersions,
+  opaqueVersion,
 } from '../../lib/services/workbench/reviewer-warm-validation-service';
 import { CONTRACT_VERSIONS, STAGES } from '../../lib/services/reviewer-stage-freshness';
 import { GraphService } from '../../lib/services/graph-service';
@@ -93,6 +93,30 @@ test('uses only the exact Phase I ProjectDescription fallback when canonical met
   );
 });
 
+test('keeps GraphService as the receiver when production metadata dependency is used', async () => {
+  const graphMetadata = jest.spyOn(GraphService, 'getFileMetadataByPath')
+    .mockImplementation(function getMetadataWithStaticReceiver(library, folder, filename) {
+      expect(this).toBe(GraphService);
+      expect([library, folder, filename]).toEqual([
+        'akoya_request',
+        'Request/1002788/Reviewer Materials',
+        'Proposal_1002788.pdf',
+      ]);
+      return Promise.resolve(metadata());
+    });
+
+  try {
+    const result = await resolveReviewerProposalMetadata({
+      requestId: REQUEST_ID,
+      requestNumber: '1002788',
+      deps: { getRequestSharePointBuckets: jest.fn(async () => buckets()) },
+    });
+    expect(result).toMatchObject({ state: 'current', binding: 'canonical' });
+  } finally {
+    graphMetadata.mockRestore();
+  }
+});
+
 test('fails closed for duplicate or missing canonical/fallback bindings', async () => {
   const duplicateBuckets = buckets(
     { library: 'akoya_request', folder: 'Request/A', source: 'dynamics' },
@@ -114,6 +138,23 @@ test('fails closed for duplicate or missing canonical/fallback bindings', async 
     deps: metadataDeps(),
   });
   expect(missing).toEqual({ state: 'stale', reasonCode: 'proposal_binding_changed', proposalContentVersion: null });
+});
+
+test('fails closed when Graph metadata lacks a bounded identity or stable change token', async () => {
+  const canonicalPath = 'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf';
+  for (const incomplete of [
+    metadata({ driveId: null }),
+    metadata({ id: '' }),
+    metadata({ eTag: null, versionId: null, lastModified: null }),
+    metadata({ eTag: 'x'.repeat(1025), versionId: null, lastModified: null }),
+  ]) {
+    const result = await resolveReviewerProposalMetadata({
+      requestId: REQUEST_ID,
+      requestNumber: '1002788',
+      deps: metadataDeps({ entries: new Map([[canonicalPath, incomplete]]) }),
+    });
+    expect(result).toEqual({ state: 'stale', reasonCode: 'proposal_binding_changed', proposalContentVersion: null });
+  }
 });
 
 test('makes a Graph metadata fault fail closed without using a download or Blob path', async () => {
@@ -143,7 +184,6 @@ test('applicant input fingerprints are deterministic and their response projecti
   expect(first).toMatchObject({
     state: 'current',
     applicantInputVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
-    institutionCoiVersion: expect.stringMatching(/^[a-f0-9]{64}$/),
     summary: { recommendationSlotCount: 1, hasExclusions: true, hasPi: true, hasApplicantOrganization: true },
   });
   const responseText = JSON.stringify(first);
@@ -152,9 +192,8 @@ test('applicant input fingerprints are deterministic and their response projecti
   expect(responseText).not.toContain('Example University');
 });
 
-test('returns a bounded non-PII planner projection and recognizes a complete metadata/input generation', async () => {
+test('keeps panel state current without fabricating a full candidate-stage cache hit', async () => {
   const req = request();
-  const applicantInput = projectApplicantWarmInputs(req);
   const proposal = await resolveReviewerProposalMetadata({
     requestId: REQUEST_ID,
     requestNumber: req.akoya_requestnum,
@@ -162,18 +201,17 @@ test('returns a bounded non-PII planner projection and recognizes a complete met
       'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
     ]]) }),
   });
-  const versions = warmAuthorityVersions({ applicantInput, proposal });
   const candidate = {
     candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
     name: 'Secret Candidate',
     email: 'secret@example.edu',
     warmCacheVersion: 1,
-    applicantInputVersion: applicantInput.applicantInputVersion,
+    applicantInputVersion: 'legacy-request-wide-input-version',
     proposalContentVersion: proposal.proposalContentVersion,
     stageFreshness: Object.fromEntries(STAGES.map((stage) => [stage, {
       state: 'current',
       contractVersion: CONTRACT_VERSIONS[stage],
-      sourceVersion: versions[stage],
+      sourceVersion: `legacy-${stage}`,
       completedAt: '2026-08-01T00:00:00.000Z',
     }])),
   };
@@ -191,15 +229,120 @@ test('returns a bounded non-PII planner projection and recognizes a complete met
     state: 'current',
     candidatePlans: [{
       candidateKey: candidate.candidateKey,
-      cacheOutcome: 'hit',
-      refreshes: [],
-      promotionAuthority: 'requires_promotion_checks',
+      promotionAuthority: 'blocked_refresh_required',
     }],
   });
+  expect(result.candidatePlans[0].cacheOutcome).not.toBe('hit');
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'identity', reason: 'stage_contract_changed' }),
+  ]));
+  expect(result.candidatePlans[0].currentStages).toEqual(['applicant_anchor']);
   const responseText = JSON.stringify(result);
   expect(responseText).not.toContain('Secret Candidate');
   expect(responseText).not.toContain('secret@example.edu');
   expect(responseText).not.toContain('Jane Example');
+});
+
+test('marks an applicant-lane candidate missing when its exact potential reviewer id is not a current slot', async () => {
+  const candidate = {
+    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    isApplicantRecommended: true,
+    potentialReviewerId: '66666666-6666-6666-6666-666666666666',
+    warmCacheVersion: 1,
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result).toMatchObject({ state: 'current' });
+  expect(result.candidatePlans[0]).toMatchObject({
+    candidateKey: candidate.candidateKey,
+    cacheOutcome: 'miss',
+  });
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor', reason: 'candidate_missing' }),
+  ]));
+});
+
+test('treats a general-search candidate applicant anchor as not applicable, not as a request-wide applicant slot', async () => {
+  const candidate = {
+    candidateKey: 'orcid:0000-0002-1825-0097',
+    warmCacheVersion: 1,
+    // This deliberately disagrees with the request's slots. General-search
+    // candidates must not inherit applicant-anchor invalidation from it.
+    applicantInputVersion: 'old-request-wide-input-version',
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion: 'old-request-wide-input-version',
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result).toMatchObject({ state: 'current' });
+  expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
+  expect(result.candidatePlans[0].refreshes).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor' }),
+  ]));
+  expect(result.candidatePlans[0].cacheOutcome).toBe('partial_hit');
+});
+
+test('uses an exact applicant slot fingerprint without granting unrelated stage authority', async () => {
+  const slotVersion = opaqueVersion('reviewer-warm-applicant-slot:v1', {
+    requestId: REQUEST_ID,
+    personId: '22222222-2222-2222-2222-222222222222',
+    slots: [1],
+  });
+  const candidate = {
+    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    isApplicantRecommended: true,
+    potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+    warmCacheVersion: 1,
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion: slotVersion,
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result).toMatchObject({ state: 'current' });
+  expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
+  expect(result.candidatePlans[0].cacheOutcome).toBe('partial_hit');
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'identity', reason: 'stage_missing' }),
+  ]));
 });
 
 test('does not guess a historical manual file binding from a roster cache key', async () => {
