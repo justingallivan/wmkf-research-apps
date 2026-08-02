@@ -1389,3 +1389,19 @@ describe('mergeReferredProvenance — unit safety', () => {
     expect(mergeReferredProvenance(keep, incoming)).toBe(keep);
   });
 });
+
+test('pruneCandidateForRoster keeps bounded warm freshness metadata and strips unknown stage fields', () => {
+  const pruned = pruneCandidateForRoster({
+    name: 'Fresh Person', candidateKey: 'suggestion:fresh', warmCacheVersion: 1,
+    proposalContentVersion: 'p'.repeat(300), applicantInputVersion: 'a'.repeat(300),
+    stageFreshness: {
+      identity: { state: 'current', contractVersion: 4, sourceVersion: 's'.repeat(300), completedAt: '2026-08-01', rawProviderBody: { pii: true } },
+      unknown_stage: { state: 'current', contractVersion: 1 },
+    },
+  });
+  expect(pruned.warmCacheVersion).toBe(1);
+  expect(pruned.proposalContentVersion).toHaveLength(160);
+  expect(pruned.applicantInputVersion).toHaveLength(160);
+  expect(pruned.stageFreshness).toEqual({ identity: expect.objectContaining({ state: 'current', sourceVersion: 's'.repeat(160) }) });
+  expect(pruned.stageFreshness.identity.rawProviderBody).toBeUndefined();
+});

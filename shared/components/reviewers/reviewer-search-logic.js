@@ -754,6 +754,24 @@ function pruneStaffIdentityConfirmation(confirmation) {
   };
 }
 
+function pruneStageFreshness(freshness) {
+  const stages = new Set(['applicant_anchor', 'identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust', 'roster_persistence']);
+  const states = new Set(['current', 'stale', 'refreshing', 'incomplete', 'failed', 'not_applicable']);
+  if (!freshness || typeof freshness !== 'object' || Array.isArray(freshness)) return {};
+  return Object.fromEntries(Object.entries(freshness)
+    .filter(([stage, value]) => stages.has(stage) && value && typeof value === 'object' && !Array.isArray(value))
+    .map(([stage, value]) => [stage, {
+      state: states.has(value.state) ? value.state : 'incomplete',
+      contractVersion: Number.isInteger(value.contractVersion) ? value.contractVersion : null,
+      sourceVersion: boundedText(value.sourceVersion, 160),
+      completedAt: boundedText(value.completedAt, 80),
+      refreshAttemptId: boundedText(value.refreshAttemptId, 100),
+      refreshStartedAt: boundedText(value.refreshStartedAt, 80),
+      reason: boundedText(value.reason, 80),
+      errorCode: boundedText(value.errorCode, 80),
+    }]));
+}
+
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card
@@ -875,6 +893,11 @@ export function pruneCandidateForRoster(c) {
     applicantEnrichmentCacheVersion: Number.isInteger(c.applicantEnrichmentCacheVersion)
       ? c.applicantEnrichmentCacheVersion
       : null,
+    warmCacheVersion: Number.isInteger(c.warmCacheVersion) && c.warmCacheVersion >= 0 && c.warmCacheVersion <= 100
+      ? c.warmCacheVersion : null,
+    proposalContentVersion: boundedText(c.proposalContentVersion, 160),
+    applicantInputVersion: boundedText(c.applicantInputVersion, 160),
+    stageFreshness: pruneStageFreshness(c.stageFreshness),
     suggestionId: c.suggestionId || null,
     // COI + mismatch detail.
     hasInstitutionCOI: !!c.hasInstitutionCOI,

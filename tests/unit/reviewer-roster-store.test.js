@@ -49,6 +49,30 @@ describe('listForRequest', () => {
   });
 });
 
+describe('stage refresh CAS', () => {
+  test('starts and completes only one candidate/stage with snapshot and attempt guards', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
+    const started = await store.startStageRefresh(REQ, 'candidate:ann', 'version-1', 'contact', { attemptId: 'attempt-1' });
+    expect(started.outcome).toBe('recorded');
+    expect(queryTextOf(0)).toMatch(/updated_at::text/);
+    expect(queryTextOf(0)).toMatch(/refreshAttemptId/);
+    expect(allInterpolations()).toEqual(expect.arrayContaining(['candidate:ann', 'version-1']));
+    expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('attempt-1'))).toBe(true);
+
+    sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'version-2', 'contact', 'wrong-attempt', {})).resolves.toMatchObject({ outcome: 'skipped_stale' });
+  });
+
+  test('failure and lease recovery preserve the existing stage evidence via JSONB merge', async () => {
+    sql.mockResolvedValue({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'next' }], rowCount: 1 });
+    await expect(store.failStageRefresh(REQ, 'candidate:ann', 'v1', 'coauthor_coi', 'attempt-1')).resolves.toMatchObject({ outcome: 'failed_retryable' });
+    await expect(store.recoverExpiredStageRefresh(REQ, 'candidate:ann', 'v2', 'coauthor_coi', 'attempt-2')).resolves.toMatchObject({ outcome: 'failed_retryable' });
+    expect(queryTextOf(0)).toMatch(/COALESCE\(candidate->'stageFreshness'->/);
+    expect(queryTextOf(1)).toMatch(/refreshStartedAt.*interval '1 millisecond'/);
+    expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('prior_refresh_incomplete'))).toBe(true);
+  });
+});
+
 describe('findCandidateBySuggestion', () => {
   test('returns the server-owned roster status with the candidate blob', async () => {
     sql.mockResolvedValueOnce({ rows: [{
