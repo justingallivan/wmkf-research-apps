@@ -2547,6 +2547,7 @@ export default function ReviewerSearchSection({
     if (displayOnly || exportingRef.current) return;
     const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
+    const myGen = genRef.current;
     exportingRef.current = true;
     setExporting(true);
     setExportError(null);
@@ -2582,11 +2583,16 @@ export default function ReviewerSearchSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, candidates: rows }),
       });
+      // Do not report or download an export after its request/candidate view was
+      // replaced. The next request may have a different selected set entirely.
+      if (genRef.current !== myGen) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (genRef.current !== myGen) return;
         throw new Error(data.error || `Export failed (${res.status})`);
       }
       const blob = await res.blob();
+      if (genRef.current !== myGen) return;
       const disposition = res.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : 'reviewer-candidates.xlsx';
@@ -2599,8 +2605,11 @@ export default function ReviewerSearchSection({
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      setExportError(e.message);
+      if (genRef.current === myGen) setExportError(e.message);
     } finally {
+      // This ref is the cross-generation concurrency lock. It must release when
+      // an old export settles so the newly selected request is not left unable
+      // to start its own export; semantic error/download effects stay guarded.
       exportingRef.current = false;
       setExporting(false);
     }
