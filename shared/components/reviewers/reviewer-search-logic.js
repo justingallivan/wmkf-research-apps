@@ -20,7 +20,7 @@ import {
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
-import { getCandidatePromotionAuthority } from '../../../lib/services/reviewer-promotion-authority';
+import { REQUIRED_STAGES } from '../../../lib/services/reviewer-promotion-authority';
 import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
@@ -52,8 +52,26 @@ export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
 // client imports keep working while server (roster-store) + client share ONE impl.
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
-export function isCandidateSelectable(c) {
-  return getCandidatePromotionAuthority(c)?.decision === 'ready'
+const CANONICAL_SERVER_PLAN_CANDIDATE_KEY = /^(?:suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/;
+
+function canonicalServerPlanCandidateKey(value) {
+  return typeof value === 'string' && CANONICAL_SERVER_PLAN_CANDIDATE_KEY.test(value)
+    ? value
+    : null;
+}
+
+export function hasCurrentServerPromotionPlan(candidate, plan) {
+  const candidateKey = canonicalServerPlanCandidateKey(candidate?.candidateKey);
+  if (!candidateKey || plan?.candidateKey !== candidateKey) return false;
+  if (plan.cacheOutcome !== 'hit' || plan.promotionAuthority !== 'requires_promotion_checks') return false;
+  if (!Array.isArray(plan.currentStages) || !Array.isArray(plan.pendingStages) || !Array.isArray(plan.refreshes)) return false;
+  if (plan.pendingStages.length > 0 || plan.refreshes.length > 0) return false;
+  const currentStages = new Set(plan.currentStages);
+  return REQUIRED_STAGES.every((stage) => currentStages.has(stage));
+}
+
+export function isCandidateSelectable(c, serverPromotionPlan = null) {
+  return hasCurrentServerPromotionPlan(c, serverPromotionPlan)
     && getCandidatePromotionDecision(c)?.decision === 'ready'
     && getCandidateEmailReadiness(c)?.action === 'ready'
     && !c?.hasInstitutionCOI;

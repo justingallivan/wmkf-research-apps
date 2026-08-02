@@ -16,6 +16,15 @@ const {
 // the two can never drift apart silently again (S387).
 const { isCandidateSelectable } = require('../../shared/components/reviewers/reviewer-search-logic');
 
+const currentServerPromotionPlan = (candidateKey) => ({
+  candidateKey,
+  cacheOutcome: 'hit',
+  currentStages: ['identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust'],
+  pendingStages: [],
+  refreshes: [],
+  promotionAuthority: 'requires_promotion_checks',
+});
+
 describe('reviewer provenance DTO helper', () => {
   test('maps literature candidates to ordered scholarly sources plus provenance kind for save', () => {
     const candidate = {
@@ -184,6 +193,7 @@ describe('referred provenance (S249)', () => {
 describe('applicant identity gate parity with promote-applicant-reviewer', () => {
   const applicant = (extra) => ({
     name: 'Applicant Pick',
+    candidateKey: 'suggestion:applicant-pick',
     email: 'applicant.pick@example.edu',
     emailSource: 'applicant_form',
     emailPersistAllowed: true,
@@ -223,7 +233,7 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
       const candidate = applicant({ identityStatus });
       expect(requiresStaffIdentityConfirmation(candidate)).toBe(false);
       expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
-      expect(isCandidateSelectable(candidate)).toBe(true);
+      expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
     }
   });
 
@@ -231,7 +241,7 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
     const candidate = applicant({ institutionMismatch: true, pdIdentityConfirmed: true });
     expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
     expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
-    expect(isCandidateSelectable(candidate)).toBe(true);
+    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
   });
 
   // The defect was a selectable card the server refuses. Assert the equivalence over the
@@ -248,7 +258,8 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
             });
             const serverWouldRefuse = requiresStaffIdentityConfirmation(candidate);
             const contactIdentityResolved = identityStatus === 'confirmed' || identityStatus === 'probable';
-            expect(isCandidateSelectable(candidate)).toBe(!serverWouldRefuse && contactIdentityResolved);
+            expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey)))
+              .toBe(!serverWouldRefuse && contactIdentityResolved);
           }
         }
       }

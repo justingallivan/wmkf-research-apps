@@ -9,6 +9,7 @@ const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
 const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
 const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
 const candidate = (name, email) => ({
+  candidateKey: `person:${encodeURIComponent(email.toLowerCase())}`,
   name,
   email,
   emailSource: 'pubmed',
@@ -30,6 +31,17 @@ const CANDIDATE_A = candidate('Dr Candidate A', 'a@example.edu');
 const CANDIDATE_B = candidate('Dr Candidate B', 'b@example.edu');
 const EXCLUDED_CANDIDATE = candidate('Dr Excluded Candidate', 'excluded@example.edu');
 
+function currentServerPromotionPlan(candidateKey) {
+  return {
+    candidateKey,
+    cacheOutcome: 'hit',
+    currentStages: ['identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust'],
+    pendingStages: [],
+    refreshes: [],
+    promotionAuthority: 'requires_promotion_checks',
+  };
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((done) => { resolve = done; });
@@ -37,7 +49,18 @@ function deferred() {
 }
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body };
+  const active = Array.isArray(body?.active) ? body.active : [];
+  const authoritativeRoster = active.length > 0 && !body.warmValidation
+    ? {
+      ...body,
+      authorityState: 'current',
+      warmValidation: {
+        state: 'current',
+        candidatePlans: active.map(({ candidateKey }) => currentServerPromotionPlan(candidateKey)),
+      },
+    }
+    : body;
+  return { ok, status, json: async () => authoritativeRoster };
 }
 
 afterEach(() => {

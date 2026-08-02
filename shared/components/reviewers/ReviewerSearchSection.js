@@ -1033,6 +1033,10 @@ export default function ReviewerSearchSection({
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
+  // The normal Workbench path receives this plan in `rosterSnapshot`. Keep the
+  // standalone roster-fetch path equally conservative: only a current server
+  // response with current warm validation can populate its request-bound map.
+  const [standaloneWarmValidationSnapshot, setStandaloneWarmValidationSnapshot] = useState(null);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
   const [rosterLoaded, setRosterLoaded] = useState(false);
@@ -1086,13 +1090,24 @@ export default function ReviewerSearchSection({
   // Keep the request match in this derivation as a render-time guard. React can
   // render once with the prior prop before the request-reset effect clears its
   // local lists; old warm-plan dates must not paint in that window.
+  const warmValidationSnapshot = parentOwnsRoster
+    ? rosterSnapshot
+    : standaloneWarmValidationSnapshot;
   const evidencePlansByCandidateKey = useMemo(
-    () => buildEvidencePlansByCandidateKey(rosterSnapshot, requestId),
-    [rosterSnapshot, requestId],
+    () => buildEvidencePlansByCandidateKey(warmValidationSnapshot, requestId),
+    [warmValidationSnapshot, requestId],
   );
   const evidenceCheckForCandidate = useCallback(
     (candidate) => projectEvidenceCheck(candidate, evidencePlansByCandidateKey),
     [evidencePlansByCandidateKey],
+  );
+  const serverPromotionPlanForCandidate = useCallback((candidate) => {
+    const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
+    return candidateKey ? evidencePlansByCandidateKey.get(candidateKey) || null : null;
+  }, [evidencePlansByCandidateKey]);
+  const candidateIsSelectable = useCallback(
+    (candidate) => isCandidateSelectable(candidate, serverPromotionPlanForCandidate(candidate)),
+    [serverPromotionPlanForCandidate],
   );
 
   // Per-user prompt-override editor toggle (S222).
@@ -1127,6 +1142,15 @@ export default function ReviewerSearchSection({
     if (genRef.current !== expectedGeneration) return null;
     if (!res.ok || !data.success) return null;
     applyRosterSnapshot(data);
+    setStandaloneWarmValidationSnapshot(
+      data.authorityState === 'current' && data.warmValidation?.state === 'current'
+        ? {
+          requestId,
+          authorityState: 'current',
+          data: { warmValidation: data.warmValidation },
+        }
+        : null,
+    );
     return data;
   }, [requestId, applyRosterSnapshot, parentOwnsRoster]);
 
@@ -1163,6 +1187,7 @@ export default function ReviewerSearchSection({
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
     if (!parentOwnsRoster) {
       setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
+      setStandaloneWarmValidationSnapshot(null);
     }
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
@@ -1626,9 +1651,10 @@ export default function ReviewerSearchSection({
   // become unselectable + unsavable (the save-candidates API also hard-rejects them).
   // The UI marker `pdIdentityConfirmed` makes an otherwise unverifiable row
   // selectable only after the authenticated roster action returned an opaque
-  // server confirmation id. Save-candidates re-verifies it; the marker has no
-  // server authority. Institution COI is never waived.
-  const selectableCandidates = displayCandidates.filter(isCandidateSelectable);
+  // server confirmation id. The exact request-scoped warm plan still has to
+  // show every promotion stage current; a card receipt alone has no authority.
+  // Save-candidates independently re-verifies both boundaries.
+  const selectableCandidates = displayCandidates.filter(candidateIsSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
   // from a database search, in this run or a prior one (it then lives in
@@ -2099,7 +2125,7 @@ export default function ReviewerSearchSection({
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
     // server 422s these anyway).
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && candidateIsSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = myGen;
     const isCurrent = () => genRef.current === myGen;
@@ -2537,6 +2563,7 @@ export default function ReviewerSearchSection({
     refreshExpiredVerification,
     reloadRoster,
     displayOnly,
+    candidateIsSelectable,
   ]);
 
   // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
@@ -2545,7 +2572,7 @@ export default function ReviewerSearchSection({
   // request metadata (number/institution/PI) authoritatively by requestId.
   const exportSelected = useCallback(async () => {
     if (displayOnly || exportingRef.current) return;
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && candidateIsSelectable(c));
     if (chosen.length === 0) return;
     const myGen = genRef.current;
     exportingRef.current = true;
@@ -2613,7 +2640,7 @@ export default function ReviewerSearchSection({
       exportingRef.current = false;
       setExporting(false);
     }
-  }, [displayCandidates, selected, requestId, displayOnly]);
+  }, [displayCandidates, selected, requestId, displayOnly, candidateIsSelectable]);
 
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
@@ -2995,7 +3022,7 @@ export default function ReviewerSearchSection({
                                 // A PD-confirmed needs-review row flips to a normal selectable
                                 // card; unconfirmed ones stay read-only but get the "confirm
                                 // identity" affordance so a PD can rescue a real reviewer.
-                                const selectableNow = isCandidateSelectable(c);
+                                const selectableNow = candidateIsSelectable(c);
                                 const promotionDecision = getCandidatePromotionDecision(c);
                                 const canConfirmForPromotion = !selectableNow
                                   && !c.hasInstitutionCOI

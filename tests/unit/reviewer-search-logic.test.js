@@ -46,6 +46,14 @@ const withCurrentPromotionAuthority = (candidate) => ({
   eligibilityStatus: 'unknown',
   ...candidate,
 });
+const currentServerPromotionPlan = (candidateKey) => ({
+  candidateKey,
+  cacheOutcome: 'hit',
+  currentStages: Object.keys(CURRENT_STAGE_FRESHNESS),
+  pendingStages: [],
+  refreshes: [],
+  promotionAuthority: 'requires_promotion_checks',
+});
 
 describe('dedupeReviewerCandidates', () => {
   test('collapses exact-ORCID search aliases and keeps the staff-attested address projection', () => {
@@ -514,6 +522,30 @@ describe('pruneCandidateForRoster — institutionCOIDetails (S240)', () => {
 });
 
 describe('isCandidateSelectable', () => {
+  test('requires the exact clean server warm plan, not candidate-carried receipts', () => {
+    const candidate = withCurrentPromotionAuthority({
+      name: 'Plan Bound',
+      email: 'plan.bound@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      addressTrustReceipt: {
+        receiptId: 'receipt-plan-bound',
+        personConfirmed: true,
+        email: 'plan.bound@example.edu',
+      },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    });
+    const plan = currentServerPromotionPlan(candidate.candidateKey);
+
+    expect(isCandidateSelectable(candidate)).toBe(false);
+    expect(isCandidateSelectable(candidate, { ...plan, candidateKey: 'person:other' })).toBe(false);
+    expect(isCandidateSelectable(candidate, { ...plan, refreshes: [{ stage: 'contact', reason: 'stage_missing' }] })).toBe(false);
+    expect(isCandidateSelectable(candidate, { ...plan, pendingStages: ['eligibility'] })).toBe(false);
+    expect(isCandidateSelectable(candidate, { ...plan, promotionAuthority: 'blocked_refresh_required' })).toBe(false);
+    expect(isCandidateSelectable(candidate, plan)).toBe(true);
+  });
+
   test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {
     expect(isCandidateSelectable(withCurrentPromotionAuthority({
       name: 'Flagged',
