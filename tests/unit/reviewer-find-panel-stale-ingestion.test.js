@@ -12,15 +12,25 @@ jest.mock('../../shared/components/reviewers/ReviewerSearchSection', () => funct
   ingestError,
   proposalKey,
   blobUrl,
+  rosterSnapshot,
+  displayOnly,
+  onRetryRoster,
 }) {
   return (
+    <>
     <div
       data-testid="search"
       data-recommended={JSON.stringify(recommended || [])}
       data-error={ingestError || ''}
       data-proposal-key={proposalKey || ''}
       data-blob-url={blobUrl || ''}
+      data-roster-state={rosterSnapshot?.authorityState || ''}
+      data-roster-names={(rosterSnapshot?.data?.active || []).map((candidate) => candidate.name).join(',')}
+      data-roster-error={rosterSnapshot?.error || ''}
+      data-display-only={String(!!displayOnly)}
     />
+    <button type="button" onClick={onRetryRoster}>Retry warm roster</button>
+    </>
   );
 });
 
@@ -56,6 +66,16 @@ function proposalBinding() {
   return {
     proposalKey: search.getAttribute('data-proposal-key'),
     blobUrl: search.getAttribute('data-blob-url'),
+  };
+}
+
+function rosterBinding() {
+  const search = screen.getByTestId('search');
+  return {
+    state: search.getAttribute('data-roster-state'),
+    names: search.getAttribute('data-roster-names'),
+    error: search.getAttribute('data-roster-error'),
+    displayOnly: search.getAttribute('data-display-only'),
   };
 }
 
@@ -298,4 +318,85 @@ test('late proposal failure for request A cannot replace request B with an error
 
   expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' });
   expect(screen.queryByText('request A proposal failed')).not.toBeInTheDocument();
+});
+
+test('parent bootstrap renders the cached roster before reconciliation and reaches current without a default roster GET', async () => {
+  const cached = deferred();
+  const reconciled = deferred();
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({ success: true, allFiles: [] }));
+    if (target.includes('/api/workbench/reviewer-roster') && target.includes('mode=cached')) return cached.promise;
+    if (target.includes('/api/workbench/reviewer-roster') && target.includes('mode=reconciled')) return reconciled.promise;
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerFindPanel requestId={REQ_A} />);
+  await act(async () => {
+    cached.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    await cached.promise;
+  });
+  await waitFor(() => expect(rosterBinding()).toEqual({ state: 'refreshing', names: 'Cached Reviewer', error: '', displayOnly: 'true' }));
+  await act(async () => {
+    reconciled.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    await reconciled.promise;
+  });
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('/api/workbench/reviewer-roster?requestId=')).every(([url]) => String(url).includes('mode='))).toBe(true);
+});
+
+test('one snapshot conflict restarts reconciliation with the fresh cached version, but a repeated conflict stops cached', async () => {
+  const reconciledResponses = [
+    response({ success: false, code: 'roster_snapshot_changed', authorityState: 'cached', rosterVersion: 'v2', active: [{ name: 'Fresh Reviewer' }] }, { ok: false, status: 409 }),
+    response({ success: false, code: 'roster_snapshot_changed', authorityState: 'cached', rosterVersion: 'v3', active: [{ name: 'Freshest Reviewer' }] }, { ok: false, status: 409 }),
+  ];
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({ success: true, allFiles: [] }));
+    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(reconciledResponses.shift());
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerFindPanel requestId={REQ_A} />);
+  await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'cached', names: 'Freshest Reviewer', error: expect.stringMatching(/changed again while checking current status/i), displayOnly: 'true' })));
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('mode=reconciled'))).toHaveLength(2);
+});
+
+test('reconciliation failure retains cached cards and exposes error state', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({ success: true, allFiles: [] }));
+    if (target.includes('mode=cached')) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Cached Reviewer' }] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: false, error: 'Dataverse unavailable' }, { ok: false, status: 503 }));
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerFindPanel requestId={REQ_A} />);
+  await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'error', names: 'Cached Reviewer', error: 'Dataverse unavailable', displayOnly: 'true' })));
+});
+
+test('late cached response for a previous request cannot overwrite the new request roster', async () => {
+  const cachedA = deferred();
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    if (target === '/api/reviewer-finder/load-proposal') return Promise.resolve(response({ success: true, allFiles: [] }));
+    if (target.includes('mode=cached') && target.includes(REQ_A)) return cachedA.promise;
+    if (target.includes('mode=cached') && target.includes(REQ_B)) return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v-b', active: [{ name: 'Reviewer B' }] }));
+    if (target.includes('mode=reconciled')) return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v-b', active: [{ name: 'Reviewer B' }] }));
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
+  rerender(<ReviewerFindPanel requestId={REQ_B} />);
+  await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'current', names: 'Reviewer B', displayOnly: 'true' })));
+  await act(async () => {
+    cachedA.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v-a', active: [{ name: 'Reviewer A' }] }));
+    await cachedA.promise;
+  });
+  expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'current', names: 'Reviewer B', displayOnly: 'true' }));
 });

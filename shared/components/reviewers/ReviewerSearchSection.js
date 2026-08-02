@@ -893,7 +893,11 @@ export default function ReviewerSearchSection({
   onNavigate,
   manualAddSlot = null,
   canManage = true,
+  rosterSnapshot,
+  onRetryRoster,
+  displayOnly = false,
 }) {
+  const parentOwnsRoster = rosterSnapshot !== undefined;
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
   const [progress, setProgress] = useState([]);
@@ -969,6 +973,10 @@ export default function ReviewerSearchSection({
   }, []);
 
   const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
+    // Embedded callers receive every snapshot through the dedicated effect
+    // below. Returning here keeps a snapshot change from retriggering this
+    // legacy bootstrap effect (and from issuing a duplicate default GET).
+    if (parentOwnsRoster) return null;
     if (!requestId) return null;
     const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
     const data = await res.json().catch(() => ({}));
@@ -976,7 +984,22 @@ export default function ReviewerSearchSection({
     if (!res.ok || !data.success) return null;
     applyRosterSnapshot(data);
     return data;
-  }, [requestId, applyRosterSnapshot]);
+  }, [requestId, applyRosterSnapshot, parentOwnsRoster]);
+
+  // The parent owns warm cached→reconciled bootstrap for the Workbench panel.
+  // Standalone callers retain the original internal roster fetch contract.
+  useEffect(() => {
+    if (!parentOwnsRoster) return;
+    if (rosterSnapshot?.requestId !== requestId) {
+      setRosterLoaded(false);
+      setRosterLoadFailed(false);
+      return;
+    }
+    if (rosterSnapshot?.data) applyRosterSnapshot(rosterSnapshot.data);
+    setRosterLoaded(Boolean(rosterSnapshot?.data) && rosterSnapshot.authorityState !== 'error');
+    setRosterLoadFailed(rosterSnapshot?.authorityState === 'error');
+    setRosterNote(rosterSnapshot?.error || null);
+  }, [requestId, parentOwnsRoster, rosterSnapshot, applyRosterSnapshot]);
 
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
@@ -988,7 +1011,9 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
+    if (!parentOwnsRoster) {
+      setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
+    }
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -1003,7 +1028,7 @@ export default function ReviewerSearchSection({
     // Load the durable roster for this request. genRef-guarded so a slower fetch
     // can't clobber state after the request/proposal changed again. Never sets
     // `phase` — the roster renders independent of the search phase.
-    if (requestId) {
+    if (requestId && !parentOwnsRoster) {
       (async () => {
         try {
           const snapshot = await reloadRoster(myGen);
@@ -1021,13 +1046,17 @@ export default function ReviewerSearchSection({
           }
         }
       })();
-    } else {
+    } else if (!parentOwnsRoster) {
       setRosterLoaded(true); // no request → nothing to load; don't block the form
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestId, blobUrl, reloadRoster]);
+  }, [requestId, blobUrl, reloadRoster, parentOwnsRoster]);
 
   const retryRosterLoad = useCallback(async () => {
+    if (parentOwnsRoster) {
+      onRetryRoster?.();
+      return;
+    }
     const myGen = genRef.current;
     setRosterLoaded(false);
     setRosterLoadFailed(false);
@@ -1047,7 +1076,7 @@ export default function ReviewerSearchSection({
         setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
       }
     }
-  }, [reloadRoster]);
+  }, [reloadRoster, parentOwnsRoster, onRetryRoster]);
 
   // When the applicant exclude list finishes loading (it can arrive after the
   // proposal), prefill the box — unless the user has already edited it.
@@ -1060,7 +1089,7 @@ export default function ReviewerSearchSection({
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (!blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    if (displayOnly || !blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
     // Exclude set = the manual/applicant box + everything already surfaced for
@@ -1304,7 +1333,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -1463,6 +1492,7 @@ export default function ReviewerSearchSection({
   const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
   const toggle = (key) => {
+    if (displayOnly) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -1470,14 +1500,16 @@ export default function ReviewerSearchSection({
     });
   };
   const allSelected = selectableCandidates.length > 0 && selectableCandidates.every((c) => selected.has(candKey(c)));
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
+  const toggleAll = () => {
+    if (!displayOnly) setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
+  };
 
   // Move a surfaced candidate into the durable Excluded set (not deleted). Optimistic:
   // splice it out of the active view immediately, persist in the background, restore on
   // failure. The candidate stays in rosterNames so a re-run still won't re-surface it.
   const excludeCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (displayOnly || !key || !requestId) return;
     const pruned = pruneCandidateForRoster(cand);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
@@ -1498,12 +1530,12 @@ export default function ReviewerSearchSection({
       setRosterActive((prev) => dedupeByName([pruned, ...prev]));
       setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
-  }, [requestId]);
+  }, [requestId, displayOnly]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (displayOnly || !key || !requestId) return;
     const myGen = genRef.current;
     setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => dedupeByName([cand, ...prev]));
@@ -1537,10 +1569,10 @@ export default function ReviewerSearchSection({
         setRosterNote("Couldn't promote that reviewer — please try again.");
       }
     }
-  }, [requestId, reloadRoster]);
+  }, [requestId, reloadRoster, displayOnly]);
 
   const removePreviousResults = useCallback(async () => {
-    if (!requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
+    if (displayOnly || !requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
     const count = previousSearchKeys.size;
     if (!window.confirm(`Remove ${count} previously found reviewer${count === 1 ? '' : 's'} from this request? Applicant-recommended, saved, excluded, and COI records will be kept.`)) return;
     const myGen = genRef.current;
@@ -1579,7 +1611,7 @@ export default function ReviewerSearchSection({
     } finally {
       if (genRef.current === myGen) setRemovingPrevious(false);
     }
-  }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs]);
+  }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs, displayOnly]);
 
   // Apply a staff-entered MANUAL contact to a candidate's client state (the row
   // isn't a saved Dataverse record yet). Used by the lead "Use this email"
@@ -1590,7 +1622,7 @@ export default function ReviewerSearchSection({
   // NEVER touches name (the find-card key) or any identity field. Auto-selects so
   // the edit is included on save.
   const setManualContact = useCallback((cand, updates) => {
-    if (!cand || !updates) return;
+    if (displayOnly || !cand || !updates) return;
     const key = candKey(cand);
     if (!key) return;
     const apply = (c) => {
@@ -1637,7 +1669,7 @@ export default function ReviewerSearchSection({
     setCandidates((prev) => prev.map(apply));
     setRecCandidates((prev) => prev.map(apply));
     setRosterActive((prev) => prev.map(apply));
-  }, []);
+  }, [displayOnly]);
 
   const applyAuthoritativeRosterCandidate = useCallback((key, candidate) => {
     if (!key || !candidate) return;
@@ -1648,6 +1680,7 @@ export default function ReviewerSearchSection({
   }, []);
 
   const verifyAddressContact = useCallback(async (cand, updates, evidence) => {
+    if (displayOnly) throw new Error('Reviewer roster actions are unavailable while status is being checked.');
     if (!cand || !requestId) throw new Error('Reload this request before verifying an address.');
     const key = candKey(cand);
     if (!key) throw new Error('This reviewer has no stable roster key. Reload and try again.');
@@ -1687,7 +1720,7 @@ export default function ReviewerSearchSection({
     applyAuthoritativeRosterCandidate(key, data.candidate);
     setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
     setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
-  }, [requestId, applyAuthoritativeRosterCandidate]);
+  }, [requestId, applyAuthoritativeRosterCandidate, displayOnly]);
 
   const reviewAddressConflict = useCallback(async (cand) => {
     const key = candKey(cand);
@@ -1711,6 +1744,7 @@ export default function ReviewerSearchSection({
   }, [requestId]);
 
   const retryAddressCheck = useCallback(async (cand) => {
+    if (displayOnly) return;
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
@@ -1730,9 +1764,10 @@ export default function ReviewerSearchSection({
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);
     setRosterNote(`${data.candidate.name || cand.name}: conflict check refreshed.`);
-  }, [requestId, applyAuthoritativeRosterCandidate]);
+  }, [requestId, applyAuthoritativeRosterCandidate, displayOnly]);
 
   const requestAddressRepair = useCallback(async (cand) => {
+    if (displayOnly) return;
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
@@ -1757,18 +1792,18 @@ export default function ReviewerSearchSection({
     setRosterNote(response.ok && data.success
       ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
-  }, [requestId]);
+  }, [requestId, displayOnly]);
 
   // Slice 4: a quarantined email lead must pass through the evidence form;
   // website-only leads remain a direct non-address edit.
   const useLead = useCallback((cand, lead) => {
-    if (!cand || !lead || !lead.value) return;
+    if (displayOnly || !cand || !lead || !lead.value) return;
     if (lead.type === 'email') {
       setEditingContact({ ...cand, email: lead.value, emailSource: 'manual' });
       return;
     }
     setManualContact(cand, { website: lead.value });
-  }, [setManualContact]);
+  }, [setManualContact, displayOnly]);
 
   // The candidate currently open in the on-card Edit-contact modal (local mode).
   const [editingContact, setEditingContact] = useState(null);
@@ -1779,7 +1814,7 @@ export default function ReviewerSearchSection({
   // contact. The authenticated roster PATCH stores the request-scoped attestation
   // first; only then do we stamp manual contact + the UI marker/opaque id locally.
   const confirmIdentityContact = useCallback(async (cand, updates, evidence) => {
-    if (!cand) return;
+    if (displayOnly || !cand) return;
     const key = candKey(cand);
     if (!key || !requestId) return;
     const myGen = genRef.current;
@@ -1813,7 +1848,7 @@ export default function ReviewerSearchSection({
     // stays open for a retry.
     applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
     await verifyAddressContact(authoritativeConfirmed, updates, evidence);
-  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate]);
+  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate, displayOnly]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -1909,7 +1944,7 @@ export default function ReviewerSearchSection({
 
   const saveSelected = useCallback(async () => {
     const myGen = genRef.current;
-    if (savingRef.current === myGen) return;
+    if (displayOnly || savingRef.current === myGen) return;
     // Filter by isSelectable too (not just `selected`): a needs-identity-review row
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
@@ -2351,6 +2386,7 @@ export default function ReviewerSearchSection({
     pushProgress,
     refreshExpiredVerification,
     reloadRoster,
+    displayOnly,
   ]);
 
   // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
@@ -2358,7 +2394,7 @@ export default function ReviewerSearchSection({
   // shows (email/orcid/scholar fall back to contactEnrichment); the server fetches
   // request metadata (number/institution/PI) authoritatively by requestId.
   const exportSelected = useCallback(async () => {
-    if (exportingRef.current) return;
+    if (displayOnly || exportingRef.current) return;
     const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     exportingRef.current = true;
@@ -2418,7 +2454,7 @@ export default function ReviewerSearchSection({
       exportingRef.current = false;
       setExporting(false);
     }
-  }, [displayCandidates, selected, requestId]);
+  }, [displayCandidates, selected, requestId, displayOnly]);
 
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
@@ -2499,6 +2535,19 @@ export default function ReviewerSearchSection({
         <p className="text-sm text-gray-600">Load a proposal document above to search for new reviewers. Candidates already found for this request appear below.</p>
       )}
 
+      {displayOnly && (
+        <div role="status" className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
+          {rosterSnapshot?.authorityState === 'error'
+            ? 'Reviewer status could not be checked. Cached candidates remain visible but all roster actions are disabled.'
+            : rosterSnapshot?.authorityState === 'current'
+              ? 'Reviewer status is current. Roster actions remain disabled in this rollout.'
+              : 'Cached reviewer candidates are display-only while current status is checked. Roster actions remain disabled in this rollout.'}
+          {rosterSnapshot?.authorityState === 'error' && onRetryRoster && (
+            <button type="button" onClick={onRetryRoster} className="ml-2 underline font-medium">Retry reviewer status</button>
+          )}
+        </div>
+      )}
+
       {blobUrl && (phase === 'idle' || phase === 'error') && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
@@ -2512,6 +2561,7 @@ export default function ReviewerSearchSection({
                       key={key}
                       type="button"
                       onClick={() => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      disabled={displayOnly}
                       aria-pressed={searchSources[key]}
                       className={`px-3 py-1.5 rounded-lg border text-xs transition-colors flex flex-col items-center min-w-[80px] ${
                         searchSources[key]
@@ -2543,6 +2593,7 @@ export default function ReviewerSearchSection({
                     step="1"
                     value={reviewerCount}
                     onChange={(e) => setReviewerCount(parseInt(e.target.value, 10))}
+                    disabled={displayOnly}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <span className="text-xs text-gray-400 w-6 text-right">25</span>
@@ -2558,6 +2609,7 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
+                  disabled={displayOnly}
                   placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
                 />
               </div>
@@ -2570,8 +2622,9 @@ export default function ReviewerSearchSection({
                     id="referred-seeds"
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
                     rows={2}
-                    value={referredSeedsText}
-                    onChange={(e) => setReferredSeedsText(e.target.value)}
+                  value={referredSeedsText}
+                  onChange={(e) => setReferredSeedsText(e.target.value)}
+                  disabled={displayOnly}
                     placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
                   />
                 </div>
@@ -2583,8 +2636,9 @@ export default function ReviewerSearchSection({
                     id="referred-by"
                     type="text"
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                    value={referredBy}
-                    onChange={(e) => setReferredBy(e.target.value)}
+                  value={referredBy}
+                  onChange={(e) => setReferredBy(e.target.value)}
+                  disabled={displayOnly}
                     placeholder="Reviewer name"
                   />
                 </div>
@@ -2598,6 +2652,7 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={excludeText}
                   onChange={onExcludeChange}
+                  disabled={displayOnly}
                   placeholder="e.g. Thomas K. Wood, Jens Hör"
                 />
                 {exclusionsUnavailable && (
@@ -2637,7 +2692,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+                disabled={!rosterLoadFailed && (displayOnly || noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {rosterLoadFailed
@@ -2682,7 +2737,7 @@ export default function ReviewerSearchSection({
                     <button
                       type="button"
                       onClick={removePreviousResults}
-                      disabled={removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
+                      disabled={displayOnly || removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
                       title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
                       className="shrink-0 text-xs font-medium underline disabled:opacity-50"
                     >
@@ -2740,7 +2795,7 @@ export default function ReviewerSearchSection({
                               A–Z
                             </button>
                           </span>
-                          <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
+                          <button type="button" onClick={toggleAll} disabled={displayOnly} className="text-xs text-blue-600 underline disabled:opacity-40">
                             {allSelected ? 'Clear all' : 'Select all'}
                           </button>
                         </div>
@@ -2784,28 +2839,28 @@ export default function ReviewerSearchSection({
                                     || promotionDecision?.decision === 'missing_email'
                                   );
                                 if (selectableNow && !readOnlySection) {
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
                                 }
                                 if (selectableNow && readOnlySection) {
                                   // needs-review row the PD just confirmed → selectable + editable.
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} />;
                                 }
                                 return <CandidateCard
                                   key={candKey(c)}
                                   candidate={c}
                                   previousResult={previousSearchKeys.has(candKey(c))}
                                   readOnly
-                                  onExclude={excludeCandidate}
+                                  onExclude={displayOnly ? undefined : excludeCandidate}
                                   onEdit={(
                                     promotionDecision?.decision === 'ready'
                                     || promotionDecision?.reason === 'contact_claim_mismatch'
                                     || c.applicantContactMismatch === true
-                                  ) ? setEditingContact : undefined}
-                                  onRequestRepair={requestAddressRepair}
-                                  onReviewAddressConflict={reviewAddressConflict}
-                                  onRetryAddressCheck={retryAddressCheck}
-                                  onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
-                                  canManage={canManage}
+                                  ) && !displayOnly ? setEditingContact : undefined}
+                                  onRequestRepair={displayOnly ? undefined : requestAddressRepair}
+                                  onReviewAddressConflict={displayOnly ? undefined : reviewAddressConflict}
+                                  onRetryAddressCheck={displayOnly ? undefined : retryAddressCheck}
+                                  onConfirmIdentity={canConfirmForPromotion && !displayOnly ? (cand) => setConfirmingContact(cand) : undefined}
+                                  canManage={canManage && !displayOnly}
                                 />;
                               })}
                             </div>
@@ -2817,7 +2872,7 @@ export default function ReviewerSearchSection({
                         <button
                           type="button"
                           onClick={saveSelected}
-                          disabled={selected.size === 0 || phase === 'saving'}
+                          disabled={displayOnly || selected.size === 0 || phase === 'saving'}
                           aria-busy={phase === 'saving'}
                           className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -2833,13 +2888,13 @@ export default function ReviewerSearchSection({
                         <button
                           type="button"
                           onClick={exportSelected}
-                          disabled={selected.size === 0 || exporting}
+                          disabled={displayOnly || selected.size === 0 || exporting}
                           title={selected.size === 0 ? 'Select candidates — or use Select all — to export' : undefined}
                           className="px-4 py-2 bg-white text-gray-900 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
                         </button>
-                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
+                        <button type="button" onClick={runSearch} disabled={displayOnly || !blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       {exportError && (
                         <p className="text-sm text-amber-700">Export failed: {exportError}</p>
@@ -2858,7 +2913,7 @@ export default function ReviewerSearchSection({
                       </summary>
                       <div className="space-y-2 mt-2">
                         {rosterExcluded.map((c) => (
-                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
+                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={displayOnly ? undefined : promoteCandidate} />
                         ))}
                       </div>
                     </details>
@@ -3125,7 +3180,7 @@ export default function ReviewerSearchSection({
                 <button
                   type="button"
                   onClick={() => enrichRecommended()}
-                  disabled={!blobUrl || !proposalKey}
+                  disabled={displayOnly || !blobUrl || !proposalKey}
                   className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Update applicant suggestions
@@ -3139,7 +3194,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={() => enrichRecommended()}
-                disabled={!blobUrl || !proposalKey}
+                disabled={displayOnly || !blobUrl || !proposalKey}
                 className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Try again

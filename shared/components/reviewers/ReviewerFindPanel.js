@@ -66,9 +66,26 @@ export default function ReviewerFindPanel({
   requestIdRef.current = requestId;
   const proposalLoadGenerationRef = useRef(0);
   const lastProposalLoadRef = useRef({ requestId: null, fileKey: undefined });
+  const rosterGenerationRef = useRef(0);
+  const [rosterRetryNonce, setRosterRetryNonce] = useState(0);
   const manualCardRef = useRef(null);
   const [ingest, setIngest] = useState({ loading: true, data: null, error: null });
   const [doc, setDoc] = useState({ loading: true, data: null, error: null });
+  // Parent-owned warm bootstrap. The child receives this snapshot and never
+  // starts a second mount-time roster request when embedded here.
+  const [warmRoster, setWarmRoster] = useState({
+    requestId: null,
+    authorityState: 'refreshing',
+    data: null,
+    rosterVersion: null,
+    restartCount: 0,
+    reconcileKey: null,
+    reconciliationStopped: false,
+    error: null,
+  });
+  // Slice 0.1 proves the warm-read handoff before re-enabling mutations. Keep
+  // every roster-changing entry point inert until the next action-contract slice.
+  const rosterActionsDisabled = true;
   const [manual, setManual] = useState({
     name: '',
     email: '',
@@ -197,6 +214,147 @@ export default function ReviewerFindPanel({
     if (previous.requestId === requestId && previous.fileKey === desiredFileKey) return;
     loadProposal(desiredFileKey);
   }, [requestId, proposalFileKey, proposalBindingReady, loadProposal]);
+
+  // Phase A: this is deliberately independent of proposal/blob state. A request
+  // change or explicit retry starts a fresh generation and aborts the prior read.
+  useEffect(() => {
+    const generation = ++rosterGenerationRef.current;
+    const controller = new AbortController();
+    setWarmRoster((previous) => ({
+      requestId,
+      authorityState: 'refreshing',
+      data: previous.requestId === requestId ? previous.data : null,
+      rosterVersion: previous.requestId === requestId ? previous.rosterVersion : null,
+      restartCount: 0,
+      reconcileKey: null,
+      reconciliationStopped: false,
+      error: null,
+    }));
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}&mode=cached`, {
+          signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (controller.signal.aborted || rosterGenerationRef.current !== generation) return;
+        if (!res.ok || !data.success || !data.rosterVersion) {
+          throw new Error(data.error || `Could not load reviewer roster (${res.status})`);
+        }
+        setWarmRoster({
+          requestId,
+          authorityState: 'cached',
+          data,
+          rosterVersion: data.rosterVersion,
+          restartCount: 0,
+          reconcileKey: 1,
+          reconciliationStopped: false,
+          error: null,
+        });
+      } catch (error) {
+        if (controller.signal.aborted || rosterGenerationRef.current !== generation) return;
+        setWarmRoster((previous) => ({
+          requestId,
+          authorityState: 'error',
+          data: previous.requestId === requestId ? previous.data : null,
+          rosterVersion: previous.requestId === requestId ? previous.rosterVersion : null,
+          restartCount: 0,
+          reconcileKey: null,
+          reconciliationStopped: false,
+          error: error.message,
+        }));
+      }
+    })();
+
+    return () => controller.abort();
+  }, [requestId, rosterRetryNonce]);
+
+  // Phase B starts only after Phase A commits `cached`. A single 409 restart is
+  // allowed; a second conflict remains visibly cached/read-only until staff retry.
+  useEffect(() => {
+    if (
+      !requestId
+      || warmRoster.requestId !== requestId
+      || warmRoster.authorityState !== 'cached'
+      || !warmRoster.data
+      || !warmRoster.rosterVersion
+      || !warmRoster.reconcileKey
+      || warmRoster.reconciliationStopped
+    ) return undefined;
+
+    const generation = rosterGenerationRef.current;
+    const controller = new AbortController();
+    setWarmRoster((previous) => (
+          previous.requestId === requestId
+      && previous.authorityState === 'cached'
+      && previous.rosterVersion === warmRoster.rosterVersion
+        ? { ...previous, authorityState: 'refreshing', error: null }
+        : previous
+    ));
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}&mode=reconciled&rosterVersion=${encodeURIComponent(warmRoster.rosterVersion)}`,
+          { signal: controller.signal },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (controller.signal.aborted || rosterGenerationRef.current !== generation) return;
+        if (res.status === 409 && data.code === 'roster_snapshot_changed' && data.rosterVersion) {
+          const restartCount = warmRoster.restartCount + 1;
+          setWarmRoster({
+            requestId,
+            authorityState: 'cached',
+            data,
+            rosterVersion: data.rosterVersion,
+            restartCount,
+            reconcileKey: restartCount > 1 ? null : warmRoster.reconcileKey + 1,
+            reconciliationStopped: restartCount > 1,
+            error: restartCount > 1
+              ? 'Reviewer roster changed again while checking current status. Retry to check this latest snapshot.'
+              : null,
+          });
+          return;
+        }
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `Could not reconcile reviewer roster (${res.status})`);
+        }
+        const authorityState = ['current', 'stale'].includes(data.authorityState)
+          ? data.authorityState
+          : 'stale';
+        setWarmRoster({
+          requestId,
+          authorityState,
+          data,
+          rosterVersion: data.rosterVersion || warmRoster.rosterVersion,
+          restartCount: warmRoster.restartCount,
+          reconcileKey: null,
+          reconciliationStopped: false,
+          error: authorityState === 'stale'
+            ? (data.error || 'Reviewer authority could not be fully reconciled. Retry before taking action.')
+            : null,
+        });
+      } catch (error) {
+        if (controller.signal.aborted || rosterGenerationRef.current !== generation) return;
+        setWarmRoster((previous) => ({
+          requestId,
+          authorityState: 'error',
+          data: previous.requestId === requestId ? previous.data : warmRoster.data,
+          rosterVersion: previous.requestId === requestId ? previous.rosterVersion : warmRoster.rosterVersion,
+          restartCount: warmRoster.restartCount,
+          reconcileKey: null,
+          reconciliationStopped: false,
+          error: error.message,
+        }));
+      }
+    })();
+
+    return () => controller.abort();
+  }, [requestId, warmRoster.reconcileKey]);
+
+  const retryWarmRoster = useCallback(() => {
+    setRosterRetryNonce((attempt) => attempt + 1);
+  }, []);
 
   const updateManual = (field, value) => {
     setManual((prev) => {
@@ -361,7 +519,7 @@ export default function ReviewerFindPanel({
 
   const addManualReviewer = async (ev) => {
     ev.preventDefault();
-    if (!requestId || manual.saving) return;
+    if (rosterActionsDisabled || !requestId || manual.saving) return;
     const name = manual.name.trim();
     if (!name) {
       setManual((prev) => ({ ...prev, error: 'Name is required.' }));
@@ -461,7 +619,11 @@ export default function ReviewerFindPanel({
         </div>
         {manual.saving && <Spinner />}
       </div>
+      {warmRoster.authorityState !== 'current' && (
+        <p className="mb-3 text-xs text-amber-700">Reviewer roster is display-only while current status is being checked.</p>
+      )}
       <form onSubmit={addManualReviewer} className="space-y-3">
+      <fieldset disabled={rosterActionsDisabled} className="space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="block">
             <span className="block text-xs text-gray-500 mb-1">Name</span>
@@ -665,6 +827,7 @@ export default function ReviewerFindPanel({
             </div>
           )}
         </div>
+      </fieldset>
       </form>
     </Card>
     </div>
@@ -766,6 +929,9 @@ export default function ReviewerFindPanel({
         onSaved={onSaved}
         onNavigate={onNavigate}
         manualAddSlot={manualAddCard}
+        rosterSnapshot={warmRoster}
+        onRetryRoster={retryWarmRoster}
+        displayOnly={rosterActionsDisabled}
       />
     </div>
   );

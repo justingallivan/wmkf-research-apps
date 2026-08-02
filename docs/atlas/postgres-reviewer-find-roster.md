@@ -119,9 +119,11 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   closed when it is absent. `findIdentityConfirmation` is the fail-closed
   save-boundary read for an exact actor-bound staff confirmation;
   `findEligibilityByCandidateKey` is the request/candidate-key save-boundary
-  read for ineligible state. The roster GET is consumed by
-  `ReviewerSearchSection` for active/excluded/ineligible/blocked rendering,
-  exact saved keys, and the dedup name union. `coi_dropped` contributes only
+  read for ineligible state. In the Workbench Find panel,
+  `ReviewerFindPanel` owns the cached-then-reconciled roster GET and passes its
+  snapshot to `ReviewerSearchSection` for active/excluded/ineligible/blocked
+  rendering, exact saved keys, and the dedup name union; standalone section
+  callers retain their internal roster read. `coi_dropped` contributes only
   through `allNames`. Its temporary missing-mode compatibility GET performs
   the existing complete request-scoped
   `findByRequest(..., { selectedOnly:false, requireComplete:true })` read for

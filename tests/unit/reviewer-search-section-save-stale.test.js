@@ -28,6 +28,7 @@ const candidate = (name, email) => ({
 });
 const CANDIDATE_A = candidate('Dr Candidate A', 'a@example.edu');
 const CANDIDATE_B = candidate('Dr Candidate B', 'b@example.edu');
+const EXCLUDED_CANDIDATE = candidate('Dr Excluded Candidate', 'excluded@example.edu');
 
 function deferred() {
   let resolve;
@@ -126,6 +127,41 @@ test('candidate results use the page scroll instead of a nested fixed-height scr
   const list = await screen.findByTestId('reviewer-candidate-list');
   expect(list).not.toHaveClass('max-h-[32rem]');
   expect(list).not.toHaveClass('overflow-y-auto');
+});
+
+test('a parent-owned warm snapshot is display-only and does not issue a second roster GET', async () => {
+  global.fetch = jest.fn();
+  render(
+    <ReviewerSearchSection
+      requestId={REQ_A}
+      blobUrl="blob-a"
+      proposalKey="proposal-a"
+      displayOnly
+      rosterSnapshot={{
+        requestId: REQ_A,
+        authorityState: 'current',
+        rosterVersion: 'v1',
+        data: {
+          active: [CANDIDATE_A],
+          excluded: [EXCLUDED_CANDIDATE],
+          ineligible: [],
+          blocked: [],
+          savedKeys: [],
+          allNames: [CANDIDATE_A.name, EXCLUDED_CANDIDATE.name],
+        },
+      }}
+    />,
+  );
+
+  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${CANDIDATE_A.name}`)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /pubmed/i })).toBeDisabled();
+  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: /exclude/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /promote back/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /run reviewer search/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /promote/i })).toBeDisabled();
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test('promotion progress and completion stay in a live status beside the action', async () => {
