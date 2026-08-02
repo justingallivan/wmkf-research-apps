@@ -18,7 +18,7 @@ related:
 
 # Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 
-> **Status:** Proposed implementation plan. No runtime or data changes are made by this document.
+> **Status:** Active implementation plan. A partial, non-deployed implementation exists on `codex/reviewer-find-performance-build`; the production behavior is unchanged.
 >
 > **Primary objective:** returning to a previously searched request should show its persisted candidates promptly and should not repeat proposal, model, publication, or contact work merely to reconstruct the screen.
 
@@ -51,6 +51,22 @@ P0 is therefore a **warm-bootstrap and cache-correctness release**:
 6. attach a reason code to every miss, invalidation, or refresh.
 
 Cold-search progressive delivery remains important, but it follows the warm-path fix. Paid-provider usage is an operational cost metric, not the headline user-experience metric.
+
+## Implementation snapshot — 2026-08-01
+
+[VERIFIED via source, focused route/component tests, the full Jest suite, TypeScript, and the production Webpack build on `codex/reviewer-find-performance-build`] the feature branch currently implements:
+
+- authenticated Postgres-first `cached` roster reads followed by request-bound `reconciled` authority reads;
+- request-generation, abort, snapshot-conflict, and request-switch guards that prevent stale responses and exports from crossing requests;
+- an idle warm/cold split that suppresses mount-time proposal download, Blob copy, applicant enrichment, and provider/model work;
+- metadata-only, exact-request proposal validation and server-generated warm candidate plans;
+- strict legacy receipt mapping, per-stage freshness planning, and `Evidence checked as of <date>` presentation;
+- fail-closed applicant and generic promotion authority checks, including institution COI, eligibility completeness, coauthor completeness, and server-owned receipt preservation across roster mutations; and
+- one exact-candidate, exact-stage manual repair path for `applicant_anchor`, protected by request binding, canonical candidate keys, roster compare-and-swap, and stale/error reload guidance.
+
+This is a safe intermediate **display-only** implementation, not a deployable completion of P0. Selection and promotion remain disabled in Reviewer Find because only `applicant_anchor` has an executable targeted refresh producer. The remaining identity, institution COI, coauthor COI, eligibility, contact, address, and proposal-dependent stage producers do not yet emit a complete server-owned authoritative version snapshot. Both promotion services therefore continue to fail closed when that snapshot is absent or stale. Unsupported targeted stages never fall back to a full batch, proposal download, or paid/provider work.
+
+The branch has not been merged to `main`, deployed, exercised through an authenticated browser, used to write production Dataverse/Postgres state, or used to send reviewer email. Claude Opus adversarial review is also pending because the local Claude credential expired; primary-agent and independent Codex adversarial reviews found and corrected request-scope, stale-export, client-authority-persistence, and async-unmount defects before this snapshot.
 
 ## Contract-reconcile Mode A: Step 0
 
