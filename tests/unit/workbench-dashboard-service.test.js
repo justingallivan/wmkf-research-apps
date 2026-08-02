@@ -29,6 +29,15 @@ const fetchReviewerRollup = jest.fn(async () => ({}));
 jest.mock('../../lib/services/reviewer-rollup', () => ({
   fetchReviewerRollup: (...a) => fetchReviewerRollup(...a),
   deriveWorkRemaining: jest.fn(() => 'find'),
+  emptyCounts: () => ({
+    candidates: 0,
+    invited: 0,
+    accepted: 0,
+    declined: 0,
+    held: 0,
+    completed: 0,
+    progress: { total: 0, accepted: 0, pending: 0, declined: 0, uninvited: 0 },
+  }),
   REVIEWERS_NEEDED: 3,
 }));
 
