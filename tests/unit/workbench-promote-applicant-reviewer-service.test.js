@@ -77,6 +77,10 @@ jest.mock('../../lib/services/institution-identity-resolver', () => ({
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
+const {
+  getCandidatePromotionAuthority: getRealCandidatePromotionAuthority,
+} = jest.requireActual('../../lib/services/reviewer-promotion-authority');
+
 const REQ = '11111111-1111-1111-1111-111111111111';
 const SUG = '33333333-3333-3333-3333-333333333333';
 const PERSON = '22222222-2222-2222-2222-222222222222';
@@ -226,6 +230,35 @@ test('authority derivation unavailable → 503 before COI, contact, or lifecycle
   expect(err.httpStatus).toBe(503);
   expect(err.body).toMatchObject({ code: 'promotion_authority_unavailable' });
   expect(institutionCOIResolution).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('a fully populated applicant roster row fails closed through the real policy without an authoritative snapshot', async () => {
+  // Do not use the normal ready mock: the real policy must see the service
+  // omitted `authoritative` and stop this otherwise-ready row before mutation.
+  mockGetCandidatePromotionAuthority.mockImplementation(getRealCandidatePromotionAuthority);
+  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+    candidateKey: 'candidate:snapshot-required',
+  }));
+
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body).toMatchObject({ code: 'promotion_authority_unavailable' });
+  expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
+    expect.objectContaining({
+      candidateKey: 'candidate:snapshot-required',
+      rosterStatus: 'active',
+      stageFreshness: CURRENT_STAGE_FRESHNESS,
+      coauthorCheckStatus: 'complete',
+      eligibilityCheckStatus: 'complete',
+    }),
+    expect.objectContaining({ serverAuthoritative: true, checkInstitution: false }),
+  );
+  expect(mockGetCandidatePromotionAuthority.mock.calls[0][1]).not.toHaveProperty('authoritative');
+  expect(loadCoiContext).not.toHaveBeenCalled();
   expect(update).not.toHaveBeenCalled();
   expect(selectIfUnengaged).not.toHaveBeenCalled();
 });

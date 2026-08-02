@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-19
+last_verified: 2026-08-02
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -111,11 +111,13 @@ PD-typed email/website/affiliation (manual provenance), while declining to
 promote resolver-sourced ORCID/Scholar/metrics; institution COI is still
 enforced. Independently, automated `confirmed`/`probable` identity fields
 loosen persistence only with the request- and identity-bundle-bound signed
-receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened
-2026-07-29 in source; not deployed:** v3 additionally binds the exact contact
-projection (normalized email/source plus persistence flags). V1/v2 remain
-identity-only during their TTL. Unsigned or mismatched client identity is
-deny-only for persistence and durable decision writes. The legacy person row
+receipt minted by `/api/reviewer-finder/enrich-contacts`. **Hardened on the
+non-deployed feature branch:** new receipts mint v4; v3/v4 bind the exact
+contact projection (normalized email/source plus persistence flags), and v4
+also binds `eligibilityCheckStatus`. A valid v3 receipt remains authoritative
+for its eligibility result/evidence but cannot overwrite the stored check
+status. V1/v2 remain identity-only during their TTL. Unsigned or mismatched
+client identity is deny-only for persistence and durable decision writes. The legacy person row
 lacks per-field lineage, so the invalid/abstain path now preserves shared
 resolver fields instead of blanket-clearing them; destructive automated clears
 remain blocked until same-binding lineage can prove ownership. Email remains

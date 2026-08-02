@@ -2,8 +2,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-07-29 in source on branch
-`codex/reviewer-promotion-remediation` (not deployed). Migration 029 adds the
+**Last verified:** 2026-08-02 in source on branch
+`codex/reviewer-find-performance-build` (not deployed). Migration 029 adds the
 durable `blocked` status; migration 027 adds `ineligible`; migration 025 keeps
 mutations keyed by `candidate_key`. The live row-count note below predates
 migration 029 and is not a deployment claim. **Time-bounded incident supplement observed
@@ -80,7 +80,7 @@ accepted, review-received, or completed.
 | normalized_name | text | `normalizeReviewerName(candidate.name)` — conservative cross-run search exclusion only |
 | display_name | text | surface-time `candidate.name` for re-render |
 | status | text | `active` \| `excluded` \| `ineligible` \| `saved` \| `blocked` \| `coi_dropped` (CHECK-constrained) |
-| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`/`blocked`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. Browser-authored POST/exclude blobs have those authority fields stripped; one bounded request/candidate-key roster read restores only an existing server confirmation and its canonical manual contact, while applicant mutations re-read the full canonical server blob. Automated candidates may carry a server-signed `automatedIdentityAttestation`; v3 binds the request, immutable surfaced roster key, identity-bearing persistence bundle, eligibility evidence, and exact contact projection without storing raw provider payloads. A blocked row also stores its server-owned promotion decision/code/reason. |
+| candidate | jsonb | pruned render DTO (only card/render evidence fields, not raw enrichment internals). Applicant-suggested enrichment rows carry `enrichedProposalKey` (`library::folder::name`), `applicantEnrichmentCacheVersion`, and an explicit `identityStatus` gate result (`confirmed`, `probable`, or `unresolved`). The UI restores the cache only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for that proposal with the current `APPLICANT_ENRICHMENT_CACHE_VERSION` and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`/`blocked`). Legacy, unversioned, older-version, and unknown terminal rows cannot satisfy a missing expected row; a missing/partial non-terminal canonical batch re-enriches. Applicant institution contradictions route to `unresolved` only after the shared identity-consistency checker has ruled out direct or one-hop associated-institution compatibility. For that final coherence check, a current-run PubMed/ORCID verification institution outranks the applicant/stored institution; the latter is used only when the current verifier has no institution, so a stale prior affiliation cannot veto a coherent current identity or self-confirm a later namesake substitution. Direct eligibility evidence carries `eligibilityStatus`, reason, and a bounded fetched first-party page DTO (URL/title/evidence sentence/domain/check time). Institution-COI ledger and flagged active rows carry `hasInstitutionCOI` and `institutionCOIDetails` (`piInstitution`, reviewer affiliation, `dropDecision`, corroboration reason, drop stage/source where applicable). An authenticated `confirm_identity` action may add bounded `staffIdentityConfirmation` (opaque id, canonical manual contact, actor ids, timestamp, source), `manualContactFields`, and its UI marker. Browser-authored POST/exclude blobs have those authority fields stripped; one bounded request/candidate-key roster read restores only an existing server confirmation and its canonical manual contact, while applicant mutations re-read the full canonical server blob. Automated candidates may carry a server-signed `automatedIdentityAttestation`; new receipts mint v4, while v3/v4 bind the request, immutable surfaced roster key, identity-bearing persistence bundle, eligibility evidence, and exact contact projection without storing raw provider payloads. V4 additionally binds `eligibilityCheckStatus`; a valid v3 receipt may restore its eligibility result/evidence but not overwrite the stored check status. A blocked row also stores its server-owned promotion decision/code/reason. |
 | source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | |
@@ -180,8 +180,11 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   (candidate-keyed upsert `active`/`ineligible`), `recordCoiDropped`,
   `setExcluded`, `promote`, `confirmIdentity`,
   `finalizeCandidatePromotion` (server-only exact-key `active`→`saved` after a
-  confirmed Dataverse suggestion success, followed by best-effort retirement
-  of active aliases carrying the same checksum-valid ORCID), `markPromotionBlocked`
+  confirmed Dataverse suggestion success; current promotion callers bind that
+  write to the server-issued `updated_at` token, so a changed/evicted row is
+  never recreated after the Dataverse mutation and is reported as partial
+  success, followed by best-effort retirement of active aliases carrying the
+  same checksum-valid ORCID), `markPromotionBlocked`
   (server-only exact-key `active`→`blocked` with decision/code/reason), and
   `removePreviousActiveSearchResults`, plus the stage-local
   `startStageRefresh`/`completeStageRefresh`/`failStageRefresh`/
@@ -189,7 +192,9 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   one named stage under `candidate.stageFreshness`, bind every write to the
   canonical candidate key + expected `updated_at` + refresh-attempt lease, and
   JSONB-merge rather than erasing prior display evidence. Terminal states are
-  monotonic against ordinary result refreshes.
+  monotonic against ordinary result refreshes. A validated
+  `completeStageRefresh` atomically stamps `candidate.warmCacheVersion=1` with
+  the completed receipt; start, failure, and lease recovery never stamp it.
 - `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
   Promote, authenticated identity confirmation, and scoped removal. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
@@ -215,8 +220,10 @@ No Dataverse equivalent for the operational roster itself. Crossing points:
 then finalizes the exact roster key as `saved` and best-effort retires active
 same-ORCID aliases; applicant promotion selects the existing suggestion, then
 performs the same server-owned finalization.
-Dataverse and Postgres are not one transaction, so a finalization failure emits
-an operational alert and the canonical Dataverse row remains authoritative.
+Dataverse and Postgres are not one transaction, so a finalization failure or
+lost roster CAS is explicit partial success: it emits an operational alert, the
+canonical Dataverse row remains authoritative, and the current promotion path
+does not recreate the changed/evicted roster row from its stale snapshot.
 Applicant-excluded no-ops become `blocked`; the roster never governs the
 Dataverse `wmkf_applicantdisposition` picklist. The branch roster GET also
 projects suggestion engagement from Dataverse as a read-only terminal overlay;
@@ -229,16 +236,18 @@ it does not rewrite Postgres or Dataverse.
 - Stores a pruned render DTO, never raw provider payloads or `tierResults`. Eligibility retains only the bounded fetched first-party page evidence needed for staff verification.
 - Staff confirmation authority is not the client boolean. `save-candidates` must retrieve the opaque confirmation id under the same request and match the canonical name/email/website/affiliation; missing, mismatched, cross-request, or failed reads stop before writes.
 - Automated `confirmed` / `probable` fields are deny-only without a valid signed
-  receipt. Projection v3 uses `NEXTAUTH_SECRET`, expires after 14 days, and
+  receipt. New projection v4 receipts use `NEXTAUTH_SECRET`, expire after 14 days, and
   binds request, immutable roster key, identity bundle, eligibility evidence,
-  exact normalized effective email/source, and contact persistence flags. Mint
-  and save use the same `projectReviewerContact` derivation. V1/v2 tokens remain
+  exact normalized effective email/source, contact persistence flags, and
+  `eligibilityCheckStatus`. Mint and save use the same
+  `projectReviewerContact` derivation. Valid v3 receipts retain the same contact
+  authority but cannot overwrite the stored eligibility check status. V1/v2 tokens remain
   verifiable against their own historical projections during the TTL but are
   identity-only evidence and never authorize contact promotion. New
   roster-managed candidates fail closed unless the receipt carries the verified
   immutable roster key; only bare pre-roster compatibility payloads retain the
   old mutable-correlation path.
-- An exact-address edit can deliberately invalidate a v3 token's contact digest.
+- An exact-address edit can deliberately invalidate a v3/v4 token's contact digest.
   Save may recover only by re-reading the submitted immutable key under the same
   request, requiring an active/saved row whose valid server identity-decision
   receipt matches the submitted identity digest and whose exact address receipt

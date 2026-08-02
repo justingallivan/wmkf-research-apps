@@ -181,6 +181,7 @@ function valueFromCandidateOrEnrichment(candidate, field) {
 
 function restoreStoredRosterAuthority(candidate, stored, {
   allowReceiptBoundEligibility = false,
+  allowReceiptBoundEligibilityCheckStatus = false,
 } = {}) {
   if (!stored || !candidate || typeof candidate !== 'object') return candidate;
   const restored = { ...candidate };
@@ -190,7 +191,11 @@ function restoreStoredRosterAuthority(candidate, stored, {
     ? { ...candidate.contactEnrichment }
     : {};
   for (const field of CLIENT_ROSTER_AUTHORITY_FIELDS) {
-    if (allowReceiptBoundEligibility && RECEIPT_BOUND_ELIGIBILITY_FIELDS.has(field)) continue;
+    if (
+      allowReceiptBoundEligibility
+      && RECEIPT_BOUND_ELIGIBILITY_FIELDS.has(field)
+      && (field !== 'eligibilityCheckStatus' || allowReceiptBoundEligibilityCheckStatus)
+    ) continue;
     const storedValue = valueFromCandidateOrEnrichment(stored, field);
     if (!storedValue.present) continue;
     restored[field] = storedValue.value;
@@ -201,10 +206,13 @@ function restoreStoredRosterAuthority(candidate, stored, {
 
 function receiptBoundEligibility(candidate, receipt) {
   const bound = receipt?.valid === true && receipt.eligibilityEvidenceBound === true;
+  // v3 eligibility digests deliberately exclude this status. Its claim is
+  // therefore not authoritative until the v4 receipt projection binds it.
+  const checkStatusBound = bound && receipt?.projectionVersion >= 4;
   const eligibilityStatus = bound && ELIGIBILITY_STATUSES.has(receipt.eligibilityStatus)
     ? receipt.eligibilityStatus
     : 'unknown';
-  const eligibilityCheckStatus = bound && ELIGIBILITY_CHECK_STATUSES.has(receipt.eligibilityCheckStatus)
+  const eligibilityCheckStatus = checkStatusBound && ELIGIBILITY_CHECK_STATUSES.has(receipt.eligibilityCheckStatus)
     ? receipt.eligibilityCheckStatus
     : null;
   const eligibilityReason = bound
@@ -215,6 +223,7 @@ function receiptBoundEligibility(candidate, receipt) {
     : null;
   return {
     bound,
+    checkStatusBound,
     eligibilityStatus,
     eligibilityCheckStatus,
     eligibilityReason,
@@ -243,9 +252,17 @@ function isReceiptBoundEligibilityCandidate(candidate) {
   return candidate?.receiptBoundEligibility === true;
 }
 
+function isReceiptBoundEligibilityCheckStatusCandidate(candidate) {
+  return candidate?.receiptBoundEligibilityCheckStatus === true;
+}
+
 function removeReceiptBoundEligibilityMarker(candidate) {
   if (!candidate || typeof candidate !== 'object') return candidate;
-  const { receiptBoundEligibility: _receiptBoundEligibility, ...safe } = candidate;
+  const {
+    receiptBoundEligibility: _receiptBoundEligibility,
+    receiptBoundEligibilityCheckStatus: _receiptBoundEligibilityCheckStatus,
+    ...safe
+  } = candidate;
   return safe;
 }
 
@@ -285,10 +302,12 @@ async function preserveStoredRosterAuthority(requestId, candidates, {
   const storedByKey = new Map(storedRows.map((candidate) => [candidate.candidateKey, candidate]));
   return list.map((markedCandidate) => {
     const allowReceiptBoundEligibility = isReceiptBoundEligibilityCandidate(markedCandidate);
+    const allowReceiptBoundEligibilityCheckStatus = isReceiptBoundEligibilityCheckStatusCandidate(markedCandidate);
     const candidate = removeReceiptBoundEligibilityMarker(markedCandidate);
     const stored = storedByKey.get(candidate?.candidateKey);
     const withStoredAuthority = restoreStoredRosterAuthority(candidate, stored, {
       allowReceiptBoundEligibility,
+      allowReceiptBoundEligibilityCheckStatus,
     });
     const freshIdentityReceipt = hasServerIdentityDecisionReceipt(withStoredAuthority)
       ? withStoredAuthority.serverIdentityDecisionReceipt
@@ -358,7 +377,10 @@ async function preserveStoredRosterAuthority(requestId, candidates, {
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
-    }, stored, { allowReceiptBoundEligibility });
+    }, stored, {
+      allowReceiptBoundEligibility,
+      allowReceiptBoundEligibilityCheckStatus,
+    });
   });
 }
 
@@ -724,6 +746,7 @@ async function handlePost(req, res) {
         ? { serverIdentityDecisionReceipt: identityReceipt }
         : {}),
       receiptBoundEligibility: eligibility.bound,
+      receiptBoundEligibilityCheckStatus: eligibility.checkStatusBound,
     };
   }))).filter(Boolean);
   const authoritativePruned = await preserveStoredRosterAuthority(requestId, pruned);

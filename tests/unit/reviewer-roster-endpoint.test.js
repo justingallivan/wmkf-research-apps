@@ -860,6 +860,66 @@ describe('POST recordSurfaced', () => {
     });
   });
 
+  it('keeps the stored eligibility check status when an old v3 receipt returns through the v4 roster tab', async () => {
+    const resurfaced = {
+      name: 'Versioned Eligibility Reviewer',
+      email: 'versioned@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+    };
+    const candidateKey = reviewerCandidateKey(resurfaced);
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      projectionVersion: 3,
+      eligibilityEvidenceBound: true,
+      eligibilityStatus: 'emeritus',
+      // v3 carried this claim but did not include it in its eligibility digest.
+      eligibilityCheckStatus: 'complete',
+    });
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      ...resurfaced,
+      candidateKey,
+      eligibilityStatus: 'unknown',
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityReason: 'The prior server check was incomplete',
+      eligibilityEvidence: { status: 'unknown', url: 'https://example.edu/prior-check' },
+      contactEnrichment: {
+        eligibilityStatus: 'unknown',
+        eligibilityCheckStatus: 'incomplete',
+        eligibilityReason: 'The prior server check was incomplete',
+        eligibilityEvidence: { status: 'unknown', url: 'https://example.edu/prior-check' },
+      },
+    }]);
+    const currentTabCandidate = {
+      ...resurfaced,
+      candidateKey,
+      automatedIdentityAttestation: 'valid-v3-receipt',
+      eligibilityStatus: 'emeritus',
+      eligibilityCheckStatus: 'complete',
+      eligibilityReason: 'Server-signed emeritus evidence',
+      eligibilityEvidence: { status: 'emeritus', url: 'https://example.edu/emeritus' },
+    };
+    const r = res();
+
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [currentTabCandidate] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      // The other v3-bound evidence remains server-controlled, but this field
+      // is restored because only a v4 digest can bind it.
+      eligibilityStatus: 'emeritus',
+      eligibilityCheckStatus: 'incomplete',
+      eligibilityReason: 'Server-signed emeritus evidence',
+      eligibilityEvidence: { status: 'emeritus', url: 'https://example.edu/emeritus' },
+      contactEnrichment: {
+        eligibilityStatus: 'emeritus',
+        eligibilityCheckStatus: 'incomplete',
+        eligibilityReason: 'Server-signed emeritus evidence',
+        eligibilityEvidence: { status: 'emeritus', url: 'https://example.edu/emeritus' },
+      },
+    });
+  });
+
   it('preserves a fresh server identity receipt while restoring stored staff authority', async () => {
     const resurfaced = {
       name: 'Ann Lee',
@@ -922,6 +982,7 @@ describe('POST recordSurfaced', () => {
   it('preserves deceased evidence only when the server receipt binds it', async () => {
     verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
       valid: true,
+      projectionVersion: 4,
       eligibilityStatus: 'deceased',
       eligibilityCheckStatus: 'complete',
       eligibilityEvidenceBound: true,

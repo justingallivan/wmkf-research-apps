@@ -11,6 +11,7 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 import { sql } from '@vercel/postgres';
 
 const store = require('../../lib/services/reviewer-roster-store');
+const { planCandidateFreshness } = require('../../lib/services/reviewer-stage-freshness');
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
@@ -58,6 +59,7 @@ describe('stage refresh CAS', () => {
     expect(queryTextOf(0)).toMatch(/refreshAttemptId/);
     expect(allInterpolations()).toEqual(expect.arrayContaining(['candidate:ann', 'version-1']));
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('attempt-1'))).toBe(true);
+    expect(allInterpolations()).not.toContain(JSON.stringify({ warmCacheVersion: 1 }));
 
     sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
     await expect(store.completeStageRefresh(REQ, 'candidate:ann', 'version-2', 'contact', 'wrong-attempt', {})).resolves.toMatchObject({ outcome: 'rejected' });
@@ -70,6 +72,76 @@ describe('stage refresh CAS', () => {
     expect(queryTextOf(0)).toMatch(/COALESCE\(candidate->'stageFreshness'->/);
     expect(queryTextOf(1)).toMatch(/CASE WHEN.*refreshStartedAt.*timestamptz/s);
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('prior_refresh_incomplete'))).toBe(true);
+    expect(allInterpolations()).not.toContain(JSON.stringify({ warmCacheVersion: 1 }));
+  });
+
+  test('a successful server stage completion atomically stamps the warm cache version for the next planner read', async () => {
+    const candidateBeforeCompletion = {
+      candidateKey: 'suggestion:aaaaaaaa-1111-1111-1111-111111111111',
+      isApplicantRecommended: true,
+      applicantInputVersion: 'applicant-input-v1',
+      proposalContentVersion: 'proposal-v1',
+      stageFreshness: {
+        applicant_anchor: {
+          state: 'refreshing',
+          refreshAttemptId: 'attempt-1',
+          refreshStartedAt: '2026-08-02T12:00:00.000Z',
+        },
+      },
+    };
+    const receipt = {
+      state: 'current',
+      contractVersion: 1,
+      sourceVersion: 'applicant-anchor-v1',
+      completedAt: '2026-08-02T12:01:00.000Z',
+    };
+    // Model the row returned by production's single UPDATE. The input row has
+    // no warmCacheVersion; the persisted shape comes from the completion patch
+    // that this test also requires the SQL call to carry.
+    sql.mockImplementationOnce(async (_fragments, ...values) => {
+      const cacheVersionPatch = values.find((value) => value === JSON.stringify({ warmCacheVersion: 1 }));
+      expect(cacheVersionPatch).toBe(JSON.stringify({ warmCacheVersion: 1 }));
+      return {
+        rows: [{
+          candidate: {
+            ...candidateBeforeCompletion,
+            ...JSON.parse(cacheVersionPatch),
+            stageFreshness: { applicant_anchor: receipt },
+          },
+          updated_at_token: 'version-2',
+        }],
+        rowCount: 1,
+      };
+    });
+
+    const completed = await store.completeStageRefresh(
+      REQ,
+      candidateBeforeCompletion.candidateKey,
+      'version-1',
+      'applicant_anchor',
+      'attempt-1',
+      receipt,
+    );
+
+    expect(completed).toMatchObject({ outcome: 'recorded', candidate: { warmCacheVersion: 1 } });
+    expect(queryTextOf(0)).toMatch(/candidate = candidate \|\|/);
+    const plan = planCandidateFreshness({
+      candidate: completed.candidate,
+      authoritative: {
+        authorityState: 'current',
+        applicantInputVersion: 'applicant-input-v1',
+        proposalContentVersion: 'proposal-v1',
+        versions: { applicant_anchor: 'applicant-anchor-v1' },
+      },
+    });
+    expect(plan.currentStages).toContain('applicant_anchor');
+    expect(plan.refreshes).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'applicant_anchor' }),
+    ]));
+    expect(plan.refreshes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'identity' }),
+    ]));
+    expect(plan.promotionAuthority).toBe('blocked_refresh_required');
   });
 
   test('rejects malformed stage contracts before issuing SQL', async () => {

@@ -19,9 +19,9 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-07-29 on branch
-`codex/reviewer-promotion-remediation` (not deployed) — Contracts 1–3 were
-re-traced through the canonical contact projection, v3 attestation,
+**Last verified:** 2026-08-02 on branch
+`codex/reviewer-find-performance-build` (not deployed) — Contracts 1–3 were
+re-traced through the canonical contact projection, v3/v4 attestation,
 server-owned roster finalization, explicit contact-clear command, and focused
 tests. Contract 5 was last re-verified 2026-07-06 against the server-side save
 recompute; Contract 7 was last re-verified 2026-07-03. See `[VERIFIED]` tags per
@@ -104,12 +104,16 @@ flags, affiliation rescue, and anti-scrape rejection. The Find card renders
 renders a promotion checkbox. `save-candidates-service.js` recomputes the
 decision before adapters are called.
 
-Automated attestation v3 binds the exact projected email, source, persistence
-flags, request, immutable roster key, identity decision, and eligibility
-evidence. V1/v2 receipts still verify their historical identity claims during
-their TTL but are never contact-authoritative. Staff confirmation remains an
-exact server-stored, actor-bound value contract; changing any confirmed contact
-field requires reconfirmation.
+New automated attestations mint projection v4. V3 and v4 bind the exact
+projected email, source, persistence flags, request, immutable roster key,
+identity decision, and eligibility evidence, so both remain
+contact-authoritative during their TTL. V4 additionally binds
+`eligibilityCheckStatus`; a valid legacy v3 receipt may restore the bound
+eligibility result/evidence but not overwrite the stored check-status field.
+V1/v2 receipts still verify their historical identity claims during their TTL
+but are never contact-authoritative. Staff confirmation remains an exact
+server-stored, actor-bound value contract; changing any confirmed contact field
+requires reconfirmation.
 
 **Why.** The old force-null path safely withheld a possibly wrong email but
 still created a selected name-only row, which made retention look like a

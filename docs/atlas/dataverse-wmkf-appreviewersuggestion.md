@@ -213,7 +213,7 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/workbench/manual-reviewer.js` — adapter `ensureStaffManualCandidate` for sparse staff-entered reviewers. Creates/reuses the person through the identity-safe manual-add path, then writes/reselects the per-request suggestion with `staff_manual` and, for reviewer referrals, `referred` in `wmkf_sources`. It does not carry or mutate decline-referral indexes.
 - `pages/api/workbench/decline-referrals.js` — GET expands unresolved referral items. Structured rows are omitted when exact request-scoped `referred` candidate evidence proves selection/engagement; legacy rows carrying the resolved memo prefix are omitted. PATCH calls `dismissLegacyDeclineReferral` and rejects structured rows.
 - `pages/api/reviewer-finder/save-candidates.js` — canonical contact projection
-  and v3/staff-confirmation authority are checked before person/suggestion
+  and contact-bound v3/v4 or staff-confirmation authority are checked before person/suggestion
   writes. Adapter `upsert` creates/converges the per-(reviewer,request)
   suggestion; the service returns exact per-key `saved`/`withheld`/`failed`
   results and performs the server-owned roster finalization. An

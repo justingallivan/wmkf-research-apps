@@ -52,7 +52,7 @@ P0 is therefore a **warm-bootstrap and cache-correctness release**:
 
 Cold-search progressive delivery remains important, but it follows the warm-path fix. Paid-provider usage is an operational cost metric, not the headline user-experience metric.
 
-## Implementation snapshot — 2026-08-01
+## Implementation snapshot — 2026-08-02
 
 [VERIFIED via source, focused route/component tests, the full Jest suite, TypeScript, and the production Webpack build on `codex/reviewer-find-performance-build`] the feature branch currently implements:
 
@@ -66,7 +66,7 @@ Cold-search progressive delivery remains important, but it follows the warm-path
 
 This is a safe intermediate **display-only** implementation, not a deployable completion of P0. Selection and promotion remain disabled in Reviewer Find because only `applicant_anchor` has an executable targeted refresh producer. The remaining identity, institution COI, coauthor COI, eligibility, contact, address, and proposal-dependent stage producers do not yet emit a complete server-owned authoritative version snapshot. Both promotion services therefore continue to fail closed when that snapshot is absent or stale. Unsupported targeted stages never fall back to a full batch, proposal download, or paid/provider work.
 
-The branch has not been merged to `main`, deployed, exercised through an authenticated browser, used to write production Dataverse/Postgres state, or used to send reviewer email. Claude Opus adversarial review is also pending because the local Claude credential expired; primary-agent and independent Codex adversarial reviews found and corrected request-scope, stale-export, client-authority-persistence, and async-unmount defects before this snapshot.
+The branch has not been merged to `main`, deployed, exercised through an authenticated browser, used to write production Dataverse/Postgres state, or used to send reviewer email. A fresh Claude Opus adversarial review returned **NEEDS REWORK** and identified one convergence defect plus promotion-authority coverage and receipt-compatibility/documentation gaps. The branch now stamps `warmCacheVersion` atomically only when a validated stage refresh completes, covers both promotion callers with the real fail-closed policy, preserves stored `eligibilityCheckStatus` when accepting a valid legacy v3 receipt, and documents token-bound roster-finalization partial success. A focused follow-up Opus review and the final gate pass remain pending at this snapshot.
 
 ## Contract-reconcile Mode A: Step 0
 

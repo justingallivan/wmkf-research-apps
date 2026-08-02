@@ -145,14 +145,17 @@ If you're touching a service or utility, read its header before this catalog. If
   CAS preserves prior evidence on failed refreshes. It never accepts
   name/receipt/dependency authority or calls the full applicant batch.
 - **`reviewer-candidate-attestation.js`** — `NEXTAUTH_SECRET`-signed
-  request/candidate receipt. Projection v3 binds the exact canonical contact
-  projection in addition to identity/eligibility; v1/v2 remain verifiable
-  against their historical projections but are never contact-authoritative. A
-  compact server-only roster receipt preserves a canonical digest of the
-  accepted identity decision after ingestion and must still match the current
-  row at use time. Mutable address/affiliation fields are deliberately excluded.
+  request/candidate receipt. New receipts mint projection v4; v3/v4 are
+  contact-authoritative when their exact canonical contact projection is ready
+  and matches, and v4 additionally binds `eligibilityCheckStatus`. v1/v2
+  remain verifiable against their historical projections but are never
+  contact-authoritative. A compact server-only roster receipt preserves a
+  canonical digest of the accepted identity decision after ingestion and must
+  still match the current row at use time. Mutable address/affiliation fields
+  are deliberately excluded.
 - **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
-  promotion boundary: canonical contact projection, v3/staff authority,
+  promotion boundary: canonical contact projection, contact-bound v3/v4 or
+  staff authority,
   exact-email owner reuse and race convergence, per-row result contract,
   bounded new-person compensation, and exact roster finalization.
 - **`reviewer-promotion-repair-classifier.js`** — Pure read-only historical

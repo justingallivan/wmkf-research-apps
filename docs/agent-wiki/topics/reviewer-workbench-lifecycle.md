@@ -94,8 +94,10 @@ selectable for **Promote to Invite**. `needs_identity_confirmation` and
 `missing_email` remain visible with their exact staff action and produce no
 person/suggestion write.
 
-Automated receipt v3 binds that exact contact projection to the request and
-immutable roster key; v1/v2 remain identity-only during their TTL. A staff
+New automated receipts mint v4. V3/v4 bind that exact contact projection to
+the request and immutable roster key; v4 also binds
+`eligibilityCheckStatus`, while a valid v3 receipt cannot replace the stored
+check status. V1/v2 remain identity-only during their TTL. A staff
 override remains an exact actor-bound server record. `save-candidates-service`
 recomputes authority before adapters, resolves a unique active exact-email
 owner before creation, converges create races, checks applicant exclusion, and

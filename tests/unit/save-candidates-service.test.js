@@ -109,6 +109,9 @@ const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const NotificationService = require('../../lib/services/notification-service').default;
+const {
+  getCandidatePromotionAuthority: getRealCandidatePromotionAuthority,
+} = jest.requireActual('../../lib/services/reviewer-promotion-authority');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
 const { VERIFICATION_STATUSES } = require('../../lib/services/discovery/constants');
 const {
@@ -653,6 +656,45 @@ test('ordinary saving withholds promotion when the authoritative roster row is m
   ]);
   expect(reviewerRosterStore.findAddressTrustReceipt).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
+test('a fully populated stored roster row still fails closed when no authoritative snapshot is supplied', async () => {
+  // This deliberately delegates to the real policy, not the suite's normal
+  // ready mock. The service currently has no authoritative snapshot resolver,
+  // so a browser-visible current stage bundle is insufficient for mutation.
+  mockGetCandidatePromotionAuthority.mockImplementation(getRealCandidatePromotionAuthority);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Snapshot Required',
+      candidateKey: 'candidate:snapshot-required',
+      automatedIdentityAttestation: 'signed-snapshot-required',
+      email: 'snapshot.required@example.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({ code: 'promotion_authority_unavailable', outcome: 'withheld' }),
+  ]);
+  expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
+    expect.objectContaining({
+      candidateKey: 'candidate:snapshot-required',
+      rosterStatus: 'active',
+      stageFreshness: CURRENT_STAGE_FRESHNESS,
+      coauthorCheckStatus: 'complete',
+      eligibilityCheckStatus: 'complete',
+    }),
+    expect.objectContaining({ serverAuthoritative: true, checkInstitution: false }),
+  );
+  expect(mockGetCandidatePromotionAuthority.mock.calls[0][1]).not.toHaveProperty('authoritative');
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
 
 test('stored staff confirmation supplies the authoritative roster key when the automated receipt expired', async () => {
