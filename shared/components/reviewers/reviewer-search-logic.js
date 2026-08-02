@@ -754,25 +754,6 @@ function pruneStaffIdentityConfirmation(confirmation) {
   };
 }
 
-function pruneStageFreshness(freshness) {
-  const stages = new Set(['applicant_anchor', 'identity', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust', 'roster_persistence']);
-  const states = new Set(['current', 'stale', 'refreshing', 'incomplete', 'failed', 'not_applicable']);
-  const reasons = new Set(['stage_missing', 'stage_incomplete', 'prior_write_incomplete', 'prior_refresh_incomplete', 'stage_contract_changed', 'proposal_content_changed', 'candidate_input_changed', 'manual_refresh', 'unclassified_miss']);
-  if (!freshness || typeof freshness !== 'object' || Array.isArray(freshness)) return {};
-  return Object.fromEntries(Object.entries(freshness)
-    .filter(([stage, value]) => stages.has(stage) && value && typeof value === 'object' && !Array.isArray(value))
-    .map(([stage, value]) => [stage, {
-      state: states.has(value.state) ? value.state : 'incomplete',
-      contractVersion: Number.isInteger(value.contractVersion) ? value.contractVersion : null,
-      sourceVersion: boundedText(value.sourceVersion, 160),
-      completedAt: boundedText(value.completedAt, 80),
-      refreshAttemptId: boundedText(value.refreshAttemptId, 100),
-      refreshStartedAt: boundedText(value.refreshStartedAt, 80),
-      reason: reasons.has(value.reason) ? value.reason : (value.reason ? 'unclassified_miss' : null),
-      errorCode: ['retryable_failure', 'terminal_failure'].includes(value.errorCode) ? value.errorCode : null,
-    }]));
-}
-
 /**
  * Prune an enriched candidate down to the fields `CandidateCard` actually
  * renders, for durable storage in `reviewer_find_roster` (S224). Keeps the card

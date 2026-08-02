@@ -68,7 +68,7 @@ describe('stage refresh CAS', () => {
     await expect(store.failStageRefresh(REQ, 'candidate:ann', 'v1', 'coauthor_coi', 'attempt-1')).resolves.toMatchObject({ outcome: 'failed_retryable' });
     await expect(store.recoverExpiredStageRefresh(REQ, 'candidate:ann', 'v2', 'coauthor_coi', 'attempt-2')).resolves.toMatchObject({ outcome: 'failed_retryable' });
     expect(queryTextOf(0)).toMatch(/COALESCE\(candidate->'stageFreshness'->/);
-    expect(queryTextOf(1)).toMatch(/refreshStartedAt.*interval '1 millisecond'/);
+    expect(queryTextOf(1)).toMatch(/CASE WHEN.*refreshStartedAt.*timestamptz/s);
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('prior_refresh_incomplete'))).toBe(true);
   });
 
