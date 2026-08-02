@@ -35,6 +35,8 @@
     "e2e:pr4": "node scripts/pr4-e2e.js",
     "test:e2e": "playwright test",
     "test:e2e:reviewer-engagement": "playwright test tests/e2e/program-director-invite.spec.js --project=chromium",
+    "test:e2e:reviewer-find": "playwright test --config=playwright.reviewer-find.config.js",
+    "check:e2e:reviewer-find-isolation": "node scripts/check-reviewer-find-e2e-isolation.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "rehearse:reviewer-invite:browser": "node scripts/rehearse-pd-invite-browser.mjs",

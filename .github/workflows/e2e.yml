@@ -10,14 +10,29 @@ on:
     paths:
       - 'pages/api/external/**'
       - 'pages/api/review-manager/**'
+      - 'pages/api/workbench/**'
+      - 'pages/api/reviewer-finder/**'
       - 'pages/external/**'
+      - 'pages/workbench/**'
       - 'shared/components/external/**'
+      - 'shared/components/Layout.js'
+      - 'shared/components/RequireAppAccess.js'
       - 'shared/components/reviewers/**'
+      - 'shared/context/**'
       # lib/bill = the honorarium-onboarding orchestrator + service the accept
       # path invokes; a change here can alter the e2e-covered accept behavior.
       - 'lib/bill/**'
+      - 'lib/services/workbench/**'
+      - 'lib/services/reviewer-*.js'
+      - 'lib/services/graph-service.js'
+      - 'lib/dataverse/adapters/grant-request.js'
+      - 'lib/dataverse/adapters/reviewer-suggestion.js'
+      - 'lib/utils/auth.js'
+      - 'lib/utils/sharepoint-buckets.js'
       - 'tests/e2e/**'
       - 'playwright.config.js'
+      - 'playwright.reviewer-find.config.js'
+      - 'scripts/reviewer-find-e2e-*.mjs'
       - 'package.json'
       - '.github/workflows/e2e.yml'
   push:
@@ -62,6 +77,11 @@ jobs:
           NEXTAUTH_SECRET: e2e-not-a-real-secret
           NEXTAUTH_URL: http://localhost:3100
           AUTH_REQUIRED: 'false'
+      # Reviewer Find gets its own process, port, configuration, and report
+      # folder. Its launcher copies only tracked files into a temporary root and
+      # constructs a credential-free child environment before Next starts.
+      - run: npm run check:e2e:reviewer-find-isolation
+      - run: npm run test:e2e:reviewer-find
       # Keep the HTML report for debugging a failed run.
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
