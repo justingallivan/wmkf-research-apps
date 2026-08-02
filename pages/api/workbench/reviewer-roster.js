@@ -45,6 +45,10 @@ import {
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
 import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
+import {
+  observationFromRequest,
+  withReviewerFindWarmObservation,
+} from '../../../lib/services/workbench/reviewer-find-warm-observation';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -105,15 +109,20 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
-  try {
-    if (req.method === 'GET') return await handleGet(req, res);
-    if (req.method === 'POST') return await handlePost(req, res);
-    if (req.method === 'PATCH') return await handlePatch(req, res, access);
-    return res.status(405).json({ error: 'Method not allowed' });
-  } catch (error) {
-    console.error('reviewer-roster error:', error.message);
-    return res.status(500).json({ error: 'Reviewer roster operation failed' });
-  }
+  // A valid header only creates a bounded correlation scope for the two warm
+  // GET modes. It is established after auth, cannot authorize anything, and
+  // absent/malformed values preserve the exact pre-observation behavior.
+  return withReviewerFindWarmObservation(observationFromRequest(req), async () => {
+    try {
+      if (req.method === 'GET') return await handleGet(req, res);
+      if (req.method === 'POST') return await handlePost(req, res);
+      if (req.method === 'PATCH') return await handlePatch(req, res, access);
+      return res.status(405).json({ error: 'Method not allowed' });
+    } catch (error) {
+      console.error('reviewer-roster error:', error.message);
+      return res.status(500).json({ error: 'Reviewer roster operation failed' });
+    }
+  });
 }
 
 function validRequestId(requestId) {

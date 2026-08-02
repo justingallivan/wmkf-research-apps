@@ -78,8 +78,10 @@ import {
 } from '../../lib/services/reviewer-candidate-attestation';
 import * as store from '../../lib/services/reviewer-roster-store';
 import { reviewerCandidateKey } from '../../shared/components/reviewers/reviewer-search-logic';
+import { OBSERVATION_HEADER } from '../../lib/services/workbench/reviewer-find-warm-observation';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
+const OBSERVATION_ID = 'rfw_0123456789abcdef0123456789abcdef';
 const SERVER_STAFF_IDENTITY_AUTHORITY = {
   state: 'confirmed',
   canonicalPersonId: '22222222-2222-4222-8222-222222222222',
@@ -131,6 +133,22 @@ describe('auth', () => {
     expect(store.listForRequest).not.toHaveBeenCalled();
     expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
     expect(requireAppAccess).toHaveBeenCalledWith(expect.any(Object), r, 'reviewer-finder', 'reviewers');
+  });
+
+  it('does not establish an observation scope before app access succeeds', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const r = res();
+    await handler({
+      method: 'GET',
+      query: { requestId: REQ, mode: 'cached' },
+      headers: { [OBSERVATION_HEADER]: OBSERVATION_ID },
+    }, r);
+
+    expect(store.listForRequest).not.toHaveBeenCalled();
+    expect(console.info).not.toHaveBeenCalledWith(
+      'reviewer-find-warm-observation',
+      expect.any(Object),
+    );
   });
 });
 
@@ -195,6 +213,34 @@ describe('GET', () => {
     });
     expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
     expect(withDalContext).not.toHaveBeenCalled();
+  });
+
+  it('emits a bounded route observation only for a valid warm GET correlation header', async () => {
+    const r = res();
+    await handler({
+      method: 'GET',
+      query: { requestId: REQ, mode: 'cached' },
+      headers: { [OBSERVATION_HEADER]: OBSERVATION_ID },
+    }, r);
+
+    const events = console.info.mock.calls
+      .filter(([label]) => label === 'reviewer-find-warm-observation')
+      .map(([, event]) => event);
+    expect(events).toEqual([
+      expect.objectContaining({
+        observationId: OBSERVATION_ID,
+        route: 'reviewer_roster',
+        mode: 'cached',
+        event: 'start',
+      }),
+      expect.objectContaining({
+        observationId: OBSERVATION_ID,
+        route: 'reviewer_roster',
+        mode: 'cached',
+        event: 'complete',
+        reasonCode: 'warm_get_completed',
+      }),
+    ]);
   });
 
   it('uses the same opaque roster version for the same persisted snapshot', async () => {
