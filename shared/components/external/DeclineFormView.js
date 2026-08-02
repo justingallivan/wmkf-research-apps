@@ -3,12 +3,17 @@
  * Stage 2a. Same URL, dedicated page-level layout (not a modal) per locked
  * decision in the build plan §6.
  *
- * Field order: referral first, reason second (per design doc — referrals
- * are the most useful capture). All fields optional; submit-without-
- * filling-anything is supported.
+ * Referrals are structured Name / Institution / Email rows (one expanding to
+ * four), followed by an optional decline-reason picklist. The form does not
+ * solicit prose. Submitting with no details remains supported.
  */
 
 import { useState, useRef, useEffect } from 'react';
+import {
+  DECLINE_REFERRAL_LIMITS,
+  MAX_DECLINE_REFERRALS,
+  normalizeDeclineReferrals,
+} from '../../utils/decline-referrals';
 
 const DECLINE_REASONS = [
   { value: '', label: 'Select a reason (optional)' },
@@ -20,9 +25,8 @@ const DECLINE_REASONS = [
 ];
 
 export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
-  const [referral, setReferral] = useState('');
+  const [referrals, setReferrals] = useState([{ name: '', institution: '', email: '' }]);
   const [reasonPicklist, setReasonPicklist] = useState('');
-  const [reasonText, setReasonText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const headingRef = useRef(null);
@@ -66,21 +70,39 @@ export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
     }
   }
 
-  // Primary submit: send whatever the reviewer typed.
   function submitDecline() {
+    const normalized = normalizeDeclineReferrals(referrals);
+    if (!normalized.ok) {
+      const messages = {
+        decline_referral_name_required: 'Please include a name for each suggested reviewer.',
+        invalid_decline_referral_email: 'Please enter a valid email address or leave it blank.',
+        decline_referrals_too_long: 'Please shorten the suggested reviewer details.',
+      };
+      setError(messages[normalized.reason] || 'Please check the suggested reviewer details.');
+      return;
+    }
     submitDeclineWith({
-      referral: referral.trim() || undefined,
       reasonPicklist: reasonPicklist || undefined,
-      reasonText: reasonText.trim() || undefined,
+      referrals: normalized.referrals.length ? normalized.referrals : undefined,
     });
   }
 
-  // Secondary affordance: explicitly send an empty decline payload, even if
-  // the reviewer typed something but then changed their mind. The label
-  // ("Submit without explanation") promises that nothing they typed will be
-  // submitted; this honors that promise.
-  function submitDeclineEmpty() {
-    submitDeclineWith({});
+  function updateReferral(index, field, value) {
+    setReferrals((current) => current.map((row, rowIndex) => (
+      rowIndex === index ? { ...row, [field]: value } : row
+    )));
+  }
+
+  function addReferral() {
+    setReferrals((current) => (
+      current.length >= MAX_DECLINE_REFERRALS
+        ? current
+        : [...current, { name: '', institution: '', email: '' }]
+    ));
+  }
+
+  function removeReferral(index) {
+    setReferrals((current) => current.filter((_, rowIndex) => rowIndex !== index));
   }
 
   return (
@@ -94,27 +116,90 @@ export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
           Sorry to hear you can't take this on
         </h2>
         <p className="text-sm text-gray-700 mt-2">
-          Anything you can share helps us find a good replacement. None of these fields are required.
+          If you’d like, select a reason or suggest up to four alternative reviewers.
         </p>
       </div>
 
-      <div>
-        <label htmlFor="decline-referral" className="block text-sm font-semibold text-gray-900">
-          Anyone you'd suggest instead?
-        </label>
+      <fieldset>
+        <legend className="block text-sm font-semibold text-gray-900">
+          Suggest another reviewer <span className="font-normal text-gray-500">(optional)</span>
+        </legend>
         <p className="text-xs text-gray-500 mt-1">
-          Names, institutions, emails — whatever you have works. We'll follow up.
+          Use the person’s published name without degrees or titles. Institution and email are optional.
         </p>
-        <textarea
-          id="decline-referral"
-          value={referral}
-          onChange={(e) => setReferral(e.target.value)}
-          rows={6}
-          disabled={submitting}
-          placeholder="e.g., Dr. Sarah Chen at Stanford works on similar problems and would be a great fit."
-          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
-        />
-      </div>
+        <div className="mt-3 space-y-3">
+          {referrals.map((referral, index) => (
+            <div key={index} className="rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-xs font-semibold text-gray-700">Reviewer {index + 1}</p>
+                {referrals.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeReferral(index)}
+                    disabled={submitting}
+                    className="text-xs text-gray-500 hover:text-gray-800 disabled:text-gray-300"
+                    aria-label={`Remove suggested reviewer ${index + 1}`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label htmlFor={`decline-referral-name-${index}`} className="block text-xs font-medium text-gray-700">
+                    Name as published
+                  </label>
+                  <input
+                    id={`decline-referral-name-${index}`}
+                    value={referral.name}
+                    onChange={(e) => updateReferral(index, 'name', e.target.value)}
+                    maxLength={DECLINE_REFERRAL_LIMITS.name}
+                    disabled={submitting}
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`decline-referral-institution-${index}`} className="block text-xs font-medium text-gray-700">
+                    Institution
+                  </label>
+                  <input
+                    id={`decline-referral-institution-${index}`}
+                    value={referral.institution}
+                    onChange={(e) => updateReferral(index, 'institution', e.target.value)}
+                    maxLength={DECLINE_REFERRAL_LIMITS.institution}
+                    disabled={submitting}
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`decline-referral-email-${index}`} className="block text-xs font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    id={`decline-referral-email-${index}`}
+                    type="email"
+                    value={referral.email}
+                    onChange={(e) => updateReferral(index, 'email', e.target.value)}
+                    maxLength={DECLINE_REFERRAL_LIMITS.email}
+                    disabled={submitting}
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {referrals.length < MAX_DECLINE_REFERRALS && (
+          <button
+            type="button"
+            onClick={addReferral}
+            disabled={submitting}
+            className="mt-3 text-sm font-medium text-gray-700 hover:text-gray-950 underline-offset-2 hover:underline disabled:text-gray-400"
+          >
+            + Add another reviewer
+          </button>
+        )}
+      </fieldset>
 
       <div>
         <label htmlFor="decline-reason" className="block text-sm font-semibold text-gray-900">
@@ -133,20 +218,6 @@ export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
         </select>
       </div>
 
-      <div>
-        <label htmlFor="decline-text" className="block text-sm font-semibold text-gray-900">
-          Anything else? <span className="font-normal text-gray-500">(optional)</span>
-        </label>
-        <textarea
-          id="decline-text"
-          value={reasonText}
-          onChange={(e) => setReasonText(e.target.value)}
-          rows={3}
-          disabled={submitting}
-          className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:ring-0 disabled:bg-gray-50"
-        />
-      </div>
-
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
           {error}
@@ -162,24 +233,14 @@ export default function DeclineFormView({ token, etag, onCancel, onDeclined }) {
         >
           ← Back to invitation
         </button>
-        <div className="flex flex-col items-end gap-2">
-          <button
-            type="button"
-            onClick={submitDecline}
-            disabled={submitting}
-            className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-400"
-          >
-            {submitting ? 'Submitting…' : 'Submit decline'}
-          </button>
-          <button
-            type="button"
-            onClick={submitDeclineEmpty}
-            disabled={submitting}
-            className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline disabled:text-gray-300"
-          >
-            Submit without explanation
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={submitDecline}
+          disabled={submitting}
+          className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-400"
+        >
+          {submitting ? 'Submitting…' : 'Submit decline'}
+        </button>
       </div>
     </div>
   );

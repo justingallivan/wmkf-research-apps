@@ -22,15 +22,15 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => functio
     <div data-testid="manage-panel" data-actions={JSON.stringify(props.referralActions || {})}>
       {(props.declineReferrals || []).map((r) => (
         <button
-          key={r.suggestionId}
-          data-testid={`add-${r.suggestionId}`}
+          key={r.referralId || r.suggestionId}
+          data-testid={`add-${r.referralId || r.suggestionId}`}
           onClick={() => props.onAddReferral(r)}
         >add</button>
       ))}
       <button
         data-testid="choose-create-new"
         onClick={() => props.onAddReferral(
-          { suggestionId: 's-a', referralText: 'Oleg Butovsky', reviewerName: 'Decliner A' },
+          { referralId: 's-a:0', suggestionId: 's-a', referralName: 'Oleg Butovsky', referralText: 'Oleg Butovsky', reviewerName: 'Decliner A' },
           { mode: 'create_new' },
         )}
       >choose</button>
@@ -58,7 +58,16 @@ jest.mock('next/router', () => ({
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 
 const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
-const REFERRALS = [{ suggestionId: 's-a', reviewerName: 'Decliner A', referralText: 'Oleg Butovsky', declinedAt: null }];
+const REFERRALS = [{
+  referralId: 's-a:0',
+  suggestionId: 's-a',
+  reviewerName: 'Decliner A',
+  referralName: 'Oleg Butovsky',
+  institution: 'Weill Cornell Medicine',
+  email: 'oleg@example.edu',
+  referralText: 'Oleg Butovsky · Weill Cornell Medicine · oleg@example.edu',
+  declinedAt: null,
+}];
 
 function actionsOf() {
   return JSON.parse(screen.getByTestId('manage-panel').getAttribute('data-actions'));
@@ -96,14 +105,20 @@ test('a confident/new add posts name+referredBy, marks the row added, and lands 
   });
 
   render(<ReviewersTab requestId={REQ} />);
-  await waitFor(() => expect(screen.getByTestId('add-s-a')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByTestId('add-s-a:0')).toBeInTheDocument());
 
-  await act(async () => { screen.getByTestId('add-s-a').click(); });
+  await act(async () => { screen.getByTestId('add-s-a:0').click(); });
 
-  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('added'));
-  expect(actionsOf()['s-a'].addedName).toBe('Oleg Butovsky');
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('added'));
+  expect(actionsOf()['s-a:0'].addedName).toBe('Oleg Butovsky');
   // No resolution on the first attempt — the server resolves identity itself.
-  expect(sentBody).toMatchObject({ requestId: REQ, name: 'Oleg Butovsky', referredBy: 'Decliner A' });
+  expect(sentBody).toMatchObject({
+    requestId: REQ,
+    name: 'Oleg Butovsky',
+    email: 'oleg@example.edu',
+    affiliation: 'Weill Cornell Medicine',
+    referredBy: 'Decliner A',
+  });
   expect(sentBody.resolution).toBeUndefined();
   // Landed on the Invite Reviewers sub-tab.
   expect(mockPush).toHaveBeenCalledWith(
@@ -133,14 +148,14 @@ test('an ambiguous identity (409 + lookup) switches the row to confirm; choosing
   });
 
   render(<ReviewersTab requestId={REQ} />);
-  await waitFor(() => expect(screen.getByTestId('add-s-a')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByTestId('add-s-a:0')).toBeInTheDocument());
 
-  await act(async () => { screen.getByTestId('add-s-a').click(); });
-  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('confirm'));
-  expect(actionsOf()['s-a'].lookup.outcome).toBe('candidates');
+  await act(async () => { screen.getByTestId('add-s-a:0').click(); });
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('confirm'));
+  expect(actionsOf()['s-a:0'].lookup.outcome).toBe('candidates');
 
   await act(async () => { screen.getByTestId('choose-create-new').click(); });
-  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('added'));
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('added'));
 
   expect(calls).toHaveLength(2);
   expect(calls[0].resolution).toBeUndefined();
@@ -155,11 +170,11 @@ test('an excluded reviewer surfaces a clear inline error', async () => {
   }));
 
   render(<ReviewersTab requestId={REQ} />);
-  await waitFor(() => expect(screen.getByTestId('add-s-a')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByTestId('add-s-a:0')).toBeInTheDocument());
 
-  await act(async () => { screen.getByTestId('add-s-a').click(); });
-  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('error'));
-  expect(actionsOf()['s-a'].error).toMatch(/excluded/i);
+  await act(async () => { screen.getByTestId('add-s-a:0').click(); });
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('error'));
+  expect(actionsOf()['s-a:0'].error).toMatch(/excluded/i);
 });
 
 test.each(['promotion_required', 'restore_required', 'already_handled'])('typed %s response renders a remedy and does not falsely navigate to Invite', async (outcome) => {
@@ -179,10 +194,10 @@ test.each(['promotion_required', 'restore_required', 'already_handled'])('typed 
   }));
 
   render(<ReviewersTab requestId={REQ} />);
-  await waitFor(() => expect(screen.getByTestId('add-s-a')).toBeInTheDocument());
-  await act(async () => { screen.getByTestId('add-s-a').click(); });
+  await waitFor(() => expect(screen.getByTestId('add-s-a:0')).toBeInTheDocument());
+  await act(async () => { screen.getByTestId('add-s-a:0').click(); });
 
-  await waitFor(() => expect(actionsOf()['s-a']?.status).toBe('remedy'));
-  expect(actionsOf()['s-a']).toMatchObject({ outcome, suggestionId: 's-existing' });
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('remedy'));
+  expect(actionsOf()['s-a:0']).toMatchObject({ outcome, suggestionId: 's-existing' });
   expect(mockPush).not.toHaveBeenCalled();
 });

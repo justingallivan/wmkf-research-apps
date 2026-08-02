@@ -43,7 +43,7 @@ flowchart TD
 
     C5 --> D{Accept or Decline?}
     D -->|Accept<br/>both policies acked +<br/>address complete| E[POST /respond action=accept]
-    D -->|Decline| F[Decline form<br/>referral + reason, all optional]
+    D -->|Decline| F[Decline form<br/>structured referrals + reason, all optional]
 
     E --> E1[Server: record accept +<br/>policy acknowledgements + audit]
     E1 --> E2[Create honorarium akoya_request<br/>+ PATCH address & phone to contact]
@@ -172,26 +172,28 @@ After acknowledging, the card flips to: `✓ Acknowledged · v1 · View again`.
 
 ### Screen 2 — Decline form (if the reviewer clicks Decline)
 
-All fields optional; "Submit without explanation" sends an empty payload.
+All fields are optional. A referral row with any content requires a published
+name; institution and email are optional. The normal Submit button also accepts
+an empty decline.
 
 ```
 ╔════════════════════════════════════════════════════════════╗
 ║  Sorry to hear you can't take this on                        ║
-║  Anything you can share helps us find a good replacement.    ║
-║  None of these fields are required.                          ║
+║  If someone else may be a fit, add their details below.      ║
+║  You may also decline without adding anyone.                 ║
 ║                                                              ║
-║  Anyone you'd suggest instead?                               ║
-║  [ e.g., Dr. Sarah Chen at Stanford works on similar      ] ║
-║  [ problems and would be a great fit.                     ] ║
+║  Alternate reviewer 1                                       ║
+║  Name as published [ Sarah Chen                         ]    ║
+║  Institution       [ Stanford University                ]    ║
+║  Email             [ sarah.chen@example.edu             ]    ║
+║  Use the published name without degrees or titles.           ║
+║  [ + Add another reviewer ]                                  ║
 ║                                                              ║
 ║  Reason for declining   [ Select a reason (optional)    ▾]  ║
 ║    · Too busy · Conflict of interest · Outside my           ║
 ║      expertise · Bad timing · Other                         ║
 ║                                                              ║
-║  Anything else? (optional)  [                            ]   ║
-║                                                              ║
 ║  ← Back to invitation              [ Submit decline ]       ║
-║                                     Submit without explanation║
 ╚════════════════════════════════════════════════════════════╝
 ```
 

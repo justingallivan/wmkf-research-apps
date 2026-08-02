@@ -1,11 +1,10 @@
 /**
  * GET /api/workbench/decline-referrals?requestId=<akoya_request GUID>
  *
- * Staff-side reader for reviewer decline-referrals (the free-text "Anyone
- * you'd suggest instead?" a declining reviewer entered on the external portal,
- * stored in `wmkf_declinereferral`). Read-only; the write path lives on the
- * external decline flow. Returns { success, referrals:[{ suggestionId,
- * reviewerName, referralText, declinedAt }] }.
+ * Staff-side reader for reviewer decline-referrals. Current portal submissions
+ * store versioned structured rows in `wmkf_declinereferral`; legacy free-text
+ * values remain readable. Read-only; the write path lives on the external
+ * decline flow. Returns one DTO per referred person.
  *
  * Thin route shell: auth → GUID-validate the client requestId → DAL context →
  * one service call → HTTP mapping. Business logic lives in

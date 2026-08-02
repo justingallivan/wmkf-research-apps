@@ -13,7 +13,9 @@ related:
 
 # Reviewer Interaction Design — Brief
 
-**Status:** Design brief, pre-build. Captures decisions from a Session 133 design conversation. Scope is the full reviewer journey for external Phase II reviewers, from invitation through post-submission. The artifact is intended as the seed for a PD-facing read-ahead document and slide deck for a staff feedback meeting.
+**Status:** Historical design brief with current-behavior corrections. It
+captures decisions from a Session 133 design conversation; current runtime and
+the active wiki/Atlas pages supersede early implementation assumptions.
 
 **Date:** 2026-05-05
 
@@ -140,12 +142,19 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 
 **Decline page:**
 
-- Field order: **referral first, reason second** (referral is most useful)
-- **Referral**: single freeform textbox. Aspiring to capture name + institution + email cleanly is unrealistic in practice; we accept loose text and ensure it is searchable.
-- **Reason**: single-select with structured options (Too busy / COI / Outside expertise / Bad timing / Other) plus optional free-text. Optional, not required.
-- Submit-without-answering allowed; any decline is recorded.
+- Field order: **alternate reviewers first, reason second**.
+- **Alternate reviewers**: one structured Name / Institution / Email row,
+  expandable to four. Name is required only for a non-empty row and the copy
+  requests the published name without degrees or titles.
+- **Reason**: optional single-select with structured options (Too busy / COI /
+  Outside expertise / Bad timing / Other). The current portal does not solicit
+  free-text explanation.
+- Empty submission remains allowed through the normal Submit button; any
+  decline is recorded.
 - Decline confirmation copy: "Thanks. We hope we can call on you in the future."
-- Decline triggers: status flip, polite-acknowledgment email back to reviewer, and — if a referral was supplied — an automated email to the PD with a deep link to the "add reviewer to database" page in our app, pre-filled with the reviewer's referral text. Referrals are never auto-invitations; staff vet and decide.
+- Decline triggers the status transition and, when referrals are supplied, a PD
+  notification. Structured rows surface in Track Reviewers with an in-place
+  identity-resolution action; referrals are never auto-invitations.
 
 **Reversibility:**
 
@@ -155,7 +164,7 @@ The reviewer clicks the magic link. They see one page with several stacked eleme
 **Status state machine on `wmkf_potentialreviewer`:**
 
 - `Invited` → `Accepted` (timestamp)
-- `Invited` → `Declined` (timestamp, reason, referral text)
+- `Invited` → `Declined` (timestamp, structured reason, structured referral rows)
 - `Invited` → `No Response` (treatment described below)
 - `Accepted` → `Submitted` (later, at Stage 5)
 - `Invited` (still pending only) → `Withdrawn-Sufficient` (when a PD calls off pending invitations because they have enough confirmed reviewers; see below)
@@ -285,7 +294,9 @@ Three new entities, designed to be flexible:
 
 - **`wmkf_policy`** — code (e.g., `coi`, `ai-use`, `honorarium`), version, title, body (rich text), effective_date, status. Editable by non-technical staff; same pattern as `wmkf_ai_prompt`.
 - **`wmkf_reviewer_acknowledgment`** — potentialreviewer ref, policy ref, version stamp, timestamp, optional captured-data JSON (extensible for future policy types that capture data alongside acknowledgment).
-- **State fields on `wmkf_potentialreviewer`** — additional status states (`Withdrawn-Sufficient`), decline reason, decline referral text, ICS `UID`s for calendar invite reschedules, accepted_at / declined_at / submitted_at timestamps.
+- **State fields on the engagement** — additional status states
+  (`Withdrawn-Sufficient`), structured decline reason, versioned structured
+  referral rows in the existing referral memo, and response timestamps.
 
 ### Staff parity (Review Manager UI)
 
@@ -320,7 +331,8 @@ These are deliberately left open for the staff meeting:
 - What read-only window length feels right post-submission?
 - Are there policy texts beyond COI and AI use that should be acknowledged at invitation time?
 - Are there PD-specific workflow needs we haven't captured (specific decline-reason categories, custom reminder cadences) that should be configurable rather than fixed?
-- Is the optional-reason / required-referral-textbox structure on the decline page right, or should reason move ahead of referral for some staff workflows?
+- Is the optional structured-reason / optional structured-referral order right,
+  or should reason move ahead of referrals for some staff workflows?
 
 ---
 

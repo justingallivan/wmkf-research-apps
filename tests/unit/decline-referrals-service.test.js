@@ -61,12 +61,49 @@ test('returns declined rows that carry a non-empty referral, with decliner name 
     success: true,
     referrals: [
       {
+        referralId: 'sug-decl',
         suggestionId: 'sug-decl',
         reviewerName: 'Dr. Alan Decliner',
+        referralName: null,
+        institution: null,
+        email: null,
         referralText: 'Try Dr. Jane Smith at MIT',
+        legacy: true,
         declinedAt: '2026-07-08T10:00:00Z',
       },
     ],
+  });
+});
+
+test('expands a structured memo into one actionable DTO per referred person', async () => {
+  const { normalizeDeclineReferrals } = require('../../shared/utils/decline-referrals');
+  const stored = normalizeDeclineReferrals([
+    { name: 'Sarah Chen', institution: 'Stanford', email: 'chen@example.edu' },
+    { name: 'Alex Rivera', institution: 'UCLA', email: '' },
+  ]).storedValue;
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-structured',
+      wmkf_declined: true,
+      wmkf_declinereferral: stored,
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(2);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-structured:0',
+    suggestionId: 'sug-structured',
+    referralName: 'Sarah Chen',
+    institution: 'Stanford',
+    email: 'chen@example.edu',
+    legacy: false,
+  });
+  expect(out.referrals[1]).toMatchObject({
+    referralId: 'sug-structured:1',
+    referralName: 'Alex Rivera',
+    institution: 'UCLA',
   });
 });
 

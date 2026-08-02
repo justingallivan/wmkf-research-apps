@@ -121,14 +121,18 @@ The same branch now also implements the automatic two-path default: exact
 `Reviewer Materials/Proposal_{Request#}.pdf` first, then exact active
 current-cycle `Phase I/ProjectDescription.pdf`; only neither/ambiguity requires
 the picker. Owner correction 2026-08-01: `Project Narrative.pdf` was named
-earlier in error. **This branch remains not deployed.**
+earlier in error. **This resolver change was merged and deployed through PR
+#107 on 2026-08-01.**
 
-## Also Deferred (owner-aware, not this session)
+## Follow-up now implemented on a review branch
 
 - Decline-referral structured rows (Name · Institution · Email, one row
-  expanding to four) — assessment §6a.1. Ours to build, no Connor dependency;
-  the server already accepts these fields.
-- Intake wording via Connor: "names as published, no degrees or titles."
+  expanding to four) now replace the two prose textareas on
+  `codex/structured-decline-referrals`. The server validates the structured
+  rows and stores a versioned envelope in the existing memo; legacy free-text
+  referrals remain readable. This branch is not yet merged or deployed.
+- The reviewer-facing wording asks for the name as published and explicitly
+  says not to include degrees or titles.
 - Data repair for legacy twins/orphans — hygiene **after** the runtime fix, not
   a correctness gate, and requires explicit Production-write authorization.
 

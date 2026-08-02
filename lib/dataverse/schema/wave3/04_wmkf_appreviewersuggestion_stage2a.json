@@ -2,7 +2,7 @@
   "name": "wmkf_appreviewersuggestion-stage2a",
   "kind": "extensions-on-existing",
   "entityLogicalName": "wmkf_appreviewersuggestion",
-  "_comment": "Stage 2a slice 1 additions to wmkf_appreviewersuggestion. Engagement-scope contact corrections, decline reason structured + free-text, honorarium opt-out, withdrawal stamp, and policy-version lookups. The two policy-version lookups depend on wmkf_policyversion existing, so this file lives in wave3 (which is processed after wave3 entities are created in 01/02/03).",
+  "_comment": "Stage 2a slice 1 additions to wmkf_appreviewersuggestion. Engagement-scope contact corrections, structured decline reason, referral capture, honorarium opt-out, withdrawal stamp, and policy-version lookups. The two policy-version lookups depend on wmkf_policyversion existing, so this file lives in wave3 (which is processed after wave3 entities are created in 01/02/03).",
   "attributes": [
     {
       "type": "String",
@@ -70,7 +70,7 @@
       "type": "String",
       "schemaName": "wmkf_DeclineReferral",
       "displayName": "Decline Referral",
-      "description": "Reviewer's freeform referral text at decline — names + affiliations of suggested alternative reviewers. Optional. Triggers a deep-link-to-PD email when populated (deferred to a follow-up build).",
+      "description": "Referral capture at decline. Current portal submissions use a versioned structured envelope containing up to four name/institution/email rows; legacy free-text values remain readable. Optional.",
       "maxLength": 2000
     },
     {

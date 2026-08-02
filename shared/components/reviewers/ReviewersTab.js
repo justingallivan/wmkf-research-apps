@@ -199,15 +199,17 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // resolves identity itself — a confident match or a clearly-new person is
   // added immediately; an ambiguous/conflicting identity returns 409 + `lookup`,
   // which we surface as an inline picker on the referral row (staff confirm → we
-  // re-POST with the chosen resolution). A free-text suggestion is thus never
-  // auto-resolved to a namesake. On success we refresh both lists and land on
+  // re-POST with the chosen resolution). Legacy free-text suggestions remain
+  // reviewable, while new structured rows carry identity anchors separately.
+  // On success we refresh both lists and land on
   // the Invite Reviewers sub-tab where the new candidate now appears.
   const addReferralCandidate = async (referral, resolution) => {
     const sid = referral?.suggestionId;
-    const name = (referral?.referralText || '').trim();
+    const actionKey = referral?.referralId || sid;
+    const name = (referral?.referralName || referral?.referralText || '').trim();
     if (!sid || !name || !requestId) return;
     const rid = requestId;
-    setReferralActions((prev) => ({ ...prev, [sid]: { status: 'adding' } }));
+    setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'adding' } }));
     try {
       const res = await fetch('/api/workbench/manual-reviewer', {
         method: 'POST',
@@ -215,6 +217,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         body: JSON.stringify({
           requestId: rid,
           name,
+          email: referral?.email || undefined,
+          affiliation: referral?.institution || undefined,
           referredBy: referral?.reviewerName || undefined,
           resolution: resolution || undefined,
         }),
@@ -225,7 +229,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         if (['promotion_required', 'restore_required', 'already_handled'].includes(data.outcome)) {
           setReferralActions((prev) => ({
             ...prev,
-            [sid]: {
+            [actionKey]: {
               status: 'remedy',
               outcome: data.outcome,
               remedy: data.remedy,
@@ -238,7 +242,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         }
         setReferralActions((prev) => ({
           ...prev,
-          [sid]: {
+          [actionKey]: {
             status: 'added',
             addedName: data.candidate?.name || name,
             invitable: !!data.candidate?.invitable,
@@ -249,16 +253,16 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         return;
       }
       if (res.status === 409 && data.lookup) {
-        setReferralActions((prev) => ({ ...prev, [sid]: { status: 'confirm', lookup: data.lookup } }));
+        setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'confirm', lookup: data.lookup } }));
         return;
       }
       const message = data.code === 'applicant_excluded'
         ? 'This person is excluded for this request.'
         : (data.error || `Couldn’t add (${res.status}).`);
-      setReferralActions((prev) => ({ ...prev, [sid]: { status: 'error', error: message } }));
+      setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'error', error: message } }));
     } catch (e) {
       if (rid !== currentRequestIdRef.current) return;
-      setReferralActions((prev) => ({ ...prev, [sid]: { status: 'error', error: e.message } }));
+      setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'error', error: e.message } }));
     }
   };
 

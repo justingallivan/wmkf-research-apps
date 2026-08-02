@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-08-01
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -24,6 +24,8 @@ source_files:
   - shared/components/external/ReviewAuthoringForm.js
   - shared/components/external/RichReviewEditor.js
   - shared/components/external/MaterialsView.js
+  - shared/components/external/DeclineFormView.js
+  - shared/utils/decline-referrals.js
   - lib/external/sanitize-review-html.js
   - lib/services/review-draft-service.js
   - lib/external/review-engagement-state.js
@@ -90,7 +92,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   The paired invitation buttons use the same signed portal token with
   `?action=accept` or `?action=decline`. On a fresh `stage2a` engagement, accept
   opens the existing Stage 2a form and decline opens the existing decline form,
-  including its optional referral field. For `accepted-pre-materials`, only the
+  including up to four optional structured alternate-reviewer rows. For
+  `accepted-pre-materials`, only the
   decline hint is honored: it opens that same form for self-service withdrawal.
   Accepted→declined remains a POST mutation and is server-locked after materials
   release or review receipt. Other non-`stage2a` views ignore action hints.
@@ -104,6 +107,17 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   assigned PD with reason/referrals. A leased acceptance worker re-checks after
   honorarium creation and compensates by deleting any late-created linked
   honorarium before it can send confirmation/quota side effects.
+- **Declines no longer solicit prose (2026-08-01).** `DeclineFormView` keeps the
+  optional structured reason picklist and collects alternate reviewers as one
+  Name / Institution / Email row, expandable to four. Name is required only
+  when a row has any content; the UI asks for the name as published without
+  degrees or titles. Empty decline submission remains valid through the normal
+  Submit button. `respond-service` validates the rows server-side and encodes
+  them with the `wmkf-referrals:v1:` prefix in the existing
+  `wmkf_declinereferral` memo. The workbench reader expands the envelope into
+  one staff action per person. Existing free-text referral/reason values and
+  already-open old browser sessions remain compatible, but the current portal
+  exposes no referral or “anything else” textarea.
 - **The stage2b "submit your review" surface is now in-browser authoring, not file upload (S301, Phase 2).**
   `MaterialsView` renders `ReviewAuthoringForm` (controlled) with the staff-editable
   Dataverse question set across `string`, single-choice `picklist`, fixed-option

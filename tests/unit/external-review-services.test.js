@@ -297,6 +297,48 @@ describe('applyReviewerResponse', () => {
       .rejects.toMatchObject({ httpStatus: 422, body: expect.objectContaining({ reason: 'payment_contact_required' }) });
   });
 
+  it('validates and serializes structured decline referrals before the Dataverse write', async () => {
+    await applyReviewerResponse({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer,
+      body: {
+        action: 'decline',
+        decline: {
+          reasonPicklist: 'too-busy',
+          referrals: [{ name: 'Sarah Chen', institution: 'Stanford', email: 'chen@example.edu' }],
+        },
+      },
+      ifMatch: 'W/"1"',
+    });
+
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        decline: expect.objectContaining({
+          reasonPicklist: 'too-busy',
+          referral: expect.stringMatching(/^wmkf-referrals:v1:/),
+        }),
+      }),
+      expect.any(Object),
+    );
+    expect(applyStage2aResponse.mock.calls[0][1].decline).not.toHaveProperty('referrals');
+  });
+
+  it.each([
+    { referrals: 'prose', reason: 'invalid_decline_referrals' },
+    { referrals: [{ institution: 'MIT' }], reason: 'decline_referral_name_required' },
+    { referrals: [{ name: 'Person', email: 'bad' }], reason: 'invalid_decline_referral_email' },
+  ])('rejects malformed structured decline referrals before any write: $reason', async ({ referrals, reason }) => {
+    await expect(applyReviewerResponse({
+      suggestion: baseSuggestion(),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: { referrals } },
+    })).rejects.toMatchObject({ httpStatus: 400, body: expect.objectContaining({ reason }) });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
   it('maps a racing late-honorarium cleanup on repeat decline to concurrent_modification', async () => {
     deleteLateHonorariumForWithdrawnReviewer.mockRejectedValueOnce(
       Object.assign(new Error('Dataverse returned 412'), { status: 412 }),

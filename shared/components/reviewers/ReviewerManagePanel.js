@@ -1231,7 +1231,7 @@ function ReferralConfirm({ referral, lookup, onChoose, onCancel }) {
   return (
     <div className="mt-2 border border-amber-200 bg-amber-50 rounded p-2 text-sm">
       <p className="font-medium text-amber-900">
-        Confirm who “{referral.referralText}” is before adding
+        Confirm who “{referral.referralName || referral.referralText}” is before adding
       </p>
       {lookup?.outcome === 'conflict' && (
         <p className="text-xs text-red-700 mt-1">
@@ -1492,12 +1492,10 @@ export default function ReviewerManagePanel({
 
   return (
     <div className="space-y-4">
-      {/* Decline-referrals: names a declining reviewer suggested (captured to
-          wmkf_declinereferral on the external portal). Surfaced only on Track
+      {/* Decline referrals are structured for new portal submissions and remain
+          backward-readable for legacy free text. They surface only on Track
           Reviewers — the home base once invites are out. "Add as candidate"
-          routes through the normal Add-or-Refer resolution flow (parent
-          switches to Find + pre-fills), so a free-text suggestion never
-          auto-resolves to a namesake. */}
+          routes through the normal identity-resolution flow. */}
       {mode === 'track' && declineReferrals.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900 mb-1">
@@ -1508,16 +1506,21 @@ export default function ReviewerManagePanel({
           </p>
           <ul className="space-y-2">
             {declineReferrals.map((r) => {
-              const state = referralActions[r.suggestionId];
+              const actionKey = r.referralId || r.suggestionId;
+              const state = referralActions[actionKey];
               const confirming = state?.status === 'confirm';
               return (
                 <li
-                  key={r.suggestionId}
+                  key={actionKey}
                   className="rounded-md bg-white/70 border border-amber-100 p-2"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm text-gray-900 break-words whitespace-pre-wrap">{r.referralText}</p>
+                      <p className="text-sm font-medium text-gray-900 break-words">
+                        {r.referralName || r.referralText}
+                      </p>
+                      {r.institution && <p className="text-xs text-gray-600">{r.institution}</p>}
+                      {r.email && <p className="text-xs text-gray-600">{r.email}</p>}
                       <p className="text-xs text-gray-500">
                         suggested by {r.reviewerName || 'a declining reviewer'}
                       </p>
@@ -1538,7 +1541,7 @@ export default function ReviewerManagePanel({
                       referral={r}
                       lookup={state.lookup}
                       onChoose={(resolution) => onAddReferral && onAddReferral(r, resolution)}
-                      onCancel={onDismissReferral ? () => onDismissReferral(r.suggestionId) : undefined}
+                      onCancel={onDismissReferral ? () => onDismissReferral(actionKey) : undefined}
                     />
                   )}
                 </li>

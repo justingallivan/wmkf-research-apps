@@ -6,7 +6,7 @@ status: canonical
 summary: "Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-31
+last_verified: 2026-08-01
 owner: product-engineering
 related:
   - docs/REVIEWER_INTERACTION_DESIGN.md
@@ -230,7 +230,7 @@ flowchart TD
     S2acc --> S2contact["Accepted-contact follow-up (all accepts, including opt-outs):<br/>• validate active existing links and identity-aware Contact reuse<br/>• ORCID-scoped deterministic create + reviewer link in one ETag-guarded changeset<br/>• ambiguous/split/inactive/namesake evidence stays unlinked for staff review<br/>• mailing address + eligible ORCID captured after a safe link"]
     S2contact -->|Honorarium not opted out| S2hon["Current no-BILL honorarium chain:<br/>• akoya_request CREATED (honorarium row)<br/>• wmkf_appreviewersuggestion.wmkf_HonorariumRequest set<br/>• honorarium links to reviewed proposal<br/>• BILL onboarding returns deferred (no vendor/network call)"]
 
-    S2A -->|Decline| S2dec["WRITES on wmkf_appreviewersuggestion:<br/>• declined=true, wmkf_responsetype<br/>• wmkf_declinereasonpicklist + wmkf_declinereason (free text)<br/>• wmkf_declinereferral (free text)"]
+    S2A -->|Decline| S2dec["WRITES on wmkf_appreviewersuggestion:<br/>• declined=true, wmkf_responsetype<br/>• optional wmkf_declinereasonpicklist<br/>• wmkf_declinereferral (versioned structured rows;<br/>legacy free text remains readable)"]
 
     S2A -->|No response| S2nor["No write at decision time; staff cancels later as<br/>wmkf_withdrawnsufficientat (Withdrawn-Sufficient state)"]
 
@@ -259,7 +259,7 @@ flowchart TD
 | Reviewer's engagement-scope corrections (they updated their email at accept) | `wmkf_appreviewersuggestion.wmkf_revieweremail` etc. | The engagement keeps its snapshot. Accepted-contact resolution may use submitted name/email to safely reuse or create a Contact and separately sync trusted name/title, but it never blindly overwrites an existing Contact email. |
 | h-index / citation count / ORCID / scholar URL | `wmkf_potentialreviewer.wmkf_hindex` etc. | on the person (S213; was the `wmkf_appresearcher` sidecar) |
 | Accept/decline state | `wmkf_appreviewersuggestion.wmkf_responsetype` (picklist) + `.wmkf_accepted` / `.wmkf_declined` booleans | |
-| Decline reason | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereason` (free text) + `.wmkf_declinereferral` | |
+| Decline reason and alternate-reviewer referrals | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereferral` | The current portal has no prose reason/referral fields. It stores up to four name/institution/email rows as a versioned envelope in the existing referral memo; legacy `.wmkf_declinereason` and free-text referral values remain readable for compatibility. |
 | COI / AI policy acknowledged? | `wmkf_appreviewersuggestion.wmkf_coiackedat` (timestamp) + `wmkf_coipolicyversion` (which version they saw) | Same shape for AI-use |
 | Honorarium opt-out | `wmkf_appreviewersuggestion.wmkf_honorariumoptout` | |
 | The honorarium row for a reviewer engagement | `akoya_request` via `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` | S196-new link; one hop |

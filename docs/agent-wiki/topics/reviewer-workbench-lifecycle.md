@@ -147,15 +147,18 @@ The "X" on an Invite Reviewers panel (`ReviewerInvitePanel`) card is a **soft-de
 
 ## Decline-referral surface + one-click add (S349)
 
-When a reviewer declines via the external portal, the decline form's free-text
-"Anyone you'd suggest instead?" is captured to `wmkf_declinereferral` on the
-suggestion row (`reviewer-suggestion.js` decline writer — **capture has always
-been live**). Until S349 **nothing read it** — the suggested names sat unseen.
+When a reviewer declines via the external portal, the current form collects up
+to four structured Name / Institution / Email rows and stores a versioned
+envelope in `wmkf_declinereferral` on the suggestion row. The reader keeps
+legacy free-text values visible, so no existing referral is lost. Until S349
+**nothing read this field** — suggested names sat unseen.
 
 - **Reader:** `GET /api/workbench/decline-referrals?requestId=` →
   `lib/services/workbench/decline-referrals-service.js` (`getDeclineReferrals`).
   Reads selected and archived suggestions, then returns declined rows with a
-  non-empty referral, each with the decliner's `wmkf_name` resolved.
+  non-empty referral, each with the decliner's `wmkf_name` resolved. Structured
+  envelopes expand to one DTO per referred person; legacy text remains one
+  display-only DTO.
   **Deliberately independent of
   `review-manager/reviewers-service.js`**, which filters to accepted reviewers
   and early-returns when none are accepted — so referrals surface even when
@@ -164,10 +167,11 @@ been live**). Until S349 **nothing read it** — the suggested names sat unseen.
   `onAddReferral` to `ReviewerManagePanel`, which renders an amber callout at
   the top of the **Track Reviewers** sub-tab only.
 - **One-click "Add as candidate" (in-place, S354):** does NOT bypass identity
-  resolution. The button POSTs the suggested name + decliner straight to
+  resolution. The button POSTs the suggested name, optional email/institution,
+  and decliner straight to
   `/api/workbench/manual-reviewer` (no `resolution`) and stays on Track
   Reviewers; the server resolves identity itself (`addManualReviewer` →
-  `lookupReviewerIdentity`). Three per-row outcomes, keyed by `suggestionId` in
+  `lookupReviewerIdentity`). Three per-row outcomes, keyed by `referralId` in
   `ReviewersTab`'s `referralActions` state and rendered inline by
   `ReviewerManagePanel` (`ReferralAction`/`ReferralConfirm`): **200** → the row
   shows "✓ Added" and the tab lands on **Invite Reviewers** where the new
@@ -175,7 +179,7 @@ been live**). Until S349 **nothing read it** — the suggested names sat unseen.
   *sendable* until staff add one there); **409 + `lookup`** (ambiguous /
   conflict) → the row switches to an **inline identity-confirm picker** (staff
   pick the right existing person or "Add as new person" → re-POST with the
-  chosen `resolution`), so a free-text suggestion never auto-resolves to a
+  chosen `resolution`), so a referral never auto-resolves to a
   namesake (memory `project-reviewer-verify-fail-dangerous`); **other error**
   (incl. `applicant_excluded`) → inline message + "Try again". Lands `referred`
   provenance exactly as the S249 manual-referral path. Before S354 the button

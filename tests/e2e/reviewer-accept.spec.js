@@ -113,28 +113,47 @@ test.describe('Reviewer Stage 2a accept flow', () => {
     expect(respondCalls[0]).not.toHaveProperty('address');
   });
 
-  test('decline path captures reason/referral and renders declined confirmation', async ({ page }) => {
+  test('decline path captures structured referrals without soliciting prose', async ({ page }) => {
     const { respondCalls } = await mockPortal(page, { context: buildContext() });
     await page.goto(portalUrl());
 
     await page.getByRole('button', { name: 'Decline' }).click();
     await expect(page.getByText("Sorry to hear you can't take this on")).toBeVisible();
 
-    await page.getByLabel("Anyone you'd suggest instead?").fill('Dr. Suggested Reviewer, suggested@example.edu');
+    await page.getByLabel('Name as published').fill('Sarah Chen');
+    await page.getByLabel('Institution').fill('Stanford University');
+    await page.getByLabel('Email').fill('suggested@example.edu');
+    await page.getByRole('button', { name: /add another reviewer/i }).click();
+    await page.getByLabel('Name as published').nth(1).fill('Alex Rivera');
+    await page.getByLabel('Institution').nth(1).fill('UCLA');
     await page.getByLabel('Reason for declining').selectOption('too-busy');
-    await page.getByLabel(/anything else/i).fill('I am unavailable during the review window.');
+    await expect(page.getByLabel(/anything else/i)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /submit without explanation/i })).toHaveCount(0);
     await page.getByRole('button', { name: 'Submit decline' }).click();
 
     await expect.poll(() => respondCalls.length).toBe(1);
     expect(respondCalls[0]).toMatchObject({
       action: 'decline',
       decline: {
-        referral: 'Dr. Suggested Reviewer, suggested@example.edu',
         reasonPicklist: 'too-busy',
-        reasonText: 'I am unavailable during the review window.',
+        referrals: [
+          { name: 'Sarah Chen', institution: 'Stanford University', email: 'suggested@example.edu' },
+          { name: 'Alex Rivera', institution: 'UCLA', email: '' },
+        ],
       },
     });
     await expect(page.getByText("Thank you. We've recorded your decline.")).toBeVisible();
+  });
+
+  test('decline can be submitted with no reason or referral details', async ({ page }) => {
+    const { respondCalls } = await mockPortal(page, { context: buildContext() });
+    await page.goto(portalUrl());
+
+    await page.getByRole('button', { name: 'Decline' }).click();
+    await page.getByRole('button', { name: 'Submit decline' }).click();
+
+    await expect.poll(() => respondCalls.length).toBe(1);
+    expect(respondCalls[0]).toEqual({ action: 'decline', decline: {} });
   });
 
   test('policy modal enforces the scroll-to-acknowledge gate', async ({ page }) => {

@@ -1,17 +1,17 @@
 ---
 name: project-reviewer-referral-capture
-description: "SHIPPED S249 (was endorsed S244): 'add or refer a reviewer' — capture reviewer-REFERRED candidates. A contacted reviewer who declines/responds often suggests a colleague via FREE TEXT. The hard part (free text → real person) was already solved by manual-reviewer-add (S236) + the hardened identity spine (abstain-or-confirm, never auto-resolve to a namesake); referral capture is a thin provenance+referrer layer over it. Codex-reviewed."
+description: "SHIPPED S249 and structured portal capture added 2026-08-01: 'add or refer a reviewer' captures reviewer-REFERRED candidates. The external decline form now collects up to four Name/Institution/Email rows; legacy free-text records remain readable. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-12
+  last_verified: 2026-08-01
 ---
 
 ## Recall Rule
-Read when touching the Workbench invite/track flow, manual reviewer add, or any
-reviewer free-text → identity resolution.
+Read when touching the Workbench invite/track flow, manual reviewer add, or
+reviewer referral capture and identity resolution.
 
 ## Status: SHIPPED S249
 Built as a thin layer over manual-add: `referredBy` on `manual-reviewer.js` →
@@ -39,9 +39,11 @@ request's Candidates pool, enriched/verified, tagged provenance **referred** +
 **referredBy** (who suggested them).
 
 ## The hard part (Justin) + the safety posture
-Referrals arrive as **free text** (name only / name+institution / name+context /
-email signature / a reviewer-form field). Resolving to a canonical person is the
-**same name→identity problem the pipeline already solves** — apply the same
+The external decline form now captures up to four structured rows with a
+required published name and optional institution/email. Existing records may
+still contain legacy free text, and staff can still enter a sparse referral.
+Resolving any referral to a canonical person is the **same name→identity problem
+the pipeline already solves** — apply the same
 posture as [[project-reviewer-verify-fail-dangerous]]: resolve confidently OR
 present the top matches for **1-click human confirmation**; on ambiguity keep a
 **sparse name-only candidate flagged "unresolved — needs contact"** (do NOT
@@ -51,6 +53,6 @@ wrong reviewer).
 ## Reuse, don't rebuild
 `pages/api/workbench/manual-reviewer.js` (S236 manual add) already adds a sparse
 person into Candidates with provenance + a manual email-source LOW-confidence
-flag. Referral capture = manual-add + a **referrer** field + the free-text
-resolution UX + a **referred** provenance tag. Identity resolution reuses the
+flag. Referral capture = manual-add + a **referrer** field + structured contact
+hints + a **referred** provenance tag. Identity resolution reuses the
 OpenAlex/ORCID/PubMed spine + `lib/services/reviewer-identity-resolver.js`.
