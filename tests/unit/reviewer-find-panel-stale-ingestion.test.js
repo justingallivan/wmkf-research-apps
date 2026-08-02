@@ -10,12 +10,16 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('../../shared/components/reviewers/ReviewerSearchSection', () => function SearchStub({
   recommended,
   ingestError,
+  proposalKey,
+  blobUrl,
 }) {
   return (
     <div
       data-testid="search"
       data-recommended={JSON.stringify(recommended || [])}
       data-error={ingestError || ''}
+      data-proposal-key={proposalKey || ''}
+      data-blob-url={blobUrl || ''}
     />
   );
 });
@@ -45,6 +49,14 @@ function response(data, { ok = true, status = 200 } = {}) {
 
 function renderedRecommendations() {
   return JSON.parse(screen.getByTestId('search').getAttribute('data-recommended'));
+}
+
+function proposalBinding() {
+  const search = screen.getByTestId('search');
+  return {
+    proposalKey: search.getAttribute('data-proposal-key'),
+    blobUrl: search.getAttribute('data-blob-url'),
+  };
 }
 
 afterEach(() => {
@@ -124,3 +136,166 @@ test('late failed ingestion for request A cannot paint an error onto request B',
   expect(renderedRecommendations()[0].suggestionId).toBe('s-b');
 });
 
+test('a validated proposal override from navigation state is replayed on initial load', async () => {
+  const fileKey = 'akoya_request::REQ/Phase I::ProjectDescription.pdf';
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) {
+      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    }
+    if (target === '/api/reviewer-finder/load-proposal') {
+      return Promise.resolve(response({
+        success: true,
+        blobUrl: 'https://blob.example/project-description.pdf',
+        filename: 'ProjectDescription.pdf',
+        picked: fileKey,
+        allFiles: [],
+      }));
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerFindPanel requestId={REQ_A} proposalFileKey={fileKey} />);
+
+  await waitFor(() => expect(proposalBinding()).toEqual({
+    proposalKey: fileKey,
+    blobUrl: 'https://blob.example/project-description.pdf',
+  }));
+  const loadCall = global.fetch.mock.calls.find(([url]) => url === '/api/reviewer-finder/load-proposal');
+  expect(JSON.parse(loadCall[1].body)).toEqual({ requestId: REQ_A, fileKey });
+  expect(screen.getByText(/Loaded selected proposal/i)).toHaveTextContent('ProjectDescription.pdf');
+});
+
+test('a deliberate dropdown selection persists only after server validation and does not reload when navigation state catches up', async () => {
+  const file = {
+    library: 'akoya_request',
+    folder: 'REQ/Phase I',
+    name: 'ProjectDescription.pdf',
+    classification: 'proposal',
+  };
+  const fileKey = `${file.library}::${file.folder}::${file.name}`;
+  const onProposalFileKeyChange = jest.fn();
+  let proposalLoads = 0;
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) {
+      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    }
+    if (target === '/api/reviewer-finder/load-proposal') {
+      proposalLoads += 1;
+      const body = JSON.parse(options.body);
+      if (!body.fileKey) {
+        return Promise.resolve(response({
+          error: 'Canonical reviewer proposal not found.',
+          allFiles: [file],
+        }, { ok: false, status: 404 }));
+      }
+      return Promise.resolve(response({
+        success: true,
+        blobUrl: 'https://blob.example/project-description.pdf',
+        filename: file.name,
+        picked: fileKey,
+        allFiles: [file],
+      }));
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  const { rerender } = render(
+    <ReviewerFindPanel
+      requestId={REQ_A}
+      onProposalFileKeyChange={onProposalFileKeyChange}
+    />,
+  );
+
+  const picker = await screen.findByRole('combobox');
+  await act(async () => {
+    picker.value = fileKey;
+    picker.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await waitFor(() => expect(onProposalFileKeyChange).toHaveBeenCalledWith(fileKey));
+  expect(proposalLoads).toBe(2);
+
+  rerender(
+    <ReviewerFindPanel
+      requestId={REQ_A}
+      proposalFileKey={fileKey}
+      onProposalFileKeyChange={onProposalFileKeyChange}
+    />,
+  );
+  await act(async () => {});
+  expect(proposalLoads).toBe(2);
+});
+
+test('late proposal success for request A cannot overwrite request B', async () => {
+  const proposalA = deferred();
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) {
+      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    }
+    if (target === '/api/reviewer-finder/load-proposal') {
+      const body = JSON.parse(options.body);
+      if (body.requestId === REQ_A) return proposalA.promise;
+      return Promise.resolve(response({
+        success: true,
+        blobUrl: 'blob-b',
+        picked: 'key-b',
+        filename: 'Proposal B.pdf',
+        allFiles: [],
+      }));
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
+  rerender(<ReviewerFindPanel requestId={REQ_B} />);
+  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' }));
+
+  await act(async () => {
+    proposalA.resolve(response({
+      success: true,
+      blobUrl: 'blob-a',
+      picked: 'key-a',
+      filename: 'Proposal A.pdf',
+      allFiles: [],
+    }));
+    await proposalA.promise;
+  });
+
+  expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' });
+});
+
+test('late proposal failure for request A cannot replace request B with an error', async () => {
+  const proposalA = deferred();
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/applicant-reviewers')) {
+      return Promise.resolve(response({ success: true, recommended: [], slotsPopulated: 0 }));
+    }
+    if (target === '/api/reviewer-finder/load-proposal') {
+      const body = JSON.parse(options.body);
+      if (body.requestId === REQ_A) return proposalA.promise;
+      return Promise.resolve(response({
+        success: true,
+        blobUrl: 'blob-b',
+        picked: 'key-b',
+        filename: 'Proposal B.pdf',
+        allFiles: [],
+      }));
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
+  rerender(<ReviewerFindPanel requestId={REQ_B} />);
+  await waitFor(() => expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' }));
+
+  await act(async () => {
+    proposalA.reject(new Error('request A proposal failed'));
+    await proposalA.promise.catch(() => {});
+  });
+
+  expect(proposalBinding()).toEqual({ proposalKey: 'key-b', blobUrl: 'blob-b' });
+  expect(screen.queryByText('request A proposal failed')).not.toBeInTheDocument();
+});

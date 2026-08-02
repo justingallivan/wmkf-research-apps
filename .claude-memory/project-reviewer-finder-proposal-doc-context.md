@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Reviewer Finder currently defaults to the exact canonical Reviewer Materials proposal; the proposed stabilization plan adds one exact legacy Project Narrative fallback, which the Session 393 Fable challenge must independently evaluate before implementation.
+description: Reviewer Finder prefers the exact canonical Reviewer Materials proposal and falls back to the exact active current-cycle Phase I/ProjectDescription.pdf before requiring a manual picker.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-31 via source, owner fallback decision, and live request 1003109 canonical-file probe
+  last_verified: 2026-08-01 via owner correction, source, branch tests, and live read-only request 1003010 SharePoint probe
 ---
 
 ## Recall Rule
@@ -27,24 +27,27 @@ publishes one clean proposal package at exactly:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
 
-Reviewer Finder's default load now requires that exact file in the active
-Dynamics-associated request folder. It does not use `classifyFile`, best-guess
-selection, the Proposal tab's `Phase I/ProjectDescription.pdf`, archive files,
-or neighboring PDFs. Missing or duplicate active canonical files fail before
-download/Blob write. An explicit authenticated `fileKey` remains available
-only for deliberate historical/ad-hoc staff analysis.
+Reviewer Finder's default load prefers that exact file in the active
+Dynamics-associated request folder. When it is absent, the current-cycle
+compatibility rule selects exactly one active `Phase I/ProjectDescription.pdf`.
+It does not use `classifyFile`, best-guess selection, archive files, or
+neighboring PDFs. A duplicate canonical file remains an error; a missing or
+ambiguous fallback returns the server-listed picker before download/Blob write.
+An explicit authenticated `fileKey` remains available only for deliberate
+historical/ad-hoc staff analysis.
 
-**Source-supported open stabilization proposal, not yet accepted for implementation:** preserve that canonical file
-as first priority, but when it is absent, select exactly one server-listed file
-named `Project Narrative.pdf`. If neither exists or the legacy name is
-ambiguous, require the authenticated dropdown. A duplicate canonical file
-remains an error. Persist a deliberate dropdown override across reload and do
-not rerun applicant enrichment when the exact resolved file key is unchanged.
-This is a bounded legacy fallback, not permission to restore `classifyFile`,
-best-guess PDFs, or broad filename heuristics. The current proposal lives in
-`docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`; the owner-directed Fable
-session must test whether the fallback, file identity, and cache/reload contract
-are actually correct before an implementation order is accepted.
+**Current branch status (2026-08-01; not deployed):**
+`codex/reviewer-proposal-binding-refresh` persists a deliberate authenticated
+dropdown choice in validated `?proposalFile=` navigation state. Refresh replays
+the exact file key, the server re-lists the request's files before accepting it,
+and the existing cache contract prevents a new random Blob URL for the same key
+from rerunning applicant enrichment. A stale or cross-request key fails closed
+and returns to the picker. The same branch now implements the automatic exact
+fallback while preserving canonical-first precedence. Request `1003010` has no
+canonical package and does have that exact Phase I file, so the patched resolver
+selects it without staff input. [VERIFIED via source + focused tests; request
+file availability verified 2026-08-01 via owner correction + read-only
+Dataverse/SharePoint probe]
 
 The next cycle combines Phase I + Phase II into a single submission with richer
 proposal text and a separate bibliography. Power Automate should still
@@ -57,12 +60,14 @@ Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin
 
 ## How to apply
 - When the combined-cycle intake/documents are built, keep the PA output at
-  the same exact canonical path; the legacy fallback does not change the
-  outbound package contract.
+  the same exact canonical path; the temporary Phase I fallback does not change
+  the outbound package contract.
 - Preserve the dedicated exact Reviewer Finder selector; do not reintroduce
-  cross-purpose `classifyFile` or heuristic selection. The only approved
-  compatibility fallback is the exact legacy `Project Narrative.pdf` rule
-  above.
+  cross-purpose `classifyFile` or heuristic selection. The only automatic
+  compatibility fallback is the exact current-cycle
+  `Phase I/ProjectDescription.pdf` rule above; other files remain deliberate,
+  server-validated dropdown choices. `Project Narrative.pdf` was an owner-
+  corrected naming mistake and is not the current-cycle fallback.
 - Consider surfacing Claude-origin (and the greyed "needs identity review" Claude names) in the Workbench Find tab the way the standalone does, so the PD can see what Claude found.
 
 Related: [[project-grant-phasing-evolution]], [[project-reviewer-finder-retrieval-redesign]], [[project-reviewer-finder-next-topics]].

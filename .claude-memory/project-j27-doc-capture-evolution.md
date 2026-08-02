@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: The D26 Proposal tab retains its Phase I display bridge, while automated proposal analysis now requires the canonical Reviewer Materials proposal. The 1002788 artifact pilot proved mechanics only.
+description: The D26 Proposal tab retains its Phase I display bridge; governed analysis requires the canonical Reviewer Materials proposal, while Reviewer Finder has one exact current-cycle fallback. The 1002788 artifact pilot proved mechanics only.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-30 via source/tests, production deployment 84155a5a, signed-in Request 1003109 generation/retry/recovery, and Dataverse/SharePoint lineage readback
+last_verified: 2026-08-01 via source/tests, production deployment 84155a5a, signed-in Request 1003109 generation/retry/recovery, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -27,13 +27,17 @@ subfolder** and matches the cycle filenames `ProjectDescription.pdf`,
 `Project Budget spreadsheet.xlsx`; `Application Cover Page.docx` is excluded
 because its content comes from the Dataverse-derived top panel.
 
-**Automated proposal analysis is separate and canonical as of 2026-07-30.**
-Initial Assessment, Workbench Field Primer request mode, and Reviewer Finder's
-default loader require the exact active
-`Reviewer Materials/Proposal_{Request#}.pdf` file. They do not use the
+**Governed proposal analysis is separate and canonical as of 2026-07-30.**
+Initial Assessment and Workbench Field Primer request mode require the exact
+active `Reviewer Materials/Proposal_{Request#}.pdf` file. They do not use the
 Proposal-tab `ProjectDescription.pdf` bridge, a raw Phase I export, an archive
 match, or a best-guess classifier. Missing or ambiguous exact input fails
 before model/result writes. Request `1003109` is the live-verified example.
+Reviewer Finder is a separate staff discovery surface: its current-cycle
+default prefers that canonical file and falls back only to exactly one active
+`Phase I/ProjectDescription.pdf`; neither or ambiguity returns a server-listed
+picker before download/Blob write. The fallback does not alter the governed or
+external-reviewer contracts.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
@@ -92,13 +96,14 @@ open, as do Workbench history/admin restore and immutable milestone snapshots.
 
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
 
-Ground truth: [VERIFIED 2026-07-30 via
+Ground truth: [VERIFIED 2026-08-01 via
 `shared/config/workbenchProposalDocuments.js`,
 `lib/external/reviewer-materials.js`,
 `lib/services/workbench-proposal-documents.js`,
 `lib/services/reviewer-finder/load-proposal-service.js`, and
 `docs/CURRENT_WORK_QUEUE.md`, production Wave 16 readback, prompt verification,
 deployment inspection, the Request `1002788` mechanics rehearsal, and the
-signed-in Request `1003109` generation/retry/recovery plus live lineage probes].
+signed-in Request `1003109` generation/retry/recovery plus live lineage probes,
+and focused Reviewer Finder proposal-resolver tests].
 The typed registry is live and exercised; broader J27 applicant-capture
 producers and the partial-pilot blockers remain open.

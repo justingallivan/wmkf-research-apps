@@ -113,6 +113,16 @@ is withdrawn. (b) The verdict's "common thread across C and D" paragraph still
 leans on **withdrawn Finding D** and is struck; any exclusion-copy
 recommendation rests solely on the separately measured name-variant evidence.
 
+**C9 — Owner correction to the proposal filename.** References below to a
+proposed `Project Narrative.pdf` fallback record the mistaken filename supplied
+during this review. For the remainder of the current grant cycle, the exact
+necessary file is `Phase I/ProjectDescription.pdf`; the next combined grant
+cycle should still publish the canonical
+`Reviewer Materials/Proposal_{Request#}.pdf`. This correction changes only the
+filename in the deferred fallback proposal. It does not authorize broad
+classification or best-guess selection, and it does not change the external
+reviewer-materials package contract.
+
 ---
 
 ## 1. Executive verdict and reframe
@@ -834,14 +844,15 @@ enforced in the roster store and should be asserted by tests, not rebuilt.
    binding itself is correct and should not be loosened. The typed
    stale-row/Reload-remedy response is worth doing but is UX polish, not the
    defect.
-6. **Phase 2-C (Project Narrative fallback) should be deferred pending demand
+6. **Phase 2-C (exact current-cycle fallback) should be deferred pending demand
    evidence.** It expands the trusted-filename surface the codebase just spent
    sessions narrowing ("Do not restore classifyFile, best-guess PDF selection,
    or filename heuristics" — the directive's own words). Before building it,
-   measure: how many active-cycle requests lack a canonical file and have a
-   `Project Narrative.pdf`? If the answer is "a handful", the reload-stable
-   override (a validated URL file-key param) alone removes the staff pain
-   without a new heuristic. The override piece IS worth keeping in the slice.
+   measure: how many active-cycle requests lack a canonical file and have the
+   exact `Phase I/ProjectDescription.pdf`? If the answer is "a handful", the
+   reload-stable override (a validated URL file-key param) alone removes the
+   staff pain without a new heuristic. The override piece IS worth keeping in
+   the slice.
 7. **Add the missing golden workflow.** None of the five covers the
    promote-a-declined-reviewer write hazard (§1). That is the only known path
    by which this incident *corrupts* Dataverse state rather than just
@@ -1012,7 +1023,8 @@ immediately before any Phase-3 Production write, per the standing rule.
    finished implementation (not another plan loop).
 
 **Explicit non-goals for the slice:** no schema/migration; no Postgres
-ownership changes; no `Project Narrative.pdf` fallback; no repair execution;
+ownership changes; no automatic `Phase I/ProjectDescription.pdf` fallback; no
+repair execution;
 no changes to the fail-closed key binding, promotion lookup strictness, or
 address-trust machinery; no `save-candidates` changes; no rework of the
 referral capture/surface itself (only its `selected` side effect).
@@ -1387,8 +1399,9 @@ the text. Do not overload one field with two formats.
   time to the slice.
 - **Stop planning a new Phase-0 diagnostic harness.** Extend
   `probe-roster-dump.mjs`; it already does ~70% of the spec.
-- **Stop advancing the `Project Narrative.pdf` fallback** until a one-query
-  demand measurement justifies re-widening the filename trust surface.
+- **Stop advancing the automatic `Phase I/ProjectDescription.pdf` fallback**
+  until a one-query demand measurement justifies re-widening the filename trust
+  surface.
 - **Stop treating Production roster cleanup as a correctness precondition.**
   After the runtime slice, twins/orphans are hygiene; run the repair on the
   existing dry-run/backup pattern at leisure, gated by a fresh probe.
@@ -1423,7 +1436,7 @@ Still open:
 | ~~Whether the fail-open answers are category text or missed names~~ | **ANSWERED 2026-08-01 (§3.2.1): neither, mostly.** 8 of 10 are prose for "none", 1 junk, 1 genuine inverted request, 0 missed names → Finding D withdrawn as a safety concern. | — |
 | ~~Whether the zero-impact reading is meaningful~~ | **ANSWERED: base rate 25%** (5 of 20 enforceable-exclusion requests have selected reviewers), so the zero-impact column is informative, not vacuous. | — |
 | The 3 oldest fail-open answers (`1001500`, `1000972`, `1000916`) are still unread | Re-run with `--limit 300`. Low value — the pattern across the other 10 is uniform and all three predate the current reviewer workflow | Yes — same probe |
-| Demand for the legacy-filename fallback (§4.6) | Count active-cycle requests with no canonical proposal file but a `Project Narrative.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
+| Demand for the exact current-cycle fallback (§4.6) | Count active-cycle requests with no canonical proposal file but an exact `Phase I/ProjectDescription.pdf` (SharePoint listing over the current cycle's requests; read-only Graph) | Yes — bounded to one cycle |
 | Whether the two July 31 Lima 409s were fresh-enrichment confirms (claim 3 causation) | Vercel request logs for the two PATCHes (payload presence of `candidateKey`), if retained | Maybe — log retention dependent |
 | How many other requests currently have engaged-but-unterminal applicant recommendations (blast radius of the perpetual re-enrich loop) | One roster/Dataverse join query — natural extension of the probe script | Yes — read-only |
 

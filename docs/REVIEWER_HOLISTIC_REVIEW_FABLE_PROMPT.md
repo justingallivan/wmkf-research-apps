@@ -25,6 +25,12 @@ related:
 > `outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`.
 > Implementation is authorized and specified in `SESSION_PROMPT.md`.
 > Retained as the historical record of the review contract.
+>
+> **Owner correction, 2026-08-01:** references below to a proposed
+> `Project Narrative.pdf` fallback preserve the prompt as executed, but the
+> actual file needed for the remainder of the current grant cycle is the exact
+> `Phase I/ProjectDescription.pdf`. Current guidance lives in the stabilization
+> directive and `SESSION_PROMPT.md`.
 
 You are Claude Fable in a fresh, top-level Claude Code CLI session. Justin has
 asked you to spend one session on the reviewer workflow because the team has
@@ -102,8 +108,9 @@ Challenge at least these possibilities:
 - the confirmation 409 may arise from more than an omitted client key;
 - proposal identity may be correctly exact while cache invalidation or UI
   orchestration is wrong;
-- the proposed `Project Narrative.pdf` fallback may be a useful bounded rule or
-  another undocumented heuristic;
+- the then-proposed filename fallback (now owner-corrected to the exact
+  `Phase I/ProjectDescription.pdf`) may be a useful bounded rule or another
+  undocumented heuristic;
 - cleanup-after-runtime-fix may be insufficient if stale rows affect how the new
   contract is designed or tested; and
 - “handled but visible” may not be the right staff experience for every terminal

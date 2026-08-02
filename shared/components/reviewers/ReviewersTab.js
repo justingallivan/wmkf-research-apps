@@ -17,6 +17,8 @@
  *
  * Sub-tab selection is query-string driven (`?tab=reviewers&sub=track`) for
  * deep-links; legacy `invite`/`completed` links normalize to Track Reviewers.
+ * A server-validated manual proposal choice is retained in `?proposalFile=` so
+ * the Find document binding survives refresh without becoming file authority.
  *
  * Props:
  *   - requestId : the akoya_request GUID
@@ -74,6 +76,23 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
   const activeSub = normalizedSubParam && SUB_TAB_KEYS.has(normalizedSubParam) ? normalizedSubParam : null;
+  const proposalFileKey = typeof router.query.proposalFile === 'string'
+    ? router.query.proposalFile
+    : null;
+
+  // A deliberate proposal override is navigation state, not component memory.
+  // The Find loader still revalidates this opaque key against the request's
+  // server-listed SharePoint files before it can download or analyze anything.
+  const persistProposalFileKey = useCallback((fileKey) => {
+    const query = { ...router.query };
+    if (fileKey) query.proposalFile = fileKey;
+    else delete query.proposalFile;
+    router.replace(
+      { pathname: router.pathname, query },
+      undefined,
+      { shallow: true },
+    );
+  }, [router]);
 
   const loadReviewers = useCallback(async () => {
     if (!requestId) return;
@@ -349,6 +368,9 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           requestId={requestId}
           context={context}
           canManage={canManage}
+          proposalFileKey={proposalFileKey}
+          proposalBindingReady={router.isReady !== false}
+          onProposalFileKeyChange={persistProposalFileKey}
           savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
           onSaved={refreshAll}
           onNavigate={selectSub}

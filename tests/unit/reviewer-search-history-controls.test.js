@@ -317,6 +317,59 @@ test('a completed resolved applicant cache can be refreshed manually', async () 
   await waitFor(() => expect(screen.getByText(/1 applicant-referred reviewer verified/i)).toBeInTheDocument());
 });
 
+test('a refreshed Blob URL for the same exact proposal key does not rerun applicant enrichment', async () => {
+  const suggestionId = '55555555-5555-5555-5555-555555555555';
+  const resolvedApplicant = {
+    ...applicantCandidate,
+    candidateKey: `suggestion:${suggestionId}`,
+    suggestionId,
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [resolvedApplicant],
+        excluded: [],
+        ineligible: [],
+        savedKeys: [],
+        allNames: [resolvedApplicant.name],
+      }));
+    }
+    if (target === '/api/workbench/enrich-recommended' && options.method === 'POST') {
+      throw new Error('same-file refresh must not enrich');
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  const recommended = [{ suggestionId, name: resolvedApplicant.name }];
+  const { rerender } = render(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob-first-load"
+      proposalKey="proposal"
+      recommended={recommended}
+    />,
+  );
+  await screen.findByRole('button', { name: 'Update applicant suggestions' });
+
+  rerender(
+    <ReviewerSearchSection
+      requestId={REQ}
+      blobUrl="blob-after-refresh"
+      proposalKey="proposal"
+      recommended={recommended}
+    />,
+  );
+  await waitFor(() => expect(global.fetch.mock.calls.filter(
+    ([url]) => String(url).includes('/api/workbench/reviewer-roster?'),
+  )).toHaveLength(2));
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    '/api/workbench/enrich-recommended',
+    expect.objectContaining({ method: 'POST' }),
+  );
+});
+
 test('labels restored generated rows and removes only the scoped previous results', async () => {
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);

@@ -7,7 +7,7 @@ summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md)
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
-last_verified: 2026-07-30
+last_verified: 2026-08-01
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
   - scripts/audit-postgres-state.js
@@ -160,7 +160,7 @@ The high-leverage services for data-layer work — full source remains authorita
 | `review-upload.js` | none | `wmkf_appreviewersuggestion` (PATCH) + SharePoint | shared writer for staff + reviewer paths |
 | `grantee-deliverable-record.js` | none | `wmkf_granteedeliverable` | canonical package helper; read-only `getDeliverableForRequest()` never creates, staff write paths use `ensureDeliverableForRequest()` and `patchDeliverable()` |
 | `initial-assessment/artifact-service.js` | none | `akoya_request`, `wmkf_requestdocument`, `wmkf_ai_prompt`, `wmkf_ai_run`, and SharePoint `akoya_request` | governed Initial Assessment producer/read model; requires exactly one active `Reviewer Materials/Proposal_{Request#}.pdf` before side effects, exact retry convergence, Ready-row no-overwrite, atomic request-pointer/Ready/supersession activation, operator-visible retained-item cleanup work without silent eviction, and stable Graph identity. Request `1002788` preserves mechanics-only evidence. Merge `84155a5a` deployed the canonical source contract, and Request `1003109` production-proved canonical-input generation, exact-input reuse, a new AI run with the correct request lookup, and interrupted-finalization recovery reusing the same row/run/SharePoint item and version. Production adds response-only Graph-current metadata overlay by stable identity, with explicit missing/unavailable fallbacks and no Dataverse write. Cleanup is manual (no drain). |
-| `reviewer-finder/load-proposal-service.js` | none | `akoya_request` and SharePoint `akoya_request` | default ingestion selects only the exact active `Reviewer Materials/Proposal_{Request#}.pdf`; zero/multiple matches fail before download/Blob write. Explicit server-listed `fileKey` supports deliberate historical/ad-hoc staff override. |
+| `reviewer-finder/load-proposal-service.js` | none | `akoya_request` and SharePoint `akoya_request` | default ingestion prefers exactly one active `Reviewer Materials/Proposal_{Request#}.pdf`, then falls back only to exactly one active current-cycle `Phase I/ProjectDescription.pdf`; neither/ambiguity fails before download/Blob write and returns the server-listed picker data. Explicit server-listed `fileKey` supports deliberate historical/ad-hoc staff override. This Reviewer Finder compatibility rule does not change external reviewer-material visibility or governed Initial Assessment input. |
 | `claude-reviewer-service.js` | none | none | legacy; new code uses `llm-client.js` |
 | `discovery-service.js` external clients (`pubmed-service.js`, `openalex-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |
 | `literature-search-service.js` | none | none | shared search shim |

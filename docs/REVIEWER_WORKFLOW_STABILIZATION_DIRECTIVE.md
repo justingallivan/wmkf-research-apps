@@ -173,8 +173,10 @@ Outcome: verdict **PLAN SOUND WITH NAMED CHANGES**, then independently reviewed
 by Codex (**needs-attention**), corrected in the assessment's §0, and accepted
 by the owner. Net changes to this directive: Contract 1 narrows to invariants
 I-1/I-2/I-2a (assessment §5); Phases 0 and 2 shrink to the Slice A work order in
-`SESSION_PROMPT.md`; the `Project Narrative.pdf` fallback is deferred; data
-repair is post-fix hygiene rather than a correctness gate; and two new golden
+`SESSION_PROMPT.md`; the proposal filename fallback is deferred (owner
+correction 2026-08-01: the exact current-cycle file is
+`Phase I/ProjectDescription.pdf`, not `Project Narrative.pdf`); data repair is
+post-fix hygiene rather than a correctness gate; and two new golden
 workflows (W6 ungated `selected=true`, W7 implausible-name create) join the set.
 The original Phase -1 instructions are retained below as the historical record.
 
@@ -253,23 +255,35 @@ against the baseline before implementation.
 - Prove both confirmation-before-enrichment and confirmation-during-enrichment
   races preserve the staff decision.
 
-#### C. Proposal document selector fallback — explicit todo
+#### C. Proposal document selector fallback
+
+**Branch implementation (2026-08-01; not deployed):** branch
+`codex/reviewer-proposal-binding-refresh` closes items 1–7. Reviewer Finder now
+selects the exact active canonical package first, falls back only to the exact
+active current-cycle `Phase I/ProjectDescription.pdf`, and returns the
+server-listed picker when neither exists. After a server-validated deliberate
+selection, Find stores the exact `library::folder::filename` in
+`?proposalFile=`, replays it on reload, and the route revalidates it against the
+current request's server-listed files. A new random-suffixed Blob URL for that
+same key does not invalidate a complete applicant-enrichment cache. The
+external reviewer-materials rules remain unchanged.
 
 Implement this precedence for **Reviewer Finder proposal ingestion only**:
 
 1. If exactly one active
    `Reviewer Materials/Proposal_{Request#}.pdf` exists, select it.
-2. If the canonical file is absent, look for the exact legacy filename
-   `Project Narrative.pdf` in the request's server-listed document set.
-3. If exactly one legacy match exists, select it automatically.
-4. If neither exists, or legacy matches are ambiguous, require the existing
-   authenticated dropdown selector.
+2. If the canonical file is absent, look for the exact current-cycle path
+   `Phase I/ProjectDescription.pdf` in the request's server-listed document
+   set. `Project Narrative.pdf` was named earlier in error.
+3. If exactly one current-cycle match exists, select it automatically.
+4. If neither exists, or current-cycle matches are ambiguous, require the
+   existing authenticated dropdown selector.
 5. A duplicate canonical file remains an error; do not silently fall back.
-6. Persist a deliberate override in reload-stable navigation state (for
-   example a validated URL file-key parameter), and revalidate it server-side.
-7. Do not rerun Claude when reload resolves the same exact file key. Rerun only
-   when the exact key changes or staff explicitly selects **Update applicant
-   suggestions**.
+6. **Implemented on the branch above:** persist a deliberate override in
+   reload-stable navigation state and revalidate it server-side.
+7. **Implemented on the branch above:** do not rerun Claude when reload resolves
+   the same exact file key. Rerun only when the exact key changes or staff
+   explicitly selects **Update applicant suggestions**.
 8. Keep cached applicant rows visible while file resolution is in progress;
    gate only actions that genuinely require proposal-dependent evidence.
 
