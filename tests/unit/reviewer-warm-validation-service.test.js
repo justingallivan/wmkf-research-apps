@@ -205,6 +205,7 @@ test('keeps panel state current without fabricating a full candidate-stage cache
     candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
     name: 'Secret Candidate',
     email: 'secret@example.edu',
+    provenance: { kind: 'proposal_named' },
     warmCacheVersion: 1,
     applicantInputVersion: 'legacy-request-wide-input-version',
     proposalContentVersion: proposal.proposalContentVersion,
@@ -343,6 +344,100 @@ test('uses an exact applicant slot fingerprint without granting unrelated stage 
   expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
     expect.objectContaining({ stage: 'identity', reason: 'stage_missing' }),
   ]));
+});
+
+test('keeps a general-search applicant anchor not applicable when the proposal panel is stale', async () => {
+  const candidate = {
+    candidateKey: 'orcid:0000-0002-1825-0097',
+    warmCacheVersion: 1,
+    applicantInputVersion: 'old-request-wide-input-version',
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    // No binding is found, making the panel stale without failing the request
+    // recommendation-slot read.
+    deps: { ...metadataDeps(), getRequestById: jest.fn(async () => request()) },
+  });
+
+  expect(result).toMatchObject({ state: 'stale', reasonCode: 'proposal_binding_changed' });
+  expect(result.candidatePlans[0]).toMatchObject({
+    candidateKey: candidate.candidateKey,
+    promotionAuthority: 'blocked_refresh_required',
+  });
+  expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
+  expect(result.candidatePlans[0].refreshes).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor' }),
+  ]));
+});
+
+test('keeps an exact applicant-slot comparison when the proposal panel is stale', async () => {
+  const slotVersion = opaqueVersion('reviewer-warm-applicant-slot:v1', {
+    requestId: REQUEST_ID,
+    personId: '22222222-2222-2222-2222-222222222222',
+    slots: [1],
+  });
+  const candidate = {
+    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    isApplicantRecommended: true,
+    potentialReviewerId: '22222222-2222-2222-2222-222222222222',
+    warmCacheVersion: 1,
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion: slotVersion,
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: { ...metadataDeps(), getRequestById: jest.fn(async () => request()) },
+  });
+
+  expect(result).toMatchObject({ state: 'stale', reasonCode: 'proposal_binding_changed' });
+  expect(result.candidatePlans[0].currentStages).toContain('applicant_anchor');
+  expect(result.candidatePlans[0].refreshes).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor' }),
+  ]));
+  expect(result.candidatePlans[0].promotionAuthority).toBe('blocked_refresh_required');
+});
+
+test('fails closed for an ambiguous suggestion row without applicant or non-applicant provenance', async () => {
+  const candidate = {
+    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    warmCacheVersion: 1,
+    stageFreshness: {
+      applicant_anchor: {
+        state: 'current',
+        contractVersion: CONTRACT_VERSIONS.applicant_anchor,
+        sourceVersion: 'legacy-applicant-anchor',
+        completedAt: '2026-08-01T00:00:00.000Z',
+      },
+    },
+  };
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result).toMatchObject({ state: 'current' });
+  expect(result.candidatePlans[0]).toMatchObject({
+    candidateKey: candidate.candidateKey,
+    cacheOutcome: 'miss',
+  });
+  expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+    expect.objectContaining({ stage: 'applicant_anchor', reason: 'candidate_missing' }),
+  ]));
+  expect(result.candidatePlans[0].currentStages).not.toContain('applicant_anchor');
 });
 
 test('does not guess a historical manual file binding from a roster cache key', async () => {

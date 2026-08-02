@@ -144,7 +144,9 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
   can make those stages current. An applicant anchor is candidate-specific only
   for an exact stored potential-reviewer id matching a current recommendation
   slot; general-search candidates receive a server-issued `not_applicable`
-  anchor so another applicant-slot edit cannot invalidate them. Warm
+  anchor so another applicant-slot edit cannot invalidate them. A
+  suggestion-keyed row missing an explicit lane fails closed instead of being
+  guessed as a general-search row. Warm
   validation reads no proposal bytes: it uses only server-owned request
   context, Graph item metadata for exact canonical
   `Reviewer Materials/Proposal_{requestNumber}.pdf`, then the exact current

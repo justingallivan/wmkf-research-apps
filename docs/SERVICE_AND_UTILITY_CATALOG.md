@@ -131,7 +131,9 @@ If you're touching a service or utility, read its header before this catalog. If
   COI, eligibility, contact, address, persistence, or promotion receipts.
   Applicant-anchor freshness is candidate-specific when an exact stored person
   id matches a current request slot; ordinary search candidates are explicitly
-  not applicable to that stage. It never
+  not applicable to that stage. A suggestion-keyed row without an explicit
+  applicant or non-applicant provenance fails closed rather than being inferred
+  as not applicable. It never
   accepts a browser file key, downloads/uploads proposal content, materializes
   suggestions, parses exclusions, or calls evidence/model providers. A
   historical manual file binding is stale when it cannot be recovered from
