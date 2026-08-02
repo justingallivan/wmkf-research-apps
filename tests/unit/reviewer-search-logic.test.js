@@ -29,6 +29,24 @@ import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-know
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
 
+const CURRENT_STAGE_FRESHNESS = {
+  identity: { state: 'current', contractVersion: 4, sourceVersion: 'identity-v4', completedAt: '2026-08-02T00:00:00.000Z' },
+  institution_coi: { state: 'current', contractVersion: 1, sourceVersion: 'institution-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  coauthor_coi: { state: 'current', contractVersion: 1, sourceVersion: 'coauthor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  eligibility: { state: 'current', contractVersion: 1, sourceVersion: 'eligibility-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  contact: { state: 'current', contractVersion: 1, sourceVersion: 'contact-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  address_trust: { state: 'current', contractVersion: 1, sourceVersion: 'address-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+};
+const withCurrentPromotionAuthority = (candidate) => ({
+  candidateKey: candidate.candidateKey || 'suggestion:test-candidate',
+  stageFreshness: CURRENT_STAGE_FRESHNESS,
+  coauthorCheckStatus: 'complete',
+  coauthorCheckFailures: [],
+  eligibilityCheckStatus: 'complete',
+  eligibilityStatus: 'unknown',
+  ...candidate,
+});
+
 describe('dedupeReviewerCandidates', () => {
   test('collapses exact-ORCID search aliases and keeps the staff-attested address projection', () => {
     const foundAgain = {
@@ -176,7 +194,9 @@ test('vetted enrichment pair stays selectable when the exact applicant person ha
     email: 'new@example.edu',
     emailSource: 'scholarly_multi',
   });
-  expect(isCandidateSelectable(pruned)).toBe(true);
+  // A browser-rendered receipt cannot establish the request/proposal source
+  // versions needed for a promotion. The server is the only authority.
+  expect(isCandidateSelectable(withCurrentPromotionAuthority(pruned))).toBe(false);
 });
 
 test('applicant contact-claim mismatch survives roster pruning and remains non-selectable until staff correction', () => {
@@ -195,7 +215,7 @@ test('applicant contact-claim mismatch survives roster pruning and remains non-s
   });
   expect(pruned.applicantContactMismatch).toBe(true);
   expect(isCandidateSelectable(pruned)).toBe(false);
-  expect(isCandidateSelectable({
+  expect(isCandidateSelectable(withCurrentPromotionAuthority({
     ...pruned,
     email: 'corrected@example.edu',
     emailSource: 'manual',
@@ -207,7 +227,7 @@ test('applicant contact-claim mismatch survives roster pruning and remains non-s
       personConfirmed: true,
       email: 'corrected@example.edu',
     },
-  })).toBe(true);
+  }))).toBe(false);
 });
 
 describe('parseReferredSeeds', () => {
@@ -495,12 +515,12 @@ describe('pruneCandidateForRoster — institutionCOIDetails (S240)', () => {
 
 describe('isCandidateSelectable', () => {
   test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {
-    expect(isCandidateSelectable({
+    expect(isCandidateSelectable(withCurrentPromotionAuthority({
       name: 'Flagged',
       hasInstitutionCOI: true,
       institutionCOIDetails: { dropDecision: 'flagged', piInstitution: 'MIT', reviewerInstitution: 'MIT' },
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    })).toBe(false);
+    }))).toBe(false);
   });
 
   test('PD identity confirmation does not waive institution COI', () => {
@@ -538,7 +558,7 @@ describe('isCandidateSelectable', () => {
         email: 'clean@example.edu',
       },
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    })).toBe(true);
+    })).toBe(false);
   });
 
   test('Dataverse split identity remains actionable but nonselectable until staff confirms person and address', () => {
@@ -563,7 +583,7 @@ describe('isCandidateSelectable', () => {
       reason: 'orcid_email_split',
     });
     expect(isCandidateSelectable(candidate)).toBe(false);
-    expect(isCandidateSelectable({ ...candidate, pdIdentityConfirmed: true })).toBe(true);
+    expect(isCandidateSelectable(withCurrentPromotionAuthority({ ...candidate, pdIdentityConfirmed: true }))).toBe(false);
   });
 
   test('nested unresolved identity overrides top-level verified/selectable signals', () => {

@@ -52,16 +52,22 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findIdentityConfirmation: jest.fn(async () => null),
   findEligibilityByCandidateKey: jest.fn(async () => null),
   findAddressTrustReceipt: jest.fn(async () => null),
+  promotionSnapshotIsCurrent: jest.fn(async () => true),
   findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
     candidateKeys.map((candidateKey) => ({ candidateKey }))
   )),
 }));
+const mockGetCandidatePromotionAuthority = jest.fn();
+jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
+  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
+}));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
-  verifyAutomatedIdentityAttestation: jest.fn(async () => ({
+  verifyAutomatedIdentityAttestation: jest.fn(async (_token, { candidate } = {}) => ({
     valid: true,
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
+    rosterCandidateKey: candidate?.candidateKey || null,
   })),
   hasServerIdentityDecisionReceipt: jest.fn(() => false),
   createServerIdentityDecisionReceipt: jest.fn(() => null),
@@ -111,19 +117,57 @@ const {
 } = require('../../lib/services/reviewer-finder/save-candidates-service');
 
 const BASE = { requestId: 'REQ-1', actingUserSystemId: 'SYS-1' };
-const saveCandidates = (args) => saveCandidatesImpl({
-  ...args,
-  candidates: (args.candidates || []).map((candidate, index) => ({
+const CURRENT_STAGE_FRESHNESS = {
+  identity: { state: 'current', contractVersion: 4, sourceVersion: 'identity-v4', completedAt: '2026-08-02T00:00:00.000Z' },
+  institution_coi: { state: 'current', contractVersion: 1, sourceVersion: 'institution-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  coauthor_coi: { state: 'current', contractVersion: 1, sourceVersion: 'coauthor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  eligibility: { state: 'current', contractVersion: 1, sourceVersion: 'eligibility-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  contact: { state: 'current', contractVersion: 1, sourceVersion: 'contact-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+  address_trust: { state: 'current', contractVersion: 1, sourceVersion: 'address-v1', completedAt: '2026-08-02T00:00:00.000Z' },
+};
+const authorityRow = (candidateKey, extra = {}) => ({
+  candidateKey,
+  rosterStatus: 'active',
+  rosterUpdatedAt: '2026-08-02 00:00:00+00',
+  stageFreshness: CURRENT_STAGE_FRESHNESS,
+  coauthorCheckStatus: 'complete',
+  coauthorCheckFailures: [],
+  eligibilityCheckStatus: 'complete',
+  eligibilityStatus: 'unknown',
+  ...extra,
+});
+const rosterRowsByKey = new Map();
+const saveCandidates = (args) => {
+  const candidates = (args.candidates || []).map((candidate, index) => ({
+    candidateKey: `test:${index}`,
+    automatedIdentityAttestation: 'server-signed-test-token',
     email: `ready-${index}@example.edu`,
     emailSource: 'pubmed',
     emailPersistAllowed: true,
     identityStatus: 'probable',
     ...candidate,
-  })),
-});
+  }));
+  for (const [index, candidate] of candidates.entries()) {
+    const serverKey = candidate.candidateKey || `test:${index}`;
+    rosterRowsByKey.set(serverKey, authorityRow(serverKey, {
+      addressTrustReceipt: {
+        receiptId: `receipt:${candidate.candidateKey}`,
+        requestId: args.requestId,
+        candidateKey: serverKey,
+        personConfirmed: true,
+        email: candidate.email,
+        evidenceType: 'publication_corresponding_author',
+        evidenceUrl: 'https://example.edu/evidence',
+        attestedAt: '2026-08-02T00:00:00.000Z',
+      },
+    }));
+  }
+  return saveCandidatesImpl({ ...args, candidates });
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
+  rosterRowsByKey.clear();
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' });
   potentialReviewerAdapter.getByIdForMerge.mockResolvedValue({
@@ -146,14 +190,20 @@ beforeEach(() => {
     candidateKey,
   }));
   reviewerRosterStore.findCandidatesByKeys.mockImplementation(async (_requestId, candidateKeys) => (
-    candidateKeys.map((candidateKey) => ({ candidateKey }))
+    candidateKeys.map((candidateKey) => rosterRowsByKey.get(candidateKey) || authorityRow(candidateKey))
   ));
-  verifyAutomatedIdentityAttestation.mockResolvedValue({
+  reviewerRosterStore.findAddressTrustReceipt.mockImplementation(async (_requestId, candidateKey) => (
+    rosterRowsByKey.get(candidateKey)?.addressTrustReceipt || null
+  ));
+  reviewerRosterStore.promotionSnapshotIsCurrent.mockResolvedValue(true);
+  mockGetCandidatePromotionAuthority.mockReturnValue({ decision: 'ready', code: null, stage: null });
+  verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate } = {}) => ({
     valid: true,
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-  });
+    rosterCandidateKey: candidate?.candidateKey || null,
+  }));
   hasServerIdentityDecisionReceipt.mockReturnValue(false);
   createServerIdentityDecisionReceipt.mockReturnValue(null);
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
@@ -243,17 +293,80 @@ test('direct deceased evidence is rejected before any Dataverse write', async ()
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
-test('durable eligibility lookup uses the signed pre-enrichment roster key', async () => {
+test('withholds promotion when the server cannot derive current stage authority', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'candidate:pending-authority',
+  });
+  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
+    decision: 'blocked',
+    code: 'promotion_authority_unavailable',
+    stage: null,
+  });
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Pending Authority',
+      candidateKey: 'candidate:pending-authority',
+      automatedIdentityAttestation: 'server-signed-test-token',
+    }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    rejectedUnresolved: 1,
+    errors: [expect.objectContaining({
+      code: 'promotion_authority_unavailable',
+      outcome: 'withheld',
+    })],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
+    expect.objectContaining({ candidateKey: expect.any(String) }),
+    expect.objectContaining({ serverAuthoritative: true, checkInstitution: false }),
+  );
+});
+
+test('server roster snapshot change withholds generic promotion before Dataverse mutation', async () => {
+  reviewerRosterStore.promotionSnapshotIsCurrent.mockResolvedValueOnce(false);
+
+  const err = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Snapshot Changed' }],
+  }).catch((error) => error);
+
+  expect(err).toBeInstanceOf(SaveCandidatesError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({
+    rejectedUnresolved: 1,
+    errors: [expect.objectContaining({ code: 'roster_snapshot_stale', outcome: 'withheld' })],
+  });
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerRosterStore.promotionSnapshotIsCurrent).toHaveBeenCalledWith(
+    BASE.requestId,
+    'test:0',
+    '2026-08-02 00:00:00+00',
+  );
+});
+
+test('durable eligibility authority uses the signed pre-enrichment roster key', async () => {
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,
     source: 'automated_resolver',
     eligibilityStatus: 'unknown',
     rosterCandidateKey: 'candidate:pre-enrichment',
   });
-  reviewerRosterStore.findEligibilityByCandidateKey.mockResolvedValueOnce({
-    rosterStatus: 'ineligible',
-    eligibilityStatus: 'deceased',
-  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([
+    authorityRow('candidate:pre-enrichment', {
+      rosterStatus: 'ineligible',
+      eligibilityStatus: 'deceased',
+    }),
+  ]);
 
   const err = await saveCandidates({
     ...BASE,
@@ -266,8 +379,8 @@ test('durable eligibility lookup uses the signed pre-enrichment roster key', asy
     }],
   }).catch((error) => error);
 
-  expect(reviewerRosterStore.findEligibilityByCandidateKey)
-    .toHaveBeenCalledWith(BASE.requestId, 'candidate:pre-enrichment');
+  expect(reviewerRosterStore.findCandidatesByKeys)
+    .toHaveBeenCalledWith(BASE.requestId, ['candidate:pre-enrichment']);
   expect(err).toBeInstanceOf(SaveCandidatesError);
   expect(err.body).toMatchObject({ rejectedIneligible: 1 });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
@@ -295,7 +408,6 @@ test.each([
     rejectedUnresolved: 1,
     errors: [expect.objectContaining({ code: 'identity_attestation_required' })],
   });
-  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
@@ -310,9 +422,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
     source: 'automated_resolver',
     identityDigest: 'identity-digest-1',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey: 'candidate:ellen',
-    rosterStatus: 'active',
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:ellen', {
     name: 'Ellen Zhong',
     email: 'zhonge@cs.princeton.edu',
     serverIdentityDecisionReceipt: {
@@ -327,7 +437,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
       requestId: BASE.requestId,
       candidateKey: 'candidate:ellen',
     },
-  }]);
+  })]);
   reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
     receiptId: 'receipt-ellen',
     email: 'zhonge@cs.princeton.edu',
@@ -376,8 +486,6 @@ test('server-owned identity and exact-address receipts recover a roster row whos
   });
 
   expect(out).toMatchObject({ success: true, savedCount: 1, savedNames: ['Ellen Zhong'] });
-  expect(reviewerRosterStore.findEligibilityByCandidateKey)
-    .toHaveBeenCalledWith(BASE.requestId, 'candidate:ellen');
   expect(lookupReviewerIdentity).toHaveBeenCalledWith(expect.objectContaining({
     name: 'Ellen Zhong',
     email: 'zhonge@cs.princeton.edu',
@@ -401,16 +509,14 @@ test('server-owned identity receipt alone cannot authorize contact after an auto
     source: 'automated_resolver',
     identityDigest: 'identity-digest-1',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey: 'candidate:no-address-receipt',
-    rosterStatus: 'active',
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:no-address-receipt', {
     name: 'Dr No Address Receipt',
     serverIdentityDecisionReceipt: {
       version: 1,
       source: 'automated_resolver',
       identityDigest: 'identity-digest-1',
     },
-  }]);
+  })]);
 
   const error = await saveCandidates({
     ...BASE,
@@ -451,15 +557,14 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
     contactAuthorityBound: true,
     rosterCandidateKey: 'candidate:blocked-address',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
-    candidateKey: 'candidate:blocked-address',
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:blocked-address', {
     conflictRecordUnavailable: true,
     addressTrustReceipt: {
       receiptId: 'old-receipt',
       email: 'found@example.edu',
       personConfirmed: true,
     },
-  }]);
+  })]);
 
   const error = await saveCandidates({
     ...BASE,
@@ -483,7 +588,6 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
     }),
   ]);
   expect(reviewerRosterStore.findAddressTrustReceipt).not.toHaveBeenCalled();
-  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
 });
@@ -555,8 +659,6 @@ test('stored staff confirmation supplies the authoritative roster key when the a
     }],
   });
 
-  expect(reviewerRosterStore.findEligibilityByCandidateKey)
-    .toHaveBeenCalledWith(BASE.requestId, 'candidate:staff-confirmed');
   expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
     BASE.requestId,
     expect.objectContaining({ name: 'Ann Lee', email: 'ann@example.edu' }),
@@ -604,7 +706,6 @@ test('staff and automated roster bindings that disagree fail closed before write
       error: expect.stringMatching(/different roster candidates/i),
     })],
   });
-  expect(reviewerRosterStore.findEligibilityByCandidateKey).not.toHaveBeenCalled();
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
 });
 
@@ -713,8 +814,6 @@ test('roster-managed promotion finalizes the receipt-bound roster key while retu
     }],
   });
 
-  expect(reviewerRosterStore.findEligibilityByCandidateKey)
-    .toHaveBeenCalledWith(BASE.requestId, 'suggestion:receipt-bound');
   expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
     BASE.requestId,
     expect.objectContaining({ name: 'Dr Receipt Bound' }),

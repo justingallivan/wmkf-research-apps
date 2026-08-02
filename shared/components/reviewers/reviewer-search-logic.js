@@ -20,6 +20,7 @@ import {
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
+import { getCandidatePromotionAuthority } from '../../../lib/services/reviewer-promotion-authority';
 import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
@@ -52,8 +53,7 @@ export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
 export function isCandidateSelectable(c) {
-  const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
-  return eligibilityStatus !== 'deceased'
+  return getCandidatePromotionAuthority(c)?.decision === 'ready'
     && getCandidatePromotionDecision(c)?.decision === 'ready'
     && getCandidateEmailReadiness(c)?.action === 'ready'
     && !c?.hasInstitutionCOI;
@@ -281,6 +281,7 @@ export function mergeEnrichment(candidates, enrichmentResults) {
         || null,
       contactEnrichment,
       eligibilityStatus: e.eligibilityStatus || enriched.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityCheckStatus: e.eligibilityCheckStatus || enriched.eligibilityCheckStatus || c.eligibilityCheckStatus || null,
       eligibilityReason: e.eligibilityReason || enriched.eligibilityReason || c.eligibilityReason || null,
       eligibilityEvidence: e.eligibilityEvidence || enriched.eligibilityEvidence || c.eligibilityEvidence || null,
       // Institution COI re-evaluated server-side against the post-enrichment
@@ -834,6 +835,9 @@ export function pruneCandidateForRoster(c) {
       // roster reload. Bounded + stripped of raw payloads; persistable stays false.
       contactLeads: pruneContactLeads(e.contactLeads),
       eligibilityStatus: e.eligibilityStatus || c.eligibilityStatus || 'unknown',
+      eligibilityCheckStatus: ['complete', 'not_applicable', 'pending', 'incomplete', 'error'].includes(
+        e.eligibilityCheckStatus || c.eligibilityCheckStatus,
+      ) ? (e.eligibilityCheckStatus || c.eligibilityCheckStatus) : null,
       eligibilityReason: e.eligibilityReason || c.eligibilityReason || null,
       eligibilityEvidence: pruneEligibilityEvidence(e.eligibilityEvidence || c.eligibilityEvidence),
       dataverseContactEvidence: pruneDataverseContactEvidence(e.dataverseContactEvidence),
@@ -850,6 +854,9 @@ export function pruneCandidateForRoster(c) {
     // (the gate would only hold for the live run). Persist all three the group test reads.
     identityStatus: c.identityStatus || e.identity?.status || null,
     eligibilityStatus: c.eligibilityStatus || e.eligibilityStatus || 'unknown',
+    eligibilityCheckStatus: ['complete', 'not_applicable', 'pending', 'incomplete', 'error'].includes(
+      c.eligibilityCheckStatus || e.eligibilityCheckStatus,
+    ) ? (c.eligibilityCheckStatus || e.eligibilityCheckStatus) : null,
     eligibilityReason: c.eligibilityReason || e.eligibilityReason || null,
     eligibilityEvidence: pruneEligibilityEvidence(c.eligibilityEvidence || e.eligibilityEvidence),
     needsIdentification: !!c.needsIdentification,
@@ -881,7 +888,9 @@ export function pruneCandidateForRoster(c) {
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
-    coauthorCheckStatus: c.coauthorCheckStatus === 'complete' || c.coauthorCheckStatus === 'incomplete'
+    coauthorCheckStatus: c.coauthorCheckStatus === 'complete'
+      || c.coauthorCheckStatus === 'incomplete'
+      || c.coauthorCheckStatus === 'not_applicable'
       ? c.coauthorCheckStatus
       : null,
     coauthorCheckFailures: pruneCoauthorCheckFailures(c.coauthorCheckFailures),

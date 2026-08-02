@@ -673,6 +673,40 @@ describe('finalizeCandidatePromotion', () => {
     )).resolves.toEqual({ saved: false, candidateKey: 'candidate:ann' });
   });
 
+  test('uses the server-read roster version as a CAS instead of recreating a changed row', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });
+
+    await expect(store.finalizeCandidatePromotion(
+      REQ,
+      { name: 'Ann Lee' },
+      {
+        candidateKey: 'candidate:ann',
+        suggestionId: 'SUG-1',
+        potentialReviewerId: 'PID-1',
+        expectedUpdatedAt: '2026-08-02 00:00:00+00',
+      },
+    )).resolves.toEqual({ saved: true, candidateKey: 'candidate:ann' });
+
+    expect(queryTextOf(0)).toMatch(/UPDATE reviewer_find_roster/);
+    expect(queryTextOf(0)).toMatch(/updated_at::text/);
+    expect(queryTextOf(0)).not.toMatch(/INSERT INTO reviewer_find_roster/);
+    expect(allInterpolations()).toContain('2026-08-02 00:00:00+00');
+  });
+
+  test('checks the exact active roster snapshot before external promotion work', async () => {
+    sql.mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 });
+    await expect(store.promotionSnapshotIsCurrent(
+      REQ,
+      'candidate:ann',
+      '2026-08-02 00:00:00+00',
+    )).resolves.toBe(true);
+    expect(queryTextOf(0)).toMatch(/status = 'active'/);
+    expect(queryTextOf(0)).toMatch(/updated_at::text/);
+
+    await expect(store.promotionSnapshotIsCurrent(REQ, 'candidate:ann', '')).resolves.toBe(false);
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+
   test('also retires active roster aliases with the same checksum-valid ORCID', async () => {
     sql
       .mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ellen-legacy' }], rowCount: 1 })
