@@ -203,6 +203,23 @@ test('records a terminal stage outcome when the server can no longer resolve the
   expect(enrichRecommended).not.toHaveBeenCalled();
 });
 
+test('fails terminal when an authoritative request read returns a different request id', async () => {
+  getById.mockResolvedValueOnce({ akoya_requestid: '44444444-4444-4444-4444-444444444444' });
+  failStageRefresh.mockResolvedValueOnce({ outcome: 'failed_terminal' });
+
+  await expect(refreshReviewerCandidateStage(target())).resolves.toMatchObject({ outcome: 'failed_terminal' });
+  expect(buildApplicantAnchorRefreshReceipt).not.toHaveBeenCalled();
+  expect(completeStageRefresh).not.toHaveBeenCalled();
+  expect(failStageRefresh).toHaveBeenCalledWith(
+    REQUEST_ID,
+    CANDIDATE_KEY,
+    STARTED_UPDATED_AT,
+    'applicant_anchor',
+    expect.any(String),
+    { terminal: true, errorCode: 'terminal_failure' },
+  );
+});
+
 test('recovers only an expired matching lease before starting a replacement attempt', async () => {
   findCandidateBySuggestion.mockResolvedValueOnce(candidate({
     stageFreshness: {
