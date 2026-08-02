@@ -12,6 +12,7 @@
 /blob-report/
 /playwright/.cache/
 /.auth/
+/.artifacts/reviewer-find-live/
 
 # Next.js
 /.next/

@@ -91,7 +91,14 @@ const SERVER_STAFF_IDENTITY_AUTHORITY = {
 };
 
 function res() {
-  return { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+  return {
+    statusCode: 200,
+    body: null,
+    headers: {},
+    setHeader(k, v) { this.headers[String(k).toLowerCase()] = v; return this; },
+    status(c) { this.statusCode = c; return this; },
+    json(b) { this.body = b; return this; },
+  };
 }
 
 beforeEach(() => {
@@ -145,10 +152,9 @@ describe('auth', () => {
     }, r);
 
     expect(store.listForRequest).not.toHaveBeenCalled();
-    expect(console.info).not.toHaveBeenCalledWith(
-      'reviewer-find-warm-observation',
-      expect.any(Object),
-    );
+    expect(console.info.mock.calls.some(([message]) => (
+      typeof message === 'string' && message.includes('reviewer_find_warm_observation')
+    ))).toBe(false);
   });
 });
 
@@ -211,6 +217,7 @@ describe('GET', () => {
       active: roster.active,
       warmTelemetry: expect.objectContaining({ mode: 'cached', reasonCode: 'cached_snapshot' }),
     });
+    expect(r.body).not.toHaveProperty('observationAttestation');
     expect(mockReconcileRosterEngagement).not.toHaveBeenCalled();
     expect(withDalContext).not.toHaveBeenCalled();
   });
@@ -224,8 +231,10 @@ describe('GET', () => {
     }, r);
 
     const events = console.info.mock.calls
-      .filter(([label]) => label === 'reviewer-find-warm-observation')
-      .map(([, event]) => event);
+      .map(([message]) => {
+        try { return JSON.parse(message); } catch { return null; }
+      })
+      .filter((event) => event?.kind === 'reviewer_find_warm_observation');
     expect(events).toEqual([
       expect.objectContaining({
         observationId: OBSERVATION_ID,
@@ -241,6 +250,46 @@ describe('GET', () => {
         reasonCode: 'warm_get_completed',
       }),
     ]);
+    expect(r.body.observationAttestation).toEqual({
+      scope: 'reviewer_roster_warm_read_only',
+      deploymentClass: 'test',
+      dataverseTargetClass: 'unknown',
+      interlockMode: 'off',
+    });
+  });
+
+  it('attests the actual deployment, Dataverse target registry class, and interlock mode without a hostname', async () => {
+    const prior = {
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      DYNAMICS_URL: process.env.DYNAMICS_URL,
+      DATAVERSE_TARGET_INTERLOCK: process.env.DATAVERSE_TARGET_INTERLOCK,
+    };
+    let body;
+    try {
+      process.env.VERCEL_ENV = 'preview';
+      process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com';
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+      const r = res();
+      await handler({
+        method: 'GET',
+        query: { requestId: REQ, mode: 'cached' },
+        headers: { [OBSERVATION_HEADER]: OBSERVATION_ID },
+      }, r);
+      body = r.body;
+    } finally {
+      for (const [key, value] of Object.entries(prior)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+
+    expect(body.observationAttestation).toEqual({
+      scope: 'reviewer_roster_warm_read_only',
+      deploymentClass: 'preview',
+      dataverseTargetClass: 'production',
+      interlockMode: 'on',
+    });
+    expect(JSON.stringify(body.observationAttestation)).not.toContain('crm.dynamics.com');
   });
 
   it('uses the same opaque roster version for the same persisted snapshot', async () => {

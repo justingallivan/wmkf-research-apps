@@ -72,8 +72,11 @@ for (const effectClass of EFFECT_CLASSES) {
 const routeSource = fs.readFileSync(path.join(root, 'pages/api/workbench/reviewer-roster.js'), 'utf8');
 expect(routeSource.includes('observationFromRequest(req)'), 'Reviewer Roster route must establish the scoped observation context.');
 expect(routeSource.includes('withReviewerFindWarmObservation'), 'Reviewer Roster route must run cached/reconciled work inside the observation scope.');
+const authIndex = routeSource.indexOf('const access = await requireAppAccess');
+const observationIndex = routeSource.indexOf('const observation = observationFromRequest(req)');
+const scopeIndex = routeSource.indexOf('withReviewerFindWarmObservation(observation');
 expect(
-  routeSource.indexOf("const access = await requireAppAccess") < routeSource.indexOf('withReviewerFindWarmObservation(observationFromRequest(req)'),
+  authIndex >= 0 && observationIndex > authIndex && scopeIndex > observationIndex,
   'Observation must begin after normal requireAppAccess; auth/session reads are outside the warm-effect ledger.',
 );
 

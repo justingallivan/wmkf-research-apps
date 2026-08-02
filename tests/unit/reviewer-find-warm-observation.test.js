@@ -38,8 +38,10 @@ function serviceStub() {
 
 function effectEvents(logSpy) {
   return logSpy.mock.calls
-    .filter(([label]) => label === 'reviewer-find-warm-observation')
-    .map(([, event]) => event);
+    .map(([message]) => {
+      try { return JSON.parse(message); } catch { return null; }
+    })
+    .filter((event) => event?.kind === 'reviewer_find_warm_observation');
 }
 
 describe('Reviewer Find warm observation', () => {
@@ -99,8 +101,10 @@ describe('Reviewer Find warm observation', () => {
 
   test('marks an instrumentation failure incomplete without changing the wrapped result', async () => {
     let effectAttempted = false;
-    logSpy.mockImplementation((label, event) => {
-      if (label === 'reviewer-find-warm-observation' && event?.event === 'effect') {
+    logSpy.mockImplementation((message) => {
+      let event = null;
+      try { event = JSON.parse(message); } catch {}
+      if (event?.kind === 'reviewer_find_warm_observation' && event?.event === 'effect') {
         effectAttempted = true;
         throw new Error('test log sink failure');
       }
@@ -166,6 +170,11 @@ describe('Reviewer Find warm observation', () => {
       'dataverse_read:dataverse_query_all_records',
       'graph_metadata:graph_file_metadata_by_path',
     ]));
+    expect(effectEvents(logSpy)).toContainEqual(expect.objectContaining({
+      event: 'complete',
+      complete: true,
+      incomplete: false,
+    }));
     expect(getSiteId).toHaveBeenCalledTimes(1);
     expect(getDriveId).toHaveBeenCalledTimes(1);
     expect(getAccessToken).toHaveBeenCalledTimes(1);

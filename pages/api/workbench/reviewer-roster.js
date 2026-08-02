@@ -49,6 +49,11 @@ import {
   observationFromRequest,
   withReviewerFindWarmObservation,
 } from '../../../lib/services/workbench/reviewer-find-warm-observation';
+import {
+  classifyDeployment,
+  classifyTarget,
+  resolveInterlockMode,
+} from '../../../lib/dataverse/core/interlock';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -109,12 +114,14 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
+  const observation = observationFromRequest(req);
+
   // A valid header only creates a bounded correlation scope for the two warm
   // GET modes. It is established after auth, cannot authorize anything, and
   // absent/malformed values preserve the exact pre-observation behavior.
-  return withReviewerFindWarmObservation(observationFromRequest(req), async () => {
+  return withReviewerFindWarmObservation(observation, async () => {
     try {
-      if (req.method === 'GET') return await handleGet(req, res);
+      if (req.method === 'GET') return await handleGet(req, res, observation);
       if (req.method === 'POST') return await handlePost(req, res);
       if (req.method === 'PATCH') return await handlePatch(req, res, access);
       return res.status(405).json({ error: 'Method not allowed' });
@@ -123,6 +130,16 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Reviewer roster operation failed' });
     }
   });
+}
+
+function reviewerFindObservationAttestation(observation) {
+  if (!observation) return null;
+  return {
+    scope: 'reviewer_roster_warm_read_only',
+    deploymentClass: classifyDeployment(),
+    dataverseTargetClass: classifyTarget(process.env.DYNAMICS_URL),
+    interlockMode: resolveInterlockMode(),
+  };
 }
 
 function validRequestId(requestId) {
@@ -411,7 +428,7 @@ async function authoritativeNonApplicantCandidate(requestId, candidate) {
   return authoritative?.candidateKey === candidateKey ? authoritative : null;
 }
 
-async function handleGet(req, res) {
+async function handleGet(req, res, observation = null) {
   const { requestId } = req.query;
   if (!validRequestId(requestId)) {
     return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
@@ -428,6 +445,7 @@ async function handleGet(req, res) {
   const startedAt = Date.now();
   const roster = await listForRequest(requestId);
   const rosterReadMs = elapsedMs(startedAt);
+  const observationAttestation = reviewerFindObservationAttestation(observation);
 
   if (modeResult.mode === 'cached') {
     const rosterVersion = createRosterVersion(requestId, roster);
@@ -444,6 +462,7 @@ async function handleGet(req, res) {
       authorityState: 'cached',
       rosterVersion,
       ...roster,
+      ...(observationAttestation ? { observationAttestation } : {}),
       warmTelemetry: telemetry,
     });
   }
@@ -470,6 +489,7 @@ async function handleGet(req, res) {
         authorityState: 'cached',
         rosterVersion,
         ...roster,
+        ...(observationAttestation ? { observationAttestation } : {}),
         warmTelemetry: telemetry,
       });
     }
@@ -528,6 +548,7 @@ async function handleGet(req, res) {
         authorityState: 'cached',
         rosterVersion: latestRosterVersion,
         ...latestRoster,
+        ...(observationAttestation ? { observationAttestation } : {}),
         warmTelemetry: telemetry,
       });
     }
@@ -552,6 +573,7 @@ async function handleGet(req, res) {
         authorityState: 'error',
         rosterVersion,
         ...latestRoster,
+        ...(observationAttestation ? { observationAttestation } : {}),
         warmValidation: warmValidation || null,
         warmTelemetry: telemetry,
       });
@@ -577,6 +599,7 @@ async function handleGet(req, res) {
         authorityState: 'error',
         rosterVersion,
         ...latestRoster,
+        ...(observationAttestation ? { observationAttestation } : {}),
         warmValidation: null,
         warmTelemetry: telemetry,
       });
@@ -627,6 +650,7 @@ async function handleGet(req, res) {
       authorityState,
       rosterVersion,
       ...reconciledRoster,
+      ...(observationAttestation ? { observationAttestation } : {}),
       warmValidation,
       warmTelemetry: telemetry,
     });

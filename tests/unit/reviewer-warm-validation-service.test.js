@@ -390,6 +390,7 @@ test('keeps panel state current without fabricating a full candidate-stage cache
 
   expect(result).toMatchObject({
     state: 'current',
+    proposalBinding: 'canonical',
     candidatePlans: [{
       candidateKey: candidate.candidateKey,
       promotionAuthority: 'blocked_refresh_required',
@@ -404,6 +405,8 @@ test('keeps panel state current without fabricating a full candidate-stage cache
   expect(responseText).not.toContain('Secret Candidate');
   expect(responseText).not.toContain('secret@example.edu');
   expect(responseText).not.toContain('Jane Example');
+  expect(responseText).not.toContain('Reviewer Materials');
+  expect(responseText).not.toContain('Proposal_1002788.pdf');
 });
 
 test('warm validation never runs evidence providers or roster writers for a provider-ready cached row', async () => {
