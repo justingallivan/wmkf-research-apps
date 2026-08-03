@@ -132,6 +132,20 @@ const RESPONSE_OUTCOMES = new Set([
 const RESPONSE_STAGE_STATES = new Set([
   'current', 'not_applicable', 'stale', 'refreshing', 'incomplete', 'failed',
 ]);
+const RESPONSE_ERROR_CODES = new Set([
+  'invalid_refresh_request', 'client_authority_claim_rejected', 'invalid_refresh_target',
+  'dedicated_address_action', 'stage_not_executable', 'invalid_expected_updated_at',
+  'refresh_internal_error',
+]);
+const RESPONSE_ERROR_MESSAGES = Object.freeze({
+  invalid_refresh_request: 'The evidence refresh request could not be read. Reload reviewer status and try again.',
+  client_authority_claim_rejected: 'The evidence refresh request included unsupported fields. Reload reviewer status and try again.',
+  invalid_refresh_target: 'The reviewer refresh target is no longer valid. Reload reviewer status before trying again.',
+  dedicated_address_action: 'Address trust must be handled with the dedicated staff action. Reload reviewer status.',
+  stage_not_executable: 'This evidence stage cannot be refreshed from this action. Reload reviewer status.',
+  invalid_expected_updated_at: 'The reviewer refresh version is missing or invalid. Reload reviewer status before trying again.',
+  refresh_internal_error: 'The evidence refresh service did not complete. Reload reviewer status before trying again.',
+});
 const DEDICATED_STAFF_ACTION_STAGES = new Set(['address_trust']);
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
@@ -273,6 +287,20 @@ function validRefreshResponse(data, target) {
   return data;
 }
 
+function validRefreshErrorResponse(data, target) {
+  const responseStage = data?.requestedStage ?? null;
+  if (!data || typeof data !== 'object'
+    || data.success !== false
+    || data.outcome !== 'rejected'
+    || !RESPONSE_ERROR_CODES.has(data.code)
+    || data.message !== RESPONSE_ERROR_MESSAGES[data.code]
+    || data.error !== RESPONSE_ERROR_MESSAGES[data.code]
+    || data.stageState !== 'stale'
+    || (data.reasonCode !== null && !RESPONSE_REASONS.has(data.reasonCode))
+    || (responseStage !== null && responseStage !== target.stage)) return null;
+  return data;
+}
+
 function responseHasExpectedStatus(response, outcome) {
   // Browser Response always has a numeric status. Keeping this permissive for
   // minimal test doubles does not relax production handling.
@@ -281,6 +309,11 @@ function responseHasExpectedStatus(response, outcome) {
   if (['skipped_stale', 'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required'].includes(outcome)) return response.status === 409;
   if (outcome === 'failed_retryable') return response.status === 503;
   return response.status === 422;
+}
+
+function errorResponseHasExpectedStatus(response, code) {
+  if (!Number.isInteger(response?.status)) return true;
+  return response.status === (code === 'refresh_internal_error' ? 500 : 400);
 }
 
 // The warm plan is server-derived display data. A duplicate or malformed key is
@@ -1451,10 +1484,23 @@ export default function ReviewerSearchSection({
         }),
         signal: controller.signal,
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => null);
       if (!isCurrentAttempt()) return;
       const valid = validRefreshResponse(data, target);
       if (!valid) {
+        const typedError = validRefreshErrorResponse(data, target);
+        if (typedError && errorResponseHasExpectedStatus(response, typedError.code)) {
+          requireReload(`${typedError.message} (Code: ${typedError.code})`);
+          return;
+        }
+        if ([400, 422, 500].includes(response?.status)) {
+          requireReload(response.status === 400
+            ? 'The evidence refresh request could not be read by the server. Reload reviewer status before trying again.'
+            : response.status === 500
+              ? 'The evidence refresh service failed. Reload reviewer status before trying again.'
+              : 'The evidence refresh was rejected. Reload reviewer status before trying again.');
+          return;
+        }
         requireReload('The evidence refresh response was not recognized. Reload reviewer status before trying again; existing evidence remains visible.');
         return;
       }

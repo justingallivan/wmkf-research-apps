@@ -461,6 +461,89 @@ test('fails closed to reload guidance for an unknown server response outcome', a
   expect(onRetryRoster).not.toHaveBeenCalled();
 });
 
+test('surfaces a closed 400 refresh error envelope instead of an unrecognized-response warning', async () => {
+  const subject = applicantCandidate();
+  const onRetryRoster = jest.fn();
+  global.fetch = jest.fn(async () => ({
+    ok: false,
+    status: 400,
+    json: async () => ({
+      success: false,
+      outcome: 'rejected',
+      code: 'invalid_expected_updated_at',
+      error: 'The reviewer refresh version is missing or invalid. Reload reviewer status before trying again.',
+      message: 'The reviewer refresh version is missing or invalid. Reload reviewer status before trying again.',
+      requestedStage: 'applicant_anchor',
+      stageState: 'stale',
+      reasonCode: 'authority_stale',
+    }),
+  }));
+  render(
+    <ReviewerSearchSection requestId={REQ_A} blobUrl={null} proposalKey={null} displayOnly rosterSnapshot={repairSnapshot(REQ_A, subject, applicantAnchorPlan())} onRetryRoster={onRetryRoster} />,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh applicant input evidence' }));
+  expect(await screen.findByText(/refresh version is missing or invalid/i)).toBeInTheDocument();
+  expect(screen.getByText(/Code: invalid_expected_updated_at/i)).toBeInTheDocument();
+  expect(screen.queryByText(/response was not recognized/i)).not.toBeInTheDocument();
+  expect(onRetryRoster).not.toHaveBeenCalled();
+});
+
+test('recognizes a closed 422 refresh rejection and retains fail-closed reload guidance', async () => {
+  const subject = applicantCandidate();
+  const onRetryRoster = jest.fn();
+  global.fetch = jest.fn(async () => ({
+    ok: false,
+    status: 422,
+    json: async () => ({
+      outcome: 'rejected',
+      code: 'invalid_refresh_target',
+      candidateKey: SUGGESTION_KEY,
+      requestedStage: 'applicant_anchor',
+      stageState: 'stale',
+      reasonCode: 'invalid_refresh_target',
+    }),
+  }));
+  render(
+    <ReviewerSearchSection requestId={REQ_A} blobUrl={null} proposalKey={null} displayOnly rosterSnapshot={repairSnapshot(REQ_A, subject, applicantAnchorPlan())} onRetryRoster={onRetryRoster} />,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh applicant input evidence' }));
+  expect(await screen.findByText(/roster changed before this evidence refresh completed/i)).toBeInTheDocument();
+  expect(screen.queryByText(/response was not recognized/i)).not.toBeInTheDocument();
+  expect(onRetryRoster).not.toHaveBeenCalled();
+});
+
+test('turns malformed 400 and non-JSON 500 refresh responses into typed reload guidance', async () => {
+  const subject = applicantCandidate();
+  const onRetryRoster = jest.fn();
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => { throw new SyntaxError('malformed JSON'); },
+    })
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => { throw new SyntaxError('not JSON'); },
+    });
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQ_A} blobUrl={null} proposalKey={null} displayOnly rosterSnapshot={repairSnapshot(REQ_A, subject, applicantAnchorPlan())} onRetryRoster={onRetryRoster} />,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh applicant input evidence' }));
+  expect(await screen.findByText(/request could not be read by the server/i)).toBeInTheDocument();
+
+  rerender(
+    <ReviewerSearchSection requestId={REQ_B} blobUrl={null} proposalKey={null} displayOnly rosterSnapshot={repairSnapshot(REQ_B, applicantCandidate({ candidateKey: 'person:other', suggestionId: undefined }), applicantAnchorPlan({ candidateKey: 'person:other' }))} onRetryRoster={onRetryRoster} />,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Refresh applicant input evidence' }));
+  expect(await screen.findByText(/evidence refresh service failed/i)).toBeInTheDocument();
+  expect(screen.queryByText(/response was not recognized/i)).not.toBeInTheDocument();
+  expect(onRetryRoster).not.toHaveBeenCalled();
+});
+
 test('aborts an applicant-anchor repair and suppresses its success callback after a request switch', async () => {
   const subject = applicantCandidate();
   const repair = deferred();

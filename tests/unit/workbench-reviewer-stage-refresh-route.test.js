@@ -85,6 +85,37 @@ test('rejects a name-only request, client evidence, and an unknown stage before 
   expect(withDalContext).not.toHaveBeenCalled();
 });
 
+test('returns a closed actionable envelope for malformed or partially parseable refresh input', async () => {
+  const malformed = response();
+  await handler({ method: 'POST', body: null }, malformed);
+  expect(malformed.statusCode).toBe(400);
+  expect(malformed.body).toEqual({
+    success: false,
+    outcome: 'rejected',
+    code: 'invalid_refresh_request',
+    error: 'The evidence refresh request could not be read. Reload reviewer status and try again.',
+    message: 'The evidence refresh request could not be read. Reload reviewer status and try again.',
+    requestedStage: null,
+    stageState: 'stale',
+    reasonCode: 'authority_stale',
+  });
+
+  const partial = response();
+  await handler({ method: 'POST', body: body({ expectedUpdatedAt: '' }) }, partial);
+  expect(partial.statusCode).toBe(400);
+  expect(partial.body).toMatchObject({
+    success: false,
+    outcome: 'rejected',
+    code: 'invalid_expected_updated_at',
+    requestedStage: 'applicant_anchor',
+    stageState: 'stale',
+    reasonCode: 'authority_stale',
+  });
+  expect(partial.body).not.toHaveProperty('candidateKey');
+  expect(partial.body).not.toHaveProperty('requestId');
+  expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
+});
+
 test('rejects address trust at the generic route in favor of its dedicated action', () => {
   expect(parseRefreshRequest(body({ stage: 'address_trust' }))).toMatchObject({
     valid: false,
@@ -172,6 +203,28 @@ test('maps malformed lease repair-required to a non-mutating conflict', async ()
   });
 });
 
+test('passes the service closed rejected envelope through as a client-recognizable 422', async () => {
+  refreshReviewerCandidateStage.mockResolvedValueOnce({
+    outcome: 'rejected',
+    code: 'invalid_refresh_target',
+    requestId: REQUEST_ID,
+    candidateKey: CANDIDATE_KEY,
+    stage: 'applicant_anchor',
+    requestedStage: 'applicant_anchor',
+    stageState: 'stale',
+    reasonCode: 'invalid_refresh_target',
+  });
+  const res = response();
+
+  await handler({ method: 'POST', body: body() }, res);
+
+  expect(res.statusCode).toBe(422);
+  expect(res.body).toMatchObject({
+    outcome: 'rejected', candidateKey: CANDIDATE_KEY,
+    requestedStage: 'applicant_anchor', stageState: 'stale', reasonCode: 'invalid_refresh_target',
+  });
+});
+
 test('logs only a bounded internal code when a stage refresh throws sensitive Dataverse details', async () => {
   const sensitive = new Error("Dataverse GET failed: $filter=emailaddress1 eq 'reviewer@example.edu'");
   sensitive.status = 503;
@@ -184,12 +237,38 @@ test('logs only a bounded internal code when a stage refresh throws sensitive Da
     await handler({ method: 'POST', body: body() }, res);
 
     expect(res.statusCode).toBe(500);
-    expect(res.body).toEqual({ error: 'Reviewer stage refresh failed' });
+    expect(res.body).toEqual({
+      success: false,
+      outcome: 'rejected',
+      code: 'refresh_internal_error',
+      error: 'The evidence refresh service did not complete. Reload reviewer status before trying again.',
+      message: 'The evidence refresh service did not complete. Reload reviewer status before trying again.',
+      requestedStage: 'applicant_anchor',
+      stageState: 'stale',
+      reasonCode: 'authority_stale',
+    });
     expect(log).toHaveBeenCalledWith(
       '[reviewer-stage-refresh] internal_failure',
       { name: 'Error', status: 503 },
     );
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/reviewer@example\.edu|\$filter|emailaddress1/i);
+  } finally {
+    log.mockRestore();
+  }
+});
+
+test('returns the same closed 500 envelope when DAL context initialization throws', async () => {
+  withDalContext.mockRejectedValueOnce(new Error('DAL startup failed: reviewer@example.edu'));
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const res = response();
+
+  try {
+    await handler({ method: 'POST', body: body() }, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({
+      success: false, outcome: 'rejected', code: 'refresh_internal_error', requestedStage: 'applicant_anchor',
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('reviewer@example.edu');
   } finally {
     log.mockRestore();
   }
