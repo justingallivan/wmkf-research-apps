@@ -6,7 +6,11 @@
  * fail-closed behaviour testable without a deployed app or a staff session.
  */
 
-const SMOKE_REQUEST_NUMBER = '1002788';
+// Owner-designated 2026-08-02 Reviewer Find no-send fixture. This request is a
+// D26 proposal that is not proceeding, is temporarily marked Advancing for the
+// test, and has no invitation/review lifecycle activity. Keep this fixed rather
+// than accepting an arbitrary request number from the browser or command line.
+const SMOKE_REQUEST_NUMBER = '1002914';
 const OBSERVATION_ID_RE = /^rfw_[a-z0-9]{16,64}$/i;
 const DEPLOYMENT_ID_RE = /^[a-z0-9_-]{6,128}$/i;
 const COMMIT_RE = /^[a-f0-9]{7,64}$/i;

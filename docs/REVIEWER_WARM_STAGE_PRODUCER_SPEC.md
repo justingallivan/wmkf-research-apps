@@ -767,6 +767,8 @@ that proves:
 5. one targeted refresh repairs only that candidate/stage; and
 6. promotion remains blocked on every incomplete/failed/unknown complement.
 
-Use request `1002788` for the authenticated no-send pilot. Do not use the
+Use request `1002914` for the authenticated no-send Reviewer Find pilot. It is
+an owner-designated D26 proposal that is not proceeding and is temporarily
+marked Advancing for this test. Do not use the
 existence of this specification as authorization to merge, deploy, send email,
 or mutate production data.

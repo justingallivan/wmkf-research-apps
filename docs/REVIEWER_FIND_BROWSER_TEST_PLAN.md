@@ -22,9 +22,13 @@ related:
 > complete cached/reconciled observation ledger passed against exact Preview
 > deployment `dpl_8i1S7ocMLFuWF2E7neWrwQgLojxU` at commit `5b359733`, after
 > temporarily registering the stable branch-alias callback. The Layer C
-> preflight still failed closed because request `1002788`'s persisted roster is
-> stale against its current canonical proposal binding
-> (`proposal_binding_changed`); the browser scenario did not run. The temporary
+> preflight then failed closed because the former fixture, request `1002788`,
+> had a roster bound to a different proposal; the browser scenario did not run.
+> On 2026-08-02 the owner designated request `1002914` as the Reviewer Find
+> no-send fixture. A production read-only audit found a current fallback proposal,
+> five unengaged applicant recommendations/slots, and no Postgres Find roster.
+> It therefore needs one explicit no-send cold search before Layer C can exercise
+> warm revisits. The temporary
 > Azure callback, branch-only production-read override, and local auth state
 > were removed after the test. Layer D sandbox fixtures and mutation rehearsal
 > remain planned and unbuilt.
@@ -76,12 +80,13 @@ mutation is not part of this plan.
   sandbox did not contain the custom Reviewer entities or required policy rows.
   Sandbox write rehearsal therefore depends on a parity gate; it is not an
   immediately available test environment.
-- [VERIFIED 2026-08-02 via
-  `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
-  `docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`] Request `1002788` is the
-  purpose-built production smoke request and is the authorized no-send pilot
-  named by the producer specification. Request `1002794` is a real request and
-  is not used by this browser plan.
+- [VERIFIED 2026-08-02 via owner decision plus production read-only audit]
+  Request `1002914` is the Reviewer Find no-send fixture: a D26 proposal that is
+  not proceeding, temporarily marked Advancing for this test, with five
+  applicant recommendations and no invitation/review lifecycle activity.
+  Request `1002788` retains other historical smoke duties but is no longer this
+  plan's Reviewer Find fixture. Request `1002794` is a real request and is not
+  used by this browser plan.
 - [OBSERVED 2026-08-02 during the attempted authenticated local exercise; to be
   made reproducible by the planned preflight] A normal
   signed-in session reached the locally served production build, but the local
@@ -141,7 +146,7 @@ prior evidence or initiate a cold search.
 | Unchanged revisit performs no expensive work | Layer A rejects unexpected browser requests | Layer B spies on proposal/provider services and asserts exactly zero calls | Layer C correlates the run with the bounded ledger at its named sanctioned seams |
 | Cached/stale authority cannot promote | Layer A exercises visible controls | Layer B exercises both promotion services | Layer C observes controls only; it does not click a mutation |
 | One stale stage refreshes only one candidate/stage | Layer A asserts the single target-only POST | Layer B verifies server-derived dependencies and per-target persistence | Layer D performs the allowlisted real refresh |
-| A -> B -> A navigation cannot leak or overwrite state | Layer A delays A responses across both switches | Layer B tests stale CAS/generation outcomes | Layer C proves dashboard -> `1002788` -> dashboard -> `1002788`; cross-request live proof waits for a second true dummy |
+| A -> B -> A navigation cannot leak or overwrite state | Layer A delays A responses across both switches | Layer B tests stale CAS/generation outcomes | Layer C proves dashboard -> `1002914` -> dashboard -> `1002914`; cross-request live proof waits for a second authorized fixture |
 | Production smoke causes no writes | Layer C aborts browser non-GET requests | Layer B proves warm route semantics and observation-ledger negative controls | Layer C uses the implemented scoped observation ledger to account for named server-internal seams |
 
 A route-mocked browser cannot prove that server code avoided an internal provider
@@ -388,12 +393,12 @@ Before opening the Workbench, a read-only preflight must report and verify:
 2. classified Dataverse target hostname, without printing credentials;
 3. successful authenticated app access;
 4. configured request alias -> GUID -> request-number agreement;
-5. request `1002788` exists in that target and is still marked/documented as the
+5. request `1002914` exists in that target and remains marked Advancing for the
    dedicated smoke request;
-6. the canonical proposal binding resolves to
-   `Reviewer Materials/Proposal_1002788.pdf`, falling back to
-   `Phase I/ProjectDescription.pdf`, with metadata available without downloading
-   bytes;
+6. the Reviewer Find proposal binding resolves through the normal priority
+   order—`Reviewer Materials/Proposal_1002914.pdf`, then
+   `Phase I/ProjectDescription.pdf`—with versioned metadata available without
+   downloading bytes; the 2026-08-02 audit observed the fallback binding;
 7. a persisted Reviewer Find roster exists for a warm exercise, or the run is
    explicitly reported as not ready; and
 8. the scoped observation mechanism and its positive controls are available; and
@@ -406,8 +411,8 @@ therefore a preflight failure, not a browser-product failure.
 
 - Abort on browser `POST`, `PUT`, `PATCH`, or `DELETE` and on any navigation to
   an invitation/send/repair action.
-- Navigate dashboard -> `1002788`, observe cached cards, wait for reconciliation,
-  return to the dashboard, then revisit `1002788`.
+- Navigate dashboard -> `1002914`, observe cached cards, wait for reconciliation,
+  return to the dashboard, then revisit `1002914`.
 - Do not click Prepare search, Prepare again, Retry preparation, proposal-file
   selection, Run reviewer search, Run another search, Retry reviewer state,
   refresh stage, confirm identity/address, promote,
@@ -425,33 +430,30 @@ therefore a preflight failure, not a browser-product failure.
   commit/deployment, target classification, milestones, call counts, and
   pass/fail reasons—not reviewer PII or auth state.
 
-Use only request `1002788` in Layer C. Request `1002794` is a real request with
+Use only request `1002914` in Layer C. Request `1002794` is a real request with
 named reviewers and is out of scope for live artifacts. Request-switch race
 coverage remains deterministic in Layer A until a second true dummy request is
 explicitly designated.
 
 ### 6.4 Fixture ownership
 
-The `1002788` warm roster, if it exists, is owned by the Reviewer Find smoke and
-must use records tagged separately from invitation-smoke candidates. Update the
-fixture inventory to prove its marker/IDs cannot collide with the invitation
-smoke. [VERIFIED 2026-08-02 via `smoke-test-candidate.mjs`] invitation cleanup is
-already limited to GUIDs recorded in its state file and protected by its marker;
-do not add another cleanup guard unless the inventory finds a shared anchor.
-Layer C itself never seeds or repairs production.
+The `1002914` warm roster, once created, is owned by the Reviewer Find smoke.
+[VERIFIED 2026-08-02 via production read-only audit] It currently has no
+Postgres Find roster; its five applicant suggestions and five request slots are
+all unengaged, with no invite, accept, decline, or review artifact. Retain those
+inputs because they exercise the applicant-ingestion and COI latency under test.
 
-If `1002788` has no warm roster, Stage 4 is blocked. Creating one requires a
-separate owner-approved, one-time production cold search with its expected
-Claude/provider, Graph/Blob, Postgres, and Dataverse consequences recorded in
-advance; this plan does not authorize that action.
+The owner authorized using `1002914` for this test and required that no external
+email be sent. Preparing its warm fixture is therefore limited to the explicit
+Find cold-search path. It must not promote candidates, navigate to a send action,
+invoke `/api/review-manager/send-emails`, or invoke any other invitation endpoint.
+The authenticated Layer C runner remains GET/HEAD/OPTIONS-only and never seeds,
+repairs, promotes, invites, or sends.
 
-[VERIFIED 2026-08-02 via redacted preflight
-`rfw_0220cf3aa30f1176eb375682adc6139a`] Request `1002788` currently has a warm
-roster and a current canonical proposal metadata binding, but at least one
-persisted candidate retains a historical manual proposal key. Warm validation
-therefore reports `stale / proposal_binding_changed`. Repairing, resetting, or
-rebuilding that production fixture is a separate owner-approved operation; the
-read-only Layer C plan does not authorize it.
+[HISTORICAL 2026-08-02 via redacted preflight
+`rfw_0220cf3aa30f1176eb375682adc6139a`] The former fixture `1002788` failed
+closed as `stale / proposal_binding_changed`. That result explains why the
+fixture changed; it is not the current Layer C prerequisite.
 
 ## 7. Layer D — sandbox mutation rehearsal
 
@@ -528,8 +530,8 @@ a green browser assertion.
 - Specify the separate Reviewer Find Playwright config, distinct port,
   `reuseExistingServer: false`, credential-free temporary test root/environment,
   and sentinel credential self-test before launching a local Next server.
-- Inventory the `1002788` Reviewer Find and invitation-smoke marker/ID namespaces
-  and prove their cleanup ownership cannot collide.
+- Inventory the `1002914` Reviewer Find cold-search scope and prove that it
+  cannot reach invitation/send endpoints.
 - Add a read-only preflight that distinguishes auth, deployment, target, request,
   proposal, and roster readiness failures.
 - Record current sandbox parity as failed until re-probed.
@@ -579,11 +581,11 @@ known-zero effect can be distinguished. No schema migration is introduced.
 - Add `.artifacts/reviewer-find-live/` to `.gitignore`; keep live artifacts out
   of the Playwright CI reporter and delete exceptional artifacts within seven days.
 - Run first against the exact Vercel Preview deployment/commit in read-only-shadow
-  mode, only when a valid normal staff session and `1002788` are present in the
+  mode, only when a valid normal staff session and a warm `1002914` roster are present in the
   target. Retrieve logs from that deployment by observation ID and require the
   same-deployment positive control. A later Production run is post-merge only.
 
-**Exit:** one signed-in `1002788` dashboard -> request -> dashboard -> same-request
+**Exit:** one signed-in `1002914` dashboard -> request -> dashboard -> same-request
 warm revisit passes with no write or expensive-call evidence at the named sanctioned seams. If the warm fixture,
 auth state, or complete correlated observation is missing, the gate is blocked.
 This is enablement evidence, not permission to merge or deploy.

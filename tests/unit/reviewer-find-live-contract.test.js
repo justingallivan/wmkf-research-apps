@@ -27,7 +27,7 @@ const ROSTER_VERSION = 'a'.repeat(64);
 
 describe('Reviewer Find live runner contract', () => {
   test('is fixed to the dedicated no-send request', () => {
-    expect(SMOKE_REQUEST_NUMBER).toBe('1002788');
+    expect(SMOKE_REQUEST_NUMBER).toBe('1002914');
   });
 
   test('requires an exact HTTPS deployment identity and explicit production confirmation', () => {
@@ -55,6 +55,8 @@ describe('Reviewer Find live runner contract', () => {
     const baseUrl = 'https://preview-example.vercel.app';
     expect(isAllowedBrowserRequest({ method: 'GET', url: `${baseUrl}/workbench`, baseUrl })).toBe(true);
     expect(isAllowedBrowserRequest({ method: 'POST', url: `${baseUrl}/api/workbench/reviewer-roster`, baseUrl })).toBe(false);
+    expect(isAllowedBrowserRequest({ method: 'POST', url: `${baseUrl}/api/review-manager/send-emails`, baseUrl })).toBe(false);
+    expect(isAllowedBrowserRequest({ method: 'POST', url: `${baseUrl}/api/workbench/grantee-deliverables/send-invite`, baseUrl })).toBe(false);
     expect(isAllowedBrowserRequest({ method: 'GET', url: 'https://login.microsoftonline.com/', baseUrl })).toBe(false);
     expect(redactBrowserPath(
       `${baseUrl}/workbench/11111111-1111-1111-1111-111111111111?email=person@example.org`,
@@ -240,6 +242,22 @@ describe('Reviewer Find live runner contract', () => {
     ], OBSERVATION_ID);
     expect(unsafe.complete).toBe(false);
     expect(unsafe.forbiddenEffects).toEqual(['claude']);
+
+    const attemptedEmail = summarizeLedger([
+      { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'email', mode: 'reconciled' },
+      { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'dataverse_action', mode: 'reconciled' },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1 },
+      },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, dataverse_read: 1, email: 1, dataverse_action: 1 },
+      },
+    ], OBSERVATION_ID);
+    expect(attemptedEmail.complete).toBe(false);
+    expect(attemptedEmail.forbiddenEffects.sort()).toEqual(['dataverse_action', 'email']);
+    expect(attemptedEmail.completeSummaryForbiddenEffects.sort()).toEqual(['dataverse_action', 'email']);
 
     const unknown = summarizeLedger([
       { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'unclassified_effect', mode: 'cached' },

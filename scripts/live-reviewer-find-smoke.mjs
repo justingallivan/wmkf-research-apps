@@ -5,7 +5,7 @@
  * This runner is deliberately stricter than a normal browser check. It uses a
  * locally captured, normal Microsoft session; permits only same-origin GET/
  * HEAD/OPTIONS browser traffic; and never clicks an action. It is restricted
- * to the dedicated no-send request 1002788. A preflight that cannot prove the
+ * to the owner-designated no-send request 1002914. A preflight that cannot prove the
  * named deployment, target, proposal binding, roster, and observation ledger
  * stops before any Workbench navigation.
  *
