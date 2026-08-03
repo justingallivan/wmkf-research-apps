@@ -41,6 +41,7 @@ function digest(value) {
 async function mintHistoricalV2Attestation(candidate, {
   issuedAt = '2026-07-29T00:00:00.000Z',
   alg = 'HS256',
+  rosterCandidateKey = candidate.candidateKey,
 } = {}) {
   const issuedAtSeconds = Date.parse(issuedAt) / 1000;
   const identity = identityAttestationProjection(candidate);
@@ -48,7 +49,7 @@ async function mintHistoricalV2Attestation(candidate, {
     typ: 'reviewer-auto-identity',
     requestId: REQUEST_ID,
     candidateKey: identity.candidateKey,
-    rosterCandidateKey: candidate.candidateKey,
+    rosterCandidateKey,
     projectionVersion: 2,
     baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
     identityDigest: digest(identity),
@@ -642,6 +643,99 @@ test('restores Katherine-shaped persisted selection after a rotated automated-at
     coauthor.mockRestore();
     stageWrite.mockRestore();
     coldWrite.mockRestore();
+  }
+});
+
+test('restores Katherine-shaped persisted selection with a valid v2 attestation when only the legacy top-level identity label differs', async () => {
+  const identity = jest.spyOn(ReviewerIdentityRuntime, 'evaluateSuggestion');
+  const coauthor = jest.spyOn(coauthorCoi, 'checkCoauthorHistory');
+  const stageWrite = jest.spyOn(reviewerRosterStore, 'completeStageRefreshWithEvidence');
+  const coldWrite = jest.spyOn(reviewerRosterStore, 'recordSurfacedWithStageEvidence');
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  const candidate = katherinePersistedLegacyCandidate();
+  try {
+    process.env.NEXTAUTH_SECRET = 'current-valid-v2-secret';
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate);
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result.candidatePlans[0]).toMatchObject({
+      candidateKey: candidate.candidateKey,
+      cacheOutcome: 'miss',
+      promotionAuthority: 'blocked_refresh_required',
+      legacySelection: {
+        version: 1,
+        state: 'selectable',
+        evidenceCheckedAt: '2026-07-29T18:20:22.776Z',
+      },
+    });
+    const promotionSnapshot = await deriveReviewerPromotionAuthoritySnapshot({
+      requestId: REQUEST_ID,
+      candidate,
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+    expect(promotionSnapshot).toMatchObject({
+      authorityState: 'stale',
+      plan: { cacheOutcome: 'miss', promotionAuthority: 'blocked_refresh_required' },
+    });
+    expect(identity).not.toHaveBeenCalled();
+    expect(coauthor).not.toHaveBeenCalled();
+    expect(stageWrite).not.toHaveBeenCalled();
+    expect(coldWrite).not.toHaveBeenCalled();
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
+    identity.mockRestore();
+    coauthor.mockRestore();
+    stageWrite.mockRestore();
+    coldWrite.mockRestore();
+  }
+});
+
+test.each([
+  ['unresolved nested identity', (candidate) => { candidate.contactEnrichment.identity.status = 'unresolved'; }, {}],
+  ['stale resolver evidence', (candidate) => { candidate.contactEnrichment.identity.resolvedAt = '2025-12-01T00:00:00.000Z'; }, {}],
+  ['known coauthor conflict', (candidate) => { candidate.hasCoauthorCOI = true; }, {}],
+  ['applicant recommendation lane', (candidate) => { candidate.isApplicantRecommended = true; }, {}],
+  ['wrong roster candidate binding', () => {}, {
+    rosterCandidateKey: 'candidate:other-person|email:other%40example.edu|orcid:0000-0000-0000-0000|affiliation:elsewhere',
+  }],
+])('valid-v2 legacy compatibility fails closed for %s', async (_label, mutate, tokenOptions) => {
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  const candidate = katherinePersistedLegacyCandidate();
+  try {
+    mutate(candidate);
+    process.env.NEXTAUTH_SECRET = 'current-valid-v2-secret';
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate, tokenOptions);
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result.candidatePlans[0].legacySelection).toBeNull();
+    expect(result.candidatePlans[0].promotionAuthority).toBe('blocked_refresh_required');
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
   }
 });
 
