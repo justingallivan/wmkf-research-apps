@@ -161,12 +161,13 @@ const RECONCILIATION_CANDIDATE_OUTCOMES = new Set([
   'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
 ]);
 const RETRYABLE_RECONCILIATION_OUTCOMES = new Set([
-  'failed_retryable', 'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
+  'failed_retryable', 'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required',
 ]);
 // Must match the server-owned active roster cap. A continuation carries every
 // active row that can safely resume rather than silently dropping it at an
 // arbitrary browser-sized subset.
-const RECONCILIATION_MAX_CANDIDATE_KEYS = 300;
+export const RECONCILIATION_MAX_CANDIDATE_KEYS = 300;
+const RECONCILIATION_ROSTER_CAP_EXCEEDED = 'roster_active_cap_exceeded';
 const RECONCILIATION_IDLE = Object.freeze({ status: 'idle', continuationCandidateKeys: [], message: null });
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
@@ -393,10 +394,14 @@ export function validReviewerReconciliationResponse(data, requestId) {
     .filter((candidate) => ['current', 'action_required', 'blocked', 'rejected'].includes(candidate.outcome))
     .map((candidate) => candidate.candidateKey));
   if (continuationCandidateKeys.some((key) => terminalCandidateKeys.has(key))) return null;
+  const rosterCapExceeded = data.code === RECONCILIATION_ROSTER_CAP_EXCEEDED;
+  if (rosterCapExceeded && (data.outcome !== 'blocked'
+    || data.candidates.length !== 0 || continuationCandidateKeys.length !== 0)) return null;
   return {
     outcome: data.outcome,
     candidates: data.candidates,
     continuationCandidateKeys,
+    code: rosterCapExceeded ? RECONCILIATION_ROSTER_CAP_EXCEEDED : null,
   };
 }
 
@@ -1566,7 +1571,10 @@ export default function ReviewerSearchSection({
       setReconciliationState({
         status: 'complete',
         continuationCandidateKeys: result.continuationCandidateKeys,
-        message: result.outcome === 'failed_retryable' && result.candidates.length === 0
+        code: result.code,
+        message: result.code === RECONCILIATION_ROSTER_CAP_EXCEEDED
+          ? 'Reviewer roster integrity check failed: more active reviewers than the safe limit were found. Reload reviewer status; if this persists, contact an administrator. Do not run another reviewer search.'
+          : result.outcome === 'failed_retryable' && result.candidates.length === 0
           ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
           : `Reviewer reconciliation finished: ${reconciliationSummaryText(result.candidates, result.continuationCandidateKeys)}.`,
       });
@@ -3616,7 +3624,8 @@ export default function ReviewerSearchSection({
                       <button
                         type="button"
                         onClick={reconcilePreviouslyFoundReviewers}
-                        disabled={displayOnly || busy || !rosterLoaded}
+                        disabled={displayOnly || busy || !rosterLoaded
+                          || reconciliationState.code === RECONCILIATION_ROSTER_CAP_EXCEEDED}
                         className="text-xs font-medium underline disabled:opacity-50"
                       >
                         {reconciliationState.status === 'running'

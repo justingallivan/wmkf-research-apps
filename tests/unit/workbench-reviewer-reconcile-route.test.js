@@ -97,3 +97,23 @@ test('binds a caught provider failure to the parsed request id', async () => {
     candidates: [],
   }));
 });
+
+test('carries an over-cap roster integrity outcome to the exact parsed request', async () => {
+  reconcileReviewerStages.mockResolvedValue({
+    outcome: 'blocked',
+    code: 'roster_active_cap_exceeded',
+    candidates: [],
+  });
+  const res = responseMock();
+
+  await handler({ method: 'POST', body: { requestId: REQUEST_ID } }, res);
+
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+    success: false,
+    outcome: 'blocked',
+    code: 'roster_active_cap_exceeded',
+    requestId: REQUEST_ID,
+    candidates: [],
+  }));
+});

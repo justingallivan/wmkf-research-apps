@@ -191,6 +191,24 @@ test('covers every active roster row through the authoritative cap without trunc
   expect(result.continuationCandidateKeys).toBeUndefined();
 });
 
+test('fails closed with an explicit integrity outcome if stored active rows exceed the cap', async () => {
+  const keys = Array.from({ length: _internals.MAX_REQUEST_CANDIDATES + 1 }, (_, index) => (
+    `candidate:reviewer${index}|email:reviewer${index}%40example.edu|orcid:-|affiliation:example%20university`
+  ));
+  listForRequest.mockResolvedValue({ active: keys.map((candidateKey) => ({ candidateKey })) });
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID });
+
+  expect(result).toEqual(expect.objectContaining({
+    outcome: 'blocked',
+    code: 'roster_active_cap_exceeded',
+    requestId: REQUEST_ID,
+    candidates: [],
+  }));
+  expect(planReviewerCandidateRefresh).not.toHaveBeenCalled();
+  expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
+});
+
 test('rejects client namespace and malformed candidate keys before request authority work', async () => {
   const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: ['client:browser-forged'] });
 

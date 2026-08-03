@@ -905,6 +905,28 @@ describe('recordSurfaced', () => {
     expect(interps).toContain('bob');
   });
 
+  test('does not report a surfaced write as successful until the active/saved cap is enforced', async () => {
+    await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
+
+    const capDelete = sql.mock.calls.findIndex((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('OFFSET'));
+    expect(capDelete).toBeGreaterThanOrEqual(0);
+    expect(queryTextOf(capDelete)).toMatch(/DELETE FROM reviewer_find_roster/);
+    expect(allInterpolations()).toContain(store.PER_REQUEST_ACTIVE_CAP);
+  });
+
+  test('fails explicitly when cap enforcement cannot complete after a surfaced write', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(store.recordSurfaced(REQ, [{ name: 'Ann Lee' }])).rejects.toMatchObject({
+      code: 'reviewer_roster_cap_enforcement_failed',
+    });
+    expect(errorLog).toHaveBeenCalledWith('reviewer-roster enforceCap error:', 'database unavailable');
+    errorLog.mockRestore();
+  });
+
   test('emits PostgreSQL-safe template text without JavaScript line comments', async () => {
     await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
     const insertCall = sql.mock.calls.findIndex((call) => (
@@ -1018,6 +1040,38 @@ describe('recordSurfaced', () => {
 });
 
 describe('recordSurfacedWithStageEvidence', () => {
+  test('enforces the active/saved cap after a new cold-stage row is recorded', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'version-2' }], rowCount: 1 });
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      stageEvidence: { applicant_anchor: coldEnvelope('applicant_anchor') },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'recorded' })]);
+    const capDelete = sql.mock.calls.findIndex((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('OFFSET'));
+    expect(capDelete).toBeGreaterThanOrEqual(0);
+    expect(queryTextOf(capDelete)).toMatch(/DELETE FROM reviewer_find_roster/);
+  });
+
+  test('fails explicitly when cap enforcement cannot complete after a cold-stage write', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Ann' }, updated_at_token: 'version-2' }], rowCount: 1 })
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      stageEvidence: { applicant_anchor: coldEnvelope('applicant_anchor') },
+    }])).rejects.toMatchObject({
+      code: 'reviewer_roster_cap_enforcement_failed',
+    });
+    expect(errorLog).toHaveBeenCalledWith('reviewer-roster enforceCap error:', 'database unavailable');
+    errorLog.mockRestore();
+  });
+
   test('merges CAS-valid cold receipts with stored receipts and computes terminal from the actual merged receipt set', async () => {
     const existingAnchor = currentReceipt('applicant_anchor', 'anchor');
     sql
@@ -1274,6 +1328,20 @@ describe('promote', () => {
     expect(queryTextOf(0)).toMatch(/status = 'excluded'/); // only promotes from excluded
     expect(queryTextOf(0)).toMatch(/candidate_key =/);
     expect(allInterpolations()).toContain('candidate:bob');
+    expect(queryTextOf(1)).toMatch(/DELETE FROM reviewer_find_roster/);
+  });
+
+  test('fails explicitly rather than returning promotion success if cap enforcement fails', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Bob Roe' } }], rowCount: 1 })
+      .mockRejectedValueOnce(new Error('database unavailable'));
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(store.promote(REQ, 'candidate:bob')).rejects.toMatchObject({
+      code: 'reviewer_roster_cap_enforcement_failed',
+    });
+    expect(errorLog).toHaveBeenCalledWith('reviewer-roster enforceCap error:', 'database unavailable');
+    errorLog.mockRestore();
   });
 
   test('no-op (null) when the row is gone (cap eviction)', async () => {

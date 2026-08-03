@@ -186,6 +186,30 @@ test('renders a terminal action-required result without offering an invalid cont
   expect(screen.queryByRole('button', { name: 'Continue reconciliation' })).not.toBeInTheDocument();
 });
 
+test('accepts a terminal rejected candidate without classifying it as retryable or offering Continue', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes(`/api/workbench/reviewer-roster?requestId=${REQ_A}`)) {
+      return Promise.resolve(response(warmRoster(REQ_A, [CANDIDATE_A])));
+    }
+    if (target === '/api/workbench/reviewer-reconcile') {
+      return Promise.resolve(response(reconciliationResponse({
+        outcome: 'blocked',
+        candidates: [{ candidateKey: KEY_A, outcome: 'rejected' }],
+        continuationCandidateKeys: [],
+      }), false, 409));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText(CANDIDATE_A.name);
+  fireEvent.click(screen.getByRole('button', { name: 'Reconcile previously found reviewers' }));
+
+  expect(await screen.findByText(/0 current · 0 need staff action · 0 blocked by safeguards · 0 need retrying/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Continue reconciliation' })).not.toBeInTheDocument();
+});
+
 test.each([
   ['status mismatch', () => response(reconciliationResponse({ outcome: 'current', candidates: [{ candidateKey: KEY_A, outcome: 'current' }], continuationCandidateKeys: [] }), true, 503)],
   ['missing numeric status', () => ({ ok: true, json: async () => reconciliationResponse({ outcome: 'current', candidates: [{ candidateKey: KEY_A, outcome: 'current' }], continuationCandidateKeys: [] }) })],
@@ -228,6 +252,36 @@ test('accepts the bound 503 retry response and keeps it distinct from a malforme
 
   expect(await screen.findByText(/temporarily unavailable/i)).toBeInTheDocument();
   expect(screen.queryByText(/response was not recognized/i)).not.toBeInTheDocument();
+});
+
+test('renders an actionable integrity message, not a zero-count summary, for an over-cap roster', async () => {
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes(`/api/workbench/reviewer-roster?requestId=${REQ_A}`)) {
+      return Promise.resolve(response(warmRoster(REQ_A, [CANDIDATE_A])));
+    }
+    if (target === '/api/workbench/reviewer-reconcile') {
+      return Promise.resolve(response({
+        ...reconciliationResponse({
+          outcome: 'blocked',
+          candidates: [],
+          continuationCandidateKeys: [],
+        }),
+        code: 'roster_active_cap_exceeded',
+      }, false, 409));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText(CANDIDATE_A.name);
+  fireEvent.click(screen.getByRole('button', { name: 'Reconcile previously found reviewers' }));
+
+  expect(await screen.findByText(/more active reviewers than the safe limit/i)).toBeInTheDocument();
+  expect(screen.getByText(/contact an administrator/i)).toBeInTheDocument();
+  expect(screen.getByText(/Do not run another reviewer search/i)).toBeInTheDocument();
+  expect(screen.queryByText(/0 current · 0 need staff action/i)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Reconcile previously found reviewers' })).toBeDisabled();
 });
 
 test('rejects a malformed reconciliation response instead of rendering forged progress or continuation state', async () => {
