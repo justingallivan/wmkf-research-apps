@@ -18,6 +18,10 @@ const MAX_CANDIDATE_KEYS = 24;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16kb' } },
+  // The coordinator stops itself at 210 seconds. Keep the platform ceiling
+  // above that internal deadline so callers receive a resumable result rather
+  // than a function timeout.
+  maxDuration: 300,
 };
 
 function parseRequest(body) {

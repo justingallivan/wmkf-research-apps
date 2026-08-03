@@ -6,10 +6,14 @@ jest.mock('../../lib/services/workbench/reviewer-stage-reconciliation-service', 
   reconcileReviewerStages: jest.fn(),
 }));
 
-import { parseRequest, statusFor } from '../../pages/api/workbench/reviewer-reconcile';
+import { config, parseRequest, statusFor } from '../../pages/api/workbench/reviewer-reconcile';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const STORED_KEY = 'candidate:alex%20reviewer|email:alex%40example.edu|orcid:-|affiliation:example%20university';
+
+test('keeps the platform timeout above the bounded reconciliation deadline', () => {
+  expect(config.maxDuration).toBe(300);
+});
 
 test('accepts only a request GUID and optional unique server-shaped stored keys', () => {
   expect(parseRequest({ requestId: REQUEST_ID })).toEqual({ valid: true, value: { requestId: REQUEST_ID } });

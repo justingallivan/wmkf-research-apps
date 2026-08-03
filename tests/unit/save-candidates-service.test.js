@@ -160,7 +160,7 @@ const saveCandidates = (args) => {
   const candidates = (args.candidates || []).map((rawCandidate, index) => {
     const { __testStaffConfirmed, ...candidate } = rawCandidate || {};
     const preparedCandidate = {
-      candidateKey: `test:${index}`,
+      candidateKey: `person:test-${index}`,
       automatedIdentityAttestation: 'server-signed-test-token',
       email: `ready-${index}@example.edu`,
       emailSource: 'pubmed',
@@ -353,7 +353,7 @@ test('withholds promotion when the server cannot derive current stage authority'
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-    rosterCandidateKey: 'candidate:pending-authority',
+    rosterCandidateKey: 'person:pending-authority',
   });
   mockGetCandidatePromotionAuthority.mockReturnValueOnce({
     decision: 'blocked',
@@ -365,7 +365,7 @@ test('withholds promotion when the server cannot derive current stage authority'
     ...BASE,
     candidates: [{
       name: 'Dr Pending Authority',
-      candidateKey: 'candidate:pending-authority',
+      candidateKey: 'person:pending-authority',
       automatedIdentityAttestation: 'server-signed-test-token',
     }],
   }).catch((error) => error);
@@ -392,7 +392,7 @@ test('reports a no-trusted-domain eligibility block without the generic refresh 
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-    rosterCandidateKey: 'candidate:no-trusted-domain',
+    rosterCandidateKey: 'person:no-trusted-domain',
   });
   mockGetCandidatePromotionAuthority.mockReturnValueOnce({
     decision: 'blocked',
@@ -404,7 +404,7 @@ test('reports a no-trusted-domain eligibility block without the generic refresh 
     ...BASE,
     candidates: [{
       name: 'Dr Domain Unavailable',
-      candidateKey: 'candidate:no-trusted-domain',
+      candidateKey: 'person:no-trusted-domain',
       automatedIdentityAttestation: 'server-signed-test-token',
     }],
   }).catch((caught) => caught);
@@ -443,7 +443,7 @@ test('server roster snapshot change withholds generic promotion before Dataverse
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerRosterStore.promotionSnapshotIsCurrent).toHaveBeenCalledWith(
     BASE.requestId,
-    'test:0',
+    'person:test-0',
     '2026-08-02 00:00:00+00',
   );
 });
@@ -514,10 +514,10 @@ test('durable eligibility authority uses the signed pre-enrichment roster key', 
     valid: true,
     source: 'automated_resolver',
     eligibilityStatus: 'unknown',
-    rosterCandidateKey: 'candidate:pre-enrichment',
+    rosterCandidateKey: 'person:pre-enrichment',
   });
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([
-    authorityRow('candidate:pre-enrichment', {
+    authorityRow('person:pre-enrichment', {
       name: 'Dr Changed',
       email: 'new.email@example.edu',
       affiliation: 'New University',
@@ -530,7 +530,7 @@ test('durable eligibility authority uses the signed pre-enrichment roster key', 
     ...BASE,
     candidates: [{
       name: 'Dr Changed',
-      candidateKey: 'candidate:pre-enrichment',
+      candidateKey: 'person:pre-enrichment',
       email: 'new.email@example.edu',
       affiliation: 'New University',
       automatedIdentityAttestation: 'signed',
@@ -538,7 +538,7 @@ test('durable eligibility authority uses the signed pre-enrichment roster key', 
   }).catch((error) => error);
 
   expect(reviewerRosterStore.findCandidatesByKeys)
-    .toHaveBeenCalledWith(BASE.requestId, ['candidate:pre-enrichment']);
+    .toHaveBeenCalledWith(BASE.requestId, ['person:pre-enrichment']);
   expect(err).toBeInstanceOf(SaveCandidatesError);
   expect(err.body).toMatchObject({ rejectedIneligible: 1 });
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
@@ -554,7 +554,7 @@ test.each([
     ...BASE,
     candidates: [{
       name: 'Dr Managed',
-      candidateKey: 'candidate:pre-enrichment',
+      candidateKey: 'person:pre-enrichment',
       eligibilityStatus: 'unknown',
       automatedIdentityAttestation: receipt.valid ? 'legacy-signed' : null,
     }],
@@ -580,7 +580,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
     source: 'automated_resolver',
     identityDigest: 'identity-digest-1',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:ellen', {
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('person:ellen', {
     name: 'Ellen Zhong',
     email: 'zhonge@cs.princeton.edu',
     emailSource: 'staff_verified',
@@ -604,7 +604,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
       email: 'zhonge@cs.princeton.edu',
       personConfirmed: true,
       requestId: BASE.requestId,
-      candidateKey: 'candidate:ellen',
+      candidateKey: 'person:ellen',
     },
   })]);
   reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
@@ -642,7 +642,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
       emailSource: 'staff_verified',
       affiliation: 'Princeton University',
       orcid: '0000-0001-6345-1907',
-      candidateKey: 'candidate:ellen',
+      candidateKey: 'person:ellen',
       automatedIdentityAttestation: 'stale-after-address-edit',
       contactEnrichment: {
         identity: { status: 'probable' },
@@ -663,11 +663,11 @@ test('server-owned identity and exact-address receipts recover a roster row whos
   expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
     BASE.requestId,
     expect.objectContaining({ name: 'Ellen Zhong', email: 'zhonge@cs.princeton.edu' }),
-    expect.objectContaining({ candidateKey: 'candidate:ellen' }),
+    expect.objectContaining({ candidateKey: 'person:ellen' }),
   );
   expect(reconcileReviewerStages).toHaveBeenCalledWith({
     requestId: BASE.requestId,
-    candidateKeys: ['candidate:ellen'],
+    candidateKeys: ['person:ellen'],
   });
 });
 
@@ -682,7 +682,7 @@ test('server-owned identity receipt alone cannot authorize contact after an auto
     source: 'automated_resolver',
     identityDigest: 'identity-digest-1',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:no-address-receipt', {
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('person:no-address-receipt', {
     name: 'Dr No Address Receipt',
     email: 'new@example.edu',
     emailSource: 'scholarly_multi',
@@ -709,7 +709,7 @@ test('server-owned identity receipt alone cannot authorize contact after an auto
       email: 'new@example.edu',
       emailSource: 'scholarly_multi',
       orcid: '0000-0002-1825-0097',
-      candidateKey: 'candidate:no-address-receipt',
+      candidateKey: 'person:no-address-receipt',
       automatedIdentityAttestation: 'stale-after-contact-change',
       contactEnrichment: {
         identity: { status: 'probable' },
@@ -739,9 +739,9 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-    rosterCandidateKey: 'candidate:blocked-address',
+    rosterCandidateKey: 'person:blocked-address',
   });
-  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('candidate:blocked-address', {
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([authorityRow('person:blocked-address', {
     name: 'Dr Blocked Address',
     conflictRecordUnavailable: true,
     addressTrustReceipt: {
@@ -755,7 +755,7 @@ test('a roster row whose conflict write failed cannot be promoted through ordina
     ...BASE,
     candidates: [{
       name: 'Dr Blocked Address',
-      candidateKey: 'candidate:blocked-address',
+      candidateKey: 'person:blocked-address',
       automatedIdentityAttestation: 'signed-blocked-address',
     }],
   }).catch((caught) => caught);
@@ -783,7 +783,7 @@ test('ordinary saving withholds promotion when the authoritative roster row is m
     source: 'automated_resolver',
     identityDecisionBound: true,
     contactAuthorityBound: true,
-    rosterCandidateKey: 'candidate:missing-roster',
+    rosterCandidateKey: 'person:missing-roster',
   });
   reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([]);
 
@@ -791,7 +791,7 @@ test('ordinary saving withholds promotion when the authoritative roster row is m
     ...BASE,
     candidates: [{
       name: 'Dr Missing Roster',
-      candidateKey: 'candidate:missing-roster',
+      candidateKey: 'person:missing-roster',
       automatedIdentityAttestation: 'signed-missing-roster',
     }],
   }).catch((caught) => caught);
@@ -821,7 +821,7 @@ test('a fully populated stored roster row still fails closed when no authoritati
     ...BASE,
     candidates: [{
       name: 'Dr Snapshot Required',
-      candidateKey: 'candidate:snapshot-required',
+      candidateKey: 'person:snapshot-required',
       automatedIdentityAttestation: 'signed-snapshot-required',
       email: 'snapshot.required@example.edu',
       emailSource: 'scholarly_multi',
@@ -837,7 +837,7 @@ test('a fully populated stored roster row still fails closed when no authoritati
   ]);
   expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
     expect.objectContaining({
-      candidateKey: 'candidate:snapshot-required',
+      candidateKey: 'person:snapshot-required',
       rosterStatus: 'active',
       stageFreshness: CURRENT_STAGE_FRESHNESS,
       coauthorCheckStatus: 'complete',
@@ -866,7 +866,7 @@ test('stored staff confirmation supplies the authoritative roster key when the a
     email: 'ann@example.edu',
     website: '',
     affiliation: 'Example University',
-    rosterCandidateKey: 'candidate:staff-confirmed',
+    rosterCandidateKey: 'person:staff-confirmed',
   });
   reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
     receiptId: 'receipt-staff',
@@ -883,7 +883,7 @@ test('stored staff confirmation supplies the authoritative roster key when the a
       email: 'ann@example.edu',
       emailSource: 'manual',
       affiliation: 'Example University',
-      candidateKey: 'candidate:staff-confirmed',
+      candidateKey: 'person:staff-confirmed',
       automatedIdentityAttestation: 'expired-token',
       pdIdentityConfirmed: true,
       pdIdentityConfirmationId: 'confirm-1',
@@ -893,7 +893,7 @@ test('stored staff confirmation supplies the authoritative roster key when the a
   expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
     BASE.requestId,
     expect.objectContaining({ name: 'Ann Lee', email: 'ann@example.edu' }),
-    expect.objectContaining({ candidateKey: 'candidate:staff-confirmed' }),
+    expect.objectContaining({ candidateKey: 'person:staff-confirmed' }),
   );
   expect(out.savedCount).toBe(1);
 });
@@ -901,7 +901,7 @@ test('stored staff confirmation supplies the authoritative roster key when the a
 test('staff and automated roster bindings that disagree fail closed before writes', async () => {
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,
-    rosterCandidateKey: 'candidate:automated',
+    rosterCandidateKey: 'person:automated',
     identityDecisionBound: true,
     contactAuthorityBound: true,
   });
@@ -916,7 +916,7 @@ test('staff and automated roster bindings that disagree fail closed before write
     email: 'ann@example.edu',
     website: '',
     affiliation: 'Example University',
-    rosterCandidateKey: 'candidate:staff-confirmed',
+    rosterCandidateKey: 'person:staff-confirmed',
   });
 
   const err = await saveCandidates({
@@ -926,7 +926,7 @@ test('staff and automated roster bindings that disagree fail closed before write
       email: 'ann@example.edu',
       emailSource: 'manual',
       affiliation: 'Example University',
-      candidateKey: 'candidate:staff-confirmed',
+      candidateKey: 'person:staff-confirmed',
       automatedIdentityAttestation: 'signed-token',
       pdIdentityConfirmed: true,
       pdIdentityConfirmationId: 'confirm-1',
@@ -1021,6 +1021,26 @@ test('clean full success: 200 payload with NO rejected*/errors keys (undefined-v
       rosterFinalized: true,
     })],
   });
+});
+
+test('promotion preflight reconciles a multi-select once with its unique server roster keys', async () => {
+  const candidateKeys = ['person:preflight-alpha', 'person:preflight-beta'];
+
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [
+      { name: 'Dr Preflight Alpha', email: 'alpha@example.edu', candidateKey: candidateKeys[0] },
+      { name: 'Dr Preflight Beta', email: 'beta@example.edu', candidateKey: candidateKeys[1] },
+    ],
+  });
+
+  expect(out).toMatchObject({ success: true, savedCount: 2 });
+  expect(reconcileReviewerStages).toHaveBeenCalledTimes(1);
+  expect(reconcileReviewerStages).toHaveBeenCalledWith({
+    requestId: BASE.requestId,
+    candidateKeys,
+  });
+  expect(reviewerRosterStore.finalizeCandidatePromotion).toHaveBeenCalledTimes(2);
 });
 
 test('roster-managed promotion finalizes the receipt-bound roster key while returning the submitted correlation key', async () => {
