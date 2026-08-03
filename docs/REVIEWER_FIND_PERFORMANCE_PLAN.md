@@ -19,11 +19,12 @@ related:
 
 # Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 
-> **Status (2026-08-02):** [VERIFIED via source/tests] the feature branch now
-> implements the manual-stage, cold applicant receipt, warm-read, and promotion
-> snapshot contracts summarized below. This document records branch/source
-> state only; it does not claim merge, deployment, production enablement, or an
-> authenticated production-browser exercise.
+> **Status (2026-08-03):** [VERIFIED via source/tests] the feature branch now
+> implements the manual-stage, cold applicant receipt, warm-read, bounded
+> reconciliation, and promotion-snapshot contracts summarized below. This
+> document records branch/source state only; it does not claim merge,
+> deployment, production enablement, production Dataverse/Postgres writes,
+> reviewer email, or an authenticated production-browser exercise.
 >
 > **Primary objective:** returning to a previously searched request should show its persisted candidates promptly and should not repeat proposal, model, publication, or contact work merely to reconstruct the screen.
 
@@ -57,7 +58,7 @@ P0 is therefore a **warm-bootstrap and cache-correctness release**:
 
 Cold-search progressive delivery remains important, but it follows the warm-path fix. Paid-provider usage is an operational cost metric, not the headline user-experience metric.
 
-## Implementation snapshot — 2026-08-02
+## Implementation snapshot — 2026-08-03
 
 [VERIFIED via source/tests] Current branch behavior is:
 
@@ -70,7 +71,9 @@ Cold-search progressive delivery remains important, but it follows the warm-path
 | Structured staff actions | `confirm_identity` derives the canonical identity from the authoritative roster/Dataverse row. The separate address action re-reads server identity/person ETags and atomically writes the matching `contact` and `address_trust` projections; neither trusts a client authority assertion. |
 | Terminal persistence | Cold upsert, manual stage completion, and provider-free terminal repair all apply `roster_persistence` within the same candidate write. A losing CAS claims neither requested-stage nor terminal success. |
 | Warm reads and display | Cached/reconciled warm reads perform zero evidence-provider and proposal-byte work. The client uses only returned target/stage state and displays each receipt's server-supplied “Evidence checked as of” value. |
-| Promotion | Both generic save and applicant promotion derive a server promotion-authority snapshot immediately before the fail-closed promotion gate; a cached receipt does not replace that fresh server decision. |
+| Legacy selection bridge | Receipt-less pre-stage rows can receive a selection-only marker only from a signature-verified, request/key/digest-bound v2+ automated attestation issued within 180 days (or an independently server-owned structured staff receipt), positive stored identity, and ready server-projected contact. The card says “Selection evidence current as of <date>”; ordinary promotion authority remains `blocked_refresh_required` and promotion rechecks current contact/conflict state. |
+| Explicit reconciliation | `POST /api/workbench/reviewer-reconcile` accepts only a request ID and an optional bounded exact roster-key subset. It re-plans and refreshes sequentially through existing per-candidate stage primitives, never cold-searches, promotes, or sends mail; partial/budget/action-required outcomes return exact `continuationCandidateKeys` for the next bounded call. |
+| Promotion | Generic save performs one bounded reconciliation preflight per multi-select batch using unique server roster keys, then re-reads each canonical roster candidate and derives a fresh promotion-authority snapshot immediately before the fail-closed gate. Applicant promotion likewise derives a fresh server snapshot; a cached receipt does not replace either current decision. |
 
 **Intentionally unwired boundary.** [VERIFIED via source/tests] standalone
 generic explicit-cold attestation/coordinator helpers and their tests exist,
@@ -89,7 +92,7 @@ this source/test reconciliation.
 The following baseline trace and planning findings were recorded before the
 branch implementation summarized above. They explain the original scope, but
 are not assertions of current branch behavior; current status is the
-**Implementation snapshot — 2026-08-02** and the source/tests it cites.
+**Implementation snapshot — 2026-08-03** and the source/tests it cites.
 
 - **Change surface:** Reviewer Workbench Find behavior from panel mount through cached roster display, authoritative revalidation, targeted refresh, explicit new search, and promotion.
 - **Entry points:** `ReviewerFindPanel`, `ReviewerSearchSection`, `reviewer-roster`, `applicant-reviewers`, `enrich-recommended`, proposal-load, analyze/discover/enrich routes, and both promotion services.
