@@ -38,7 +38,10 @@ function digest(value) {
 // bound, but the later contact digest did not yet exist. Keep the fixture
 // historical rather than minting today's v4 token so the warm bridge covers
 // the actual pre-migration row without broadening promotion authority.
-async function mintHistoricalV2Attestation(candidate, { issuedAt = '2026-07-29T00:00:00.000Z' } = {}) {
+async function mintHistoricalV2Attestation(candidate, {
+  issuedAt = '2026-07-29T00:00:00.000Z',
+  alg = 'HS256',
+} = {}) {
   const issuedAtSeconds = Date.parse(issuedAt) / 1000;
   const identity = identityAttestationProjection(candidate);
   return new SignJWT({
@@ -52,10 +55,46 @@ async function mintHistoricalV2Attestation(candidate, { issuedAt = '2026-07-29T0
     eligibilityStatus: 'unknown',
     eligibilityDigest: digest({ status: 'unknown', reason: null, evidence: null }),
   })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setProtectedHeader({ alg, typ: 'JWT' })
     .setIssuedAt(issuedAtSeconds)
     .setExpirationTime(issuedAtSeconds + (14 * 24 * 60 * 60))
     .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+}
+
+function katherinePersistedLegacyCandidate() {
+  return {
+    candidateKey: 'candidate:katherine-ferrara|email:kwferrar%40stanford.edu|orcid:0000-0002-1825-0097|affiliation:stanford-university',
+    rosterStatus: 'active',
+    stageFreshness: null,
+    stageRefresh: null,
+    // This is injected by reviewer-roster-store from the active Postgres row,
+    // not stored in the candidate JSON supplied by a browser.
+    rosterUpdatedAt: '2026-07-29 18:21:00.929+00',
+    provenance: { kind: 'literature_retrieved' },
+    name: 'Katherine Ferrara',
+    // Production has a legacy top-level label while the nested resolver is
+    // the current contact authority. The fallback must use the latter.
+    identityStatus: 'verified',
+    orcid: '0000-0002-1825-0097',
+    email: 'kwferrar@stanford.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    contactEnrichment: {
+      email: 'kwferrar@stanford.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      dataverseContactEvidence: {
+        status: 'known',
+        matchKey: 'orcid',
+        checkedAt: '2026-07-29T18:20:56.724Z',
+      },
+      identity: {
+        status: 'probable',
+        resolverVersion: 'works-first-v1',
+        resolvedAt: '2026-07-29T18:20:22.776Z',
+      },
+    },
+  };
 }
 
 function request(overrides = {}) {
@@ -533,6 +572,159 @@ test('projects Katherine-shaped signed v2 legacy evidence as selectable while re
     coauthor.mockRestore();
     stageWrite.mockRestore();
     coldWrite.mockRestore();
+  }
+});
+
+test('restores Katherine-shaped persisted selection after a rotated automated-attestation secret without granting promotion authority', async () => {
+  const identity = jest.spyOn(ReviewerIdentityRuntime, 'evaluateSuggestion');
+  const coauthor = jest.spyOn(coauthorCoi, 'checkCoauthorHistory');
+  const stageWrite = jest.spyOn(reviewerRosterStore, 'completeStageRefreshWithEvidence');
+  const coldWrite = jest.spyOn(reviewerRosterStore, 'recordSurfacedWithStageEvidence');
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  const candidate = katherinePersistedLegacyCandidate();
+  try {
+    process.env.NEXTAUTH_SECRET = 'historical-rotated-secret';
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate);
+    process.env.NEXTAUTH_SECRET = 'current-secret-that-cannot-verify-history';
+
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result.candidatePlans[0]).toMatchObject({
+      candidateKey: candidate.candidateKey,
+      cacheOutcome: 'miss',
+      promotionAuthority: 'blocked_refresh_required',
+      legacySelection: {
+        version: 1,
+        state: 'selectable',
+        evidenceCheckedAt: '2026-07-29T18:20:22.776Z',
+      },
+    });
+    expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'identity', reason: 'warm_cache_version_changed' }),
+    ]));
+    expect(identity).not.toHaveBeenCalled();
+    expect(coauthor).not.toHaveBeenCalled();
+    expect(stageWrite).not.toHaveBeenCalled();
+    expect(coldWrite).not.toHaveBeenCalled();
+
+    const promotionSnapshot = await deriveReviewerPromotionAuthoritySnapshot({
+      requestId: REQUEST_ID,
+      candidate,
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+    expect(promotionSnapshot).toMatchObject({
+      authorityState: 'stale',
+      plan: { cacheOutcome: 'miss', promotionAuthority: 'blocked_refresh_required' },
+    });
+    expect(getCandidatePromotionAuthority(candidate, {
+      serverAuthoritative: true,
+      requestId: REQUEST_ID,
+      authoritative: promotionSnapshot,
+    })).toMatchObject({ decision: 'blocked' });
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
+    identity.mockRestore();
+    coauthor.mockRestore();
+    stageWrite.mockRestore();
+    coldWrite.mockRestore();
+  }
+});
+
+test.each([
+  ['unresolved nested identity', (candidate) => { candidate.contactEnrichment.identity.status = 'unresolved'; }],
+  ['unready contact', (candidate) => { candidate.emailPersistAllowed = false; }],
+  ['missing exact ORCID binding', (candidate) => { delete candidate.orcid; }],
+  ['stale resolver evidence despite a fresh roster row', (candidate) => { candidate.contactEnrichment.identity.resolvedAt = '2025-12-01T00:00:00.000Z'; }],
+  ['stale Dataverse evidence despite a fresh roster row', (candidate) => { candidate.contactEnrichment.dataverseContactEvidence.checkedAt = '2025-12-01T00:00:00.000Z'; }],
+  ['missing Dataverse evidence timestamp', (candidate) => { delete candidate.contactEnrichment.dataverseContactEvidence.checkedAt; }],
+  ['stale server roster bound', (candidate) => { candidate.rosterUpdatedAt = '2025-12-01 00:00:00+00'; }],
+  ['missing server roster evidence', (candidate) => { delete candidate.rosterUpdatedAt; }],
+  ['applicant recommendation lane', (candidate) => { candidate.isApplicantRecommended = true; }],
+  ['ambiguous suggestion lane', (candidate) => { candidate.candidateKey = 'suggestion:11111111-1111-1111-1111-111111111111'; }],
+  ['known coauthor conflict', (candidate) => { candidate.hasCoauthorCOI = true; }],
+  ['ineligible row', (candidate) => { candidate.eligibilityStatus = 'ineligible'; }],
+  ['deceased row', (candidate) => { candidate.eligibilityStatus = 'deceased'; }],
+])('rotated-signature legacy fallback fails closed for %s', async (_label, mutate) => {
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  const candidate = katherinePersistedLegacyCandidate();
+  try {
+    mutate(candidate);
+    process.env.NEXTAUTH_SECRET = 'historical-rotated-secret';
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate);
+    process.env.NEXTAUTH_SECRET = 'current-secret-that-cannot-verify-history';
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result.candidatePlans[0].legacySelection).toBeNull();
+    expect(result.candidatePlans[0].promotionAuthority).toBe('blocked_refresh_required');
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
+  }
+});
+
+test('rotated-signature legacy fallback rejects a malformed automated receipt', async () => {
+  const candidate = katherinePersistedLegacyCandidate();
+  candidate.automatedIdentityAttestation = 'not-a-signed-attestation';
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result.candidatePlans[0].legacySelection).toBeNull();
+});
+
+test('rotated-signature legacy fallback rejects an algorithm the verifier did not allow', async () => {
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  const candidate = katherinePersistedLegacyCandidate();
+  try {
+    process.env.NEXTAUTH_SECRET = 'historical-rotated-secret';
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate, { alg: 'HS384' });
+    process.env.NEXTAUTH_SECRET = 'current-secret-that-cannot-verify-history';
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result.candidatePlans[0].legacySelection).toBeNull();
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
   }
 });
 

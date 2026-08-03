@@ -67,6 +67,7 @@ async function mintHistoricalV2(candidate, {
   requestId = REQUEST,
   rosterCandidateKey = candidate.candidateKey,
   issuedAt = '2026-07-29T00:00:00.000Z',
+  alg = 'HS256',
 } = {}) {
   const issuedAtSeconds = Date.parse(issuedAt) / 1000;
   const identityProjection = identityAttestationProjection(candidate);
@@ -81,7 +82,7 @@ async function mintHistoricalV2(candidate, {
     eligibilityStatus: 'unknown',
     eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 2)),
   })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setProtectedHeader({ alg, typ: 'JWT' })
     .setIssuedAt(issuedAtSeconds)
     .setExpirationTime(issuedAtSeconds + TTL_SECONDS)
     .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
@@ -216,6 +217,16 @@ test('receipt signed with a different secret fails closed', async () => {
     requestId: REQUEST,
     candidate: CANDIDATE,
   })).resolves.toEqual({ valid: false, reason: 'invalid_signature' });
+});
+
+test('historical selection distinguishes a rejected JOSE algorithm from a signature mismatch', async () => {
+  const candidate = { ...CANDIDATE, candidateKey: 'candidate:jane' };
+  const token = await mintHistoricalV2(candidate, { alg: 'HS384' });
+
+  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
+    requestId: REQUEST,
+    candidate,
+  })).resolves.toEqual({ valid: false, reason: 'invalid_algorithm' });
 });
 
 test('receipt fails closed after the 14-day lifetime and clock tolerance', async () => {
