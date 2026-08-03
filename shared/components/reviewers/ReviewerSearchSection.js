@@ -163,7 +163,10 @@ const RECONCILIATION_CANDIDATE_OUTCOMES = new Set([
 const RETRYABLE_RECONCILIATION_OUTCOMES = new Set([
   'failed_retryable', 'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
 ]);
-const RECONCILIATION_MAX_CANDIDATE_KEYS = 24;
+// Must match the server-owned active roster cap. A continuation carries every
+// active row that can safely resume rather than silently dropping it at an
+// arbitrary browser-sized subset.
+const RECONCILIATION_MAX_CANDIDATE_KEYS = 300;
 const RECONCILIATION_IDLE = Object.freeze({ status: 'idle', continuationCandidateKeys: [], message: null });
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
@@ -335,10 +338,7 @@ function errorResponseHasExpectedStatus(response, code) {
 }
 
 function reconciliationStatusMatches(response, outcome) {
-  // Browser Response always has a numeric status. Keeping this permissive for
-  // the small response doubles used by older component tests does not relax
-  // production handling.
-  if (!Number.isInteger(response?.status)) return true;
+  if (!Number.isInteger(response?.status)) return false;
   if (outcome === 'current' || outcome === 'partial') return response.status === 200;
   if (['action_required', 'blocked', 'budget_exhausted'].includes(outcome)) return response.status === 409;
   return response.status === 503;
@@ -359,7 +359,7 @@ function reconciliationSummaryText(candidates, continuationCandidateKeys) {
     `${summary.blocked} blocked by safeguards`,
     `${summary.retryable} need retrying`,
     `${summary.budgetExhausted} paused at the work limit`,
-    `${continuationCandidateKeys.length} remaining`,
+    `${continuationCandidateKeys.length} queued to continue`,
   ].join(' · ');
 }
 
@@ -373,8 +373,7 @@ export function validReviewerReconciliationResponse(data, requestId) {
     || data.success !== ['current', 'partial'].includes(data.outcome)
     || !Array.isArray(data.candidates)) return null;
 
-  const globalRetry = data.outcome === 'failed_retryable' && data.requestId === undefined && data.candidates.length === 0;
-  if (!globalRetry && data.requestId !== requestId) return null;
+  if (data.requestId !== requestId) return null;
   if (!data.candidates.every((candidate) => (
     candidate && typeof candidate === 'object'
       && canonicalCandidateKey(candidate.candidateKey) === candidate.candidateKey
@@ -382,9 +381,6 @@ export function validReviewerReconciliationResponse(data, requestId) {
   ))) return null;
   const candidateKeys = data.candidates.map((candidate) => candidate.candidateKey);
   if (new Set(candidateKeys).size !== candidateKeys.length) return null;
-  if (globalRetry) {
-    return { outcome: data.outcome, candidates: [], continuationCandidateKeys: [] };
-  }
   const continuationCandidateKeys = data.continuationCandidateKeys === undefined
     ? []
     : data.continuationCandidateKeys;
@@ -392,8 +388,11 @@ export function validReviewerReconciliationResponse(data, requestId) {
     || continuationCandidateKeys.length > RECONCILIATION_MAX_CANDIDATE_KEYS
     || !continuationCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
     || new Set(continuationCandidateKeys).size !== continuationCandidateKeys.length) return null;
-  if ((data.outcome === 'current' && continuationCandidateKeys.length !== 0)
-    || (data.outcome !== 'current' && continuationCandidateKeys.length === 0)) return null;
+  if (data.outcome === 'current' && continuationCandidateKeys.length !== 0) return null;
+  const terminalCandidateKeys = new Set(data.candidates
+    .filter((candidate) => ['current', 'action_required', 'blocked', 'rejected'].includes(candidate.outcome))
+    .map((candidate) => candidate.candidateKey));
+  if (continuationCandidateKeys.some((key) => terminalCandidateKeys.has(key))) return null;
   return {
     outcome: data.outcome,
     candidates: data.candidates,
@@ -1541,7 +1540,7 @@ export default function ReviewerSearchSection({
     setReconciliationState({
       status: 'running',
       continuationCandidateKeys,
-      message: 'Reconciling previously found reviewers. This checks stored evidence only; it does not search for new reviewers, send invitations, or change selections.',
+      message: 'Reconciling previously found reviewers. This may update identity, COI, eligibility, or contact evidence, and a reviewer’s candidate status may change. It does not search for new reviewers, change selections, or send invitations.',
     });
     try {
       const body = continuationCandidateKeys.length > 0
@@ -1568,7 +1567,7 @@ export default function ReviewerSearchSection({
         status: 'complete',
         continuationCandidateKeys: result.continuationCandidateKeys,
         message: result.outcome === 'failed_retryable' && result.candidates.length === 0
-          ? 'Reviewer reconciliation is temporarily unavailable. Retry later; no reviewer selection or promotion was changed.'
+          ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
           : `Reviewer reconciliation finished: ${reconciliationSummaryText(result.candidates, result.continuationCandidateKeys)}.`,
       });
       // The endpoint may have persisted a subset before returning an action,
@@ -1824,7 +1823,11 @@ export default function ReviewerSearchSection({
     if (reconciliationStatusRef.current !== 'running') return;
     reconciliationRef.current?.abort();
     reconciliationRef.current = null;
-    setReconciliationState(RECONCILIATION_IDLE);
+    setReconciliationState({
+      status: 'stale',
+      continuationCandidateKeys: [],
+      message: 'Reviewer status changed while reconciliation was running. Reloaded status is shown; start reconciliation again if needed.',
+    });
   }, [stageRefreshSnapshotVersion]);
 
   useEffect(() => () => {

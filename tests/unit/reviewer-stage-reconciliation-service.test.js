@@ -9,6 +9,7 @@ const refreshReviewerCandidateStage = jest.fn();
 
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: (...args) => listForRequest(...args),
+  PER_REQUEST_ACTIVE_CAP: 300,
 }));
 jest.mock('../../lib/services/workbench/reviewer-stage-refresh-service', () => ({
   createReviewerStageRefreshRequestContext: (...args) => createReviewerStageRefreshRequestContext(...args),
@@ -16,7 +17,7 @@ jest.mock('../../lib/services/workbench/reviewer-stage-refresh-service', () => (
   refreshReviewerCandidateStage: (...args) => refreshReviewerCandidateStage(...args),
 }));
 
-import { reconcileReviewerStages } from '../../lib/services/workbench/reviewer-stage-reconciliation-service';
+import { _internals, reconcileReviewerStages } from '../../lib/services/workbench/reviewer-stage-reconciliation-service';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const CANDIDATE_KEY = 'candidate:alex%20reviewer|email:alex%40example.edu|orcid:-|affiliation:example%20university';
@@ -84,8 +85,29 @@ test('does not report success when every candidate needs the dedicated address a
   expect(result).toMatchObject({
     outcome: 'action_required',
     counts: { action_required: 1 },
-    continuationCandidateKeys: [CANDIDATE_KEY],
   });
+  expect(result.continuationCandidateKeys).toBeUndefined();
+  expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
+});
+
+test('does not offer a hard coauthor-COI policy block under Continue', async () => {
+  planReviewerCandidateRefresh.mockResolvedValueOnce(planned({
+    pendingStages: ['coauthor_coi'],
+    refreshes: [],
+  }));
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
+
+  expect(result).toMatchObject({
+    outcome: 'blocked',
+    counts: { blocked: 1 },
+    candidates: [expect.objectContaining({
+      candidateKey: CANDIDATE_KEY,
+      outcome: 'blocked',
+      code: 'no_executable_refresh',
+    })],
+  });
+  expect(result.continuationCandidateKeys).toBeUndefined();
   expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
 });
 
@@ -111,6 +133,7 @@ test('preserves a per-stage retryable failure and never falls through to a later
       stages: [{ stage: 'identity', outcome: 'failed_retryable', code: 'retryable_failure' }],
     })],
   });
+  expect(result.continuationCandidateKeys).toEqual([CANDIDATE_KEY]);
   expect(refreshReviewerCandidateStage).toHaveBeenCalledTimes(1);
 });
 
@@ -148,6 +171,24 @@ test('uses only active server-listed candidate keys for an all-request pass and 
   expect(listForRequest).toHaveBeenCalledWith(REQUEST_ID);
   expect(planReviewerCandidateRefresh).toHaveBeenCalledWith(expect.objectContaining({ candidateKey: CANDIDATE_KEY }));
   expect(planReviewerCandidateRefresh).toHaveBeenCalledWith(expect.objectContaining({ candidateKey: second }));
+});
+
+test('covers every active roster row through the authoritative cap without truncating a request-wide pass', async () => {
+  const keys = Array.from({ length: _internals.MAX_REQUEST_CANDIDATES }, (_, index) => (
+    `candidate:reviewer${index}|email:reviewer${index}%40example.edu|orcid:-|affiliation:example%20university`
+  ));
+  listForRequest.mockResolvedValue({ active: keys.map((candidateKey) => ({ candidateKey })) });
+  planReviewerCandidateRefresh.mockImplementation(async ({ candidateKey }) => ({
+    ...planned({ cacheOutcome: 'hit', pendingStages: [], refreshes: [] }),
+    candidateKey,
+  }));
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID });
+
+  expect(_internals.MAX_REQUEST_CANDIDATES).toBe(300);
+  expect(result).toMatchObject({ outcome: 'current', counts: { current: keys.length } });
+  expect(planReviewerCandidateRefresh).toHaveBeenCalledTimes(keys.length);
+  expect(result.continuationCandidateKeys).toBeUndefined();
 });
 
 test('rejects client namespace and malformed candidate keys before request authority work', async () => {

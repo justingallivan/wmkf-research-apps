@@ -10,14 +10,20 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
-import { reconcileReviewerStages } from '../../../lib/services/workbench/reviewer-stage-reconciliation-service';
+import {
+  MAX_REQUEST_CANDIDATES,
+  reconcileReviewerStages,
+} from '../../../lib/services/workbench/reviewer-stage-reconciliation-service';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEST_FIELDS = new Set(['requestId', 'candidateKeys']);
-const MAX_CANDIDATE_KEYS = 24;
+const MAX_CANDIDATE_KEYS = MAX_REQUEST_CANDIDATES;
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '16kb' } },
+  // A canonical stored key permits up to 560 characters. The active roster is
+  // authoritatively capped at 300 rows, so 256kb accepts every valid exact
+  // continuation without allowing arbitrary candidate payloads.
+  api: { bodyParser: { sizeLimit: '256kb' } },
   // The coordinator stops itself at 210 seconds. Keep the platform ceiling
   // above that internal deadline so callers receive a resumable result rather
   // than a function timeout.
@@ -65,14 +71,25 @@ export default async function handler(req, res) {
   return withDalContext('workbench-reviewer-reconcile', async () => {
     try {
       const result = await reconcileReviewerStages(parsed.value);
-      return res.status(statusFor(result)).json({
-        success: result.outcome === 'current' || result.outcome === 'partial',
-        ...result,
+      // The service can fail before it has a request context. The route still
+      // binds every parsed response to the request that this authenticated
+      // caller submitted, so the browser can never render a cross-request
+      // retry result.
+      const boundResult = { ...result, requestId: parsed.value.requestId };
+      return res.status(statusFor(boundResult)).json({
+        success: boundResult.outcome === 'current' || boundResult.outcome === 'partial',
+        ...boundResult,
       });
     } catch {
       // Reconciliation may touch external evidence providers. Their raw errors
       // can contain query fragments or reviewer data, so do not log them here.
-      return res.status(503).json({ success: false, error: 'Reviewer reconciliation is temporarily unavailable' });
+      return res.status(503).json({
+        success: false,
+        outcome: 'failed_retryable',
+        requestId: parsed.value.requestId,
+        candidates: [],
+        error: 'Reviewer reconciliation is temporarily unavailable',
+      });
     }
   });
 }
