@@ -22,6 +22,7 @@ import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import { REQUIRED_STAGES } from '../../../lib/services/reviewer-promotion-authority';
+import { LEGACY_SELECTION_PROJECTION_VERSION, canonicalIso } from '../../../lib/services/reviewer-stage-freshness';
 import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
 import {
   projectCanonicalApplicantContact,
@@ -68,8 +69,36 @@ export function hasCurrentServerPromotionPlan(candidate, plan) {
   return REQUIRED_STAGES.every((stage) => currentStages.has(stage));
 }
 
+// A narrow visual/checkbox bridge for older stored rows. It is intentionally
+// not promotion authority: current stage evidence remains absent, and every
+// mutation route derives its own fresh server snapshot before it can select or
+// promote the candidate.
+export function hasLegacyServerSelectionPlan(candidate, plan) {
+  const candidateKey = canonicalServerPlanCandidateKey(candidate?.candidateKey);
+  const legacy = plan?.legacySelection;
+  return !!candidateKey
+    && plan?.candidateKey === candidateKey
+    && plan?.cacheOutcome !== 'hit'
+    && plan?.promotionAuthority === 'blocked_refresh_required'
+    && legacy?.version === LEGACY_SELECTION_PROJECTION_VERSION
+    && legacy?.state === 'selectable'
+    && canonicalIso(legacy?.evidenceCheckedAt);
+}
+
+// The compatibility marker describes only the signed selection evidence. It
+// must not imply that every stage is current: promotion re-runs its current
+// server-side contact and conflict preflight.
+export function legacySelectionNotice(candidate, plan) {
+  if (!hasLegacyServerSelectionPlan(candidate, plan)) return null;
+  return {
+    evidenceCheckedAt: plan.legacySelection.evidenceCheckedAt,
+    message: `Selection evidence current as of ${plan.legacySelection.evidenceCheckedAt}; current contact and conflict checks run automatically when promoted.`,
+  };
+}
+
 export function isCandidateSelectable(c, serverPromotionPlan = null) {
-  return hasCurrentServerPromotionPlan(c, serverPromotionPlan)
+  return (hasCurrentServerPromotionPlan(c, serverPromotionPlan)
+      || hasLegacyServerSelectionPlan(c, serverPromotionPlan))
     && getCandidatePromotionDecision(c)?.decision === 'ready'
     && getCandidateEmailReadiness(c)?.action === 'ready'
     && !c?.hasInstitutionCOI;

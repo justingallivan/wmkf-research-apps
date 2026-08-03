@@ -1,7 +1,7 @@
 /** @jest-environment node */
 const {
   STAGES, CONTRACT_VERSIONS, DOWNSTREAM, DEFAULT_AGE_POLICY,
-  planCandidateFreshness, mapLegacyStage,
+  planCandidateFreshness, mapLegacyStage, projectLegacySelectionProjection,
 } = require('../../lib/services/reviewer-stage-freshness');
 const { expiredLeaseRecoverySourceVersion } = require('../../lib/services/workbench/reviewer-stage-source-versions');
 
@@ -240,4 +240,60 @@ test('legacy compatibility requires explicit equivalent provenance and never cre
   });
   expect(mapLegacyStage(ambiguous, 'identity', withDependencies)).toMatchObject({ state: 'incomplete' });
   expect(planCandidateFreshness({ candidate: ambiguous, authoritative: withDependencies, now }).refreshes).toContainEqual({ stage: 'identity', reason: 'stage_incomplete' });
+});
+
+test('legacy selection projection accepts only verified signed historical evidence or a structured staff receipt', () => {
+  const legacyCandidate = {
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    identityStatus: 'probable',
+    email: 'kwferrar@stanford.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    contactEnrichment: {
+      identity: {
+        status: 'probable',
+        resolvedAt: '2026-07-29T12:00:00.000Z',
+      },
+    },
+  };
+  const args = {
+    requestId: '11111111-1111-1111-1111-111111111111',
+    contact: { decision: 'ready', email: 'kwferrar@stanford.edu' },
+    automatedAttestation: {
+      valid: true,
+      historicalSelection: true,
+      identityDecisionBound: true,
+      eligibilityEvidenceBound: true,
+      issuedAt: '2026-07-29T00:00:00.000Z',
+    },
+  };
+
+  expect(projectLegacySelectionProjection(legacyCandidate, args)).toEqual({
+    version: 1,
+    state: 'selectable',
+    evidenceCheckedAt: '2026-07-29T00:00:00.000Z',
+  });
+
+  const mutations = [
+    { stageFreshness: { identity: {} } },
+    { stageRefresh: { identity: {} } },
+    { warmCacheVersion: 1 },
+    { identityStatus: 'unresolved' },
+    { contactEnrichment: { identity: { status: 'probable', resolvedAt: 'not-a-date' } } },
+  ];
+  for (const mutation of mutations) {
+    expect(projectLegacySelectionProjection({ ...legacyCandidate, ...mutation }, args)).toBeNull();
+  }
+  expect(projectLegacySelectionProjection(legacyCandidate, {
+    ...args,
+    contact: { decision: 'ready', email: 'other@example.edu' },
+  })).toBeNull();
+  expect(projectLegacySelectionProjection(legacyCandidate, {
+    ...args,
+    contact: { decision: 'needs_identity_confirmation', email: 'kwferrar@stanford.edu' },
+  })).toBeNull();
+  expect(projectLegacySelectionProjection(legacyCandidate, {
+    ...args,
+    automatedAttestation: { ...args.automatedAttestation, historicalSelection: false },
+  })).toBeNull();
 });

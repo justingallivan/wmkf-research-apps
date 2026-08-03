@@ -1,5 +1,8 @@
 /** @jest-environment node */
 
+import { SignJWT } from 'jose';
+import crypto from 'crypto';
+
 import {
   buildApplicantAnchorRefreshReceipt,
   deriveReviewerPromotionAuthoritySnapshot,
@@ -19,9 +22,41 @@ import { GraphService } from '../../lib/services/graph-service';
 import { ReviewerIdentityRuntime } from '../../lib/services/reviewer-identity-runtime';
 import * as coauthorCoi from '../../lib/services/discovery/coauthor-coi';
 import * as reviewerRosterStore from '../../lib/services/reviewer-roster-store';
+import {
+  identityAttestationProjection,
+  legacyIdentityAttestationProjection,
+} from '../../lib/services/reviewer-candidate-attestation';
 import fs from 'fs';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+
+function digest(value) {
+  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('base64url');
+}
+
+// Katherine's production receipt shape is v2: identity and eligibility are
+// bound, but the later contact digest did not yet exist. Keep the fixture
+// historical rather than minting today's v4 token so the warm bridge covers
+// the actual pre-migration row without broadening promotion authority.
+async function mintHistoricalV2Attestation(candidate, { issuedAt = '2026-07-29T00:00:00.000Z' } = {}) {
+  const issuedAtSeconds = Date.parse(issuedAt) / 1000;
+  const identity = identityAttestationProjection(candidate);
+  return new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId: REQUEST_ID,
+    candidateKey: identity.candidateKey,
+    rosterCandidateKey: candidate.candidateKey,
+    projectionVersion: 2,
+    baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
+    identityDigest: digest(identity),
+    eligibilityStatus: 'unknown',
+    eligibilityDigest: digest({ status: 'unknown', reason: null, evidence: null }),
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt(issuedAtSeconds)
+    .setExpirationTime(issuedAtSeconds + (14 * 24 * 60 * 60))
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+}
 
 function request(overrides = {}) {
   return {
@@ -407,6 +442,134 @@ test('keeps panel state current and plans a historical stored row without fabric
   expect(responseText).not.toContain('Jane Example');
   expect(responseText).not.toContain('Reviewer Materials');
   expect(responseText).not.toContain('Proposal_1002788.pdf');
+});
+
+test('projects Katherine-shaped signed v2 legacy evidence as selectable while retaining blocked promotion authority', async () => {
+  const identity = jest.spyOn(ReviewerIdentityRuntime, 'evaluateSuggestion');
+  const coauthor = jest.spyOn(coauthorCoi, 'checkCoauthorHistory');
+  const stageWrite = jest.spyOn(reviewerRosterStore, 'completeStageRefreshWithEvidence');
+  const coldWrite = jest.spyOn(reviewerRosterStore, 'recordSurfacedWithStageEvidence');
+  const priorSecret = process.env.NEXTAUTH_SECRET;
+  process.env.NEXTAUTH_SECRET = 'reviewer-warm-legacy-test-secret';
+  const candidate = {
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    rosterStatus: 'active',
+    name: 'Katherine Ferrara',
+    identityStatus: 'probable',
+    email: 'kwferrar@stanford.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    contactEnrichment: {
+      email: 'kwferrar@stanford.edu',
+      emailSource: 'scholarly_multi',
+      emailPersistAllowed: true,
+      identity: {
+        status: 'probable',
+        resolverVersion: 'works-first-v1',
+        resolvedAt: '2026-07-29T12:00:00.000Z',
+        anchors: [{ type: 'orcid', canonicalKey: 'orcid:0000-0002-1825-0097' }],
+      },
+    },
+  };
+  try {
+    candidate.automatedIdentityAttestation = await mintHistoricalV2Attestation(candidate);
+    const result = await readReviewerWarmValidation({
+      requestId: REQUEST_ID,
+      roster: { active: [candidate] },
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+
+    expect(result).toMatchObject({ state: 'current' });
+    expect(result.candidatePlans[0]).toMatchObject({
+      candidateKey: candidate.candidateKey,
+      cacheOutcome: 'miss',
+      promotionAuthority: 'blocked_refresh_required',
+      legacySelection: {
+        version: 1,
+        state: 'selectable',
+        evidenceCheckedAt: '2026-07-29T00:00:00.000Z',
+      },
+    });
+    expect(result.candidatePlans[0].currentStages).toEqual([]);
+    expect(result.candidatePlans[0].refreshes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: 'identity', reason: 'warm_cache_version_changed' }),
+    ]));
+    expect(identity).not.toHaveBeenCalled();
+    expect(coauthor).not.toHaveBeenCalled();
+    expect(stageWrite).not.toHaveBeenCalled();
+    expect(coldWrite).not.toHaveBeenCalled();
+    const promotionSnapshot = await deriveReviewerPromotionAuthoritySnapshot({
+      requestId: REQUEST_ID,
+      candidate,
+      deps: {
+        ...metadataDeps({ entries: new Map([[
+          'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+        ]]) }),
+        getRequestById: jest.fn(async () => request()),
+      },
+    });
+    expect(promotionSnapshot).toMatchObject({
+      authorityState: 'stale',
+      plan: { cacheOutcome: 'miss', promotionAuthority: 'blocked_refresh_required' },
+    });
+    expect(getCandidatePromotionAuthority(candidate, {
+      serverAuthoritative: true,
+      requestId: REQUEST_ID,
+      authoritative: promotionSnapshot,
+    })).toMatchObject({ decision: 'blocked' });
+    expect(identity).not.toHaveBeenCalled();
+    expect(coauthor).not.toHaveBeenCalled();
+    expect(stageWrite).not.toHaveBeenCalled();
+    expect(coldWrite).not.toHaveBeenCalled();
+  } finally {
+    if (priorSecret === undefined) delete process.env.NEXTAUTH_SECRET;
+    else process.env.NEXTAUTH_SECRET = priorSecret;
+    identity.mockRestore();
+    coauthor.mockRestore();
+    stageWrite.mockRestore();
+    coldWrite.mockRestore();
+  }
+});
+
+test.each([
+  ['missing server address attestation', (candidate) => { const next = { ...candidate }; delete next.addressTrustReceipt; return next; }],
+  ['ambiguous identity', (candidate) => ({ ...candidate, identityStatus: 'unresolved' })],
+  ['modern receipt marker', (candidate) => ({ ...candidate, warmCacheVersion: 1 })],
+])('receipt-less legacy projection fails closed for %s', async (_label, mutate) => {
+  const candidate = mutate({
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    identityStatus: 'probable',
+    email: 'legacy.reviewer@example.edu',
+    emailSource: 'faculty_page',
+    emailPersistAllowed: true,
+    addressTrustReceipt: {
+      receiptId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', personConfirmed: true,
+      email: 'legacy.reviewer@example.edu', requestId: REQUEST_ID,
+      candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+      actorProfileId: 'profile-1', actorSystemUserId: 'actor-1',
+      evidenceType: 'institution_page', evidenceUrl: 'https://example.edu/legacy-reviewer', note: null,
+      attestedAt: '2026-08-02T10:00:00.000Z',
+      canonicalPersonId: '55555555-5555-4555-8555-555555555555', canonicalPersonEtag: 'W/"legacy-person-v1"',
+    },
+  });
+  const result = await readReviewerWarmValidation({
+    requestId: REQUEST_ID,
+    roster: { active: [candidate] },
+    deps: {
+      ...metadataDeps({ entries: new Map([[
+        'akoya_request::Request/1002788/Reviewer Materials::Proposal_1002788.pdf', metadata(),
+      ]]) }),
+      getRequestById: jest.fn(async () => request()),
+    },
+  });
+
+  expect(result.candidatePlans[0].legacySelection).toBeNull();
+  expect(result.candidatePlans[0].promotionAuthority).toBe('blocked_refresh_required');
 });
 
 test('warm validation never runs evidence providers or roster writers for a provider-ready cached row', async () => {

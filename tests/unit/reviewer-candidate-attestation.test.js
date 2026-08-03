@@ -14,6 +14,7 @@ import {
   PROJECTION_VERSION,
   TTL_SECONDS,
   verifyAutomatedIdentityAttestation,
+  verifyHistoricalAutomatedIdentitySelection,
 } from '../../lib/services/reviewer-candidate-attestation';
 import {
   mergeEnrichment,
@@ -300,6 +301,10 @@ test('legacy receipts remain valid for bound metrics but cannot authorize identi
     contactAuthorityBound: false,
     projectionVersion: 1,
   });
+  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({ valid: false, reason: 'selection_claims_insufficient' });
 });
 
 test('pre-deployment v2 receipt still verifies as identity-only authority', async () => {
@@ -330,6 +335,70 @@ test('pre-deployment v2 receipt still verifies as identity-only authority', asyn
     contactAuthorityBound: false,
     projectionVersion: 2,
   });
+});
+
+test('historical selection verifies a signed, claim-bound v2 receipt without relaxing normal expiry', async () => {
+  jest.useFakeTimers();
+  const issuedAt = new Date('2026-07-29T00:00:00.000Z');
+  jest.setSystemTime(issuedAt);
+  const candidate = {
+    ...CANDIDATE,
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    eligibilityStatus: 'unknown',
+    contactEnrichment: {
+      ...CANDIDATE.contactEnrichment,
+      identity: {
+        status: 'probable',
+        resolverVersion: 'works-first-v1',
+        resolvedAt: '2026-07-29T00:00:00.000Z',
+      },
+    },
+  };
+  const identityProjection = identityAttestationProjection(candidate);
+  const token = await new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId: REQUEST,
+    candidateKey: identityProjection.candidateKey,
+    rosterCandidateKey: candidate.candidateKey,
+    projectionVersion: 2,
+    baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
+    identityDigest: digest(identityProjection),
+    eligibilityStatus: 'unknown',
+    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 2)),
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(issuedAt.getTime() / 1000) + TTL_SECONDS)
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+
+  jest.setSystemTime(new Date('2026-08-20T00:00:00.000Z'));
+  await expect(verifyAutomatedIdentityAttestation(token, { requestId: REQUEST, candidate }))
+    .resolves.toEqual({ valid: false, reason: 'expired' });
+  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
+    requestId: REQUEST,
+    candidate,
+  })).resolves.toMatchObject({
+    valid: true,
+    historicalSelection: true,
+    identityDecisionBound: true,
+    eligibilityEvidenceBound: true,
+    contactAuthorityBound: false,
+    projectionVersion: 2,
+    issuedAt: '2026-07-29T00:00:00.000Z',
+  });
+});
+
+test('historical selection fails closed for evidence older than 180 days', async () => {
+  jest.useFakeTimers();
+  const issuedAt = new Date('2026-01-01T00:00:00.000Z');
+  jest.setSystemTime(issuedAt);
+  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
+
+  jest.setSystemTime(new Date('2026-08-03T00:00:00.000Z'));
+  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
+    requestId: REQUEST,
+    candidate: CANDIDATE,
+  })).resolves.toEqual({ valid: false, reason: 'historical_evidence_stale' });
 });
 
 test('v3 binds the exact email, source, and persist flags', async () => {

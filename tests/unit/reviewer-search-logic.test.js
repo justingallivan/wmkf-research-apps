@@ -12,6 +12,9 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  hasCurrentServerPromotionPlan,
+  hasLegacyServerSelectionPlan,
+  legacySelectionNotice,
   candidateWasSaved,
   getCandidatePromotionDecision,
   getCandidateEmailReadiness,
@@ -566,6 +569,56 @@ describe('isCandidateSelectable', () => {
     });
 
     expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
+  });
+
+  test('accepts only the explicit legacy selection marker without treating it as promotion authority', () => {
+    const candidate = withCurrentPromotionAuthority({
+      candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+      name: 'Legacy Attested',
+      email: 'legacy.attested@example.edu',
+      emailSource: 'faculty_page',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      addressTrustReceipt: {
+        receiptId: 'receipt-legacy-attested',
+        personConfirmed: true,
+        email: 'legacy.attested@example.edu',
+      },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    });
+    const plan = {
+      candidateKey: candidate.candidateKey,
+      cacheOutcome: 'miss',
+      currentStages: [],
+      pendingStages: [],
+      refreshes: [{ stage: 'identity', reason: 'stage_missing' }],
+      promotionAuthority: 'blocked_refresh_required',
+      legacySelection: {
+        version: 1,
+        state: 'selectable',
+        evidenceCheckedAt: '2026-08-02T10:00:00.000Z',
+      },
+    };
+
+    expect(hasCurrentServerPromotionPlan(candidate, plan)).toBe(false);
+    expect(hasLegacyServerSelectionPlan(candidate, plan)).toBe(true);
+    expect(legacySelectionNotice(candidate, plan)).toEqual({
+      evidenceCheckedAt: '2026-08-02T10:00:00.000Z',
+      message: 'Selection evidence current as of 2026-08-02T10:00:00.000Z; current contact and conflict checks run automatically when promoted.',
+    });
+    expect(isCandidateSelectable(candidate, plan)).toBe(true);
+
+    for (const invalidPlan of [
+      { ...plan, cacheOutcome: 'hit' },
+      { ...plan, promotionAuthority: 'requires_promotion_checks' },
+      { ...plan, legacySelection: { ...plan.legacySelection, version: 2 } },
+      { ...plan, legacySelection: { ...plan.legacySelection, state: 'unknown' } },
+      { ...plan, legacySelection: { ...plan.legacySelection, evidenceCheckedAt: 'not-a-date' } },
+    ]) {
+      expect(hasLegacyServerSelectionPlan(candidate, invalidPlan)).toBe(false);
+      expect(legacySelectionNotice(candidate, invalidPlan)).toBeNull();
+      expect(isCandidateSelectable(candidate, invalidPlan)).toBe(false);
+    }
   });
 
   test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {

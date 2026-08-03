@@ -145,6 +145,45 @@ test('omits the evidence claim when current stages have only missing or invalid 
   expect(screen.queryByText(/Evidence checked as of/)).not.toBeInTheDocument();
 });
 
+test('shows signed legacy selection evidence as-of and suppresses the per-stage refresh action', () => {
+  const subject = {
+    ...candidate('person:legacy-selection', 'Dr Legacy Selection'),
+    rosterUpdatedAt: '2026-08-02 12:00:00+00',
+    email: 'legacy.selection@example.edu',
+    emailSource: 'scholarly_multi',
+    emailPersistAllowed: true,
+    provenance: { kind: 'proposal_named' },
+  };
+  const legacyPlan = {
+    candidateKey: subject.candidateKey,
+    cacheOutcome: 'miss',
+    currentStages: [],
+    pendingStages: [],
+    refreshes: [{ stage: 'identity', reason: 'warm_cache_version_changed' }],
+    promotionAuthority: 'blocked_refresh_required',
+    legacySelection: {
+      version: 1,
+      state: 'selectable',
+      evidenceCheckedAt: '2026-07-29T00:00:00.000Z',
+    },
+  };
+
+  render(
+    <ReviewerSearchSection
+      requestId={REQ_A}
+      blobUrl={null}
+      proposalKey={null}
+      displayOnly
+      rosterSnapshot={repairSnapshot(REQ_A, subject, legacyPlan)}
+    />,
+  );
+
+  expect(screen.getByText(
+    'Selection evidence current as of 2026-07-29T00:00:00.000Z; current contact and conflict checks run automatically when promoted.',
+  )).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Refresh identity evidence/i })).not.toBeInTheDocument();
+});
+
 test('joins same-name candidates only by their distinct canonical candidate keys', () => {
   const plans = buildEvidencePlansByCandidateKey(snapshot(REQ_A, [
     plan('person:one', ['identity'], { identity: '2026-08-01T00:00:00.000Z' }),

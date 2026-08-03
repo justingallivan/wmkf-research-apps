@@ -52,6 +52,8 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  hasLegacyServerSelectionPlan,
+  legacySelectionNotice,
   getCandidatePromotionDecision,
   candidateWasSaved,
   getCandidateEmailReadiness,
@@ -478,7 +480,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshStage, onReloadRoster, stageRefresh = null, canManage = true, evidenceCheck = null }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshStage, onReloadRoster, stageRefresh = null, legacySelection = null, canManage = true, evidenceCheck = null }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -746,6 +748,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           )}
 
           <EvidenceCheck evidenceCheck={evidenceCheck} />
+
+          {legacySelection?.message && (
+            <p className="mt-2 text-xs text-sky-800" role="status">
+              {legacySelection.message}
+            </p>
+          )}
 
           {stageRefresh && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
@@ -1562,9 +1570,13 @@ export default function ReviewerSearchSection({
   }, [requestId, serverPromotionPlanForCandidate, reloadAfterStageRefresh, stageRefreshGeneration]);
 
   const stageRefreshPropsForCandidate = useCallback((candidate) => {
+    const plan = serverPromotionPlanForCandidate(candidate);
+    if (hasLegacyServerSelectionPlan(candidate, plan)) {
+      return { legacySelection: legacySelectionNotice(candidate, plan) };
+    }
     const target = reviewerStageRefreshTarget(
       candidate,
-      serverPromotionPlanForCandidate(candidate),
+      plan,
     );
     if (!target) return {};
     if (target.kind === 'invalid') {
