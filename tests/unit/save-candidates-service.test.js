@@ -381,6 +381,46 @@ test('withholds promotion when the server cannot derive current stage authority'
   );
 });
 
+test('reports a no-trusted-domain eligibility block without the generic refresh instruction', async () => {
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: 'candidate:no-trusted-domain',
+  });
+  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
+    decision: 'blocked',
+    code: 'eligibility_no_trusted_domains',
+    stage: 'eligibility',
+  });
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Domain Unavailable',
+      candidateKey: 'candidate:no-trusted-domain',
+      automatedIdentityAttestation: 'server-signed-test-token',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors).toEqual([
+    expect.objectContaining({
+      code: 'eligibility_no_trusted_domains',
+      outcome: 'withheld',
+      error: expect.stringMatching(/No trusted institutional domain/i),
+      remediation: [
+        expect.objectContaining({ action: 'create_repair_request' }),
+        expect.objectContaining({ action: 'set_aside' }),
+      ],
+    }),
+  ]);
+  expect(error.body.errors[0].error).not.toMatch(/refresh this candidate/i);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+});
+
 test('server roster snapshot change withholds generic promotion before Dataverse mutation', async () => {
   reviewerRosterStore.promotionSnapshotIsCurrent.mockResolvedValueOnce(false);
 

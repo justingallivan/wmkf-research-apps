@@ -142,7 +142,7 @@ beforeEach(() => {
     attestedAt: '2026-07-31T12:00:00.000Z',
   });
   findCandidateBySuggestion.mockResolvedValue({
-    ...authorityCandidate(),
+    ...authorityCandidate({ affiliation: 'Different University' }),
   });
   promotionSnapshotIsCurrent.mockResolvedValue(true);
   mockGetCandidatePromotionAuthority.mockReturnValue({ decision: 'ready', code: null, stage: null });
@@ -244,6 +244,32 @@ test('authority derivation unavailable → 503 before COI, contact, or lifecycle
   expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
+test('no trusted eligibility domain gives the actionable repair message, not a generic refresh', async () => {
+  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
+    decision: 'blocked',
+    code: 'eligibility_no_trusted_domains',
+    stage: 'eligibility',
+  });
+
+  const error = await promoteApplicantReviewer(args()).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body).toMatchObject({
+    code: 'eligibility_no_trusted_domains',
+    stage: 'eligibility',
+    message: expect.stringMatching(/No trusted institutional domain/i),
+    remediation: [
+      expect.objectContaining({ action: 'create_repair_request' }),
+      expect.objectContaining({ action: 'set_aside' }),
+    ],
+  });
+  expect(error.body.message).not.toMatch(/refresh this candidate/i);
+  expect(institutionCOIResolution).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
 test('a fully populated applicant roster row fails closed through the real policy without an authoritative snapshot', async () => {
   // Do not use the normal ready mock: the real policy must see the service
   // omitted `authoritative` and stop this otherwise-ready row before mutation.
@@ -285,6 +311,60 @@ test('trusted applicant institution screen: clean no-match allows promotion', as
     expect.any(Array),
     expect.any(Object),
   );
+  expect(selectIfUnengaged).toHaveBeenCalled();
+});
+
+test('trusted applicant institution screen: missing roster and canonical affiliations fails closed', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate());
+  institutionCOIResolution.mockResolvedValueOnce({
+    status: 'candidate_institution_missing',
+    decision: null,
+  });
+
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body).toMatchObject({
+    code: 'institution_coi_unavailable',
+    decisionSource: 'reviewer_institution_affiliation_unavailable',
+  });
+  expect(update).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('trusted applicant institution screen: canonical known-different affiliation permits promotion when roster affiliation is absent', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate());
+  getById.mockResolvedValueOnce({
+    wmkf_primaryaffiliation: 'Different University',
+    wmkf_emailaddress: 'existing@example.edu',
+    wmkf_emailsource: 'scholarly_multi',
+    _etag: 'W/"person"',
+  });
+  institutionCOIResolution.mockResolvedValueOnce({
+    status: 'candidate_institution_missing',
+    decision: null,
+  });
+
+  const body = await promoteApplicantReviewer(args());
+
+  expect(body.success).toBe(true);
+  expect(institutionCOIDecisionResolved).toHaveBeenCalledWith(
+    expect.objectContaining({ affiliation: 'Different University' }),
+    expect.any(Array),
+    expect.any(Object),
+  );
+  expect(selectIfUnengaged).toHaveBeenCalled();
+});
+
+test('trusted applicant institution screen: known roster non-match permits promotion without canonical affiliation', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate({ affiliation: 'Different University' }));
+  institutionCOIResolution.mockResolvedValueOnce({ status: 'lexical_non_match', decision: null });
+
+  const body = await promoteApplicantReviewer(args());
+
+  expect(body.success).toBe(true);
+  expect(institutionCOIDecisionResolved).not.toHaveBeenCalled();
   expect(selectIfUnengaged).toHaveBeenCalled();
 });
 

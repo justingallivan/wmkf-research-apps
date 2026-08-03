@@ -81,6 +81,18 @@ describe('institutionsMatchForCOI — institution ids first', () => {
 });
 
 describe('institution COI exemptions and campus separation', () => {
+  test('distinguishes missing candidate institution authority from a known lexical non-match', async () => {
+    await expect(DeduplicationService.institutionCOIResolution(
+      { name: 'No affiliation' },
+      ['Applicant University'],
+    )).resolves.toEqual({ status: 'candidate_institution_missing', decision: null });
+
+    await expect(DeduplicationService.institutionCOIResolution(
+      { name: 'Known different institution', affiliation: 'Different University' },
+      ['Applicant University'],
+    )).resolves.toEqual({ status: 'lexical_non_match', decision: null });
+  });
+
   test.each([
     ['Broad Institute', 'The Broad Institute'],
     ['HHMI', 'Howard Hughes Medical Institute'],
