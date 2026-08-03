@@ -60,6 +60,19 @@ test('reconciles a selected durable key through the existing stage primitive, th
   expect(listForRequest).not.toHaveBeenCalled();
 });
 
+test('treats an all-request pass with no active roster rows as a successful no-op', async () => {
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID });
+
+  expect(result).toEqual(expect.objectContaining({
+    outcome: 'current',
+    requestId: REQUEST_ID,
+    candidates: [],
+    counts: { current: 0 },
+  }));
+  expect(planReviewerCandidateRefresh).not.toHaveBeenCalled();
+  expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
+});
+
 test('does not report success when every candidate needs the dedicated address action', async () => {
   planReviewerCandidateRefresh.mockResolvedValueOnce(planned({
     pendingStages: ['address_trust'],
@@ -99,6 +112,26 @@ test('preserves a per-stage retryable failure and never falls through to a later
     })],
   });
   expect(refreshReviewerCandidateStage).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  [{ outcome: 'skipped_stale', stage: 'identity', reasonCode: 'roster_snapshot_changed' }],
+  [{ outcome: 'rejected', stage: 'identity', code: 'roster_snapshot_changed', reasonCode: 'roster_snapshot_changed' }],
+])('classifies roster snapshot/CAS drift as retryable rather than blocked', async (refreshResult) => {
+  planReviewerCandidateRefresh.mockResolvedValueOnce(planned({
+    pendingStages: ['identity'],
+    refreshes: [{ stage: 'identity', action: 'refresh_stage' }],
+  }));
+  refreshReviewerCandidateStage.mockResolvedValueOnce(refreshResult);
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
+
+  expect(result).toMatchObject({
+    outcome: 'failed_retryable',
+    counts: { [refreshResult.outcome]: 1 },
+    candidates: [expect.objectContaining({ outcome: refreshResult.outcome })],
+  });
+  expect(result.outcome).not.toBe('blocked');
 });
 
 test('uses only active server-listed candidate keys for an all-request pass and exposes exact continuation keys', async () => {

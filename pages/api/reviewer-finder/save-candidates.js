@@ -22,6 +22,11 @@ import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { saveCandidates } from '../../../lib/services/reviewer-finder/save-candidates-service';
 
+// A promotion preflight can spend its bounded reconciliation window before
+// the normal Dataverse writes. Keep the route below the same Fluid Compute cap
+// as the other long-running reviewer operations.
+export const config = { maxDuration: 800 };
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
