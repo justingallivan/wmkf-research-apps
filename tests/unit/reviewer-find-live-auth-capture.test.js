@@ -24,7 +24,9 @@ describe('Reviewer Find live auth capture and preflight safety', () => {
   });
 
   test('auth capture confines state to a private direct .auth JSON file before disk or browser use', () => {
-    expect(authCapture).toContain("const AUTH_STATE_DIRECTORY = path.resolve('.auth');");
+    expect(authCapture).toContain("const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');");
+    expect(authCapture).toContain("const AUTH_STATE_DIRECTORY = path.join(REPOSITORY_ROOT, '.auth');");
+    expect(authCapture).toContain("const requested = path.resolve(REPOSITORY_ROOT, value || '.auth/reviewer-invite-smoke.json');");
     expect(authCapture).toContain('const AUTH_STATE_DIRECTORY_MODE = 0o700;');
     expect(authCapture).toContain('const AUTH_STATE_FILE_MODE = 0o600;');
     expect(authCapture).toContain('const relative = path.relative(AUTH_STATE_DIRECTORY, requested);');

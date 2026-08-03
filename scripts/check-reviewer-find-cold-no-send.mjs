@@ -58,9 +58,29 @@ function relative(file) {
   return path.relative(root, file).split(path.sep).join('/');
 }
 
+function repositoryAliasTarget(specifier) {
+  if (typeof specifier !== 'string') return null;
+  // This repository has no jsconfig/tsconfig alias map. These two spellings
+  // are nevertheless unambiguously repository-root aliases, not npm package
+  // names, so resolve them directly and inspect the resulting local edge.
+  if (specifier.startsWith('@/')) return specifier.slice(2);
+  if (specifier.startsWith('~/')) return specifier.slice(2);
+  return null;
+}
+
+function isUnsupportedRepositoryAlias(specifier) {
+  // Node's package-import namespace is the only other common local alias
+  // shape. With no tracked map, fail closed rather than treating it as an npm
+  // package and silently omitting a local graph edge.
+  return typeof specifier === 'string' && specifier.startsWith('#');
+}
+
 function resolveLocal(fromFile, specifier) {
-  if (typeof specifier !== 'string' || !specifier.startsWith('.')) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier);
+  const aliasTarget = repositoryAliasTarget(specifier);
+  if (typeof specifier !== 'string' || (!specifier.startsWith('.') && aliasTarget === null)) return null;
+  const base = aliasTarget === null
+    ? path.resolve(path.dirname(fromFile), specifier)
+    : path.resolve(root, aliasTarget);
   const candidates = [
     base,
     ...LOCAL_MODULE_EXTENSIONS.map((extension) => `${base}${extension}`),
@@ -84,7 +104,11 @@ function parse(file) {
     destructured_call: '\nconst { sendEmail: transmit } = DynamicsService; transmit();\n',
     computed_call: "\nDynamicsService['sendEmail']();\n",
     forbidden_module: "\nimport '../../../lib/services/dynamics/email.js';\n",
+    aliased_forbidden_module: "\nimport '@/lib/services/dynamics/email.js';\n",
+    dynamic_forbidden_module: "\nasync function fixture() { return import('../../../lib/services/dynamics/email.js'); }\n",
     unresolvable_local_import: "\nimport '../../../lib/services/__cold-no-send-missing__.js';\n",
+    unresolvable_repository_alias: "\nimport '@/lib/services/__cold-no-send-missing__.js';\n",
+    unsupported_repository_alias: "\nimport '#cold-no-send-local';\n",
   };
   const injection = process.env.REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT;
   const source = fs.readFileSync(file, 'utf8')
@@ -185,10 +209,16 @@ while (queue.length > 0) {
     if (forbiddenCalls.has(call)) failures.push(`forbidden call ${call} reachable in ${rel}`);
   }
   for (const specifier of importSpecifiers(ast)) {
-    if (typeof specifier !== 'string' || !specifier.startsWith('.')) continue;
+    if (isUnsupportedRepositoryAlias(specifier)) {
+      failures.push(`unsupported repository alias import ${specifier} from ${rel}`);
+      continue;
+    }
+    const isRelative = typeof specifier === 'string' && specifier.startsWith('.');
+    const isRepositoryAlias = repositoryAliasTarget(specifier) !== null;
+    if (!isRelative && !isRepositoryAlias) continue;
     const resolved = resolveLocal(file, specifier);
     if (!resolved) {
-      failures.push(`unresolvable local import ${specifier} from ${rel}`);
+      failures.push(`unresolvable ${isRepositoryAlias ? 'repository alias' : 'local'} import ${specifier} from ${rel}`);
       continue;
     }
     if (!resolved.startsWith(root + path.sep)) {

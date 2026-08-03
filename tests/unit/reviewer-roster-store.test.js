@@ -988,15 +988,32 @@ describe('recordSurfaced', () => {
       identityEvidence: { decision: 'changed evidence' },
       stageFreshness: allCurrentUpstreams(),
       stageRefresh: { identity: { refreshAttemptId: 'browser-lease' } },
+      warmCacheVersion: 999,
+      proposalContentVersion: 'forged-proposal-version',
+      applicantInputVersion: 'forged-applicant-version',
+      staffIdentityConfirmation: { forged: true },
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'forged-confirmation',
+      addressTrustReceipt: { forged: true },
+      manualContactFields: ['email'],
     }]);
 
     const text = queryTextOf(0);
     const submitted = jsonInterpolations().find((value) => value?.identityEvidence?.decision === 'changed evidence');
     expect(submitted.stageFreshness).toBeUndefined();
     expect(submitted.stageRefresh).toBeUndefined();
+    expect(submitted.warmCacheVersion).toBeUndefined();
+    expect(submitted.proposalContentVersion).toBeUndefined();
+    expect(submitted.applicantInputVersion).toBeUndefined();
+    expect(submitted.staffIdentityConfirmation).toBeUndefined();
+    expect(submitted.pdIdentityConfirmed).toBeUndefined();
+    expect(submitted.pdIdentityConfirmationId).toBeUndefined();
+    expect(submitted.addressTrustReceipt).toBeUndefined();
+    expect(submitted.manualContactFields).toBeUndefined();
     expect(text).toMatch(/'stageFreshness', '\{\}'::jsonb/);
     expect(text).not.toMatch(/COALESCE\(reviewer_find_roster\.candidate->'stageFreshness'/);
     expect(text).toMatch(/'stageRefresh', reviewer_find_roster\.candidate->'stageRefresh'/);
+    expect(text).not.toMatch(/jsonb_strip_nulls/);
   });
 });
 
@@ -1113,7 +1130,7 @@ describe('recordSurfacedWithStageEvidence', () => {
     }]);
 
     expect(outcomes).toEqual([expect.objectContaining({
-      candidateKey: 'person:ann', outcome: 'partial', code: 'skipped_staff_authority',
+      candidateKey: 'person:ann', outcome: 'skipped_staff_authority', code: 'skipped_staff_authority',
       stageOutcomes: expect.objectContaining({ identity: 'current' }),
     })]);
     expect(sql.mock.calls.some((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('UPDATE reviewer_find_roster'))).toBe(false);

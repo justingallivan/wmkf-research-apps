@@ -29,6 +29,18 @@ for (const injection of ['send_call', 'aliased_call', 'destructured_call', 'comp
   }
 }
 
+for (const injection of ['forbidden_module', 'aliased_forbidden_module', 'dynamic_forbidden_module']) {
+  const injected = spawnSync(process.execPath, [checker], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT: injection },
+  });
+  if (injected.status === 0 || !injected.stderr.includes('forbidden module reachable')) {
+    console.error(`Cold no-send self-test failed: ${injection} was not rejected as a forbidden module.`);
+    process.exit(1);
+  }
+}
+
 const unresolvedLocalImport = spawnSync(process.execPath, [checker], {
   cwd: root,
   encoding: 'utf8',
@@ -40,13 +52,25 @@ if (unresolvedLocalImport.status === 0
   process.exit(1);
 }
 
-const forbiddenModule = spawnSync(process.execPath, [checker], {
+const unresolvedRepositoryAlias = spawnSync(process.execPath, [checker], {
   cwd: root,
   encoding: 'utf8',
-  env: { ...process.env, REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT: 'forbidden_module' },
+  env: { ...process.env, REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT: 'unresolvable_repository_alias' },
 });
-if (forbiddenModule.status === 0 || !forbiddenModule.stderr.includes('forbidden module reachable')) {
-  console.error('Cold no-send self-test failed: a forbidden module import was not rejected.');
+if (unresolvedRepositoryAlias.status === 0
+  || !unresolvedRepositoryAlias.stderr.includes('unresolvable repository alias import')) {
+  console.error('Cold no-send self-test failed: an unresolvable repository alias was not rejected.');
+  process.exit(1);
+}
+
+const unsupportedRepositoryAlias = spawnSync(process.execPath, [checker], {
+  cwd: root,
+  encoding: 'utf8',
+  env: { ...process.env, REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT: 'unsupported_repository_alias' },
+});
+if (unsupportedRepositoryAlias.status === 0
+  || !unsupportedRepositoryAlias.stderr.includes('unsupported repository alias import')) {
+  console.error('Cold no-send self-test failed: an unsupported repository alias was not rejected.');
   process.exit(1);
 }
 

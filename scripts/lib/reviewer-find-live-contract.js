@@ -18,7 +18,10 @@ const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/i;
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUID_IN_PATH_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const EMAIL_IN_PATH_RE = /[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const OPAQUE_PATH_SEGMENT_RE = /\/[A-Za-z0-9_-]{49,}(?=\/|$)/g;
+// Opaque API/browser tokens commonly use 32-char hex IDs or 43-char
+// base64url values. Treat every path segment at least that long as opaque:
+// preserving a potential user/file token is riskier than losing a route label.
+const OPAQUE_PATH_SEGMENT_RE = /\/[A-Za-z0-9_-]{32,}(?=\/|$)/g;
 const REASON_CODE_RE = /^[a-z][a-z0-9_]{0,79}$/;
 const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OBSERVATION_EFFECT_CLASSES = new Set([
@@ -98,6 +101,9 @@ function redactBrowserPath(url, baseUrl) {
     // The path alone is bounded and has no request/query values. Dynamic
     // Workbench GUIDs, email-like values, and long opaque identifiers are
     // normalized before becoming an artifact field.
+    // GUID/email replacement must precede opaque replacement: both patterns
+    // can occur inside a long dynamic segment, and their semantic labels are
+    // more useful than the generic opaque marker.
     return parsed.pathname
       .replace(GUID_IN_PATH_RE, ':requestId')
       .replace(EMAIL_IN_PATH_RE, ':email')

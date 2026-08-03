@@ -66,6 +66,18 @@ describe('Reviewer Find live runner contract', () => {
       `${baseUrl}/api/reviewer/person@example.org/${'a'.repeat(72)}`,
       baseUrl,
     )).toBe('/api/reviewer/:email/:opaque');
+    expect(redactBrowserPath(
+      `${baseUrl}/api/reviewer/${'a'.repeat(31)}`,
+      baseUrl,
+    )).toBe(`/api/reviewer/${'a'.repeat(31)}`);
+    expect(redactBrowserPath(
+      `${baseUrl}/api/reviewer/${'a'.repeat(32)}`,
+      baseUrl,
+    )).toBe('/api/reviewer/:opaque');
+    expect(redactBrowserPath(
+      `${baseUrl}/api/reviewer/${'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abc'.slice(0, 43)}`,
+      baseUrl,
+    )).toBe('/api/reviewer/:opaque');
     expect(redactBrowserPath(`${baseUrl}/api/reviewer/person%40example.org`, baseUrl))
       .toBe('/api/reviewer/:email');
     expect(isGuid('11111111-1111-1111-1111-111111111111')).toBe(true);

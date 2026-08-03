@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 import { createInterface } from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
+import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 
 function arg(name, def = null) {
@@ -43,12 +44,13 @@ const baseUrl = (arg('base-url', process.env.LIVE_REVIEWER_BASE_URL || '') || ''
 const requireReviewersAccess = hasFlag('require-reviewers-access');
 const READINESS_TIMEOUT_MS = 60_000;
 const READINESS_POLL_MS = 1_000;
-const AUTH_STATE_DIRECTORY = path.resolve('.auth');
+const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const AUTH_STATE_DIRECTORY = path.join(REPOSITORY_ROOT, '.auth');
 const AUTH_STATE_DIRECTORY_MODE = 0o700;
 const AUTH_STATE_FILE_MODE = 0o600;
 
 function resolveAuthStatePath(value) {
-  const requested = path.resolve(value || '.auth/reviewer-invite-smoke.json');
+  const requested = path.resolve(REPOSITORY_ROOT, value || '.auth/reviewer-invite-smoke.json');
   const relative = path.relative(AUTH_STATE_DIRECTORY, requested);
   if (
     !relative

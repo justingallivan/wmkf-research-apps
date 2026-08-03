@@ -284,17 +284,19 @@ test('mixed cold persistence outcomes distinguish partial writes and report ever
   const summary = summarizeRosterPersistenceResults([
     { outcome: 'recorded' },
     { outcome: 'partial' },
+    { outcome: 'skipped_staff_authority' },
     { outcome: 'refresh_in_progress' },
     { outcome: 'rejected' },
     { outcome: 'failed_retryable' },
-  ], 6);
+  ], 7);
 
   expect(summary).toEqual({
     recorded: 1,
     partial: 1,
-    skipped: 4,
+    skipped: 5,
     notRecordedByOutcome: {
       refresh_in_progress: 1,
+      skipped_staff_authority: 1,
       rejected: 1,
       failed_retryable: 1,
       unknown: 1,
@@ -302,6 +304,7 @@ test('mixed cold persistence outcomes distinguish partial writes and report ever
   });
   expect(rosterPersistenceWarningMessages(summary)).toEqual([
     expect.stringContaining('1 reviewer row(s) were only partially persisted'),
+    expect.stringContaining('1 reviewer row(s) were unchanged because staff-confirmed evidence is authoritative'),
     expect.stringMatching(/4 reviewer row\(s\) were not persisted.*failed_retryable: 1.*refresh_in_progress: 1.*rejected: 1.*unknown: 1/),
   ]);
 });
@@ -664,7 +667,7 @@ test('an enrichment write uses the pre-run roster token and leaves a concurrentl
   expect(events.at(-1).event).toBe('complete');
 });
 
-test('a partial cold persistence result emits a warning before the completion frame', async () => {
+test('a staff-authoritative cold persistence skip emits a non-retry warning before completion', async () => {
   findCandidateBySuggestion.mockResolvedValueOnce({
     candidateKey: `suggestion:${SUG}`,
     suggestionId: SUG,
@@ -674,8 +677,8 @@ test('a partial cold persistence result emits a warning before the completion fr
   });
   recordSurfacedWithStageEvidence.mockResolvedValueOnce([{
     candidateKey: `suggestion:${SUG}`,
-    outcome: 'partial',
-    code: 'staff_authority_preserved',
+    outcome: 'skipped_staff_authority',
+    code: 'skipped_staff_authority',
   }]);
 
   const { events, onEvent } = recorder();
@@ -684,7 +687,7 @@ test('a partial cold persistence result emits a warning before the completion fr
   expect(events).toContainEqual({
     event: 'progress',
     data: {
-      message: '1 reviewer row(s) were only partially persisted; newer staff-owned or canonical evidence was preserved. Reload reviewer status before relying on the saved evidence.',
+      message: '1 reviewer row(s) were unchanged because staff-confirmed evidence is authoritative. A staff-authoritative refresh is required; do not retry this cold result.',
     },
   });
   expect(events.at(-1).event).toBe('complete');
