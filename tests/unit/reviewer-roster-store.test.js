@@ -96,6 +96,10 @@ describe('stage refresh CAS', () => {
     expect(started.outcome).toBe('recorded');
     expect(queryTextOf(0)).toMatch(/updated_at::text/);
     expect(queryTextOf(0)).toMatch(/stageRefresh/);
+    // PostgreSQL's jsonb_build_object key is polymorphic. The tagged-template
+    // placeholder must be typed in SQL itself; otherwise production rejects
+    // the lease UPDATE with "could not determine data type of parameter".
+    expect(queryTextOf(0)).toMatch(/jsonb_build_object\(\s+::text,\s+::jsonb\)/);
     expect(queryTextOf(0)).toMatch(/status\s*=\s*'active'/);
     expect(allInterpolations()).toEqual(expect.arrayContaining(['candidate:ann', 'version-1']));
     expect(allInterpolations().some((value) => typeof value === 'string' && value.includes('attempt-1'))).toBe(true);
