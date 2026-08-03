@@ -149,6 +149,22 @@ const RESPONSE_ERROR_MESSAGES = Object.freeze({
   refresh_internal_error: 'The evidence refresh service did not complete. Reload reviewer status before trying again.',
 });
 const DEDICATED_STAFF_ACTION_STAGES = new Set(['address_trust']);
+// These are response-shape guards for the bounded server reconciliation route.
+// They do not confer any authority on the browser: the server accepts only the
+// request ID (or exact server-returned continuation keys) and re-reads every
+// roster row before running a stage.
+const RECONCILIATION_OUTCOMES = new Set([
+  'current', 'partial', 'action_required', 'blocked', 'budget_exhausted', 'failed_retryable',
+]);
+const RECONCILIATION_CANDIDATE_OUTCOMES = new Set([
+  'current', 'action_required', 'blocked', 'budget_exhausted', 'failed_retryable',
+  'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
+]);
+const RETRYABLE_RECONCILIATION_OUTCOMES = new Set([
+  'failed_retryable', 'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
+]);
+const RECONCILIATION_MAX_CANDIDATE_KEYS = 24;
+const RECONCILIATION_IDLE = Object.freeze({ status: 'idle', continuationCandidateKeys: [], message: null });
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
 
@@ -316,6 +332,73 @@ function responseHasExpectedStatus(response, outcome) {
 function errorResponseHasExpectedStatus(response, code) {
   if (!Number.isInteger(response?.status)) return true;
   return response.status === (code === 'refresh_internal_error' ? 500 : 400);
+}
+
+function reconciliationStatusMatches(response, outcome) {
+  // Browser Response always has a numeric status. Keeping this permissive for
+  // the small response doubles used by older component tests does not relax
+  // production handling.
+  if (!Number.isInteger(response?.status)) return true;
+  if (outcome === 'current' || outcome === 'partial') return response.status === 200;
+  if (['action_required', 'blocked', 'budget_exhausted'].includes(outcome)) return response.status === 409;
+  return response.status === 503;
+}
+
+function reconciliationSummaryText(candidates, continuationCandidateKeys) {
+  const summary = { current: 0, actionRequired: 0, blocked: 0, retryable: 0, budgetExhausted: 0 };
+  for (const candidate of candidates) {
+    if (candidate.outcome === 'current') summary.current += 1;
+    else if (candidate.outcome === 'action_required') summary.actionRequired += 1;
+    else if (candidate.outcome === 'blocked') summary.blocked += 1;
+    else if (candidate.outcome === 'budget_exhausted') summary.budgetExhausted += 1;
+    else if (RETRYABLE_RECONCILIATION_OUTCOMES.has(candidate.outcome)) summary.retryable += 1;
+  }
+  return [
+    `${summary.current} current`,
+    `${summary.actionRequired} need staff action`,
+    `${summary.blocked} blocked by safeguards`,
+    `${summary.retryable} need retrying`,
+    `${summary.budgetExhausted} paused at the work limit`,
+    `${continuationCandidateKeys.length} remaining`,
+  ].join(' · ');
+}
+
+// Only accept the endpoint's compact, server-owned result shape. In
+// particular, do not render a malformed continuation key or infer an outcome
+// from a transport status alone.
+export function validReviewerReconciliationResponse(data, requestId) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)
+    || !RECONCILIATION_OUTCOMES.has(data.outcome)
+    || typeof data.success !== 'boolean'
+    || data.success !== ['current', 'partial'].includes(data.outcome)
+    || !Array.isArray(data.candidates)) return null;
+
+  const globalRetry = data.outcome === 'failed_retryable' && data.requestId === undefined && data.candidates.length === 0;
+  if (!globalRetry && data.requestId !== requestId) return null;
+  if (!data.candidates.every((candidate) => (
+    candidate && typeof candidate === 'object'
+      && canonicalCandidateKey(candidate.candidateKey) === candidate.candidateKey
+      && RECONCILIATION_CANDIDATE_OUTCOMES.has(candidate.outcome)
+  ))) return null;
+  const candidateKeys = data.candidates.map((candidate) => candidate.candidateKey);
+  if (new Set(candidateKeys).size !== candidateKeys.length) return null;
+  if (globalRetry) {
+    return { outcome: data.outcome, candidates: [], continuationCandidateKeys: [] };
+  }
+  const continuationCandidateKeys = data.continuationCandidateKeys === undefined
+    ? []
+    : data.continuationCandidateKeys;
+  if (!Array.isArray(continuationCandidateKeys)
+    || continuationCandidateKeys.length > RECONCILIATION_MAX_CANDIDATE_KEYS
+    || !continuationCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
+    || new Set(continuationCandidateKeys).size !== continuationCandidateKeys.length) return null;
+  if ((data.outcome === 'current' && continuationCandidateKeys.length !== 0)
+    || (data.outcome !== 'current' && continuationCandidateKeys.length === 0)) return null;
+  return {
+    outcome: data.outcome,
+    candidates: data.candidates,
+    continuationCandidateKeys,
+  };
 }
 
 // The warm plan is server-derived display data. A duplicate or malformed key is
@@ -1278,7 +1361,8 @@ export default function ReviewerSearchSection({
     || knownLookupFailed.length > 0
     || slotsPopulated !== null;
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
-  const busy = phase === 'running' || phase === 'saving';
+  const [reconciliationState, setReconciliationState] = useState(RECONCILIATION_IDLE);
+  const busy = phase === 'running' || phase === 'saving' || reconciliationState.status === 'running';
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
@@ -1387,6 +1471,9 @@ export default function ReviewerSearchSection({
   const excludeEditedRef = useRef(false);
   const stageRefreshesRef = useRef(new Map());
   const stageRefreshScopeRef = useRef({ scope: null, generation: 0 });
+  const reconciliationRef = useRef(null);
+  const reconciliationStatusRef = useRef('idle');
+  reconciliationStatusRef.current = reconciliationState.status;
   if (stageRefreshScopeRef.current.scope !== stageRefreshScope) {
     stageRefreshScopeRef.current = {
       scope: stageRefreshScope,
@@ -1435,6 +1522,82 @@ export default function ReviewerSearchSection({
     }
     void reloadRoster(expectedGeneration);
   }, [onRetryRoster, reloadRoster]);
+
+  const reconcilePreviouslyFoundReviewers = useCallback(async () => {
+    if (!requestId || displayOnly || !canManage || !rosterLoaded || busy || removingPrevious) return;
+    if (reconciliationRef.current) return;
+    const expectedGeneration = genRef.current;
+    const expectedStageRefreshGeneration = stageRefreshGeneration;
+    const continuationCandidateKeys = reconciliationState.continuationCandidateKeys;
+    const controller = new AbortController();
+    reconciliationRef.current = controller;
+    const isCurrentAttempt = () => (
+      !controller.signal.aborted
+      && reconciliationRef.current === controller
+      && genRef.current === expectedGeneration
+      && stageRefreshScopeRef.current.generation === expectedStageRefreshGeneration
+    );
+    if (!isCurrentAttempt()) return;
+    setReconciliationState({
+      status: 'running',
+      continuationCandidateKeys,
+      message: 'Reconciling previously found reviewers. This checks stored evidence only; it does not search for new reviewers, send invitations, or change selections.',
+    });
+    try {
+      const body = continuationCandidateKeys.length > 0
+        ? { requestId, candidateKeys: continuationCandidateKeys }
+        : { requestId };
+      const response = await fetch('/api/workbench/reviewer-reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const data = await response.json().catch(() => null);
+      if (!isCurrentAttempt()) return;
+      const result = validReviewerReconciliationResponse(data, requestId);
+      if (!result || !reconciliationStatusMatches(response, result.outcome)) {
+        setReconciliationState({
+          status: 'error',
+          continuationCandidateKeys: [],
+          message: 'The reviewer reconciliation response was not recognized. Reload reviewer status before trying again; existing safeguards remain in effect.',
+        });
+        return;
+      }
+      setReconciliationState({
+        status: 'complete',
+        continuationCandidateKeys: result.continuationCandidateKeys,
+        message: result.outcome === 'failed_retryable' && result.candidates.length === 0
+          ? 'Reviewer reconciliation is temporarily unavailable. Retry later; no reviewer selection or promotion was changed.'
+          : `Reviewer reconciliation finished: ${reconciliationSummaryText(result.candidates, result.continuationCandidateKeys)}.`,
+      });
+      // The endpoint may have persisted a subset before returning an action,
+      // budget, or retryable outcome. Always ask the existing owner to reload;
+      // only this response summary is rendered locally.
+      if (onRetryRoster) onRetryRoster();
+      else await reloadRoster(expectedGeneration);
+    } catch {
+      if (!isCurrentAttempt()) return;
+      setReconciliationState({
+        status: 'error',
+        continuationCandidateKeys: [],
+        message: 'Reviewer reconciliation could not be completed. Reload reviewer status before trying again; existing safeguards remain in effect.',
+      });
+    } finally {
+      if (reconciliationRef.current === controller) reconciliationRef.current = null;
+    }
+  }, [
+    requestId,
+    displayOnly,
+    canManage,
+    rosterLoaded,
+    busy,
+    removingPrevious,
+    reconciliationState.continuationCandidateKeys,
+    stageRefreshGeneration,
+    onRetryRoster,
+    reloadRoster,
+  ]);
 
   const refreshReviewerStage = useCallback(async (candidate) => {
     const target = reviewerStageRefreshTarget(
@@ -1649,9 +1812,26 @@ export default function ReviewerSearchSection({
     setStageRefreshStates({});
   }, [requestId, blobUrl, parentOwnsRoster, stageRefreshSnapshotVersion]);
 
+  useEffect(() => {
+    reconciliationRef.current?.abort();
+    reconciliationRef.current = null;
+    setReconciliationState(RECONCILIATION_IDLE);
+  }, [requestId, blobUrl, parentOwnsRoster]);
+
+  // A new parent-owned roster version supersedes an in-flight batch, but it
+  // must not erase the completed summary from this batch's own reload.
+  useEffect(() => {
+    if (reconciliationStatusRef.current !== 'running') return;
+    reconciliationRef.current?.abort();
+    reconciliationRef.current = null;
+    setReconciliationState(RECONCILIATION_IDLE);
+  }, [stageRefreshSnapshotVersion]);
+
   useEffect(() => () => {
     for (const controller of stageRefreshesRef.current.values()) controller.abort();
     stageRefreshesRef.current.clear();
+    reconciliationRef.current?.abort();
+    reconciliationRef.current = null;
   }, []);
 
   // The parent owns warm cached→reconciled bootstrap for the Workbench panel.
@@ -1767,7 +1947,7 @@ export default function ReviewerSearchSection({
     // Search is an explicit cold action. Its results remain ephemeral until the
     // separately reviewed Promote flow accepts a current server plan for each
     // selected candidate.
-    if (!blobUrl || !applicantInputsReady || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    if (!blobUrl || !applicantInputsReady || runningRef.current || busy || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
     // Exclude set = the manual/applicant box + everything already surfaced for
@@ -2011,7 +2191,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, applicantInputsReady, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
+  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, applicantInputsReady, busy, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -3429,16 +3609,45 @@ export default function ReviewerSearchSection({
                     {previousSearchKeys.size} candidate{previousSearchKeys.size === 1 ? '' : 's'} below {previousSearchKeys.size === 1 ? 'was' : 'were'} restored from an earlier search.
                   </span>
                   {canManage && (
-                    <button
-                      type="button"
-                      onClick={removePreviousResults}
-                      disabled={displayOnly || removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
-                      title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
-                      className="shrink-0 text-xs font-medium underline disabled:opacity-50"
-                    >
-                      {removingPrevious ? 'Removing…' : 'Remove previous results'}
-                    </button>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={reconcilePreviouslyFoundReviewers}
+                        disabled={displayOnly || busy || !rosterLoaded}
+                        className="text-xs font-medium underline disabled:opacity-50"
+                      >
+                        {reconciliationState.status === 'running'
+                          ? 'Reconciling…'
+                          : reconciliationState.continuationCandidateKeys.length > 0
+                            ? 'Continue reconciliation'
+                            : 'Reconcile previously found reviewers'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removePreviousResults}
+                        disabled={displayOnly || removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
+                        title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
+                        className="text-xs font-medium underline disabled:opacity-50"
+                      >
+                        {removingPrevious ? 'Removing…' : 'Remove previous results'}
+                      </button>
+                    </div>
                   )}
+                </div>
+              )}
+              {reconciliationState.status !== 'idle' && (
+                <div
+                  role="status"
+                  className={`p-3 rounded-lg text-sm ${
+                    reconciliationState.status === 'error'
+                      ? 'bg-amber-50 text-amber-800'
+                      : reconciliationState.status === 'running'
+                        ? 'bg-blue-50 text-blue-800'
+                        : 'bg-slate-50 text-slate-800'
+                  }`}
+                >
+                  {reconciliationState.status === 'running' && <span className="mr-2 inline-block align-middle"><Spinner /></span>}
+                  <span>{reconciliationState.message}</span>
                 </div>
               )}
               {excludedRemoved > 0 && (
