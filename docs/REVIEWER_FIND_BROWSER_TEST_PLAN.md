@@ -27,8 +27,11 @@ related:
 > On 2026-08-02 the owner designated request `1002914` as the Reviewer Find
 > no-send fixture. A production read-only audit found a current fallback proposal,
 > five unengaged applicant recommendations/slots, and no Postgres Find roster.
-> It therefore needs one explicit no-send cold search before Layer C can exercise
-> warm revisits. The temporary
+> The branch now includes a fixed-fixture Preview preflight, a no-send
+> route-graph gate, and exact read-only authority/activity snapshot contracts.
+> The Production cold execution remains deliberately locked pending fresh
+> approval after its exact durable effects are presented. Layer C can exercise
+> warm revisits only after that guarded preparation succeeds. The temporary
 > Azure callback, branch-only production-read override, and local auth state
 > were removed after the test. Layer D sandbox fixtures and mutation rehearsal
 > remain planned and unbuilt.
@@ -430,12 +433,53 @@ therefore a preflight failure, not a browser-product failure.
   commit/deployment, target classification, milestones, call counts, and
   pass/fail reasons—not reviewer PII or auth state.
 
+### 6.4 One-time cold fixture preparation for request 1002914
+
+This is a controlled preparation design for the dedicated no-send fixture, not
+Layer C read-only evidence and not a reusable production-mutation harness.
+Preview/local writes to production Dataverse are denied by the target interlock,
+so Preview can run only the read-only preflight. The eventual cold producer must
+run against an exact, attested Production deployment after a fresh approval of
+the named durable effects. It has no request-number, file-picker, promotion,
+invitation, or email option.
+
+The runner and its independent checks are:
+
+- `npm run check:reviewer-find-cold-no-send` walks the repository-relative
+  import/call graph reachable from the five allowed cold POST routes plus the
+  page's idempotent applicant-ingestion GET and fails if an email, invitation,
+  or token-send call becomes reachable;
+- `npm run smoke:reviewer-find:cold:preflight -- --base-url <alias>
+  --deployment-id <id> --commit <sha>` verifies the immutable deployment,
+  normal staff auth, production-target/interlock attestation, exact request,
+  five unengaged applicant suggestions, zero lifecycle activity, and an empty
+  Postgres Find roster;
+- the not-yet-enabled Production action is specified to prepare only the
+  priority-resolved standard proposal (no manual file override), explicitly
+  verify the five applicant suggestions, and run one display-only general
+  search; and
+- its browser fence allows only `load-proposal`, `enrich-recommended`,
+  `analyze`, `discover`, and `enrich-contacts` POSTs with the resolved fixture
+  GUID. It aborts every other mutation. Postflight requires a non-empty
+  authoritative roster anchored to the same five suggestion IDs while the full
+  suggestion lifecycle/token snapshot remains byte-stable and no request-linked
+  Dynamics email activity is created or changed during the bounded run window.
+
+The applicant verification will be the durable cold producer in the current
+display-only rollout. General discovered candidates remain ephemeral by design;
+the run exercises their expensive path but must not POST the roster or promote
+any card. A partial producer result, unexpected browser request, missing roster,
+or lifecycle/activity drift is a failed preparation. Authority details remain
+process-local; the artifact contains only counts and SHA-256 digests. It is
+written under the gitignored
+`.artifacts/reviewer-find-cold-live/` directory.
+
 Use only request `1002914` in Layer C. Request `1002794` is a real request with
 named reviewers and is out of scope for live artifacts. Request-switch race
 coverage remains deterministic in Layer A until a second true dummy request is
 explicitly designated.
 
-### 6.4 Fixture ownership
+### 6.5 Fixture ownership
 
 The `1002914` warm roster, once created, is owned by the Reviewer Find smoke.
 [VERIFIED 2026-08-02 via production read-only audit] It currently has no
