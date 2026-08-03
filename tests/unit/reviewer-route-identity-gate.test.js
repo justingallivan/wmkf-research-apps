@@ -114,6 +114,10 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
     ...(token && candidate?.candidateKey ? { rosterCandidateKey: candidate.candidateKey } : {}),
   })),
 }));
+const reconcileReviewerStages = jest.fn();
+jest.mock('../../lib/services/workbench/reviewer-stage-reconciliation-service', () => ({
+  reconcileReviewerStages: (...args) => reconcileReviewerStages(...args),
+}));
 const mockGetCandidatePromotionAuthority = jest.fn();
 jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
   ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
@@ -242,10 +246,14 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     jest.clearAllMocks();
     testRosterEmails.clear();
     mockRosterCandidates.clear();
+    // clearAllMocks intentionally preserves queued mockResolvedValueOnce()
+    // implementations. Reset this write adapter so a failed predecessor
+    // cannot lend its queued suggestion id to the next test.
+    reviewerSuggestionAdapter.upsert.mockReset().mockResolvedValue({ id: 'S1' });
+    reconcileReviewerStages.mockResolvedValue({ outcome: 'current', candidates: [] });
     mockGetCandidatePromotionAuthority.mockReturnValue({
       decision: 'ready', code: null, stage: null, reason: null,
     });
-    reviewerSuggestionAdapter.upsert.mockResolvedValue({ id: 'S1' });
     contactAdapter.getInstitutionById.mockResolvedValue(null);
     accountAdapter.getById.mockResolvedValue(null);
     lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
@@ -358,7 +366,7 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
         requestId: 'REQ-1',
         candidates: [{
           name: 'Dr. Anchor Row',
-          candidateKey: 'candidate:anchor-row',
+          candidateKey: 'person:anchor-row',
           automatedIdentityAttestation: 'signed-anchor-row',
           contactEnrichment: enrichmentFor({ status: 'probable' }),
         }],
@@ -371,11 +379,15 @@ describe('save-candidates route — identity gate + clear-on-downgrade', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
+    expect(reconcileReviewerStages).toHaveBeenCalledWith({
+      requestId: 'REQ-1',
+      candidateKeys: ['person:anchor-row'],
+    });
     expect(rosterStore.finalizeCandidatePromotion).toHaveBeenCalledWith(
       'REQ-1',
       expect.objectContaining({ name: 'Dr. Anchor Row' }),
       {
-        candidateKey: 'candidate:anchor-row',
+        candidateKey: 'person:anchor-row',
         suggestionId: 'SUG-ANCHOR',
         potentialReviewerId: 'PID-ANCHOR',
         expectedUpdatedAt: '2026-08-02 00:00:00+00',
