@@ -62,6 +62,12 @@ describe('Reviewer Find live runner contract', () => {
       `${baseUrl}/workbench/11111111-1111-1111-1111-111111111111?email=person@example.org`,
       baseUrl,
     )).toBe('/workbench/:requestId');
+    expect(redactBrowserPath(
+      `${baseUrl}/api/reviewer/person@example.org/${'a'.repeat(72)}`,
+      baseUrl,
+    )).toBe('/api/reviewer/:email/:opaque');
+    expect(redactBrowserPath(`${baseUrl}/api/reviewer/person%40example.org`, baseUrl))
+      .toBe('/api/reviewer/:email');
     expect(isGuid('11111111-1111-1111-1111-111111111111')).toBe(true);
     expect(isGuid('11111111-1111-1111-111111111111'.replace('-1111-', '-'))).toBe(false);
   });
@@ -99,7 +105,7 @@ describe('Reviewer Find live runner contract', () => {
     const good = deploymentSummary({
       readyState: 'READY',
       url: 'preview-example.vercel.app',
-      target: null,
+      target: 'preview',
       meta: { githubCommitSha: COMMIT },
     }, {
       baseUrl: 'https://preview-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'preview',
@@ -107,7 +113,7 @@ describe('Reviewer Find live runner contract', () => {
     expect(good).toMatchObject({ ready: true, target: 'preview', actualCommit: COMMIT });
 
     const mismatch = deploymentSummary({
-      readyState: 'READY', url: 'another-preview.vercel.app', target: null, meta: { githubCommitSha: COMMIT },
+      readyState: 'READY', url: 'another-preview.vercel.app', target: 'preview', meta: { githubCommitSha: COMMIT },
     }, {
       baseUrl: 'https://preview-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'preview',
     });
@@ -118,7 +124,7 @@ describe('Reviewer Find live runner contract', () => {
       readyState: 'READY',
       url: 'immutable-preview.vercel.app',
       aliases: ['reviewer-find-smoke.example.org'],
-      target: null,
+      target: 'preview',
       meta: { githubCommitSha: COMMIT },
     }, {
       baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
@@ -129,7 +135,7 @@ describe('Reviewer Find live runner contract', () => {
       readyState: 'READY',
       url: 'immutable-preview.vercel.app',
       aliases: [],
-      target: null,
+      target: 'preview',
       meta: { githubCommitSha: COMMIT },
     }, {
       baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
@@ -141,12 +147,34 @@ describe('Reviewer Find live runner contract', () => {
       readyState: 'READY',
       url: 'other-immutable-preview.vercel.app',
       aliases: ['another-stable-host.example.org'],
-      target: null,
+      target: 'preview',
       meta: { githubCommitSha: COMMIT },
     }, {
       baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
     });
     expect(aliasMovedAfterBrowser).toMatchObject({ ready: false, baseHostMatch: null });
+
+    for (const target of [null, 'staging', 'development']) {
+      const unknownTarget = deploymentSummary({
+        readyState: 'READY', url: 'preview-example.vercel.app', target, meta: { githubCommitSha: COMMIT },
+      }, {
+        baseUrl: 'https://preview-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'preview',
+      });
+      expect(unknownTarget).toMatchObject({ ready: false, target: null });
+      expect(unknownTarget.reasons).toContain('deployment_target_unknown');
+    }
+
+    const production = deploymentSummary({
+      readyState: 'READY', url: 'production-example.vercel.app', target: 'production', meta: { githubCommitSha: COMMIT },
+    }, {
+      baseUrl: 'https://production-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'production',
+    });
+    expect(production).toMatchObject({ ready: true, target: 'production' });
+    expect(deploymentSummary({
+      readyState: 'READY', url: 'production-example.vercel.app', target: 'preview', meta: { githubCommitSha: COMMIT },
+    }, {
+      baseUrl: 'https://production-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'production',
+    })).toMatchObject({ ready: false, target: 'preview' });
   });
 
   test('joins omitted inspect git metadata only from one exact immutable hostname', () => {

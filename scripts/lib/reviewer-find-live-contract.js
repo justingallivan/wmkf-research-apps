@@ -17,6 +17,8 @@ const COMMIT_RE = /^[a-f0-9]{7,64}$/i;
 const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/i;
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUID_IN_PATH_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const EMAIL_IN_PATH_RE = /[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const OPAQUE_PATH_SEGMENT_RE = /\/[A-Za-z0-9_-]{49,}(?=\/|$)/g;
 const REASON_CODE_RE = /^[a-z][a-z0-9_]{0,79}$/;
 const ALLOWED_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const OBSERVATION_EFFECT_CLASSES = new Set([
@@ -94,8 +96,13 @@ function redactBrowserPath(url, baseUrl) {
     const parsed = new URL(url);
     if (parsed.origin !== new URL(baseUrl).origin) return 'external';
     // The path alone is bounded and has no request/query values. Dynamic
-    // Workbench GUIDs are normalized before becoming an artifact field.
-    return parsed.pathname.replace(GUID_IN_PATH_RE, ':requestId').slice(0, 160);
+    // Workbench GUIDs, email-like values, and long opaque identifiers are
+    // normalized before becoming an artifact field.
+    return parsed.pathname
+      .replace(GUID_IN_PATH_RE, ':requestId')
+      .replace(EMAIL_IN_PATH_RE, ':email')
+      .replace(OPAQUE_PATH_SEGMENT_RE, '/:opaque')
+      .slice(0, 160);
   } catch {
     return 'invalid';
   }
@@ -192,10 +199,12 @@ function deploymentSummary(deployment, { baseUrl, expectedCommit, deploymentClas
       : null;
   const meta = deployment?.meta && typeof deployment.meta === 'object' ? deployment.meta : {};
   const actualCommit = meta.githubCommitSha || meta.gitCommitSha || deployment?.gitSource?.sha || null;
-  const target = deployment?.target || null;
-  const classMatches = deploymentClass === 'production'
-    ? target === 'production'
-    : target !== 'production';
+  const target = deployment?.target === 'production'
+    ? 'production'
+    : deployment?.target === 'preview'
+      ? 'preview'
+      : null;
+  const classMatches = target !== null && target === deploymentClass;
   return {
     ready: deployment?.readyState === 'READY'
       && baseHostMatch !== null
@@ -205,13 +214,14 @@ function deploymentSummary(deployment, { baseUrl, expectedCommit, deploymentClas
     deploymentHost: immutableDeploymentHost,
     baseHostMatch,
     actualCommit: COMMIT_RE.test(String(actualCommit || '')) ? actualCommit : null,
-    target: target === 'production' ? 'production' : 'preview',
+    target,
     reasons: [
       deployment?.readyState === 'READY' ? null : 'deployment_not_ready',
       baseHostMatch !== null ? null : 'deployment_base_host_unlisted',
       typeof actualCommit === 'string' && actualCommit.toLowerCase() === String(expectedCommit).toLowerCase()
         ? null
         : 'deployment_commit_mismatch',
+      target !== null ? null : 'deployment_target_unknown',
       classMatches ? null : 'deployment_class_mismatch',
     ].filter(Boolean),
   };

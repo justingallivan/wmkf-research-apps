@@ -29,6 +29,17 @@ for (const injection of ['send_call', 'aliased_call', 'destructured_call', 'comp
   }
 }
 
+const unresolvedLocalImport = spawnSync(process.execPath, [checker], {
+  cwd: root,
+  encoding: 'utf8',
+  env: { ...process.env, REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT: 'unresolvable_local_import' },
+});
+if (unresolvedLocalImport.status === 0
+  || !unresolvedLocalImport.stderr.includes('unresolvable local import')) {
+  console.error('Cold no-send self-test failed: an unresolvable local import was not rejected.');
+  process.exit(1);
+}
+
 const forbiddenModule = spawnSync(process.execPath, [checker], {
   cwd: root,
   encoding: 'utf8',

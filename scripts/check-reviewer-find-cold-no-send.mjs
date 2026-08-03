@@ -49,6 +49,10 @@ const traversalBoundaries = new Set([
   // facade into every implementation module and manufacture a false edge.
   'lib/services/dynamics-service.js',
 ]);
+// Keep this list aligned with the local module forms Next/Node can resolve in
+// this repository. A relative import that names none of these forms must be
+// rejected rather than silently omitted from the cold-route graph.
+const LOCAL_MODULE_EXTENSIONS = ['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.mts', '.cts', '.json'];
 
 function relative(file) {
   return path.relative(root, file).split(path.sep).join('/');
@@ -57,13 +61,22 @@ function relative(file) {
 function resolveLocal(fromFile, specifier) {
   if (typeof specifier !== 'string' || !specifier.startsWith('.')) return null;
   const base = path.resolve(path.dirname(fromFile), specifier);
-  for (const candidate of [base, `${base}.js`, `${base}.mjs`, path.join(base, 'index.js')]) {
+  const candidates = [
+    base,
+    ...LOCAL_MODULE_EXTENSIONS.map((extension) => `${base}${extension}`),
+    ...LOCAL_MODULE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
+  ];
+  for (const candidate of candidates) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   return null;
 }
 
 function parse(file) {
+  // JSON has no executable import/call graph. It still goes through
+  // resolveLocal(), so a missing JSON dependency fails closed, but a resolved
+  // configuration leaf requires no Babel parse.
+  if (path.extname(file) === '.json') return null;
   const rel = relative(file);
   const injections = {
     send_call: '\nsendEmail();\n',
@@ -71,13 +84,14 @@ function parse(file) {
     destructured_call: '\nconst { sendEmail: transmit } = DynamicsService; transmit();\n',
     computed_call: "\nDynamicsService['sendEmail']();\n",
     forbidden_module: "\nimport '../../../lib/services/dynamics/email.js';\n",
+    unresolvable_local_import: "\nimport '../../../lib/services/__cold-no-send-missing__.js';\n",
   };
   const injection = process.env.REVIEWER_FIND_COLD_NO_SEND_TEST_INJECT;
   const source = fs.readFileSync(file, 'utf8')
     + (rel === routeEntries[0] ? (injections[injection] || '') : '');
   return parser.parse(source, {
     sourceType: 'unambiguous',
-    plugins: ['dynamicImport', 'importMeta', 'jsx', 'optionalChaining'],
+    plugins: ['dynamicImport', 'importMeta', 'jsx', 'optionalChaining', 'typescript'],
   });
 }
 
@@ -166,12 +180,22 @@ while (queue.length > 0) {
     failures.push(`could not parse ${rel}: ${error.message}`);
     continue;
   }
+  if (!ast) continue;
   for (const call of calledNames(ast)) {
     if (forbiddenCalls.has(call)) failures.push(`forbidden call ${call} reachable in ${rel}`);
   }
   for (const specifier of importSpecifiers(ast)) {
+    if (typeof specifier !== 'string' || !specifier.startsWith('.')) continue;
     const resolved = resolveLocal(file, specifier);
-    if (resolved && resolved.startsWith(root + path.sep)) queue.push(resolved);
+    if (!resolved) {
+      failures.push(`unresolvable local import ${specifier} from ${rel}`);
+      continue;
+    }
+    if (!resolved.startsWith(root + path.sep)) {
+      failures.push(`local import escapes repository ${specifier} from ${rel}`);
+      continue;
+    }
+    queue.push(resolved);
   }
 }
 

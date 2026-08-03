@@ -40,17 +40,59 @@ if (process.env.EMERGENCY_AUTH_BYPASS === 'true') {
 }
 
 const baseUrl = (arg('base-url', process.env.LIVE_REVIEWER_BASE_URL || '') || '').replace(/\/$/, '');
-const statePath = arg('state', process.env.PLAYWRIGHT_AUTH_STATE || '.auth/reviewer-invite-smoke.json');
 const requireReviewersAccess = hasFlag('require-reviewers-access');
 const READINESS_TIMEOUT_MS = 60_000;
 const READINESS_POLL_MS = 1_000;
+const AUTH_STATE_DIRECTORY = path.resolve('.auth');
+const AUTH_STATE_DIRECTORY_MODE = 0o700;
+const AUTH_STATE_FILE_MODE = 0o600;
+
+function resolveAuthStatePath(value) {
+  const requested = path.resolve(value || '.auth/reviewer-invite-smoke.json');
+  const relative = path.relative(AUTH_STATE_DIRECTORY, requested);
+  if (
+    !relative
+    || path.dirname(relative) !== '.'
+    || relative.startsWith(`..${path.sep}`)
+    || path.isAbsolute(relative)
+    || path.extname(relative).toLowerCase() !== '.json'
+  ) {
+    throw new Error('Auth state path must be a JSON file directly under .auth/.');
+  }
+  return requested;
+}
+
+function ensureAuthStateTarget(statePath) {
+  fs.mkdirSync(AUTH_STATE_DIRECTORY, {
+    recursive: true,
+    mode: AUTH_STATE_DIRECTORY_MODE,
+  });
+  const directory = fs.lstatSync(AUTH_STATE_DIRECTORY);
+  if (!directory.isDirectory() || directory.isSymbolicLink()) {
+    throw new Error('Auth state directory must be a real local .auth/ directory.');
+  }
+  fs.chmodSync(AUTH_STATE_DIRECTORY, AUTH_STATE_DIRECTORY_MODE);
+
+  try {
+    const existing = fs.lstatSync(statePath);
+    if (!existing.isFile() || existing.isSymbolicLink()) {
+      throw new Error('Auth state path must be a regular local file.');
+    }
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+const statePath = resolveAuthStatePath(
+  arg('state', process.env.PLAYWRIGHT_AUTH_STATE || '.auth/reviewer-invite-smoke.json'),
+);
 
 if (!baseUrl) {
   console.error('Missing --base-url. Example: --base-url https://wmkfresearch.vercel.app');
   process.exit(1);
 }
 
-fs.mkdirSync(path.dirname(statePath), { recursive: true });
+ensureAuthStateTarget(statePath);
 
 async function readAuthReadiness(page) {
   return page.evaluate(async ({ needsReviewersAccess }) => {
@@ -115,6 +157,7 @@ if (!ready) {
 }
 
 await context.storageState({ path: statePath });
+fs.chmodSync(statePath, AUTH_STATE_FILE_MODE);
 await browser.close();
 
 console.log(`Saved Playwright auth state to ${statePath}`);
