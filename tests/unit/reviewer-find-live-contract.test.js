@@ -80,12 +80,18 @@ describe('Reviewer Find live runner contract', () => {
     });
     expect(summarizeWarmValidation({
       state: 'current',
-      binding: 'fallback',
+      proposalBinding: 'fallback',
       proposalContentVersion: ROSTER_VERSION,
       reasonCode: null,
-      bindingKey: 'akoya_request::private folder::Phase I/ProjectDescription.pdf',
     })).toEqual({
       state: 'current', reasonCode: null, binding: 'fallback', hasVersionedMetadata: true,
+    });
+    expect(summarizeWarmValidation({
+      state: 'current',
+      proposalBinding: 'not-an-authoritative-binding',
+      proposalContentVersion: ROSTER_VERSION,
+    })).toEqual({
+      state: 'current', reasonCode: null, binding: null, hasVersionedMetadata: true,
     });
   });
 

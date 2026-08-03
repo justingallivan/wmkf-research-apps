@@ -120,11 +120,15 @@ function summarizeWarmValidation(warmValidation) {
   const state = ['current', 'stale', 'error'].includes(warmValidation?.state)
     ? warmValidation.state
     : 'unclassified';
-  const binding = ['canonical', 'fallback'].includes(warmValidation?.proposal?.binding)
-    ? warmValidation.proposal.binding
-    : ['canonical', 'fallback'].includes(warmValidation?.binding)
-      ? warmValidation.binding
-      : null;
+  // The roster endpoint projects its bounded server attestation as
+  // `proposalBinding`; retain the two older shapes only for runner fixture
+  // compatibility. Every shape remains constrained to the same two bindings.
+  const bindingValue = warmValidation?.proposalBinding
+    ?? warmValidation?.proposal?.binding
+    ?? warmValidation?.binding;
+  const binding = ['canonical', 'fallback'].includes(bindingValue)
+    ? bindingValue
+    : null;
   const contentVersion = warmValidation?.proposalContentVersion;
   return {
     state,
