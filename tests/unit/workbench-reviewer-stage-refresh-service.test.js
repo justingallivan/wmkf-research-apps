@@ -529,6 +529,24 @@ test('recovers an expired matching lease as its own explicit action before any r
   expect(completeStageRefreshWithEvidence).not.toHaveBeenCalled();
 });
 
+test('a store failure while clearing an expired lease fails closed without throwing or starting a new stage', async () => {
+  findCandidateByKey.mockResolvedValueOnce(candidate({
+    stageRefresh: {
+      applicant_anchor: {
+        refreshAttemptId: 'prior-attempt',
+        refreshStartedAt: '2025-08-02T11:00:00.000Z',
+      },
+    },
+  }));
+  recoverExpiredStageRefresh.mockRejectedValueOnce(new Error('Postgres unavailable'));
+
+  await expect(refreshReviewerCandidateStage(target())).resolves.toMatchObject({
+    outcome: 'rejected', code: 'roster_write_failed', reasonCode: 'authority_stale',
+  });
+  expect(startStageRefresh).not.toHaveBeenCalled();
+  expect(completeStageRefreshWithEvidence).not.toHaveBeenCalled();
+});
+
 test('legacy multiple expired leases recover in deterministic owner order without deadlock', async () => {
   findCandidateByKey.mockResolvedValueOnce(candidate({
     stageRefresh: {

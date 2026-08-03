@@ -71,6 +71,10 @@ const deriveReviewerPromotionAuthoritySnapshot = jest.fn(async ({ requestId, can
 jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
   deriveReviewerPromotionAuthoritySnapshot: (...args) => deriveReviewerPromotionAuthoritySnapshot(...args),
 }));
+const reconcileReviewerStages = jest.fn(async () => ({ outcome: 'current', candidates: [] }));
+jest.mock('../../lib/services/workbench/reviewer-stage-reconciliation-service', () => ({
+  reconcileReviewerStages: (...args) => reconcileReviewerStages(...args),
+}));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
   verifyAutomatedIdentityAttestation: jest.fn(async (_token, { candidate } = {}) => ({
     valid: true,
@@ -244,6 +248,7 @@ beforeEach(() => {
     rosterRowsByKey.get(candidateKey)?.addressTrustReceipt || null
   ));
   reviewerRosterStore.promotionSnapshotIsCurrent.mockResolvedValue(true);
+  reconcileReviewerStages.mockResolvedValue({ outcome: 'current', candidates: [] });
   mockGetCandidatePromotionAuthority.mockReturnValue({ decision: 'ready', code: null, stage: null });
   verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate } = {}) => ({
     valid: true,
@@ -660,6 +665,10 @@ test('server-owned identity and exact-address receipts recover a roster row whos
     expect.objectContaining({ name: 'Ellen Zhong', email: 'zhonge@cs.princeton.edu' }),
     expect.objectContaining({ candidateKey: 'candidate:ellen' }),
   );
+  expect(reconcileReviewerStages).toHaveBeenCalledWith({
+    requestId: BASE.requestId,
+    candidateKeys: ['candidate:ellen'],
+  });
 });
 
 test('server-owned identity receipt alone cannot authorize contact after an automated token mismatch', async () => {
