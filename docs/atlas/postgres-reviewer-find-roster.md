@@ -237,6 +237,19 @@ cold search emitted the new authority envelope.
   deliberately rejected here and routed only through the structured action.
   The server re-reads the exact canonical row and derives all authority; it
   never selects by name or launches a batch repair.
+- `pages/api/workbench/reviewer-reconcile.js` is the private request-level
+  legacy-recovery surface. [VERIFIED via source/tests] the browser submits the
+  exact active keys from its server-owned roster and accepts only a one-for-one
+  result before reloading the parent snapshot. When a legacy row has a verified
+  ORCID but lacks persisted person authority, the server may bind exactly one
+  active, name-consistent Dataverse reviewer using the freshly read person ID
+  and ETag. Only deterministic ready, quick-check, staff-verified, or
+  not-applicable address results can project matching `contact` and
+  `address_trust` receipts; ambiguity, conflict, research-only evidence,
+  inactive people, or an ETag change remains a dedicated staff action. An
+  applicant suggestion with no linked reviewer person is also terminal staff
+  action and never receives a fabricated person anchor. The route never runs a
+  cold search, promotes, invites, or sends email.
 - `pages/api/workbench/reviewer-roster.js` `confirm_identity` re-resolves the
   authoritative roster/Dataverse identity and derives the canonical candidate
   key server-side before persistence. The dedicated structured address route

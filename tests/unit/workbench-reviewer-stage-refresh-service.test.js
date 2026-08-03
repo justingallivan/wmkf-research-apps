@@ -10,6 +10,8 @@ const recoverExpiredStageRefresh = jest.fn();
 const findById = jest.fn();
 const hasApplicantProvenance = jest.fn();
 const getById = jest.fn();
+const getPotentialReviewerById = jest.fn();
+const lookupReviewerIdentity = jest.fn();
 const buildApplicantAnchorRefreshReceipt = jest.fn();
 const projectApplicantWarmInputs = jest.fn(() => ({ state: 'current' }));
 const resolveReviewerProposalMetadata = jest.fn(async () => ({
@@ -34,6 +36,12 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...args) => getById(...args),
 }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  getById: (...args) => getPotentialReviewerById(...args),
+}));
+jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
+  lookupReviewerIdentity: (...args) => lookupReviewerIdentity(...args),
+}));
 jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
   REQUEST_SELECT: 'akoya_requestid,_wmkf_potentialreviewer1_value',
   buildApplicantAnchorRefreshReceipt: (...args) => buildApplicantAnchorRefreshReceipt(...args),
@@ -56,6 +64,7 @@ jest.mock('../../lib/services/claude-reviewer-service', () => ({
 
 import {
   EXECUTABLE_REVIEWER_REFRESH_STAGES,
+  planReviewerCandidateRefresh,
   refreshReviewerCandidateStage,
   _internals,
 } from '../../lib/services/workbench/reviewer-stage-refresh-service';
@@ -68,10 +77,12 @@ import {
   buildReviewerStageDependencySnapshot,
   expiredLeaseRecoverySourceVersion,
 } from '../../lib/services/workbench/reviewer-stage-source-versions';
+import { createConflictPendingState } from '../../lib/utils/reviewer-address-trust';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '22222222-2222-2222-2222-222222222222';
 const PERSON_ID = '33333333-3333-3333-3333-333333333333';
+const ADDRESS_PERSON_ID = '44444444-4444-4444-8444-444444444444';
 const CANDIDATE_KEY = `suggestion:${SUGGESTION_ID}`;
 const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 const UPDATED_AT = '2026-08-02 12:00:00+00';
@@ -132,6 +143,12 @@ beforeEach(() => {
   failStageRefresh.mockResolvedValue({ outcome: 'failed_retryable' });
   recoverExpiredStageRefresh.mockResolvedValue({ outcome: 'failed_retryable', updatedAt: '2026-08-02 12:00:00.500+00' });
   getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1000001' });
+  getPotentialReviewerById.mockResolvedValue({
+    wmkf_potentialreviewersid: ADDRESS_PERSON_ID,
+    _etag: 'W/"address-person-1"',
+    statecode: 0,
+  });
+  lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
   buildApplicantAnchorRefreshReceipt.mockReturnValue({
     state: 'current',
     contractVersion: 1,
@@ -142,6 +159,31 @@ beforeEach(() => {
   extractTextFromBuffer.mockResolvedValue('Proposal text '.repeat(20));
   analyzeProposal.mockResolvedValue({ proposalInfo: { title: 'Server proposal', primaryResearchArea: 'Biochemistry' } });
 });
+
+function addressContext(overrides = {}) {
+  return {
+    candidate: {
+      candidateKey: CANDIDATE_KEY,
+      name: 'Address-ready reviewer',
+      identityDecision: 'confirmed',
+      identityEvidence: { decision: 'confirmed' },
+      email: 'address.ready@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      contactEnrichment: {
+        identity: { status: 'confirmed' },
+        email: 'address.ready@example.edu',
+        emailSource: 'pubmed',
+        emailPersistAllowed: true,
+      },
+      canonicalPersonId: ADDRESS_PERSON_ID,
+      canonicalPersonEtag: 'W/"address-person-1"',
+      personEtag: 'W/"address-person-1"',
+      ...overrides,
+    },
+    snapshot: { stageInputVersions: { address_trust: 'd'.repeat(64) } },
+  };
+}
 
 test('refreshes exactly one canonical applicant anchor and never calls batch enrichment', async () => {
   const result = await refreshReviewerCandidateStage(target());
@@ -186,6 +228,159 @@ test('a stale identity plan is a one-stage refresh, while current ambiguous iden
   expect(_internals.safePlan({
     cacheOutcome: 'hit', currentStages: ['identity'], pendingStages: [], refreshes: [], promotionAuthority: 'blocked_identity_review',
   }).refreshes).toEqual([]);
+});
+
+test('request-level reconciliation may project a server-current quick-check address stage from the exact linked person', async () => {
+  const projection = await _internals.deterministicAddressTrustProjection(addressContext());
+
+  expect(projection).toMatchObject({
+    action: 'refresh_stage',
+    envelope: {
+      outcome: 'current',
+      evidencePatch: {
+        addressTrustStatus: 'quick_check',
+        addressTrustEmail: 'address.ready@example.edu',
+      },
+      receipt: { state: 'current', sourceVersion: 'd'.repeat(64) },
+    },
+    person: { id: ADDRESS_PERSON_ID, etag: 'W/"address-person-1"' },
+  });
+  expect(getPotentialReviewerById).toHaveBeenCalledWith(ADDRESS_PERSON_ID);
+});
+
+test('server-binds a legacy exact-ORCID row to a current canonical person before contact refresh', async () => {
+  const legacy = candidate({
+    name: 'Katherine Ferrara',
+    potentialReviewerId: null,
+    canonicalPersonId: null,
+    canonicalPersonEtag: null,
+    personEtag: null,
+    seedResolvedPotentialReviewerId: null,
+    applicantKnownReviewer: null,
+    isApplicantRecommended: false,
+    provenance: { kind: 'literature_retrieved' },
+    identityStatus: 'verified',
+    identityEvidence: { decision: 'confirmed' },
+    orcid: '0000-0002-4976-9107',
+    affiliation: 'Stanford University · kwferrar@stanford.edu',
+    contactEnrichment: {
+      orcidId: '0000-0002-4976-9107',
+      dataverseContactEvidence: { status: 'known', matchKey: 'orcid', nameConsistent: true },
+    },
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      matchKey: 'orcid',
+      nameConsistent: true,
+      reviewerId: ADDRESS_PERSON_ID,
+    },
+  });
+
+  const context = await _internals.serverContext(REQUEST_ID, legacy);
+  const envelope = await _internals.executeStage('contact', {
+    ...context,
+    snapshot: {
+      ...context.snapshot,
+      stageInputVersions: {
+        ...context.snapshot.stageInputVersions,
+        contact: 'c'.repeat(64),
+      },
+    },
+  });
+
+  expect(lookupReviewerIdentity).toHaveBeenCalledWith({
+    name: 'Katherine Ferrara', email: null, orcid: '0000-0002-4976-9107',
+  }, { allowNameFallback: false });
+  expect(getPotentialReviewerById).toHaveBeenCalledWith(ADDRESS_PERSON_ID);
+  expect(context.contactCanonicalPerson).toEqual({
+    authority: 'server_loaded',
+    canonicalPersonId: ADDRESS_PERSON_ID,
+    canonicalPersonEtag: 'W/\"address-person-1\"',
+    personEtag: 'W/\"address-person-1\"',
+  });
+  expect(envelope.evidencePatch).toMatchObject({
+    canonicalPersonId: ADDRESS_PERSON_ID,
+    canonicalPersonEtag: 'W/\"address-person-1\"',
+    personEtag: 'W/\"address-person-1\"',
+  });
+});
+
+test('legacy Dataverse-contact evidence alone never creates a canonical person binding', async () => {
+  const legacy = candidate({
+    potentialReviewerId: null,
+    canonicalPersonId: null,
+    canonicalPersonEtag: null,
+    personEtag: null,
+    seedResolvedPotentialReviewerId: null,
+    applicantKnownReviewer: null,
+    name: 'Katherine Ferrara',
+    orcid: '0000-0002-4976-9107',
+    contactEnrichment: {
+      orcidId: '0000-0002-4976-9107',
+      dataverseContactEvidence: { status: 'known', matchKey: 'orcid', nameConsistent: true },
+    },
+  });
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'candidates',
+    candidates: [{ reviewerId: ADDRESS_PERSON_ID, matchKey: 'orcid' }],
+  });
+
+  const context = await _internals.serverContext(REQUEST_ID, legacy);
+
+  expect(context.contactCanonicalPerson).toBeNull();
+  expect(context.candidate.canonicalPersonId).toBeNull();
+  expect(context.candidate.canonicalPersonEtag).toBeNull();
+  expect(getPotentialReviewerById).not.toHaveBeenCalled();
+});
+
+test('a contested server-linked address remains a dedicated staff action without emitting authority', async () => {
+  const conflict = createConflictPendingState({
+    email: 'address.ready@example.edu',
+    foundEmail: 'other@example.edu',
+    reason: 'email_mismatch',
+    requestId: REQUEST_ID,
+    candidateKey: CANDIDATE_KEY,
+    detectedAt: '2026-08-03T00:00:00.000Z',
+  });
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: ADDRESS_PERSON_ID,
+    _etag: 'W/"address-person-1"',
+    statecode: 0,
+    wmkf_emailaddress: 'address.ready@example.edu',
+    wmkf_addresstruststatejson: JSON.stringify(conflict),
+  });
+
+  const projection = await _internals.deterministicAddressTrustProjection(addressContext());
+
+  expect(projection).toMatchObject({ action: 'dedicated_address_action' });
+  expect(projection).not.toHaveProperty('envelope');
+});
+
+test('a changed or inactive canonical person remains a dedicated staff action', async () => {
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: ADDRESS_PERSON_ID,
+    _etag: 'W/"new-address-person-etag"',
+    statecode: 0,
+  });
+  await expect(_internals.deterministicAddressTrustProjection(addressContext()))
+    .resolves.toMatchObject({ action: 'dedicated_address_action', reason: 'canonical_person_changed' });
+
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: ADDRESS_PERSON_ID,
+    _etag: 'W/"address-person-1"',
+    statecode: 1,
+  });
+  await expect(_internals.deterministicAddressTrustProjection(addressContext()))
+    .resolves.toMatchObject({ action: 'dedicated_address_action', reason: 'canonical_person_changed' });
+});
+
+test('the standalone generic refresh route remains unable to run address trust', async () => {
+  await expect(refreshReviewerCandidateStage(target({ stage: 'address_trust' }))).resolves.toMatchObject({
+    outcome: 'rejected', code: 'dedicated_address_action',
+  });
+  expect(getPotentialReviewerById).not.toHaveBeenCalled();
+  expect(startStageRefresh).not.toHaveBeenCalled();
 });
 
 test('forged roster proposal evidence cannot make manual identity current', async () => {
@@ -356,6 +551,58 @@ test('rejects a suggestion from a different request without starting a stage wri
   });
   expect(startStageRefresh).not.toHaveBeenCalled();
   expect(enrichRecommended).not.toHaveBeenCalled();
+});
+
+test('classifies a request-scoped applicant suggestion without a person link as staff identity action, never a rejected refresh', async () => {
+  const unlinked = candidate({
+    potentialReviewerId: null,
+    applicantKnownReviewer: null,
+  });
+  findCandidateByKey.mockResolvedValue(unlinked);
+
+  await expect(planReviewerCandidateRefresh({ requestId: REQUEST_ID, candidateKey: CANDIDATE_KEY })).resolves.toEqual({
+    outcome: 'action_required',
+    code: 'dedicated_identity_action',
+    candidateKey: CANDIDATE_KEY,
+  });
+  await expect(refreshReviewerCandidateStage(target())).resolves.toMatchObject({
+    outcome: 'action_required',
+    code: 'dedicated_identity_action',
+    stage: 'applicant_anchor',
+    reasonCode: 'prerequisite_action_required',
+  });
+
+  expect(findById).toHaveBeenCalledWith(SUGGESTION_ID);
+  expect(startStageRefresh).not.toHaveBeenCalled();
+  expect(completeStageRefreshWithEvidence).not.toHaveBeenCalled();
+});
+
+test('keeps an unlinked applicant suggestion from another request rejected rather than offering identity repair', async () => {
+  findCandidateByKey.mockResolvedValue(candidate({
+    potentialReviewerId: null,
+    applicantKnownReviewer: null,
+  }));
+  findById.mockResolvedValueOnce(suggestion({ _wmkf_request_value: '44444444-4444-4444-4444-444444444444' }));
+
+  await expect(planReviewerCandidateRefresh({ requestId: REQUEST_ID, candidateKey: CANDIDATE_KEY })).resolves.toEqual({
+    outcome: 'rejected',
+    code: 'suggestion_anchor_mismatch',
+    candidateKey: CANDIDATE_KEY,
+  });
+  expect(startStageRefresh).not.toHaveBeenCalled();
+});
+
+test('accepts a server-seeded applicant person link and does not misclassify it as staff identity repair', async () => {
+  findCandidateByKey.mockResolvedValue(candidate({
+    potentialReviewerId: null,
+    applicantKnownReviewer: null,
+    seedResolvedPotentialReviewerId: PERSON_ID,
+  }));
+
+  await expect(planReviewerCandidateRefresh({ requestId: REQUEST_ID, candidateKey: CANDIDATE_KEY })).resolves.toMatchObject({
+    outcome: 'planned',
+    candidateKey: CANDIDATE_KEY,
+  });
 });
 
 test('returns skipped_stale when the initial candidate-key CAS loses', async () => {

@@ -74,17 +74,49 @@ test('treats an all-request pass with no active roster rows as a successful no-o
   expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
 });
 
-test('does not report success when every candidate needs the dedicated address action', async () => {
+test('offers address trust only to the private reconciler, which reports staff action when its deterministic projection cannot run', async () => {
   planReviewerCandidateRefresh.mockResolvedValueOnce(planned({
     pendingStages: ['address_trust'],
     refreshes: [{ stage: 'address_trust', action: 'dedicated_address_action' }],
   }));
+  refreshReviewerCandidateStage.mockResolvedValueOnce({
+    outcome: 'action_required',
+    stage: 'address_trust',
+    code: 'dedicated_address_action',
+  });
 
   const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
 
   expect(result).toMatchObject({
     outcome: 'action_required',
     counts: { action_required: 1 },
+  });
+  expect(result.continuationCandidateKeys).toBeUndefined();
+  expect(refreshReviewerCandidateStage).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQUEST_ID,
+    candidateKey: CANDIDATE_KEY,
+    stage: 'address_trust',
+    reconciliationContext: expect.objectContaining({ requestId: REQUEST_ID }),
+  }));
+});
+
+test('keeps a request-scoped applicant person-link repair out of stage refresh and reports explicit staff action', async () => {
+  planReviewerCandidateRefresh.mockResolvedValueOnce({
+    outcome: 'action_required',
+    candidateKey: CANDIDATE_KEY,
+    code: 'dedicated_identity_action',
+  });
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
+
+  expect(result).toMatchObject({
+    outcome: 'action_required',
+    counts: { action_required: 1 },
+    candidates: [expect.objectContaining({
+      candidateKey: CANDIDATE_KEY,
+      outcome: 'action_required',
+      code: 'dedicated_identity_action',
+    })],
   });
   expect(result.continuationCandidateKeys).toBeUndefined();
   expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();

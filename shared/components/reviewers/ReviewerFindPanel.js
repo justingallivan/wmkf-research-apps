@@ -87,6 +87,8 @@ export default function ReviewerFindPanel({
   const proposalAbortRef = useRef(null);
   const ingestionAbortRef = useRef(null);
   const rosterGenerationRef = useRef(0);
+  const rosterRetrySequenceRef = useRef(0);
+  const rosterRetryWaitersRef = useRef(new Map());
   const [rosterRetryNonce, setRosterRetryNonce] = useState(0);
   const manualCardRef = useRef(null);
   const [ingest, setIngest] = useState(() => idleIngest(requestId));
@@ -98,6 +100,7 @@ export default function ReviewerFindPanel({
     authorityState: 'refreshing',
     data: null,
     rosterVersion: null,
+    retryNonce: 0,
     restartCount: 0,
     reconcileKey: null,
     reconciliationStopped: false,
@@ -279,6 +282,34 @@ export default function ReviewerFindPanel({
     };
   }, [requestId]);
 
+  // A retry is acknowledged only after the parent has committed its terminal
+  // cached→reconciled snapshot. Resolve rather than reject so child actions can
+  // retain their own request-generation guard on every terminal outcome.
+  useEffect(() => {
+    for (const [nonce, waiter] of rosterRetryWaitersRef.current) {
+      if (waiter.requestId !== requestId) {
+        waiter.resolve({ state: 'superseded' });
+        rosterRetryWaitersRef.current.delete(nonce);
+        continue;
+      }
+      if (warmRoster.requestId !== requestId
+        || warmRoster.retryNonce !== nonce
+        || !['current', 'stale', 'error'].includes(warmRoster.authorityState)) continue;
+      waiter.resolve({
+        state: warmRoster.authorityState,
+        rosterVersion: warmRoster.rosterVersion || null,
+      });
+      rosterRetryWaitersRef.current.delete(nonce);
+    }
+  }, [requestId, warmRoster]);
+
+  useEffect(() => () => {
+    for (const waiter of rosterRetryWaitersRef.current.values()) {
+      waiter.resolve({ state: 'superseded' });
+    }
+    rosterRetryWaitersRef.current.clear();
+  }, []);
+
   const prepareSearch = useCallback(() => {
     if (!proposalBindingReady) return;
     // A saved URL binding represents a past deliberate picker choice, but
@@ -290,12 +321,14 @@ export default function ReviewerFindPanel({
   // change or explicit retry starts a fresh generation and aborts the prior read.
   useEffect(() => {
     const generation = ++rosterGenerationRef.current;
+    const retryNonce = rosterRetryNonce;
     if (!requestId) {
       setWarmRoster({
         requestId: null,
         authorityState: 'refreshing',
         data: null,
         rosterVersion: null,
+        retryNonce,
         restartCount: 0,
         reconcileKey: null,
         reconciliationStopped: false,
@@ -309,6 +342,7 @@ export default function ReviewerFindPanel({
       authorityState: 'refreshing',
       data: previous.requestId === requestId ? previous.data : null,
       rosterVersion: previous.requestId === requestId ? previous.rosterVersion : null,
+      retryNonce,
       restartCount: 0,
       reconcileKey: null,
       reconciliationStopped: false,
@@ -330,6 +364,7 @@ export default function ReviewerFindPanel({
           authorityState: 'cached',
           data,
           rosterVersion: data.rosterVersion,
+          retryNonce,
           restartCount: 0,
           reconcileKey: 1,
           reconciliationStopped: false,
@@ -342,6 +377,7 @@ export default function ReviewerFindPanel({
           authorityState: 'error',
           data: previous.requestId === requestId ? previous.data : null,
           rosterVersion: previous.requestId === requestId ? previous.rosterVersion : null,
+          retryNonce,
           restartCount: 0,
           reconcileKey: null,
           reconciliationStopped: false,
@@ -389,9 +425,10 @@ export default function ReviewerFindPanel({
           setWarmRoster({
             requestId,
             authorityState: 'cached',
-            data,
-            rosterVersion: data.rosterVersion,
-            restartCount,
+          data,
+          rosterVersion: data.rosterVersion,
+          retryNonce: warmRoster.retryNonce,
+          restartCount,
             reconcileKey: restartCount > 1 ? null : warmRoster.reconcileKey + 1,
             reconciliationStopped: restartCount > 1,
             error: restartCount > 1
@@ -411,6 +448,7 @@ export default function ReviewerFindPanel({
           authorityState,
           data,
           rosterVersion: data.rosterVersion || warmRoster.rosterVersion,
+          retryNonce: warmRoster.retryNonce,
           restartCount: warmRoster.restartCount,
           reconcileKey: null,
           reconciliationStopped: false,
@@ -425,6 +463,7 @@ export default function ReviewerFindPanel({
           authorityState: 'error',
           data: previous.requestId === requestId ? previous.data : warmRoster.data,
           rosterVersion: previous.requestId === requestId ? previous.rosterVersion : warmRoster.rosterVersion,
+          retryNonce: previous.requestId === requestId ? previous.retryNonce : warmRoster.retryNonce,
           restartCount: warmRoster.restartCount,
           reconcileKey: null,
           reconciliationStopped: false,
@@ -437,7 +476,15 @@ export default function ReviewerFindPanel({
   }, [requestId, warmRoster.reconcileKey]);
 
   const retryWarmRoster = useCallback(() => {
-    setRosterRetryNonce((attempt) => attempt + 1);
+    const retryNonce = rosterRetrySequenceRef.current + 1;
+    rosterRetrySequenceRef.current = retryNonce;
+    return new Promise((resolve) => {
+      rosterRetryWaitersRef.current.set(retryNonce, {
+        requestId: requestIdRef.current,
+        resolve,
+      });
+      setRosterRetryNonce(retryNonce);
+    });
   }, []);
 
   const updateManual = (field, value) => {

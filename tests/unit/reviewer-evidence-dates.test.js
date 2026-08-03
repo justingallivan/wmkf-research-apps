@@ -15,6 +15,7 @@ import ReviewerSearchSection, {
 const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
 const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
 const SUGGESTION_ID = 'cccccccc-3333-3333-3333-333333333333';
+const APPLICANT_PERSON_ID = 'dddddddd-4444-4444-8444-444444444444';
 const SUGGESTION_KEY = `suggestion:${SUGGESTION_ID}`;
 
 function plan(candidateKey, currentStages, evidenceCheckedDates) {
@@ -44,6 +45,10 @@ function applicantCandidate(overrides = {}) {
   return {
     ...candidate(SUGGESTION_KEY, 'Dr Applicant Evidence'),
     suggestionId: SUGGESTION_ID,
+    // This fixture represents an applicant suggestion already anchored to its
+    // exact reviewer record. Tests for an unlinked applicant live with the
+    // reconciliation controls, where the card must remain read-only.
+    potentialReviewerId: APPLICANT_PERSON_ID,
     isApplicantRecommended: true,
     provenance: { kind: 'applicant_suggested' },
     rosterUpdatedAt: '2026-08-02 12:00:00+00',

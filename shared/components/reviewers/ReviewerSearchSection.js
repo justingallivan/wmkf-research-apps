@@ -118,7 +118,7 @@ const WARM_PLAN_REASONS = new Set([
 ]);
 const WARM_PLAN_ACTIONS = new Set([
   'refresh_stage', 'recover_expired_lease', 'operator_repair_required',
-  'finalize_cached_evidence', 'dedicated_address_action',
+  'finalize_cached_evidence', 'dedicated_address_action', 'dedicated_identity_action',
 ]);
 const RESPONSE_REASONS = new Set([
   ...WARM_PLAN_REASONS,
@@ -129,7 +129,7 @@ const RESPONSE_REASONS = new Set([
 ]);
 const RESPONSE_OUTCOMES = new Set([
   'recorded', 'not_required', 'skipped_stale', 'rejected',
-  'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'failed_retryable', 'failed_terminal',
+  'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'action_required', 'failed_retryable', 'failed_terminal',
 ]);
 const RESPONSE_STAGE_STATES = new Set([
   'current', 'not_applicable', 'stale', 'refreshing', 'incomplete', 'failed',
@@ -168,7 +168,12 @@ const RETRYABLE_RECONCILIATION_OUTCOMES = new Set([
 // arbitrary browser-sized subset.
 export const RECONCILIATION_MAX_CANDIDATE_KEYS = 300;
 const RECONCILIATION_ROSTER_CAP_EXCEEDED = 'roster_active_cap_exceeded';
-const RECONCILIATION_IDLE = Object.freeze({ status: 'idle', continuationCandidateKeys: [], message: null });
+const RECONCILIATION_IDLE = Object.freeze({
+  status: 'idle',
+  continuationCandidateKeys: [],
+  identityActionCandidateKeys: [],
+  message: null,
+});
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
 
@@ -212,6 +217,7 @@ function planRefreshesInDependencyOrder(plan) {
       || (refresh.action === 'recover_expired_lease' && refresh.reason !== 'prior_refresh_incomplete')
       || (refresh.action === 'finalize_cached_evidence' && refresh.stage !== 'roster_persistence')
       || (refresh.action === 'dedicated_address_action' && refresh.stage !== 'address_trust')
+      || (refresh.action === 'dedicated_identity_action' && refresh.stage !== APPLICANT_ANCHOR_STAGE)
       || seen.has(refresh.stage)) return null;
     seen.add(refresh.stage);
     refreshes.push(refresh);
@@ -328,7 +334,7 @@ function responseHasExpectedStatus(response, outcome) {
   // minimal test doubles does not relax production handling.
   if (!Number.isInteger(response?.status)) return true;
   if (['recorded', 'not_required'].includes(outcome)) return response.status === 200;
-  if (['skipped_stale', 'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required'].includes(outcome)) return response.status === 409;
+  if (['skipped_stale', 'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'action_required'].includes(outcome)) return response.status === 409;
   if (outcome === 'failed_retryable') return response.status === 503;
   return response.status === 422;
 }
@@ -345,19 +351,29 @@ function reconciliationStatusMatches(response, outcome) {
   return response.status === 503;
 }
 
-function reconciliationSummaryText(candidates, continuationCandidateKeys) {
-  const summary = { current: 0, actionRequired: 0, blocked: 0, retryable: 0, budgetExhausted: 0 };
+function reconciliationSummaryText(candidates, continuationCandidateKeys, totalCandidateCount = candidates.length) {
+  const summary = {
+    current: 0,
+    actionRequired: 0,
+    blocked: 0,
+    rejected: 0,
+    retryable: 0,
+    budgetExhausted: 0,
+  };
   for (const candidate of candidates) {
     if (candidate.outcome === 'current') summary.current += 1;
     else if (candidate.outcome === 'action_required') summary.actionRequired += 1;
     else if (candidate.outcome === 'blocked') summary.blocked += 1;
+    else if (candidate.outcome === 'rejected') summary.rejected += 1;
     else if (candidate.outcome === 'budget_exhausted') summary.budgetExhausted += 1;
     else if (RETRYABLE_RECONCILIATION_OUTCOMES.has(candidate.outcome)) summary.retryable += 1;
   }
   return [
+    `${candidates.length}/${totalCandidateCount} processed`,
     `${summary.current} current`,
     `${summary.actionRequired} need staff action`,
     `${summary.blocked} blocked by safeguards`,
+    `${summary.rejected} rejected`,
     `${summary.retryable} need retrying`,
     `${summary.budgetExhausted} paused at the work limit`,
     `${continuationCandidateKeys.length} queued to continue`,
@@ -367,7 +383,7 @@ function reconciliationSummaryText(candidates, continuationCandidateKeys) {
 // Only accept the endpoint's compact, server-owned result shape. In
 // particular, do not render a malformed continuation key or infer an outcome
 // from a transport status alone.
-export function validReviewerReconciliationResponse(data, requestId) {
+export function validReviewerReconciliationResponse(data, requestId, expectedCandidateKeys = null) {
   if (!data || typeof data !== 'object' || Array.isArray(data)
     || !RECONCILIATION_OUTCOMES.has(data.outcome)
     || typeof data.success !== 'boolean'
@@ -382,6 +398,21 @@ export function validReviewerReconciliationResponse(data, requestId) {
   ))) return null;
   const candidateKeys = data.candidates.map((candidate) => candidate.candidateKey);
   if (new Set(candidateKeys).size !== candidateKeys.length) return null;
+  const rosterCapExceeded = data.code === RECONCILIATION_ROSTER_CAP_EXCEEDED;
+  // The route may fail before it can reconcile any submitted row. This is the
+  // one server-legal aggregate response with no candidate correlation result;
+  // accept it so staff receive its tailored reload/retry guidance. It must not
+  // carry a continuation, which remains validated below.
+  const emptyRetryableAggregate = data.outcome === 'failed_retryable' && data.candidates.length === 0;
+  if (expectedCandidateKeys !== null && !rosterCapExceeded && !emptyRetryableAggregate) {
+    if (!Array.isArray(expectedCandidateKeys)
+      || expectedCandidateKeys.length === 0
+      || !expectedCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
+      || new Set(expectedCandidateKeys).size !== expectedCandidateKeys.length
+      || candidateKeys.length !== expectedCandidateKeys.length) return null;
+    const expected = new Set(expectedCandidateKeys);
+    if (candidateKeys.some((key) => !expected.has(key))) return null;
+  }
   const continuationCandidateKeys = data.continuationCandidateKeys === undefined
     ? []
     : data.continuationCandidateKeys;
@@ -389,12 +420,12 @@ export function validReviewerReconciliationResponse(data, requestId) {
     || continuationCandidateKeys.length > RECONCILIATION_MAX_CANDIDATE_KEYS
     || !continuationCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
     || new Set(continuationCandidateKeys).size !== continuationCandidateKeys.length) return null;
+  if (emptyRetryableAggregate && continuationCandidateKeys.length !== 0) return null;
   if (data.outcome === 'current' && continuationCandidateKeys.length !== 0) return null;
   const terminalCandidateKeys = new Set(data.candidates
     .filter((candidate) => ['current', 'action_required', 'blocked', 'rejected'].includes(candidate.outcome))
     .map((candidate) => candidate.candidateKey));
   if (continuationCandidateKeys.some((key) => terminalCandidateKeys.has(key))) return null;
-  const rosterCapExceeded = data.code === RECONCILIATION_ROSTER_CAP_EXCEEDED;
   if (rosterCapExceeded && (data.outcome !== 'blocked'
     || data.candidates.length !== 0 || continuationCandidateKeys.length !== 0)) return null;
   return {
@@ -515,6 +546,18 @@ function isApplicantOriginCandidate(c) {
   return !!c && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED);
 }
 
+// This is a UI-only fail-closed guard for the legacy checkbox bridge. It never
+// establishes applicant authority: server reconciliation still validates that
+// the suggestion belongs to this request before classifying the staff action.
+function applicantPersonLinkMissing(c) {
+  return isApplicantOriginCandidate(c)
+    && typeof c?.suggestionId === 'string'
+    && c.suggestionId.length > 0
+    && !c?.potentialReviewerId
+    && !c?.applicantKnownReviewer?.potentialReviewerId
+    && !c?.seedResolvedPotentialReviewerId;
+}
+
 function formatSaveFailureDetails(errors = []) {
   const first = Array.isArray(errors) ? errors.find((e) => e?.error || e?.name) : null;
   if (!first) return '';
@@ -567,7 +610,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshStage, onReloadRoster, stageRefresh = null, legacySelection = null, canManage = true, evidenceCheck = null }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshStage, onReloadRoster, stageRefresh = null, legacySelection = null, identityLinkRequired = false, canManage = true, evidenceCheck = null }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -827,6 +870,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               Confirm the exact person and email before promoting this reviewer to Invite.
             </div>
           )}
+          {identityLinkRequired && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
+              <span className="font-medium">Keep in Find — applicant reviewer identity needs repair.</span>{' '}
+              This request's applicant suggestion is not linked to an exact reviewer record. Use the identity/edit-add workflow after the exact person is linked; this reviewer cannot be selected or promoted yet.
+            </div>
+          )}
           {missingVerifiedEmail && (
             <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
               <span className="font-medium">Keep in Find — verified email missing.</span>{' '}
@@ -902,6 +951,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {previousResult && <Pill tone="blue">Previously found</Pill>}
             {identityUnverified && (
               <Pill tone="amber">⚠ Identity review required</Pill>
+            )}
+            {identityLinkRequired && (
+              <Pill tone="amber">⚠ Identity/person link required</Pill>
             )}
             {missingVerifiedEmail && (
               <Pill tone="amber">⚠ Verified email required</Pill>
@@ -1366,7 +1418,8 @@ export default function ReviewerSearchSection({
     || slotsPopulated !== null;
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const [reconciliationState, setReconciliationState] = useState(RECONCILIATION_IDLE);
-  const busy = phase === 'running' || phase === 'saving' || reconciliationState.status === 'running';
+  const busy = phase === 'running' || phase === 'saving'
+    || ['running', 'reloading'].includes(reconciliationState.status);
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
@@ -1440,6 +1493,23 @@ export default function ReviewerSearchSection({
   const visibleRecCandidates = parentRosterSnapshotCurrent ? recCandidates : [];
   const visibleRecHandled = parentRosterSnapshotCurrent ? recHandled : [];
   const visibleUnverified = parentRosterSnapshotCurrent ? unverified : [];
+  // The first request-wide reconciliation must be bounded to the exact rows
+  // visible from the parent-owned server snapshot. Never fall back to an
+  // unscoped request reconciliation: a stale or malformed projection must be
+  // repaired by the normal roster reload before it can trigger provider work.
+  const visibleActiveReconciliationTargets = useMemo(() => {
+    const rows = Array.isArray(visibleRosterActive) ? visibleRosterActive : [];
+    const keys = rows.map((candidate) => canonicalCandidateKey(candidate?.candidateKey));
+    const valid = rows.length === 0 || (
+      keys.every(Boolean)
+      && new Set(keys).size === keys.length
+    );
+    return {
+      activeCount: rows.length,
+      keys: valid ? keys : [],
+      valid,
+    };
+  }, [visibleRosterActive]);
   // Keep the request match in this derivation as a render-time guard. React can
   // render once with the prior prop before the request-reset effect clears its
   // local lists; old warm-plan dates must not paint in that window.
@@ -1450,6 +1520,21 @@ export default function ReviewerSearchSection({
     () => buildEvidencePlansByCandidateKey(warmValidationSnapshot, requestId),
     [warmValidationSnapshot, requestId],
   );
+  // A completed request-level reconciliation can identify a legacy
+  // applicant row whose request-scoped suggestion exists but is not linked to
+  // an exact person. Keep that server result only for this panel generation:
+  // it suppresses the legacy checkbox bridge and explains the staff remedy,
+  // but does not become browser-held promotion authority.
+  const identityActionCandidateKeys = useMemo(() => new Set(
+    Array.isArray(reconciliationState.identityActionCandidateKeys)
+      ? reconciliationState.identityActionCandidateKeys
+      : [],
+  ), [reconciliationState.identityActionCandidateKeys]);
+  const candidateNeedsIdentityLinkAction = useCallback((candidate) => {
+    const key = canonicalCandidateKey(candidate?.candidateKey);
+    return applicantPersonLinkMissing(candidate)
+      || (!!key && identityActionCandidateKeys.has(key));
+  }, [identityActionCandidateKeys]);
   const evidenceCheckForCandidate = useCallback(
     (candidate) => projectEvidenceCheck(candidate, evidencePlansByCandidateKey),
     [evidencePlansByCandidateKey],
@@ -1459,8 +1544,9 @@ export default function ReviewerSearchSection({
     return candidateKey ? evidencePlansByCandidateKey.get(candidateKey) || null : null;
   }, [evidencePlansByCandidateKey]);
   const candidateIsSelectable = useCallback(
-    (candidate) => isCandidateSelectable(candidate, serverPromotionPlanForCandidate(candidate)),
-    [serverPromotionPlanForCandidate],
+    (candidate) => !candidateNeedsIdentityLinkAction(candidate)
+      && isCandidateSelectable(candidate, serverPromotionPlanForCandidate(candidate)),
+    [candidateNeedsIdentityLinkAction, serverPromotionPlanForCandidate],
   );
 
   // Per-user prompt-override editor toggle (S222).
@@ -1541,16 +1627,43 @@ export default function ReviewerSearchSection({
       && genRef.current === expectedGeneration
       && stageRefreshScopeRef.current.generation === expectedStageRefreshGeneration
     );
+    // The acknowledged parent reload necessarily advances the roster-version
+    // scope. It is still the same reconciliation attempt unless the request
+    // generation or controller changed.
+    const isCurrentRequestAttempt = () => (
+      !controller.signal.aborted
+      && reconciliationRef.current === controller
+      && genRef.current === expectedGeneration
+    );
     if (!isCurrentAttempt()) return;
     setReconciliationState({
       status: 'running',
       continuationCandidateKeys,
+      identityActionCandidateKeys: [],
       message: 'Reconciling previously found reviewers. This may update identity, COI, eligibility, or contact evidence, and a reviewer’s candidate status may change. It does not search for new reviewers, change selections, or send invitations.',
     });
     try {
-      const body = continuationCandidateKeys.length > 0
-        ? { requestId, candidateKeys: continuationCandidateKeys }
-        : { requestId };
+      const targetCandidateKeys = continuationCandidateKeys.length > 0
+        ? continuationCandidateKeys
+        : visibleActiveReconciliationTargets.keys;
+      if (continuationCandidateKeys.length === 0 && visibleActiveReconciliationTargets.activeCount > 0
+        && (!visibleActiveReconciliationTargets.valid || targetCandidateKeys.length === 0)) {
+        setReconciliationState({
+          status: 'error',
+          continuationCandidateKeys: [],
+          message: 'The visible reviewer roster has active rows without valid reconciliation keys. Reload reviewer status before trying again; no reviewer evidence was changed.',
+        });
+        return;
+      }
+      if (targetCandidateKeys.length === 0) {
+        setReconciliationState({
+          status: 'complete',
+          continuationCandidateKeys: [],
+          message: 'No previously found reviewers require reconciliation.',
+        });
+        return;
+      }
+      const body = { requestId, candidateKeys: targetCandidateKeys };
       const response = await fetch('/api/workbench/reviewer-reconcile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1559,7 +1672,7 @@ export default function ReviewerSearchSection({
       });
       const data = await response.json().catch(() => null);
       if (!isCurrentAttempt()) return;
-      const result = validReviewerReconciliationResponse(data, requestId);
+      const result = validReviewerReconciliationResponse(data, requestId, targetCandidateKeys);
       if (!result || !reconciliationStatusMatches(response, result.outcome)) {
         setReconciliationState({
           status: 'error',
@@ -1568,21 +1681,67 @@ export default function ReviewerSearchSection({
         });
         return;
       }
+      const resultIdentityActionCandidateKeys = result.candidates
+        .filter((candidate) => (
+          candidate?.outcome === 'action_required'
+          && candidate?.code === 'dedicated_identity_action'
+        ))
+        .map((candidate) => candidate.candidateKey);
       setReconciliationState({
-        status: 'complete',
+        status: 'reloading',
         continuationCandidateKeys: result.continuationCandidateKeys,
+        identityActionCandidateKeys: resultIdentityActionCandidateKeys,
         code: result.code,
         message: result.code === RECONCILIATION_ROSTER_CAP_EXCEEDED
           ? 'Reviewer roster integrity check failed: more active reviewers than the safe limit were found. Reload reviewer status; if this persists, contact an administrator. Do not run another reviewer search.'
           : result.outcome === 'failed_retryable' && result.candidates.length === 0
           ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
-          : `Reviewer reconciliation finished: ${reconciliationSummaryText(result.candidates, result.continuationCandidateKeys)}.`,
+          : 'Reviewer reconciliation finished. Reloading reviewer status.',
       });
       // The endpoint may have persisted a subset before returning an action,
-      // budget, or retryable outcome. Always ask the existing owner to reload;
-      // only this response summary is rendered locally.
-      if (onRetryRoster) onRetryRoster();
-      else await reloadRoster(expectedGeneration);
+      // budget, or retryable outcome. Do not show a completion summary until
+      // the parent has committed the exact cached→reconciled terminal snapshot.
+      const acknowledgement = onRetryRoster
+        ? await Promise.resolve(onRetryRoster())
+        : await reloadRoster(expectedGeneration);
+      if (!isCurrentRequestAttempt()) return;
+      if (onRetryRoster && acknowledgement?.state !== 'current') {
+        setReconciliationState({
+          status: acknowledgement?.state === 'superseded' ? 'stale' : 'error',
+          continuationCandidateKeys: result.continuationCandidateKeys,
+          identityActionCandidateKeys: resultIdentityActionCandidateKeys,
+          code: result.code,
+          message: acknowledgement?.state === 'superseded'
+            ? 'Reviewer status changed while reconciliation was running. Reloaded status is shown; start reconciliation again if needed.'
+            : 'Reviewer evidence was reconciled, but current reviewer status could not be confirmed. Reload reviewer status before taking action.',
+        });
+        return;
+      }
+      if (!onRetryRoster && !acknowledgement) {
+        setReconciliationState({
+          status: 'error',
+          continuationCandidateKeys: result.continuationCandidateKeys,
+          identityActionCandidateKeys: resultIdentityActionCandidateKeys,
+          code: result.code,
+          message: 'Reviewer evidence was reconciled, but current reviewer status could not be reloaded. Reload reviewer status before taking action.',
+        });
+        return;
+      }
+      setReconciliationState({
+        status: 'complete',
+        continuationCandidateKeys: result.continuationCandidateKeys,
+        identityActionCandidateKeys: resultIdentityActionCandidateKeys,
+        code: result.code,
+        message: result.code === RECONCILIATION_ROSTER_CAP_EXCEEDED
+          ? 'Reviewer roster integrity check failed: more active reviewers than the safe limit were found. Reload reviewer status; if this persists, contact an administrator. Do not run another reviewer search.'
+          : result.outcome === 'failed_retryable' && result.candidates.length === 0
+            ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
+            : `Reviewer reconciliation finished: ${reconciliationSummaryText(
+              result.candidates,
+              result.continuationCandidateKeys,
+              targetCandidateKeys.length,
+            )}.`,
+      });
     } catch {
       if (!isCurrentAttempt()) return;
       setReconciliationState({
@@ -1604,6 +1763,7 @@ export default function ReviewerSearchSection({
     stageRefreshGeneration,
     onRetryRoster,
     reloadRoster,
+    visibleActiveReconciliationTargets,
   ]);
 
   const refreshReviewerStage = useCallback(async (candidate) => {
@@ -1741,6 +1901,9 @@ export default function ReviewerSearchSection({
 
   const stageRefreshPropsForCandidate = useCallback((candidate) => {
     const plan = serverPromotionPlanForCandidate(candidate);
+    if (candidateNeedsIdentityLinkAction(candidate)) {
+      return { identityLinkRequired: true };
+    }
     if (hasLegacyServerSelectionPlan(candidate, plan)) {
       return { legacySelection: legacySelectionNotice(candidate, plan) };
     }
@@ -1803,6 +1966,7 @@ export default function ReviewerSearchSection({
   }, [
     requestId,
     serverPromotionPlanForCandidate,
+    candidateNeedsIdentityLinkAction,
     stageRefreshStates,
     refreshReviewerStage,
     reloadAfterStageRefresh,
@@ -3653,12 +3817,12 @@ export default function ReviewerSearchSection({
                   className={`p-3 rounded-lg text-sm ${
                     reconciliationState.status === 'error'
                       ? 'bg-amber-50 text-amber-800'
-                      : reconciliationState.status === 'running'
+                    : ['running', 'reloading'].includes(reconciliationState.status)
                         ? 'bg-blue-50 text-blue-800'
                         : 'bg-slate-50 text-slate-800'
                   }`}
                 >
-                  {reconciliationState.status === 'running' && <span className="mr-2 inline-block align-middle"><Spinner /></span>}
+                  {['running', 'reloading'].includes(reconciliationState.status) && <span className="mr-2 inline-block align-middle"><Spinner /></span>}
                   <span>{reconciliationState.message}</span>
                 </div>
               )}

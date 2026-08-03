@@ -9,7 +9,12 @@ jest.mock('../../lib/services/workbench/reviewer-stage-reconciliation-service', 
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { reconcileReviewerStages } from '../../lib/services/workbench/reviewer-stage-reconciliation-service';
-import handler, { config, parseRequest, statusFor } from '../../pages/api/workbench/reviewer-reconcile';
+import handler, {
+  config,
+  parseRequest,
+  reconciliationDiagnostics,
+  statusFor,
+} from '../../pages/api/workbench/reviewer-reconcile';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const STORED_KEY = 'candidate:alex%20reviewer|email:alex%40example.edu|orcid:-|affiliation:example%20university';
@@ -49,6 +54,33 @@ test('reports all-blocked/action-required reconciliation as non-success statuses
   expect(statusFor({ outcome: 'failed_retryable' })).toBe(503);
 });
 
+test('projects bounded, allowlisted reconciliation diagnostics without candidate data', () => {
+  const rejected = {
+    candidateKey: 'candidate:do-not-log',
+    name: 'Do Not Log',
+    outcome: 'rejected',
+    code: 'request_authority_unavailable',
+    reasonCode: 'authority_changed',
+    providerError: 'do-not-log',
+  };
+  const result = reconciliationDiagnostics({
+    candidates: [
+      ...Array.from({ length: 305 }, () => rejected),
+      { outcome: 'unexpected_internal_value', code: 'provider response detail', reasonCode: 'other' },
+    ],
+  });
+
+  expect(result).toEqual({
+    candidateCount: 300,
+    outcomeCounts: { rejected: 300 },
+    codeCounts: { request_authority_unavailable: 300 },
+    reasonCodeCounts: { authority_changed: 300 },
+  });
+  expect(JSON.stringify(result)).not.toContain('Do Not Log');
+  expect(JSON.stringify(result)).not.toContain('do-not-log');
+  expect(JSON.stringify(result)).not.toContain('provider response detail');
+});
+
 function responseMock() {
   const res = {
     setHeader: jest.fn(),
@@ -81,6 +113,46 @@ test('binds a service failed-retryable result to the parsed request id', async (
     requestId: REQUEST_ID,
     candidates: [],
   }));
+});
+
+test('returns and logs only safe diagnostics for a terminal rejected result', async () => {
+  reconcileReviewerStages.mockResolvedValue({
+    outcome: 'blocked',
+    candidates: [{
+      candidateKey: STORED_KEY,
+      name: 'Sensitive Reviewer Name',
+      outcome: 'rejected',
+      code: 'request_authority_unavailable',
+      reasonCode: 'authority_changed',
+      providerError: 'sensitive provider detail',
+    }],
+  });
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const res = responseMock();
+
+  await handler({ method: 'POST', body: { requestId: REQUEST_ID } }, res);
+
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+    outcome: 'blocked',
+    diagnostics: {
+      candidateCount: 1,
+      outcomeCounts: { rejected: 1 },
+      codeCounts: { request_authority_unavailable: 1 },
+      reasonCodeCounts: { authority_changed: 1 },
+    },
+  }));
+  expect(warn).toHaveBeenCalledWith('[reviewer-reconcile] result', {
+    requestId: REQUEST_ID,
+    outcome: 'blocked',
+    candidateCount: 1,
+    outcomeCounts: { rejected: 1 },
+    codeCounts: { request_authority_unavailable: 1 },
+    reasonCodeCounts: { authority_changed: 1 },
+  });
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('Sensitive Reviewer Name');
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('sensitive provider detail');
+  warn.mockRestore();
 });
 
 test('binds a caught provider failure to the parsed request id', async () => {

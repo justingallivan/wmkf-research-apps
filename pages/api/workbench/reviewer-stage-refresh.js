@@ -118,7 +118,8 @@ function httpStatusForOutcome(refreshOutcome) {
   if (refreshOutcome === 'skipped_stale'
     || refreshOutcome === 'refresh_in_progress'
     || refreshOutcome === 'lease_recovery_required'
-    || refreshOutcome === 'lease_repair_required') return 409;
+    || refreshOutcome === 'lease_repair_required'
+    || refreshOutcome === 'action_required') return 409;
   if (refreshOutcome === 'rejected' || refreshOutcome === 'failed_terminal') return 422;
   return 503;
 }

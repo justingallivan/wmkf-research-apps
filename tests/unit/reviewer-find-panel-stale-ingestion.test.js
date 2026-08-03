@@ -4,6 +4,8 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+let mockOnRetryRoster;
+
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
@@ -17,6 +19,7 @@ jest.mock('../../shared/components/reviewers/ReviewerSearchSection', () => funct
   onRetryRoster,
   onRetryIngestion,
 }) {
+  mockOnRetryRoster = onRetryRoster;
   return (
     <>
     <div
@@ -282,6 +285,96 @@ test('parent bootstrap renders the cached roster before reconciliation and reach
   });
   await waitFor(() => expect(rosterBinding().state).toBe('current'));
   expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('/api/workbench/reviewer-roster?requestId=')).every(([url]) => String(url).includes('mode='))).toBe(true);
+});
+
+test('parent roster retry resolves only after its own cached-to-reconciled terminal snapshot commits', async () => {
+  const retryReconciled = deferred();
+  let cachedReads = 0;
+  let reconciledReads = 0;
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('mode=cached')) {
+      cachedReads += 1;
+      return Promise.resolve(response({
+        success: true,
+        authorityState: 'cached',
+        rosterVersion: `v${cachedReads}`,
+        active: [{ name: 'Cached Reviewer' }],
+      }));
+    }
+    if (target.includes('mode=reconciled')) {
+      reconciledReads += 1;
+      if (reconciledReads === 1) {
+        return Promise.resolve(response({
+          success: true,
+          authorityState: 'current',
+          rosterVersion: 'v1',
+          active: [{ name: 'Cached Reviewer' }],
+        }));
+      }
+      return retryReconciled.promise;
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerFindPanel requestId={REQ_A} />);
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+
+  let acknowledgement;
+  act(() => {
+    acknowledgement = mockOnRetryRoster();
+  });
+  let settled = false;
+  acknowledgement.then(() => { settled = true; });
+  await waitFor(() => expect(reconciledReads).toBe(2));
+  expect(settled).toBe(false);
+
+  await act(async () => {
+    retryReconciled.resolve(response({
+      success: true,
+      authorityState: 'current',
+      rosterVersion: 'v2',
+      active: [{ name: 'Fresh Reviewer' }],
+    }));
+    await retryReconciled.promise;
+  });
+  await expect(acknowledgement).resolves.toEqual({ state: 'current', rosterVersion: 'v2' });
+  expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'current', names: 'Fresh Reviewer' }));
+});
+
+test('a pending parent roster retry resolves as superseded after a request switch', async () => {
+  const retryCached = deferred();
+  let cachedReads = 0;
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('mode=cached') && target.includes(REQ_A)) {
+      cachedReads += 1;
+      return cachedReads === 1
+        ? Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v1', active: [{ name: 'Reviewer A' }] }))
+        : retryCached.promise;
+    }
+    if (target.includes('mode=reconciled') && target.includes(REQ_A)) {
+      return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v1', active: [{ name: 'Reviewer A' }] }));
+    }
+    if (target.includes('mode=cached') && target.includes(REQ_B)) {
+      return Promise.resolve(response({ success: true, authorityState: 'cached', rosterVersion: 'v-b', active: [{ name: 'Reviewer B' }] }));
+    }
+    if (target.includes('mode=reconciled') && target.includes(REQ_B)) {
+      return Promise.resolve(response({ success: true, authorityState: 'current', rosterVersion: 'v-b', active: [{ name: 'Reviewer B' }] }));
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  });
+
+  const { rerender } = render(<ReviewerFindPanel requestId={REQ_A} />);
+  await waitFor(() => expect(rosterBinding().state).toBe('current'));
+  let acknowledgement;
+  act(() => {
+    acknowledgement = mockOnRetryRoster();
+  });
+  rerender(<ReviewerFindPanel requestId={REQ_B} />);
+
+  await expect(acknowledgement).resolves.toEqual({ state: 'superseded' });
+  await waitFor(() => expect(rosterBinding()).toEqual(expect.objectContaining({ state: 'current', names: 'Reviewer B' })));
 });
 
 test('one snapshot conflict restarts reconciliation with the fresh cached version, but a repeated conflict stops cached', async () => {
