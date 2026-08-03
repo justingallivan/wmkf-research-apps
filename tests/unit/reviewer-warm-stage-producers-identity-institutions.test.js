@@ -25,6 +25,7 @@ const WHEN = '2026-08-02T12:00:00.000Z';
 const IDENTITY_SOURCE = '1'.repeat(64);
 const DOMAINS_SOURCE = '2'.repeat(64);
 const INSTITUTION_COI_SOURCE = '3'.repeat(64);
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function projectIdentityEvidence(input = {}) {
   return rawProjectIdentityEvidence({ ...input, expectedSourceVersion: input.expectedSourceVersion || IDENTITY_SOURCE });
@@ -190,7 +191,7 @@ describe('reviewer warm-stage identity producer', () => {
       completedAt: WHEN,
       confirmation: {
         authority: 'server_loaded',
-        canonicalPersonId: '33333333-3333-4333-8333-333333333333',
+        canonicalPersonId: GENERIC_DATAVERSE_GUID,
         canonicalPersonEtag: 'W/"etag-1"',
         actorId: 'staff-1',
         confirmedAt: WHEN,

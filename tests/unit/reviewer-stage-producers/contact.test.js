@@ -7,6 +7,7 @@ import {
 
 const NOW = '2026-08-02T12:00:00.000Z';
 const EXPECTED_SOURCE = 'f'.repeat(64);
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function tierApi(overrides = {}) {
   return {
@@ -63,6 +64,26 @@ test('runs the explicit contact tiers and emits a bounded ready contact projecti
       contactTierSummary: { providerError: false },
     },
     receipt: { state: 'current', completedAt: NOW },
+  });
+});
+
+test('persists a server-loaded generic Dataverse GUID and ETag with the contact receipt', async () => {
+  const result = await produceReviewerContactEvidence(input({
+    tierApi: tierApi(),
+    canonicalPerson: {
+      authority: 'server_loaded',
+      canonicalPersonId: GENERIC_DATAVERSE_GUID,
+      canonicalPersonEtag: 'W/"dataverse-person-v1"',
+    },
+  }));
+
+  expect(result).toMatchObject({
+    outcome: 'current',
+    evidencePatch: {
+      canonicalPersonId: GENERIC_DATAVERSE_GUID,
+      canonicalPersonEtag: 'W/"dataverse-person-v1"',
+      personEtag: 'W/"dataverse-person-v1"',
+    },
   });
 });
 

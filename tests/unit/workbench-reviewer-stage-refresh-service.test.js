@@ -73,6 +73,7 @@ import {
   proposalAuthorFingerprint,
 } from '../../lib/services/reviewer-proposal-author-fingerprint';
 import {
+  CONTRACT_VERSIONS,
   applicantAnchorSourceVersion,
   buildReviewerStageDependencySnapshot,
   expiredLeaseRecoverySourceVersion,
@@ -82,7 +83,7 @@ import { createConflictPendingState } from '../../lib/utils/reviewer-address-tru
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '22222222-2222-2222-2222-222222222222';
 const PERSON_ID = '33333333-3333-3333-3333-333333333333';
-const ADDRESS_PERSON_ID = '44444444-4444-4444-8444-444444444444';
+const ADDRESS_PERSON_ID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 const CANDIDATE_KEY = `suggestion:${SUGGESTION_ID}`;
 const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 const UPDATED_AT = '2026-08-02 12:00:00+00';
@@ -183,6 +184,73 @@ function addressContext(overrides = {}) {
     },
     snapshot: { stageInputVersions: { address_trust: 'd'.repeat(64) } },
   };
+}
+
+function receipt(stage, sourceVersion, resultVersion) {
+  return {
+    state: 'current',
+    contractVersion: CONTRACT_VERSIONS[stage],
+    sourceVersion,
+    resultVersion,
+    completedAt: '2026-08-02T12:00:00.000Z',
+    reasonCode: null,
+    failureCode: null,
+  };
+}
+
+function legacyCurrentContactCandidate() {
+  const row = candidate({
+    candidateKey: STORED_CANDIDATE_KEY,
+    suggestionId: null,
+    potentialReviewerId: null,
+    canonicalPersonId: null,
+    canonicalPersonEtag: null,
+    personEtag: null,
+    seedResolvedPotentialReviewerId: null,
+    applicantKnownReviewer: null,
+    isApplicantRecommended: false,
+    provenance: { kind: 'literature_retrieved' },
+    warmCacheVersion: 1,
+    proposalContentVersion: 'a'.repeat(64),
+    name: 'Katherine Ferrara',
+    affiliation: 'Stanford University',
+    primaryAffiliation: 'Stanford University',
+    identityDecision: 'confirmed',
+    identityEvidence: { decision: 'confirmed' },
+    institutionDomainEvidence: { inputFingerprint: 'd'.repeat(64), anchoredDomains: ['stanford.edu'] },
+    trustedInstitutionDomains: ['stanford.edu'],
+    proposalAuthorVersion: 'e'.repeat(64),
+    email: 'kwferrar@stanford.edu',
+    emailSource: 'pubmed',
+    emailAction: 'ready',
+    contactEnrichment: {
+      identity: { status: 'confirmed' },
+      orcidId: '0000-0002-4976-9107',
+      email: 'kwferrar@stanford.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      dataverseContactEvidence: { status: 'known', matchKey: 'orcid', nameConsistent: true },
+    },
+    stageFreshness: {},
+  });
+  const snapshot = () => buildReviewerStageDependencySnapshot({
+    candidate: row,
+    requestId: REQUEST_ID,
+    proposalContentVersion: 'a'.repeat(64),
+    requestCoiContextVersion: null,
+  });
+
+  let current = snapshot();
+  row.stageFreshness.applicant_anchor = receipt('applicant_anchor', current.versions.applicant_anchor, '1'.repeat(64));
+  current = snapshot();
+  row.stageFreshness.identity = receipt('identity', current.versions.identity, '2'.repeat(64));
+  current = snapshot();
+  row.stageFreshness.institution_domains = receipt('institution_domains', current.versions.institution_domains, '3'.repeat(64));
+  current = snapshot();
+  row.stageFreshness.contact = receipt('contact', current.versions.contact, '4'.repeat(64));
+  current = snapshot();
+  row.stageFreshness.address_trust = receipt('address_trust', current.versions.address_trust, '5'.repeat(64));
+  return row;
 }
 
 test('refreshes exactly one canonical applicant anchor and never calls batch enrichment', async () => {
@@ -304,6 +372,32 @@ test('server-binds a legacy exact-ORCID row to a current canonical person before
     canonicalPersonEtag: 'W/\"address-person-1\"',
     personEtag: 'W/\"address-person-1\"',
   });
+});
+
+test('a current legacy contact receipt without canonical fields is automatically replanned after exact-ORCID binding', async () => {
+  const legacy = legacyCurrentContactCandidate();
+  lookupReviewerIdentity.mockResolvedValueOnce({
+    outcome: 'confident',
+    match: {
+      matchKey: 'orcid',
+      nameConsistent: true,
+      reviewerId: ADDRESS_PERSON_ID,
+    },
+  });
+
+  const context = await _internals.serverContext(REQUEST_ID, legacy);
+
+  expect(legacy.stageFreshness.contact.state).toBe('current');
+  expect(legacy.canonicalPersonId).toBeNull();
+  expect(context.candidate).toMatchObject({
+    canonicalPersonId: ADDRESS_PERSON_ID,
+    canonicalPersonEtag: 'W/"address-person-1"',
+  });
+  expect(context.plan.refreshes).toContainEqual({ stage: 'contact', reason: 'stage_contract_changed' });
+  expect(context.plan.refreshes).toContainEqual({ stage: 'address_trust', reason: 'stage_contract_changed' });
+  expect(startStageRefresh).not.toHaveBeenCalled();
+  expect(completeStageRefreshWithEvidence).not.toHaveBeenCalled();
+  expect(enrichRecommended).not.toHaveBeenCalled();
 });
 
 test('legacy Dataverse-contact evidence alone never creates a canonical person binding', async () => {

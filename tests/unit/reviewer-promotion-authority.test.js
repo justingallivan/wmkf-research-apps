@@ -9,6 +9,7 @@ const {
 const CHECKED_AT = '2026-08-02T00:00:00.000Z';
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const CANDIDATE_KEY = 'suggestion:33333333-3333-3333-3333-333333333333';
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function authority() {
   return {
@@ -183,6 +184,23 @@ test('current non-authoritative identity and its downstream N/A receipts remain 
     code: 'identity_not_authoritative',
     stage: 'identity',
   });
+});
+
+test('keeps a server-attested generic Dataverse person GUID promotion-authoritative', () => {
+  const row = candidate({
+    identityDecision: null,
+    identityEvidence: {
+      staffConfirmation: {
+        state: 'confirmed',
+        canonicalPersonId: GENERIC_DATAVERSE_GUID,
+        canonicalPersonEtag: 'W/"dataverse-person-v1"',
+        actorId: 'staff-1',
+        confirmedAt: CHECKED_AT,
+      },
+    },
+  });
+
+  expect(serverDecision(row)).toMatchObject({ decision: 'ready' });
 });
 
 test('complete negative contact evidence never becomes promotion authority', () => {

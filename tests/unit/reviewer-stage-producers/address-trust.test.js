@@ -7,6 +7,7 @@ import { createConflictPendingState, createStaffVerifiedState } from '../../../l
 
 const NOW = '2026-08-02T12:00:00.000Z';
 const EXPECTED_SOURCE = 'b'.repeat(64);
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function candidate(overrides = {}) {
   return {
@@ -48,7 +49,7 @@ test('reads a valid exact server-side staff bundle without accepting browser evi
     linkedPerson: { email: 'jane@example.edu', addressTrustStateJson: JSON.stringify(state) },
     canonicalPerson: {
       authority: 'server_loaded',
-      canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+      canonicalPersonId: GENERIC_DATAVERSE_GUID,
       canonicalPersonEtag: 'W/"person-1"',
     },
   }));
@@ -60,7 +61,7 @@ test('reads a valid exact server-side staff bundle without accepting browser evi
       addressTrustEmail: 'jane@example.edu',
       addressTrustSource: 'staff_verified',
       addressTrustEvidence: expect.objectContaining({
-        canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+        canonicalPersonId: GENERIC_DATAVERSE_GUID,
         actorId: 'staff-1',
       }),
     },

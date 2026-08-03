@@ -11,11 +11,13 @@ const {
   expiredLeaseRecoverySourceVersion,
   rosterPersistenceSourceVersion,
 } = require('../../lib/services/workbench/reviewer-stage-source-versions');
+const { planCandidateFreshness } = require('../../lib/services/reviewer-stage-freshness');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const CANDIDATE_KEY = 'person:22222222-2222-2222-2222-222222222222';
 const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 const COMPLETED_AT = '2026-08-02T00:00:00.000Z';
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function resultVersion(index) {
   return index.toString(16).repeat(64);
@@ -282,7 +284,7 @@ test('uses only the contact-projector canonical person pair, never raw candidate
   const projected = buildReviewerStageDependencySnapshot({
     candidate: {
       ...noRawPerson,
-      canonicalPersonId: '22222222-2222-4222-8222-222222222222',
+      canonicalPersonId: GENERIC_DATAVERSE_GUID,
       canonicalPersonEtag: 'W/"server-read-v2"',
       personEtag: 'W/"server-read-v2"',
     },
@@ -291,6 +293,32 @@ test('uses only the contact-projector canonical person pair, never raw candidate
 
   expect(raw.versions.contact).toBe(withoutRaw.versions.contact);
   expect(projected.versions.contact).not.toBe(withoutRaw.versions.contact);
+});
+
+test('a server-bound generic Dataverse person GUID automatically schedules contact repair', () => {
+  const { row, requestCoiContextVersion, proposalContentVersion } = completeCandidate();
+  const serverBound = {
+    ...row,
+    warmCacheVersion: 1,
+    proposalContentVersion,
+    canonicalPersonId: GENERIC_DATAVERSE_GUID,
+    canonicalPersonEtag: 'W/"server-read-v2"',
+    personEtag: 'W/"server-read-v2"',
+  };
+  const authoritative = buildReviewerStageDependencySnapshot({
+    candidate: serverBound,
+    requestId: REQUEST_ID,
+    proposalContentVersion,
+    requestCoiContextVersion,
+  });
+  const plan = planCandidateFreshness({
+    candidate: serverBound,
+    authoritative: { ...authoritative, authorityState: 'current' },
+  });
+
+  expect(authoritative.versions.contact).not.toBe(row.stageFreshness.contact.sourceVersion);
+  expect(plan.refreshes).toContainEqual({ stage: 'contact', reason: 'stage_contract_changed' });
+  expect(plan.refreshes).toContainEqual({ stage: 'address_trust', reason: 'stage_contract_changed' });
 });
 
 test('keeps the source builder and domain fingerprint utility outside producer import graphs', () => {

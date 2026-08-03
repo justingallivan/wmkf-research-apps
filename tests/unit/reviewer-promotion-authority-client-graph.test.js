@@ -10,6 +10,8 @@ const {
   hasCandidateStaffIdentityConfirmation,
 } = require('../../lib/utils/reviewer-identity-authority');
 
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
+
 function localDependencies(file) {
   const source = fs.readFileSync(file, 'utf8');
   const dependencies = [];
@@ -43,7 +45,7 @@ test('the dependency-free identity predicate recognizes only positive resolver o
   expect(isIdentityAuthoritySatisfied({ identityEvidence: {
     staffConfirmation: {
       state: 'confirmed',
-      canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+      canonicalPersonId: GENERIC_DATAVERSE_GUID,
       canonicalPersonEtag: 'W/"etag-1"',
       actorId: 'staff-1',
       confirmedAt: '2026-08-02T00:00:00.000Z',

@@ -7,6 +7,7 @@ const {
 const { CONTRACT_VERSIONS } = require('../../lib/services/reviewer-stage-freshness');
 
 const SOURCE_VERSION = 'a'.repeat(64);
+const GENERIC_DATAVERSE_GUID = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
 
 function envelope(overrides = {}) {
   return {
@@ -140,7 +141,7 @@ test('accepts a coupled server person version only from contact evidence and rej
     completedAt: '2026-08-02T00:00:00.000Z', reasonCode: null, failureCode: null,
   };
   const evidencePatch = {
-    canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+    canonicalPersonId: GENERIC_DATAVERSE_GUID,
     canonicalPersonEtag: 'W/"person-1"',
     personEtag: 'W/"person-1"',
   };
@@ -186,7 +187,7 @@ test('requires a closed, server-attested address evidence shape', () => {
     completedAt: '2026-08-02T00:00:00.000Z', reasonCode: null, failureCode: null,
   };
   const evidence = {
-    canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+    canonicalPersonId: GENERIC_DATAVERSE_GUID,
     canonicalPersonEtag: 'W/"person-1"', actorId: 'staff-1',
     attestedAt: '2026-08-02T00:00:00.000Z', evidenceType: 'institution_page',
     evidenceUrl: 'https://example.edu/jane',
@@ -211,7 +212,7 @@ test('rejects malformed nested staff identity confirmation before it can seed au
   };
   const valid = {
     state: 'confirmed',
-    canonicalPersonId: '11111111-1111-4111-8111-111111111111',
+    canonicalPersonId: GENERIC_DATAVERSE_GUID,
     canonicalPersonEtag: 'W/"person-1"',
     actorId: 'staff-1',
     confirmedAt: '2026-08-02T00:00:00.000Z',
