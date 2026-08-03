@@ -63,6 +63,30 @@ function digest(value) {
   return crypto.createHash('sha256').update(JSON.stringify(value)).digest('base64url');
 }
 
+async function mintHistoricalV2(candidate, {
+  requestId = REQUEST,
+  rosterCandidateKey = candidate.candidateKey,
+  issuedAt = '2026-07-29T00:00:00.000Z',
+} = {}) {
+  const issuedAtSeconds = Date.parse(issuedAt) / 1000;
+  const identityProjection = identityAttestationProjection(candidate);
+  return new SignJWT({
+    typ: 'reviewer-auto-identity',
+    requestId,
+    candidateKey: identityProjection.candidateKey,
+    ...(rosterCandidateKey === null ? {} : { rosterCandidateKey }),
+    projectionVersion: 2,
+    baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
+    identityDigest: digest(identityProjection),
+    eligibilityStatus: 'unknown',
+    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 2)),
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt(issuedAtSeconds)
+    .setExpirationTime(issuedAtSeconds + TTL_SECONDS)
+    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+}
+
 let priorSecret;
 
 beforeEach(() => {
@@ -354,22 +378,7 @@ test('historical selection verifies a signed, claim-bound v2 receipt without rel
       },
     },
   };
-  const identityProjection = identityAttestationProjection(candidate);
-  const token = await new SignJWT({
-    typ: 'reviewer-auto-identity',
-    requestId: REQUEST,
-    candidateKey: identityProjection.candidateKey,
-    rosterCandidateKey: candidate.candidateKey,
-    projectionVersion: 2,
-    baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
-    identityDigest: digest(identityProjection),
-    eligibilityStatus: 'unknown',
-    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 2)),
-  })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuedAt()
-    .setExpirationTime(Math.floor(issuedAt.getTime() / 1000) + TTL_SECONDS)
-    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+  const token = await mintHistoricalV2(candidate);
 
   jest.setSystemTime(new Date('2026-08-20T00:00:00.000Z'));
   await expect(verifyAutomatedIdentityAttestation(token, { requestId: REQUEST, candidate }))
@@ -386,6 +395,44 @@ test('historical selection verifies a signed, claim-bound v2 receipt without rel
     projectionVersion: 2,
     issuedAt: '2026-07-29T00:00:00.000Z',
   });
+});
+
+test('historical selection rejects missing or mismatched roster keys and a tampered issued-at claim', async () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date('2026-08-03T00:00:00.000Z'));
+  const candidate = {
+    ...CANDIDATE,
+    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
+    eligibilityStatus: 'unknown',
+    contactEnrichment: {
+      ...CANDIDATE.contactEnrichment,
+      identity: {
+        status: 'probable',
+        resolverVersion: 'works-first-v1',
+        resolvedAt: '2026-07-29T00:00:00.000Z',
+      },
+    },
+  };
+  const missingRosterKey = await mintHistoricalV2(candidate, { rosterCandidateKey: null });
+  const mismatchedRosterKey = await mintHistoricalV2(candidate, { rosterCandidateKey: 'person:other' });
+  const valid = await mintHistoricalV2(candidate);
+  const [header, payload, signature] = valid.split('.');
+  const tamperedClaims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  tamperedClaims.iat += 1;
+  const tamperedIssuedAt = `${header}.${Buffer.from(JSON.stringify(tamperedClaims)).toString('base64url')}.${signature}`;
+
+  await expect(verifyHistoricalAutomatedIdentitySelection(missingRosterKey, {
+    requestId: REQUEST,
+    candidate,
+  })).resolves.toEqual({ valid: false, reason: 'selection_claims_insufficient' });
+  await expect(verifyHistoricalAutomatedIdentitySelection(mismatchedRosterKey, {
+    requestId: REQUEST,
+    candidate,
+  })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
+  await expect(verifyHistoricalAutomatedIdentitySelection(tamperedIssuedAt, {
+    requestId: REQUEST,
+    candidate,
+  })).resolves.toEqual({ valid: false, reason: 'invalid_signature' });
 });
 
 test('historical selection fails closed for evidence older than 180 days', async () => {
