@@ -18,10 +18,16 @@ related:
 
 > **Status (2026-08-02):** [PARTIALLY IMPLEMENTED] Layers A and B, the scoped
 > warm-effect observation ledger, and the authenticated read-only Layer C runner
-> are built. The deterministic suite passes; the first deployed Layer C preflight
-> remained fail-closed because Azure AD does not register the immutable Preview
-> callback URI. No live warm scenario has therefore passed yet. Layer D sandbox
-> fixtures and mutation rehearsal remain planned and unbuilt.
+> are built. The deterministic suite passes. A normal staff session and the
+> complete cached/reconciled observation ledger passed against exact Preview
+> deployment `dpl_8i1S7ocMLFuWF2E7neWrwQgLojxU` at commit `5b359733`, after
+> temporarily registering the stable branch-alias callback. The Layer C
+> preflight still failed closed because request `1002788`'s persisted roster is
+> stale against its current canonical proposal binding
+> (`proposal_binding_changed`); the browser scenario did not run. The temporary
+> Azure callback, branch-only production-read override, and local auth state
+> were removed after the test. Layer D sandbox fixtures and mutation rehearsal
+> remain planned and unbuilt.
 >
 > **Primary objective:** prove that returning to a previously searched request
 > renders persisted Reviewer Find candidates promptly, preserves request
@@ -353,19 +359,18 @@ An existing signed-in Chrome window is useful for an immediate manual smoke but
 is not a durable test dependency. The repeatable runner should use Playwright
 storage state captured by `scripts/save-playwright-auth-state.mjs`.
 
-**Current Preview auth blocker (2026-08-02):** [VERIFIED via a normal Microsoft
-sign-in attempt] Azure AD returned `AADSTS50011` for the immutable Vercel Preview
-callback URL. The runner must not work around that mismatch by replaying cookies,
-changing redirect targets, or bypassing authentication. A pre-merge Layer C run
-therefore requires a registered stable test host whose redirect URI is approved
-in Azure AD **and** whose request can be bound to the inspected immutable Preview
-deployment. The runner accepts that stable base host only while it is listed as
-an alias of the exact inspected deployment ID; it still verifies the immutable
-host, commit, and deployment class, and re-inspects after browser activity so an
-alias move fails closed. Otherwise the required confirmation is the runner's
-explicit, post-merge, production read-only confirmation using the already
-registered production callback. Until one of those conditions is met, Layer C is
-blocked for authentication—not reported as a warm-product failure.
+**Preview authentication procedure verified (2026-08-02):** [VERIFIED via a
+normal Microsoft staff sign-in] Azure AD accepted the exact stable branch-alias
+callback after it was temporarily registered, and the runner bound that alias to
+the inspected immutable Preview deployment and commit. The earlier
+`AADSTS50011` result remains historical evidence that an unregistered Preview
+callback fails closed; it is no longer the active Layer C blocker. Do not replay
+cookies, change redirect targets, or bypass authentication. A pre-merge Layer C
+run still requires an owner-approved callback registration for the exact stable
+test host, exact-deployment/commit/alias attestation before and after browser
+activity, and rollback of the callback and local auth state afterward. Otherwise
+the required confirmation is the runner's explicit post-merge production
+read-only confirmation using the already registered production callback.
 
 The pre-merge Layer C target is the branch's Vercel Preview deployment operating
 in the release strategy's read-only-shadow mode: production Dataverse reads are
@@ -439,6 +444,14 @@ If `1002788` has no warm roster, Stage 4 is blocked. Creating one requires a
 separate owner-approved, one-time production cold search with its expected
 Claude/provider, Graph/Blob, Postgres, and Dataverse consequences recorded in
 advance; this plan does not authorize that action.
+
+[VERIFIED 2026-08-02 via redacted preflight
+`rfw_0220cf3aa30f1176eb375682adc6139a`] Request `1002788` currently has a warm
+roster and a current canonical proposal metadata binding, but at least one
+persisted candidate retains a historical manual proposal key. Warm validation
+therefore reports `stale / proposal_binding_changed`. Repairing, resetting, or
+rebuilding that production fixture is a separate owner-approved operation; the
+read-only Layer C plan does not authorize it.
 
 ## 7. Layer D — sandbox mutation rehearsal
 
