@@ -44,7 +44,11 @@ async function openFind(page, context, testInfo, requestId = REQUEST_A, options 
 
 test.describe('Reviewer Find warm revisit contract', () => {
   test('shows cached candidates before delayed reconciliation and does no cold work', async ({ page, context }, testInfo) => {
-    const reviewer = candidate({ name: 'Dr. Cached Before Reconciled' });
+    const reviewer = candidate({
+      name: 'Dr. Cached Before Reconciled',
+      emailSource: 'orcid',
+      emailPersistAllowed: true,
+    });
     const reconciled = deferred();
     const { mocks } = await openFind(page, context, testInfo, REQUEST_A, {
       rosterHandler: async ({ requestId, mode }) => {
@@ -61,20 +65,22 @@ test.describe('Reviewer Find warm revisit contract', () => {
 
     await expect(page.getByText('Dr. Cached Before Reconciled', { exact: true })).toBeVisible();
     await expect(page.getByRole('status')).toContainText('Cached reviewer candidates are display-only while current status is checked.');
+    await expect(page.getByLabel('Select Dr. Cached Before Reconciled')).toHaveCount(0);
     expect(mocks.rosterReads().map((entry) => entry.mode)).toEqual(['cached', 'reconciled']);
     expect(noColdPaths(mocks.ledger)).toEqual([]);
     expect(mocks.unexpected).toEqual([]);
     expect(mocks.external).toEqual([]);
 
     reconciled.resolve(json(200, currentRoster(REQUEST_A, [reviewer], 'cached-v1')));
-    await expect(page.getByRole('status')).toContainText('Reviewer status is current. Roster actions remain disabled in this rollout.');
+    await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByText('Dr. Cached Before Reconciled', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Select Dr. Cached Before Reconciled')).toBeVisible();
   });
 
   test('preserves cached cards after reconciliation failure and exposes the exact retry action', async ({ page, context }, testInfo) => {
-    // This is otherwise promotion-ready: after authority recovers, the absent
-    // checkbox below proves the intentional panel-wide display-only rollout,
-    // rather than a candidate-level identity or address gate.
+    // This is otherwise promotion-ready. The panel-wide authority lock remains
+    // closed during the failed reconciliation and opens only after retry returns
+    // a current request-bound plan.
     const reviewer = candidate({
       name: 'Dr. Cached On Authority Error',
       emailSource: 'orcid',
@@ -103,12 +109,11 @@ test.describe('Reviewer Find warm revisit contract', () => {
     const retry = page.getByRole('button', { name: 'Retry reviewer status' });
     await expect(retry).toBeVisible();
     await retry.click();
-    await expect(page.getByRole('status').filter({ hasText: 'Reviewer status is current.' })).toBeVisible();
-    // This is an authority-state control, not a roster-mutation affordance. It
-    // must disappear after the recovered authoritative read even while the
-    // display-only rollout keeps selection and promotion globally disabled.
+    await expect(page.getByRole('status')).toHaveCount(0);
+    // The retry control disappears and the current per-candidate plan restores
+    // selection only after the recovered authoritative read.
     await expect(page.getByRole('button', { name: 'Retry reviewer status' })).toHaveCount(0);
-    await expect(page.getByLabel('Select Dr. Cached On Authority Error')).toHaveCount(0);
+    await expect(page.getByLabel('Select Dr. Cached On Authority Error')).toBeVisible();
     expect(mocks.rosterReads().map((entry) => entry.mode)).toEqual([
       'cached', 'reconciled', 'cached', 'reconciled',
     ]);
@@ -239,9 +244,8 @@ test.describe('Reviewer Find warm revisit contract', () => {
   });
 
   test('fails closed for unknown authority and malformed stage-plan complements', async ({ page, context }, testInfo) => {
-    // Like the authority-error fixture, this is promotion-ready once the
-    // recovered response supplies a valid server plan. Its checkbox must still
-    // be absent because this rollout keeps the whole roster display-only.
+    // Like the authority-error fixture, this is promotion-ready only once the
+    // recovered response supplies a valid server plan.
     const reviewer = candidate({
       candidateKey: 'person:unknown-complement',
       name: 'Dr. Unknown Complement',
@@ -279,14 +283,14 @@ test.describe('Reviewer Find warm revisit contract', () => {
     await expect(page.getByText('The reviewer evidence plan was not recognized. Reload reviewer status; this row is read-only until the server plan is available.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reload reviewer status' })).toBeVisible();
     await page.getByRole('button', { name: 'Retry reviewer status' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Reviewer status is current.' })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveCount(0);
     // The recovered authority and the malformed row plan are separate
     // contracts: the authority retry and stale row-plan repair both go away
     // when the fresh server snapshot supplies a valid plan. The selection
-    // control still stays absent solely because display-only is global.
+    // control appears only after both request authority and the row plan recover.
     await expect(page.getByRole('button', { name: 'Retry reviewer status' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Reload reviewer status' })).toHaveCount(0);
-    await expect(page.getByLabel('Select Dr. Unknown Complement')).toHaveCount(0);
+    await expect(page.getByLabel('Select Dr. Unknown Complement')).toBeVisible();
     expect(mocks.rosterReads().map((entry) => entry.mode)).toEqual([
       'cached', 'reconciled', 'cached', 'reconciled',
     ]);

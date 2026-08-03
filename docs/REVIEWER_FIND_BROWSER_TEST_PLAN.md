@@ -263,10 +263,12 @@ These milestone events are initially synthesized by the Playwright harness from
 DOM and response observations; they do not yet exist as browser runtime events.
 
 The existing provisional product hypotheses remain cached visible within two
-seconds and first qualified interaction within five seconds. The current
-rollout intentionally keeps roster actions disabled, so Layer C records full
-reconciled UI readiness in place of an unavailable qualified interaction. These
-become release budgets only after enough authenticated shadow/smoke runs
+seconds and first qualified interaction within five seconds. Current authority
+releases the panel-wide lock, while candidate actions remain gated by their
+request-bound server plans. Layer C stays read-only and therefore records full
+reconciled UI readiness without clicking an available action; deterministic
+Layer A proves that a promotion-ready checkbox appears only after reconciliation.
+These become release budgets only after enough authenticated shadow/smoke runs
 establish a baseline; the plan owner records the sample window and percentile
 before enforcement.
 
@@ -476,13 +478,13 @@ The runner and its independent checks are:
   suggestion lifecycle/token snapshot remains byte-stable and no request-linked
   Dynamics email activity is created or changed during the bounded run window.
 
-The applicant verification will be the durable cold producer in the current
-display-only rollout. General discovered candidates remain ephemeral by design;
-the run exercises their expensive path but must not POST the roster or promote
-any card. A partial producer result, unexpected browser request, missing roster,
-or lifecycle/activity drift is a failed preparation. Authority details remain
-process-local; the artifact contains only counts and SHA-256 digests. It is
-written under the gitignored
+The applicant verification is the durable cold producer in the current
+authority-gated rollout. General discovered candidates remain ephemeral until
+an explicit promotion; this smoke exercises their expensive path but must not
+POST the roster or promote any card. A partial producer result, unexpected
+browser request, missing roster, or lifecycle/activity drift is a failed
+preparation. Authority details remain process-local; the artifact contains only
+counts and SHA-256 digests. It is written under the gitignored
 `.artifacts/reviewer-find-cold-live/` directory.
 
 Use only request `1002914` in Layer C. Request `1002794` is a real request with

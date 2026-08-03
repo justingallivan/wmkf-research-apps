@@ -103,9 +103,17 @@ export default function ReviewerFindPanel({
     reconciliationStopped: false,
     error: null,
   });
-  // Slice 0.1 proves the warm-read handoff before re-enabling mutations. Keep
-  // every roster-changing entry point inert until the next action-contract slice.
-  const rosterActionsDisabled = true;
+  // Cached rows are display history, not mutation authority. Once the parent
+  // has reconciled a current server snapshot, release the panel-wide lock; the
+  // child still applies the stricter per-candidate promotion plan before it
+  // renders any selection control.
+  const rosterActionsDisabled = (
+    warmRoster.requestId !== requestId
+    || warmRoster.authorityState !== 'current'
+    || warmRoster.reconciliationStopped === true
+    || warmRoster.data?.authorityState !== 'current'
+    || warmRoster.data?.warmValidation?.state !== 'current'
+  );
   const [manual, setManual] = useState({
     name: '',
     email: '',

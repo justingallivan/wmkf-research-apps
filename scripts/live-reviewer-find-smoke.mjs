@@ -530,9 +530,15 @@ async function observeWarmVisit(page, state, url, label) {
   let reconciliationSettled = false;
   const reconciledResponse = page.waitForResponse((response) => isWarmRosterResponse(response, 'reconciled'), {
     timeout: REQUEST_TIMEOUT_MS,
-  }).then((response) => {
+  }).then(async (response) => {
     reconciliationSettled = true;
-    return { status: response.status(), elapsedMs: Date.now() - startedAt };
+    const body = await response.json().catch(() => ({}));
+    return {
+      status: response.status(),
+      elapsedMs: Date.now() - startedAt,
+      authorityState: body.authorityState || null,
+      warmValidationState: body.warmValidation?.state || null,
+    };
   });
 
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: REQUEST_TIMEOUT_MS });
@@ -551,10 +557,13 @@ async function observeWarmVisit(page, state, url, label) {
 
   const reconciled = await reconciledResponse;
   if (reconciled.status !== 200) throw new Error('reconciled_roster_response_not_ok');
+  if (reconciled.authorityState !== 'current' || reconciled.warmValidationState !== 'current') {
+    throw new Error('reconciled_roster_authority_not_current');
+  }
   state.milestones[`${label}ReconciledResponseMs`] = reconciled.elapsedMs;
   await page.getByRole('status').filter({
-    hasText: 'Reviewer status is current. Roster actions remain disabled in this rollout.',
-  }).waitFor({ state: 'visible', timeout: REQUEST_TIMEOUT_MS });
+    hasText: 'Cached reviewer candidates are display-only while current status is checked.',
+  }).waitFor({ state: 'hidden', timeout: REQUEST_TIMEOUT_MS });
   state.milestones[`${label}ReconciledUiReadyMs`] = Date.now() - startedAt;
 
   const milestoneCheck = validateWarmVisitMilestones({

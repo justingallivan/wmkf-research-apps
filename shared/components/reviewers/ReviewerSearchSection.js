@@ -1705,9 +1705,9 @@ export default function ReviewerSearchSection({
   }, []);
 
   const runSearch = useCallback(async () => {
-    // This explicit action is allowed in the display-only rollout: it may show
-    // ephemeral results, but the persistence block below remains closed until
-    // roster actions are re-enabled in their own reviewed slice.
+    // Search is an explicit cold action. Its results remain ephemeral until the
+    // separately reviewed Promote flow accepts a current server plan for each
+    // selected candidate.
     if (!blobUrl || !applicantInputsReady || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
@@ -3170,9 +3170,7 @@ export default function ReviewerSearchSection({
               ? (rosterSnapshot?.error || 'Reviewer status is stale. Retry to check the latest snapshot before taking action.')
             : rosterSnapshot?.authorityState === 'error'
             ? 'Reviewer status could not be checked. Cached candidates remain visible but all roster actions are disabled.'
-            : rosterSnapshot?.authorityState === 'current'
-              ? 'Reviewer status is current. Roster actions remain disabled in this rollout.'
-              : 'Cached reviewer candidates are display-only while current status is checked. Roster actions remain disabled in this rollout.'}
+            : 'Cached reviewer candidates are display-only while current status is checked.'}
           {rosterRetryRequired && onRetryRoster && (
             <button type="button" onClick={onRetryRoster} className="ml-2 underline font-medium">Retry reviewer status</button>
           )}
