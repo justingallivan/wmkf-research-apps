@@ -375,4 +375,43 @@ describe('Reviewer Find live runner contract', () => {
       message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, route: 'other_route', event: 'complete', mode: 'cached', complete: true, incomplete: false }),
     }), OBSERVATION_ID)).toEqual([]);
   });
+
+  test('extracts the complete bounded event sequence from Vercel request-level logs', () => {
+    const cachedStart = JSON.stringify({
+      kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID,
+      route: 'reviewer_roster', event: 'start', mode: 'cached', reasonCode: 'warm_get_started',
+    });
+    const cachedComplete = JSON.stringify({
+      kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID,
+      route: 'reviewer_roster', event: 'complete', mode: 'cached', complete: true,
+      incomplete: false, effectCounts: { postgres_read: 1 }, reasonCode: 'warm_get_completed',
+    });
+    const reconciledComplete = JSON.stringify({
+      kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID,
+      route: 'reviewer_roster', event: 'complete', mode: 'reconciled', complete: true,
+      incomplete: false, effectCounts: { postgres_read: 1, dataverse_read: 1 }, reasonCode: 'warm_get_completed',
+    });
+    const output = JSON.stringify({
+      message: cachedStart,
+      logs: [
+        { level: 'info', message: cachedStart },
+        { level: 'info', message: cachedComplete },
+        { level: 'info', message: reconciledComplete },
+      ],
+    });
+
+    const events = parseVercelObservationEvents(output, OBSERVATION_ID);
+    expect(events).toHaveLength(3);
+    expect(summarizeLedger(events, OBSERVATION_ID)).toMatchObject({
+      complete: true,
+      completeModes: ['cached', 'reconciled'],
+      completeScopeCounts: { cached: 1, reconciled: 1 },
+    });
+
+    const malformedNested = parseVercelObservationEvents(JSON.stringify({
+      message: 'request completed',
+      logs: [{ level: 'info', message: `truncated ${OBSERVATION_ID}` }],
+    }), OBSERVATION_ID);
+    expect(summarizeLedger(malformedNested, OBSERVATION_ID).incomplete).toBe(true);
+  });
 });

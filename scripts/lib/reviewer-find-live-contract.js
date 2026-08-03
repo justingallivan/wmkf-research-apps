@@ -420,35 +420,44 @@ function parseVercelObservationEvents(jsonLines, observationId) {
   }
   const events = [];
   for (const record of records) {
-    const candidates = [record, record?.message, record?.text, record?.output, record?.data]
-      .filter((value) => typeof value === 'string' || (value && typeof value === 'object'));
-    for (const candidate of candidates) {
-      let event;
-      if (typeof candidate === 'string') {
-        try { event = JSON.parse(candidate); } catch {
-          if (hasCorrelatedObservationMarker(candidate)) malformedCorrelatedObservation = true;
-          continue;
+    // Vercel CLI v58 historical log records include the first application log
+    // in `message` and the complete per-request log sequence in `logs`. Prefer
+    // that bounded sequence when present so the top-level first item is not
+    // double-counted while later positive-control events remain observable.
+    const sources = Array.isArray(record?.logs) && record.logs.length > 0
+      ? record.logs.slice(0, 512)
+      : [record];
+    for (const source of sources) {
+      const candidates = [source, source?.message, source?.text, source?.output, source?.data]
+        .filter((value) => typeof value === 'string' || (value && typeof value === 'object'));
+      for (const candidate of candidates) {
+        let event;
+        if (typeof candidate === 'string') {
+          try { event = JSON.parse(candidate); } catch {
+            if (hasCorrelatedObservationMarker(candidate)) malformedCorrelatedObservation = true;
+            continue;
+          }
+        } else {
+          event = candidate;
         }
-      } else {
-        event = candidate;
+        if (!event || Array.isArray(event) || event.kind !== 'reviewer_find_warm_observation'
+          || event.observationId !== observationId || event.route !== 'reviewer_roster') continue;
+        if (!['start', 'effect', 'complete', 'observation_incomplete'].includes(event.event)) continue;
+        events.push({
+          observationId,
+          event: event.event,
+          effectClass: typeof event.effectClass === 'string' ? event.effectClass : null,
+          mode: event.mode === 'cached' || event.mode === 'reconciled' ? event.mode : null,
+          complete: event.complete === true,
+          incomplete: event.event === 'observation_incomplete' || event.incomplete === true,
+          effectCounts: event.event === 'complete'
+            ? normalizeCompleteEffectCounts(event.effectCounts)
+            : null,
+          reasonCode: typeof event.reasonCode === 'string' && REASON_CODE_RE.test(event.reasonCode)
+            ? event.reasonCode
+            : null,
+        });
       }
-      if (!event || Array.isArray(event) || event.kind !== 'reviewer_find_warm_observation'
-        || event.observationId !== observationId || event.route !== 'reviewer_roster') continue;
-      if (!['start', 'effect', 'complete', 'observation_incomplete'].includes(event.event)) continue;
-      events.push({
-        observationId,
-        event: event.event,
-        effectClass: typeof event.effectClass === 'string' ? event.effectClass : null,
-        mode: event.mode === 'cached' || event.mode === 'reconciled' ? event.mode : null,
-        complete: event.complete === true,
-        incomplete: event.event === 'observation_incomplete' || event.incomplete === true,
-        effectCounts: event.event === 'complete'
-          ? normalizeCompleteEffectCounts(event.effectCounts)
-          : null,
-        reasonCode: typeof event.reasonCode === 'string' && REASON_CODE_RE.test(event.reasonCode)
-          ? event.reasonCode
-          : null,
-      });
     }
   }
   if (malformedCorrelatedObservation) {
