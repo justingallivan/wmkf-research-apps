@@ -4,12 +4,12 @@
  * Static contract gate for Reviewer Find warm GET observation.
  *
  * It does not infer reachability from names.  Instead it verifies the explicit
- * post-auth inventory covers every normalized effect family and that every
- * reachable entry names a real source chokepoint containing its observation
- * marker.  The inventory deliberately records false entries for effect
- * families that the cached/reconciled GET does not reach, so a future warm path
- * must consciously update this gate rather than silently disappear from the
- * ledger.
+ * post-auth inventory covers every normalized effect family. Every positive
+ * control and every declared negative control must name a real, sanctioned
+ * runtime call site containing the observation helper and its bounded marker.
+ * This makes a future warm path through one of those named seams visible in the
+ * live ledger; it is not a global raw SQL/fetch/Blob interception mechanism.
+ * A prose non-reachability declaration alone cannot satisfy this gate.
  */
 
 import fs from 'node:fs';
@@ -25,6 +25,7 @@ const {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
+const testDropMarkerFor = process.env.REVIEWER_FIND_WARM_OBSERVATION_TEST_DROP_MARKER || null;
 
 function expect(condition, message) {
   if (!condition) errors.push(message);
@@ -48,6 +49,25 @@ for (const entry of REVIEWER_FIND_WARM_REACHABILITY_INVENTORY) {
       typeof entry.nonReachabilityReason === 'string' && entry.nonReachabilityReason.length > 0,
       `${entry.id}: a non-reachable effect family needs a named reason.`,
     );
+    expect(Array.isArray(entry.chokepoints) && entry.chokepoints.length > 0, `${entry.id}: negative control needs chokepoints.`);
+    expect(Array.isArray(entry.markers) && entry.markers.length > 0, `${entry.id}: negative control needs markers.`);
+    const sources = (entry.chokepoints || []).map((chokepoint) => {
+      const target = path.join(root, chokepoint);
+      expect(fs.existsSync(target), `${entry.id}: negative-control chokepoint does not exist: ${chokepoint}`);
+      const source = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
+      // Test-only source masking proves that a prose reason cannot keep this
+      // gate green after an instrumentation marker disappears. It never writes
+      // to the worktree and is ignored unless the self-test sets the exact id.
+      return testDropMarkerFor === entry.id && entry.markers?.[0]
+        ? source.replace(entry.markers[0], '')
+        : source;
+    });
+    for (const marker of entry.markers || []) {
+      expect(
+        sources.some((source) => source.includes('observeReviewerFindWarmEffect') && source.includes(marker)),
+        `${entry.id}: negative-control marker is not dynamically instrumented: ${marker}`,
+      );
+    }
     continue;
   }
 

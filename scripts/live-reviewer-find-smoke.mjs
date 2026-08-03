@@ -17,14 +17,14 @@
  *
  * Usage:
  *   npm run smoke:reviewer-find:preflight -- \
- *     --base-url https://<exact-preview>.vercel.app \
+ *     --base-url https://<exact-preview-or-registered-alias> \
  *     --deployment-id <vercel-deployment-id> --commit <git-sha>
  *
  *   npm run smoke:reviewer-find:live -- [same arguments]
  *
  * Required local state:
  *   .auth/reviewer-find-live.json captured with
- *   npm run smoke:reviewer-find:auth -- --base-url <exact-preview-url>
+ *   npm run smoke:reviewer-find:auth -- --base-url <exact-preview-or-registered-alias>
  *
  * Optional environment:
  *   VERCEL_TOKEN=<read-only token>       Optional fallback if the authenticated CLI is unavailable.
@@ -49,6 +49,10 @@ const {
   summarizeWarmValidation,
   validateRuntimeAttestation,
   deploymentSummary,
+  enrichDeploymentWithListing,
+  validateWarmVisitMilestones,
+  observationLogPollPlan,
+  ledgerPhaseDeadline,
   summarizeLedger,
   parseVercelObservationEvents,
 } = require('./lib/reviewer-find-live-contract');
@@ -72,8 +76,8 @@ function hasFlag(name) {
 
 function usage() {
   console.log(`Usage:
-  node scripts/live-reviewer-find-smoke.mjs preflight --base-url <exact-preview-url> --deployment-id <id> --commit <sha>
-  node scripts/live-reviewer-find-smoke.mjs run --base-url <exact-preview-url> --deployment-id <id> --commit <sha>
+  node scripts/live-reviewer-find-smoke.mjs preflight --base-url <exact-preview-or-registered-alias> --deployment-id <id> --commit <sha>
+  node scripts/live-reviewer-find-smoke.mjs run --base-url <exact-preview-or-registered-alias> --deployment-id <id> --commit <sha>
 
 Options:
   --auth-state .auth/reviewer-find-live.json
@@ -193,9 +197,22 @@ function parseCliJson(stdout) {
 async function readDeployment({ deploymentId, baseUrl, expectedCommit, deploymentClass }) {
   const cli = await runVercelCli(['inspect', deploymentId, '--json']);
   if (cli.ok) {
-    const deployment = parseCliJson(cli.stdout);
+    let deployment = parseCliJson(cli.stdout);
     if (!deployment || deployment.id !== deploymentId) {
       return { ok: false, reason: 'vercel_cli_deployment_response_invalid' };
+    }
+    // Vercel CLI 58's `inspect --json` proves the immutable deployment ID,
+    // hostname, readiness, and target but omits git metadata. Join it only to
+    // the unique exact-host record from `list --json`; no branch alias or
+    // merely-latest deployment is accepted.
+    const inspectHasCommit = typeof deployment?.meta?.githubCommitSha === 'string'
+      || typeof deployment?.meta?.gitCommitSha === 'string'
+      || typeof deployment?.gitSource?.sha === 'string';
+    if (!inspectHasCommit) {
+      const listingCli = await runVercelCli(['list', '--json']);
+      if (listingCli.ok) {
+        deployment = enrichDeploymentWithListing(deployment, parseCliJson(listingCli.stdout));
+      }
     }
     const summary = deploymentSummary(deployment, { baseUrl, expectedCommit, deploymentClass });
     return summary.ready
@@ -232,9 +249,22 @@ async function readDeployment({ deploymentId, baseUrl, expectedCommit, deploymen
     : { ok: false, reason: summary.reasons[0] || 'vercel_deployment_unverified', summary };
 }
 
-async function readObservationLedger({ deploymentId, observationId, startedAt, minimumCompleteScopesPerMode = 1 }) {
+async function readObservationLedger({
+  deploymentId,
+  observationId,
+  startedAt,
+  deadlineAtMs,
+  minimumCompleteScopesPerMode = 1,
+}) {
   let latest = { ok: false, reason: 'observation_log_query_not_attempted' };
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  while (true) {
+    const poll = observationLogPollPlan({
+      nowMs: Date.now(),
+      deadlineAtMs,
+    });
+    if (!poll.canPoll) return latest.reason === 'observation_log_query_not_attempted'
+      ? { ok: false, reason: 'observation_log_deadline_exhausted' }
+      : latest;
     const cli = await runVercelCli([
       'logs',
       '--deployment', deploymentId,
@@ -243,18 +273,24 @@ async function readObservationLedger({ deploymentId, observationId, startedAt, m
       '--query', observationId,
       '--json',
       '--limit', '512',
-    ], { timeoutMs: 10_000 });
+    ], { timeoutMs: poll.queryTimeoutMs });
     if (!cli.ok) {
       latest = { ok: false, reason: cli.reason };
     } else {
       const events = parseVercelObservationEvents(cli.stdout, observationId);
       const ledger = summarizeLedger(events, observationId);
-      if (!ledger.complete) {
-        latest = { ok: false, reason: 'observation_complete_event_missing_or_incomplete', ledger };
-      } else if ((ledger.effectCounts.postgres_read || 0) < 1) {
-        latest = { ok: false, reason: 'observation_positive_postgres_read_missing', ledger };
+      if (ledger.incomplete) {
+        return { ok: false, reason: 'observation_complete_event_missing_or_incomplete', ledger };
+      } else if (ledger.completeSummaryForbiddenEffects.length > 0) {
+        return { ok: false, reason: 'observation_complete_summary_forbidden_effect_observed', ledger };
+      } else if (ledger.completeSummaryFailures.length > 0) {
+        return { ok: false, reason: 'observation_complete_summary_invalid_or_missing_required_read', ledger };
       } else if (ledger.forbiddenEffects.length > 0) {
-        latest = { ok: false, reason: 'observation_forbidden_effect_observed', ledger };
+        return { ok: false, reason: 'observation_forbidden_effect_observed', ledger };
+      } else if (ledger.unknownEffects.length > 0) {
+        return { ok: false, reason: 'observation_unknown_effect_observed', ledger };
+      } else if (!ledger.complete) {
+        latest = { ok: false, reason: 'observation_complete_event_missing_or_incomplete', ledger };
       } else if (ledger.completeScopeCounts.cached < minimumCompleteScopesPerMode
         || ledger.completeScopeCounts.reconciled < minimumCompleteScopesPerMode) {
         latest = { ok: false, reason: 'observation_scenario_scopes_missing', ledger };
@@ -262,9 +298,13 @@ async function readObservationLedger({ deploymentId, observationId, startedAt, m
         return { ok: true, ledger };
       }
     }
-    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1000));
+    const nextPoll = observationLogPollPlan({
+      nowMs: Date.now(),
+      deadlineAtMs,
+    });
+    if (!nextPoll.canPoll || nextPoll.retryDelayMs < 1) return latest;
+    await new Promise((resolve) => setTimeout(resolve, nextPoll.retryDelayMs));
   }
-  return latest;
 }
 
 function recordBrowserRequest(state, request) {
@@ -487,9 +527,13 @@ async function observeWarmVisit(page, state, url, label) {
   const cachedResponse = page.waitForResponse((response) => isWarmRosterResponse(response, 'cached'), {
     timeout: REQUEST_TIMEOUT_MS,
   }).then((response) => ({ status: response.status(), elapsedMs: Date.now() - startedAt }));
+  let reconciliationSettled = false;
   const reconciledResponse = page.waitForResponse((response) => isWarmRosterResponse(response, 'reconciled'), {
     timeout: REQUEST_TIMEOUT_MS,
-  }).then((response) => ({ status: response.status(), elapsedMs: Date.now() - startedAt }));
+  }).then((response) => {
+    reconciliationSettled = true;
+    return { status: response.status(), elapsedMs: Date.now() - startedAt };
+  });
 
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: REQUEST_TIMEOUT_MS });
   const cached = await cachedResponse;
@@ -498,12 +542,27 @@ async function observeWarmVisit(page, state, url, label) {
     state: 'visible',
     timeout: REQUEST_TIMEOUT_MS,
   });
+  await page.getByRole('status').filter({
+    hasText: 'Cached reviewer candidates are display-only while current status is checked.',
+  }).waitFor({ state: 'visible', timeout: REQUEST_TIMEOUT_MS });
   state.milestones[`${label}CachedResponseMs`] = cached.elapsedMs;
   state.milestones[`${label}CandidateUiVisibleMs`] = Date.now() - startedAt;
+  state.milestones[`${label}ReconciliationPendingAtCachedUi`] = !reconciliationSettled;
 
   const reconciled = await reconciledResponse;
   if (reconciled.status !== 200) throw new Error('reconciled_roster_response_not_ok');
   state.milestones[`${label}ReconciledResponseMs`] = reconciled.elapsedMs;
+  await page.getByRole('status').filter({
+    hasText: 'Reviewer status is current. Roster actions remain disabled in this rollout.',
+  }).waitFor({ state: 'visible', timeout: REQUEST_TIMEOUT_MS });
+  state.milestones[`${label}ReconciledUiReadyMs`] = Date.now() - startedAt;
+
+  const milestoneCheck = validateWarmVisitMilestones({
+    cachedCandidateUiVisibleMs: state.milestones[`${label}CandidateUiVisibleMs`],
+    reconciledRosterUiReadyMs: state.milestones[`${label}ReconciledUiReadyMs`],
+    reconciliationPendingAtCachedUi: state.milestones[`${label}ReconciliationPendingAtCachedUi`],
+  });
+  if (!milestoneCheck.ok) throw new Error(milestoneCheck.reasons[0]);
 }
 
 async function runBrowserScenario(state, authState) {
@@ -557,6 +616,7 @@ async function main() {
     mode,
     startedAt: new Date().toISOString(),
     startedAtMs: Date.now(),
+    deadlineAtMs: Date.now() + MAX_RUN_MS,
     pass: false,
     deployment: {
       id: arg('deployment-id', process.env.VERCEL_DEPLOYMENT_ID || '') || null,
@@ -602,11 +662,13 @@ async function main() {
     status(state, 'deployment', 'ready', null, {
       target: deployment.summary.target,
       actualCommit: deployment.summary.actualCommit,
+      baseHostMatch: deployment.summary.baseHostMatch,
     });
   } else {
     status(state, 'deployment', 'blocked', deployment.reason, deployment.summary ? {
       target: deployment.summary.target,
       actualCommit: deployment.summary.actualCommit,
+      baseHostMatch: deployment.summary.baseHostMatch,
     } : null);
   }
 
@@ -614,7 +676,13 @@ async function main() {
   status(state, 'observation', 'blocked', 'observation_ledger_not_checked');
 
   const authState = localAuthStatePath(arg('auth-state', DEFAULT_AUTH_STATE));
-  if (!authState || !fs.existsSync(authState)) {
+  if (!ready(state, 'deployment')) {
+    // Do not present a normal staff session to a host until its immutable
+    // deployment, commit, class, and optional stable alias have been attested.
+    // This is stricter than merely preventing Workbench navigation: even the
+    // auth/session preflight stays behind the deployment proof.
+    status(state, 'auth', 'blocked', 'deployment_attestation_required_before_auth');
+  } else if (!authState || !fs.existsSync(authState)) {
     status(state, 'auth', 'blocked', 'auth_state_missing_or_outside_dot_auth');
   } else {
     await runAuthenticatedReadPreflight(state, authState);
@@ -625,6 +693,11 @@ async function main() {
       deploymentId: state.deployment.id,
       observationId: state.observationId,
       startedAt: state.startedAt,
+      deadlineAtMs: ledgerPhaseDeadline({
+        nowMs: Date.now(),
+        globalDeadlineAtMs: state.deadlineAtMs,
+        phase: 'preflight',
+      }),
     });
     if (ledger.ok) {
       status(state, 'observation', 'ready', null, {
@@ -639,10 +712,33 @@ async function main() {
   if (mode === 'run' && allRequiredReady(state) && state.blockedBrowserRequests.length === 0) {
     try {
       await runBrowserScenario(state, authState);
+      // A stable auth callback alias can move between deployments. Re-inspect
+      // the exact immutable deployment after browser activity so the result
+      // cannot be credited to an alias that changed owners mid-run.
+      const postBrowserDeployment = await readDeployment({
+        deploymentId: state.deployment.id,
+        baseUrl: state.deployment.baseUrl,
+        expectedCommit: state.deployment.expectedCommit,
+        deploymentClass: state.deployment.class,
+      });
+      if (!postBrowserDeployment.ok) {
+        status(state, 'deployment', 'blocked', postBrowserDeployment.reason, postBrowserDeployment.summary ? {
+          target: postBrowserDeployment.summary.target,
+          actualCommit: postBrowserDeployment.summary.actualCommit,
+          baseHostMatch: postBrowserDeployment.summary.baseHostMatch,
+        } : null);
+        status(state, 'scenario', 'blocked', 'deployment_reinspection_failed_after_browser');
+        throw new Error('deployment_reinspection_failed_after_browser');
+      }
       const finalLedger = await readObservationLedger({
         deploymentId: state.deployment.id,
         observationId: state.observationId,
         startedAt: state.startedAt,
+        deadlineAtMs: ledgerPhaseDeadline({
+          nowMs: Date.now(),
+          globalDeadlineAtMs: state.deadlineAtMs,
+          phase: 'final',
+        }),
         // Preflight contributes one cached/reconciled pair; both actual
         // Workbench visits must add their own completed pair before a run can
         // pass, so the final ledger requires at least three of each mode.
@@ -661,8 +757,18 @@ async function main() {
       } else {
         status(state, 'scenario', 'blocked', 'browser_mutation_or_off_origin_request_blocked');
       }
-    } catch {
-      status(state, 'scenario', 'blocked', 'warm_browser_milestone_not_observed');
+    } catch (error) {
+      const reason = new Set([
+        'cached_roster_response_not_ok',
+        'reconciled_roster_response_not_ok',
+        'cached_ui_not_observed_before_reconciliation',
+        'cached_candidate_ui_budget_exceeded',
+        'reconciled_roster_ui_budget_exceeded',
+        'deployment_reinspection_failed_after_browser',
+      ]).has(error?.message)
+        ? error.message
+        : 'warm_browser_milestone_not_observed';
+      status(state, 'scenario', 'blocked', reason);
     }
   } else if (mode === 'run') {
     status(state, 'scenario', 'blocked', state.blockedBrowserRequests.length > 0

@@ -38,6 +38,7 @@
     "test:e2e:reviewer-find": "playwright test --config=playwright.reviewer-find.config.js",
     "check:e2e:reviewer-find-isolation": "node scripts/check-reviewer-find-e2e-isolation.mjs",
     "check:reviewer-find-warm-observation": "node scripts/check-reviewer-find-warm-observation-inventory.mjs",
+    "check:reviewer-find-warm-observation:self-test": "node scripts/check-reviewer-find-warm-observation-self-test.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "rehearse:reviewer-invite:browser": "node scripts/rehearse-pd-invite-browser.mjs",

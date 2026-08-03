@@ -86,6 +86,15 @@ function httpStatusForOutcome(refreshOutcome) {
   return 503;
 }
 
+function boundedErrorMetadata(error) {
+  const rawName = error instanceof Error ? error.name : '';
+  const name = /^[A-Za-z][A-Za-z0-9]{0,31}$/.test(rawName) ? rawName : 'Error';
+  const status = Number.isSafeInteger(error?.status) && error.status >= 400 && error.status <= 599
+    ? error.status
+    : null;
+  return { name, status };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -112,10 +121,14 @@ export default async function handler(req, res) {
         ...result,
       });
     } catch (error) {
-      console.error('reviewer-stage-refresh error:', error);
+      // Do not log transport/Dataverse errors here: those may carry an OData
+      // filter or a reviewer email. The route's public response is deliberately
+      // generic. Only a bounded error class and numeric HTTP status are retained
+      // so production failures remain distinguishable without logging payloads.
+      console.error('[reviewer-stage-refresh] internal_failure', boundedErrorMetadata(error));
       return res.status(500).json({ error: 'Reviewer stage refresh failed' });
     }
   });
 }
 
-export { parseRefreshRequest };
+export { boundedErrorMetadata, parseRefreshRequest };

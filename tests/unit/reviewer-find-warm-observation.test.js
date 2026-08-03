@@ -129,6 +129,35 @@ describe('Reviewer Find warm observation', () => {
     expect(result.summary.instrumentationFailures).toBeGreaterThan(0);
   });
 
+  test('latches the effect-event limit to one incomplete event while preserving product work', async () => {
+    const result = await withReviewerFindWarmObservation({
+      observationId: OBSERVATION_ID,
+      route: 'reviewer_roster',
+      mode: 'cached',
+    }, async () => {
+      for (let index = 0; index < 66; index += 1) {
+        await observeReviewerFindWarmEffect({
+          effectClass: 'postgres_read',
+          operation: 'reviewer_roster_list',
+        }, async () => index);
+      }
+      return reviewerFindWarmObservationSummary();
+    });
+
+    const overflowEvents = effectEvents(logSpy).filter((event) => (
+      event.event === 'observation_incomplete'
+      && event.reasonCode === 'effect_event_limit_exceeded'
+    ));
+    expect(overflowEvents).toHaveLength(1);
+    expect(result.complete).toBe(false);
+    expect(result.instrumentationFailures).toBe(1);
+    expect(effectEvents(logSpy)).toContainEqual(expect.objectContaining({
+      event: 'complete',
+      complete: false,
+      incomplete: true,
+    }));
+  });
+
   test('positive controls observe every current reachable warm chokepoint', async () => {
     sql.mockResolvedValue({ rows: [] });
     global.fetch

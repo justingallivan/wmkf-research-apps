@@ -163,3 +163,26 @@ test('maps malformed lease repair-required to a non-mutating conflict', async ()
     leaseStage: 'contact',
   });
 });
+
+test('logs only a bounded internal code when a stage refresh throws sensitive Dataverse details', async () => {
+  const sensitive = new Error("Dataverse GET failed: $filter=emailaddress1 eq 'reviewer@example.edu'");
+  sensitive.status = 503;
+  sensitive.odata = { filter: "emailaddress1 eq 'reviewer@example.edu'" };
+  refreshReviewerCandidateStage.mockRejectedValueOnce(sensitive);
+  const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const res = response();
+
+  try {
+    await handler({ method: 'POST', body: body() }, res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'Reviewer stage refresh failed' });
+    expect(log).toHaveBeenCalledWith(
+      '[reviewer-stage-refresh] internal_failure',
+      { name: 'Error', status: 503 },
+    );
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/reviewer@example\.edu|\$filter|emailaddress1/i);
+  } finally {
+    log.mockRestore();
+  }
+});

@@ -11,6 +11,12 @@ const {
   summarizeWarmValidation,
   validateRuntimeAttestation,
   deploymentSummary,
+  enrichDeploymentWithListing,
+  LIVE_WARM_TIMING_BUDGETS,
+  LEDGER_PHASE_MAX_WAIT_MS,
+  validateWarmVisitMilestones,
+  observationLogPollPlan,
+  ledgerPhaseDeadline,
   summarizeLedger,
   parseVercelObservationEvents,
 } = require('../../scripts/lib/reviewer-find-live-contract');
@@ -81,7 +87,7 @@ describe('Reviewer Find live runner contract', () => {
     });
   });
 
-  test('requires exact Vercel host, commit, readiness, and deployment class', () => {
+  test('requires inspected immutable host or its current alias, commit, readiness, and deployment class', () => {
     const good = deploymentSummary({
       readyState: 'READY',
       url: 'preview-example.vercel.app',
@@ -98,7 +104,93 @@ describe('Reviewer Find live runner contract', () => {
       baseUrl: 'https://preview-example.vercel.app', expectedCommit: COMMIT, deploymentClass: 'preview',
     });
     expect(mismatch.ready).toBe(false);
-    expect(mismatch.reasons).toContain('deployment_host_mismatch');
+    expect(mismatch.reasons).toContain('deployment_base_host_unlisted');
+
+    const alias = deploymentSummary({
+      readyState: 'READY',
+      url: 'immutable-preview.vercel.app',
+      aliases: ['reviewer-find-smoke.example.org'],
+      target: null,
+      meta: { githubCommitSha: COMMIT },
+    }, {
+      baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
+    });
+    expect(alias).toMatchObject({ ready: true, deploymentHost: 'immutable-preview.vercel.app', baseHostMatch: 'alias' });
+
+    const aliasRemovedAfterBrowser = deploymentSummary({
+      readyState: 'READY',
+      url: 'immutable-preview.vercel.app',
+      aliases: [],
+      target: null,
+      meta: { githubCommitSha: COMMIT },
+    }, {
+      baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
+    });
+    expect(aliasRemovedAfterBrowser).toMatchObject({ ready: false, baseHostMatch: null });
+    expect(aliasRemovedAfterBrowser.reasons).toContain('deployment_base_host_unlisted');
+
+    const aliasMovedAfterBrowser = deploymentSummary({
+      readyState: 'READY',
+      url: 'other-immutable-preview.vercel.app',
+      aliases: ['another-stable-host.example.org'],
+      target: null,
+      meta: { githubCommitSha: COMMIT },
+    }, {
+      baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
+    });
+    expect(aliasMovedAfterBrowser).toMatchObject({ ready: false, baseHostMatch: null });
+  });
+
+  test('joins omitted inspect git metadata only from one exact immutable hostname', () => {
+    const inspected = {
+      id: 'dpl_abcdefgh',
+      url: 'preview-example.vercel.app',
+      readyState: 'READY',
+      target: 'preview',
+      meta: null,
+      gitSource: null,
+    };
+    const listed = {
+      deployments: [{
+        url: 'preview-example.vercel.app',
+        meta: { githubCommitSha: COMMIT },
+      }],
+    };
+    expect(enrichDeploymentWithListing(inspected, listed)).toMatchObject({
+      id: 'dpl_abcdefgh',
+      url: 'preview-example.vercel.app',
+      meta: { githubCommitSha: COMMIT },
+    });
+    expect(enrichDeploymentWithListing(inspected, {
+      deployments: [listed.deployments[0], listed.deployments[0]],
+    })).toEqual(inspected);
+    expect(enrichDeploymentWithListing(inspected, {
+      deployments: [{ url: 'branch-alias.vercel.app', meta: { githubCommitSha: COMMIT } }],
+    })).toEqual(inspected);
+    expect(enrichDeploymentWithListing(inspected, {
+      deployments: [{ id: 'dpl_other', url: inspected.url, meta: { githubCommitSha: COMMIT } }],
+    })).toEqual(inspected);
+    expect(enrichDeploymentWithListing(inspected, {
+      deployments: [{ uid: inspected.id, url: inspected.url, meta: { githubCommitSha: COMMIT } }],
+    })).toMatchObject({ id: inspected.id, meta: { githubCommitSha: COMMIT } });
+
+    const listedAliasOnly = enrichDeploymentWithListing({
+      ...inspected,
+      alias: undefined,
+      aliases: undefined,
+    }, {
+      deployments: [{
+        id: inspected.id,
+        url: inspected.url,
+        alias: ['reviewer-find-smoke.example.org'],
+        meta: { githubCommitSha: COMMIT },
+      }],
+    });
+    expect(listedAliasOnly.alias).toBeUndefined();
+    expect(listedAliasOnly.aliases).toBeUndefined();
+    expect(deploymentSummary(listedAliasOnly, {
+      baseUrl: 'https://reviewer-find-smoke.example.org', expectedCommit: COMMIT, deploymentClass: 'preview',
+    })).toMatchObject({ ready: false, baseHostMatch: null });
   });
 
   test('accepts only the explicit read-only production-target runtime attestation', () => {
@@ -121,12 +213,18 @@ describe('Reviewer Find live runner contract', () => {
     }
   });
 
-  test('does not accept incomplete or effectful observation events as a warm pass', () => {
+  test('requires per-scope complete-effect positive controls and rejects unsafe summaries', () => {
     const clean = summarizeLedger([
       { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'postgres_read', mode: 'cached' },
-      { event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1 },
+      },
       { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'dataverse_read', mode: 'reconciled' },
-      { event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, dataverse_read: 1 },
+      },
     ], OBSERVATION_ID);
     expect(clean).toMatchObject({
       complete: true,
@@ -142,21 +240,139 @@ describe('Reviewer Find live runner contract', () => {
     ], OBSERVATION_ID);
     expect(unsafe.complete).toBe(false);
     expect(unsafe.forbiddenEffects).toEqual(['claude']);
+
+    const unknown = summarizeLedger([
+      { event: 'effect', observationId: OBSERVATION_ID, effectClass: 'unclassified_effect', mode: 'cached' },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1 },
+      },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, dataverse_read: 1 },
+      },
+    ], OBSERVATION_ID);
+    expect(unknown.complete).toBe(false);
+    expect(unknown.unknownEffects).toEqual(['unclassified_effect']);
+
+    const missingCachedPositiveControl = summarizeLedger([
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: {},
+      },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, dataverse_read: 1 },
+      },
+    ], OBSERVATION_ID);
+    expect(missingCachedPositiveControl.complete).toBe(false);
+    expect(missingCachedPositiveControl.completeSummaryFailures)
+      .toContain('cached_complete_postgres_read_missing');
+
+    const malformedReconciledSummary = summarizeLedger([
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1 },
+      },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 'one', dataverse_read: 1 },
+      },
+    ], OBSERVATION_ID);
+    expect(malformedReconciledSummary.complete).toBe(false);
+    expect(malformedReconciledSummary.completeSummaryFailures)
+      .toContain('reconciled_complete_effect_counts_invalid');
+
+    const forbiddenCompleteSummary = summarizeLedger([
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'cached', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, claude: 1 },
+      },
+      {
+        event: 'complete', observationId: OBSERVATION_ID, mode: 'reconciled', complete: true, incomplete: false,
+        effectCounts: { postgres_read: 1, dataverse_read: 1 },
+      },
+    ], OBSERVATION_ID);
+    expect(forbiddenCompleteSummary.complete).toBe(false);
+    expect(forbiddenCompleteSummary.completeSummaryForbiddenEffects).toEqual(['claude']);
+  });
+
+  test('fails closed unless cached candidate UI visibly precedes reconciliation within warm budgets', () => {
+    expect(validateWarmVisitMilestones({
+      cachedCandidateUiVisibleMs: LIVE_WARM_TIMING_BUDGETS.cachedCandidateUiVisibleMs,
+      reconciledRosterUiReadyMs: LIVE_WARM_TIMING_BUDGETS.reconciledRosterUiReadyMs,
+      reconciliationPendingAtCachedUi: true,
+    })).toEqual({ ok: true, reasons: [] });
+    expect(validateWarmVisitMilestones({
+      cachedCandidateUiVisibleMs: LIVE_WARM_TIMING_BUDGETS.cachedCandidateUiVisibleMs + 1,
+      reconciledRosterUiReadyMs: LIVE_WARM_TIMING_BUDGETS.reconciledRosterUiReadyMs,
+      reconciliationPendingAtCachedUi: true,
+    }).reasons).toContain('cached_candidate_ui_budget_exceeded');
+    expect(validateWarmVisitMilestones({
+      cachedCandidateUiVisibleMs: 100,
+      reconciledRosterUiReadyMs: 200,
+      reconciliationPendingAtCachedUi: false,
+    }).reasons).toContain('cached_ui_not_observed_before_reconciliation');
+  });
+
+  test('polls Vercel logs through the remaining global run window only', () => {
+    expect(observationLogPollPlan({ nowMs: 100, deadlineAtMs: 100 })).toEqual({
+      canPoll: false, queryTimeoutMs: 0, retryDelayMs: 0,
+    });
+    expect(observationLogPollPlan({ nowMs: 1_000, deadlineAtMs: 4_000 })).toEqual({
+      canPoll: true, queryTimeoutMs: 3_000, retryDelayMs: 2_000,
+    });
+    expect(observationLogPollPlan({ nowMs: 1_000, deadlineAtMs: 40_000 })).toMatchObject({
+      canPoll: true, queryTimeoutMs: 10_000, retryDelayMs: 2_000,
+    });
+    expect(ledgerPhaseDeadline({
+      nowMs: 1_000,
+      globalDeadlineAtMs: 200_000,
+      phase: 'preflight',
+    })).toBe(1_000 + LEDGER_PHASE_MAX_WAIT_MS.preflight);
+    expect(ledgerPhaseDeadline({
+      nowMs: 1_000,
+      globalDeadlineAtMs: 30_000,
+      phase: 'final',
+    })).toBe(30_000);
+    expect(ledgerPhaseDeadline({
+      nowMs: 1_000,
+      globalDeadlineAtMs: 30_000,
+      phase: 'unknown',
+    })).toBeNull();
   });
 
   test('extracts only exact bounded observation events from Vercel JSON log lines', () => {
     const output = [
-      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, event: 'effect', mode: 'cached', effectClass: 'postgres_read', reasonCode: 'completed', requestId: 'must_not_return' }) }),
-      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, event: 'complete', mode: 'cached', complete: true, incomplete: false, reasonCode: 'warm_get_completed' }) }),
-      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, event: 'complete', mode: 'reconciled', complete: true, incomplete: false, reasonCode: 'warm_get_completed' }) }),
+      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, route: 'reviewer_roster', event: 'effect', mode: 'cached', effectClass: 'postgres_read', reasonCode: 'completed', requestId: 'must_not_return' }) }),
+      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, route: 'reviewer_roster', event: 'complete', mode: 'cached', complete: true, incomplete: false, effectCounts: { postgres_read: 1 }, reasonCode: 'warm_get_completed' }) }),
+      JSON.stringify({ message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, route: 'reviewer_roster', event: 'complete', mode: 'reconciled', complete: true, incomplete: false, effectCounts: { postgres_read: 1, dataverse_read: 1 }, reasonCode: 'warm_get_completed' }) }),
       JSON.stringify({ message: 'another app log with person@example.org' }),
     ].join('\n');
     expect(parseVercelObservationEvents(output, OBSERVATION_ID)).toEqual([
-      { observationId: OBSERVATION_ID, event: 'effect', effectClass: 'postgres_read', mode: 'cached', complete: false, incomplete: false, reasonCode: 'completed' },
-      { observationId: OBSERVATION_ID, event: 'complete', effectClass: null, mode: 'cached', complete: true, incomplete: false, reasonCode: 'warm_get_completed' },
-      { observationId: OBSERVATION_ID, event: 'complete', effectClass: null, mode: 'reconciled', complete: true, incomplete: false, reasonCode: 'warm_get_completed' },
+      { observationId: OBSERVATION_ID, event: 'effect', effectClass: 'postgres_read', mode: 'cached', complete: false, incomplete: false, effectCounts: null, reasonCode: 'completed' },
+      { observationId: OBSERVATION_ID, event: 'complete', effectClass: null, mode: 'cached', complete: true, incomplete: false, effectCounts: { postgres_read: 1 }, reasonCode: 'warm_get_completed' },
+      { observationId: OBSERVATION_ID, event: 'complete', effectClass: null, mode: 'reconciled', complete: true, incomplete: false, effectCounts: { postgres_read: 1, dataverse_read: 1 }, reasonCode: 'warm_get_completed' },
     ]);
     expect(parseVercelObservationEvents('not-json', OBSERVATION_ID)).toEqual([]);
-    expect(parseVercelObservationEvents(`${output}\n{\"message\":`, OBSERVATION_ID)).toEqual([]);
+    expect(parseVercelObservationEvents(`${output}\n{\"message\":`, OBSERVATION_ID)).toEqual(parseVercelObservationEvents(output, OBSERVATION_ID));
+    const malformedCorrelated = parseVercelObservationEvents(
+      `${output}\n{\"message\":\"truncated ${OBSERVATION_ID}`,
+      OBSERVATION_ID,
+    );
+    expect(malformedCorrelated.at(-1)).toEqual({
+      observationId: OBSERVATION_ID,
+      event: 'observation_incomplete',
+      effectClass: null,
+      mode: null,
+      complete: false,
+      incomplete: true,
+      effectCounts: null,
+      reasonCode: 'malformed_observation_log_line',
+    });
+    expect(summarizeLedger(malformedCorrelated, OBSERVATION_ID).complete).toBe(false);
+    expect(parseVercelObservationEvents(JSON.stringify({
+      message: JSON.stringify({ kind: 'reviewer_find_warm_observation', observationId: OBSERVATION_ID, route: 'other_route', event: 'complete', mode: 'cached', complete: true, incomplete: false }),
+    }), OBSERVATION_ID)).toEqual([]);
   });
 });

@@ -16,9 +16,12 @@ related:
 
 # Reviewer Find Browser Test and Rehearsal Plan
 
-> **Status (2026-08-02):** [PLANNED] This is an implementation and operating
-> plan. It does not claim that the Reviewer Find browser suite, sandbox fixture,
-> production smoke runner, or browser-performance budgets are built or enabled.
+> **Status (2026-08-02):** [PARTIALLY IMPLEMENTED] Layers A and B, the scoped
+> warm-effect observation ledger, and the authenticated read-only Layer C runner
+> are built. The deterministic suite passes; the first deployed Layer C preflight
+> remained fail-closed because Azure AD does not register the immutable Preview
+> callback URI. No live warm scenario has therefore passed yet. Layer D sandbox
+> fixtures and mutation rehearsal remain planned and unbuilt.
 >
 > **Primary objective:** prove that returning to a previously searched request
 > renders persisted Reviewer Find candidates promptly, preserves request
@@ -92,7 +95,7 @@ mutation is not part of this plan.
   currently emits request-local timing fields to `console.info` without a
   correlation ID or effect counts. Existing `api_usage_log` covers LLM usage,
   while Graph, proposal download, publication/contact providers, writes, email,
-  and jobs do not provide the correlated silence proof required by Layer C.
+  and jobs do not provide the correlated named-seam silence proof required by Layer C.
   A scoped observation slice is therefore a prerequisite to—not evidence from—
   the live smoke.
 
@@ -129,11 +132,11 @@ prior evidence or initiate a cold search.
 | Invariant | Browser proof | Server proof | Live proof |
 |---|---|---|---|
 | Cached candidates render before delayed reconciliation | Layer A orders mocked responses and observes the DOM | Layer B verifies cached route is Postgres-only | Layer C records cached and reconciled milestones |
-| Unchanged revisit performs no expensive work | Layer A rejects unexpected browser requests | Layer B spies on proposal/provider services and asserts exactly zero calls | Layer C correlates the run with the bounded server observation ledger |
+| Unchanged revisit performs no expensive work | Layer A rejects unexpected browser requests | Layer B spies on proposal/provider services and asserts exactly zero calls | Layer C correlates the run with the bounded ledger at its named sanctioned seams |
 | Cached/stale authority cannot promote | Layer A exercises visible controls | Layer B exercises both promotion services | Layer C observes controls only; it does not click a mutation |
 | One stale stage refreshes only one candidate/stage | Layer A asserts the single target-only POST | Layer B verifies server-derived dependencies and per-target persistence | Layer D performs the allowlisted real refresh |
 | A -> B -> A navigation cannot leak or overwrite state | Layer A delays A responses across both switches | Layer B tests stale CAS/generation outcomes | Layer C proves dashboard -> `1002788` -> dashboard -> `1002788`; cross-request live proof waits for a second true dummy |
-| Production smoke causes no writes | Layer C aborts browser non-GET requests | Layer B proves warm route semantics and observation-ledger negative controls | Layer C uses the implemented scoped observation ledger to account for server-internal calls |
+| Production smoke causes no writes | Layer C aborts browser non-GET requests | Layer B proves warm route semantics and observation-ledger negative controls | Layer C uses the implemented scoped observation ledger to account for named server-internal seams |
 
 A route-mocked browser cannot prove that server code avoided an internal provider
 or Dataverse call because the request never reached that server code. Conversely,
@@ -231,19 +234,27 @@ data, not a mirror of production records.
 
 ### 4.4 Timing assertions
 
-Do not make a wall-clock threshold the initial CI contract. CI first proves
-ordering by holding reconciliation open and observing cached DOM state. The test
-also records `warm_panel_mounted`, `warm_cached_roster_visible`,
-`warm_first_candidate_interactive`, and `warm_full_reconciliation_complete` as
-separate milestones for later aggregation.
+Do not make a wall-clock threshold the initial deterministic CI contract. CI
+first proves ordering by holding reconciliation open and observing cached DOM
+state. The test also records `warm_panel_mounted`,
+`warm_cached_roster_visible`, `warm_first_candidate_interactive`, and
+`warm_full_reconciliation_complete` as separate milestones for later
+aggregation. The authenticated Layer C runner is stricter: it fails closed if
+cached candidate UI is not visibly read-only **before** reconciliation settles,
+or if cached visibility exceeds the provisional two-second bound or full
+reconciled UI readiness exceeds the provisional five-second bound. Those are
+manual smoke guardrails, not CI or production release SLOs.
 
 These milestone events are initially synthesized by the Playwright harness from
 DOM and response observations; they do not yet exist as browser runtime events.
 
 The existing provisional product hypotheses remain cached visible within two
-seconds and first qualified interaction within five seconds. They become release
-budgets only after enough authenticated shadow/smoke runs establish a baseline;
-the plan owner records the sample window and percentile before enforcement.
+seconds and first qualified interaction within five seconds. The current
+rollout intentionally keeps roster actions disabled, so Layer C records full
+reconciled UI readiness in place of an unavailable qualified interaction. These
+become release budgets only after enough authenticated shadow/smoke runs
+establish a baseline; the plan owner records the sample window and percentile
+before enforcement.
 
 ## 5. Layer B — server contract companion
 
@@ -302,18 +313,20 @@ Implement a Reviewer Find warm observation context with these constraints:
    fixture, or write authority.
 2. Before instrumentation, produce a caller -> effect-capable operation ->
    authoritative chokepoint matrix for every path reachable from cached and
-   reconciled modes. Instrument the lowest shared chokepoints—including the
-   Dataverse core boundary, LLM client, Graph service, roster Postgres store, and
-   every reachable Blob/provider/email/job boundary—not an arbitrary sample of
-   call sites. The route establishes a request-scoped context and those
-   chokepoints report normalized effect classes: Postgres read/write, Dataverse
+   reconciled modes. Instrument the named, sanctioned call sites in that matrix
+   at the lowest shared chokepoint available—including the Dataverse core
+   boundary, LLM client, Graph service, roster Postgres store, and the named
+   Blob/provider/email/job boundaries. The route establishes a request-scoped
+   context and those chokepoints report normalized effect classes: Postgres read/write, Dataverse
    read/write/action, Graph metadata/download, Blob read/write, proposal load,
-   Claude, publication/COI/contact provider, email, and job enqueue.
+   Claude, publication/COI/contact provider, email, and job enqueue. This is
+   not process-wide interception: a future direct raw SQL, fetch, or Blob call
+   outside the named sanctioned seams requires a new inventory entry and review.
 3. Structured events contain observation ID, route/mode, effect class, operation,
    count, reason code, and elapsed time only—no request/reviewer PII, proposal
    text, query text, URLs containing record IDs, or provider bodies.
-4. A static contract gate fails when the warm reachable-path inventory names an
-   effect-capable path without an instrumented chokepoint. Unit tests include
+4. A static contract gate fails when the warm reachable-path inventory names a
+   sanctioned effect-capable path without an instrumented chokepoint. Unit tests include
    positive controls proving every inventoried chokepoint produces a detectable
    event and negative controls proving a normal unobserved request does not
    change application behavior. Absence is not meaningful unless the inventory
@@ -339,6 +352,20 @@ for input during an unattended run and do not enable an auth bypass.
 An existing signed-in Chrome window is useful for an immediate manual smoke but
 is not a durable test dependency. The repeatable runner should use Playwright
 storage state captured by `scripts/save-playwright-auth-state.mjs`.
+
+**Current Preview auth blocker (2026-08-02):** [VERIFIED via a normal Microsoft
+sign-in attempt] Azure AD returned `AADSTS50011` for the immutable Vercel Preview
+callback URL. The runner must not work around that mismatch by replaying cookies,
+changing redirect targets, or bypassing authentication. A pre-merge Layer C run
+therefore requires a registered stable test host whose redirect URI is approved
+in Azure AD **and** whose request can be bound to the inspected immutable Preview
+deployment. The runner accepts that stable base host only while it is listed as
+an alias of the exact inspected deployment ID; it still verifies the immutable
+host, commit, and deployment class, and re-inspects after browser activity so an
+alias move fails closed. Otherwise the required confirmation is the runner's
+explicit, post-merge, production read-only confirmation using the already
+registered production callback. Until one of those conditions is met, Layer C is
+blocked for authentication—not reported as a warm-product failure.
 
 The pre-merge Layer C target is the branch's Vercel Preview deployment operating
 in the release strategy's read-only-shadow mode: production Dataverse reads are
@@ -524,7 +551,7 @@ parent shell contains sentinel credentials.
 
 - Produce the warm reachable-path/chokepoint matrix, add the bounded observation
   context and effect classifications in §6.0, and add the static inventory gate.
-- Add positive/negative controls at each instrumented seam.
+- Add positive/negative controls at each named instrumented seam.
 - Establish a reliable, redacted log retrieval procedure against a named
   deployment and time window.
 
@@ -544,7 +571,7 @@ known-zero effect can be distinguished. No schema migration is introduced.
   same-deployment positive control. A later Production run is post-merge only.
 
 **Exit:** one signed-in `1002788` dashboard -> request -> dashboard -> same-request
-warm revisit passes with no write or expensive-call evidence. If the warm fixture,
+warm revisit passes with no write or expensive-call evidence at the named sanctioned seams. If the warm fixture,
 auth state, or complete correlated observation is missing, the gate is blocked.
 This is enablement evidence, not permission to merge or deploy.
 

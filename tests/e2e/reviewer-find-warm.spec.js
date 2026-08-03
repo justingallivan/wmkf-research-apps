@@ -72,7 +72,15 @@ test.describe('Reviewer Find warm revisit contract', () => {
   });
 
   test('preserves cached cards after reconciliation failure and exposes the exact retry action', async ({ page, context }, testInfo) => {
-    const reviewer = candidate({ name: 'Dr. Cached On Authority Error' });
+    // This is otherwise promotion-ready: after authority recovers, the absent
+    // checkbox below proves the intentional panel-wide display-only rollout,
+    // rather than a candidate-level identity or address gate.
+    const reviewer = candidate({
+      name: 'Dr. Cached On Authority Error',
+      emailSource: 'orcid',
+      emailPersistAllowed: true,
+    });
+    let reconciledAttempts = 0;
     const { mocks } = await openFind(page, context, testInfo, REQUEST_A, {
       rosterHandler: async ({ requestId, mode }) => {
         if (mode === 'cached') return json(200, roster({
@@ -82,14 +90,28 @@ test.describe('Reviewer Find warm revisit contract', () => {
           active: [reviewer],
           candidatePlans: [currentPlan(reviewer.candidateKey)],
         }));
-        return json(503, { success: false, error: 'Fixture authority unavailable' });
+        reconciledAttempts += 1;
+        if (reconciledAttempts === 1) {
+          return json(503, { success: false, error: 'Fixture authority unavailable' });
+        }
+        return json(200, currentRoster(requestId, [reviewer], 'error-v1-recovered'));
       },
     });
 
     await expect(page.getByText('Dr. Cached On Authority Error', { exact: true })).toBeVisible();
     await expect(page.getByRole('status')).toContainText('Reviewer status could not be checked. Cached candidates remain visible but all roster actions are disabled.');
-    await expect(page.getByRole('button', { name: 'Retry reviewer status' })).toBeVisible();
+    const retry = page.getByRole('button', { name: 'Retry reviewer status' });
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect(page.getByRole('status').filter({ hasText: 'Reviewer status is current.' })).toBeVisible();
+    // This is an authority-state control, not a roster-mutation affordance. It
+    // must disappear after the recovered authoritative read even while the
+    // display-only rollout keeps selection and promotion globally disabled.
+    await expect(page.getByRole('button', { name: 'Retry reviewer status' })).toHaveCount(0);
     await expect(page.getByLabel('Select Dr. Cached On Authority Error')).toHaveCount(0);
+    expect(mocks.rosterReads().map((entry) => entry.mode)).toEqual([
+      'cached', 'reconciled', 'cached', 'reconciled',
+    ]);
     expect(noColdPaths(mocks.ledger)).toEqual([]);
     expect(mocks.unexpected).toEqual([]);
   });
@@ -217,26 +239,57 @@ test.describe('Reviewer Find warm revisit contract', () => {
   });
 
   test('fails closed for unknown authority and malformed stage-plan complements', async ({ page, context }, testInfo) => {
-    const reviewer = candidate({ candidateKey: 'person:unknown-complement', name: 'Dr. Unknown Complement' });
+    // Like the authority-error fixture, this is promotion-ready once the
+    // recovered response supplies a valid server plan. Its checkbox must still
+    // be absent because this rollout keeps the whole roster display-only.
+    const reviewer = candidate({
+      candidateKey: 'person:unknown-complement',
+      name: 'Dr. Unknown Complement',
+      emailSource: 'orcid',
+      emailPersistAllowed: true,
+    });
     const malformedPlan = currentPlan(reviewer.candidateKey, {
       currentStages: ['not_a_real_stage'],
       evidenceCheckedDates: {},
     });
-    await openFind(page, context, testInfo, REQUEST_A, {
-      rosterHandler: async ({ requestId, mode }) => json(200, roster({
-        requestId,
-        authorityState: mode === 'cached' ? 'cached' : 'not_a_real_authority',
-        rosterVersion: 'unknown-v1',
-        active: [reviewer],
-        candidatePlans: [malformedPlan],
-      })),
+    let reconciledAttempts = 0;
+    const { mocks } = await openFind(page, context, testInfo, REQUEST_A, {
+      rosterHandler: async ({ requestId, mode }) => {
+        if (mode === 'cached') return json(200, roster({
+          requestId,
+          authorityState: 'cached',
+          rosterVersion: 'unknown-v1',
+          active: [reviewer],
+          candidatePlans: [malformedPlan],
+        }));
+        reconciledAttempts += 1;
+        if (reconciledAttempts === 1) return json(200, roster({
+          requestId,
+          authorityState: 'not_a_real_authority',
+          rosterVersion: 'unknown-v1',
+          active: [reviewer],
+          candidatePlans: [malformedPlan],
+        }));
+        return json(200, currentRoster(requestId, [reviewer], 'unknown-v1-recovered'));
+      },
     });
 
     await expect(page.getByText('Dr. Unknown Complement', { exact: true })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Reviewer authority could not be fully reconciled.' })).toContainText('Retry before taking action.');
     await expect(page.getByText('The reviewer evidence plan was not recognized. Reload reviewer status; this row is read-only until the server plan is available.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reload reviewer status' })).toBeVisible();
+    await page.getByRole('button', { name: 'Retry reviewer status' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Reviewer status is current.' })).toBeVisible();
+    // The recovered authority and the malformed row plan are separate
+    // contracts: the authority retry and stale row-plan repair both go away
+    // when the fresh server snapshot supplies a valid plan. The selection
+    // control still stays absent solely because display-only is global.
+    await expect(page.getByRole('button', { name: 'Retry reviewer status' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reload reviewer status' })).toHaveCount(0);
     await expect(page.getByLabel('Select Dr. Unknown Complement')).toHaveCount(0);
+    expect(mocks.rosterReads().map((entry) => entry.mode)).toEqual([
+      'cached', 'reconciled', 'cached', 'reconciled',
+    ]);
   });
 
   test('keeps late A responses from contaminating B -> A client navigation', async ({ page, context }, testInfo) => {
