@@ -444,6 +444,54 @@ describe('reviewer warm-stage institution-COI producer', () => {
     expect(decideCoi).toHaveBeenCalledTimes(1);
   });
 
+  test('accepts a generic Dataverse request GUID for both projection and execution', async () => {
+    const dataverseRequestId = '17e1c7ae-c844-f111-88b5-000d3a3065b8';
+    const inputs = {
+      requestId: dataverseRequestId,
+      candidate: candidate(),
+      identityReceipt: identityReceipt(),
+      identityEvidence: identityEvidence(),
+      completedAt: WHEN,
+    };
+    const projected = projectInstitutionCoiEvidence({
+      ...inputs,
+      context: completeCoiContext(),
+      decision: null,
+    });
+    const loadContext = jest.fn(async () => completeCoiContext());
+    const produced = await produceInstitutionCoiEvidence({
+      ...inputs,
+      loadContext,
+      decideCoi: jest.fn(() => null),
+    });
+
+    expect(projected).toMatchObject({
+      outcome: 'current',
+      receipt: { state: 'current', failureCode: null },
+    });
+    expect(produced).toMatchObject({
+      outcome: 'current',
+      receipt: { state: 'current', failureCode: null },
+    });
+    expect(loadContext).toHaveBeenCalledWith(dataverseRequestId, expect.any(Object));
+  });
+
+  test('rejects an injection-shaped request ID before loading COI context', async () => {
+    const loadContext = jest.fn();
+    const result = await produceInstitutionCoiEvidence({
+      requestId: "17e1c7ae-c844-f111-88b5-000d3a3065b8') OR 1=1 --",
+      candidate: candidate(),
+      identityReceipt: identityReceipt(),
+      identityEvidence: identityEvidence(),
+      completedAt: WHEN,
+      loadContext,
+      decideCoi: jest.fn(),
+    });
+
+    expect(result).toMatchObject({ outcome: 'incomplete', receipt: { state: 'incomplete' } });
+    expect(loadContext).not.toHaveBeenCalled();
+  });
+
   test('incomplete context, unknown matcher output, and stale identity all fail closed', async () => {
     const contextResult = await produceInstitutionCoiEvidence({
       requestId: REQUEST_ID,
