@@ -353,7 +353,7 @@ test('applicant input fingerprints are deterministic and their response projecti
   expect(responseText).not.toContain('Example University');
 });
 
-test('keeps panel state current without fabricating a full candidate-stage cache hit', async () => {
+test('keeps panel state current and plans a historical stored row without fabricating a cache hit', async () => {
   const req = request();
   const proposal = await resolveReviewerProposalMetadata({
     requestId: REQUEST_ID,
@@ -363,7 +363,7 @@ test('keeps panel state current without fabricating a full candidate-stage cache
     ]]) }),
   });
   const candidate = {
-    candidateKey: 'suggestion:55555555-5555-5555-5555-555555555555',
+    candidateKey: 'candidate:secret%20candidate|email:secret%40example.edu|orcid:-|affiliation:example%20university',
     name: 'Secret Candidate',
     email: 'secret@example.edu',
     provenance: { kind: 'proposal_named' },

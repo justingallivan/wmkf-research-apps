@@ -549,6 +549,25 @@ describe('isCandidateSelectable', () => {
     expect(isCandidateSelectable(candidate, plan)).toBe(true);
   });
 
+  test('accepts a complete server plan for an exact historical stored-row key', () => {
+    const candidate = withCurrentPromotionAuthority({
+      candidateKey: 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university',
+      name: 'Katherine Ferrara',
+      email: 'kwferrar@stanford.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      identityStatus: 'probable',
+      addressTrustReceipt: {
+        receiptId: 'receipt-katherine-ferrara',
+        personConfirmed: true,
+        email: 'kwferrar@stanford.edu',
+      },
+      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
+    });
+
+    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
+  });
+
   test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {
     expect(isCandidateSelectable(withCurrentPromotionAuthority({
       name: 'Flagged',

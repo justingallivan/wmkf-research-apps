@@ -187,7 +187,7 @@ test('derives an applicant-anchor repair target only from the exact canonical ap
   )).toMatchObject({ candidateKey: SUGGESTION_KEY, stage: 'applicant_anchor' });
 });
 
-test('chooses one recognized warm-plan action in dependency order and reserves identity/address for their dedicated controls', () => {
+test('chooses one recognized warm-plan action in dependency order and reserves structured address trust', () => {
   const subject = applicantCandidate();
   expect(reviewerStageRefreshTarget(subject, applicantAnchorPlan({
     refreshes: [
@@ -197,7 +197,7 @@ test('chooses one recognized warm-plan action in dependency order and reserves i
   }))).toMatchObject({ kind: 'refresh', stage: 'institution_domains', candidateKey: SUGGESTION_KEY });
   expect(reviewerStageRefreshTarget(subject, applicantAnchorPlan({
     refreshes: [{ stage: 'identity', reason: 'stage_missing' }],
-  }))).toMatchObject({ kind: 'dedicated', stage: 'identity' });
+  }))).toMatchObject({ kind: 'refresh', stage: 'identity' });
   expect(reviewerStageRefreshTarget(subject, applicantAnchorPlan({
     refreshes: [{ stage: 'address_trust', reason: 'stage_missing' }],
   }))).toMatchObject({ kind: 'dedicated', stage: 'address_trust' });

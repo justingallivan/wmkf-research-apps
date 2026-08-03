@@ -14,6 +14,7 @@ const {
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const CANDIDATE_KEY = 'person:22222222-2222-2222-2222-222222222222';
+const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 const COMPLETED_AT = '2026-08-02T00:00:00.000Z';
 
 function resultVersion(index) {
@@ -90,6 +91,9 @@ test('expired-lease recovery source is a deterministic, server-scoped marker and
   expect(expiredLeaseRecoverySourceVersion({
     requestId: REQUEST_ID, candidateKey: 'candidate:browser-row', stage: 'contact',
   })).toBeNull();
+  expect(expiredLeaseRecoverySourceVersion({
+    requestId: REQUEST_ID, candidateKey: STORED_CANDIDATE_KEY, stage: 'contact',
+  })).toMatch(/^[a-f0-9]{64}$/);
 });
 
 function completeCandidate() {

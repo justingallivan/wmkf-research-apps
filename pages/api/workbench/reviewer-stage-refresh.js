@@ -14,9 +14,9 @@ import {
   EXECUTABLE_REVIEWER_REFRESH_STAGES,
   refreshReviewerCandidateStage,
 } from '../../../lib/services/workbench/reviewer-stage-refresh-service';
+import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CANDIDATE_KEY_RE = /^(suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/i;
 const REQUEST_FIELDS = new Set(['requestId', 'candidateKey', 'stage', 'expectedUpdatedAt']);
 
 export const config = {
@@ -35,10 +35,7 @@ function validExpectedUpdatedAt(value) {
 }
 
 function validCandidateKey(value) {
-  return typeof value === 'string'
-    && value.trim().length > 0
-    && value.trim().length <= 560
-    && CANDIDATE_KEY_RE.test(value.trim());
+  return canonicalStoredReviewerCandidateKey(value) !== null;
 }
 
 function parseRefreshRequest(body) {

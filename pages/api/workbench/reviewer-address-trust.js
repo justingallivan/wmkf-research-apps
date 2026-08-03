@@ -17,6 +17,7 @@ import {
   createAddressRepairRequest,
 } from '../../../lib/services/reviewer-address-trust-service';
 import { withRemediation } from '../../../lib/utils/reviewer-remediation';
+import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 const ACTIONS = new Set([
   'verify_person_and_address',
@@ -24,7 +25,6 @@ const ACTIONS = new Set([
   'retry_check',
   'create_repair_request',
 ]);
-const CANONICAL_CANDIDATE_KEY_RE = /^(suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/i;
 // The structured address action accepts a staff choice/evidence, never a
 // browser-produced stage receipt, source/result version, canonical-person
 // assertion, or mode switch.  The service derives those after authenticated
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
       message: 'That reviewer repair action is not supported.',
     }));
   }
-  if (action === 'verify_person_and_address' && candidateKey && !CANONICAL_CANDIDATE_KEY_RE.test(candidateKey)) {
+  if (action === 'verify_person_and_address' && candidateKey && !canonicalStoredReviewerCandidateKey(candidateKey)) {
     return res.status(400).json(withRemediation({
       success: false,
       decision: 'blocked',

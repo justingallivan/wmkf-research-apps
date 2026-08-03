@@ -13,6 +13,7 @@ import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 import {
+  canonicalStoredReviewerCandidateKey,
   reviewerCandidateKey as _reviewerCandidateKey,
   reviewerSuggestionCandidateKey,
   withReviewerCandidateKey as _withReviewerCandidateKey,
@@ -53,12 +54,8 @@ export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
 // client imports keep working while server (roster-store) + client share ONE impl.
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
-const CANONICAL_SERVER_PLAN_CANDIDATE_KEY = /^(?:suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/;
-
 function canonicalServerPlanCandidateKey(value) {
-  return typeof value === 'string' && CANONICAL_SERVER_PLAN_CANDIDATE_KEY.test(value)
-    ? value
-    : null;
+  return canonicalStoredReviewerCandidateKey(value);
 }
 
 export function hasCurrentServerPromotionPlan(candidate, plan) {

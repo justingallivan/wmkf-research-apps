@@ -73,6 +73,7 @@ import {
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
 import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
+import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -131,14 +132,12 @@ const RESPONSE_OUTCOMES = new Set([
 const RESPONSE_STAGE_STATES = new Set([
   'current', 'not_applicable', 'stale', 'refreshing', 'incomplete', 'failed',
 ]);
-const DEDICATED_STAFF_ACTION_STAGES = new Set(['identity', 'address_trust']);
-const CANONICAL_CANDIDATE_KEY = /^(?:suggestion|person|orcid|openalex|scholar|seed):[^\s:]{1,512}$/;
+const DEDICATED_STAFF_ACTION_STAGES = new Set(['address_trust']);
 const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
 const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
 
 function canonicalCandidateKey(value) {
-  const key = typeof value === 'string' ? value.trim() : '';
-  return CANONICAL_CANDIDATE_KEY.test(key) ? key : null;
+  return canonicalStoredReviewerCandidateKey(value);
 }
 
 function canonicalEvidenceDate(value) {
@@ -194,7 +193,8 @@ function planRefreshesInDependencyOrder(plan) {
 
 // This derives one action from the server-owned plan only. The browser never
 // derives a prerequisite from candidate evidence, and reserved structured staff
-// actions remain with their existing identity/address controls.
+// actions remain with their existing controls. Identity refresh runs the
+// server-side resolver; it never accepts a browser assertion of identity.
 export function reviewerStageRefreshTarget(candidate, plan) {
   const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
   const expectedUpdatedAt = serverRosterUpdatedAt(candidate?.rosterUpdatedAt);
@@ -1557,8 +1557,9 @@ export default function ReviewerSearchSection({
         onReloadRoster: () => reloadAfterStageRefresh(genRef.current),
       };
     }
-    // Identity confirmation and structured address trust have dedicated staff
-    // UI below; do not send either through the generic stage route.
+    // Structured address trust has dedicated staff UI below. Identity refresh
+    // is a server-side resolver action and remains available here; a later
+    // ambiguous result can still require the separate staff confirmation UI.
     if (target.kind === 'dedicated') return {};
     const state = stageRefreshStates[reviewerStageStateKey({
       requestId,

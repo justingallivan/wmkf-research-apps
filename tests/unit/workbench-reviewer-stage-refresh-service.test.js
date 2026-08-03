@@ -73,6 +73,7 @@ const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '22222222-2222-2222-2222-222222222222';
 const PERSON_ID = '33333333-3333-3333-3333-333333333333';
 const CANDIDATE_KEY = `suggestion:${SUGGESTION_ID}`;
+const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 const UPDATED_AT = '2026-08-02 12:00:00+00';
 const STARTED_UPDATED_AT = '2026-08-02 12:00:01+00';
 const APPLICANT_SOURCE = 'a'.repeat(64);
@@ -308,7 +309,7 @@ test('rejects unknown stages and a name-only identity before any roster or Datav
   expect(enrichRecommended).not.toHaveBeenCalled();
 });
 
-test('rejects legacy generic candidate-key namespaces before any roster read', async () => {
+test('rejects malformed historical and browser candidate-key namespaces before any roster read', async () => {
   for (const candidateKey of ['candidate:legacy-row', 'client:browser-row']) {
     await expect(refreshReviewerCandidateStage(target({ candidateKey }))).resolves.toMatchObject({
       outcome: 'rejected',
@@ -316,6 +317,34 @@ test('rejects legacy generic candidate-key namespaces before any roster read', a
     });
   }
   expect(findCandidateByKey).not.toHaveBeenCalled();
+});
+
+test('revalidates an exact active historical stored-row key without treating it as cold authority', async () => {
+  findCandidateByKey.mockResolvedValue(candidate({
+    candidateKey: STORED_CANDIDATE_KEY,
+    suggestionId: null,
+    potentialReviewerId: null,
+    isApplicantRecommended: false,
+    provenance: { kind: 'literature_retrieved' },
+    applicantInputVersion: null,
+  }));
+
+  const result = await refreshReviewerCandidateStage(target({ candidateKey: STORED_CANDIDATE_KEY }));
+
+  expect(result).toMatchObject({
+    outcome: 'recorded',
+    candidateKey: STORED_CANDIDATE_KEY,
+    stage: 'applicant_anchor',
+  });
+  expect(findCandidateByKey).toHaveBeenCalledWith(REQUEST_ID, STORED_CANDIDATE_KEY);
+  expect(findById).not.toHaveBeenCalled();
+  expect(startStageRefresh).toHaveBeenCalledWith(
+    REQUEST_ID,
+    STORED_CANDIDATE_KEY,
+    UPDATED_AT,
+    'applicant_anchor',
+    expect.objectContaining({ reason: 'manual_refresh' }),
+  );
 });
 
 test('rejects a suggestion from a different request without starting a stage write', async () => {

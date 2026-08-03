@@ -20,6 +20,7 @@ import handler, { parseRefreshRequest } from '../../pages/api/workbench/reviewer
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '22222222-2222-2222-2222-222222222222';
 const CANDIDATE_KEY = `suggestion:${SUGGESTION_ID}`;
+const STORED_CANDIDATE_KEY = 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university';
 
 function response() {
   return {
@@ -88,6 +89,13 @@ test('rejects address trust at the generic route in favor of its dedicated actio
   expect(parseRefreshRequest(body({ stage: 'address_trust' }))).toMatchObject({
     valid: false,
     code: 'dedicated_address_action',
+  });
+});
+
+test('accepts an exact historical stored-row key for server-side revalidation', () => {
+  expect(parseRefreshRequest(body({ candidateKey: STORED_CANDIDATE_KEY }))).toMatchObject({
+    valid: true,
+    value: { candidateKey: STORED_CANDIDATE_KEY },
   });
 });
 
