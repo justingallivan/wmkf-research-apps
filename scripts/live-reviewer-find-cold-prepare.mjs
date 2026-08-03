@@ -21,6 +21,11 @@ const {
   validateColdBrowserRequest,
 } = require('./lib/reviewer-find-cold-live-contract');
 const {
+  readProductionAuthoritySnapshot,
+  validateColdAuthorityBaseline,
+  publicAuthoritySummary,
+} = require('./lib/reviewer-find-cold-authority-audit');
+const {
   validateLiveConfig,
   isGuid,
   redactBrowserPath,
@@ -279,7 +284,9 @@ function boundedFailureCode(error) {
     'cold_fixture_state_unavailable',
     'cold_fixture_roster_not_empty',
     'cold_fixture_has_reviewer_lifecycle',
-    'cold_fixture_applicant_slate_mismatch',
+    'cold_authority_prod_reads_not_explicit',
+    'cold_authority_snapshot_unavailable',
+    'cold_authority_baseline_invalid',
     'runtime_target_attestation_unavailable',
     'proposal_metadata_not_current',
     'workbench_request_guid_missing',
@@ -404,6 +411,30 @@ async function readBoundedState(page, requestId) {
   };
 }
 
+async function readAndValidateColdAuthorityBaseline(state, requestId) {
+  // Require an explicit process-level acknowledgement. readProductionAuthoritySnapshot
+  // separately checks the registered production target and active interlock before
+  // issuing its bounded OAuth/Dataverse GETs.
+  if (process.env.DATAVERSE_ALLOW_PROD_READS !== 'yes') {
+    throw new Error('cold_authority_prod_reads_not_explicit');
+  }
+  let snapshot;
+  try {
+    snapshot = await readProductionAuthoritySnapshot({
+      requestId,
+      windowStart: state.startedAt,
+    });
+  } catch {
+    throw new Error('cold_authority_snapshot_unavailable');
+  }
+  const validation = validateColdAuthorityBaseline(snapshot, {
+    requestId,
+    expectedSuggestionCount: 5,
+  });
+  if (!validation.ok) throw new Error('cold_authority_baseline_invalid');
+  return publicAuthoritySummary(snapshot);
+}
+
 async function authenticatedPreflight(state, authState) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ storageState: authState });
@@ -439,11 +470,14 @@ async function authenticatedPreflight(state, authState) {
     state.internalRequestId = requestId;
     state.readiness.request = 'ready';
 
+    const authority = await readAndValidateColdAuthorityBaseline(state, requestId);
+    state.readiness.authority = 'ready';
+
     const baseline = await readBoundedState(page, requestId);
     if (!baseline.ok || !baseline.roster.success || !baseline.lifecycle.success) {
       throw new Error('cold_fixture_state_unavailable');
     }
-    state.baseline = baseline;
+    state.baseline = { ...baseline, authority };
     if (baseline.roster.total !== 0) throw new Error('cold_fixture_roster_not_empty');
     if (baseline.lifecycle.selected !== 0
       || baseline.lifecycle.invited !== 0
@@ -452,10 +486,10 @@ async function authenticatedPreflight(state, authState) {
       || baseline.lifecycle.reviewArtifacts !== 0) {
       throw new Error('cold_fixture_has_reviewer_lifecycle');
     }
-    if (baseline.lifecycle.totalSuggestions !== 5
-      || baseline.lifecycle.uninvitedSuggestions !== 5) {
-      throw new Error('cold_fixture_applicant_slate_mismatch');
-    }
+    // reviewer-rollup intentionally filters to selected/declined rows. A
+    // pristine applicant recommendation is unselected and therefore reports
+    // zero progress here; the direct authority snapshot above proves the five
+    // applicant-recommended rows instead.
     state.readiness.fixture = 'ready';
 
     const reconciled = await fetchJson(

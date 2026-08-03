@@ -15,6 +15,7 @@ const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_SUGGESTIONS = 25;
 const MAX_EMAIL_ACTIVITIES = 100;
 const SUGGESTION_ID = 'wmkf_appreviewersuggestionid';
+const APPLICANT_RECOMMENDED_DISPOSITION = 100000000;
 const SUGGESTION_FIELDS = Object.freeze([
   SUGGESTION_ID,
   '_wmkf_request_value',
@@ -24,6 +25,7 @@ const SUGGESTION_FIELDS = Object.freeze([
   'wmkf_invited',
   'wmkf_accepted',
   'wmkf_declined',
+  'wmkf_externaltokenrevoked',
   'wmkf_responsetype',
   'wmkf_emailsentat',
   'wmkf_materialssentat',
@@ -40,7 +42,6 @@ const SUGGESTION_FIELDS = Object.freeze([
   'wmkf_externaltokenhash',
   'wmkf_externaltokenissued',
   'wmkf_externaltokenexpires',
-  'wmkf_externaltokenrevoked',
   'wmkf_coiackedat',
   'wmkf_aiuseackedat',
   'wmkf_withdrawnsufficientat',
@@ -53,6 +54,40 @@ const EMAIL_FIELDS = Object.freeze([
   'statecode',
   'statuscode',
   '_regardingobjectid_value',
+]);
+const UNTOUCHED_BOOLEAN_FIELDS = Object.freeze([
+  'wmkf_selected',
+  'wmkf_invited',
+  'wmkf_accepted',
+  'wmkf_declined',
+  'wmkf_externaltokenrevoked',
+]);
+const EMPTY_LIFECYCLE_FIELDS = Object.freeze([
+  'wmkf_responsetype',
+]);
+const EMPTY_OUTREACH_FIELDS = Object.freeze([
+  'wmkf_emailsentat',
+  'wmkf_materialssentat',
+  'wmkf_remindersentat',
+  'wmkf_respondremindersentat',
+  'wmkf_responsereceivedat',
+]);
+const EMPTY_REVIEW_FIELDS = Object.freeze([
+  'wmkf_reviewstatus',
+  'wmkf_reviewreceivedat',
+  'wmkf_completedat',
+  'wmkf_thankyousentat',
+  'wmkf_proposalfirstaccessed',
+  'wmkf_reviewfilename',
+  'wmkf_reviewsharepointfolder',
+]);
+const EMPTY_TOKEN_AND_ACK_FIELDS = Object.freeze([
+  'wmkf_externaltokenhash',
+  'wmkf_externaltokenissued',
+  'wmkf_externaltokenexpires',
+  'wmkf_coiackedat',
+  'wmkf_aiuseackedat',
+  'wmkf_withdrawnsufficientat',
 ]);
 
 function canonical(value) {
@@ -88,6 +123,74 @@ function publicAuthoritySummary(snapshot) {
     emailActivityCount: normalized.emailActivities.length,
     emailActivityDigest: digest(normalized.emailActivities),
   };
+}
+
+function anchor(value) {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
+}
+
+function sameAnchor(left, right) {
+  const normalizedLeft = anchor(left);
+  const normalizedRight = anchor(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+}
+
+function hasDuplicate(values) {
+  const present = values.filter(Boolean);
+  return new Set(present).size !== present.length;
+}
+
+function isEmpty(value) {
+  return value === null || value === '';
+}
+
+/**
+ * Validate that the fixed cold fixture is a pristine set of applicant
+ * recommendations. This is deliberately a pure, public-safe result: callers
+ * receive failure codes only, never row identifiers or reviewer details.
+ */
+function validateColdAuthorityBaseline(snapshot, { requestId, expectedSuggestionCount = 5 } = {}) {
+  const normalized = normalizeAuthoritySnapshot(snapshot);
+  const failures = new Set();
+  const expectedRequest = anchor(requestId);
+  if (!expectedRequest) failures.add('authority_request_id_invalid');
+  if (!Number.isSafeInteger(expectedSuggestionCount) || expectedSuggestionCount < 1
+    || normalized.suggestions.length !== expectedSuggestionCount) {
+    failures.add('authority_suggestion_count_mismatch');
+  }
+  if (normalized.emailActivities.length !== 0) failures.add('authority_email_activity_not_empty');
+
+  const suggestionAnchors = normalized.suggestions.map((row) => anchor(row[SUGGESTION_ID]));
+  const reviewerAnchors = normalized.suggestions.map((row) => anchor(row._wmkf_potentialreviewer_value));
+  if (suggestionAnchors.some((value) => !value)) failures.add('authority_suggestion_anchor_missing');
+  if (reviewerAnchors.some((value) => !value)) failures.add('authority_potential_reviewer_anchor_missing');
+  if (hasDuplicate(suggestionAnchors)) failures.add('authority_suggestion_anchor_duplicate');
+  if (hasDuplicate(reviewerAnchors)) failures.add('authority_potential_reviewer_anchor_duplicate');
+
+  for (const row of normalized.suggestions) {
+    if (!sameAnchor(row._wmkf_request_value, expectedRequest)) {
+      failures.add('authority_request_linkage_mismatch');
+    }
+    if (row.wmkf_applicantdisposition !== APPLICANT_RECOMMENDED_DISPOSITION) {
+      failures.add('authority_applicant_disposition_mismatch');
+    }
+    if (UNTOUCHED_BOOLEAN_FIELDS.some((field) => row[field] !== false && row[field] !== null)) {
+      failures.add('authority_lifecycle_boolean_not_pristine');
+    }
+    if (EMPTY_LIFECYCLE_FIELDS.some((field) => !isEmpty(row[field]))) {
+      failures.add('authority_lifecycle_not_pristine');
+    }
+    if (EMPTY_OUTREACH_FIELDS.some((field) => !isEmpty(row[field]))) {
+      failures.add('authority_outreach_not_pristine');
+    }
+    if (EMPTY_REVIEW_FIELDS.some((field) => !isEmpty(row[field]))) {
+      failures.add('authority_review_not_pristine');
+    }
+    if (EMPTY_TOKEN_AND_ACK_FIELDS.some((field) => !isEmpty(row[field]))) {
+      failures.add('authority_token_or_acknowledgement_not_pristine');
+    }
+  }
+  return { ok: failures.size === 0, failures: [...failures].sort() };
 }
 
 function validateAuthorityUnchanged(before, after, { expectedSuggestionCount = 5 } = {}) {
@@ -160,10 +263,12 @@ async function readProductionAuthoritySnapshot({ requestId, windowStart }) {
 }
 
 module.exports = {
+  APPLICANT_RECOMMENDED_DISPOSITION,
   SUGGESTION_FIELDS,
   EMAIL_FIELDS,
   normalizeAuthoritySnapshot,
   publicAuthoritySummary,
+  validateColdAuthorityBaseline,
   validateAuthorityUnchanged,
   validateRosterAnchors,
   readProductionAuthoritySnapshot,

@@ -459,7 +459,12 @@ The runner and its independent checks are:
   --deployment-id <id> --commit <sha>` verifies the immutable deployment,
   normal staff auth, production-target/interlock attestation, exact request,
   five unengaged applicant suggestions, zero lifecycle activity, and an empty
-  Postgres Find roster;
+  Postgres Find roster. This requires an explicit local
+  `DATAVERSE_ALLOW_PROD_READS=yes` for the bounded, GET-only authority audit;
+  the reader also requires the registered production Dataverse host and active
+  target interlock. The browser's reviewer rollup intentionally returns zero
+  for these unselected, non-declined applicant rows, so the direct authority
+  snapshot—not rollup progress—proves the five applicant recommendations;
 - the not-yet-enabled Production action is specified to prepare only the
   priority-resolved standard proposal (no manual file override), explicitly
   verify the five applicant suggestions, and run one display-only general

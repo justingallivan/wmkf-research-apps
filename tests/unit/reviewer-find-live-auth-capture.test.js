@@ -29,5 +29,8 @@ describe('Reviewer Find live auth capture and preflight safety', () => {
     expect(coldPreflight).toContain('blockedBrowserRequestTotal: state.blockedBrowserRequestTotal');
     expect(coldPreflight).toContain('recordBlockedBrowserRequest(state, {');
     expect(coldPreflight).toContain("throw new Error('authenticated_reviewer_access_unavailable');");
+    expect(coldPreflight).toContain('readProductionAuthoritySnapshot({');
+    expect(coldPreflight).toContain("throw new Error('cold_authority_prod_reads_not_explicit');");
+    expect(coldPreflight).toContain("throw new Error('cold_authority_baseline_invalid');");
   });
 });
