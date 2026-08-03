@@ -982,9 +982,21 @@ describe('recordSurfaced', () => {
     expect(allInterpolations()).toEqual(expect.arrayContaining([false, '']));
   });
 
-  test('invalidates roster persistence whenever a generic evidence replacement wins', async () => {
-    await store.recordSurfaced(REQ, [{ name: 'Ann Lee' }]);
-    expect(queryTextOf(0)).toMatch(/stageFreshness'.*\- 'roster_persistence'/s);
+  test('drops every stage receipt when generic replacement evidence wins', async () => {
+    await store.recordSurfaced(REQ, [{
+      name: 'Ann Lee',
+      identityEvidence: { decision: 'changed evidence' },
+      stageFreshness: allCurrentUpstreams(),
+      stageRefresh: { identity: { refreshAttemptId: 'browser-lease' } },
+    }]);
+
+    const text = queryTextOf(0);
+    const submitted = jsonInterpolations().find((value) => value?.identityEvidence?.decision === 'changed evidence');
+    expect(submitted.stageFreshness).toBeUndefined();
+    expect(submitted.stageRefresh).toBeUndefined();
+    expect(text).toMatch(/'stageFreshness', '\{\}'::jsonb/);
+    expect(text).not.toMatch(/COALESCE\(reviewer_find_roster\.candidate->'stageFreshness'/);
+    expect(text).toMatch(/'stageRefresh', reviewer_find_roster\.candidate->'stageRefresh'/);
   });
 });
 
@@ -1037,6 +1049,75 @@ describe('recordSurfacedWithStageEvidence', () => {
     expect(outcomes).toEqual([expect.objectContaining({ outcome: 'skipped_stale' })]);
     expect(sql).toHaveBeenCalledTimes(2); // snapshot + cap; no candidate mutation
     expect(queryTextOf(0)).toMatch(/SELECT candidate_key/);
+  });
+
+  test('creates a cold deceased candidate as ineligible from projected eligibility evidence', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Pat' }, updated_at_token: 'version-2' }], rowCount: 1 });
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Pat', candidateKey: 'person:pat' },
+      stageEvidence: {
+        eligibility: coldEnvelope('eligibility', 'deceased', {
+          eligibilityStatus: 'deceased',
+          eligibilityCheckStatus: 'complete',
+        }),
+      },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'recorded' })]);
+    expect(allInterpolations()).toContain('ineligible');
+    expect(queryTextOf(1)).toMatch(/INSERT INTO reviewer_find_roster/);
+  });
+
+  test('marks an active cold row ineligible when projected eligibility is deceased', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'person:pat', status: 'active', updated_at_token: 'version-1',
+        candidate: { name: 'Pat', candidateKey: 'person:pat' },
+      }] })
+      .mockResolvedValueOnce({ rows: [{ candidate: { name: 'Pat' }, updated_at_token: 'version-2' }], rowCount: 1 });
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Pat', candidateKey: 'person:pat' },
+      expectedUpdatedAt: 'version-1',
+      stageEvidence: {
+        eligibility: coldEnvelope('eligibility', 'deceased', {
+          eligibilityStatus: 'deceased',
+          eligibilityCheckStatus: 'complete',
+        }),
+      },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({ outcome: 'recorded' })]);
+    expect(allInterpolations()).toContain('ineligible');
+    expect(queryTextOf(1)).toMatch(/SET status = CASE/);
+  });
+
+  test('leaves a staff-confirmed row untouched when cold evidence projects an identity-dependent stage', async () => {
+    const priorReceipts = allCurrentUpstreams();
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'person:ann', status: 'active', updated_at_token: 'version-1',
+      candidate: {
+        name: 'Ann', candidateKey: 'person:ann', stageFreshness: priorReceipts,
+        pdIdentityConfirmed: true,
+        staffIdentityConfirmation: { confirmationId: 'staff-confirm-1' },
+      },
+    }] });
+
+    const outcomes = await store.recordSurfacedWithStageEvidence(REQ, [{
+      candidate: { name: 'Ann', candidateKey: 'person:ann' },
+      expectedUpdatedAt: 'version-1',
+      stageEvidence: { applicant_anchor: coldEnvelope('applicant_anchor', 'new-anchor') },
+    }]);
+
+    expect(outcomes).toEqual([expect.objectContaining({
+      candidateKey: 'person:ann', outcome: 'partial', code: 'skipped_staff_authority',
+      stageOutcomes: expect.objectContaining({ identity: 'current' }),
+    })]);
+    expect(sql.mock.calls.some((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('UPDATE reviewer_find_roster'))).toBe(false);
+    expect(sql).toHaveBeenCalledTimes(2); // snapshot + cap only
   });
 
   test('discards forged candidate receipt/version/evidence fields and persists only projector output', async () => {

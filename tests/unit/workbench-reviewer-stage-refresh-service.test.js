@@ -147,6 +147,10 @@ test('refreshes exactly one canonical applicant anchor and never calls batch enr
 
   expect(EXECUTABLE_REVIEWER_REFRESH_STAGES).toEqual(expect.arrayContaining(['applicant_anchor', 'contact', 'roster_persistence']));
   expect(result).toMatchObject({ outcome: 'recorded', requestId: REQUEST_ID, candidateKey: CANDIDATE_KEY, stage: 'applicant_anchor' });
+  // The service has only the pre-write plan here. The client reloads the
+  // canonical roster after success, so a response must not expose it as the
+  // post-write plan.
+  expect(result).not.toHaveProperty('candidatePlan');
   expect(findCandidateByKey).toHaveBeenCalledWith(REQUEST_ID, CANDIDATE_KEY);
   expect(findById).toHaveBeenCalledWith(SUGGESTION_ID);
   expect(startStageRefresh).toHaveBeenCalledWith(
