@@ -7,6 +7,7 @@
  *
  * Usage:
  *   npm run smoke:reviewer-invite:auth -- --base-url https://wmkfresearch.vercel.app
+ *   npm run smoke:reviewer-find:auth -- --base-url https://wmkfresearch.vercel.app
  */
 import fs from 'fs';
 import path from 'path';
@@ -24,9 +25,11 @@ function hasFlag(name) {
 }
 
 if (hasFlag('help') || hasFlag('h')) {
-  console.log(`Usage: node scripts/save-playwright-auth-state.mjs --base-url <app-url> [--state .auth/reviewer-invite-smoke.json]
+  console.log(`Usage: node scripts/save-playwright-auth-state.mjs --base-url <app-url> [--state .auth/reviewer-invite-smoke.json] [--require-reviewers-access]
 
-Opens a headed browser for normal Microsoft sign-in and saves local auth state.
+Opens a headed browser for normal Microsoft sign-in. After Enter, it verifies
+the session before saving local auth state. --require-reviewers-access also
+verifies the normal staff Reviewer Find entitlement.
 The .auth/ directory is gitignored because it contains session cookies.`);
   process.exit(0);
 }
@@ -38,6 +41,9 @@ if (process.env.EMERGENCY_AUTH_BYPASS === 'true') {
 
 const baseUrl = (arg('base-url', process.env.LIVE_REVIEWER_BASE_URL || '') || '').replace(/\/$/, '');
 const statePath = arg('state', process.env.PLAYWRIGHT_AUTH_STATE || '.auth/reviewer-invite-smoke.json');
+const requireReviewersAccess = hasFlag('require-reviewers-access');
+const READINESS_TIMEOUT_MS = 60_000;
+const READINESS_POLL_MS = 1_000;
 
 if (!baseUrl) {
   console.error('Missing --base-url. Example: --base-url https://wmkfresearch.vercel.app');
@@ -45,6 +51,44 @@ if (!baseUrl) {
 }
 
 fs.mkdirSync(path.dirname(statePath), { recursive: true });
+
+async function readAuthReadiness(page) {
+  return page.evaluate(async ({ needsReviewersAccess }) => {
+    const readJson = async (relativePath) => {
+      const response = await fetch(relativePath, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      });
+      let body = null;
+      try { body = await response.json(); } catch { body = null; }
+      return { ok: response.ok, body };
+    };
+    const session = await readJson('/api/auth/session');
+    if (!session.ok || !session.body?.user) return { ready: false };
+    if (!needsReviewersAccess) return { ready: true };
+    const access = await readJson('/api/app-access');
+    return {
+      ready: access.ok && Array.isArray(access.body?.apps) && access.body.apps.includes('reviewers'),
+    };
+  }, { needsReviewersAccess: requireReviewersAccess });
+}
+
+async function waitForVerifiedReadiness(page) {
+  const deadline = Date.now() + READINESS_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      await page.goto(`${baseUrl}/workbench`, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+      const readiness = await readAuthReadiness(page);
+      if (readiness.ready) return true;
+    } catch {
+      // Microsoft may still be completing its normal redirect. Do not save
+      // storage state until an authenticated first-party session is confirmed.
+    }
+    await new Promise((resolve) => setTimeout(resolve, READINESS_POLL_MS));
+  }
+  return false;
+}
 
 const browser = await chromium.launch({
   headless: false,
@@ -56,9 +100,19 @@ await page.goto(`${baseUrl}/workbench`, { waitUntil: 'domcontentloaded' });
 
 console.log('\nA browser is open for normal staff sign-in.');
 console.log('After you are signed in and can see the Workbench, return here and press Enter.');
+console.log('Enter starts a bounded verification; it does not save credentials by itself.');
 const rl = createInterface({ input, output });
 await rl.question('Press Enter after sign-in is complete...');
 rl.close();
+
+const ready = await waitForVerifiedReadiness(page);
+if (!ready) {
+  await browser.close();
+  console.error(requireReviewersAccess
+    ? 'Reviewer Find access was not verified within 60 seconds; auth state was not saved.'
+    : 'A signed-in staff session was not verified within 60 seconds; auth state was not saved.');
+  process.exit(1);
+}
 
 await context.storageState({ path: statePath });
 await browser.close();

@@ -363,6 +363,12 @@ the existing capture script is headed and waits for a human. If stored state is
 absent or expired, mark Layer C blocked and continue Layers A and B; do not wait
 for input during an unattended run and do not enable an auth bypass.
 
+For Reviewer Find, the capture command verifies `/workbench`, an authenticated
+first-party session, and the `reviewers` app entitlement after Enter before it
+writes storage state. Enter alone never persists credentials. If normal
+Microsoft sign-in is still redirecting or the reviewer entitlement is absent,
+the bounded capture fails without saving a file.
+
 An existing signed-in Chrome window is useful for an immediate manual smoke but
 is not a durable test dependency. The repeatable runner should use Playwright
 storage state captured by `scripts/save-playwright-auth-state.mjs`.

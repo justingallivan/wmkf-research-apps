@@ -46,7 +46,7 @@
     "rehearse:reviewer-invite:browser": "node scripts/rehearse-pd-invite-browser.mjs",
     "smoke:reviewer-invite:auth": "node scripts/save-playwright-auth-state.mjs",
     "smoke:reviewer-invite:live": "node scripts/live-reviewer-invite-smoke.mjs",
-    "smoke:reviewer-find:auth": "node scripts/save-playwright-auth-state.mjs --state .auth/reviewer-find-live.json",
+    "smoke:reviewer-find:auth": "node scripts/save-playwright-auth-state.mjs --state .auth/reviewer-find-live.json --require-reviewers-access",
     "smoke:reviewer-find:cold:preflight": "node scripts/live-reviewer-find-cold-prepare.mjs preflight",
     "smoke:reviewer-find:preflight": "node scripts/live-reviewer-find-smoke.mjs preflight",
     "smoke:reviewer-find:live": "node scripts/live-reviewer-find-smoke.mjs run",

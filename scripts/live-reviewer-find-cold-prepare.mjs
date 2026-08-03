@@ -39,6 +39,7 @@ const CLI_MAX_OUTPUT_BYTES = 262144;
 const SHA_RE = /^[a-f0-9]{40}$/i;
 const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/i;
 const MAX_SAFE_COUNT = 10_000;
+const MAX_BLOCKED_BROWSER_REQUEST_ENTRIES = 25;
 
 function arg(name, defaultValue = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -155,6 +156,7 @@ function initialState(mode, config, deploymentClass) {
     milestones: {},
     browserRequestCounts: {},
     blockedBrowserRequests: [],
+    blockedBrowserRequestTotal: 0,
     baseline: null,
     postflight: null,
   };
@@ -180,6 +182,7 @@ function writeArtifact(state) {
     milestones: state.milestones,
     browserRequestCounts: state.browserRequestCounts,
     blockedBrowserRequests: state.blockedBrowserRequests,
+    blockedBrowserRequestTotal: state.blockedBrowserRequestTotal,
     baseline: publicBoundedState(state.baseline),
     postflight: publicBoundedState(state.postflight),
   };
@@ -352,6 +355,15 @@ function recordRequest(state, request) {
   state.browserRequestCounts[key] = (state.browserRequestCounts[key] || 0) + 1;
 }
 
+function recordBlockedBrowserRequest(state, entry) {
+  state.blockedBrowserRequestTotal = Number.isSafeInteger(state.blockedBrowserRequestTotal)
+    ? state.blockedBrowserRequestTotal + 1
+    : 1;
+  if (state.blockedBrowserRequests.length < MAX_BLOCKED_BROWSER_REQUEST_ENTRIES) {
+    state.blockedBrowserRequests.push(entry);
+  }
+}
+
 async function installFence(context, state, { coldProducers }) {
   context.on('request', (request) => recordRequest(state, request));
   await context.route('**/*', async (route) => {
@@ -366,7 +378,7 @@ async function installFence(context, state, { coldProducers }) {
     });
     const preflightSafe = ['GET', 'HEAD', 'OPTIONS'].includes(method) && decision.allowed;
     if ((!coldProducers && !preflightSafe) || (coldProducers && !decision.allowed)) {
-      state.blockedBrowserRequests.push({
+      recordBlockedBrowserRequest(state, {
         method: ['GET', 'HEAD', 'OPTIONS'].includes(method) ? method : 'MUTATION',
         path: safeArtifactPath(request.url(), state.deployment.baseUrl),
         reason: decision.reason || 'preflight_mutation_forbidden',
@@ -398,10 +410,17 @@ async function authenticatedPreflight(state, authState) {
   await installFence(context, state, { coldProducers: false });
   const page = await context.newPage();
   try {
-    await page.goto(`${state.deployment.baseUrl}/api/auth/session`, {
-      waitUntil: 'domcontentloaded',
-      timeout: REQUEST_TIMEOUT_MS,
-    });
+    try {
+      await page.goto(`${state.deployment.baseUrl}/api/auth/session`, {
+        waitUntil: 'domcontentloaded',
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+    } catch {
+      // An expired session can redirect to Microsoft. The cold fence correctly
+      // aborts that off-origin request; report the actionable auth condition
+      // rather than treating it as a generic browser failure.
+      throw new Error('authenticated_reviewer_access_unavailable');
+    }
     const auth = await fetchJson(page, '/api/auth/session');
     const access = await fetchJson(page, '/api/app-access');
     if (!auth.ok || !auth.body?.user || !access.ok || !access.body?.apps?.includes('reviewers')) {

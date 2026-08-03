@@ -13,6 +13,7 @@
 /playwright/.cache/
 /.auth/
 /.artifacts/reviewer-find-live/
+/.artifacts/reviewer-find-cold-live/
 
 # Next.js
 /.next/
