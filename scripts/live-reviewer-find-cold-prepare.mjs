@@ -45,6 +45,7 @@ const SHA_RE = /^[a-f0-9]{40}$/i;
 const ROSTER_VERSION_RE = /^[a-f0-9]{64}$/i;
 const MAX_SAFE_COUNT = 10_000;
 const MAX_BLOCKED_BROWSER_REQUEST_ENTRIES = 25;
+const COLD_OBSERVATION_ID = 'rfw_coldprepare1002914';
 
 function arg(name, defaultValue = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -142,11 +143,12 @@ async function readDeployment({ deploymentId, baseUrl, expectedCommit, deploymen
     : { ok: false, reason: summary.reasons[0] || 'vercel_deployment_unverified', summary };
 }
 
-function initialState(mode, config, deploymentClass) {
+function initialState(mode, config, deploymentClass, observationId) {
   return {
     schemaVersion: 1,
     kind: 'reviewer_find_cold_preparation',
     requestNumber: COLD_REQUEST_NUMBER,
+    observationId,
     mode,
     startedAt: new Date().toISOString(),
     startedAtMs: Date.now(),
@@ -177,6 +179,7 @@ function writeArtifact(state) {
     schemaVersion: state.schemaVersion,
     kind: state.kind,
     requestNumber: state.requestNumber,
+    observationId: state.observationId,
     mode: state.mode,
     startedAt: state.startedAt,
     completedAt: new Date().toISOString(),
@@ -437,7 +440,10 @@ async function readAndValidateColdAuthorityBaseline(state, requestId) {
 
 async function authenticatedPreflight(state, authState) {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ storageState: authState });
+  const context = await browser.newContext({
+    storageState: authState,
+    extraHTTPHeaders: { 'x-reviewer-find-observation-id': state.observationId },
+  });
   await installFence(context, state, { coldProducers: false });
   const page = await context.newPage();
   try {
@@ -531,14 +537,14 @@ async function main() {
     deploymentId: arg('deployment-id', process.env.VERCEL_DEPLOYMENT_ID || ''),
     expectedCommit: arg('commit', process.env.VERCEL_GIT_COMMIT_SHA || ''),
     deploymentClass: 'preview',
-    observationId: 'rfw_coldprepare1002914',
+    observationId: COLD_OBSERVATION_ID,
   });
   if (!config.ok) throw new Error(`invalid_live_config:${config.failures.join(',')}`);
   config.deploymentId = arg('deployment-id', process.env.VERCEL_DEPLOYMENT_ID || '');
   config.expectedCommit = arg('commit', process.env.VERCEL_GIT_COMMIT_SHA || '');
   const authState = localAuthStatePath(arg('auth-state', DEFAULT_AUTH_STATE));
   if (!authState) throw new Error('Auth state must be a JSON file under .auth/.');
-  const state = initialState(mode, config, 'preview');
+  const state = initialState(mode, config, 'preview', COLD_OBSERVATION_ID);
 
   if (hasFlag('dry-run')) {
     state.readiness.localConfig = 'ready';

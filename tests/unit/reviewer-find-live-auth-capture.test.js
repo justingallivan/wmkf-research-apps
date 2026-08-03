@@ -32,5 +32,8 @@ describe('Reviewer Find live auth capture and preflight safety', () => {
     expect(coldPreflight).toContain('readProductionAuthoritySnapshot({');
     expect(coldPreflight).toContain("throw new Error('cold_authority_prod_reads_not_explicit');");
     expect(coldPreflight).toContain("throw new Error('cold_authority_baseline_invalid');");
+    expect(coldPreflight).toContain("const COLD_OBSERVATION_ID = 'rfw_coldprepare1002914';");
+    expect(coldPreflight).toContain('observationId: COLD_OBSERVATION_ID');
+    expect(coldPreflight).toContain("extraHTTPHeaders: { 'x-reviewer-find-observation-id': state.observationId }");
   });
 });
