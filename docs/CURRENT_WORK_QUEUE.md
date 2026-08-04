@@ -182,6 +182,10 @@ These are valid directions but are not current app-team delivery commitments:
   inputs, and deadlines before any build.
 - Proposal-context extraction and staged-pipeline evolution — later-cycle work, not part of the
   current reviewer campaign.
+- Excluded-reviewers structured intake (`docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md`,
+  S398) — schema contract drafted; repo-side Phases A/B (Dataverse wave + backend consumption)
+  are buildable on owner go, but final field names and the form work wait on the Justin×Connor
+  reconciliation meeting (agenda in the plan §6).
 
 ## Parked — do not resurface without a new decision
 

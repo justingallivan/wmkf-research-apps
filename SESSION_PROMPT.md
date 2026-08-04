@@ -5,6 +5,48 @@
 > owner-smoked with a measured ~47% warm-settle cut. All smoke scaffolding is
 > removed and verified. Nothing here is urgent. Run `/start` first.
 
+## Session 398 progress (2026-08-04, same day — latency dig SET ASIDE by owner)
+
+All gates were green at start; git clean. The latency thread below is
+**deliberately set aside** (owner, 2026-08-04) in favor of the major queue
+items (`docs/CURRENT_WORK_QUEUE.md` Current sequence). Do not resume it
+without an owner pick from the increment options.
+
+1. **Traffic-gated observation window VOIDED** (`88cf40b1`): reviewer search
+   runs ~twice per year, so the S397 "~90d window gates Candidate B" was
+   vacuous. New memory
+   `project-reviewer-find-usage-cadence-blocks-observation-windows`;
+   reconciled in DEVELOPMENT_LOG, findings doc, and here.
+2. **Client-side measurement pass (5 production loads, owner's Chrome).**
+   Both S397 [ASSUMED] attributions resolved; full data in
+   `outputs/reviewer-find-warm-revisit-step0-findings.md` "Client-side
+   capture" + "Dig pass" sections. Headlines: the pre-fetch gap is
+   ~1.1–1.35s of sequential auth-gating fetches (a RequireAuth
+   render-race unmount/remount — not script); `applicant-reviewers` is the
+   dominant cost (median ~4.0s at N=4 slots, ~2.9s fixed floor at N=0) and
+   its Haiku exclusion parse NEVER fired on 1002903; `load-proposal` blob
+   HIT confirmed both loads (residual 1.7–3.3s is the SharePoint listFiles
+   invalidation check, by design).
+3. **Dig pass (3 Sonnet agents + orchestrator).** Decomposition: ingestion
+   critical path = 1 + 2N + 2 sequential Dataverse round-trips, N almost
+   always 5 when nonzero (slot census bimodal: 363 zero / 207 four-five).
+   Exclusion-text prevalence: 43/570 (~8%) substantive. The survey needed a
+   one-off owner-authorized `DATAVERSE_ALLOW_PROD_READS=yes` (command-scoped,
+   nothing to clean up); the interlock correctly fail-closed first.
+4. **Excluded-reviewers structured intake plan** (`766b6cd2`, routing
+   `bd3bc534`): `docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md` — schema
+   contract for Connor reconciliation; repo-side Phases A/B buildable without
+   the form. Queued under dependency-bound work.
+
+### Owner decision pending — next latency increment (pick ONE, tier-gated)
+- **C. Auth-waterfall fix** (RequireAuth render race + auth/status dedupe):
+  ~0.5–1.0s on every page. Recommended first; S395-adjacent, keep single-change.
+- **D. applicant-reviewers slot loop** (parallelize + skip no-op PATCH):
+  ~1–2s on N=5 warm revisits. **D0** cheap precursor: attribute the ~2.9s
+  N=0 fixed floor before sizing D.
+- **B. exclusion-parse cache**: helps only the ~8% substantive requests; also
+  largely obsoleted for new data if the structured-intake plan ships.
+
 ## Session 397 Summary
 
 A long full-arc session: housekeeping → dependency fix → Step 0 measurement →
@@ -91,14 +133,13 @@ Step 1 build/review/ship/verify/cleanup.
 
 ### Parked
 
-1. **Candidate B (exclusion-parse cache).** Re-open trigger: a deliberate
-   smoke shows the Haiku exclusion parse is actually firing and costing
-   materially on a warm revisit, and the owner approves a new increment.
-   (No longer gated on an observation window — see Verified Open #1.)
-   Evidence: Step 0 findings doc.
-2. **~1.9s client mount delay before the Find panel fetches.** Deliberately
-   left — render-sequencing work is closest to the S395 burn zone. Re-open
-   only inside an approved increment.
+1. **Candidate B (exclusion-parse cache).** SUPERSEDED by the S398 dig: it is
+   now option B in the decision-pending list above (helps ~8% of requests;
+   never fired on 1002903; partly obsoleted by the structured-intake plan).
+2. **~1.9s client mount delay before the Find panel fetches.** RESOLVED as a
+   mystery by the S398 measurement: it is ~1.1–1.35s of RequireAuth
+   render-race auth gating, now option C in the decision-pending list above.
+   The S395-burn-zone caution stands: single-change, tier-gated if approved.
 
 ### Verify Before Acting
 
