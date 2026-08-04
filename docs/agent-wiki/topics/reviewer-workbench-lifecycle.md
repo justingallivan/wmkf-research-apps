@@ -1,6 +1,6 @@
 ---
 agent_wiki: topic
-status: active
+status: stale
 last_verified: 2026-08-03
 stale_after_days: 90
 owner: reviewers
@@ -47,11 +47,6 @@ source_files:
   - lib/external/verify-suggestion-token.js
   - lib/services/review-receipt-guard.js
   - lib/services/reviewer-roster-store.js
-  - lib/services/workbench/reviewer-stage-reconciliation-service.js
-  - lib/services/workbench/reviewer-stage-refresh-service.js
-  - lib/services/workbench/reviewer-stage-producers/contact.js
-  - pages/api/workbench/reviewer-reconcile.js
-  - pages/api/workbench/reviewer-stage-refresh.js
   - lib/services/contact-enrichment-service.js
 canonical_docs:
   - docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md
