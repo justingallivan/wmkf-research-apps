@@ -38,14 +38,13 @@
    out-of-range bump to 5.0.9) and moderate `postcss` pinned under `next`
    (likely needs a `next` upgrade). `main` auto-deploys — treat either as a
    deliberate change with full verification.
-2. **[P2] Verify temporary smoke scaffolding was removed** (owner was doing
-   this at session end; verify, don't assume):
-   - Vercel Preview env var `DATAVERSE_ALLOW_PROD_READS` on branch
-     `reviewer-find-revert-baseline` (`vercel env ls`).
-   - Entra redirect URI
-     `https://wmkfresearchapps-git-reviewer-76ad8d-justin-gallivans-projects.vercel.app/api/auth/callback/azure-ad`
-     on app `WMK: SSO Authentication` (appId
-     `a652a292-2574-434c-ae6f-aa01f61d82ad`) — Codex removes it via `az`.
+2. ~~Temporary smoke scaffolding~~ — DONE in S396: owner removed the Vercel
+   Preview env var `DATAVERSE_ALLOW_PROD_READS` (verified via `vercel env rm`
+   output) and Codex removed the temporary Entra redirect URI (independently
+   verified via `az ad app show` — the registration is back to its four
+   permanent callbacks). Note: a local homebrew Azure CLI now exists and is
+   owner-login authenticated for the `wmkeck.org` tenant; see the
+   dev-environment wiki topic for its verified capabilities and caveats.
 3. **[P2] Wiki topic** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
    was marked stale during the incident (S395, commit `08bdbe7c`). Refresh it
    against the now-live baseline behavior and clear the stale marker.
