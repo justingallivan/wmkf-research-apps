@@ -139,7 +139,13 @@ Claude config sync, and environment-specific operating notes.
   e.g. its redirect URIs. [VERIFIED 2026-08-03 via `az ad app show` after
   interactive `az login`.] Write access (adding/removing temporary
   preview-smoke callbacks, historically done via Codex/Cloud Shell) is
-  [ASSUMED] — not yet exercised from this install. Home tenant `wmkeck.org`
+  [VERIFIED 2026-08-04: owner-run `az ad app update --web-redirect-uris`
+  from this install added a temporary Preview callback successfully
+  (session S397 live probe, 2026-08-04 — post-update `az ad app show`
+  returned all five URIs: the four permanent callbacks plus the temporary
+  branch-alias one). Note: in that session the Claude Code auto-mode permission
+  classifier denied the agent running the same write directly; expect to
+  hand the exact command to the owner rather than executing it]. Home tenant `wmkeck.org`
   signs in; the separate "Grant Application Portal" tenant demands extra MFA
   [VERIFIED via 2026-08-03 `az login` output]. Treat any tenant-level write as
   confirm-first and remove temporary callbacks after use (see
