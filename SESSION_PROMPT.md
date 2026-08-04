@@ -68,13 +68,38 @@
    `reviewer-find-outcome-contract` is ABANDONED but kept for history — never
    merge it.
 
+## Reviewer Find latency — incremental plan ACTIVE (S397, 2026-08-04)
+
+The freeze is lifted: the owner approved a new incremental, tier-gated plan
+(measure → one cache per increment → observe). Record of truth:
+`outputs/reviewer-find-warm-revisit-step0-findings.md` (gitignored working
+doc — durable facts must be re-homed at closeout if the file is retired).
+- **Step 0 measured** (production, 2026-08-04): warm revisit ≈5.9s; roster
+  GET cheap; the repeated work was `load-proposal` (full PDF re-download +
+  Blob re-upload every view) and the ungated Haiku exclusion parse.
+- **Step 1 SHIPPED to production**: proposal blob cache
+  (`efa6aa5e`+`bc3a8739`+`122e6661`, main ff → `c4e08fcc`). Full chain:
+  sonnet build → opus review (3 hardenings) → Codex adversarial (1 hardening
+  + 1 pre-existing finding deferred) → Preview smoke → owner production
+  smoke: MISS→HIT proven on `1003010`; `1002903` warm settle ~3.1s vs 5.9s
+  baseline (~47% cut). Observation window ~90d (one blob-sweep cycle) gates
+  the Candidate B (exclusion-parse cache) go/no-go.
+- **Deferred backlog item (owner to prioritize)**: enrichment cache
+  staleness on in-place proposal updates — PRE-EXISTING on main, verified
+  not introduced by Step 1; fix shape recorded in the findings doc.
+- **Cleanup status**: Preview env var removed (verified); merged branch
+  deleted local+origin; temporary Entra callback restore to the four
+  permanent URIs was handed to the owner — VERIFY DONE before closeout
+  (`az ad app show --id a652a292-2574-434c-ae6f-aa01f61d82ad --query
+  "web.redirectUris"` must list exactly four).
+
 ## Standing constraints
 
-- **Latency/performance work stays frozen** until the owner approves a NEW
-  incremental, tier-gated plan per
-  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Read
+- Latency/performance work proceeds ONLY within the incremental plan above —
+  one owner-approved increment at a time, tier-gated, with its own
+  observation window. Read
   `.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md` before
-  drafting one.
+  proposing any expansion.
 - Do not cherry-pick from `5b6757df..7072d52a` or from
   `reviewer-find-outcome-contract` without owner sign-off.
 - Request `1002903` remains read-only; no reviewer promotion/invite/email
