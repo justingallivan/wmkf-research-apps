@@ -32,12 +32,15 @@
 
 1. **[P1] Remaining lockfile advisories** (the revert reintroduced advisories;
    S396 late: owner ran the non-force `npm audit fix`, which cleared the
-   `ip-address` high — verified via types + 6,774 unit tests + build, shipped
-   as `f9d9a1f2`, production Ready). Still open, both needing an owner
-   decision: `brace-expansion` (high, DoS — requires `npm audit fix --force`,
-   out-of-range bump to 5.0.9) and moderate `postcss` pinned under `next`
-   (likely needs a `next` upgrade). `main` auto-deploys — treat either as a
-   deliberate change with full verification.
+   `ip-address` high, shipped as `f9d9a1f2`). S397: the `brace-expansion`
+   high (GHSA-rgw5-rvv9-x895) is FIXED and promoted to `main` (`3130733e`,
+   owner-approved ff) — no `--force` was needed: the advisory sat on the
+   vendored compat shim's upstream pin (`vendor/brace-expansion-compat`,
+   `npm:brace-expansion@5.0.8`), bumped to `5.0.9` in place; verified via
+   shim/minimatch smoke + types + 6,774 unit tests + production build.
+   Still open, needing an owner decision: moderate `postcss` pinned under
+   `next` (likely needs a `next` upgrade). `main` auto-deploys — treat it as
+   a deliberate change with full verification.
 2. ~~Temporary smoke scaffolding~~ — DONE in S396: owner removed the Vercel
    Preview env var `DATAVERSE_ALLOW_PROD_READS` (verified via `vercel env rm`
    output) and Codex removed the temporary Entra redirect URI (independently
