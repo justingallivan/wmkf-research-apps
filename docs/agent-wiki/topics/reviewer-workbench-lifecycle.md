@@ -264,6 +264,8 @@ legacy free-text values visible, so no existing referral is lost. Until S349
 
 Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmkf_potentialreviewer1..5`) are integrated into the main candidate list on the Find tab rather than shown in a separate bottom card. As of S264, ingestion creates these rows with `wmkf_selected=false`; the candidate pool is the PD-selected set, and applicant-suggested rows enter it only when a Program Director explicitly promotes the existing junction row.
 
+**Ingestion performance contract (increment D, S399, production-verified):** the lazy `GET /api/workbench/applicant-reviewers` slot materialization runs all populated slots **concurrently** (`Promise.allSettled`; the S210 person-dedup set is fully built before any await, response slot ordering and per-slot failure isolation unchanged), and `ensureApplicantRecommended` **skips its PATCH when it would be a no-op** (row already `disposition=recommended` + `applicant` in sources + no empty descriptive field to fill). The skip is scoped to `!requireEtag` — the sole `requireEtag:true` caller (the merge service's provenance-union in `lib/services/reviewer-merge.js`, grep-verified S399) deliberately keeps its always-write ETag-conditional PATCH so a raced disposition flip still 412s before a loser-row delete. D0 evidence basis (2026-08-04, single true-cold N=5 production sample): the old sequential loop was ~2.0s of a ~3.4s handler total; measurements in `outputs/reviewer-find-warm-revisit-step0-findings.md` §D0.
+
 **Historical warm-reconciliation build, reverted (deployed through `7072d52a`,
 reverted 2026-08-03 S396 — see the incident section above):** the abandoned
 build gave `ReviewerFindPanel` a cached-then-reconciled roster read with
