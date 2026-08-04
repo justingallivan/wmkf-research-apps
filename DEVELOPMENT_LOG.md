@@ -22,7 +22,9 @@ fail-open). Review chain: sonnet build → opus (3 hardenings) → Codex adversa
 1 pre-existing enrichment-staleness finding deferred to backlog). Owner-smoked MISS→HIT in
 production; all temporary smoke scaffolding removed and verified.
 **Why it matters:** first proof the measure-first, one-cache-per-increment discipline works where
-the S394 big-bang failed; ~90d observation window now gates the next increment (Candidate B).
+the S394 big-bang failed. (The "~90d observation window gates Candidate B" sequencing recorded
+here was **voided by the owner 2026-08-04**: reviewer search runs ~twice per year, so an
+organic-traffic window collects no data — follow-on increments are decided on deliberate smokes.)
 **Pointers:** `SESSION_PROMPT.md` "incremental plan ACTIVE";
 `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` blob-cache subsection;
 commits `efa6aa5e`, `bc3a8739`, `122e6661`, `c4e08fcc`.

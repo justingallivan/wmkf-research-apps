@@ -66,12 +66,17 @@ Step 1 build/review/ship/verify/cleanup.
 
 ### Verified Open
 
-1. **Blob-cache observation window (~90d, one blob-sweep cycle, from
-   2026-08-04).** Evidence: `outputs/reviewer-find-warm-revisit-step0-findings.md`
+1. **Blob-cache hazard watch (passive, open-ended, from 2026-08-04).**
+   Evidence: `outputs/reviewer-find-warm-revisit-step0-findings.md`
    (gitignored working doc; durable summary below and in the wiki topic).
    Passive: watch for `[load-proposal] blob cache` MISS-rate anomalies or the
    documented delete-after-hit window (analyze fails `Failed to fetch uploaded
    file`, reload self-heals) in any owner report. No action unless signal.
+   **The former "~90d observation window" is VOID as a gate** (owner,
+   2026-08-04): reviewer search runs ~twice per year, so an organic-traffic
+   window yields no data. Follow-on increments are decided on deliberate
+   smokes, not elapsed time. See
+   `.claude-memory/project-reviewer-find-usage-cadence-blocks-observation-windows.md`.
 
 ### Owner Decision Needed
 
@@ -86,9 +91,11 @@ Step 1 build/review/ship/verify/cleanup.
 
 ### Parked
 
-1. **Candidate B (exclusion-parse cache).** Re-open trigger: observation
-   window data shows remaining warm-revisit latency justifies it, owner
-   approves a new increment. Evidence: Step 0 findings doc.
+1. **Candidate B (exclusion-parse cache).** Re-open trigger: a deliberate
+   smoke shows the Haiku exclusion parse is actually firing and costing
+   materially on a warm revisit, and the owner approves a new increment.
+   (No longer gated on an observation window — see Verified Open #1.)
+   Evidence: Step 0 findings doc.
 2. **~1.9s client mount delay before the Find panel fetches.** Deliberately
    left — render-sequencing work is closest to the S395 burn zone. Re-open
    only inside an approved increment.
