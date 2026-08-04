@@ -15,6 +15,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import ProfileLinkingDialog from './ProfileLinkingDialog';
+import { getAuthEnabled } from '../utils/auth-enabled';
 
 export default function RequireAuth({ children }) {
   const router = useRouter();
@@ -24,24 +25,10 @@ export default function RequireAuth({ children }) {
   // and prevents loading-state flicker. Auth UI appears after the fetch.
   const [authEnabled, setAuthEnabled] = useState(false);
 
-  // Check auth status on mount (client-side)
+  // Check auth status on mount (client-side). Shared, deduped lookup —
+  // Layout mounts on the same page load and needs the same answer (S398).
   useEffect(() => {
-    // Use cached value if available
-    if (typeof window !== 'undefined' && window.__AUTH_ENABLED__ !== undefined) {
-      setAuthEnabled(window.__AUTH_ENABLED__);
-      return;
-    }
-    fetch('/api/auth/status')
-      .then(res => res.json())
-      .then(data => {
-        if (typeof window !== 'undefined') {
-          window.__AUTH_ENABLED__ = data.enabled;
-        }
-        setAuthEnabled(data.enabled);
-      })
-      .catch(() => {
-        setAuthEnabled(false);
-      });
+    getAuthEnabled().then(setAuthEnabled);
   }, []);
 
   useEffect(() => {
@@ -64,16 +51,18 @@ export default function RequireAuth({ children }) {
     return children;
   }
 
-  // Loading state
+  // While the session is still resolving, KEEP children mounted. Children
+  // already render before any auth check completes (the !authEnabled branch
+  // above — designed no-flicker behavior), so this widens nothing; server
+  // routes and the fail-closed RequireAppAccess/AppAccessContext guards stay
+  // authoritative. Swapping to a spinner here unmounted the provider subtree
+  // mid-flight (authEnabled flips true while useSession() is 'loading'),
+  // discarding the in-flight /api/app-access result and re-fetching it on
+  // remount — measured at ~0.3-0.4s per warm page load, ~2s when app-access
+  // ran slow, S398. The 'unauthenticated' branch below still replaces
+  // children with the sign-in screen once the session actually resolves.
   if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Checking authentication...</p>
-        </div>
-      </div>
-    );
+    return children;
   }
 
   // Not authenticated - redirect to signin

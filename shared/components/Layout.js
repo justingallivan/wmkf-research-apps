@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useProfile } from '../context/ProfileContext';
 import { useAppAccess } from '../context/AppAccessContext';
+import { getAuthEnabled } from '../utils/auth-enabled';
 import { APP_REGISTRY } from '../config/appRegistry';
 import ProfileSelector from './ProfileSelector';
 
@@ -22,12 +23,10 @@ export default function Layout({
   const { currentProfile } = useProfile();
   const { hasAccess, isSuperuser } = useAppAccess();
 
-  // Check if auth is enabled
+  // Check if auth is enabled — shared, deduped lookup (one /api/auth/status
+  // per page load across RequireAuth + Layout, S398).
   useEffect(() => {
-    fetch('/api/auth/status')
-      .then(res => res.json())
-      .then(data => setAuthEnabled(data.enabled))
-      .catch(() => setAuthEnabled(false));
+    getAuthEnabled().then(setAuthEnabled);
   }, []);
 
   // Fetch active alert count for superusers (for nav badge)
