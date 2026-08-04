@@ -1,102 +1,80 @@
-# Session Prompt: Deploy the Reviewer Find baseline revert (Session 396)
+# Session Prompt: Post-revert steady state (Session 397)
 
-> **Owner-directed handoff, 2026-08-03 (late).** Session 395 post-mortemed the
-> warm-performance debacle and built the recovery branch. Your ONE job:
-> get production functional (the owner's boss can use the app, slow is fine),
-> then stop. Run `/start` first.
+> **Handoff, 2026-08-03 (late, Session 396).** The Reviewer Find
+> warm-reconciliation incident is CLOSED. Production runs the pre-rollout
+> baseline again and the owner smoked it. This session starts from a working
+> production; nothing here is urgent. Run `/start` first.
 
-## Objective (owner's words)
+## What Session 396 did
 
-Restore the app to its "fine, just slow" state. No reconcile buttons, no
-per-card evidence-repair actions, checkboxes on previously-found reviewers.
-Latency work is explicitly deferred until the owner approves a new,
-incremental, tier-gated plan.
+- Ran the full `/start` gate suite on branch `reviewer-find-revert-baseline`:
+  all gates green (including the doc-drift gates the S395 handoff expected to
+  be red — S395's doc cleanup had already handled them).
+- Pushed the branch; Vercel Git integration built a Preview
+  (stable alias `wmkfresearchapps-git-reviewer-76ad8d-…vercel.app`).
+- Preview smoke initially failed with "Failed to load dashboard": the
+  Dataverse target interlock correctly denied preview→prod reads. Fixed per
+  the owner-decided S355 pattern — owner set `DATAVERSE_ALLOW_PROD_READS=yes`
+  scoped to the branch's Preview env, redeploy, smoke passed.
+- Owner smoke (preview, then production) verified Request `1002903`: warm
+  roster with checkboxes on selectable rows (Shapiro, Ferrara), identity-gated
+  rows correctly read-only with the confirm affordance (Rajan, Kim, Lu —
+  checkbox gating confirmed against
+  `shared/components/reviewers/ReviewerSearchSection.js:2773-2809`), no
+  "Reconcile previously found reviewers" button, no per-card evidence-refresh.
+- On owner go: fast-forwarded `main` `aef99e63 → 2fc29b82` and pushed.
+  Production deployment `dpl_EbFDP4PpPa9K91bs9CnuH2yUviW1` Ready, serving all
+  prod domains; owner re-smoked production. Incident closed.
+- Durable closeout: incident doc marked `status: historical` with a resolution
+  section; `DEVELOPMENT_LOG.md` milestone entry; memory-router line updated.
 
-## Where things stand
+## Open items for this or a later session
 
-- **[VERIFIED] Branch `reviewer-find-revert-baseline`** holds the recovery:
-  runtime tree (lib/pages/shared/tests/scripts/package.json/.github) restored
-  byte-for-byte to `94c5b9d9` (2026-08-01 22:36 — plan docs locked, zero
-  implementation; the last tree with no identified defect), plus the one
-  genuine keeper from the hotfix chain: `institution-coi-context.js`
-  strict-GUID → permissive `isGuid` (from `edbe6931`; that bug predates the
-  rollout). Docs/memory kept at HEAD as history.
-- **[VERIFIED] Green on the branch:** `check:types`, all 527 unit suites
-  (6,412 tests), `npm run build`.
-- **[VERIFIED] Data is safe:** the rollout added zero DB migrations, zero
-  env/cron requirements; all its state lives inside the roster `candidate`
-  JSONB, which baseline code treats as opaque and passes through; staff
-  identity confirmations / address attestations from the incident window use
-  pre-existing field names baseline code reads. Nothing was promoted, invited,
-  or emailed during the incident.
-- **[NOT DONE] Not deployed, not pushed, not merged.** Production still serves
-  the broken `7072d52a`-era build.
-- Branch `reviewer-find-outcome-contract` holds Session 395's earlier
-  forward-fix work (repair plan, regression fixtures, R0/R1 Codex reviews).
-  It is ABANDONED as a direction — keep for history, do not merge.
+1. **[P1] Lockfile advisories reintroduced by the revert** (Dependabot +
+   `npm audit`, verified S396): `ip-address` ≤10.3.0 (high, SSRF/trust-boundary
+   misclassification — plain `npm audit fix` resolves in-range) and
+   `brace-expansion` (high, DoS — fix requires `npm audit fix --force`,
+   out-of-range bump to 5.0.9, riskier). Also pre-existing moderate
+   `postcss`-via-`next`. Plan: run the non-force `npm audit fix`, full unit
+   suite + `check:types` + build, commit; decide the `--force` bump separately
+   with the owner. `main` auto-deploys — treat as a deliberate small change.
+2. **[P2] Verify temporary smoke scaffolding was removed** (owner was doing
+   this at session end; verify, don't assume):
+   - Vercel Preview env var `DATAVERSE_ALLOW_PROD_READS` on branch
+     `reviewer-find-revert-baseline` (`vercel env ls`).
+   - Entra redirect URI
+     `https://wmkfresearchapps-git-reviewer-76ad8d-justin-gallivans-projects.vercel.app/api/auth/callback/azure-ad`
+     on app `WMK: SSO Authentication` (appId
+     `a652a292-2574-434c-ae6f-aa01f61d82ad`) — Codex removes it via `az`.
+3. **[P2] Wiki topic** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
+   was marked stale during the incident (S395, commit `08bdbe7c`). Refresh it
+   against the now-live baseline behavior and clear the stale marker.
+4. **[P3] Optional read-only check** (inherited from S395, never done): confirm
+   a reviewer identity/address confirmation made during the incident window
+   (Aug 1–3) still renders on its roster card. Read-only.
+5. **Branch hygiene (do NOT delete without owner say-so):**
+   `reviewer-find-revert-baseline` is merged (can be deleted normally);
+   `reviewer-find-outcome-contract` is ABANDONED but kept for history — never
+   merge it.
 
-## Post-mortem (read before doing anything clever)
+## Standing constraints
 
-`.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md` — the
-short version: a Friday-night latency plan self-expanded into a fail-closed
-receipts/authority rewrite presented as "settled decisions," implementation
-started 31 minutes after the plan was locked, 76 commits went direct to
-auto-deploying `main` with no tier gate, verification never constructed the
-production data shape, and five stacked hotfixes entrenched the breakage.
-Superseded docs: `REVIEWER_FIND_PERFORMANCE_PLAN.md`,
-`REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`, `REVIEWER_FIND_BROWSER_TEST_PLAN.md`.
-
-## Next steps, in order (this session's whole scope)
-
-1. `/start` housekeeping on branch `reviewer-find-revert-baseline`; re-run the
-   branch's own gate suite (baseline `package.json` — its `check:*` list is
-   the authority, not the one in the /start skill text) and full unit tests;
-   expect green as recorded above.
-2. Expect and triage doc-drift gates only: docs at HEAD may reference removed
-   code paths (`check:doc-symbol-refs`, `check:build-claim-freshness`,
-   memory-drift advisories). Fix by marking docs historical/superseded —
-   NEVER by resurrecting code.
-3. Push the branch, create a Vercel **preview** deployment, and have the
-   owner smoke it: warm roster for Request `1002903` shows previously-found
-   reviewers with checkboxes; no "Reconcile previously found reviewers"
-   button; no per-card "Refresh … evidence" actions; Katherine Ferrara and
-   Kanaka Rajan rows render. Kanaka may show identity/institution caution
-   copy — that's the pre-rollout state, acceptable.
-4. On owner approval ONLY: merge to `main` (this is the deliberate Tier
-   promotion), confirm the production deployment is Ready and serving, owner
-   re-smokes production.
-5. Close out durable surfaces: incident doc
-   (`REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`) → resolved-by-
-   revert note + `status: historical`; memory router Task Routing lines for
-   the incident; `DEVELOPMENT_LOG.md` entry; rewrite this file for the next
-   session.
-6. If time and owner energy allow, verify staff-authority data survived in
-   the UI (a row confirmed during the incident still shows its confirmation).
-   Read-only checks only.
-
-## Do not
-
-- Do not merge or push `main` without the owner's explicit go after the
-  preview smoke.
-- Do not start latency/performance work of any kind. The future latency
-  effort requires a NEW owner-approved plan, tier-gated per
-  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, built in small
-  slices on top of working behavior.
-- Do not cherry-pick anything else from `5b6757df..7072d52a` or from the
-  `reviewer-find-outcome-contract` branch without owner sign-off.
-- Do not send email, promote, or invite reviewers during verification.
-  Request `1002903` stays read-only.
-- Do not "fix" doc-drift gates by restoring deleted modules.
+- **Latency/performance work stays frozen** until the owner approves a NEW
+  incremental, tier-gated plan per
+  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Read
+  `.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md` before
+  drafting one.
+- Do not cherry-pick from `5b6757df..7072d52a` or from
+  `reviewer-find-outcome-contract` without owner sign-off.
+- Request `1002903` remains read-only; no reviewer promotion/invite/email
+  during any verification.
 
 ## Handoff summary
 
 ```text
-Previous owner: Session 395 (Fable) — post-mortem + revert construction
-Branch: reviewer-find-revert-baseline @ (uncommitted at handoff-write time;
-  commit lands as the session's final act — verify with git log)
-Baseline: 94c5b9d9 runtime tree + edbe6931 GUID fix
-Production: still broken (7072d52a era) until step 4
-Data: untouched, verified revert-safe
-Abandoned branch (keep, don't merge): reviewer-find-outcome-contract
-Post-mortem memory: feedback-latency-plan-scope-accretion-postmortem
+Previous owner: Session 396 (Fable) — preview smoke, production promotion, closeout
+Branch: main @ 2fc29b82 (= reviewer-find-revert-baseline tip, merged)
+Production: dpl_EbFDP4PpPa9K91bs9CnuH2yUviW1 Ready, owner-smoked, incident CLOSED
+Incident doc: docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md (historical)
+Next candidate first task: item 1 (lockfile advisories)
 ```

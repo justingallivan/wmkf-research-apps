@@ -2,8 +2,8 @@
 title: Reviewer Find Warm-Reconciliation Production Incident — 2026-08-03
 domain: reviewer-workbench
 kind: status
-status: active
-summary: "Handoff assessment of the deployed Reviewer Find warm-reconciliation work, verified recoveries, remaining production regressions, and the safest next actions."
+status: historical
+summary: "RESOLVED BY REVERT 2026-08-03 (S396): production restored to the 94c5b9d9 baseline plus the edbe6931 GUID fix. Body is the historical open-incident assessment."
 canonical: false
 cataloged: 2026-08-03
 owner: product-engineering
@@ -18,9 +18,37 @@ related:
 
 # Reviewer Find Warm-Reconciliation Production Incident — 2026-08-03
 
-## Executive assessment
+## Resolution (2026-08-03, Session 396) — CLOSED BY REVERT
 
-**Incident status: OPEN. Production must not be described as fixed.**
+Production was restored by fast-forwarding `main` to `2fc29b82` (branch
+`reviewer-find-revert-baseline`) [VERIFIED via S396 git merge/push and Vercel
+inspect]. Per the S395 handoff's construction record: the runtime tree was
+restored byte-for-byte to the pre-rollout baseline `94c5b9d9`, keeping only
+the `edbe6931` `institution-coi-context.js` permissive-`isGuid` fix (that bug
+predated the rollout), and no data migration was needed — incident-era roster
+state lives inside `candidate` JSONB the baseline treats as opaque [VERIFIED
+in S395 per SESSION_PROMPT handoff; not re-derived in S396]. Owner smoked a
+Preview deployment and then production (`dpl_EbFDP4PpPa9K91bs9CnuH2yUviW1`,
+Ready, serving all prod domains) [VERIFIED via S396 owner smoke + vercel
+inspect]: Request `1002903` warm roster renders with checkboxes on selectable
+rows, no reconcile/evidence-refresh controls, Ferrara correct, Rajan in the
+expected pre-rollout identity-caution state (checkbox gating confirmed against
+`shared/components/reviewers/ReviewerSearchSection.js:2773-2809`).
+Forward-fix branch `reviewer-find-outcome-contract` is abandoned (kept for
+history). Root-cause lessons:
+`.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md`.
+Known revert side effect: the restored `package-lock.json` reintroduced
+high-severity transitive advisories (`ip-address`, `brace-expansion`)
+[VERIFIED via S396 `npm audit`] — tracked in `SESSION_PROMPT.md` as
+next-session work.
+
+Everything below is the historical assessment written while the incident was
+open; "current"/"live" claims in the body describe the since-reverted
+`7072d52a` build.
+
+## Executive assessment (historical)
+
+**Incident status at write time: OPEN (since resolved by revert — see above).**
 
 The August 2–3 Reviewer Find performance release is merged to `main`, pushed,
 and deployed. It added a cached warm-read path, per-candidate stage receipts,

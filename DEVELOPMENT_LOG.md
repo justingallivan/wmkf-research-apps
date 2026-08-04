@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Warm-reconciliation incident closed by baseline revert (Sessions 395–396)
+
+**Milestone:** The Session-394 rollout was reverted wholesale; production runs the pre-rollout
+baseline again and the incident is closed.
+**Sessions:** 395 (post-mortem + revert construction), 396 (preview smoke, promotion, closeout).
+**Ship state:** `main` fast-forwarded to `2fc29b82` — runtime tree restored to `94c5b9d9` plus the
+`edbe6931` `isGuid` fix; production deployment `dpl_EbFDP4PpPa9K91bs9CnuH2yUviW1` Ready and
+owner-smoked (Request `1002903` warm roster correct, no reconcile/evidence-refresh UI). Zero data
+migration; forward-fix branch `reviewer-find-outcome-contract` abandoned. Revert side effect: two
+high-severity transitive lockfile advisories reintroduced (`ip-address`, `brace-expansion`) — open.
+**Why it matters:** revert-first beat forward-fixing a 76-commit untier-gated rollout; latency work
+restarts only under a new owner-approved, tier-gated plan.
+**Pointers:** `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` (resolution section);
+`.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md`; `SESSION_PROMPT.md`.
+
 ## August 2026 — Reviewer Find warm-reconciliation rollout remains an open production incident (Session 394)
 
 **Milestone:** A 50-commit warm-revisit/reconciliation release reached Production, repaired several
