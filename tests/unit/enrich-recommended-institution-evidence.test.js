@@ -67,7 +67,10 @@ jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () =>
 }));
 jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
 
-import { institutionEvidenceConnectsIdentity } from '../../lib/services/workbench/enrich-recommended-service';
+import {
+  institutionEvidenceConnectsIdentity,
+  institutionVerdictReason,
+} from '../../lib/services/workbench/enrich-recommended-service';
 const { createInstitutionConsistencyChecker } = require('../../lib/services/institution-affiliation-consistency');
 
 // Abstaining resolver: mirrors captured production behavior for decorated
@@ -133,6 +136,39 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
   test('missing operands still abstain (null), preserving the fail-closed fallback upstream', async () => {
     await expect(compare(null, 'Columbia University')).resolves.toBe(null);
     await expect(compare(CAPTURED.columbia.evidence, null)).resolves.toBe(null);
+  });
+
+  test('verdict reason: a decided contradiction names BOTH compared institutions', () => {
+    const reason = institutionVerdictReason({
+      contradictionSource: 'compared',
+      contradictedEvidence: CAPTURED.zhou.evidence,
+      finalAffiliation: 'Texas A&M University',
+    });
+    expect(reason).toContain('Northwestern University');
+    expect(reason).toContain('Texas A&M University');
+    expect(reason).not.toMatch(/contradict the listed institution$/);
+  });
+
+  test('verdict reason: a comparison error reads as unverified, never as affirmative contradiction', () => {
+    const reason = institutionVerdictReason({ contradictionSource: 'comparison_error' });
+    expect(reason).toContain('could not be completed');
+    expect(reason).toContain('unverified');
+    expect(reason).not.toContain('contradict');
+  });
+
+  test('verdict reason: a carried prior flag says so', () => {
+    expect(institutionVerdictReason({ contradictionSource: 'prior_flag' }))
+      .toContain('earlier verification pass');
+  });
+
+  test('verdict reason: long bylines are clipped for copy, not dumped verbatim', () => {
+    const reason = institutionVerdictReason({
+      contradictionSource: 'compared',
+      contradictedEvidence: CAPTURED.zhou.listed, // 300+ chars
+      finalAffiliation: 'Texas A&M University',
+    });
+    expect(reason).toContain('…');
+    expect(reason.length).toBeLessThan(400);
   });
 
   test('resolved-institution direct match still short-circuits before any checker call', async () => {

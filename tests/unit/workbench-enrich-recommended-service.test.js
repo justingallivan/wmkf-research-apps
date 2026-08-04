@@ -893,7 +893,10 @@ test('an institution contradiction overrides a probable identity verdict and lea
     email: null,
     hasInstitutionCOI: false,
   });
-  expect(candidate.reasoning).toMatch(/contradict the listed institution/i);
+  // S400 increment B: the contradiction copy names BOTH compared institutions
+  // instead of the old vague "contradict the listed institution".
+  expect(candidate.reasoning).toMatch(/place them at “Expected University”/);
+  expect(candidate.reasoning).toMatch(/could not be reconciled with the listed “Different University”/);
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(writeIdentityDecision).not.toHaveBeenCalled();
   expect(setMatchReason).not.toHaveBeenCalled();
