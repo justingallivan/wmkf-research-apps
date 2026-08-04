@@ -30,14 +30,14 @@
 
 ## Open items for this or a later session
 
-1. **[P1] Lockfile advisories reintroduced by the revert** (Dependabot +
-   `npm audit`, verified S396): `ip-address` ≤10.3.0 (high, SSRF/trust-boundary
-   misclassification — plain `npm audit fix` resolves in-range) and
-   `brace-expansion` (high, DoS — fix requires `npm audit fix --force`,
-   out-of-range bump to 5.0.9, riskier). Also pre-existing moderate
-   `postcss`-via-`next`. Plan: run the non-force `npm audit fix`, full unit
-   suite + `check:types` + build, commit; decide the `--force` bump separately
-   with the owner. `main` auto-deploys — treat as a deliberate small change.
+1. **[P1] Remaining lockfile advisories** (the revert reintroduced advisories;
+   S396 late: owner ran the non-force `npm audit fix`, which cleared the
+   `ip-address` high — verified via types + 6,774 unit tests + build, shipped
+   as `f9d9a1f2`, production Ready). Still open, both needing an owner
+   decision: `brace-expansion` (high, DoS — requires `npm audit fix --force`,
+   out-of-range bump to 5.0.9) and moderate `postcss` pinned under `next`
+   (likely needs a `next` upgrade). `main` auto-deploys — treat either as a
+   deliberate change with full verification.
 2. **[P2] Verify temporary smoke scaffolding was removed** (owner was doing
    this at session end; verify, don't assume):
    - Vercel Preview env var `DATAVERSE_ALLOW_PROD_READS` on branch
@@ -76,5 +76,5 @@ Previous owner: Session 396 (Fable) — preview smoke, production promotion, clo
 Branch: main @ 2fc29b82 (= reviewer-find-revert-baseline tip, merged)
 Production: dpl_EbFDP4PpPa9K91bs9CnuH2yUviW1 Ready, owner-smoked, incident CLOSED
 Incident doc: docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md (historical)
-Next candidate first task: item 1 (lockfile advisories)
+Next candidate first task: item 1 (owner decision on remaining advisories)
 ```
