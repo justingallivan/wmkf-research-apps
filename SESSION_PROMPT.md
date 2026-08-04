@@ -56,11 +56,10 @@ post-merge), main ff `912ab995 → 27aba5be`.
   re-measurement post-promotion — gate went from 2–3 sequential rounds to
   ONE app-access round-trip fired at t≈130ms; the stacked-slow-app-access
   blowout mode (3.9s gate, pre-C load 3) is structurally eliminated. 6,790
-  tests green. **Cleanup pending**: the temporary Entra preview callback
-  (`…-git-fix-requi-f5589c-….vercel.app/api/auth/callback/azure-ad`) still
-  needs owner-run removal — restore command handed to owner 2026-08-04;
-  verify via `az ad app show` returning exactly four URIs before marking
-  this done.
+  tests green. **Cleanup COMPLETE**: temporary Entra preview callback
+  removed — owner-run `az ad app update` 2026-08-04, post-restore
+  `az ad app show` returned exactly the four permanent URIs [VERIFIED via
+  owner-pasted output, S398].
 - **Known remaining (out of scope, attributed)**: `user-profiles` +
   `user-preferences` still fetch twice — the second `session` response
   landing with the real profileId re-fires ProfileProvider's init effect
