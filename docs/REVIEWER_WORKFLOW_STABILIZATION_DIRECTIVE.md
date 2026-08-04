@@ -378,6 +378,16 @@ finished or fully production-proved.
 
 ## S399 addendum — enrichment identity-verdict findings (2026-08-04)
 
+> [RECHECKED after lib/services/workbench/enrich-recommended-service.js change:
+> S400 added TEMP `[verdict-trace]` instrumentation (sentinel `TEMP S400`) —
+> 62 inserted lines, 0 deletions (`git diff --stat`, 2026-08-04) — so
+> `enrich-recommended-service.js` line numbers cited below refer to the
+> pre-instrumentation shape and are shifted by up to ~62 lines until the trace
+> is removed. Verdict inputs and outputs are untouched (insert-only diff; trace
+> state is local and never read by the verdict path); the trace adds structured
+> `console.log` lines plus trace-only read calls to OpenAlex. Remove this note
+> with the instrumentation.]
+
 Observed on request `1002903` after increment D's production smoke, then
 investigated read-only. A fresh owner-triggered enrichment run reproduced the
 same outcome: **all five applicant-referred reviewers flagged "Institution
