@@ -1170,6 +1170,10 @@ test('a resolved co-affiliation suppresses the string mismatch instead of creati
     needsIdentification: false,
     identityStatus: 'probable',
     email: 'reviewer@mit.edu',
+    // S400 increment D: the DTO carries the RECONCILED verdict — the cleared
+    // contradiction must not leave the stale pre-comparison mismatch flag
+    // (and its banner) on a verified card.
+    institutionMismatch: false,
   });
   expect(upsertByPotentialReviewer).toHaveBeenCalled();
 });
