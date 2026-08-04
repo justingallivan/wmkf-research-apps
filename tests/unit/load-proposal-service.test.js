@@ -11,8 +11,11 @@
  * Also covers the Step 1 proposal-blob-cache addition (S397,
  * outputs/reviewer-find-warm-revisit-step0-findings.md "Step 1 — APPROVED"):
  * deterministic cache path, head()-hit short-circuit, head()-miss/head()-error
- * fall-through to download+put, and cache-key sensitivity to lastModified/
- * size/fileKey-override. `file()` fixture fields (name/size/mimeType/
+ * fall-through to download+put, cache-key sensitivity to lastModified/size/
+ * fileKey-override, the cached-size-mismatch guard (treat as miss, self-heal
+ * via overwrite), and the miss-path race guard (file changed between listing
+ * and download → uncached random-suffix upload, never persisted under a
+ * stale version key). `file()` fixture fields (name/size/mimeType/
  * lastModified/folder) mirror the exact shape GraphService.listFiles returns
  * per-item (lib/services/graph-service.js:351-359: name, size,
  * lastModified: item.lastModifiedDateTime, mimeType, webUrl, id, folder).
@@ -229,10 +232,12 @@ test('golden path (cache miss) downloads, uploads at the deterministic hashed pa
 
 test('cache hit: returns the existing blob contract-identical, with no download or put', async () => {
   listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  // `file()`'s default size is 10 — the cached blob's size must match
+  // picked.size for this to count as a real hit.
   head.mockResolvedValue({
     url: 'https://blob.example/cached.pdf',
     contentType: 'application/pdf',
-    size: 12345,
+    size: 10,
     pathname: 'reviewer-finder/1002836/deadbeefdeadbeef/Proposal_1002836.pdf',
   });
   const out = await loadProposal({ requestId: REQ });
@@ -241,7 +246,7 @@ test('cache hit: returns the existing blob contract-identical, with no download 
     blobUrl: 'https://blob.example/cached.pdf',
     filename: 'Proposal_1002836.pdf',
     contentType: 'application/pdf',
-    size: 12345,
+    size: 10,
     picked: 'akoya_request::F/Reviewer Materials::Proposal_1002836.pdf',
     requestNumber: '1002836',
     allFiles: [expect.objectContaining({
@@ -252,6 +257,34 @@ test('cache hit: returns the existing blob contract-identical, with no download 
   });
   expect(downloadFileByPath).not.toHaveBeenCalled();
   expect(put).not.toHaveBeenCalled();
+});
+
+test('head() hit with a mismatched size is treated as a miss (warns, downloads, self-heals via overwrite)', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  // Codex adversarial finding: a stored blob whose size doesn't match the
+  // metadata we keyed the cache on (hash collision, or an entry written
+  // under a since-widened key scheme) must not be served as-is.
+  head.mockResolvedValue({
+    url: 'https://blob.example/cached.pdf',
+    contentType: 'application/pdf',
+    size: 12345,
+    pathname: 'reviewer-finder/1002836/deadbeefdeadbeef/Proposal_1002836.pdf',
+  });
+  const out = await loadProposal({ requestId: REQ });
+  expect(downloadFileByPath).toHaveBeenCalled();
+  expect(put).toHaveBeenCalledWith(
+    expect.stringMatching(CACHE_PATH_RE),
+    expect.any(Buffer),
+    expect.objectContaining({ addRandomSuffix: false, allowOverwrite: true }),
+  );
+  expect(out.blobUrl).toBe('https://blob.example/x.pdf');
+  expect(out.size).toBe(10);
+  expect(warnSpy).toHaveBeenCalledWith(
+    '[load-proposal] blob cache size mismatch (treating as miss): '
+    + 'cached=12345 expected=10 request=1002836',
+  );
+  warnSpy.mockRestore();
 });
 
 test('cache hit payload is contract-identical to the cache miss payload for the same file', async () => {
@@ -310,6 +343,45 @@ test('missing lastModified/size skips the cache check entirely and falls straigh
   expect(downloadFileByPath).toHaveBeenCalled();
   expect(put).toHaveBeenCalled();
   expect(out.blobUrl).toBe('https://blob.example/x.pdf');
+});
+
+test('miss path: file changed between listing and download (size mismatch) uploads uncached at the legacy random-suffix path', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]); // listed size: 10
+  downloadFileByPath.mockResolvedValue({
+    buffer: Buffer.from('xyz'), filename: 'Proposal_1002836.pdf', mimeType: 'application/pdf', size: 999,
+  });
+  const out = await loadProposal({ requestId: REQ });
+  expect(put).toHaveBeenCalledWith(
+    'reviewer-finder/1002836/Proposal_1002836.pdf',
+    expect.any(Buffer),
+    { access: 'public', contentType: 'application/pdf', addRandomSuffix: true },
+  );
+  // Never written under the version-keyed cache path.
+  expect(put).not.toHaveBeenCalledWith(
+    expect.stringMatching(CACHE_PATH_RE),
+    expect.anything(),
+    expect.anything(),
+  );
+  expect(out).toEqual({
+    success: true,
+    blobUrl: 'https://blob.example/x.pdf',
+    filename: 'Proposal_1002836.pdf',
+    contentType: 'application/pdf',
+    size: 999,
+    picked: 'akoya_request::F/Reviewer Materials::Proposal_1002836.pdf',
+    requestNumber: '1002836',
+    allFiles: [expect.objectContaining({
+      name: 'Proposal_1002836.pdf',
+      classification: 'proposal',
+      source: 'dynamics',
+    })],
+  });
+  expect(warnSpy).toHaveBeenCalledWith(
+    '[load-proposal] downloaded size 999 != listed size 10 '
+    + 'for request=1002836 — file changed mid-flight, uploading uncached',
+  );
+  warnSpy.mockRestore();
 });
 
 test('an explicit fileKey override picks its own file identity and therefore its own cache key', async () => {
