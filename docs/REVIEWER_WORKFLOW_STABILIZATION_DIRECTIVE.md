@@ -378,9 +378,12 @@ finished or fully production-proved.
 
 ## S399 addendum — enrichment identity-verdict findings (2026-08-04)
 
-> [Branch `fix/enrichment-identity-verdict` note: the S400 fix work modifies
-> `enrich-recommended-service.js`, so line refs in this addendum drift on the
-> branch; they will be reconciled in the branch's docs pass before promotion.]
+> [STALE-ACCEPTED: lib/services/workbench/enrich-recommended-service.js — the
+> `fix/enrichment-identity-verdict` branch (increments A–E, S400) modifies this
+> file, so line refs in this addendum drift on the branch. Behavior claims in
+> findings 1–4 describe the PRE-FIX state the branch remediates. Full
+> reconciliation happens in the branch's docs pass after the Codex review
+> verdict, before promotion.]
 >
 > S400 update: attribution CLOSED via a one-run production capture (TEMP
 > `[verdict-trace]` instrumentation, added and removed same-day; line refs
