@@ -589,16 +589,56 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
       selected: false,
       engagement: expect.objectContaining({ handled: false, stage: null }),
     });
-    const payload = DynamicsService.updateRecord.mock.calls[0][2];
-    // The update must NOT flip wmkf_selected back to true.
-    expect(payload.wmkf_selected).toBeUndefined();
+    // Since increment D (S399) this converged row is a recognized no-op: NO
+    // write is issued at all, which is the strongest possible non-resurrection
+    // guarantee for a staff-removed candidate.
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
-  test('is idempotent — re-running with applicant already in sources keeps a single source', async () => {
+  test('is idempotent — re-running with applicant already in sources issues NO write (no-op skip)', async () => {
     DynamicsService.queryRecords.mockResolvedValue({
       records: [{
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'applicant',
+        wmkf_suggestionlabel: 'Title — Jane Doe',
+        wmkf_selected: true,
+      }],
+    });
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      id: SUGGESTION_ID,
+      created: false,
+      selected: true,
+      engagement: expect.objectContaining({ handled: true, stage: 'selected' }),
+    });
+  });
+
+  test('no-op skip does NOT fire when sources lack applicant (PATCH still issued)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'claude',
+        wmkf_suggestionlabel: 'Title — Jane Doe',
+      }],
+    });
+
+    await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_sources).toBe('claude,applicant');
+  });
+
+  test('no-op skip does NOT fire when disposition is not yet recommended (PATCH still issued)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: null,
         wmkf_sources: 'applicant',
         wmkf_suggestionlabel: 'Title — Jane Doe',
       }],
@@ -606,9 +646,49 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
 
     await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
 
-    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
-    expect(payload.wmkf_sources).toBe('applicant');
+    expect(payload.wmkf_applicantdisposition).toBe(APPLICANT_DISPOSITION_MAP.recommended);
+  });
+
+  test('no-op skip does NOT fire when an empty field would be filled (PATCH still issued)', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'applicant',
+        wmkf_suggestionlabel: null,
+      }],
+    });
+
+    await ensureApplicantRecommended({
+      potentialReviewerId: PR_ID,
+      requestId: REQUEST_ID,
+      suggestionLabel: 'Title — Jane Doe',
+    });
+
+    const payload = DynamicsService.updateRecord.mock.calls[0][2];
+    expect(payload.wmkf_suggestionlabel).toBe('Title — Jane Doe');
+  });
+
+  test('requireEtag bypasses the no-op skip — the merge caller keeps its ETag-conditional write', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({
+      records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+        wmkf_sources: 'applicant',
+        wmkf_suggestionlabel: 'Title — Jane Doe',
+        _etag: 'W/"123"',
+      }],
+    });
+
+    await ensureApplicantRecommended(
+      { potentialReviewerId: PR_ID, requestId: REQUEST_ID },
+      { requireEtag: true },
+    );
+
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    const opts = DynamicsService.updateRecord.mock.calls[0][3];
+    expect(opts.ifMatch).toBe('W/"123"');
   });
 
   test('excluded wins — never flips an existing excluded row to recommended', async () => {

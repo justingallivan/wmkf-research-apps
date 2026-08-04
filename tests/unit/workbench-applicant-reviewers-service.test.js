@@ -159,6 +159,48 @@ test('extraction failure never blocks recommended ingestion (excludedParseFailed
   expect(body.errors).toEqual([{ stage: 'excluded-extraction', error: 'llm down' }]);
 });
 
+test('slot materializations run concurrently — every populated slot is dispatched before any resolves (increment D, S399)', async () => {
+  getById.mockResolvedValue(baseRequest({
+    _wmkf_potentialreviewer1_value: P1,
+    _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+    _wmkf_potentialreviewer2_value: P2,
+    _wmkf_potentialreviewer2_value_formatted: 'Dr. Two',
+  }));
+  let inFlight = 0;
+  let maxInFlight = 0;
+  ensureApplicantRecommended.mockImplementation(async () => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setImmediate(resolve));
+    inFlight -= 1;
+    return { id: 'sug-1', created: true, skippedExcluded: false };
+  });
+  await ingestApplicantReviewers(args);
+  expect(maxInFlight).toBe(2);
+});
+
+test('response slot ordering is preserved even when a later slot resolves first', async () => {
+  getById.mockResolvedValue(baseRequest({
+    _wmkf_potentialreviewer1_value: P1,
+    _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+    _wmkf_potentialreviewer2_value: P2,
+    _wmkf_potentialreviewer2_value_formatted: 'Dr. Two',
+  }));
+  let resolveSlot1;
+  ensureApplicantRecommended
+    .mockImplementationOnce(() => new Promise((resolve) => {
+      resolveSlot1 = () => resolve({ id: 'sug-1', created: true, skippedExcluded: false });
+    }))
+    .mockImplementationOnce(async () => {
+      // Slot 2 resolves immediately, then releases slot 1.
+      setImmediate(() => resolveSlot1());
+      return { id: 'sug-2', created: true, skippedExcluded: false };
+    });
+  const body = await ingestApplicantReviewers(args);
+  expect(body.recommended.map((r) => r.slot)).toEqual([1, 2]);
+  expect(body.recommended.map((r) => r.suggestionId)).toEqual(['sug-1', 'sug-2']);
+});
+
 test('passes acting user + request-derived label/cycle/programArea to the adapter', async () => {
   getById.mockResolvedValue(baseRequest({
     wmkf_meetingdate: '2026-06-01',
