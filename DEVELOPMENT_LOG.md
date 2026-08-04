@@ -10,6 +10,23 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — First tier-gated latency increment ships: warm-revisit proposal blob cache (Session 397)
+
+**Milestone:** The post-incident incremental latency plan went from approval to a measured
+production win in one session: warm-revisit ≈5.9s → ≈3.1s on Request `1002903` (~47%).
+**Sessions:** 397 (Step 0 measurement, Step 1 build/review/ship, cleanup; also cleared the
+`brace-expansion` high advisory via a vendored-shim pin bump, `3130733e`).
+**Ship state:** `main` ff `1d1753f7 → c4e08fcc`; `load-proposal` now `head()`-checks a
+deterministic version-keyed Blob path before SharePoint (size-validated hit, race-guarded miss,
+fail-open). Review chain: sonnet build → opus (3 hardenings) → Codex adversarial (1 hardening;
+1 pre-existing enrichment-staleness finding deferred to backlog). Owner-smoked MISS→HIT in
+production; all temporary smoke scaffolding removed and verified.
+**Why it matters:** first proof the measure-first, one-cache-per-increment discipline works where
+the S394 big-bang failed; ~90d observation window now gates the next increment (Candidate B).
+**Pointers:** `SESSION_PROMPT.md` "incremental plan ACTIVE";
+`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` blob-cache subsection;
+commits `efa6aa5e`, `bc3a8739`, `122e6661`, `c4e08fcc`.
+
 ## August 2026 — Warm-reconciliation incident closed by baseline revert (Sessions 395–396)
 
 **Milestone:** The Session-394 rollout was reverted wholesale; production runs the pre-rollout
