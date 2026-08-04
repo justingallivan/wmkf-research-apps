@@ -20,14 +20,22 @@ export function getAuthEnabled() {
   }
   if (inFlight) return inFlight;
   inFlight = fetch('/api/auth/status')
-    .then((res) => res.json())
-    .then((data) => {
-      const enabled = !!data.enabled;
+    .then(async (res) => {
+      // A non-2xx or shape-invalid response is a RETRYABLE failure, never a
+      // cacheable "auth disabled": a transient 503 JSON body must not disable
+      // the client auth gate for the page lifetime (Codex adversarial review,
+      // S398 — the old inline code self-healed here because it cached the raw
+      // undefined, which the cache check treated as unset).
+      if (!res.ok) throw new Error(`auth/status ${res.status}`);
+      const data = await res.json();
+      if (typeof data.enabled !== 'boolean') {
+        throw new Error('auth/status: invalid response shape');
+      }
       if (typeof window !== 'undefined') {
-        window.__AUTH_ENABLED__ = enabled;
+        window.__AUTH_ENABLED__ = data.enabled;
       }
       inFlight = null;
-      return enabled;
+      return data.enabled;
     })
     .catch(() => {
       inFlight = null; // do not cache failures — next mount retries

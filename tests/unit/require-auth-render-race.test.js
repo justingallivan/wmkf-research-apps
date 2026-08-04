@@ -126,6 +126,32 @@ test('getAuthEnabled dedupes concurrent lookups into one fetch', async () => {
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
+test('a transient 503 JSON body is not cached as auth-disabled (Codex S398)', async () => {
+  // First lookup: 503 with a JSON error body — must NOT land in the cache.
+  global.fetch = jest.fn(() =>
+    Promise.resolve({ ok: false, status: 503, json: async () => ({ error: 'temporary' }) }),
+  );
+  await expect(getAuthEnabled()).resolves.toBe(false);
+  expect(window.__AUTH_ENABLED__).toBeUndefined();
+
+  // Recovery: the next mount performs a SECOND fetch and gets the truth.
+  global.fetch = jest.fn(() => okStatus(true));
+  await expect(getAuthEnabled()).resolves.toBe(true);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(window.__AUTH_ENABLED__).toBe(true);
+});
+
+test('a 200 with an invalid shape is not cached either', async () => {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({ ok: true, status: 200, json: async () => ({}) }),
+  );
+  await expect(getAuthEnabled()).resolves.toBe(false);
+  expect(window.__AUTH_ENABLED__).toBeUndefined();
+
+  global.fetch = jest.fn(() => okStatus(true));
+  await expect(getAuthEnabled()).resolves.toBe(true);
+});
+
 test('getAuthEnabled resolves false on failure and does not cache it', async () => {
   global.fetch = jest.fn(() => Promise.reject(new Error('network down')));
   await expect(getAuthEnabled()).resolves.toBe(false);
