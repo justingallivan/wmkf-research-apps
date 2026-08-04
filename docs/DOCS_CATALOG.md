@@ -306,6 +306,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md](EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md) | plan | active |  | Structured name/affiliation/email exclusion rows in Dataverse; backend ships first, Connor's intake-form change binds to the schema later. | 2026-08-04 |
 | [REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md](REVIEWER_FINDER_COI_SAVE_RECOMPUTE_PLAN.md) | plan | historical |  | Implemented save-time institution-COI recompute; retained as the historical implementation record. |  |
 
 ## reviewer-workbench
