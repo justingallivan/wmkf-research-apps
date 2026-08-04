@@ -45,14 +45,23 @@
    permanent callbacks). Note: a local homebrew Azure CLI now exists and is
    owner-login authenticated for the `wmkeck.org` tenant; see the
    dev-environment wiki topic for its verified capabilities and caveats.
-3. **[P2] Wiki topic** `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`
-   was marked stale during the incident (S395, commit `08bdbe7c`). Refresh it
-   against the now-live baseline behavior and clear the stale marker.
-4. **[P3] Optional read-only check** (inherited from S395, never done): confirm
-   a reviewer identity/address confirmation made during the incident window
-   (Aug 1–3) still renders on its roster card. Read-only.
-5. **Branch hygiene (do NOT delete without owner say-so):**
-   `reviewer-find-revert-baseline` is merged (can be deleted normally);
+3. ~~[P2] Wiki topic~~ — DONE in S397 (`30af076d`):
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` reconciled against
+   the live baseline, stale marker cleared (`status: active`), agent-wiki /
+   memory-router / doc-currency gates green.
+4. ~~[P3] Optional read-only check~~ — DONE in S397, verdict **RENDERS**
+   [VERIFIED via S397 SELECT-only probe of Postgres `reviewer_find_roster`]:
+   the probe found 7 staff identity confirmations with `confirmedAt` in the
+   Aug 1–3 window and explicitly checked the disconfirming condition on each —
+   none carries the incident-only shape (`canonicalPersonId` /
+   `canonicalPersonEtag` / missing `email`), all match the old/simple
+   `staffIdentityConfirmation` shape with `pdIdentityConfirmationId` =
+   `confirmationId`, so the baseline read path
+   (`preserveStoredRosterAuthority`) surfaces email/website/affiliation
+   correctly. The theoretical shape mismatch was possible in code but did not
+   materialize in stored data.
+5. **Branch hygiene** — `reviewer-find-revert-baseline` deleted in S397
+   (verified ancestor of `main` first; removed locally and on origin).
    `reviewer-find-outcome-contract` is ABANDONED but kept for history — never
    merge it.
 
