@@ -1,0 +1,148 @@
+/**
+ * @jest-environment node
+ *
+ * institutionEvidenceConnectsIdentity — characterization against the five
+ * REAL production operand pairs captured on request 1002903 (S400
+ * [verdict-trace] capture, 2026-08-04; outputs/s400-verdict-trace-capture).
+ *
+ * Deliberately uses the REAL DeduplicationService, REAL consistency checker,
+ * and REAL byline-core extractor: the pre-existing service suite mocks
+ * institutionDirectMatch with lenient substring logic, which is exactly why
+ * the byline false-mismatch class was never caught there. Only the OpenAlex
+ * resolver is stubbed (returns null = abstain), mirroring the captured
+ * production behavior where every decorated byline resolution abstained.
+ *
+ * Spec pinned by the capture: the four same-institution byline pairs must
+ * compare CONSISTENT after the byline-core fallback; the genuine
+ * cross-institution pair (Northwestern byline vs listed Texas A&M) must stay
+ * CONTRADICTED. The identity-confirmation gate is untouched by this seam.
+ */
+
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  findApplicantRecommendedByRequest: jest.fn(),
+  setMatchReason: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  getById: jest.fn(), findByEmailCandidates: jest.fn(), update: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/researcher', () => ({
+  upsertByPotentialReviewer: jest.fn(), writeIdentityDecision: jest.fn(), clearIdentityFields: jest.fn(),
+}));
+jest.mock('../../lib/services/discovery-service', () => ({
+  DiscoveryService: { YEARS_LOOKBACK: 5 },
+}));
+jest.mock('../../lib/services/contact-enrichment-service', () => ({
+  ContactEnrichmentService: { enrichCandidates: jest.fn() },
+}));
+jest.mock('../../lib/services/openalex-service', () => ({
+  OpenAlexService: { searchInstitutions: jest.fn(), getInstitution: jest.fn(), getWorksByAuthor: jest.fn() },
+}));
+jest.mock('../../lib/services/claude-reviewer-service', () => ({
+  ClaudeReviewerService: { analyzeProposal: jest.fn() },
+}));
+jest.mock('../../lib/services/proposal-pi-identity', () => ({
+  resolveProposalPI: jest.fn(), appendPiName: jest.fn(), piInstitutions: jest.fn(),
+}));
+jest.mock('../../lib/utils/proposal-authors', () => ({ deriveProposalAuthorNames: jest.fn() }));
+jest.mock('../../lib/services/reviewer-identity-resolver', () => ({
+  mayPersistIdentity: jest.fn(), RESOLVER_SOURCED_FIELDS: [],
+}));
+jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
+  backPropReviewerOrcidToContact: jest.fn(),
+}));
+jest.mock('../../lib/services/reviewer-time-budget', () => ({
+  getReviewerTimeBudgetSeconds: jest.fn(),
+}));
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadReviewerRequestContext: jest.fn(),
+}));
+jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 3, pruneCandidateForRoster: jest.fn(),
+}));
+jest.mock('../../lib/services/reviewer-roster-store', () => ({
+  recordSurfaced: jest.fn(), findCandidateBySuggestion: jest.fn(),
+}));
+jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
+  loadApplicantKnownReviewerContext: jest.fn(),
+}));
+jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+
+import { institutionEvidenceConnectsIdentity } from '../../lib/services/workbench/enrich-recommended-service';
+const { createInstitutionConsistencyChecker } = require('../../lib/services/institution-affiliation-consistency');
+
+// Abstaining resolver: mirrors captured production behavior for decorated
+// bylines (OpenAlex returns zero results → resolve() null). Consistency must
+// therefore come from the direct matcher over extracted cores.
+const abstainResolver = { resolve: jest.fn(async () => null) };
+const checker = () => createInstitutionConsistencyChecker({ resolver: abstainResolver });
+
+const compare = (evidenceInstitution, finalAffiliation, resolvedInstitutions = [finalAffiliation]) =>
+  institutionEvidenceConnectsIdentity({
+    evidenceInstitution,
+    resolvedInstitutions,
+    finalAffiliation,
+    checker: checker(),
+  });
+
+// Verbatim operands from the S400 production capture (request 1002903).
+const CAPTURED = {
+  ucsd: {
+    evidence: 'Department of Bioengineering, University of California San Diego, La Jolla, California 92093, United States.',
+    listed: 'University of California San Diego',
+  },
+  columbia: {
+    evidence: 'Dept. of Biomedical Engineering, Columbia University, New York, NY, USA; Dept. of Radiology, Columbia University, New York, NY, USA.',
+    listed: 'Columbia University',
+  },
+  ncstate: {
+    evidence: 'Department of Mechanical and Aerospace Engineering, North Carolina State University, Raleigh, NC, 27695, USA.',
+    listed: 'North Carolina State University',
+  },
+  vumc: {
+    evidence: 'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.',
+    listed: 'Vanderbilt University Medical Center',
+  },
+  zhou: {
+    evidence: 'Division of Nephrology and Hypertension, Northwestern University Feinberg School of Medicine and the Feinberg Cardiovascular and Renal Research Institute, Chicago, IL, United States.',
+    listed: 'Center for Translational Cancer Research, Institute of Biosciences and Technology, Texas A&M University, Houston, TX 77030, USA; Department of Medical Physiology, College of Medicine, Texas A&M University, Bryan, TX 77807, USA; Department of Translational Medical Sciences, College of Medicine, Texas A&M University, Houston, TX 77030, USA. Electronic address: yubinzhou@tamu.edu.',
+  },
+};
+
+describe('institutionEvidenceConnectsIdentity — S400 captured operands', () => {
+  test.each([
+    ['UCSD', CAPTURED.ucsd],
+    ['Columbia', CAPTURED.columbia],
+    ['NC State', CAPTURED.ncstate],
+    ['VUMC', CAPTURED.vumc],
+  ])('%s byline vs its listed institution is CONSISTENT via core fallback', async (_label, pair) => {
+    await expect(compare(pair.evidence, pair.listed)).resolves.toBe(true);
+  });
+
+  test('Northwestern byline vs listed Texas A&M stays CONTRADICTED', async () => {
+    await expect(compare(CAPTURED.zhou.evidence, CAPTURED.zhou.listed)).resolves.toBe(false);
+  });
+
+  test('distinct clean institutions stay contradicted (fallback does not fire on unchanged cores)', async () => {
+    await expect(compare('Stanford University', 'Columbia University', ['Columbia University'])).resolves.toBe(false);
+  });
+
+  test('byline evidence vs a DIFFERENT university core stays contradicted', async () => {
+    await expect(compare(CAPTURED.ucsd.evidence, 'Columbia University', ['Columbia University'])).resolves.toBe(false);
+  });
+
+  test('missing operands still abstain (null), preserving the fail-closed fallback upstream', async () => {
+    await expect(compare(null, 'Columbia University')).resolves.toBe(null);
+    await expect(compare(CAPTURED.columbia.evidence, null)).resolves.toBe(null);
+  });
+
+  test('resolved-institution direct match still short-circuits before any checker call', async () => {
+    const spy = { areConsistent: jest.fn() };
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: 'Columbia University',
+      resolvedInstitutions: ['Columbia University'],
+      finalAffiliation: 'Columbia University',
+      checker: spy,
+    })).resolves.toBe(true);
+    expect(spy.areConsistent).not.toHaveBeenCalled();
+  });
+});
