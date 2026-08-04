@@ -65,23 +65,12 @@ jest.mock('../../lib/services/contact-enrichment-service', () => ({
   ContactEnrichmentService: { enrichCandidates: (...a) => enrichCandidates(...a) },
 }));
 
-const downloadFileByPath = jest.fn();
-jest.mock('../../lib/services/graph-service', () => ({
-  GraphService: { downloadFileByPath: (...a) => downloadFileByPath(...a) },
-}));
-
-const extractTextFromBuffer = jest.fn();
-jest.mock('../../lib/utils/file-loader', () => ({
-  extractTextFromBuffer: (...a) => extractTextFromBuffer(...a),
-}));
-
 jest.mock('../../lib/services/openalex-service', () => ({
   OpenAlexService: { getWorksByAuthor: jest.fn(async () => ({ totalCount: 12 })) },
 }));
 
-const analyzeProposal = jest.fn();
 jest.mock('../../lib/services/claude-reviewer-service', () => ({
-  ClaudeReviewerService: { analyzeProposal: (...a) => analyzeProposal(...a) },
+  ClaudeReviewerService: { analyzeProposal: jest.fn() },
 }));
 
 jest.mock('../../lib/services/proposal-pi-identity', () => ({
@@ -125,35 +114,13 @@ jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
 }));
 
 const recordSurfaced = jest.fn(async () => 1);
-const recordSurfacedWithStageEvidence = jest.fn(async (requestId, entries) => (
-  entries.map((entry) => ({
-    candidateKey: entry.candidate.candidateKey,
-    outcome: 'recorded',
-    updatedAt: 'cold-v2',
-  }))
-));
 const findCandidateBySuggestion = jest.fn(async () => null);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: (...a) => recordSurfaced(...a),
-  recordSurfacedWithStageEvidence: (...a) => recordSurfacedWithStageEvidence(...a),
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
-const getRequestById = jest.fn();
-jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
-  getById: (...a) => getRequestById(...a),
-}));
-
-const buildApplicantAnchorRefreshReceipt = jest.fn();
-const resolveReviewerProposalMetadata = jest.fn();
-jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
-  REQUEST_SELECT: 'akoya_requestid,akoya_requestnum',
-  buildApplicantAnchorRefreshReceipt: (...a) => buildApplicantAnchorRefreshReceipt(...a),
-  resolveReviewerProposalMetadata: (...a) => resolveReviewerProposalMetadata(...a),
-}));
-
-const safeFetch = jest.fn();
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: (...a) => safeFetch(...a) }));
+jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
 jest.mock('../../lib/utils/contact-parser', () => ({
   ContactParser: { isNameConsistentEmail: jest.fn(() => true) },
 }));
@@ -165,33 +132,11 @@ const {
   createStaffVerifiedState,
 } = require('../../lib/utils/reviewer-address-trust');
 const { projectCanonicalApplicantContact } = require('../../lib/utils/applicant-known-reviewer');
-import {
-  buildApplicantColdStageEvidence,
-  enrichRecommended,
-  rosterPersistenceWarningMessages,
-  summarizeRosterPersistenceResults,
-} from '../../lib/services/workbench/enrich-recommended-service';
-const { buildReviewerStageDependencySnapshot } = require('../../lib/services/workbench/reviewer-stage-source-versions');
-const { projectIdentityEvidence } = require('../../lib/services/workbench/reviewer-stage-producers/identity');
-const { proposalAuthorFingerprint } = require('../../lib/services/reviewer-proposal-author-fingerprint');
+import { enrichRecommended } from '../../lib/services/workbench/enrich-recommended-service';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 const PR = '22222222-2222-2222-2222-222222222222';
 const SUG = '33333333-3333-3333-3333-333333333333';
-const APPLICANT_INPUT_VERSION = 'a'.repeat(64);
-const PROPOSAL_CONTENT_VERSION = 'b'.repeat(64);
-
-function authoritativeRequest() {
-  return {
-    akoya_requestid: REQ,
-    akoya_requestnum: '1002788',
-    _akoya_applicantid_value: '44444444-4444-4444-4444-444444444444',
-    _akoya_applicantid_value_formatted: 'Applicant University',
-    _wmkf_projectleader_value: '55555555-5555-5555-5555-555555555555',
-    _wmkf_projectleader_value_formatted: 'Principal Investigator',
-    _wmkf_potentialreviewer1_value: PR,
-  };
-}
 
 function recorder() {
   const events = [];
@@ -215,22 +160,6 @@ beforeEach(() => {
   areInstitutionsConsistent.mockResolvedValue(false);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
   findCandidateBySuggestion.mockResolvedValue(null);
-  getRequestById.mockResolvedValue(authoritativeRequest());
-  buildApplicantAnchorRefreshReceipt.mockImplementation(({ candidate }) => (
-    candidate?.potentialReviewerId === PR
-      ? {
-          state: 'current',
-          contractVersion: 1,
-          sourceVersion: APPLICANT_INPUT_VERSION,
-          resultVersion: APPLICANT_INPUT_VERSION,
-          completedAt: '2026-08-02T12:00:00.000Z',
-        }
-      : null
-  ));
-  resolveReviewerProposalMetadata.mockResolvedValue({
-    state: 'current',
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-  });
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
@@ -271,339 +200,12 @@ test('happy path: progress frames strictly precede one terminal complete; never 
     name: 'Dr. Rec One',
     isApplicantRecommended: true,
   });
-  expect(recordSurfacedWithStageEvidence).toHaveBeenCalledWith(
+  expect(recordSurfaced).toHaveBeenCalledTimes(1);
+  expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({
-      candidate: expect.objectContaining({ applicantEnrichmentCacheVersion: 3, candidateKey: `suggestion:${SUG}` }),
-      stageEvidence: expect.objectContaining({ applicant_anchor: expect.any(Object), identity: expect.any(Object) }),
-    })],
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 3 })],
+    { expectedUpdatedAt: null },
   );
-});
-
-test('mixed cold persistence outcomes distinguish partial writes and report every non-recorded row', () => {
-  const summary = summarizeRosterPersistenceResults([
-    { outcome: 'recorded' },
-    { outcome: 'partial' },
-    { outcome: 'skipped_staff_authority' },
-    { outcome: 'refresh_in_progress' },
-    { outcome: 'rejected' },
-    { outcome: 'failed_retryable' },
-  ], 7);
-
-  expect(summary).toEqual({
-    recorded: 1,
-    partial: 1,
-    skipped: 5,
-    notRecordedByOutcome: {
-      refresh_in_progress: 1,
-      skipped_staff_authority: 1,
-      rejected: 1,
-      failed_retryable: 1,
-      unknown: 1,
-    },
-  });
-  expect(rosterPersistenceWarningMessages(summary)).toEqual([
-    expect.stringContaining('1 reviewer row(s) were only partially persisted'),
-    expect.stringContaining('1 reviewer row(s) were unchanged because staff-confirmed evidence is authoritative'),
-    expect.stringMatching(/4 reviewer row\(s\) were not persisted.*failed_retryable: 1.*refresh_in_progress: 1.*rejected: 1.*unknown: 1/),
-  ]);
-});
-
-test('cold identity emission uses the same projector and shared source version as manual refresh', async () => {
-  const candidate = {
-    candidateKey: `suggestion:${SUG}`,
-    suggestionId: SUG,
-    potentialReviewerId: PR,
-    name: 'Dr. Rec One',
-    affiliation: 'Rec University',
-    suggestedInstitution: 'Rec University',
-    isApplicantRecommended: true,
-    applicantKnownReviewer: { status: 'known', potentialReviewerId: PR },
-    contactEnrichment: { identity: { status: 'probable' } },
-  };
-  const identityResult = { status: 'probable', anchors: [] };
-  const stageEvidence = await buildApplicantColdStageEvidence({
-    requestId: REQ,
-    request: authoritativeRequest(),
-    candidate,
-    identityResult,
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    proposalAnalysisAuthoritative: true,
-  });
-  const afterAnchor = {
-    ...candidate,
-    ...stageEvidence.applicant_anchor.evidencePatch,
-    stageFreshness: { applicant_anchor: stageEvidence.applicant_anchor.receipt },
-  };
-  const expectedIdentity = buildReviewerStageDependencySnapshot({
-    candidate: afterAnchor,
-    requestId: REQ,
-    applicantInputVersion: APPLICANT_INPUT_VERSION,
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    requestCoiContextVersion: null,
-  }).stageInputVersions.identity;
-  // The COI version is unrelated to identity; derive with the exact request
-  // context used by the adapter rather than trusting a client-side version.
-  expect(stageEvidence.identity.receipt.sourceVersion).toBe(expectedIdentity);
-  const manual = projectIdentityEvidence({
-    candidate: afterAnchor,
-    applicantInputVersion: APPLICANT_INPUT_VERSION,
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    identityResult,
-    completedAt: stageEvidence.identity.receipt.completedAt,
-    expectedSourceVersion: stageEvidence.identity.receipt.sourceVersion,
-  });
-  expect(stageEvidence.identity).toEqual(manual);
-  expect(expectedIdentity).not.toBeNull();
-});
-
-test('applicant cold coauthor authority uses the shared proposal-version and normalized-author fingerprint', async () => {
-  const proposalAuthors = ['Dr. Alice Author', 'alice author', 'Professor Bob Writer'];
-  const stageEvidence = await buildApplicantColdStageEvidence({
-    requestId: REQ,
-    request: authoritativeRequest(),
-    candidate: {
-      candidateKey: `suggestion:${SUG}`,
-      suggestionId: SUG,
-      potentialReviewerId: PR,
-      name: 'Dr. Rec One',
-      affiliation: 'Rec University',
-      suggestedInstitution: 'Rec University',
-      isApplicantRecommended: true,
-      applicantKnownReviewer: { status: 'known', potentialReviewerId: PR },
-      coauthorCheckStatus: 'complete',
-      coauthorships: [],
-      coauthorCheckFailures: [],
-      contactEnrichment: { identity: { status: 'probable' } },
-    },
-    identityResult: { status: 'probable', anchors: [] },
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    proposalAnalysisAuthoritative: true,
-    proposalAuthors,
-    proposalAuthorsAuthoritative: true,
-  });
-
-  expect(stageEvidence.coauthor_coi.evidencePatch.proposalAuthorVersion).toBe(
-    proposalAuthorFingerprint(PROPOSAL_CONTENT_VERSION, proposalAuthors),
-  );
-});
-
-test('a Graph version change discards authority from exact Graph analysis without repeating provider work', async () => {
-  resolveReviewerProposalMetadata
-    .mockResolvedValueOnce({
-      state: 'current',
-      proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-      bindingKey: 'Akoya_Request::1002788/Reviewer Materials::Proposal_1002788.pdf',
-    })
-    .mockResolvedValueOnce({
-      state: 'current',
-      proposalContentVersion: 'c'.repeat(64),
-      bindingKey: 'Akoya_Request::1002788/Reviewer Materials::Proposal_1002788.pdf',
-    });
-  downloadFileByPath.mockResolvedValue({
-    buffer: Buffer.from('exact graph bytes'),
-    filename: 'Proposal_1002788.pdf',
-    mimeType: 'application/pdf',
-  });
-  extractTextFromBuffer.mockResolvedValue('exact graph proposal text '.repeat(8));
-  analyzeProposal.mockResolvedValue({
-    proposalInfo: { authorInstitution: 'PI University', proposalAuthors: 'Dr. PI', primaryResearchArea: 'Biology' },
-  });
-
-  const rec = recorder();
-  await enrichRecommended(args({
-    analysisResult: undefined,
-    blobUrl: 'https://attacker.example/wrong-proposal.pdf',
-  }), rec.onEvent);
-
-  expect(verifyClaudeSuggestions).toHaveBeenCalledTimes(1);
-  expect(enrichCandidates).toHaveBeenCalledTimes(1);
-  expect(downloadFileByPath).toHaveBeenCalledWith(
-    'Akoya_Request',
-    '1002788/Reviewer Materials',
-    'Proposal_1002788.pdf',
-  );
-  expect(safeFetch).not.toHaveBeenCalled();
-  const [, entries] = recordSurfacedWithStageEvidence.mock.calls[0];
-  expect(entries[0].stageEvidence.applicant_anchor.receipt.state).toBe('current');
-  expect(entries[0].stageEvidence.identity).toBeUndefined();
-  expect(entries[0].stageEvidence.coauthor_coi).toBeUndefined();
-});
-
-test('exact server-resolved Graph bytes produce proposal-bound cold receipts', async () => {
-  const bindingKey = 'Akoya_Request::1002788/Reviewer Materials::Proposal_1002788.pdf';
-  resolveReviewerProposalMetadata.mockResolvedValue({
-    state: 'current',
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    bindingKey,
-  });
-  const graphBuffer = Buffer.from('exact graph bytes');
-  downloadFileByPath.mockResolvedValue({
-    buffer: graphBuffer,
-    filename: 'Proposal_1002788.pdf',
-    mimeType: 'application/pdf',
-  });
-  const graphText = 'server-resolved Graph proposal text '.repeat(8);
-  extractTextFromBuffer.mockResolvedValue(graphText);
-  analyzeProposal.mockResolvedValue({
-    proposalInfo: { authorInstitution: 'PI University', proposalAuthors: 'Dr. PI', primaryResearchArea: 'Biology' },
-  });
-
-  const rec = recorder();
-  await enrichRecommended(args({
-    analysisResult: undefined,
-    blobUrl: 'https://attacker.example/wrong-proposal.pdf',
-  }), rec.onEvent);
-
-  expect(downloadFileByPath).toHaveBeenCalledWith(
-    'Akoya_Request',
-    '1002788/Reviewer Materials',
-    'Proposal_1002788.pdf',
-  );
-  expect(extractTextFromBuffer).toHaveBeenCalledWith(graphBuffer, 'Proposal_1002788.pdf', 'application/pdf');
-  expect(analyzeProposal).toHaveBeenCalledWith(
-    graphText,
-    'test-key',
-    expect.objectContaining({ analysisPurpose: 'proposal_info' }),
-  );
-  expect(safeFetch).not.toHaveBeenCalled();
-  const [, entries] = recordSurfacedWithStageEvidence.mock.calls[0];
-  expect(entries[0].stageEvidence.identity).toMatchObject({
-    outcome: 'current',
-    receipt: { state: 'current' },
-    evidencePatch: { proposalContentVersion: PROPOSAL_CONTENT_VERSION },
-  });
-});
-
-test('client-supplied proposal analysis remains display-only for cold receipts', async () => {
-  const rec = recorder();
-  await enrichRecommended(args({
-    analysisResult: {
-      proposalInfo: {
-        authorInstitution: 'Attacker Controlled Institute',
-        proposalAuthors: 'Attacker Controlled Author',
-        primaryResearchArea: 'Biology',
-      },
-    },
-  }), rec.onEvent);
-
-  expect(verifyClaudeSuggestions).toHaveBeenCalledTimes(1);
-  expect(enrichCandidates).toHaveBeenCalledTimes(1);
-  const [, entries] = recordSurfacedWithStageEvidence.mock.calls[0];
-  const evidence = entries[0].stageEvidence;
-  expect(evidence.applicant_anchor.receipt.state).toBe('current');
-  expect(evidence.identity).toMatchObject({
-    outcome: 'incomplete',
-    receipt: { state: 'incomplete', failureCode: 'missing_required_input' },
-  });
-  const afterAnchor = {
-    ...entries[0].candidate,
-    ...evidence.applicant_anchor.evidencePatch,
-    stageFreshness: { applicant_anchor: evidence.applicant_anchor.receipt },
-  };
-  const expectedIdentity = buildReviewerStageDependencySnapshot({
-    candidate: afterAnchor,
-    requestId: REQ,
-    applicantInputVersion: evidence.applicant_anchor.receipt.sourceVersion,
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    requestCoiContextVersion: null,
-  }).stageInputVersions.identity;
-  expect(evidence.identity.receipt.sourceVersion).toBe(expectedIdentity);
-  // The shared builder cannot derive a downstream version after an incomplete
-  // identity receipt. Cold emission must omit those stages—not synthesize one.
-  expect(Object.keys(evidence).sort()).toEqual(['applicant_anchor', 'identity']);
-});
-
-test('a server analysis of a hostile browser-selected blob remains display-only', async () => {
-  safeFetch.mockResolvedValue({
-    ok: true,
-    headers: { get: () => 'text/plain' },
-    text: async () => 'wrong proposal bytes '.repeat(12),
-  });
-  analyzeProposal.mockResolvedValue({
-    proposalInfo: {
-      authorInstitution: 'Wrong Blob Institute',
-      proposalAuthors: 'Wrong Blob Author',
-      primaryResearchArea: 'Biology',
-    },
-  });
-
-  const rec = recorder();
-  await enrichRecommended(args({
-    analysisResult: undefined,
-    blobUrl: 'https://attacker.example/wrong-proposal.txt',
-  }), rec.onEvent);
-
-  expect(analyzeProposal).toHaveBeenCalledTimes(1);
-  expect(rec.events.at(-1)).toMatchObject({ event: 'complete' });
-  expect(rec.events.at(-1).data.recommended).toEqual([
-    expect.objectContaining({ name: 'Dr. Rec One', isApplicantRecommended: true }),
-  ]);
-  const [, entries] = recordSurfacedWithStageEvidence.mock.calls[0];
-  expect(entries[0].stageEvidence.applicant_anchor.receipt.state).toBe('current');
-  expect(entries[0].stageEvidence.identity).toMatchObject({
-    outcome: 'incomplete',
-    receipt: { state: 'incomplete', failureCode: 'missing_required_input' },
-  });
-  expect(Object.keys(entries[0].stageEvidence).sort()).toEqual(['applicant_anchor', 'identity']);
-});
-
-test('cold stages with no shared source version are omitted rather than locally hashed', async () => {
-  const candidate = {
-    candidateKey: `suggestion:${SUG}`,
-    suggestionId: SUG,
-    potentialReviewerId: PR,
-    name: 'Dr. Rec One',
-    affiliation: 'Rec University',
-    suggestedInstitution: 'Rec University',
-    isApplicantRecommended: true,
-    applicantKnownReviewer: { status: 'known', potentialReviewerId: PR },
-    contactEnrichment: { identity: { status: 'probable' } },
-  };
-  const stageEvidence = await buildApplicantColdStageEvidence({
-    requestId: REQ,
-    request: authoritativeRequest(),
-    candidate,
-    identityResult: { status: 'probable', anchors: [] },
-    // The anchor can be sealed, but missing proposal authority prevents the
-    // shared builder from deriving identity or any successor source version.
-    proposalAnalysisAuthoritative: false,
-  });
-
-  expect(Object.keys(stageEvidence)).toEqual(['applicant_anchor']);
-});
-
-test('missing proposal-author authority omits coauthor evidence when its shared source is unavailable', async () => {
-  const stageEvidence = await buildApplicantColdStageEvidence({
-    requestId: REQ,
-    request: authoritativeRequest(),
-    candidate: {
-      candidateKey: `suggestion:${SUG}`,
-      suggestionId: SUG,
-      potentialReviewerId: PR,
-      name: 'Dr. Rec One',
-      affiliation: 'Rec University',
-      suggestedInstitution: 'Rec University',
-      isApplicantRecommended: true,
-      applicantKnownReviewer: { status: 'known', potentialReviewerId: PR },
-      contactEnrichment: { identity: { status: 'probable' } },
-    },
-    identityResult: { status: 'probable', anchors: [] },
-    proposalContentVersion: PROPOSAL_CONTENT_VERSION,
-    proposalAnalysisAuthoritative: true,
-    proposalAuthorsAuthoritative: false,
-  });
-
-  expect(stageEvidence.identity.receipt.state).toBe('current');
-  expect(stageEvidence.coauthor_coi).toBeUndefined();
-});
-
-test('noncanonical keys never emit cold authority', async () => {
-  await expect(buildApplicantColdStageEvidence({
-    requestId: REQ,
-    request: authoritativeRequest(),
-    candidate: { candidateKey: 'candidate:legacy', name: 'Legacy' },
-  })).resolves.toBeNull();
 });
 
 test.each([
@@ -645,50 +247,19 @@ test('an enrichment write uses the pre-run roster token and leaves a concurrentl
     identityStatus: 'unresolved',
     rosterUpdatedAt: '2026-07-20 10:00:00+00',
   });
-  recordSurfacedWithStageEvidence.mockResolvedValueOnce([{
-    candidateKey: `suggestion:${SUG}`,
-    outcome: 'skipped_stale',
-  }]);
+  recordSurfaced.mockResolvedValueOnce(0);
 
   const { events, onEvent } = recorder();
   await enrichRecommended(args(), onEvent);
 
-  expect(recordSurfacedWithStageEvidence).toHaveBeenCalledWith(
+  expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({
-      candidate: expect.objectContaining({ suggestionId: SUG }),
-      expectedUpdatedAt: '2026-07-20 10:00:00+00',
-    })],
+    [expect.objectContaining({ suggestionId: SUG })],
+    { expectedUpdatedAt: '2026-07-20 10:00:00+00' },
   );
   expect(events).toContainEqual({
     event: 'progress',
-    data: { message: '1 reviewer row(s) were not persisted (skipped_stale: 1). Reload reviewer status before retrying.' },
-  });
-  expect(events.at(-1).event).toBe('complete');
-});
-
-test('a staff-authoritative cold persistence skip emits a non-retry warning before completion', async () => {
-  findCandidateBySuggestion.mockResolvedValueOnce({
-    candidateKey: `suggestion:${SUG}`,
-    suggestionId: SUG,
-    name: 'Dr. Rec One',
-    identityStatus: 'unresolved',
-    rosterUpdatedAt: '2026-07-20 10:00:00+00',
-  });
-  recordSurfacedWithStageEvidence.mockResolvedValueOnce([{
-    candidateKey: `suggestion:${SUG}`,
-    outcome: 'skipped_staff_authority',
-    code: 'skipped_staff_authority',
-  }]);
-
-  const { events, onEvent } = recorder();
-  await enrichRecommended(args(), onEvent);
-
-  expect(events).toContainEqual({
-    event: 'progress',
-    data: {
-      message: '1 reviewer row(s) were unchanged because staff-confirmed evidence is authoritative. A staff-authoritative refresh is required; do not retry this cold result.',
-    },
+    data: { message: '1 reviewer row(s) changed while enrichment was running and were left unchanged.' },
   });
   expect(events.at(-1).event).toBe('complete');
 });
@@ -704,15 +275,7 @@ test('rerun preserves an authenticated staff-confirmed row without automated ove
     isApplicantRecommended: true,
     pdIdentityConfirmed: true,
     pdIdentityConfirmationId: 'confirm-1',
-    staffIdentityConfirmation: {
-      confirmationId: 'confirm-1',
-      source: 'staff_confirmed',
-      state: 'confirmed',
-      canonicalPersonId: '11111111-1111-4111-8111-111111111111',
-      canonicalPersonEtag: 'W/"etag-1"',
-      actorId: 'staff-1',
-      confirmedAt: '2026-08-02T00:00:00.000Z',
-    },
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
   });
 
   const { events, onEvent } = recorder();
@@ -760,15 +323,7 @@ test('transient person-read failure preserves prior actor-confirmed canonical ev
     },
     pdIdentityConfirmed: true,
     pdIdentityConfirmationId: 'confirm-1',
-    staffIdentityConfirmation: {
-      confirmationId: 'confirm-1',
-      source: 'staff_confirmed',
-      state: 'confirmed',
-      canonicalPersonId: '11111111-1111-4111-8111-111111111111',
-      canonicalPersonEtag: 'W/"etag-1"',
-      actorId: 'staff-1',
-      confirmedAt: '2026-08-02T00:00:00.000Z',
-    },
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
   });
   getPersonById.mockRejectedValue(new Error('Dataverse unavailable'));
 
@@ -845,8 +400,7 @@ test('one failed exact-person read coexists with a successful sibling that still
     expect.anything(),
     expect.anything(),
   );
-  expect(recordSurfaced).toHaveBeenCalledTimes(1);
-  expect(recordSurfacedWithStageEvidence).not.toHaveBeenCalled();
+  expect(recordSurfaced).toHaveBeenCalledTimes(2);
 });
 
 test('empty junctions complete empty; malformed linked rows complete with an explicit unresolved result', async () => {
@@ -1293,11 +847,10 @@ test('a stored affiliation does not exempt an applicant reviewer from the identi
   expect(writeIdentityDecision).not.toHaveBeenCalled();
   expect(clearIdentityFields).not.toHaveBeenCalled();
   expect(setMatchReason).not.toHaveBeenCalled();
-  expect(recordSurfacedWithStageEvidence).toHaveBeenCalledWith(
+  expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({
-      candidate: expect.objectContaining({ needsIdentification: true, identityStatus: 'unresolved', email: null }),
-    })],
+    [expect.objectContaining({ needsIdentification: true, identityStatus: 'unresolved', email: null })],
+    { expectedUpdatedAt: null },
   );
 });
 

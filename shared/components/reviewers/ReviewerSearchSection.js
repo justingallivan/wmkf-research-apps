@@ -52,8 +52,6 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
-  hasLegacyServerSelectionPlan,
-  legacySelectionNotice,
   getCandidatePromotionDecision,
   candidateWasSaved,
   getCandidateEmailReadiness,
@@ -74,8 +72,6 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
-import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
-import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -92,413 +88,6 @@ const BLOCKED_REFERRAL_REASON = {
   proposal_author: 'proposal author',
   institution_coi: 'PI institution conflict',
 };
-
-// These labels are deliberately bounded. The browser receives a server-owned
-// freshness plan but must not turn an unknown stage into a staff-facing claim.
-const EVIDENCE_STAGE_LABELS = Object.freeze({
-  applicant_anchor: 'Applicant input',
-  identity: 'Identity',
-  institution_domains: 'Institution domains',
-  institution_coi: 'Institution COI',
-  coauthor_coi: 'Coauthor COI',
-  eligibility: 'Eligibility',
-  contact: 'Contact',
-  address_trust: 'Address trust',
-  roster_persistence: 'Roster persistence',
-});
-const EVIDENCE_STAGE_ORDER = Object.freeze(Object.keys(EVIDENCE_STAGE_LABELS));
-const EVIDENCE_STAGE_SET = new Set(EVIDENCE_STAGE_ORDER);
-const WARM_PLAN_REASONS = new Set([
-  'no_roster_history', 'candidate_added', 'candidate_missing', 'candidate_input_changed',
-  'applicant_set_changed', 'proposal_binding_changed', 'proposal_content_changed',
-  'warm_cache_version_changed', 'stage_contract_changed', 'stage_missing',
-  'stage_incomplete', 'prior_write_incomplete', 'prior_refresh_incomplete',
-  'authority_stale', 'engagement_changed', 'roster_snapshot_changed', 'manual_refresh',
-  'unclassified_miss',
-]);
-const WARM_PLAN_ACTIONS = new Set([
-  'refresh_stage', 'recover_expired_lease', 'operator_repair_required',
-  'finalize_cached_evidence', 'dedicated_address_action', 'dedicated_identity_action',
-]);
-const RESPONSE_REASONS = new Set([
-  ...WARM_PLAN_REASONS,
-  'refresh_not_required', 'authority_changed', 'refresh_in_progress',
-  'lease_recovery_required', 'lease_repair_required',
-  'prerequisite_stale', 'prerequisite_action_required', 'stage_not_executable',
-  'canonical_candidate_unavailable', 'invalid_refresh_target',
-]);
-const RESPONSE_OUTCOMES = new Set([
-  'recorded', 'not_required', 'skipped_stale', 'rejected',
-  'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'action_required', 'failed_retryable', 'failed_terminal',
-]);
-const RESPONSE_STAGE_STATES = new Set([
-  'current', 'not_applicable', 'stale', 'refreshing', 'incomplete', 'failed',
-]);
-const RESPONSE_ERROR_CODES = new Set([
-  'invalid_refresh_request', 'client_authority_claim_rejected', 'invalid_refresh_target',
-  'dedicated_address_action', 'stage_not_executable', 'invalid_expected_updated_at',
-  'refresh_internal_error',
-]);
-const RESPONSE_ERROR_MESSAGES = Object.freeze({
-  invalid_refresh_request: 'The evidence refresh request could not be read. Reload reviewer status and try again.',
-  client_authority_claim_rejected: 'The evidence refresh request included unsupported fields. Reload reviewer status and try again.',
-  invalid_refresh_target: 'The reviewer refresh target is no longer valid. Reload reviewer status before trying again.',
-  dedicated_address_action: 'Address trust must be handled with the dedicated staff action. Reload reviewer status.',
-  stage_not_executable: 'This evidence stage cannot be refreshed from this action. Reload reviewer status.',
-  invalid_expected_updated_at: 'The reviewer refresh version is missing or invalid. Reload reviewer status before trying again.',
-  refresh_internal_error: 'The evidence refresh service did not complete. Reload reviewer status before trying again.',
-});
-const DEDICATED_STAFF_ACTION_STAGES = new Set(['address_trust']);
-// These are response-shape guards for the bounded server reconciliation route.
-// They do not confer any authority on the browser: the server accepts only the
-// request ID (or exact server-returned continuation keys) and re-reads every
-// roster row before running a stage.
-const RECONCILIATION_OUTCOMES = new Set([
-  'current', 'partial', 'action_required', 'blocked', 'budget_exhausted', 'failed_retryable',
-]);
-const RECONCILIATION_CANDIDATE_OUTCOMES = new Set([
-  'current', 'action_required', 'blocked', 'budget_exhausted', 'failed_retryable',
-  'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required', 'rejected',
-]);
-const RETRYABLE_RECONCILIATION_OUTCOMES = new Set([
-  'failed_retryable', 'refresh_in_progress', 'skipped_stale', 'lease_recovery_required', 'lease_repair_required',
-]);
-// Must match the server-owned active roster cap. A continuation carries every
-// active row that can safely resume rather than silently dropping it at an
-// arbitrary browser-sized subset.
-export const RECONCILIATION_MAX_CANDIDATE_KEYS = 300;
-const RECONCILIATION_ROSTER_CAP_EXCEEDED = 'roster_active_cap_exceeded';
-const RECONCILIATION_IDLE = Object.freeze({
-  status: 'idle',
-  continuationCandidateKeys: [],
-  identityActionCandidateKeys: [],
-  message: null,
-});
-const CANONICAL_ISO_DATE = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/;
-const APPLICANT_ANCHOR_STAGE = 'applicant_anchor';
-
-function canonicalCandidateKey(value) {
-  return canonicalStoredReviewerCandidateKey(value);
-}
-
-function canonicalEvidenceDate(value) {
-  if (typeof value !== 'string' || !CANONICAL_ISO_DATE.test(value)) return null;
-  try {
-    return new Date(value).toISOString() === value ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function serverRosterUpdatedAt(value) {
-  return typeof value === 'string'
-    && value.trim().length > 0
-    && value.trim().length <= 128
-    && !/[\u0000-\u001f\u007f]/.test(value)
-    ? value.trim()
-    : null;
-}
-
-function planRefreshesInDependencyOrder(plan) {
-  if (!Array.isArray(plan?.currentStages)
-    || !Array.isArray(plan?.refreshes)
-    || !Array.isArray(plan?.pendingStages)
-    || (Object.prototype.hasOwnProperty.call(plan, 'leaseRepairRequired')
-      && typeof plan.leaseRepairRequired !== 'boolean')
-    || plan.currentStages.some((stage) => !EVIDENCE_STAGE_SET.has(stage))) return null;
-  const seen = new Set();
-  const refreshes = [];
-  for (const refresh of plan.refreshes) {
-    if (!refresh || typeof refresh !== 'object'
-      || !EVIDENCE_STAGE_SET.has(refresh.stage)
-      || !WARM_PLAN_REASONS.has(refresh.reason)
-      || (Object.prototype.hasOwnProperty.call(refresh, 'action')
-        && !WARM_PLAN_ACTIONS.has(refresh.action))
-      || (refresh.action === 'recover_expired_lease' && refresh.reason !== 'prior_refresh_incomplete')
-      || (refresh.action === 'finalize_cached_evidence' && refresh.stage !== 'roster_persistence')
-      || (refresh.action === 'dedicated_address_action' && refresh.stage !== 'address_trust')
-      || (refresh.action === 'dedicated_identity_action' && refresh.stage !== APPLICANT_ANCHOR_STAGE)
-      || seen.has(refresh.stage)) return null;
-    seen.add(refresh.stage);
-    refreshes.push(refresh);
-  }
-  if (plan.pendingStages.some((stage) => !EVIDENCE_STAGE_SET.has(stage))) return null;
-  return refreshes.sort((left, right) => {
-    const recoveryOrder = Number(
-      right.action === 'recover_expired_lease' || right.action === 'operator_repair_required',
-    ) - Number(
-      left.action === 'recover_expired_lease' || left.action === 'operator_repair_required',
-    );
-    return recoveryOrder || EVIDENCE_STAGE_ORDER.indexOf(left.stage) - EVIDENCE_STAGE_ORDER.indexOf(right.stage);
-  });
-}
-
-// This derives one action from the server-owned plan only. The browser never
-// derives a prerequisite from candidate evidence, and reserved structured staff
-// actions remain with their existing controls. Identity refresh runs the
-// server-side resolver; it never accepts a browser assertion of identity.
-export function reviewerStageRefreshTarget(candidate, plan) {
-  const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
-  const expectedUpdatedAt = serverRosterUpdatedAt(candidate?.rosterUpdatedAt);
-  const planKey = canonicalCandidateKey(plan?.candidateKey);
-  const refreshes = planRefreshesInDependencyOrder(plan);
-  if (!candidateKey || !expectedUpdatedAt || candidateKey !== planKey) return null;
-  if (!refreshes) return { kind: 'invalid', candidateKey, expectedUpdatedAt };
-  if (plan.leaseRepairRequired === true) {
-    return { kind: 'operator_repair', candidateKey, expectedUpdatedAt, stage: null };
-  }
-  if (plan.pendingStages.length > 0) {
-    return {
-      kind: 'pending', candidateKey, expectedUpdatedAt, stage: plan.pendingStages[0],
-    };
-  }
-  const next = refreshes[0];
-  if (!next) return null;
-  if (next.action === 'operator_repair_required') {
-    return { kind: 'operator_repair', candidateKey, expectedUpdatedAt, stage: next.stage };
-  }
-  if (next.action === 'recover_expired_lease' && next.stage !== 'address_trust') {
-    return { kind: 'refresh', candidateKey, expectedUpdatedAt, stage: next.stage, reason: next.reason };
-  }
-  // Terminal persistence is provider-free only when the server explicitly
-  // names that narrow finalization action. A normal stale receipt is never a
-  // browser instruction to run the generic evidence route.
-  if (next.stage === 'roster_persistence' && next.action !== 'finalize_cached_evidence') {
-    return { kind: 'reserved', candidateKey, expectedUpdatedAt, stage: next.stage, reason: next.reason };
-  }
-  if (DEDICATED_STAFF_ACTION_STAGES.has(next.stage)) {
-    return { kind: 'dedicated', candidateKey, expectedUpdatedAt, stage: next.stage, reason: next.reason };
-  }
-  return { kind: 'refresh', candidateKey, expectedUpdatedAt, stage: next.stage, reason: next.reason };
-}
-
-// Retained for direct consumers of the former applicant-only helper. Unlike
-// the previous shape it deliberately exposes no Dataverse suggestion ID.
-export function applicantAnchorRepairTarget(candidate, plan) {
-  const target = reviewerStageRefreshTarget(candidate, plan);
-  return target?.kind === 'refresh' && target.stage === APPLICANT_ANCHOR_STAGE
-    ? target
-    : null;
-}
-
-// A stage result belongs to one rendered request/roster generation, not merely
-// to a reusable person key. That keeps a late response from an earlier view
-// from becoming visible if the same person appears again after a request swap.
-export function reviewerStageStateKey({ requestId, candidateKey, stage, generation }) {
-  return JSON.stringify([requestId, candidateKey, stage, generation]);
-}
-
-export function reviewerStageInFlightKey(args) {
-  return JSON.stringify([args.requestId, args.candidateKey, args.generation]);
-}
-
-function validRefreshResponse(data, target) {
-  const responseStage = data?.requestedStage ?? data?.stage;
-  if (!data || typeof data !== 'object'
-    || !RESPONSE_OUTCOMES.has(data.outcome)
-    || data.candidateKey !== target.candidateKey
-    || responseStage !== target.stage
-    || !Object.prototype.hasOwnProperty.call(data, 'stageState')
-    || !Object.prototype.hasOwnProperty.call(data, 'reasonCode')
-    || !RESPONSE_STAGE_STATES.has(data.stageState)
-    || (data.reasonCode !== null && !RESPONSE_REASONS.has(data.reasonCode))) return null;
-
-  const state = data.stageState;
-  if (['recorded', 'not_required'].includes(data.outcome)
-    && !['current', 'not_applicable'].includes(state)) return null;
-  if (data.outcome === 'skipped_stale' && state !== 'stale') return null;
-  if (data.outcome === 'lease_recovery_required' && state !== 'stale') return null;
-  if (data.outcome === 'lease_repair_required' && state !== 'stale') return null;
-  if (data.outcome === 'refresh_in_progress' && state !== 'refreshing') return null;
-  if (data.outcome === 'failed_retryable' && !['incomplete', 'failed'].includes(state)) return null;
-  if (data.outcome === 'failed_terminal' && !['incomplete', 'failed'].includes(state)) return null;
-  return data;
-}
-
-function validRefreshErrorResponse(data, target) {
-  const responseStage = data?.requestedStage ?? null;
-  if (!data || typeof data !== 'object'
-    || data.success !== false
-    || data.outcome !== 'rejected'
-    || !RESPONSE_ERROR_CODES.has(data.code)
-    || data.message !== RESPONSE_ERROR_MESSAGES[data.code]
-    || data.error !== RESPONSE_ERROR_MESSAGES[data.code]
-    || data.stageState !== 'stale'
-    || (data.reasonCode !== null && !RESPONSE_REASONS.has(data.reasonCode))
-    || (responseStage !== null && responseStage !== target.stage)) return null;
-  return data;
-}
-
-function responseHasExpectedStatus(response, outcome) {
-  // Browser Response always has a numeric status. Keeping this permissive for
-  // minimal test doubles does not relax production handling.
-  if (!Number.isInteger(response?.status)) return true;
-  if (['recorded', 'not_required'].includes(outcome)) return response.status === 200;
-  if (['skipped_stale', 'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'action_required'].includes(outcome)) return response.status === 409;
-  if (outcome === 'failed_retryable') return response.status === 503;
-  return response.status === 422;
-}
-
-function errorResponseHasExpectedStatus(response, code) {
-  if (!Number.isInteger(response?.status)) return true;
-  return response.status === (code === 'refresh_internal_error' ? 500 : 400);
-}
-
-function reconciliationStatusMatches(response, outcome) {
-  if (!Number.isInteger(response?.status)) return false;
-  if (outcome === 'current' || outcome === 'partial') return response.status === 200;
-  if (['action_required', 'blocked', 'budget_exhausted'].includes(outcome)) return response.status === 409;
-  return response.status === 503;
-}
-
-function reconciliationSummaryText(candidates, continuationCandidateKeys, totalCandidateCount = candidates.length) {
-  const summary = {
-    current: 0,
-    actionRequired: 0,
-    blocked: 0,
-    rejected: 0,
-    retryable: 0,
-    budgetExhausted: 0,
-  };
-  for (const candidate of candidates) {
-    if (candidate.outcome === 'current') summary.current += 1;
-    else if (candidate.outcome === 'action_required') summary.actionRequired += 1;
-    else if (candidate.outcome === 'blocked') summary.blocked += 1;
-    else if (candidate.outcome === 'rejected') summary.rejected += 1;
-    else if (candidate.outcome === 'budget_exhausted') summary.budgetExhausted += 1;
-    else if (RETRYABLE_RECONCILIATION_OUTCOMES.has(candidate.outcome)) summary.retryable += 1;
-  }
-  return [
-    `${candidates.length}/${totalCandidateCount} processed`,
-    `${summary.current} current`,
-    `${summary.actionRequired} need staff action`,
-    `${summary.blocked} blocked by safeguards`,
-    `${summary.rejected} rejected`,
-    `${summary.retryable} need retrying`,
-    `${summary.budgetExhausted} paused at the work limit`,
-    `${continuationCandidateKeys.length} queued to continue`,
-  ].join(' · ');
-}
-
-// Only accept the endpoint's compact, server-owned result shape. In
-// particular, do not render a malformed continuation key or infer an outcome
-// from a transport status alone.
-export function validReviewerReconciliationResponse(data, requestId, expectedCandidateKeys = null) {
-  if (!data || typeof data !== 'object' || Array.isArray(data)
-    || !RECONCILIATION_OUTCOMES.has(data.outcome)
-    || typeof data.success !== 'boolean'
-    || data.success !== ['current', 'partial'].includes(data.outcome)
-    || !Array.isArray(data.candidates)) return null;
-
-  if (data.requestId !== requestId) return null;
-  if (!data.candidates.every((candidate) => (
-    candidate && typeof candidate === 'object'
-      && canonicalCandidateKey(candidate.candidateKey) === candidate.candidateKey
-      && RECONCILIATION_CANDIDATE_OUTCOMES.has(candidate.outcome)
-  ))) return null;
-  const candidateKeys = data.candidates.map((candidate) => candidate.candidateKey);
-  if (new Set(candidateKeys).size !== candidateKeys.length) return null;
-  const rosterCapExceeded = data.code === RECONCILIATION_ROSTER_CAP_EXCEEDED;
-  // The route may fail before it can reconcile any submitted row. This is the
-  // one server-legal aggregate response with no candidate correlation result;
-  // accept it so staff receive its tailored reload/retry guidance. It must not
-  // carry a continuation, which remains validated below.
-  const emptyRetryableAggregate = data.outcome === 'failed_retryable' && data.candidates.length === 0;
-  if (expectedCandidateKeys !== null && !rosterCapExceeded && !emptyRetryableAggregate) {
-    if (!Array.isArray(expectedCandidateKeys)
-      || expectedCandidateKeys.length === 0
-      || !expectedCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
-      || new Set(expectedCandidateKeys).size !== expectedCandidateKeys.length
-      || candidateKeys.length !== expectedCandidateKeys.length) return null;
-    const expected = new Set(expectedCandidateKeys);
-    if (candidateKeys.some((key) => !expected.has(key))) return null;
-  }
-  const continuationCandidateKeys = data.continuationCandidateKeys === undefined
-    ? []
-    : data.continuationCandidateKeys;
-  if (!Array.isArray(continuationCandidateKeys)
-    || continuationCandidateKeys.length > RECONCILIATION_MAX_CANDIDATE_KEYS
-    || !continuationCandidateKeys.every((key) => canonicalCandidateKey(key) === key)
-    || new Set(continuationCandidateKeys).size !== continuationCandidateKeys.length) return null;
-  if (emptyRetryableAggregate && continuationCandidateKeys.length !== 0) return null;
-  if (data.outcome === 'current' && continuationCandidateKeys.length !== 0) return null;
-  const terminalCandidateKeys = new Set(data.candidates
-    .filter((candidate) => ['current', 'action_required', 'blocked', 'rejected'].includes(candidate.outcome))
-    .map((candidate) => candidate.candidateKey));
-  if (continuationCandidateKeys.some((key) => terminalCandidateKeys.has(key))) return null;
-  if (rosterCapExceeded && (data.outcome !== 'blocked'
-    || data.candidates.length !== 0 || continuationCandidateKeys.length !== 0)) return null;
-  return {
-    outcome: data.outcome,
-    candidates: data.candidates,
-    continuationCandidateKeys,
-    code: rosterCapExceeded ? RECONCILIATION_ROSTER_CAP_EXCEEDED : null,
-  };
-}
-
-// The warm plan is server-derived display data. A duplicate or malformed key is
-// ambiguous, so this projection omits it rather than associating it by name or
-// by a client-generated fallback key.
-export function buildEvidencePlansByCandidateKey(rosterSnapshot, requestId) {
-  if (rosterSnapshot?.requestId !== requestId) return new Map();
-  const plans = rosterSnapshot?.data?.warmValidation?.candidatePlans;
-  if (!Array.isArray(plans)) return new Map();
-  const byKey = new Map();
-  const ambiguous = new Set();
-  for (const plan of plans) {
-    const key = canonicalCandidateKey(plan?.candidateKey);
-    if (!key || ambiguous.has(key)) continue;
-    if (byKey.has(key)) {
-      byKey.delete(key);
-      ambiguous.add(key);
-      continue;
-    }
-    byKey.set(key, plan);
-  }
-  return byKey;
-}
-
-// Only current/not-applicable stages are represented in `currentStages` by the
-// server planner. Do not inspect candidate receipts here: that would let stale
-// roster JSON create an evidence-date claim outside the warm-plan contract.
-export function projectEvidenceCheck(candidate, plansByCandidateKey) {
-  const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
-  const plan = candidateKey ? plansByCandidateKey?.get(candidateKey) : null;
-  const currentStages = Array.isArray(plan?.currentStages) ? new Set(plan.currentStages) : null;
-  const checkedDates = plan?.evidenceCheckedDates;
-  if (!currentStages || !checkedDates || typeof checkedDates !== 'object' || Array.isArray(checkedDates)) return null;
-
-  const stages = EVIDENCE_STAGE_ORDER.flatMap((stage) => {
-    if (!currentStages.has(stage)) return [];
-    const date = canonicalEvidenceDate(checkedDates[stage]);
-    return date ? [{ stage, label: EVIDENCE_STAGE_LABELS[stage], date }] : [];
-  });
-  if (stages.length === 0) return null;
-  const summaryDate = stages.reduce((oldest, stage) => (stage.date < oldest ? stage.date : oldest), stages[0].date);
-  return { summaryDate, stages };
-}
-
-function EvidenceCheck({ evidenceCheck }) {
-  if (!evidenceCheck) return null;
-  return (
-    <div className="mt-2 text-xs text-gray-600">
-      <p>
-        Evidence checked as of <time dateTime={evidenceCheck.summaryDate}>{evidenceCheck.summaryDate}</time>
-      </p>
-      <details className="mt-1">
-        <summary className="cursor-pointer text-gray-500">Evidence checked by stage</summary>
-        <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-2 gap-y-0.5 pl-2">
-          {evidenceCheck.stages.map(({ stage, label, date }) => (
-            <div key={stage} className="contents">
-              <dt>{label}</dt>
-              <dd><time dateTime={date}>{date}</time></dd>
-            </div>
-          ))}
-        </dl>
-      </details>
-    </div>
-  );
-}
 
 export function addressTrustFailureMessage(data, fallback) {
   const base = data?.message || data?.error || fallback;
@@ -544,18 +133,6 @@ function dedupeByName(list) {
 
 function isApplicantOriginCandidate(c) {
   return !!c && (c.isApplicantRecommended || provenanceKindOf(c) === PROVENANCE_KINDS.APPLICANT_SUGGESTED);
-}
-
-// This is a UI-only fail-closed guard for the legacy checkbox bridge. It never
-// establishes applicant authority: server reconciliation still validates that
-// the suggestion belongs to this request before classifying the staff action.
-function applicantPersonLinkMissing(c) {
-  return isApplicantOriginCandidate(c)
-    && typeof c?.suggestionId === 'string'
-    && c.suggestionId.length > 0
-    && !c?.potentialReviewerId
-    && !c?.applicantKnownReviewer?.potentialReviewerId
-    && !c?.seedResolvedPotentialReviewerId;
 }
 
 function formatSaveFailureDetails(errors = []) {
@@ -610,7 +187,7 @@ function emailOwnershipLabel(evidence) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRefreshStage, onReloadRoster, stageRefresh = null, legacySelection = null, identityLinkRequired = false, canManage = true, evidenceCheck = null }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -700,11 +277,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
   const needsRecordRepair = promotionDecision?.decision === 'needs_record_repair';
   const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
-  const stageRefreshing = stageRefresh?.status === 'refreshing';
-  const stageReloadRequired = stageRefresh?.reloadRequired === true;
-  const stageRecorded = stageRefresh?.status === 'recorded';
-  const stageRetryable = stageRefresh?.status === 'retryable';
-  const stageLabel = EVIDENCE_STAGE_LABELS[stageRefresh?.stage] || 'Evidence';
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
   // could belong to a namesake while keeping the row actionable in Find.
@@ -870,63 +442,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               Confirm the exact person and email before promoting this reviewer to Invite.
             </div>
           )}
-          {identityLinkRequired && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">Keep in Find — applicant reviewer identity needs repair.</span>{' '}
-              This request's applicant suggestion is not linked to an exact reviewer record. Use the identity/edit-add workflow after the exact person is linked; this reviewer cannot be selected or promoted yet.
-            </div>
-          )}
           {missingVerifiedEmail && (
             <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
               <span className="font-medium">Keep in Find — verified email missing.</span>{' '}
               Add or verify an email before promoting this reviewer to Invite.
-            </div>
-          )}
-
-          <EvidenceCheck evidenceCheck={evidenceCheck} />
-
-          {legacySelection?.message && (
-            <p className="mt-2 text-xs text-sky-800" role="status">
-              {legacySelection.message}
-            </p>
-          )}
-
-          {stageRefresh && (
-            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-              <p>
-                {stageLabel} evidence needs a server action. This repairs evidence only; it does not select or promote this reviewer.
-              </p>
-              {stageReloadRequired ? (
-                <p className="mt-1" role="status">
-                  {stageRefresh.message || 'The roster changed while refreshing evidence. Reload reviewer status before trying again.'}
-                  {onReloadRoster && (
-                    <button type="button" onClick={onReloadRoster} className="ml-2 font-medium underline">
-                      Reload reviewer status
-                    </button>
-                  )}
-                </p>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onRefreshStage?.(candidate)}
-                    disabled={!onRefreshStage || stageRefreshing || stageRecorded}
-                    aria-busy={stageRefreshing}
-                    className="mt-1 font-medium underline disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {stageRefreshing
-                      ? `Refreshing ${stageLabel.toLocaleLowerCase('en-US')} evidence…`
-                      : stageRecorded
-                        ? `${stageLabel} evidence refreshed`
-                        : stageRetryable
-                          ? `Retry ${stageLabel.toLocaleLowerCase('en-US')} evidence refresh`
-                          : `Refresh ${stageLabel.toLocaleLowerCase('en-US')} evidence`}
-                  </button>
-                  {stageRefresh.message && (
-                    <p className="mt-1" role="status">{stageRefresh.message}</p>
-                  )}
-                </>
-              )}
             </div>
           )}
 
@@ -951,9 +470,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {previousResult && <Pill tone="blue">Previously found</Pill>}
             {identityUnverified && (
               <Pill tone="amber">⚠ Identity review required</Pill>
-            )}
-            {identityLinkRequired && (
-              <Pill tone="amber">⚠ Identity/person link required</Pill>
             )}
             {missingVerifiedEmail && (
               <Pill tone="amber">⚠ Verified email required</Pill>
@@ -1277,8 +793,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 onClick={() => (c.addressConflictPending && onReviewAddressConflict
                   ? onReviewAddressConflict(c)
                   : onEdit?.(c))}
-                disabled={stageRefreshing}
-                className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
                 title={needsAddressVerification
                   ? 'Review the evidence, correct the address if needed, and verify the exact person and address'
                   : 'Edit contact details (email/website/affiliation) for this candidate'}
@@ -1290,8 +805,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={() => onRetryAddressCheck(c)}
-                disabled={stageRefreshing}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
               >
                 ↻ Retry conflict check
               </button>
@@ -1313,8 +827,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={() => onConfirmIdentity(c)}
-                disabled={stageRefreshing}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
                 title="If you recognize this person, confirm their identity and correct the email/website, then add them to the candidate list"
               >
                 ✓ This is the right person → edit &amp; add
@@ -1374,52 +887,15 @@ export default function ReviewerSearchSection({
   slotsPopulated = null,
   ingestLoading = false,
   ingestError = null,
-  ingestAttempted = false,
-  // Embedded Workbench callers must explicitly materialize applicant inputs
-  // before cold search so request exclusions are not silently omitted.
-  // Standalone callers preserve their historical contract by defaulting ready.
-  applicantInputsReady = true,
   onRetryIngestion,
   savedPoolNames = [],
   onSaved,
   onNavigate,
   manualAddSlot = null,
   canManage = true,
-  rosterSnapshot,
-  onRetryRoster,
-  displayOnly = false,
 }) {
-  const parentOwnsRoster = rosterSnapshot !== undefined;
-  const stageRefreshSnapshotVersion = parentOwnsRoster
-    ? rosterSnapshot?.rosterVersion || null
-    : null;
-  // This changes synchronously with the rendered request/roster identity. A
-  // monotonic generation also distinguishes A → B → A before passive effects
-  // run, which a request-id-only key cannot do.
-  const stageRefreshScope = JSON.stringify([
-    requestId || null,
-    parentOwnsRoster,
-    stageRefreshSnapshotVersion,
-    blobUrl || null,
-  ]);
-  const rosterRetryRequired = (
-    rosterSnapshot?.reconciliationStopped === true
-    || ['stale', 'error'].includes(rosterSnapshot?.authorityState)
-  );
-  // Standalone/test callers historically supply the already-materialized rows
-  // without the parent panel's explicit-attempt bit. Treat concrete row/error
-  // data as an attempted load while keeping a truly empty parent bootstrap idle.
-  const applicantInputAvailable = ingestAttempted
-    || ingestLoading
-    || !!ingestError
-    || recommended.length > 0
-    || recommendedFailed.length > 0
-    || knownLookupFailed.length > 0
-    || slotsPopulated !== null;
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
-  const [reconciliationState, setReconciliationState] = useState(RECONCILIATION_IDLE);
-  const busy = phase === 'running' || phase === 'saving'
-    || ['running', 'reloading'].includes(reconciliationState.status);
+  const busy = phase === 'running' || phase === 'saving';
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
@@ -1438,16 +914,11 @@ export default function ReviewerSearchSection({
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
-  // The normal Workbench path receives this plan in `rosterSnapshot`. Keep the
-  // standalone roster-fetch path equally conservative: only a current server
-  // response with current warm validation can populate its request-bound map.
-  const [standaloneWarmValidationSnapshot, setStandaloneWarmValidationSnapshot] = useState(null);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
   const [rosterLoaded, setRosterLoaded] = useState(false);
   const [rosterLoadFailed, setRosterLoadFailed] = useState(false);
   const [rosterNote, setRosterNote] = useState(null); // surfaced if a durable write fails
-  const [stageRefreshStates, setStageRefreshStates] = useState({});
   const [removingPrevious, setRemovingPrevious] = useState(false);
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [error, setError] = useState(null);
@@ -1476,79 +947,6 @@ export default function ReviewerSearchSection({
   const [recError, setRecError] = useState(null);
   const recRunningRef = useRef(false);
 
-  // Do not let an old parent snapshot paint during the render that switches
-  // requests. The effect below clears the stored projections as well; these
-  // derived views close the before-effect paint window.
-  const parentRosterSnapshotCurrent = !parentOwnsRoster || (
-    rosterSnapshot?.requestId === requestId && !!rosterSnapshot?.data
-  );
-  const visibleRosterActive = parentRosterSnapshotCurrent ? rosterActive : [];
-  const visibleRosterExcluded = parentRosterSnapshotCurrent ? rosterExcluded : [];
-  const visibleRosterIneligible = parentRosterSnapshotCurrent ? rosterIneligible : [];
-  const visibleRosterBlocked = parentRosterSnapshotCurrent ? rosterBlocked : [];
-  const visibleRosterHandled = parentRosterSnapshotCurrent ? rosterHandled : [];
-  const visibleRosterSavedKeys = parentRosterSnapshotCurrent ? rosterSavedKeys : [];
-  const visibleRosterNames = parentRosterSnapshotCurrent ? rosterNames : [];
-  const visibleCandidates = parentRosterSnapshotCurrent ? candidates : [];
-  const visibleRecCandidates = parentRosterSnapshotCurrent ? recCandidates : [];
-  const visibleRecHandled = parentRosterSnapshotCurrent ? recHandled : [];
-  const visibleUnverified = parentRosterSnapshotCurrent ? unverified : [];
-  // The first request-wide reconciliation must be bounded to the exact rows
-  // visible from the parent-owned server snapshot. Never fall back to an
-  // unscoped request reconciliation: a stale or malformed projection must be
-  // repaired by the normal roster reload before it can trigger provider work.
-  const visibleActiveReconciliationTargets = useMemo(() => {
-    const rows = Array.isArray(visibleRosterActive) ? visibleRosterActive : [];
-    const keys = rows.map((candidate) => canonicalCandidateKey(candidate?.candidateKey));
-    const valid = rows.length === 0 || (
-      keys.every(Boolean)
-      && new Set(keys).size === keys.length
-    );
-    return {
-      activeCount: rows.length,
-      keys: valid ? keys : [],
-      valid,
-    };
-  }, [visibleRosterActive]);
-  // Keep the request match in this derivation as a render-time guard. React can
-  // render once with the prior prop before the request-reset effect clears its
-  // local lists; old warm-plan dates must not paint in that window.
-  const warmValidationSnapshot = parentOwnsRoster
-    ? rosterSnapshot
-    : standaloneWarmValidationSnapshot;
-  const evidencePlansByCandidateKey = useMemo(
-    () => buildEvidencePlansByCandidateKey(warmValidationSnapshot, requestId),
-    [warmValidationSnapshot, requestId],
-  );
-  // A completed request-level reconciliation can identify a legacy
-  // applicant row whose request-scoped suggestion exists but is not linked to
-  // an exact person. Keep that server result only for this panel generation:
-  // it suppresses the legacy checkbox bridge and explains the staff remedy,
-  // but does not become browser-held promotion authority.
-  const identityActionCandidateKeys = useMemo(() => new Set(
-    Array.isArray(reconciliationState.identityActionCandidateKeys)
-      ? reconciliationState.identityActionCandidateKeys
-      : [],
-  ), [reconciliationState.identityActionCandidateKeys]);
-  const candidateNeedsIdentityLinkAction = useCallback((candidate) => {
-    const key = canonicalCandidateKey(candidate?.candidateKey);
-    return applicantPersonLinkMissing(candidate)
-      || (!!key && identityActionCandidateKeys.has(key));
-  }, [identityActionCandidateKeys]);
-  const evidenceCheckForCandidate = useCallback(
-    (candidate) => projectEvidenceCheck(candidate, evidencePlansByCandidateKey),
-    [evidencePlansByCandidateKey],
-  );
-  const serverPromotionPlanForCandidate = useCallback((candidate) => {
-    const candidateKey = canonicalCandidateKey(candidate?.candidateKey);
-    return candidateKey ? evidencePlansByCandidateKey.get(candidateKey) || null : null;
-  }, [evidencePlansByCandidateKey]);
-  const candidateIsSelectable = useCallback(
-    (candidate) => !candidateNeedsIdentityLinkAction(candidate)
-      && isCandidateSelectable(candidate, serverPromotionPlanForCandidate(candidate)),
-    [candidateNeedsIdentityLinkAction, serverPromotionPlanForCandidate],
-  );
-
   // Per-user prompt-override editor toggle (S222).
   const [showPromptEditor, setShowPromptEditor] = useState(false);
 
@@ -1559,18 +957,6 @@ export default function ReviewerSearchSection({
   const savingRef = useRef(null);
   const genRef = useRef(0);
   const excludeEditedRef = useRef(false);
-  const stageRefreshesRef = useRef(new Map());
-  const stageRefreshScopeRef = useRef({ scope: null, generation: 0 });
-  const reconciliationRef = useRef(null);
-  const reconciliationStatusRef = useRef('idle');
-  reconciliationStatusRef.current = reconciliationState.status;
-  if (stageRefreshScopeRef.current.scope !== stageRefreshScope) {
-    stageRefreshScopeRef.current = {
-      scope: stageRefreshScope,
-      generation: stageRefreshScopeRef.current.generation + 1,
-    };
-  }
-  const stageRefreshGeneration = stageRefreshScopeRef.current.generation;
 
   const applyRosterSnapshot = useCallback((data) => {
     setRosterActive(Array.isArray(data?.active) ? data.active : []);
@@ -1583,452 +969,14 @@ export default function ReviewerSearchSection({
   }, []);
 
   const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
-    // Embedded callers receive every snapshot through the dedicated effect
-    // below. Returning here keeps a snapshot change from retriggering this
-    // legacy bootstrap effect (and from issuing a duplicate default GET).
-    if (parentOwnsRoster) return null;
     if (!requestId) return null;
     const res = await fetch(`/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`);
     const data = await res.json().catch(() => ({}));
     if (genRef.current !== expectedGeneration) return null;
     if (!res.ok || !data.success) return null;
     applyRosterSnapshot(data);
-    setStandaloneWarmValidationSnapshot(
-      data.authorityState === 'current' && data.warmValidation?.state === 'current'
-        ? {
-          requestId,
-          authorityState: 'current',
-          data: { warmValidation: data.warmValidation },
-        }
-        : null,
-    );
     return data;
-  }, [requestId, applyRosterSnapshot, parentOwnsRoster]);
-
-  const reloadAfterStageRefresh = useCallback((expectedGeneration) => {
-    if (onRetryRoster) {
-      onRetryRoster();
-      return;
-    }
-    void reloadRoster(expectedGeneration);
-  }, [onRetryRoster, reloadRoster]);
-
-  const reconcilePreviouslyFoundReviewers = useCallback(async () => {
-    if (!requestId || displayOnly || !canManage || !rosterLoaded || busy || removingPrevious) return;
-    if (reconciliationRef.current) return;
-    const expectedGeneration = genRef.current;
-    const expectedStageRefreshGeneration = stageRefreshGeneration;
-    const continuationCandidateKeys = reconciliationState.continuationCandidateKeys;
-    const controller = new AbortController();
-    reconciliationRef.current = controller;
-    const isCurrentAttempt = () => (
-      !controller.signal.aborted
-      && reconciliationRef.current === controller
-      && genRef.current === expectedGeneration
-      && stageRefreshScopeRef.current.generation === expectedStageRefreshGeneration
-    );
-    // The acknowledged parent reload necessarily advances the roster-version
-    // scope. It is still the same reconciliation attempt unless the request
-    // generation or controller changed.
-    const isCurrentRequestAttempt = () => (
-      !controller.signal.aborted
-      && reconciliationRef.current === controller
-      && genRef.current === expectedGeneration
-    );
-    if (!isCurrentAttempt()) return;
-    setReconciliationState({
-      status: 'running',
-      continuationCandidateKeys,
-      identityActionCandidateKeys: [],
-      message: 'Reconciling previously found reviewers. This may update identity, COI, eligibility, or contact evidence, and a reviewer’s candidate status may change. It does not search for new reviewers, change selections, or send invitations.',
-    });
-    try {
-      const targetCandidateKeys = continuationCandidateKeys.length > 0
-        ? continuationCandidateKeys
-        : visibleActiveReconciliationTargets.keys;
-      if (continuationCandidateKeys.length === 0 && visibleActiveReconciliationTargets.activeCount > 0
-        && (!visibleActiveReconciliationTargets.valid || targetCandidateKeys.length === 0)) {
-        setReconciliationState({
-          status: 'error',
-          continuationCandidateKeys: [],
-          message: 'The visible reviewer roster has active rows without valid reconciliation keys. Reload reviewer status before trying again; no reviewer evidence was changed.',
-        });
-        return;
-      }
-      if (targetCandidateKeys.length === 0) {
-        setReconciliationState({
-          status: 'complete',
-          continuationCandidateKeys: [],
-          message: 'No previously found reviewers require reconciliation.',
-        });
-        return;
-      }
-      const body = { requestId, candidateKeys: targetCandidateKeys };
-      const response = await fetch('/api/workbench/reviewer-reconcile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      const data = await response.json().catch(() => null);
-      if (!isCurrentAttempt()) return;
-      const result = validReviewerReconciliationResponse(data, requestId, targetCandidateKeys);
-      if (!result || !reconciliationStatusMatches(response, result.outcome)) {
-        setReconciliationState({
-          status: 'error',
-          continuationCandidateKeys: [],
-          message: 'The reviewer reconciliation response was not recognized. Reload reviewer status before trying again; existing safeguards remain in effect.',
-        });
-        return;
-      }
-      const resultIdentityActionCandidateKeys = result.candidates
-        .filter((candidate) => (
-          candidate?.outcome === 'action_required'
-          && candidate?.code === 'dedicated_identity_action'
-        ))
-        .map((candidate) => candidate.candidateKey);
-      setReconciliationState({
-        status: 'reloading',
-        continuationCandidateKeys: result.continuationCandidateKeys,
-        identityActionCandidateKeys: resultIdentityActionCandidateKeys,
-        code: result.code,
-        message: result.code === RECONCILIATION_ROSTER_CAP_EXCEEDED
-          ? 'Reviewer roster integrity check failed: more active reviewers than the safe limit were found. Reload reviewer status; if this persists, contact an administrator. Do not run another reviewer search.'
-          : result.outcome === 'failed_retryable' && result.candidates.length === 0
-          ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
-          : 'Reviewer reconciliation finished. Reloading reviewer status.',
-      });
-      // The endpoint may have persisted a subset before returning an action,
-      // budget, or retryable outcome. Do not show a completion summary until
-      // the parent has committed the exact cached→reconciled terminal snapshot.
-      const acknowledgement = onRetryRoster
-        ? await Promise.resolve(onRetryRoster())
-        : await reloadRoster(expectedGeneration);
-      if (!isCurrentRequestAttempt()) return;
-      if (onRetryRoster && acknowledgement?.state !== 'current') {
-        setReconciliationState({
-          status: acknowledgement?.state === 'superseded' ? 'stale' : 'error',
-          continuationCandidateKeys: result.continuationCandidateKeys,
-          identityActionCandidateKeys: resultIdentityActionCandidateKeys,
-          code: result.code,
-          message: acknowledgement?.state === 'superseded'
-            ? 'Reviewer status changed while reconciliation was running. Reloaded status is shown; start reconciliation again if needed.'
-            : 'Reviewer evidence was reconciled, but current reviewer status could not be confirmed. Reload reviewer status before taking action.',
-        });
-        return;
-      }
-      if (!onRetryRoster && !acknowledgement) {
-        setReconciliationState({
-          status: 'error',
-          continuationCandidateKeys: result.continuationCandidateKeys,
-          identityActionCandidateKeys: resultIdentityActionCandidateKeys,
-          code: result.code,
-          message: 'Reviewer evidence was reconciled, but current reviewer status could not be reloaded. Reload reviewer status before taking action.',
-        });
-        return;
-      }
-      setReconciliationState({
-        status: 'complete',
-        continuationCandidateKeys: result.continuationCandidateKeys,
-        identityActionCandidateKeys: resultIdentityActionCandidateKeys,
-        code: result.code,
-        message: result.code === RECONCILIATION_ROSTER_CAP_EXCEEDED
-          ? 'Reviewer roster integrity check failed: more active reviewers than the safe limit were found. Reload reviewer status; if this persists, contact an administrator. Do not run another reviewer search.'
-          : result.outcome === 'failed_retryable' && result.candidates.length === 0
-            ? 'Reviewer reconciliation is temporarily unavailable. Retry later; selections and invitations were not changed.'
-            : `Reviewer reconciliation finished: ${reconciliationSummaryText(
-              result.candidates,
-              result.continuationCandidateKeys,
-              targetCandidateKeys.length,
-            )}.`,
-      });
-    } catch {
-      if (!isCurrentAttempt()) return;
-      setReconciliationState({
-        status: 'error',
-        continuationCandidateKeys: [],
-        message: 'Reviewer reconciliation could not be completed. Reload reviewer status before trying again; existing safeguards remain in effect.',
-      });
-    } finally {
-      if (reconciliationRef.current === controller) reconciliationRef.current = null;
-    }
-  }, [
-    requestId,
-    displayOnly,
-    canManage,
-    rosterLoaded,
-    busy,
-    removingPrevious,
-    reconciliationState.continuationCandidateKeys,
-    stageRefreshGeneration,
-    onRetryRoster,
-    reloadRoster,
-    visibleActiveReconciliationTargets,
-  ]);
-
-  const refreshReviewerStage = useCallback(async (candidate) => {
-    const target = reviewerStageRefreshTarget(
-      candidate,
-      serverPromotionPlanForCandidate(candidate),
-    );
-    if (target?.kind !== 'refresh') return;
-
-    const expectedGeneration = genRef.current;
-    const expectedStageRefreshGeneration = stageRefreshGeneration;
-    const controller = new AbortController();
-    const inFlightKey = reviewerStageInFlightKey({
-      requestId,
-      candidateKey: target.candidateKey,
-      stage: target.stage,
-      generation: expectedStageRefreshGeneration,
-    });
-    if (stageRefreshesRef.current.has(inFlightKey)) return;
-    stageRefreshesRef.current.set(inFlightKey, controller);
-    const isCurrentAttempt = () => (
-      !controller.signal.aborted
-      && genRef.current === expectedGeneration
-      && stageRefreshScopeRef.current.generation === expectedStageRefreshGeneration
-      && stageRefreshesRef.current.get(inFlightKey) === controller
-    );
-    const stateKey = reviewerStageStateKey({
-      requestId,
-      candidateKey: target.candidateKey,
-      stage: target.stage,
-      generation: expectedStageRefreshGeneration,
-    });
-    if (!isCurrentAttempt()) return;
-    setStageRefreshStates((previous) => ({
-      ...previous,
-      [stateKey]: { status: 'refreshing', stage: target.stage, message: null, reloadRequired: false },
-    }));
-
-    const requireReload = (message) => {
-      if (!isCurrentAttempt()) return;
-      setStageRefreshStates((previous) => ({
-        ...previous,
-        [stateKey]: { status: 'stale', stage: target.stage, message, reloadRequired: true },
-      }));
-    };
-
-    try {
-      const response = await fetch('/api/workbench/reviewer-stage-refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          candidateKey: target.candidateKey,
-          stage: target.stage,
-          expectedUpdatedAt: target.expectedUpdatedAt,
-        }),
-        signal: controller.signal,
-      });
-      const data = await response.json().catch(() => null);
-      if (!isCurrentAttempt()) return;
-      const valid = validRefreshResponse(data, target);
-      if (!valid) {
-        const typedError = validRefreshErrorResponse(data, target);
-        if (typedError && errorResponseHasExpectedStatus(response, typedError.code)) {
-          requireReload(`${typedError.message} (Code: ${typedError.code})`);
-          return;
-        }
-        if ([400, 422, 500].includes(response?.status)) {
-          requireReload(response.status === 400
-            ? 'The evidence refresh request could not be read by the server. Reload reviewer status before trying again.'
-            : response.status === 500
-              ? 'The evidence refresh service failed. Reload reviewer status before trying again.'
-              : 'The evidence refresh was rejected. Reload reviewer status before trying again.');
-          return;
-        }
-        requireReload('The evidence refresh response was not recognized. Reload reviewer status before trying again; existing evidence remains visible.');
-        return;
-      }
-      if (!responseHasExpectedStatus(response, valid.outcome)) {
-        requireReload('The evidence refresh response had an unexpected status. Reload reviewer status before trying again; existing evidence remains visible.');
-        return;
-      }
-
-      if (['recorded', 'not_required'].includes(valid.outcome)) {
-        if (!isCurrentAttempt()) return;
-        setStageRefreshStates((previous) => ({
-          ...previous,
-          [stateKey]: {
-            status: 'recorded',
-            stage: target.stage,
-            message: valid.outcome === 'recorded'
-              ? 'Evidence refresh recorded. Reloading reviewer status.'
-              : 'Evidence is already current. Reloading reviewer status.',
-            reloadRequired: false,
-          },
-        }));
-        if (isCurrentAttempt()) reloadAfterStageRefresh(expectedGeneration);
-        return;
-      }
-      if (valid.outcome === 'failed_retryable') {
-        if (!isCurrentAttempt()) return;
-        setStageRefreshStates((previous) => ({
-          ...previous,
-          [stateKey]: {
-            status: 'retryable', stage: target.stage,
-            message: 'This evidence refresh did not complete. Retry only this named stage after reviewing the current roster.',
-            reloadRequired: false,
-          },
-        }));
-        if (valid.reasonCode === 'prior_refresh_incomplete') {
-          reloadAfterStageRefresh(expectedGeneration);
-        }
-        return;
-      }
-      if (['skipped_stale', 'refresh_in_progress', 'lease_recovery_required', 'lease_repair_required', 'rejected', 'failed_terminal'].includes(valid.outcome)) {
-        requireReload(valid.outcome === 'lease_recovery_required'
-          ? `The ${EVIDENCE_STAGE_LABELS[valid.leaseStage] || 'existing'} evidence refresh lease must be recovered first. Reload reviewer status and retry that named stage.`
-          : valid.outcome === 'lease_repair_required'
-            ? 'A prior reviewer refresh has malformed lease data and cannot be retried automatically. Ask a Workbench administrator to repair the lease, then reload reviewer status.'
-          : 'The reviewer roster changed before this evidence refresh completed. Reload reviewer status before trying again.');
-        return;
-      }
-      requireReload('The evidence refresh did not complete. Reload reviewer status before trying again; existing evidence remains visible.');
-    } catch {
-      if (!isCurrentAttempt()) return;
-      requireReload('The evidence refresh result is unknown. Reload reviewer status before trying again; existing evidence remains visible.');
-    } finally {
-      // The candidate-wide key includes the generation, so this cannot delete
-      // a newer retry for the same person after a scope change.
-      if (stageRefreshesRef.current.get(inFlightKey) === controller) {
-        stageRefreshesRef.current.delete(inFlightKey);
-      }
-    }
-  }, [requestId, serverPromotionPlanForCandidate, reloadAfterStageRefresh, stageRefreshGeneration]);
-
-  const stageRefreshPropsForCandidate = useCallback((candidate) => {
-    const plan = serverPromotionPlanForCandidate(candidate);
-    if (candidateNeedsIdentityLinkAction(candidate)) {
-      return { identityLinkRequired: true };
-    }
-    if (hasLegacyServerSelectionPlan(candidate, plan)) {
-      return { legacySelection: legacySelectionNotice(candidate, plan) };
-    }
-    const target = reviewerStageRefreshTarget(
-      candidate,
-      plan,
-    );
-    if (!target) return {};
-    if (target.kind === 'invalid') {
-      return {
-        stageRefresh: {
-          status: 'stale', stage: null, reloadRequired: true,
-          message: 'The reviewer evidence plan was not recognized. Reload reviewer status; this row is read-only until the server plan is available.',
-        },
-        onReloadRoster: () => reloadAfterStageRefresh(genRef.current),
-      };
-    }
-    if (target.kind === 'pending') {
-      return {
-        stageRefresh: {
-          status: 'refreshing', stage: target.stage, reloadRequired: true,
-          message: 'A reviewer evidence refresh is already in progress. Reload reviewer status before taking another action.',
-        },
-        onReloadRoster: () => reloadAfterStageRefresh(genRef.current),
-      };
-    }
-    if (target.kind === 'reserved') {
-      return {
-        stageRefresh: {
-          status: 'stale', stage: target.stage, reloadRequired: true,
-          message: 'Roster finalization has not been explicitly offered by the server. Reload reviewer status; this row remains read-only.',
-        },
-        onReloadRoster: () => reloadAfterStageRefresh(genRef.current),
-      };
-    }
-    if (target.kind === 'operator_repair') {
-      return {
-        stageRefresh: {
-          status: 'stale', stage: target.stage, reloadRequired: true,
-          message: 'A prior reviewer refresh has malformed lease data and cannot be retried automatically. Ask a Workbench administrator to repair the lease, then reload reviewer status.',
-        },
-        onReloadRoster: () => reloadAfterStageRefresh(genRef.current),
-      };
-    }
-    // Structured address trust has dedicated staff UI below. Identity refresh
-    // is a server-side resolver action and remains available here; a later
-    // ambiguous result can still require the separate staff confirmation UI.
-    if (target.kind === 'dedicated') return {};
-    const state = stageRefreshStates[reviewerStageStateKey({
-      requestId,
-      candidateKey: target.candidateKey,
-      stage: target.stage,
-      generation: stageRefreshGeneration,
-    })] || null;
-    return {
-      stageRefresh: state || { status: 'ready', stage: target.stage, message: null, reloadRequired: false },
-      onRefreshStage: refreshReviewerStage,
-      onReloadRoster: state?.reloadRequired ? () => reloadAfterStageRefresh(genRef.current) : undefined,
-    };
-  }, [
-    requestId,
-    serverPromotionPlanForCandidate,
-    candidateNeedsIdentityLinkAction,
-    stageRefreshStates,
-    refreshReviewerStage,
-    reloadAfterStageRefresh,
-    stageRefreshGeneration,
-  ]);
-
-  // This action remains available while the P0 panel is display-only: it
-  // repairs a server-derived evidence receipt and never selects, saves, or
-  // promotes the reviewer. Abort old request attempts before any post-await UI
-  // update; the in-flight key and generation check are the second guard.
-  useEffect(() => {
-    for (const controller of stageRefreshesRef.current.values()) controller.abort();
-    stageRefreshesRef.current.clear();
-    setStageRefreshStates({});
-  }, [requestId, blobUrl, parentOwnsRoster, stageRefreshSnapshotVersion]);
-
-  useEffect(() => {
-    reconciliationRef.current?.abort();
-    reconciliationRef.current = null;
-    setReconciliationState(RECONCILIATION_IDLE);
-  }, [requestId, blobUrl, parentOwnsRoster]);
-
-  // A new parent-owned roster version supersedes an in-flight batch, but it
-  // must not erase the completed summary from this batch's own reload.
-  useEffect(() => {
-    if (reconciliationStatusRef.current !== 'running') return;
-    reconciliationRef.current?.abort();
-    reconciliationRef.current = null;
-    setReconciliationState({
-      status: 'stale',
-      continuationCandidateKeys: [],
-      message: 'Reviewer status changed while reconciliation was running. Reloaded status is shown; start reconciliation again if needed.',
-    });
-  }, [stageRefreshSnapshotVersion]);
-
-  useEffect(() => () => {
-    for (const controller of stageRefreshesRef.current.values()) controller.abort();
-    stageRefreshesRef.current.clear();
-    reconciliationRef.current?.abort();
-    reconciliationRef.current = null;
-  }, []);
-
-  // The parent owns warm cached→reconciled bootstrap for the Workbench panel.
-  // Standalone callers retain the original internal roster fetch contract.
-  useEffect(() => {
-    if (!parentOwnsRoster) return;
-    const snapshotMatchesRequest = rosterSnapshot?.requestId === requestId;
-    if (!snapshotMatchesRequest || !rosterSnapshot?.data) {
-      // The child retains same-request cached data during a parent retry, but
-      // must never render a prior request's projection while the new cached
-      // read is pending (or if a late prior snapshot arrives).
-      applyRosterSnapshot(null);
-      setRosterLoaded(false);
-      setRosterLoadFailed(snapshotMatchesRequest && rosterSnapshot?.authorityState === 'error');
-      setRosterNote(snapshotMatchesRequest ? (rosterSnapshot?.error || null) : null);
-      return;
-    }
-    applyRosterSnapshot(rosterSnapshot.data);
-    setRosterLoaded(Boolean(rosterSnapshot?.data) && rosterSnapshot.authorityState !== 'error');
-    setRosterLoadFailed(rosterSnapshot?.authorityState === 'error');
-    setRosterNote(rosterSnapshot?.error || null);
-  }, [requestId, parentOwnsRoster, rosterSnapshot, applyRosterSnapshot]);
+  }, [requestId, applyRosterSnapshot]);
 
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
@@ -2040,10 +988,7 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    if (!parentOwnsRoster) {
-      setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
-      setStandaloneWarmValidationSnapshot(null);
-    }
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -2058,7 +1003,7 @@ export default function ReviewerSearchSection({
     // Load the durable roster for this request. genRef-guarded so a slower fetch
     // can't clobber state after the request/proposal changed again. Never sets
     // `phase` — the roster renders independent of the search phase.
-    if (requestId && !parentOwnsRoster) {
+    if (requestId) {
       (async () => {
         try {
           const snapshot = await reloadRoster(myGen);
@@ -2076,17 +1021,13 @@ export default function ReviewerSearchSection({
           }
         }
       })();
-    } else if (!parentOwnsRoster) {
+    } else {
       setRosterLoaded(true); // no request → nothing to load; don't block the form
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestId, blobUrl, reloadRoster, parentOwnsRoster]);
+  }, [requestId, blobUrl, reloadRoster]);
 
   const retryRosterLoad = useCallback(async () => {
-    if (parentOwnsRoster) {
-      onRetryRoster?.();
-      return;
-    }
     const myGen = genRef.current;
     setRosterLoaded(false);
     setRosterLoadFailed(false);
@@ -2106,7 +1047,7 @@ export default function ReviewerSearchSection({
         setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
       }
     }
-  }, [reloadRoster, parentOwnsRoster, onRetryRoster]);
+  }, [reloadRoster]);
 
   // When the applicant exclude list finishes loading (it can arrive after the
   // proposal), prefill the box — unless the user has already edited it.
@@ -2119,10 +1060,7 @@ export default function ReviewerSearchSection({
   }, []);
 
   const runSearch = useCallback(async () => {
-    // Search is an explicit cold action. Its results remain ephemeral until the
-    // separately reviewed Promote flow accepts a current server plan for each
-    // selected candidate.
-    if (!blobUrl || !applicantInputsReady || runningRef.current || busy || removingPrevious || noSourcesSelected || !rosterLoaded) return;
+    if (!blobUrl || runningRef.current || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = true;
     const myGen = genRef.current;
     // Exclude set = the manual/applicant box + everything already surfaced for
@@ -2131,7 +1069,7 @@ export default function ReviewerSearchSection({
     // same set (S224).
     const effectiveExcluded = Array.from(new Set([
       ...parseExcludeList(excludeText),
-      ...visibleRosterNames,
+      ...rosterNames,
       ...(savedPoolNames || []),
     ]));
     const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
@@ -2323,7 +1261,7 @@ export default function ReviewerSearchSection({
       // it as deduped — a slow POST must not clobber a newer search's roster
       // (S224). Verified (Claude) + database discoveries only; unverified stay
       // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
-      if (!displayOnly && dedupedEnriched.length > 0 && requestId) {
+      if (dedupedEnriched.length > 0 && requestId) {
         try {
           const pruned = dedupedEnriched.map(pruneCandidateForRoster);
           const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
@@ -2366,7 +1304,7 @@ export default function ReviewerSearchSection({
     } finally {
       runningRef.current = false;
     }
-  }, [blobUrl, requestId, excludeText, visibleRosterNames, savedPoolNames, rosterLoaded, applicantInputsReady, busy, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress, displayOnly]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, pushProgress]);
 
   // Run the applicant-recommended reviewers through the full verify→COI→enrich
   // pipeline (server-side) and write the enrichment back to their existing rows.
@@ -2417,47 +1355,50 @@ export default function ReviewerSearchSection({
     }
   }, [blobUrl, proposalKey, requestId, analysis]);
 
-  // A valid cached applicant result is only a display-state transition. A
-  // missing/stale cache stays idle until staff explicitly choose to update it;
-  // warm revisits and newly prepared proposal blobs must never launch the
-  // provider/COI pipeline by themselves.
+  // Auto-trigger applicant enrichment once both the proposal (blobUrl) and the
+  // ingested recommendations are ready. Runs independently of the Claude search —
+  // enrichment uses blobUrl directly for COI if no prior analysis result exists.
+  // Defined after enrichRecommended to avoid a temporal dead zone reference error.
   const terminalApplicantKeys = useMemo(
-    () => applicantTerminalSuggestionKeys(visibleRosterExcluded, visibleRosterSavedKeys),
-    [visibleRosterExcluded, visibleRosterSavedKeys],
+    () => applicantTerminalSuggestionKeys(rosterExcluded, rosterSavedKeys),
+    [rosterExcluded, rosterSavedKeys],
   );
   const actionableRecommended = useMemo(
     () => recommended.filter((row) => !reviewerEngagementProjection(row).handled),
     [recommended],
   );
   const haveValidCache = hasValidApplicantEnrichmentCache(
-    [...visibleRosterActive, ...visibleRosterIneligible],
+    [...rosterActive, ...rosterIneligible],
     proposalKey,
     actionableRecommended,
     terminalApplicantKeys,
   );
   useEffect(() => {
+    const selectableCount = actionableRecommended.length;
     if (recPhase !== 'idle' || recRunningRef.current) return;
     if (rosterLoaded && haveValidCache) {
       setRecPhase('done');
+      return;
     }
-  }, [recPhase, rosterLoaded, haveValidCache]);
+    if (blobUrl && proposalKey && selectableCount > 0 && rosterLoaded && !haveValidCache) {
+      enrichRecommended();
+    }
+  }, [blobUrl, proposalKey, actionableRecommended, recPhase, rosterLoaded, haveValidCache, enrichRecommended]);
 
   // The selectable list = the durable active roster ∪ this run's results, deduped
   // by normalized name (run results win — freshest enrichment). Renders + ranks
   // independent of `phase` so the roster shows on reload without a fresh search.
   // recCandidates (enriched applicant-referred) prepend so fresh enrichment wins
   // over any stale roster copy of the same person.
-  const displayRosterActive = useMemo(() => visibleRosterActive.filter((c) => (
-    !isApplicantOriginCandidate(c)
-      || !proposalKey
-      || c.enrichedProposalKey === proposalKey
-  )), [visibleRosterActive, proposalKey]);
-  const currentVisibleRecCandidates = useMemo(() => visibleRecCandidates.filter((candidate) => (
+  const displayRosterActive = useMemo(() => rosterActive.filter((c) => (
+    !isApplicantOriginCandidate(c) || (!!proposalKey && c.enrichedProposalKey === proposalKey)
+  )), [rosterActive, proposalKey]);
+  const visibleRecCandidates = useMemo(() => recCandidates.filter((candidate) => (
     !terminalApplicantKeys.has(candKey(candidate))
-  )), [visibleRecCandidates, terminalApplicantKeys]);
+  )), [recCandidates, terminalApplicantKeys]);
   const currentRunKeys = useMemo(() => new Set(
-    [...currentVisibleRecCandidates, ...visibleCandidates].map(candKey).filter(Boolean)
-  ), [currentVisibleRecCandidates, visibleCandidates]);
+    [...visibleRecCandidates, ...candidates].map(candKey).filter(Boolean)
+  ), [visibleRecCandidates, candidates]);
   const previousSearchCandidates = useMemo(() => (
     displayRosterActive
       .filter((c) => !isApplicantOriginCandidate(c) && !currentRunKeys.has(candKey(c)))
@@ -2473,10 +1414,10 @@ export default function ReviewerSearchSection({
       candidateKey: candKey(candidate),
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
-  const displayCandidates = dedupeByName([...currentVisibleRecCandidates, ...visibleCandidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  const displayCandidates = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
   const handledReviewers = useMemo(() => dedupeByName([
-    ...visibleRecHandled,
-    ...visibleRosterHandled,
+    ...recHandled,
+    ...rosterHandled,
     ...recommended
       .filter((row) => reviewerEngagementProjection(row).handled)
       .map((row) => ({
@@ -2485,8 +1426,8 @@ export default function ReviewerSearchSection({
         name: row.applicantKnownReviewer?.name || row.name || 'Applicant-recommended reviewer',
         stage: reviewerEngagementProjection(row).stage,
       })),
-  ]), [visibleRecHandled, visibleRosterHandled, recommended]);
-  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...visibleRosterIneligible])
+  ]), [recHandled, rosterHandled, recommended]);
+  const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
   const incompleteCoiLabel = incompleteCoiNames.length === 0
@@ -2506,10 +1447,9 @@ export default function ReviewerSearchSection({
   // become unselectable + unsavable (the save-candidates API also hard-rejects them).
   // The UI marker `pdIdentityConfirmed` makes an otherwise unverifiable row
   // selectable only after the authenticated roster action returned an opaque
-  // server confirmation id. The exact request-scoped warm plan still has to
-  // show every promotion stage current; a card receipt alone has no authority.
-  // Save-candidates independently re-verifies both boundaries.
-  const selectableCandidates = displayCandidates.filter(candidateIsSelectable);
+  // server confirmation id. Save-candidates re-verifies it; the marker has no
+  // server authority. Institution COI is never waived.
+  const selectableCandidates = displayCandidates.filter(isCandidateSelectable);
 
   // A Claude suggestion the server couldn't verify can ALSO surface — and verify —
   // from a database search, in this run or a prior one (it then lives in
@@ -2518,12 +1458,11 @@ export default function ReviewerSearchSection({
   // verified row always wins over its unverified twin. Excluded names drop too —
   // they already have their own collapsed section.
   const knownNameKeys = new Set(
-    [...displayCandidates.map(candKey), ...visibleRosterExcluded.map(candKey), ...visibleRosterIneligible.map(candKey)].filter(Boolean)
+    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey), ...rosterIneligible.map(candKey)].filter(Boolean)
   );
-  const unverifiedToShow = visibleUnverified.filter((c) => !knownNameKeys.has(candKey(c)));
+  const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
   const toggle = (key) => {
-    if (displayOnly) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -2531,16 +1470,14 @@ export default function ReviewerSearchSection({
     });
   };
   const allSelected = selectableCandidates.length > 0 && selectableCandidates.every((c) => selected.has(candKey(c)));
-  const toggleAll = () => {
-    if (!displayOnly) setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
-  };
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectableCandidates.map(candKey)));
 
   // Move a surfaced candidate into the durable Excluded set (not deleted). Optimistic:
   // splice it out of the active view immediately, persist in the background, restore on
   // failure. The candidate stays in rosterNames so a re-run still won't re-surface it.
   const excludeCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (displayOnly || !key || !requestId) return;
+    if (!key || !requestId) return;
     const pruned = pruneCandidateForRoster(cand);
     setCandidates((prev) => prev.filter((c) => candKey(c) !== key));
     setRecCandidates((prev) => prev.filter((c) => candKey(c) !== key));
@@ -2561,12 +1498,12 @@ export default function ReviewerSearchSection({
       setRosterActive((prev) => dedupeByName([pruned, ...prev]));
       setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
-  }, [requestId, displayOnly]);
+  }, [requestId]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {
     const key = candKey(cand);
-    if (displayOnly || !key || !requestId) return;
+    if (!key || !requestId) return;
     const myGen = genRef.current;
     setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
     setRosterActive((prev) => dedupeByName([cand, ...prev]));
@@ -2600,10 +1537,10 @@ export default function ReviewerSearchSection({
         setRosterNote("Couldn't promote that reviewer — please try again.");
       }
     }
-  }, [requestId, reloadRoster, displayOnly]);
+  }, [requestId, reloadRoster]);
 
   const removePreviousResults = useCallback(async () => {
-    if (displayOnly || !requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
+    if (!requestId || busy || removingPrevious || previousSearchRefs.length === 0) return;
     const count = previousSearchKeys.size;
     if (!window.confirm(`Remove ${count} previously found reviewer${count === 1 ? '' : 's'} from this request? Applicant-recommended, saved, excluded, and COI records will be kept.`)) return;
     const myGen = genRef.current;
@@ -2642,7 +1579,7 @@ export default function ReviewerSearchSection({
     } finally {
       if (genRef.current === myGen) setRemovingPrevious(false);
     }
-  }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs, displayOnly]);
+  }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs]);
 
   // Apply a staff-entered MANUAL contact to a candidate's client state (the row
   // isn't a saved Dataverse record yet). Used by the lead "Use this email"
@@ -2653,7 +1590,7 @@ export default function ReviewerSearchSection({
   // NEVER touches name (the find-card key) or any identity field. Auto-selects so
   // the edit is included on save.
   const setManualContact = useCallback((cand, updates) => {
-    if (displayOnly || !cand || !updates) return;
+    if (!cand || !updates) return;
     const key = candKey(cand);
     if (!key) return;
     const apply = (c) => {
@@ -2700,7 +1637,7 @@ export default function ReviewerSearchSection({
     setCandidates((prev) => prev.map(apply));
     setRecCandidates((prev) => prev.map(apply));
     setRosterActive((prev) => prev.map(apply));
-  }, [displayOnly]);
+  }, []);
 
   const applyAuthoritativeRosterCandidate = useCallback((key, candidate) => {
     if (!key || !candidate) return;
@@ -2711,7 +1648,6 @@ export default function ReviewerSearchSection({
   }, []);
 
   const verifyAddressContact = useCallback(async (cand, updates, evidence) => {
-    if (displayOnly) throw new Error('Reviewer roster actions are unavailable while status is being checked.');
     if (!cand || !requestId) throw new Error('Reload this request before verifying an address.');
     const key = candKey(cand);
     if (!key) throw new Error('This reviewer has no stable roster key. Reload and try again.');
@@ -2751,7 +1687,7 @@ export default function ReviewerSearchSection({
     applyAuthoritativeRosterCandidate(key, data.candidate);
     setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
     setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
-  }, [requestId, applyAuthoritativeRosterCandidate, displayOnly]);
+  }, [requestId, applyAuthoritativeRosterCandidate]);
 
   const reviewAddressConflict = useCallback(async (cand) => {
     const key = candKey(cand);
@@ -2775,7 +1711,6 @@ export default function ReviewerSearchSection({
   }, [requestId]);
 
   const retryAddressCheck = useCallback(async (cand) => {
-    if (displayOnly) return;
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
@@ -2795,10 +1730,9 @@ export default function ReviewerSearchSection({
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);
     setRosterNote(`${data.candidate.name || cand.name}: conflict check refreshed.`);
-  }, [requestId, applyAuthoritativeRosterCandidate, displayOnly]);
+  }, [requestId, applyAuthoritativeRosterCandidate]);
 
   const requestAddressRepair = useCallback(async (cand) => {
-    if (displayOnly) return;
     const key = candKey(cand);
     if (!requestId || !key) return;
     const myGen = genRef.current;
@@ -2823,18 +1757,18 @@ export default function ReviewerSearchSection({
     setRosterNote(response.ok && data.success
       ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
-  }, [requestId, displayOnly]);
+  }, [requestId]);
 
   // Slice 4: a quarantined email lead must pass through the evidence form;
   // website-only leads remain a direct non-address edit.
   const useLead = useCallback((cand, lead) => {
-    if (displayOnly || !cand || !lead || !lead.value) return;
+    if (!cand || !lead || !lead.value) return;
     if (lead.type === 'email') {
       setEditingContact({ ...cand, email: lead.value, emailSource: 'manual' });
       return;
     }
     setManualContact(cand, { website: lead.value });
-  }, [setManualContact, displayOnly]);
+  }, [setManualContact]);
 
   // The candidate currently open in the on-card Edit-contact modal (local mode).
   const [editingContact, setEditingContact] = useState(null);
@@ -2845,7 +1779,7 @@ export default function ReviewerSearchSection({
   // contact. The authenticated roster PATCH stores the request-scoped attestation
   // first; only then do we stamp manual contact + the UI marker/opaque id locally.
   const confirmIdentityContact = useCallback(async (cand, updates, evidence) => {
-    if (displayOnly || !cand) return;
+    if (!cand) return;
     const key = candKey(cand);
     if (!key || !requestId) return;
     const myGen = genRef.current;
@@ -2879,7 +1813,7 @@ export default function ReviewerSearchSection({
     // stays open for a retry.
     applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
     await verifyAddressContact(authoritativeConfirmed, updates, evidence);
-  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate, displayOnly]);
+  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -2975,12 +1909,12 @@ export default function ReviewerSearchSection({
 
   const saveSelected = useCallback(async () => {
     const myGen = genRef.current;
-    if (displayOnly || savingRef.current === myGen) return;
+    if (savingRef.current === myGen) return;
     // Filter by isSelectable too (not just `selected`): a needs-identity-review row
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
     // server 422s these anyway).
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && candidateIsSelectable(c));
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = myGen;
     const isCurrent = () => genRef.current === myGen;
@@ -3417,8 +2351,6 @@ export default function ReviewerSearchSection({
     pushProgress,
     refreshExpiredVerification,
     reloadRoster,
-    displayOnly,
-    candidateIsSelectable,
   ]);
 
   // Export the SELECTED candidates to an Excel workbook (Request Info + Candidates
@@ -3426,10 +2358,9 @@ export default function ReviewerSearchSection({
   // shows (email/orcid/scholar fall back to contactEnrichment); the server fetches
   // request metadata (number/institution/PI) authoritatively by requestId.
   const exportSelected = useCallback(async () => {
-    if (displayOnly || exportingRef.current) return;
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && candidateIsSelectable(c));
+    if (exportingRef.current) return;
+    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
-    const myGen = genRef.current;
     exportingRef.current = true;
     setExporting(true);
     setExportError(null);
@@ -3465,16 +2396,11 @@ export default function ReviewerSearchSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, candidates: rows }),
       });
-      // Do not report or download an export after its request/candidate view was
-      // replaced. The next request may have a different selected set entirely.
-      if (genRef.current !== myGen) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (genRef.current !== myGen) return;
         throw new Error(data.error || `Export failed (${res.status})`);
       }
       const blob = await res.blob();
-      if (genRef.current !== myGen) return;
       const disposition = res.headers.get('Content-Disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : 'reviewer-candidates.xlsx';
@@ -3487,15 +2413,12 @@ export default function ReviewerSearchSection({
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      if (genRef.current === myGen) setExportError(e.message);
+      setExportError(e.message);
     } finally {
-      // This ref is the cross-generation concurrency lock. It must release when
-      // an old export settles so the newly selected request is not left unable
-      // to start its own export; semantic error/download effects stay guarded.
       exportingRef.current = false;
       setExporting(false);
     }
-  }, [displayCandidates, selected, requestId, displayOnly, candidateIsSelectable]);
+  }, [displayCandidates, selected, requestId]);
 
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
@@ -3541,11 +2464,11 @@ export default function ReviewerSearchSection({
   const applicantDisplayCandidates = displayCandidates.filter(isApplicantOriginCandidate);
   const recVerifiedCount = applicantDisplayCandidates.filter((c) => (
     provenanceGroupOf(withReviewerProvenance(c)) === 'applicant_suggested'
-      || hasCandidateStaffIdentityConfirmation(c)
+      || c?.pdIdentityConfirmed === true
   )).length;
   const recIdentityReviewCount = applicantDisplayCandidates.filter((c) => (
     provenanceGroupOf(withReviewerProvenance(c)) === 'needs_identity_review'
-      && !hasCandidateStaffIdentityConfirmation(c)
+      && c?.pdIdentityConfirmed !== true
   )).length;
 
   return (
@@ -3576,21 +2499,6 @@ export default function ReviewerSearchSection({
         <p className="text-sm text-gray-600">Load a proposal document above to search for new reviewers. Candidates already found for this request appear below.</p>
       )}
 
-      {displayOnly && (
-        <div role="status" className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-          {rosterSnapshot?.reconciliationStopped
-            ? (rosterSnapshot?.error || 'Reviewer roster changed repeatedly while status was being checked. Retry to check the latest snapshot.')
-            : rosterSnapshot?.authorityState === 'stale'
-              ? (rosterSnapshot?.error || 'Reviewer status is stale. Retry to check the latest snapshot before taking action.')
-            : rosterSnapshot?.authorityState === 'error'
-            ? 'Reviewer status could not be checked. Cached candidates remain visible but all roster actions are disabled.'
-            : 'Cached reviewer candidates are display-only while current status is checked.'}
-          {rosterRetryRequired && onRetryRoster && (
-            <button type="button" onClick={onRetryRoster} className="ml-2 underline font-medium">Retry reviewer status</button>
-          )}
-        </div>
-      )}
-
       {blobUrl && (phase === 'idle' || phase === 'error') && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
@@ -3604,7 +2512,6 @@ export default function ReviewerSearchSection({
                       key={key}
                       type="button"
                       onClick={() => setSearchSources((prev) => ({ ...prev, [key]: !prev[key] }))}
-                      disabled={!applicantInputsReady}
                       aria-pressed={searchSources[key]}
                       className={`px-3 py-1.5 rounded-lg border text-xs transition-colors flex flex-col items-center min-w-[80px] ${
                         searchSources[key]
@@ -3636,7 +2543,6 @@ export default function ReviewerSearchSection({
                     step="1"
                     value={reviewerCount}
                     onChange={(e) => setReviewerCount(parseInt(e.target.value, 10))}
-                    disabled={!applicantInputsReady}
                     className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <span className="text-xs text-gray-400 w-6 text-right">25</span>
@@ -3652,7 +2558,6 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
-                  disabled={!applicantInputsReady}
                   placeholder="e.g. prioritize clinical trialists; avoid industry-affiliated reviewers"
                 />
               </div>
@@ -3665,9 +2570,8 @@ export default function ReviewerSearchSection({
                     id="referred-seeds"
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
                     rows={2}
-                  value={referredSeedsText}
-                  onChange={(e) => setReferredSeedsText(e.target.value)}
-                  disabled={!applicantInputsReady}
+                    value={referredSeedsText}
+                    onChange={(e) => setReferredSeedsText(e.target.value)}
                     placeholder="e.g. Jane Smith, jane@uni.edu, University of Example"
                   />
                 </div>
@@ -3679,9 +2583,8 @@ export default function ReviewerSearchSection({
                     id="referred-by"
                     type="text"
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-                  value={referredBy}
-                  onChange={(e) => setReferredBy(e.target.value)}
-                  disabled={!applicantInputsReady}
+                    value={referredBy}
+                    onChange={(e) => setReferredBy(e.target.value)}
                     placeholder="Reviewer name"
                   />
                 </div>
@@ -3695,7 +2598,6 @@ export default function ReviewerSearchSection({
                   rows={2}
                   value={excludeText}
                   onChange={onExcludeChange}
-                  disabled={!applicantInputsReady}
                   placeholder="e.g. Thomas K. Wood, Jens Hör"
                 />
                 {exclusionsUnavailable && (
@@ -3732,23 +2634,16 @@ export default function ReviewerSearchSection({
                   )}
                 </div>
               )}
-              {!applicantInputsReady && (
-                <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
-                  Load applicant suggestions before running a search so applicant-referred exclusions are included. This is required even when no reviewers were listed.
-                </div>
-              )}
               <button
                 type="button"
                 onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-                disabled={!rosterLoadFailed && (!applicantInputsReady || noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+                disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
                 className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {rosterLoadFailed
                   ? 'Retry reviewer state'
                   : !rosterLoaded
                   ? 'Loading existing candidates…'
-                  : !applicantInputsReady
-                    ? 'Load applicant suggestions first'
                   : errorMeta?.status === 'analysis_refused'
                     ? 'Alternate analysis required'
                     : phase === 'error' ? 'Try again' : 'Run reviewer search'}
@@ -3768,7 +2663,7 @@ export default function ReviewerSearchSection({
           {/* Durable roster + this-run results — rendered INDEPENDENT of `phase`
               so the per-request candidate list (active + the collapsed Excluded
               set) shows on reload and even when no proposal is loaded. */}
-          {(rosterNote || displayCandidates.length > 0 || visibleRosterExcluded.length > 0 || visibleRosterIneligible.length > 0 || visibleRosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
+          {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
               {incompleteCoiCandidates.length > 0 && (
@@ -3784,46 +2679,16 @@ export default function ReviewerSearchSection({
                     {previousSearchKeys.size} candidate{previousSearchKeys.size === 1 ? '' : 's'} below {previousSearchKeys.size === 1 ? 'was' : 'were'} restored from an earlier search.
                   </span>
                   {canManage && (
-                    <div className="flex shrink-0 items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={reconcilePreviouslyFoundReviewers}
-                        disabled={displayOnly || busy || !rosterLoaded
-                          || reconciliationState.code === RECONCILIATION_ROSTER_CAP_EXCEEDED}
-                        className="text-xs font-medium underline disabled:opacity-50"
-                      >
-                        {reconciliationState.status === 'running'
-                          ? 'Reconciling…'
-                          : reconciliationState.continuationCandidateKeys.length > 0
-                            ? 'Continue reconciliation'
-                            : 'Reconcile previously found reviewers'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={removePreviousResults}
-                        disabled={displayOnly || removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
-                        title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
-                        className="text-xs font-medium underline disabled:opacity-50"
-                      >
-                        {removingPrevious ? 'Removing…' : 'Remove previous results'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={removePreviousResults}
+                      disabled={removingPrevious || busy || previousSearchRefs.length !== previousSearchKeys.size}
+                      title={previousSearchRefs.length !== previousSearchKeys.size ? 'Reload this request before removing prior results.' : undefined}
+                      className="shrink-0 text-xs font-medium underline disabled:opacity-50"
+                    >
+                      {removingPrevious ? 'Removing…' : 'Remove previous results'}
+                    </button>
                   )}
-                </div>
-              )}
-              {reconciliationState.status !== 'idle' && (
-                <div
-                  role="status"
-                  className={`p-3 rounded-lg text-sm ${
-                    reconciliationState.status === 'error'
-                      ? 'bg-amber-50 text-amber-800'
-                    : ['running', 'reloading'].includes(reconciliationState.status)
-                        ? 'bg-blue-50 text-blue-800'
-                        : 'bg-slate-50 text-slate-800'
-                  }`}
-                >
-                  {['running', 'reloading'].includes(reconciliationState.status) && <span className="mr-2 inline-block align-middle"><Spinner /></span>}
-                  <span>{reconciliationState.message}</span>
                 </div>
               )}
               {excludedRemoved > 0 && (
@@ -3843,7 +2708,7 @@ export default function ReviewerSearchSection({
                   </ul>
                 </div>
               )}
-              {displayCandidates.length === 0 && visibleRosterExcluded.length === 0 && visibleRosterIneligible.length === 0 && visibleRosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
+              {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && rosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
                 <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
               ) : (
                 <>
@@ -3875,7 +2740,7 @@ export default function ReviewerSearchSection({
                               A–Z
                             </button>
                           </span>
-                          <button type="button" onClick={toggleAll} disabled={displayOnly} className="text-xs text-blue-600 underline disabled:opacity-40">
+                          <button type="button" onClick={toggleAll} className="text-xs text-blue-600 underline">
                             {allSelected ? 'Clear all' : 'Select all'}
                           </button>
                         </div>
@@ -3905,7 +2770,7 @@ export default function ReviewerSearchSection({
                                 // A PD-confirmed needs-review row flips to a normal selectable
                                 // card; unconfirmed ones stay read-only but get the "confirm
                                 // identity" affordance so a PD can rescue a real reviewer.
-                                const selectableNow = candidateIsSelectable(c);
+                                const selectableNow = isCandidateSelectable(c);
                                 const promotionDecision = getCandidatePromotionDecision(c);
                                 const canConfirmForPromotion = !selectableNow
                                   && !c.hasInstitutionCOI
@@ -3919,30 +2784,28 @@ export default function ReviewerSearchSection({
                                     || promotionDecision?.decision === 'missing_email'
                                   );
                                 if (selectableNow && !readOnlySection) {
-                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} {...stageRefreshPropsForCandidate(c)} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
                                 if (selectableNow && readOnlySection) {
                                   // needs-review row the PD just confirmed → selectable + editable.
-                                  return <CandidateCard key={candKey(c)} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} readOnly={displayOnly} onToggle={displayOnly ? undefined : () => toggle(candKey(c))} onExclude={displayOnly ? undefined : excludeCandidate} onUseLead={displayOnly ? undefined : useLead} onEdit={displayOnly ? undefined : setEditingContact} canManage={canManage && !displayOnly} {...stageRefreshPropsForCandidate(c)} />;
+                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
                                 }
                                 return <CandidateCard
                                   key={candKey(c)}
                                   candidate={c}
-                                  evidenceCheck={evidenceCheckForCandidate(c)}
                                   previousResult={previousSearchKeys.has(candKey(c))}
                                   readOnly
-                                  onExclude={displayOnly ? undefined : excludeCandidate}
+                                  onExclude={excludeCandidate}
                                   onEdit={(
                                     promotionDecision?.decision === 'ready'
                                     || promotionDecision?.reason === 'contact_claim_mismatch'
                                     || c.applicantContactMismatch === true
-                                  ) && !displayOnly ? setEditingContact : undefined}
-                                  onRequestRepair={displayOnly ? undefined : requestAddressRepair}
-                                  onReviewAddressConflict={displayOnly ? undefined : reviewAddressConflict}
-                                  onRetryAddressCheck={displayOnly ? undefined : retryAddressCheck}
-                                  onConfirmIdentity={canConfirmForPromotion && !displayOnly ? (cand) => setConfirmingContact(cand) : undefined}
-                                  canManage={canManage && !displayOnly}
-                                  {...stageRefreshPropsForCandidate(c)}
+                                  ) ? setEditingContact : undefined}
+                                  onRequestRepair={requestAddressRepair}
+                                  onReviewAddressConflict={reviewAddressConflict}
+                                  onRetryAddressCheck={retryAddressCheck}
+                                  onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
+                                  canManage={canManage}
                                 />;
                               })}
                             </div>
@@ -3954,7 +2817,7 @@ export default function ReviewerSearchSection({
                         <button
                           type="button"
                           onClick={saveSelected}
-                          disabled={displayOnly || selected.size === 0 || phase === 'saving'}
+                          disabled={selected.size === 0 || phase === 'saving'}
                           aria-busy={phase === 'saving'}
                           className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -3970,13 +2833,13 @@ export default function ReviewerSearchSection({
                         <button
                           type="button"
                           onClick={exportSelected}
-                          disabled={displayOnly || selected.size === 0 || exporting}
+                          disabled={selected.size === 0 || exporting}
                           title={selected.size === 0 ? 'Select candidates — or use Select all — to export' : undefined}
                           className="px-4 py-2 bg-white text-gray-900 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
                         </button>
-                        <button type="button" onClick={runSearch} disabled={!blobUrl || !applicantInputsReady || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
+                        <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
                       </div>
                       {exportError && (
                         <p className="text-sm text-amber-700">Export failed: {exportError}</p>
@@ -3988,26 +2851,26 @@ export default function ReviewerSearchSection({
                   )}
 
                   {/* Collapsed, recoverable Excluded set (durable per request). */}
-                  {visibleRosterExcluded.length > 0 && (
+                  {rosterExcluded.length > 0 && (
                     <details open={excludedOpen} onToggle={(e) => setExcludedOpen(e.currentTarget.open)} className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Excluded ({visibleRosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
+                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
                       </summary>
                       <div className="space-y-2 mt-2">
-                        {visibleRosterExcluded.map((c) => (
-                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} readOnly onPromote={displayOnly ? undefined : promoteCandidate} />
+                        {rosterExcluded.map((c) => (
+                          <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
                         ))}
                       </div>
                     </details>
                   )}
 
-                  {visibleRosterIneligible.length > 0 && (
+                  {rosterIneligible.length > 0 && (
                     <details className="border border-red-200 bg-red-50 rounded-lg p-2">
                       <summary className="text-xs font-medium text-red-800 cursor-pointer">
-                        Not eligible ({visibleRosterIneligible.length}) — official institutional evidence reports these people are deceased
+                        Not eligible ({rosterIneligible.length}) — official institutional evidence reports these people are deceased
                       </summary>
                       <ul className="mt-2 space-y-1 text-xs text-red-800">
-                        {visibleRosterIneligible.map((candidate) => {
+                        {rosterIneligible.map((candidate) => {
                           const evidence = candidate.eligibilityEvidence
                             || candidate.contactEnrichment?.eligibilityEvidence;
                           return (
@@ -4033,17 +2896,16 @@ export default function ReviewerSearchSection({
                     </details>
                   )}
 
-                  {visibleRosterBlocked.length > 0 && (
+                  {rosterBlocked.length > 0 && (
                     <details className="border border-amber-200 bg-amber-50 rounded-lg p-2">
                       <summary className="text-xs font-medium text-amber-900 cursor-pointer">
-                        Promotion blocked ({visibleRosterBlocked.length}) — applicant-excluded for this request
+                        Promotion blocked ({rosterBlocked.length}) — applicant-excluded for this request
                       </summary>
                       <div className="space-y-2 mt-2">
-                        {visibleRosterBlocked.map((candidate) => (
+                        {rosterBlocked.map((candidate) => (
                           <CandidateCard
                             key={`blocked-${candKey(candidate)}`}
                             candidate={candidate}
-                            evidenceCheck={evidenceCheckForCandidate(candidate)}
                             readOnly
                           />
                         ))}
@@ -4058,7 +2920,7 @@ export default function ReviewerSearchSection({
                       </summary>
                       <div className="space-y-2 mt-2">
                         {unverifiedToShow.map((c, i) => (
-                          <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} evidenceCheck={evidenceCheckForCandidate(c)} readOnly />
+                          <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} readOnly />
                         ))}
                       </div>
                     </details>
@@ -4162,8 +3024,11 @@ export default function ReviewerSearchSection({
       </Card>
     )}
 
-    {/* Applicant-referred reviewer status card — both materialization and the
-        expensive verification/COI pipeline are explicit staff actions. */}
+    {/* Applicant-referred reviewer status card — ingestion + enrichment state.
+        Enriched candidates surface in the Applicant-referred provenance section
+        of the main candidate list above; this card is a status surface only.
+        Enrichment fires automatically when both the proposal and the ingested
+        recommendations are ready (no manual trigger required). */}
     <Card hover={false}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-medium text-gray-900">Applicant-referred reviewers</p>
@@ -4173,19 +3038,7 @@ export default function ReviewerSearchSection({
       {ingestError ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn't ingest applicant reviewers: {ingestError}{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
-        </div>
-      ) : !applicantInputAvailable ? (
-        <div className="space-y-2 text-sm text-gray-600">
-          <p>Applicant recommendations have not been loaded. Loading them can materialize the request’s recommended-reviewer records; it does not begin verification.</p>
-          <button
-            type="button"
-            onClick={onRetryIngestion}
-            disabled={!onRetryIngestion}
-            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Load applicant suggestions
-          </button>
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
         </div>
       ) : ingestLoading ? (
         <p className="text-sm text-gray-500">Materializing the applicant's recommended reviewers…</p>
@@ -4194,7 +3047,7 @@ export default function ReviewerSearchSection({
       ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn't confirm the applicant's recommended reviewers.{' '}
-          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
+          <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -4206,7 +3059,7 @@ export default function ReviewerSearchSection({
                 <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
               )}
               . They are <span className="font-medium">not</span> saved as candidates.{' '}
-              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry applicant input refresh</button>
+              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
           )}
           {knownLookupFailed.length > 0 && (
@@ -4242,22 +3095,10 @@ export default function ReviewerSearchSection({
               })}
             </ul>
           )}
-          {recPhase === 'idle' && recCount > 0 && (
-            <div className="space-y-2 text-sm text-gray-600">
-              <p>
-                {!blobUrl
-                  ? `${recCount} applicant-referred reviewer${recCount === 1 ? '' : 's'} ingested. Prepare a proposal before verifying them.`
-                  : 'Applicant suggestions have not been verified against this prepared proposal.'}
-              </p>
-              <button
-                type="button"
-                onClick={enrichRecommended}
-                disabled={!blobUrl || !proposalKey || recRunningRef.current}
-                className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Verify applicant suggestions
-              </button>
-            </div>
+          {recPhase === 'idle' && !blobUrl && recCount > 0 && (
+            <p className="text-sm text-gray-500">
+              {recCount} applicant-referred reviewer{recCount === 1 ? '' : 's'} ingested — waiting for the proposal to load before verifying.
+            </p>
           )}
           {recPhase === 'running' && (
             <div className="space-y-2">
@@ -4284,7 +3125,7 @@ export default function ReviewerSearchSection({
                 <button
                   type="button"
                   onClick={() => enrichRecommended()}
-                  disabled={!blobUrl || !proposalKey || recRunningRef.current}
+                  disabled={!blobUrl || !proposalKey}
                   className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Update applicant suggestions
@@ -4298,7 +3139,7 @@ export default function ReviewerSearchSection({
               <button
                 type="button"
                 onClick={() => enrichRecommended()}
-                  disabled={!blobUrl || !proposalKey || recRunningRef.current}
+                disabled={!blobUrl || !proposalKey}
                 className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Try again

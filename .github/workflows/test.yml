@@ -50,16 +50,6 @@ jobs:
       - run: npm run check:scaffolding-tokens:self-test
       - run: npm run check:harness-framing
       - run: npm run check:harness-framing:self-test
-      # Static inventory for the production warm-revisit observation boundary.
-      # This workflow is unfiltered, so it covers source-only changes without
-      # duplicating the same gate in the paths-filtered browser workflow.
-      - run: npm run check:reviewer-find-warm-observation
-      - run: npm run check:reviewer-find-warm-observation:self-test
-      # Static transitive graph guard for the future cold-preparation route
-      # allowlist. This is unfiltered so a source-only dependency change cannot
-      # bypass the no-send check.
-      - run: npm run check:reviewer-find-cold-no-send
-      - run: npm run check:reviewer-find-cold-no-send:self-test
       # Scoped tsc --noEmit over the JSDoc-annotated GUID-selector core
       # (tsconfig.check.json include list). Standalone gate — deliberately
       # decoupled from `next build` (no root tsconfig.json, no .ts files).

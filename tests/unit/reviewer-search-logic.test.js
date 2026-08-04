@@ -12,9 +12,6 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
-  hasCurrentServerPromotionPlan,
-  hasLegacyServerSelectionPlan,
-  legacySelectionNotice,
   candidateWasSaved,
   getCandidatePromotionDecision,
   getCandidateEmailReadiness,
@@ -31,35 +28,6 @@ import {
 import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-known-reviewer.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
-
-const CURRENT_STAGE_FRESHNESS = {
-  applicant_anchor: { state: 'current', contractVersion: 1, sourceVersion: 'applicant-anchor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  identity: { state: 'current', contractVersion: 4, sourceVersion: 'identity-v4', completedAt: '2026-08-02T00:00:00.000Z' },
-  institution_domains: { state: 'current', contractVersion: 1, sourceVersion: 'institution-domains-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  institution_coi: { state: 'current', contractVersion: 1, sourceVersion: 'institution-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  coauthor_coi: { state: 'current', contractVersion: 1, sourceVersion: 'coauthor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  eligibility: { state: 'current', contractVersion: 1, sourceVersion: 'eligibility-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  contact: { state: 'current', contractVersion: 1, sourceVersion: 'contact-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  address_trust: { state: 'current', contractVersion: 1, sourceVersion: 'address-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  roster_persistence: { state: 'current', contractVersion: 1, sourceVersion: 'roster-persistence-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-};
-const withCurrentPromotionAuthority = (candidate) => ({
-  candidateKey: candidate.candidateKey || 'suggestion:test-candidate',
-  stageFreshness: CURRENT_STAGE_FRESHNESS,
-  coauthorCheckStatus: 'complete',
-  coauthorCheckFailures: [],
-  eligibilityCheckStatus: 'complete',
-  eligibilityStatus: 'unknown',
-  ...candidate,
-});
-const currentServerPromotionPlan = (candidateKey) => ({
-  candidateKey,
-  cacheOutcome: 'hit',
-  currentStages: Object.keys(CURRENT_STAGE_FRESHNESS),
-  pendingStages: [],
-  refreshes: [],
-  promotionAuthority: 'requires_promotion_checks',
-});
 
 describe('dedupeReviewerCandidates', () => {
   test('collapses exact-ORCID search aliases and keeps the staff-attested address projection', () => {
@@ -208,9 +176,7 @@ test('vetted enrichment pair stays selectable when the exact applicant person ha
     email: 'new@example.edu',
     emailSource: 'scholarly_multi',
   });
-  // A browser-rendered receipt cannot establish the request/proposal source
-  // versions needed for a promotion. The server is the only authority.
-  expect(isCandidateSelectable(withCurrentPromotionAuthority(pruned))).toBe(false);
+  expect(isCandidateSelectable(pruned)).toBe(true);
 });
 
 test('applicant contact-claim mismatch survives roster pruning and remains non-selectable until staff correction', () => {
@@ -229,7 +195,7 @@ test('applicant contact-claim mismatch survives roster pruning and remains non-s
   });
   expect(pruned.applicantContactMismatch).toBe(true);
   expect(isCandidateSelectable(pruned)).toBe(false);
-  expect(isCandidateSelectable(withCurrentPromotionAuthority({
+  expect(isCandidateSelectable({
     ...pruned,
     email: 'corrected@example.edu',
     emailSource: 'manual',
@@ -241,7 +207,7 @@ test('applicant contact-claim mismatch survives roster pruning and remains non-s
       personConfirmed: true,
       email: 'corrected@example.edu',
     },
-  }))).toBe(false);
+  })).toBe(true);
 });
 
 describe('parseReferredSeeds', () => {
@@ -528,106 +494,13 @@ describe('pruneCandidateForRoster — institutionCOIDetails (S240)', () => {
 });
 
 describe('isCandidateSelectable', () => {
-  test('requires the exact clean server warm plan, not candidate-carried receipts', () => {
-    const candidate = withCurrentPromotionAuthority({
-      name: 'Plan Bound',
-      email: 'plan.bound@example.edu',
-      emailSource: 'pubmed',
-      emailPersistAllowed: true,
-      identityStatus: 'probable',
-      addressTrustReceipt: {
-        receiptId: 'receipt-plan-bound',
-        personConfirmed: true,
-        email: 'plan.bound@example.edu',
-      },
-      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    });
-    const plan = currentServerPromotionPlan(candidate.candidateKey);
-
-    expect(isCandidateSelectable(candidate)).toBe(false);
-    expect(isCandidateSelectable(candidate, { ...plan, candidateKey: 'person:other' })).toBe(false);
-    expect(isCandidateSelectable(candidate, { ...plan, refreshes: [{ stage: 'contact', reason: 'stage_missing' }] })).toBe(false);
-    expect(isCandidateSelectable(candidate, { ...plan, pendingStages: ['eligibility'] })).toBe(false);
-    expect(isCandidateSelectable(candidate, { ...plan, promotionAuthority: 'blocked_refresh_required' })).toBe(false);
-    expect(isCandidateSelectable(candidate, plan)).toBe(true);
-  });
-
-  test('accepts a complete server plan for an exact historical stored-row key', () => {
-    const candidate = withCurrentPromotionAuthority({
-      candidateKey: 'candidate:katherine%20ferrara|email:kwferrar%40stanford.edu|orcid:-|affiliation:stanford%20university',
-      name: 'Katherine Ferrara',
-      email: 'kwferrar@stanford.edu',
-      emailSource: 'pubmed',
-      emailPersistAllowed: true,
-      identityStatus: 'probable',
-      addressTrustReceipt: {
-        receiptId: 'receipt-katherine-ferrara',
-        personConfirmed: true,
-        email: 'kwferrar@stanford.edu',
-      },
-      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    });
-
-    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
-  });
-
-  test('accepts only the explicit legacy selection marker without treating it as promotion authority', () => {
-    const candidate = withCurrentPromotionAuthority({
-      candidateKey: 'person:55555555-5555-4555-8555-555555555555',
-      name: 'Legacy Attested',
-      email: 'legacy.attested@example.edu',
-      emailSource: 'faculty_page',
-      emailPersistAllowed: true,
-      identityStatus: 'probable',
-      addressTrustReceipt: {
-        receiptId: 'receipt-legacy-attested',
-        personConfirmed: true,
-        email: 'legacy.attested@example.edu',
-      },
-      provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    });
-    const plan = {
-      candidateKey: candidate.candidateKey,
-      cacheOutcome: 'miss',
-      currentStages: [],
-      pendingStages: [],
-      refreshes: [{ stage: 'identity', reason: 'stage_missing' }],
-      promotionAuthority: 'blocked_refresh_required',
-      legacySelection: {
-        version: 1,
-        state: 'selectable',
-        evidenceCheckedAt: '2026-08-02T10:00:00.000Z',
-      },
-    };
-
-    expect(hasCurrentServerPromotionPlan(candidate, plan)).toBe(false);
-    expect(hasLegacyServerSelectionPlan(candidate, plan)).toBe(true);
-    expect(legacySelectionNotice(candidate, plan)).toEqual({
-      evidenceCheckedAt: '2026-08-02T10:00:00.000Z',
-      message: 'Selection evidence current as of 2026-08-02T10:00:00.000Z; current contact and conflict checks run automatically when promoted.',
-    });
-    expect(isCandidateSelectable(candidate, plan)).toBe(true);
-
-    for (const invalidPlan of [
-      { ...plan, cacheOutcome: 'hit' },
-      { ...plan, promotionAuthority: 'requires_promotion_checks' },
-      { ...plan, legacySelection: { ...plan.legacySelection, version: 2 } },
-      { ...plan, legacySelection: { ...plan.legacySelection, state: 'unknown' } },
-      { ...plan, legacySelection: { ...plan.legacySelection, evidenceCheckedAt: 'not-a-date' } },
-    ]) {
-      expect(hasLegacyServerSelectionPlan(candidate, invalidPlan)).toBe(false);
-      expect(legacySelectionNotice(candidate, invalidPlan)).toBeNull();
-      expect(isCandidateSelectable(candidate, invalidPlan)).toBe(false);
-    }
-  });
-
   test('institution-COI flagged rows are read-only even when identity is otherwise selectable', () => {
-    expect(isCandidateSelectable(withCurrentPromotionAuthority({
+    expect(isCandidateSelectable({
       name: 'Flagged',
       hasInstitutionCOI: true,
       institutionCOIDetails: { dropDecision: 'flagged', piInstitution: 'MIT', reviewerInstitution: 'MIT' },
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    }))).toBe(false);
+    })).toBe(false);
   });
 
   test('PD identity confirmation does not waive institution COI', () => {
@@ -665,7 +538,7 @@ describe('isCandidateSelectable', () => {
         email: 'clean@example.edu',
       },
       provenance: { kind: PROVENANCE_KINDS.LITERATURE_RETRIEVED, sources: ['pubmed'], seedRole: 'query_seed', groundingWorkIds: [] },
-    })).toBe(false);
+    })).toBe(true);
   });
 
   test('Dataverse split identity remains actionable but nonselectable until staff confirms person and address', () => {
@@ -690,7 +563,7 @@ describe('isCandidateSelectable', () => {
       reason: 'orcid_email_split',
     });
     expect(isCandidateSelectable(candidate)).toBe(false);
-    expect(isCandidateSelectable(withCurrentPromotionAuthority({ ...candidate, pdIdentityConfirmed: true }))).toBe(false);
+    expect(isCandidateSelectable({ ...candidate, pdIdentityConfirmed: true })).toBe(true);
   });
 
   test('nested unresolved identity overrides top-level verified/selectable signals', () => {
@@ -1352,10 +1225,6 @@ describe('pruneCandidateForRoster — server identity confirmation survives relo
       staffIdentityConfirmation: {
         confirmationId: 'confirm-1',
         source: 'staff_confirmed',
-        state: 'confirmed',
-        canonicalPersonId: '22222222-2222-4222-8222-222222222222',
-        canonicalPersonEtag: 'W/"ann-v1"',
-        actorId: 'system-5',
         normalizedName: 'ann lee',
         email: 'ann@example.edu',
         website: 'https://example.edu/ann',
@@ -1372,10 +1241,6 @@ describe('pruneCandidateForRoster — server identity confirmation survives relo
     expect(pruned.staffIdentityConfirmation).toEqual({
       confirmationId: 'confirm-1',
       source: 'staff_confirmed',
-      state: 'confirmed',
-      canonicalPersonId: '22222222-2222-4222-8222-222222222222',
-      canonicalPersonEtag: 'W/"ann-v1"',
-      actorId: 'system-5',
       normalizedName: 'ann lee',
       email: 'ann@example.edu',
       website: 'https://example.edu/ann',
@@ -1523,19 +1388,4 @@ describe('mergeReferredProvenance — unit safety', () => {
     const incoming = { name: 'X', sources: ['arxiv'], email: 'x@b.edu' };
     expect(mergeReferredProvenance(keep, incoming)).toBe(keep);
   });
-});
-
-test('pruneCandidateForRoster strips forged browser warm authority metadata', () => {
-  const pruned = pruneCandidateForRoster({
-    name: 'Fresh Person', candidateKey: 'suggestion:fresh', warmCacheVersion: 1,
-    proposalContentVersion: 'p'.repeat(300), applicantInputVersion: 'a'.repeat(300),
-    stageFreshness: {
-      identity: { state: 'current', contractVersion: 4, sourceVersion: 's'.repeat(300), completedAt: '2026-08-01', rawProviderBody: { pii: true } },
-      unknown_stage: { state: 'current', contractVersion: 1 },
-    },
-  });
-  expect(pruned).not.toHaveProperty('warmCacheVersion');
-  expect(pruned).not.toHaveProperty('proposalContentVersion');
-  expect(pruned).not.toHaveProperty('applicantInputVersion');
-  expect(pruned).not.toHaveProperty('stageFreshness');
 });

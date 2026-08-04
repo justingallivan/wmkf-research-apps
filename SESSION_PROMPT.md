@@ -1,110 +1,102 @@
-# Session Prompt: Reviewer Find production incident handoff (Session 394)
+# Session Prompt: Deploy the Reviewer Find baseline revert (Session 396)
 
-> **Owner-directed handoff, 2026-08-03.** The Reviewer Find warm-revisit
-> performance rollout is deployed but remains regressed. Do not treat earlier
-> “implemented,” “green,” or narrow adversarial-review results as proof that the
-> production workflow is fixed. Run `/start` first.
+> **Owner-directed handoff, 2026-08-03 (late).** Session 395 post-mortemed the
+> warm-performance debacle and built the recovery branch. Your ONE job:
+> get production functional (the owner's boss can use the app, slow is fine),
+> then stop. Run `/start` first.
 
-## Read first
+## Objective (owner's words)
 
-1. `CLAUDE.md` and the normal `/start` output.
-2. `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` — the
-   current incident assessment and next-orchestrator priorities.
-3. `docs/REVIEWER_FIND_PERFORMANCE_PLAN.md` — design intent and implementation
-   history; its new incident notice supersedes old branch-only status text.
-4. `docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md` — producer contract; compare its
-   outcome semantics against the incident before changing code.
-5. `docs/atlas/postgres-reviewer-find-roster.md` and
-   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` for persistence and
-   UI lifecycle context.
+Restore the app to its "fine, just slow" state. No reconcile buttons, no
+per-card evidence-repair actions, checkboxes on previously-found reviewers.
+Latency work is explicitly deferred until the owner approves a new,
+incremental, tier-gated plan.
 
-## Current state
+## Where things stand
 
-- **[VERIFIED via Git]** branch is `main`; `main` and `origin/main` were at
-  `7072d52a` before the handoff documentation commit.
-- **[VERIFIED during deployment]** `7072d52a` reached a Ready production
-  deployment and was served at `https://applications.wmkeck.org`.
-- **[BROKEN]** the core owner requirement is not satisfied: an existing warm
-  roster can still expose per-candidate **Refresh contact evidence**, and a
-  request-level **Continue reconciliation** can loop on a deterministic
-  staff-action condition.
-- **[VERIFIED narrow recovery]** Request `1002903` / Katherine Ferrara regained
-  a selection checkbox after the final GUID/stage-order fixes. She was not
-  promoted or invited during verification.
-- **[VERIFIED remaining incident]** the same request's Kanaka Rajan row remains
-  retryable/queued even though the persistent institution/identity mismatch
-  requires a staff decision. Repeating reconciliation cannot change that
-  condition.
-- **[SAFETY]** no reviewer was selected, promoted, invited, or emailed in the
-  live verification. Preserve that no-send boundary.
+- **[VERIFIED] Branch `reviewer-find-revert-baseline`** holds the recovery:
+  runtime tree (lib/pages/shared/tests/scripts/package.json/.github) restored
+  byte-for-byte to `94c5b9d9` (2026-08-01 22:36 — plan docs locked, zero
+  implementation; the last tree with no identified defect), plus the one
+  genuine keeper from the hotfix chain: `institution-coi-context.js`
+  strict-GUID → permissive `isGuid` (from `edbe6931`; that bug predates the
+  rollout). Docs/memory kept at HEAD as history.
+- **[VERIFIED] Green on the branch:** `check:types`, all 527 unit suites
+  (6,412 tests), `npm run build`.
+- **[VERIFIED] Data is safe:** the rollout added zero DB migrations, zero
+  env/cron requirements; all its state lives inside the roster `candidate`
+  JSONB, which baseline code treats as opaque and passes through; staff
+  identity confirmations / address attestations from the incident window use
+  pre-existing field names baseline code reads. Nothing was promoted, invited,
+  or emailed during the incident.
+- **[NOT DONE] Not deployed, not pushed, not merged.** Production still serves
+  the broken `7072d52a`-era build.
+- Branch `reviewer-find-outcome-contract` holds Session 395's earlier
+  forward-fix work (repair plan, regression fixtures, R0/R1 Codex reviews).
+  It is ABANDONED as a direction — keep for history, do not merge.
 
-## Work completed in the closed session
+## Post-mortem (read before doing anything clever)
 
-The warm performance/reconciliation implementation spans 50 commits,
-`5b6757df..7072d52a`, and 142 files. Major delivered surfaces:
+`.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md` — the
+short version: a Friday-night latency plan self-expanded into a fail-closed
+receipts/authority rewrite presented as "settled decisions," implementation
+started 31 minutes after the plan was locked, 76 commits went direct to
+auto-deploying `main` with no tier gate, verification never constructed the
+production data shape, and five stacked hotfixes entrenched the breakage.
+Superseded docs: `REVIEWER_FIND_PERFORMANCE_PLAN.md`,
+`REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`, `REVIEWER_FIND_BROWSER_TEST_PLAN.md`.
 
-- cached-then-reconciled roster reads;
-- per-candidate/per-stage evidence receipts and freshness planning;
-- server-owned stage producers and targeted refresh route;
-- request-level bounded reconciliation and continuation;
-- fresh promotion-authority preflight;
-- legacy receipt/identity compatibility bridges;
-- deterministic, live-read, and no-send browser/test tooling; and
-- five production hotfixes ending at `7072d52a`.
+## Next steps, in order (this session's whole scope)
 
-Final focused verification passed 60 tests, scoped ESLint,
-`check:reviewer-find-warm-observation` plus self-test,
-`check:reviewer-find-cold-no-send` plus self-test, `check:types`, and the build.
-The final Opus 4.8 review covered only the stage-order hotfix; it was not a
-whole-feature approval.
+1. `/start` housekeeping on branch `reviewer-find-revert-baseline`; re-run the
+   branch's own gate suite (baseline `package.json` — its `check:*` list is
+   the authority, not the one in the /start skill text) and full unit tests;
+   expect green as recorded above.
+2. Expect and triage doc-drift gates only: docs at HEAD may reference removed
+   code paths (`check:doc-symbol-refs`, `check:build-claim-freshness`,
+   memory-drift advisories). Fix by marking docs historical/superseded —
+   NEVER by resurrecting code.
+3. Push the branch, create a Vercel **preview** deployment, and have the
+   owner smoke it: warm roster for Request `1002903` shows previously-found
+   reviewers with checkboxes; no "Reconcile previously found reviewers"
+   button; no per-card "Refresh … evidence" actions; Katherine Ferrara and
+   Kanaka Rajan rows render. Kanaka may show identity/institution caution
+   copy — that's the pre-rollout state, acceptable.
+4. On owner approval ONLY: merge to `main` (this is the deliberate Tier
+   promotion), confirm the production deployment is Ready and serving, owner
+   re-smokes production.
+5. Close out durable surfaces: incident doc
+   (`REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`) → resolved-by-
+   revert note + `status: historical`; memory router Task Routing lines for
+   the incident; `DEVELOPMENT_LOG.md` entry; rewrite this file for the next
+   session.
+6. If time and owner energy allow, verify staff-authority data survived in
+   the UI (a row confirmed during the incident still shows its confirmation).
+   Read-only checks only.
 
-## Root cause still open
+## Do not
 
-`projectReviewerContact` treats `institutionMismatch === true` as unresolved
-identity even with probable/exact-ORCID evidence. The contact producer records
-that as incomplete `missing_required_input`; reconciliation classifies it as
-retryable and queues it; `CandidateCard` renders the individual refresh action.
-This is an end-to-end outcome-contract defect, not a button-only problem and not
-something Dataverse latency will cure.
-
-## Next work — status labeled
-
-1. **[P0 / NOT STARTED]** Add a production-shaped Kanaka regression fixture and
-   prove the current code fails by returning retryable/queued.
-2. **[P0 / NOT STARTED]** Reconcile producer → receipt → planner → reconciler →
-   route → client outcome semantics. Deterministic missing input that requires a
-   person/institution decision must be `action_required`, not `retryable`.
-3. **[P0 / NOT STARTED]** Hide per-card refresh controls when no transient
-   server action can succeed; show only the exact staff workflow.
-4. **[P0 / DECISION REQUIRED]** Decide whether the Harvard Medical School /
-   Harvard University relationship is normalized as hierarchy-equivalent or
-   remains a staff confirmation. Either outcome must be terminal, not queued.
-5. **[P0 / VERIFY]** Run focused tests and no-send production read-only smoke on
-   Request `1002903`. Do not cold-search, promote, or email.
-6. **[P1 / NOT STARTED]** Remove misleading `Omitted — see note below`, clarify
-   topical-match percentage, and correct evidence-date semantics.
-7. **[P2 / DEFERRED]** Resume latency/background-continuation work only after
-   the outcome taxonomy is coherent and production-shaped acceptance cases pass.
-
-## Do not do
-
-- Do not instruct staff to refresh every reviewer.
-- Do not rerun searches to repair existing roster evidence.
-- Do not blindly revert the hotfix chain; Katherine-shaped recovery depends on
-  parts of it.
-- Do not treat Request `1002903` as a mutation fixture.
-- Do not send external emails. Request `1002914` remains the owner-designated
-  no-send Reviewer Find fixture if a later exact authorization permits its use.
+- Do not merge or push `main` without the owner's explicit go after the
+  preview smoke.
+- Do not start latency/performance work of any kind. The future latency
+  effort requires a NEW owner-approved plan, tier-gated per
+  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`, built in small
+  slices on top of working behavior.
+- Do not cherry-pick anything else from `5b6757df..7072d52a` or from the
+  `reviewer-find-outcome-contract` branch without owner sign-off.
+- Do not send email, promote, or invite reviewers during verification.
+  Request `1002903` stays read-only.
+- Do not "fix" doc-drift gates by restoring deleted modules.
 
 ## Handoff summary
 
 ```text
-Previous owner: Codex orchestrator
-Branch/source head before handoff docs: main @ 7072d52a
-Status: production incident open; partial recovery only
-Primary incident case: Request 1002903 / Kanaka Rajan retry loop
-Known recovered case: Request 1002903 / Katherine Ferrara checkbox
-Production mutations in final verification: none
-Email sent: none
-Next owner/action: repair and test the outcome taxonomy before any further rollout
+Previous owner: Session 395 (Fable) — post-mortem + revert construction
+Branch: reviewer-find-revert-baseline @ (uncommitted at handoff-write time;
+  commit lands as the session's final act — verify with git log)
+Baseline: 94c5b9d9 runtime tree + edbe6931 GUID fix
+Production: still broken (7072d52a era) until step 4
+Data: untouched, verified revert-safe
+Abandoned branch (keep, don't merge): reviewer-find-outcome-contract
+Post-mortem memory: feedback-latency-plan-scope-accretion-postmortem
 ```

@@ -13,7 +13,6 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 
 const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
 const candidate = (name, email) => ({
-  candidateKey: `person:${encodeURIComponent(email.toLowerCase())}`,
   name,
   email,
   emailSource: 'pubmed',
@@ -32,40 +31,8 @@ const candidate = (name, email) => ({
   },
 });
 
-function currentServerPromotionPlan(candidateKey) {
-  return {
-    candidateKey,
-    cacheOutcome: 'hit',
-    currentStages: [
-      'applicant_anchor',
-      'identity',
-      'institution_domains',
-      'institution_coi',
-      'coauthor_coi',
-      'eligibility',
-      'contact',
-      'address_trust',
-      'roster_persistence',
-    ],
-    pendingStages: [],
-    refreshes: [],
-    promotionAuthority: 'requires_promotion_checks',
-  };
-}
-
 function response(body, ok = true, status = ok ? 200 : 422) {
-  const active = Array.isArray(body?.active) ? body.active : [];
-  const authoritativeRoster = active.length > 0 && !body.warmValidation
-    ? {
-      ...body,
-      authorityState: 'current',
-      warmValidation: {
-        state: 'current',
-        candidatePlans: active.map(({ candidateKey }) => currentServerPromotionPlan(candidateKey)),
-      },
-    }
-    : body;
-  return { ok, status, json: async () => authoritativeRoster };
+  return { ok, status, json: async () => body };
 }
 
 afterEach(() => {
@@ -187,7 +154,7 @@ test('verify contact sends every confirmation-bound field and promotes the serve
   };
   const reviewer = {
     ...candidate('Tatiana Kutateladze', 'tatiana@example.edu'),
-    candidateKey: 'person:tatiana',
+    candidateKey: 'candidate:tatiana',
     website: staleConfirmation.website,
     affiliation: staleConfirmation.affiliation,
     addressTrustReceipt: null,
@@ -278,7 +245,7 @@ test('verify contact sends every confirmation-bound field and promotes the serve
 test('stale promote conflict reloads server truth instead of restoring the reviewer to Excluded', async () => {
   const stale = {
     ...candidate('Stale Excluded Reviewer', 'stale@example.edu'),
-    candidateKey: 'person:stale-excluded',
+    candidateKey: 'candidate:stale-excluded',
   };
   let rosterLoads = 0;
   global.fetch = jest.fn((url, options = {}) => {
@@ -325,7 +292,7 @@ test('stale promote conflict reloads server truth instead of restoring the revie
 test('saved row with failed roster finalization stays successful and reloads the server-owned roster', async () => {
   const saved = {
     ...candidate('Unfinalized Reviewer', 'unfinalized@example.edu'),
-    candidateKey: 'person:unfinalized',
+    candidateKey: 'candidate:unfinalized',
   };
   const saveKey = reviewerSaveKey(saved);
   let rosterLoads = 0;
@@ -372,7 +339,7 @@ test('saved row with failed roster finalization stays successful and reloads the
 test('expired verification is refreshed durably and deselected for review without automatic promotion', async () => {
   const expired = {
     ...candidate('Expired Verification Reviewer', 'old@example.edu'),
-    candidateKey: 'person:expired-verification',
+    candidateKey: 'candidate:expired-verification',
     automatedIdentityAttestation: 'expired-token',
     contactEnrichment: {
       email: 'old@example.edu',
@@ -465,11 +432,11 @@ test('expired verification is refreshed durably and deselected for review withou
 test('mixed saved and expired rows reconcile independently before the refreshed row is retried', async () => {
   const saved = {
     ...candidate('Mixed Saved Reviewer', 'saved@example.edu'),
-    candidateKey: 'person:mixed-saved',
+    candidateKey: 'candidate:mixed-saved',
   };
   const expired = {
     ...candidate('Mixed Expired Reviewer', 'expired@example.edu'),
-    candidateKey: 'person:mixed-expired',
+    candidateKey: 'candidate:mixed-expired',
     automatedIdentityAttestation: 'expired-token',
     contactEnrichment: {
       email: 'expired@example.edu',

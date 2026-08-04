@@ -17,23 +17,12 @@ import {
   createAddressRepairRequest,
 } from '../../../lib/services/reviewer-address-trust-service';
 import { withRemediation } from '../../../lib/utils/reviewer-remediation';
-import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 const ACTIONS = new Set([
   'verify_person_and_address',
   'get_address_conflict',
   'retry_check',
   'create_repair_request',
-]);
-// The structured address action accepts a staff choice/evidence, never a
-// browser-produced stage receipt, source/result version, canonical-person
-// assertion, or mode switch.  The service derives those after authenticated
-// roster/Dataverse re-reads.
-const FORBIDDEN_AUTHORITY_FIELDS = new Set([
-  'stage', 'stages', 'sourceVersion', 'resultVersion', 'contentVersion',
-  'receipt', 'stageFreshness', 'stageRefresh', 'candidate', 'personId',
-  'canonicalPersonId', 'canonicalPersonEtag', 'personEtag', 'authority',
-  'expectedSourceVersions', 'mode', 'providerOptions',
 ]);
 
 export const config = { api: { bodyParser: { sizeLimit: '64kb' } } };
@@ -46,23 +35,10 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
-  // model-override-warming:ignore reason=projection-only — this route calls only
-  // verifyPersonAndAddress / getAddressConflict / retryAddressCheck /
-  // createAddressRepairRequest, which reach projectColdReviewerContactEvidence
-  // (cached projection) and produceAddressTrustEvidence; the model-resolving
-  // sibling export produceReviewerContactEvidence is never invoked.
   const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId.trim() : '';
   const candidateKey = typeof req.body?.candidateKey === 'string' ? req.body.candidateKey.trim() : '';
   const suggestionId = typeof req.body?.suggestionId === 'string' ? req.body.suggestionId.trim() : '';
   const action = typeof req.body?.action === 'string' ? req.body.action.trim() : '';
-  if (Object.keys(req.body || {}).some((key) => FORBIDDEN_AUTHORITY_FIELDS.has(key))) {
-    return res.status(400).json(withRemediation({
-      success: false,
-      decision: 'blocked',
-      code: 'client_authority_claim_rejected',
-      message: 'Address evidence is derived from the current server roster and reviewer record.',
-    }));
-  }
   const hasRosterKey = !!candidateKey && candidateKey.length <= 1200;
   const hasSuggestion = isGuid(suggestionId);
   if (!isGuid(requestId) || (!hasRosterKey && !(
@@ -77,14 +53,6 @@ export default async function handler(req, res) {
       decision: 'blocked',
       code: 'unknown_action',
       message: 'That reviewer repair action is not supported.',
-    }));
-  }
-  if (action === 'verify_person_and_address' && candidateKey && !canonicalStoredReviewerCandidateKey(candidateKey)) {
-    return res.status(400).json(withRemediation({
-      success: false,
-      decision: 'blocked',
-      code: 'candidate_stale',
-      message: 'Reload the current canonical reviewer card before verifying its address.',
     }));
   }
 

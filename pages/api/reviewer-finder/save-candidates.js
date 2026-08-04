@@ -21,12 +21,6 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { saveCandidates } from '../../../lib/services/reviewer-finder/save-candidates-service';
-import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-
-// A promotion preflight can spend its bounded reconciliation window before
-// the normal Dataverse writes. Keep the route below the same Fluid Compute cap
-// as the other long-running reviewer operations.
-export const config = { maxDuration: 800 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -36,15 +30,15 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
-  // Promotion preflight can reach an identity-stage refresh, which resolves an
-  // LLM model via ClaudeReviewerService.
-  await loadModelOverrides();
-
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 
   const {
+    proposalTitle,
+    programArea,
     requestId,
+    grantCycleCode,
     candidates,
+    summaryBlobUrl,
   } = req.body;
 
   if (!requestId) {
@@ -59,8 +53,12 @@ export default async function handler(req, res) {
   return withDalContext('save-candidates', async () => {
     try {
       const result = await saveCandidates({
+        proposalTitle,
+        programArea,
         requestId,
+        grantCycleCode,
         candidates,
+        summaryBlobUrl,
         actingUserSystemId,
       });
       return res.status(200).json(result);

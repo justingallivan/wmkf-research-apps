@@ -2,7 +2,7 @@
 title: Reviewer Find Browser Test and Rehearsal Plan
 domain: reviewer-workbench
 kind: plan
-status: active
+status: superseded
 summary: "Layered, side-effect-controlled browser verification for Reviewer Find warm revisits and targeted refreshes."
 canonical: false
 cataloged: 2026-08-02

@@ -14,7 +14,6 @@ import {
   PROJECTION_VERSION,
   TTL_SECONDS,
   verifyAutomatedIdentityAttestation,
-  verifyHistoricalAutomatedIdentitySelection,
 } from '../../lib/services/reviewer-candidate-attestation';
 import {
   mergeEnrichment,
@@ -33,60 +32,6 @@ const CANDIDATE = {
   hIndex: 20,
   contactEnrichment: { identity: { status: 'probable' } },
 };
-
-function eligibilityProjectionForVersion(candidate, projectionVersion) {
-  const enrichment = candidate.contactEnrichment && typeof candidate.contactEnrichment === 'object'
-    ? candidate.contactEnrichment
-    : {};
-  const evidence = candidate.eligibilityEvidence || enrichment.eligibilityEvidence;
-  const normalized = (value) => (value === undefined || value === '' ? null : value);
-  return {
-    status: normalized(candidate.eligibilityStatus || enrichment.eligibilityStatus || 'unknown'),
-    ...(projectionVersion >= 4
-      ? { checkStatus: normalized(candidate.eligibilityCheckStatus || enrichment.eligibilityCheckStatus) }
-      : {}),
-    reason: normalized(candidate.eligibilityReason || enrichment.eligibilityReason),
-    evidence: evidence && typeof evidence === 'object' && !Array.isArray(evidence)
-      ? {
-          status: normalized(evidence.status),
-          url: normalized(evidence.url),
-          title: normalized(evidence.title),
-          snippet: normalized(evidence.snippet),
-          sourceDomain: normalized(evidence.sourceDomain),
-          checkedAt: normalized(evidence.checkedAt),
-        }
-      : null,
-  };
-}
-
-function digest(value) {
-  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('base64url');
-}
-
-async function mintHistoricalV2(candidate, {
-  requestId = REQUEST,
-  rosterCandidateKey = candidate.candidateKey,
-  issuedAt = '2026-07-29T00:00:00.000Z',
-  alg = 'HS256',
-} = {}) {
-  const issuedAtSeconds = Date.parse(issuedAt) / 1000;
-  const identityProjection = identityAttestationProjection(candidate);
-  return new SignJWT({
-    typ: 'reviewer-auto-identity',
-    requestId,
-    candidateKey: identityProjection.candidateKey,
-    ...(rosterCandidateKey === null ? {} : { rosterCandidateKey }),
-    projectionVersion: 2,
-    baseIdentityDigest: digest(legacyIdentityAttestationProjection(candidate)),
-    identityDigest: digest(identityProjection),
-    eligibilityStatus: 'unknown',
-    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 2)),
-  })
-    .setProtectedHeader({ alg, typ: 'JWT' })
-    .setIssuedAt(issuedAtSeconds)
-    .setExpirationTime(issuedAtSeconds + TTL_SECONDS)
-    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
-}
 
 let priorSecret;
 
@@ -219,16 +164,6 @@ test('receipt signed with a different secret fails closed', async () => {
   })).resolves.toEqual({ valid: false, reason: 'invalid_signature' });
 });
 
-test('historical selection distinguishes a rejected JOSE algorithm from a signature mismatch', async () => {
-  const candidate = { ...CANDIDATE, candidateKey: 'candidate:jane' };
-  const token = await mintHistoricalV2(candidate, { alg: 'HS384' });
-
-  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
-    requestId: REQUEST,
-    candidate,
-  })).resolves.toEqual({ valid: false, reason: 'invalid_algorithm' });
-});
-
 test('receipt fails closed after the 14-day lifetime and clock tolerance', async () => {
   jest.useFakeTimers();
   const issuedAt = new Date('2026-07-13T00:00:00.000Z');
@@ -336,10 +271,6 @@ test('legacy receipts remain valid for bound metrics but cannot authorize identi
     contactAuthorityBound: false,
     projectionVersion: 1,
   });
-  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
-    requestId: REQUEST,
-    candidate: CANDIDATE,
-  })).resolves.toEqual({ valid: false, reason: 'selection_claims_insufficient' });
 });
 
 test('pre-deployment v2 receipt still verifies as identity-only authority', async () => {
@@ -372,93 +303,6 @@ test('pre-deployment v2 receipt still verifies as identity-only authority', asyn
   });
 });
 
-test('historical selection verifies a signed, claim-bound v2 receipt without relaxing normal expiry', async () => {
-  jest.useFakeTimers();
-  const issuedAt = new Date('2026-07-29T00:00:00.000Z');
-  jest.setSystemTime(issuedAt);
-  const candidate = {
-    ...CANDIDATE,
-    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
-    eligibilityStatus: 'unknown',
-    contactEnrichment: {
-      ...CANDIDATE.contactEnrichment,
-      identity: {
-        status: 'probable',
-        resolverVersion: 'works-first-v1',
-        resolvedAt: '2026-07-29T00:00:00.000Z',
-      },
-    },
-  };
-  const token = await mintHistoricalV2(candidate);
-
-  jest.setSystemTime(new Date('2026-08-20T00:00:00.000Z'));
-  await expect(verifyAutomatedIdentityAttestation(token, { requestId: REQUEST, candidate }))
-    .resolves.toEqual({ valid: false, reason: 'expired' });
-  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
-    requestId: REQUEST,
-    candidate,
-  })).resolves.toMatchObject({
-    valid: true,
-    historicalSelection: true,
-    identityDecisionBound: true,
-    eligibilityEvidenceBound: true,
-    contactAuthorityBound: false,
-    projectionVersion: 2,
-    issuedAt: '2026-07-29T00:00:00.000Z',
-  });
-});
-
-test('historical selection rejects missing or mismatched roster keys and a tampered issued-at claim', async () => {
-  jest.useFakeTimers();
-  jest.setSystemTime(new Date('2026-08-03T00:00:00.000Z'));
-  const candidate = {
-    ...CANDIDATE,
-    candidateKey: 'person:55555555-5555-4555-8555-555555555555',
-    eligibilityStatus: 'unknown',
-    contactEnrichment: {
-      ...CANDIDATE.contactEnrichment,
-      identity: {
-        status: 'probable',
-        resolverVersion: 'works-first-v1',
-        resolvedAt: '2026-07-29T00:00:00.000Z',
-      },
-    },
-  };
-  const missingRosterKey = await mintHistoricalV2(candidate, { rosterCandidateKey: null });
-  const mismatchedRosterKey = await mintHistoricalV2(candidate, { rosterCandidateKey: 'person:other' });
-  const valid = await mintHistoricalV2(candidate);
-  const [header, payload, signature] = valid.split('.');
-  const tamperedClaims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  tamperedClaims.iat += 1;
-  const tamperedIssuedAt = `${header}.${Buffer.from(JSON.stringify(tamperedClaims)).toString('base64url')}.${signature}`;
-
-  await expect(verifyHistoricalAutomatedIdentitySelection(missingRosterKey, {
-    requestId: REQUEST,
-    candidate,
-  })).resolves.toEqual({ valid: false, reason: 'selection_claims_insufficient' });
-  await expect(verifyHistoricalAutomatedIdentitySelection(mismatchedRosterKey, {
-    requestId: REQUEST,
-    candidate,
-  })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
-  await expect(verifyHistoricalAutomatedIdentitySelection(tamperedIssuedAt, {
-    requestId: REQUEST,
-    candidate,
-  })).resolves.toEqual({ valid: false, reason: 'invalid_signature' });
-});
-
-test('historical selection fails closed for evidence older than 180 days', async () => {
-  jest.useFakeTimers();
-  const issuedAt = new Date('2026-01-01T00:00:00.000Z');
-  jest.setSystemTime(issuedAt);
-  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate: CANDIDATE });
-
-  jest.setSystemTime(new Date('2026-08-03T00:00:00.000Z'));
-  await expect(verifyHistoricalAutomatedIdentitySelection(token, {
-    requestId: REQUEST,
-    candidate: CANDIDATE,
-  })).resolves.toEqual({ valid: false, reason: 'historical_evidence_stale' });
-});
-
 test('v3 binds the exact email, source, and persist flags', async () => {
   expect(contactAttestationProjection(CANDIDATE)).toMatchObject({
     decision: 'ready',
@@ -478,58 +322,6 @@ test('v3 binds the exact email, source, and persist flags', async () => {
       candidate,
     })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
   }
-});
-
-test('v4 rejects a changed eligibility check status', async () => {
-  const candidate = {
-    ...CANDIDATE,
-    eligibilityStatus: 'unknown',
-    eligibilityCheckStatus: 'complete',
-    eligibilityReason: 'No ineligibility evidence found',
-  };
-  const token = await mintAutomatedIdentityAttestation({ requestId: REQUEST, candidate });
-
-  await expect(verifyAutomatedIdentityAttestation(token, {
-    requestId: REQUEST,
-    candidate: { ...candidate, eligibilityCheckStatus: 'incomplete' },
-  })).resolves.toEqual({ valid: false, reason: 'claim_mismatch' });
-});
-
-test('v3 remains valid when only eligibility check status changes', async () => {
-  const candidate = {
-    ...CANDIDATE,
-    eligibilityStatus: 'unknown',
-    eligibilityCheckStatus: 'complete',
-    eligibilityReason: 'No ineligibility evidence found',
-  };
-  const identityProjection = identityAttestationProjection(candidate);
-  const legacyProjection = legacyIdentityAttestationProjection(candidate);
-  const token = await new SignJWT({
-    typ: 'reviewer-auto-identity',
-    requestId: REQUEST,
-    candidateKey: identityProjection.candidateKey,
-    projectionVersion: 3,
-    baseIdentityDigest: digest(legacyProjection),
-    identityDigest: digest(identityProjection),
-    contactDigest: digest(contactAttestationProjection(candidate)),
-    eligibilityStatus: candidate.eligibilityStatus,
-    eligibilityCheckStatus: candidate.eligibilityCheckStatus,
-    eligibilityDigest: digest(eligibilityProjectionForVersion(candidate, 3)),
-  })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuedAt()
-    .setExpirationTime(Math.floor(Date.now() / 1000) + TTL_SECONDS)
-    .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
-
-  await expect(verifyAutomatedIdentityAttestation(token, {
-    requestId: REQUEST,
-    candidate: { ...candidate, eligibilityCheckStatus: 'incomplete' },
-  })).resolves.toMatchObject({
-    valid: true,
-    contactAuthorityBound: true,
-    eligibilityEvidenceBound: true,
-    projectionVersion: 3,
-  });
 });
 
 test('contact changes invalidate a receipt bound to the submitted candidate key', async () => {

@@ -30,14 +30,7 @@ describe('DiscoveryService.toPubMedAuthorFormat', () => {
 describe('DiscoveryService.checkCoauthorHistory', () => {
   it('short-circuits with no proposal authors', async () => {
     const out = await DiscoveryService.checkCoauthorHistory('Jane Smith', []);
-    expect(out).toEqual({
-      hasCoauthorship: false,
-      coauthorships: [],
-      coauthorCheckStatus: 'not_applicable',
-      coauthorCheckFailures: [],
-      sharedPaperTotal: 0,
-      maxSharedWithOneAuthor: 0,
-    });
+    expect(out).toEqual({ hasCoauthorship: false, coauthorships: [] });
     expect(PubMedService.search).not.toHaveBeenCalled();
   });
   it('aggregates shared papers and reports the max-with-one-author', async () => {
@@ -141,16 +134,7 @@ describe('DiscoveryService.checkCoauthorshipsForCandidates', () => {
   });
   it('returns candidates unchanged with no proposal authors', async () => {
     const cands = [{ name: 'X' }];
-    expect(await DiscoveryService.checkCoauthorshipsForCandidates(cands, [])).toEqual([{
-      name: 'X',
-      hasCoauthorCOI: false,
-      coauthorCOIStrength: null,
-      coauthorships: [],
-      coauthorSharedPaperTotal: 0,
-      coauthorMaxWithOneAuthor: 0,
-      coauthorCheckStatus: 'not_applicable',
-      coauthorCheckFailures: [],
-    }]);
+    expect(await DiscoveryService.checkCoauthorshipsForCandidates(cands, [])).toBe(cands);
   });
 });
 

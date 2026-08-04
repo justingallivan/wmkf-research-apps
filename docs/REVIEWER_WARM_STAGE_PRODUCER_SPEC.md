@@ -2,8 +2,8 @@
 title: Reviewer Find Authoritative Warm-Stage Producer Specification
 domain: reviewer-workbench
 kind: spec
-status: active
-summary: "Contracts for emitting and selectively refreshing authoritative Reviewer Find stage evidence and receipts."
+status: superseded
+summary: "Historical: warm-stage evidence/receipt contracts removed by the 2026-08-03 baseline revert. Do not implement against this spec."
 canonical: false
 cataloged: 2026-08-02
 owner: product-engineering
@@ -13,11 +13,13 @@ related:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - docs/audits/reviewer-warm-stage-producer-fable-review-2026-08-02.md
   - docs/atlas/postgres-reviewer-find-roster.md
-  - lib/services/workbench/reviewer-stage-refresh-service.js
-  - lib/services/workbench/reviewer-warm-validation-service.js
-  - lib/services/reviewer-stage-freshness.js
-  - lib/services/reviewer-roster-store.js
 ---
+
+> **Superseded 2026-08-03.** The implementation this spec describes was
+> removed by the revert to the pre-rollout baseline (`94c5b9d9` runtime
+> tree) after the warm-reconciliation production incident. Retained as
+> history; see the S395 post-mortem
+> (`.claude-memory/feedback-latency-plan-scope-accretion-postmortem.md`).
 
 # Reviewer Find Authoritative Warm-Stage Producer Specification
 

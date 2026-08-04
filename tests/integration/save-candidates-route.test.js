@@ -13,8 +13,6 @@
  * depend on these exact shapes (plan warning for save-candidates.js).
  */
 
-const mockRosterCandidates = new Map();
-
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({
     profileId: 'P1', session: { user: { dynamicsSystemuserId: 'SYS-1' } },
@@ -48,30 +46,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   stampSuggestionAnchor: jest.fn(async () => ({ updated: 1 })),
   findEligibilityByCandidateKey: jest.fn(async () => null),
-  findCandidatesByKeys: jest.fn(async (_requestId, candidateKeys) => (
-    candidateKeys.map((candidateKey) => mockRosterCandidates.get(candidateKey)).filter(Boolean)
-  )),
-  findIdentityConfirmation: jest.fn(async () => null),
-  findAddressTrustReceipt: jest.fn(async () => null),
-  promotionSnapshotIsCurrent: jest.fn(async () => true),
   finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
-}));
-jest.mock('../../lib/services/reviewer-candidate-attestation', () => ({
-  ...jest.requireActual('../../lib/services/reviewer-candidate-attestation'),
-  verifyAutomatedIdentityAttestation: jest.fn(async (token, { candidate } = {}) => ({
-    valid: token === 'test-signed-attestation',
-    source: 'automated_resolver',
-    identityDecisionBound: token === 'test-signed-attestation',
-    contactAuthorityBound: token === 'test-signed-attestation',
-    ...(token === 'test-signed-attestation' && candidate?.candidateKey
-      ? { rosterCandidateKey: candidate.candidateKey }
-      : {}),
-  })),
-}));
-const mockGetCandidatePromotionAuthority = jest.fn();
-jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
-  ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
-  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
 }));
 jest.mock('../../lib/services/reviewer-identity-lookup', () => ({
   lookupReviewerIdentity: jest.fn(async () => ({ outcome: 'none' })),
@@ -92,7 +67,6 @@ const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
-const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
 
 function mockRes() {
   const res = {};
@@ -106,45 +80,11 @@ function mockRes() {
 
 let handler;
 beforeAll(() => {
-  const rawHandler = require('../../pages/api/reviewer-finder/save-candidates').default;
-  handler = (req, res) => rawHandler(withCurrentRosterAuthorityRequest(req), res);
+  handler = require('../../pages/api/reviewer-finder/save-candidates').default;
 });
-
-function withCurrentRosterAuthority(candidate) {
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return candidate;
-  const candidateKey = candidate.candidateKey || reviewerSaveKey(candidate);
-  // Mirror the server-read roster row independently of the client selection
-  // DTO. The route must use this row, not the posted candidate fields.
-  mockRosterCandidates.set(candidateKey, {
-    ...candidate,
-    candidateKey,
-    rosterStatus: 'active',
-    rosterUpdatedAt: '2026-08-02 00:00:00+00',
-  });
-  return {
-    ...candidate,
-    candidateKey,
-    automatedIdentityAttestation: candidate.automatedIdentityAttestation || 'test-signed-attestation',
-  };
-}
-
-function withCurrentRosterAuthorityRequest(req) {
-  if (!Array.isArray(req?.body?.candidates)) return req;
-  return {
-    ...req,
-    body: {
-      ...req.body,
-      candidates: req.body.candidates.map(withCurrentRosterAuthority),
-    },
-  };
-}
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockRosterCandidates.clear();
-  mockGetCandidatePromotionAuthority.mockReturnValue({
-    decision: 'ready', code: null, stage: null, reason: null,
-  });
   requireAppAccess.mockResolvedValue({
     profileId: 'P1', session: { user: { dynamicsSystemuserId: 'SYS-1' } },
   });
@@ -211,7 +151,7 @@ test('happy-path response envelope is pinned exactly (single resolved candidate)
       candidates: [{
         name: 'Dr X',
         email: 'x@mit.edu',
-        emailSource: 'orcid',
+        emailSource: 'pubmed',
         emailPersistAllowed: true,
         identityStatus: 'probable',
         affiliation: 'MIT',
@@ -313,7 +253,7 @@ test('500 envelope pinned exactly when every candidate fails a non-identity adap
       candidates: [{
         name: 'Dr Fails',
         email: 'fails@example.edu',
-        emailSource: 'orcid',
+        emailSource: 'pubmed',
         emailPersistAllowed: true,
         identityStatus: 'probable',
       }],

@@ -38,26 +38,10 @@ jest.mock('../../lib/dataverse/duplicate-key', () => ({
 const findCandidateBySuggestion = jest.fn(async () => null);
 const findAddressTrustReceipt = jest.fn(async () => null);
 const finalizeCandidatePromotion = jest.fn(async () => ({ saved: true, candidateKey: 'candidate:applicant' }));
-const promotionSnapshotIsCurrent = jest.fn(async () => true);
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
   findAddressTrustReceipt: (...a) => findAddressTrustReceipt(...a),
   finalizeCandidatePromotion: (...a) => finalizeCandidatePromotion(...a),
-  promotionSnapshotIsCurrent: (...a) => promotionSnapshotIsCurrent(...a),
-}));
-const mockGetCandidatePromotionAuthority = jest.fn();
-jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
-  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
-}));
-const deriveReviewerPromotionAuthoritySnapshot = jest.fn(async ({ requestId, candidate }) => ({
-  authorityState: 'current', requestId, candidateKey: candidate?.candidateKey,
-  versions: Object.fromEntries([
-    'applicant_anchor', 'identity', 'institution_domains', 'institution_coi', 'coauthor_coi',
-    'eligibility', 'contact', 'address_trust', 'roster_persistence',
-  ].map((stage) => [stage, `${stage}-source-v1`])),
-}));
-jest.mock('../../lib/services/workbench/reviewer-warm-validation-service', () => ({
-  deriveReviewerPromotionAuthoritySnapshot: (...args) => deriveReviewerPromotionAuthoritySnapshot(...args),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
@@ -68,53 +52,13 @@ const loadApplicantKnownReviewerContext = jest.fn();
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
   loadApplicantKnownReviewerContext: (...a) => loadApplicantKnownReviewerContext(...a),
 }));
-const loadCoiContext = jest.fn();
-jest.mock('../../lib/services/reviewer-request-context', () => ({
-  loadCoiContext: (...a) => loadCoiContext(...a),
-}));
-const institutionCOIResolution = jest.fn();
-const institutionCOIDecisionResolved = jest.fn();
-jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: {
-    institutionCOIResolution: (...a) => institutionCOIResolution(...a),
-    institutionCOIDecisionResolved: (...a) => institutionCOIDecisionResolved(...a),
-  },
-}));
-jest.mock('../../lib/services/institution-identity-resolver', () => ({
-  createInstitutionIdentityResolver: jest.fn(() => ({ resolve: jest.fn(async () => null) })),
-}));
 
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
-const {
-  getCandidatePromotionAuthority: getRealCandidatePromotionAuthority,
-} = jest.requireActual('../../lib/services/reviewer-promotion-authority');
-
 const REQ = '11111111-1111-1111-1111-111111111111';
 const SUG = '33333333-3333-3333-3333-333333333333';
 const PERSON = '22222222-2222-2222-2222-222222222222';
-const CURRENT_STAGE_FRESHNESS = {
-  identity: { state: 'current', contractVersion: 4, sourceVersion: 'identity-v4', completedAt: '2026-08-02T00:00:00.000Z' },
-  institution_coi: { state: 'current', contractVersion: 1, sourceVersion: 'institution-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  coauthor_coi: { state: 'current', contractVersion: 1, sourceVersion: 'coauthor-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  eligibility: { state: 'current', contractVersion: 1, sourceVersion: 'eligibility-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  contact: { state: 'current', contractVersion: 1, sourceVersion: 'contact-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-  address_trust: { state: 'current', contractVersion: 1, sourceVersion: 'address-v1', completedAt: '2026-08-02T00:00:00.000Z' },
-};
-const authorityCandidate = (extra = {}) => ({
-  candidateKey: 'candidate:applicant',
-  suggestionId: SUG,
-  rosterStatus: 'active',
-  identityStatus: 'probable',
-  needsIdentification: false,
-  stageFreshness: CURRENT_STAGE_FRESHNESS,
-  coauthorCheckStatus: 'complete',
-  coauthorCheckFailures: [],
-  eligibilityCheckStatus: 'complete',
-  eligibilityStatus: 'unknown',
-  ...extra,
-});
 
 const args = (over = {}) => ({ requestId: REQ, suggestionId: SUG, contact: undefined, actingUserSystemId: 'u-1', ...over });
 
@@ -142,10 +86,11 @@ beforeEach(() => {
     attestedAt: '2026-07-31T12:00:00.000Z',
   });
   findCandidateBySuggestion.mockResolvedValue({
-    ...authorityCandidate({ affiliation: 'Different University' }),
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
   });
-  promotionSnapshotIsCurrent.mockResolvedValue(true);
-  mockGetCandidatePromotionAuthority.mockReturnValue({ decision: 'ready', code: null, stage: null });
   finalizeCandidatePromotion.mockResolvedValue({ saved: true, candidateKey: 'candidate:applicant' });
   translateDuplicateKeyError.mockReturnValue(null);
   loadApplicantKnownReviewerContext.mockResolvedValue({
@@ -163,12 +108,6 @@ beforeEach(() => {
     },
     contactId: null,
   });
-  loadCoiContext.mockResolvedValue({
-    piResolution: { state: 'ok', reason: null },
-    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
-  });
-  institutionCOIResolution.mockResolvedValue({ status: 'lexical_non_match', decision: null });
-  institutionCOIDecisionResolved.mockResolvedValue(null);
 });
 
 test('wrong-request suggestion → 404 typed error, no lifecycle write', async () => {
@@ -227,177 +166,6 @@ test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m no
   expect(err.httpStatus).toBe(404);
 });
 
-test('authority derivation unavailable → 503 before COI, contact, or lifecycle mutation', async () => {
-  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
-    decision: 'blocked',
-    code: 'promotion_authority_unavailable',
-    stage: null,
-  });
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(503);
-  expect(err.body).toMatchObject({ code: 'promotion_authority_unavailable' });
-  expect(institutionCOIResolution).not.toHaveBeenCalled();
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
-test('no trusted eligibility domain gives the actionable repair message, not a generic refresh', async () => {
-  mockGetCandidatePromotionAuthority.mockReturnValueOnce({
-    decision: 'blocked',
-    code: 'eligibility_no_trusted_domains',
-    stage: 'eligibility',
-  });
-
-  const error = await promoteApplicantReviewer(args()).catch((caught) => caught);
-
-  expect(error).toBeInstanceOf(ServiceHttpError);
-  expect(error.httpStatus).toBe(422);
-  expect(error.body).toMatchObject({
-    code: 'eligibility_no_trusted_domains',
-    stage: 'eligibility',
-    message: expect.stringMatching(/No trusted institutional domain/i),
-    remediation: [
-      expect.objectContaining({ action: 'create_repair_request' }),
-      expect.objectContaining({ action: 'set_aside' }),
-    ],
-  });
-  expect(error.body.message).not.toMatch(/refresh this candidate/i);
-  expect(institutionCOIResolution).not.toHaveBeenCalled();
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
-test('a fully populated applicant roster row fails closed through the real policy without an authoritative snapshot', async () => {
-  // Do not use the normal ready mock: the real policy must see the service
-  // omitted `authoritative` and stop this otherwise-ready row before mutation.
-  mockGetCandidatePromotionAuthority.mockImplementation(getRealCandidatePromotionAuthority);
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
-    candidateKey: 'candidate:snapshot-required',
-  }));
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(422);
-  expect(err.body).toMatchObject({ code: 'stage_authority_stale', stage: 'identity' });
-  expect(mockGetCandidatePromotionAuthority).toHaveBeenCalledWith(
-    expect.objectContaining({
-      candidateKey: 'candidate:snapshot-required',
-      rosterStatus: 'active',
-      stageFreshness: CURRENT_STAGE_FRESHNESS,
-      coauthorCheckStatus: 'complete',
-      eligibilityCheckStatus: 'complete',
-    }),
-    expect.objectContaining({ serverAuthoritative: true, checkInstitution: false }),
-  );
-  expect(mockGetCandidatePromotionAuthority.mock.calls[0][1]).toMatchObject({
-    requestId: REQ,
-    authoritative: expect.objectContaining({ authorityState: 'current' }),
-  });
-  expect(loadCoiContext).not.toHaveBeenCalled();
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen: clean no-match allows promotion', async () => {
-  const body = await promoteApplicantReviewer(args());
-
-  expect(body.success).toBe(true);
-  expect(institutionCOIResolution).toHaveBeenCalledWith(
-    expect.objectContaining({ candidateKey: 'candidate:applicant' }),
-    expect.any(Array),
-    expect.any(Object),
-  );
-  expect(selectIfUnengaged).toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen: missing roster and canonical affiliations fails closed', async () => {
-  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate());
-  institutionCOIResolution.mockResolvedValueOnce({
-    status: 'candidate_institution_missing',
-    decision: null,
-  });
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(503);
-  expect(err.body).toMatchObject({
-    code: 'institution_coi_unavailable',
-    decisionSource: 'reviewer_institution_affiliation_unavailable',
-  });
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen: canonical known-different affiliation permits promotion when roster affiliation is absent', async () => {
-  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate());
-  getById.mockResolvedValueOnce({
-    wmkf_primaryaffiliation: 'Different University',
-    wmkf_emailaddress: 'existing@example.edu',
-    wmkf_emailsource: 'scholarly_multi',
-    _etag: 'W/"person"',
-  });
-  institutionCOIResolution.mockResolvedValueOnce({
-    status: 'candidate_institution_missing',
-    decision: null,
-  });
-
-  const body = await promoteApplicantReviewer(args());
-
-  expect(body.success).toBe(true);
-  expect(institutionCOIDecisionResolved).toHaveBeenCalledWith(
-    expect.objectContaining({ affiliation: 'Different University' }),
-    expect.any(Array),
-    expect.any(Object),
-  );
-  expect(selectIfUnengaged).toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen: known roster non-match permits promotion without canonical affiliation', async () => {
-  findCandidateBySuggestion.mockResolvedValueOnce(authorityCandidate({ affiliation: 'Different University' }));
-  institutionCOIResolution.mockResolvedValueOnce({ status: 'lexical_non_match', decision: null });
-
-  const body = await promoteApplicantReviewer(args());
-
-  expect(body.success).toBe(true);
-  expect(institutionCOIDecisionResolved).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen: blocking decision prevents lifecycle mutation', async () => {
-  institutionCOIResolution.mockResolvedValueOnce({
-    status: 'matched',
-    decision: {
-      dropDecision: 'dropped',
-      candidate: { institutionCOIDetails: { piInstitution: 'Applicant University' } },
-    },
-  });
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(422);
-  expect(err.body).toMatchObject({ code: 'institution_coi' });
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
-test('trusted applicant institution screen failure prevents lifecycle mutation', async () => {
-  loadCoiContext.mockRejectedValueOnce(new Error('Dataverse unavailable'));
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(503);
-  expect(err.body).toMatchObject({ code: 'institution_coi_unavailable' });
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
-});
-
 test('plain promote: canonical email verified, selected flipped, roster finalized', async () => {
   const body = await promoteApplicantReviewer(args());
   expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
@@ -412,17 +180,6 @@ test('plain promote: canonical email verified, selected flipped, roster finalize
     emailAction: 'ready',
     emailActionReason: 'Address source: scholarly_multi',
   });
-});
-
-test('changed server roster snapshot prevents lifecycle mutation', async () => {
-  promotionSnapshotIsCurrent.mockResolvedValueOnce(false);
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(409);
-  expect(err.body).toMatchObject({ code: 'roster_snapshot_stale' });
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 test('source-null canonical contact requires evidence and becomes exact-bundle ready', async () => {
@@ -541,9 +298,13 @@ test('known exact person with no stored or vetted email remains in Find', async 
 });
 
 test('stored/enriched email mismatch blocks promotion and does not select the suggestion', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
     email: 'new@example.edu',
-  }));
+  });
   const err = await promoteApplicantReviewer(args()).catch((error) => error);
   expect(err.httpStatus).toBe(409);
   expect(err.body).toMatchObject({ code: 'contact_claim_mismatch' });
@@ -551,7 +312,11 @@ test('stored/enriched email mismatch blocks promotion and does not select the su
 });
 
 test('applicant promotion cannot use a receipt when the address conflict was never durably recorded', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
     email: 'found@example.edu',
     emailSource: 'scholarly_multi',
     emailPersistAllowed: true,
@@ -568,7 +333,7 @@ test('applicant promotion cannot use a receipt when the address conflict was nev
       emailPersistAllowed: true,
       conflictRecordUnavailable: true,
     },
-  }));
+  });
   getById.mockResolvedValueOnce({
     wmkf_emailaddress: 'existing@example.edu',
     wmkf_emailsource: 'scholarly_multi',
@@ -593,7 +358,11 @@ test('applicant promotion cannot use a receipt when the address conflict was nev
 });
 
 test('a manual applicant address cannot bypass a failed conflict write', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
     email: 'found@example.edu',
     emailSource: 'manual',
     manualContactFields: ['email'],
@@ -605,7 +374,7 @@ test('a manual applicant address cannot bypass a failed conflict write', async (
       emailPersistAllowed: true,
       conflictRecordUnavailable: true,
     },
-  }));
+  });
   getById.mockResolvedValueOnce({
     wmkf_emailaddress: 'existing@example.edu',
     wmkf_emailsource: 'scholarly_multi',
@@ -624,24 +393,78 @@ test('a manual applicant address cannot bypass a failed conflict write', async (
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
-test('posted manual contact cannot rewrite the canonical person during applicant promotion', async () => {
+test('actor-confirmed manual correction clears a historical mismatch, writes first, then passes the fresh exact-person gate', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-corrected',
+    personConfirmed: true,
+    email: 'corrected@example.edu',
+    evidenceType: 'direct_correspondence',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'unresolved',
+    needsIdentification: true,
+    email: 'corrected@example.edu',
+    emailSource: 'manual',
+    manualContactFields: ['email'],
+    applicantContactMismatch: true,
+    pdIdentityConfirmed: true,
+    pdIdentityConfirmationId: 'confirm-1',
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
+  loadApplicantKnownReviewerContext
+    .mockResolvedValueOnce({
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: PERSON,
+        email: 'stored@example.edu',
+        emailSource: null,
+      },
+    })
+    .mockResolvedValueOnce({
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: PERSON,
+        email: 'corrected@example.edu',
+        emailSource: 'staff_verified',
+        addressTrustVerified: true,
+        emailReadiness: {
+          level: 'high',
+          action: 'ready',
+          reason: 'Exact address verified by staff',
+        },
+      },
+    });
+
   const body = await promoteApplicantReviewer(args({
-    contact: { email: 'corrected@example.edu', affiliation: 'Attacker Institute' },
+    contact: { email: 'corrected@example.edu' },
   }));
-  expect(body).toMatchObject({ success: true, emailAction: 'ready' });
-  expect(update).not.toHaveBeenCalled();
-  expect(updateById).not.toHaveBeenCalled();
+
+  expect(update).toHaveBeenCalledWith(
+    PERSON,
+    expect.objectContaining({
+      email: 'corrected@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }),
+    { actingUserSystemId: 'u-1', ifMatch: 'W/"person"' },
+  );
   expect(selectIfUnengaged).toHaveBeenCalled();
+  expect(body).toMatchObject({ success: true, emailAction: 'ready' });
 });
 
-test('anti-scrape browser contact is ignored before any person write', async () => {
-  const body = await promoteApplicantReviewer(args({
+test('anti-scrape manual correction is rejected before any person write', async () => {
+  const err = await promoteApplicantReviewer(args({
     contact: { email: 'reviewer@nospam.example.edu', affiliation: 'Example U' },
-  }));
-  expect(body).toMatchObject({ success: true });
+  })).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'anti_scrape_email' });
   expect(update).not.toHaveBeenCalled();
   expect(updateById).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('missing authoritative roster row is rejected before lifecycle promotion', async () => {
@@ -651,21 +474,6 @@ test('missing authoritative roster row is rejected before lifecycle promotion', 
   expect(err.httpStatus).toBe(422);
   expect(err.body).toMatchObject({ code: 'identity_verification_required' });
   expect(updateLifecycle).not.toHaveBeenCalled();
-});
-
-test('a roster row bound to a different suggestion is rejected before any mutation', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
-    suggestionId: '44444444-4444-4444-4444-444444444444',
-  }));
-
-  const err = await promoteApplicantReviewer(args()).catch((error) => error);
-
-  expect(err).toBeInstanceOf(ServiceHttpError);
-  expect(err.httpStatus).toBe(409);
-  expect(err.body).toMatchObject({ code: 'roster_snapshot_stale' });
-  expect(institutionCOIResolution).not.toHaveBeenCalled();
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).not.toHaveBeenCalled();
 });
 
 test('deceased applicant-recommended reviewer is rejected before lifecycle promotion', async () => {
@@ -696,14 +504,14 @@ test('durable ineligible status blocks promotion even when the candidate blob la
 });
 
 test('identity-review applicant is rejected before lifecycle promotion without server confirmation', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Namesake',
     candidateKey: 'candidate:namesake',
     suggestionId: SUG,
     needsIdentification: true,
     identityStatus: 'unresolved',
     verificationStatus: 'unresolved',
-  }));
+  });
   const err = await promoteApplicantReviewer(args()).catch((error) => error);
   expect(err).toBeInstanceOf(ServiceHttpError);
   expect(err.httpStatus).toBe(422);
@@ -713,7 +521,7 @@ test('identity-review applicant is rejected before lifecycle promotion without s
 });
 
 test('server-recorded staff confirmation permits promotion of an identity-review applicant', async () => {
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
     name: 'Dr Namesake',
     candidateKey: 'candidate:namesake',
     suggestionId: SUG,
@@ -721,31 +529,32 @@ test('server-recorded staff confirmation permits promotion of an identity-review
     identityStatus: 'unresolved',
     pdIdentityConfirmed: true,
     pdIdentityConfirmationId: 'confirm-1',
-    staffIdentityConfirmation: {
-      confirmationId: 'confirm-1',
-      source: 'staff_confirmed',
-      state: 'confirmed',
-      canonicalPersonId: '22222222-2222-4222-8222-222222222222',
-      canonicalPersonEtag: 'W/"person-v1"',
-      actorId: 'u-1',
-      confirmedAt: '2026-08-02T00:00:00.000Z',
-    },
-  }));
+    staffIdentityConfirmation: { confirmationId: 'confirm-1', source: 'staff_confirmed' },
+  });
   const body = await promoteApplicantReviewer(args());
   expect(body.success).toBe(true);
   expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
 });
 
-test('browser email collision cannot alter applicant promotion', async () => {
+test('manual email collision withholds promotion and returns a merge-required conflict', async () => {
+  findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-manual',
+    personConfirmed: true,
+    email: 'a@b.edu',
+    evidenceType: 'direct_correspondence',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'email' in updates) throw new Error('alt-key duplicate');
   });
   translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'a@b.edu' });
-  const body = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA', email: 'a@b.edu' } }));
-  expect(body).toMatchObject({ success: true });
-  expect(update).not.toHaveBeenCalled();
+  const err = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA', email: 'a@b.edu' } }))
+    .catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body.contactError).toMatchObject({ code: 'email_conflict', value: 'a@b.edu' });
   expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
-  expect(selectIfUnengaged).toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('B1 backfill: vetted roster email written with roster provenance when no manual email', async () => {
@@ -757,8 +566,10 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
     evidenceUrl: 'https://example.edu/paper',
     attestedAt: '2026-07-31T12:00:00.000Z',
   });
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:kaang',
+    suggestionId: SUG,
+    identityStatus: 'probable',
     email: 'kaang@snu.ac.kr',
     emailSource: 'claude_search',
     contactEnrichment: {
@@ -767,14 +578,9 @@ test('B1 backfill: vetted roster email written with roster provenance when no ma
       emailSource: 'claude_search',
       emailPersistAllowed: true,
     },
-  }));
+  });
   getById
     .mockResolvedValueOnce({})
-    .mockResolvedValueOnce({
-      wmkf_emailaddress: 'kaang@snu.ac.kr',
-      wmkf_emailsource: 'claude_search',
-      _etag: 'W/"kaang"',
-    })
     .mockResolvedValueOnce({
       wmkf_emailaddress: 'kaang@snu.ac.kr',
       wmkf_emailsource: 'claude_search',
@@ -813,12 +619,14 @@ test('existing research-only person email is upgraded only after exact attestati
     evidenceUrl: 'https://example.edu/paper',
     attestedAt: '2026-07-31T12:00:00.000Z',
   });
-  findCandidateBySuggestion.mockResolvedValue(authorityCandidate({
+  findCandidateBySuggestion.mockResolvedValue({
     candidateKey: 'candidate:x',
+    suggestionId: SUG,
+    identityStatus: 'probable',
     email: 'x@y.edu',
     emailSource: 'claude_search',
     emailPersistAllowed: true,
-  }));
+  });
   getById.mockResolvedValue({
     wmkf_emailaddress: 'x@y.edu',
     wmkf_emailsource: 'claude_search',
@@ -854,12 +662,14 @@ test('eligibility roster read failure returns retryable 503 before lifecycle mut
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
-test('browser safe-field payload is ignored before lifecycle promotion', async () => {
+test('safe-field write failure blocks promotion with a retryable error', async () => {
   update.mockImplementation(async (_id, updates) => {
     if (updates && 'affiliation' in updates) throw new Error('boom');
   });
-  const body = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA' } }));
-  expect(body).toMatchObject({ success: true });
-  expect(update).not.toHaveBeenCalled();
-  expect(selectIfUnengaged).toHaveBeenCalled();
+  const err = await promoteApplicantReviewer(args({ contact: { affiliation: 'JILA' } }))
+    .catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body.contactError).toMatchObject({ code: 'contact_write_failed' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });

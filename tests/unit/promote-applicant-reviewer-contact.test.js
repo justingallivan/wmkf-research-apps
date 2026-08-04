@@ -1,10 +1,13 @@
 /**
  * @jest-environment node
  *
- * The promotion endpoint is intentionally selection-only: browser-provided
- * contact corrections never write a shared person record.  Address changes go
- * through their dedicated authenticated and server-attested workflow; this
- * route can only use an already-vetted roster email for its own suggestion.
+ * Fix (S306): promoting an applicant-suggested reviewer must persist the PD's
+ * hand-corrections (the "lowest-trust input" routinely has no email or a wrong-
+ * namesake identity). Previously promote-applicant-reviewer ONLY flipped
+ * wmkf_selected=true, so the corrected contact was dropped. Now it flips selected
+ * first, then writes ONLY the client-marked manual fields to the suggestion's OWN
+ * person record, forcing source 'manual', and reports a partial-success contactError
+ * (instead of failing the promote) when the email collides with another record.
  */
 
 jest.mock('../../lib/utils/auth', () => ({
@@ -49,26 +52,6 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: jest.fn(async () => null), // no roster row by default → no backfill
   finalizeCandidatePromotion: jest.fn(async () => ({ saved: true })),
   findAddressTrustReceipt: jest.fn(async () => null),
-  promotionSnapshotIsCurrent: jest.fn(async () => true),
-}));
-const mockGetCandidatePromotionAuthority = jest.fn();
-jest.mock('../../lib/services/reviewer-promotion-authority', () => ({
-  ...jest.requireActual('../../lib/services/reviewer-promotion-authority'),
-  getCandidatePromotionAuthority: (...args) => mockGetCandidatePromotionAuthority(...args),
-}));
-jest.mock('../../lib/services/reviewer-request-context', () => ({
-  loadCoiContext: jest.fn(async () => ({
-    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
-  })),
-}));
-jest.mock('../../lib/services/deduplication-service', () => ({
-  DeduplicationService: {
-    institutionCOIResolution: jest.fn(async () => ({ status: 'clear', decision: null })),
-    institutionCOIDecisionResolved: jest.fn(async () => null),
-  },
-}));
-jest.mock('../../lib/services/institution-identity-resolver', () => ({
-  createInstitutionIdentityResolver: jest.fn(() => ({})),
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
@@ -112,7 +95,7 @@ function mockRes() {
   return res;
 }
 
-describe('promote-applicant-reviewer — browser contact is not mutation authority', () => {
+describe('promote-applicant-reviewer — persist hand-corrections', () => {
   let handler;
 
   beforeAll(() => {
@@ -121,9 +104,6 @@ describe('promote-applicant-reviewer — browser contact is not mutation authori
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetCandidatePromotionAuthority.mockReturnValue({
-      decision: 'ready', code: null, stage: null, reason: null,
-    });
     mockPersonEmail = 'existing@example.org';
     mockPersonEmailSource = 'scholarly_multi';
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
@@ -147,7 +127,8 @@ describe('promote-applicant-reviewer — browser contact is not mutation authori
     findCandidateBySuggestion.mockResolvedValue(SAFE_ROSTER_CANDIDATE);
   });
 
-  test('ignores marked contact and promotes using only the server-held reviewer record', async () => {
+  test('flips selected and persists the marked contact, stamping email manual', async () => {
+    mockAddressReceipt('ava.mercer@example.org');
     const req = {
       method: 'POST',
       body: {
@@ -164,17 +145,29 @@ describe('promote-applicant-reviewer — browser contact is not mutation authori
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.partialSuccess).toBe(false);
-    expect(res.body.savedFields).toEqual([]);
+    expect(res.body.savedFields).toEqual(expect.arrayContaining(['affiliation', 'email']));
 
     // selected flipped.
     expect(suggestionAdapter.selectIfUnengaged).toHaveBeenCalledWith(
       SUGGESTION_ID, expect.anything(),
     );
-    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
-    expect(researcherAdapter.updateById).not.toHaveBeenCalled();
+    // Writes target the suggestion's OWN person, never the client-supplied id.
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { affiliation: 'Example Research Lab' }, expect.anything());
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
+      email: 'ava.mercer@example.org',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: expect.any(String),
+    }), expect.anything());
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalledWith('99999999-9999-9999-9999-999999999999', expect.anything(), expect.anything());
+    // S387: emailSource is forced manual in the SAME patch as the address, never as a
+    // follow-up write — a source must not be able to outlive the address it describes.
+    expect(researcherAdapter.updateById).not.toHaveBeenCalledWith(
+      PERSON_ID, { emailSource: 'manual' }, expect.anything(),
+    );
   });
 
-  test('browser email-collision bait cannot withhold a promotion', async () => {
+  test('email collision withholds promotion and returns a conflict', async () => {
+    mockAddressReceipt('ava.mercer@example.org');
     potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
       if (updates && 'email' in updates) throw new Error('alt-key duplicate');
       return undefined;
@@ -192,10 +185,9 @@ describe('promote-applicant-reviewer — browser contact is not mutation authori
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toMatchObject({ success: true, savedFields: [] });
-    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
-    expect(suggestionAdapter.selectIfUnengaged).toHaveBeenCalled();
+    expect(res.statusCode).toBe(409);
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'ava.mercer@example.org' });
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
   });
 
   test('no contact payload: behaves as a plain promote (selected only)', async () => {
@@ -236,9 +228,6 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
   beforeAll(() => { handler = require('../../pages/api/workbench/promote-applicant-reviewer').default; });
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetCandidatePromotionAuthority.mockReturnValue({
-      decision: 'ready', code: null, stage: null, reason: null,
-    });
     // Restore clean adapter defaults — clearAllMocks clears calls but NOT the throwing
     // mockImplementation the describe-1 collision test installs, which would leak here.
     mockPersonEmail = null;
@@ -342,27 +331,16 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     }), expect.anything());
   });
 
-  test('a browser manual email cannot override the vetted roster backfill', async () => {
-    mockAddressReceipt('roster@example.org');
-    findCandidateBySuggestion.mockResolvedValue({
-      ...SAFE_ROSTER_CANDIDATE,
-      email: 'roster@example.org',
-      emailSource: 'claude_search',
-      emailPersistAllowed: true,
-      contactEnrichment: {
-        identity: { status: 'probable' },
-        email: 'roster@example.org',
-        emailSource: 'claude_search',
-        emailPersistAllowed: true,
-      },
-    });
+  test('a manual email wins: backfill is skipped after the eligibility read', async () => {
+    mockAddressReceipt('manual@example.org');
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
     const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
     const res = mockRes();
     await handler(req, res);
-    // Promotion keeps using the roster email; the browser value is only ignored
-    // transport data and cannot choose a canonical address.
+    // Manual email persisted; the one roster read is the eligibility boundary,
+    // and no separate email-backfill lookup occurs.
     expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, expect.objectContaining({
-      email: 'roster@example.org',
+      email: 'manual@example.org',
       emailSource: 'staff_verified',
       addressTrustStateJson: expect.any(String),
     }), expect.anything());
@@ -396,4 +374,22 @@ describe('promote-applicant-reviewer — B1 enriched-email backfill', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
   });
 
+  test('a manual email that COLLIDES is not silently overwritten by the roster email', async () => {
+    mockAddressReceipt('manual@example.org');
+    // PD typed a conflicting email; the manual write 409s → not in savedFields.
+    findCandidateBySuggestion.mockResolvedValue({ ...SAFE_ROSTER_CANDIDATE, email: 'roster@example.org', emailSource: 'claude_search', emailPersistAllowed: true });
+    potentialReviewerAdapter.update.mockImplementation(async (_id, updates) => {
+      if (updates && 'email' in updates) throw new Error('alt-key duplicate');
+      return undefined;
+    });
+    translateDuplicateKeyError.mockReturnValue({ field: 'wmkf_emailaddress', value: 'manual@example.org' });
+    const req = { method: 'POST', body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, contact: { email: 'manual@example.org' } } };
+    const res = mockRes();
+    await handler(req, res);
+    // The PD's explicit choice routes to merge — backfill must NOT run.
+    expect(findCandidateBySuggestion).toHaveBeenCalledTimes(1);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.contactError).toMatchObject({ code: 'email_conflict', value: 'manual@example.org' });
+    expect(suggestionAdapter.selectIfUnengaged).not.toHaveBeenCalled();
+  });
 });

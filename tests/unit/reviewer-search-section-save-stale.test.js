@@ -9,7 +9,6 @@ const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
 const REQ_A = 'aaaaaaaa-1111-1111-1111-111111111111';
 const REQ_B = 'bbbbbbbb-2222-2222-2222-222222222222';
 const candidate = (name, email) => ({
-  candidateKey: `person:${encodeURIComponent(email.toLowerCase())}`,
   name,
   email,
   emailSource: 'pubmed',
@@ -29,21 +28,6 @@ const candidate = (name, email) => ({
 });
 const CANDIDATE_A = candidate('Dr Candidate A', 'a@example.edu');
 const CANDIDATE_B = candidate('Dr Candidate B', 'b@example.edu');
-const EXCLUDED_CANDIDATE = candidate('Dr Excluded Candidate', 'excluded@example.edu');
-
-function currentServerPromotionPlan(candidateKey) {
-  return {
-    candidateKey,
-    cacheOutcome: 'hit',
-    currentStages: [
-      'applicant_anchor', 'identity', 'institution_domains', 'institution_coi',
-      'coauthor_coi', 'eligibility', 'contact', 'address_trust', 'roster_persistence',
-    ],
-    pendingStages: [],
-    refreshes: [],
-    promotionAuthority: 'requires_promotion_checks',
-  };
-}
 
 function deferred() {
   let resolve;
@@ -52,18 +36,7 @@ function deferred() {
 }
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  const active = Array.isArray(body?.active) ? body.active : [];
-  const authoritativeRoster = active.length > 0 && !body.warmValidation
-    ? {
-      ...body,
-      authorityState: 'current',
-      warmValidation: {
-        state: 'current',
-        candidatePlans: active.map(({ candidateKey }) => currentServerPromotionPlan(candidateKey)),
-      },
-    }
-    : body;
-  return { ok, status, json: async () => authoritativeRoster };
+  return { ok, status, json: async () => body };
 }
 
 afterEach(() => {
@@ -153,137 +126,6 @@ test('candidate results use the page scroll instead of a nested fixed-height scr
   const list = await screen.findByTestId('reviewer-candidate-list');
   expect(list).not.toHaveClass('max-h-[32rem]');
   expect(list).not.toHaveClass('overflow-y-auto');
-});
-
-test('a parent-owned display-only warm snapshot permits an explicit prepared search but blocks roster mutations', async () => {
-  global.fetch = jest.fn();
-  render(
-    <ReviewerSearchSection
-      requestId={REQ_A}
-      blobUrl="blob-a"
-      proposalKey="proposal-a"
-      displayOnly
-      applicantInputsReady
-      rosterSnapshot={{
-        requestId: REQ_A,
-        authorityState: 'current',
-        rosterVersion: 'v1',
-        data: {
-          active: [CANDIDATE_A],
-          excluded: [EXCLUDED_CANDIDATE],
-          ineligible: [],
-          blocked: [],
-          savedKeys: [],
-          allNames: [CANDIDATE_A.name, EXCLUDED_CANDIDATE.name],
-        },
-      }}
-    />,
-  );
-
-  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
-  expect(screen.queryByLabelText(`Select ${CANDIDATE_A.name}`)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /pubmed/i })).toBeEnabled();
-  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeEnabled();
-  expect(screen.queryByRole('button', { name: /exclude/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /promote back/i })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^add reviewer$/i })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /run reviewer search/i })).toBeEnabled();
-  expect(screen.getByRole('button', { name: /promote selected to invite/i })).toBeDisabled();
-  expect(global.fetch).not.toHaveBeenCalled();
-});
-
-test('a display-only snapshot keeps cold-search configuration locked until applicant inputs are ready', async () => {
-  global.fetch = jest.fn();
-  render(
-    <ReviewerSearchSection
-      requestId={REQ_A}
-      blobUrl="blob-a"
-      proposalKey="proposal-a"
-      displayOnly
-      applicantInputsReady={false}
-      rosterSnapshot={{
-        requestId: REQ_A,
-        authorityState: 'current',
-        rosterVersion: 'v1',
-        data: {
-          active: [CANDIDATE_A],
-          excluded: [],
-          ineligible: [],
-          blocked: [],
-          savedKeys: [],
-          allNames: [CANDIDATE_A.name],
-        },
-      }}
-    />,
-  );
-
-  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /pubmed/i })).toBeDisabled();
-  expect(screen.getByRole('slider', { name: /number of candidates to find/i })).toBeDisabled();
-  expect(screen.getByRole('button', { name: /load applicant suggestions first/i })).toBeDisabled();
-  expect(screen.queryByLabelText(`Select ${CANDIDATE_A.name}`)).not.toBeInTheDocument();
-  expect(global.fetch).not.toHaveBeenCalled();
-});
-
-test('a parent-owned request change clears old roster cards before its cached snapshot arrives', async () => {
-  const snapshotA = {
-    requestId: REQ_A,
-    authorityState: 'current',
-    rosterVersion: 'v-a',
-    data: { active: [CANDIDATE_A], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [CANDIDATE_A.name] },
-  };
-  const { rerender } = render(
-    <ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" displayOnly rosterSnapshot={snapshotA} />,
-  );
-  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
-
-  rerender(
-    <ReviewerSearchSection
-      requestId={REQ_B}
-      blobUrl="blob-b"
-      proposalKey="proposal-b"
-      displayOnly
-      rosterSnapshot={{ requestId: REQ_B, authorityState: 'refreshing', data: null }}
-    />,
-  );
-  await waitFor(() => expect(screen.queryByText(CANDIDATE_A.name)).not.toBeInTheDocument());
-
-  // A late parent snapshot for request A is ignored while request B is active.
-  rerender(
-    <ReviewerSearchSection requestId={REQ_B} blobUrl="blob-b" proposalKey="proposal-b" displayOnly rosterSnapshot={snapshotA} />,
-  );
-  await waitFor(() => expect(screen.queryByText(CANDIDATE_A.name)).not.toBeInTheDocument());
-});
-
-test('stopped or stale reconciliation exposes the display-only retry control', async () => {
-  const onRetryRoster = jest.fn();
-  const snapshot = {
-    requestId: REQ_A,
-    authorityState: 'cached',
-    reconciliationStopped: true,
-    error: 'Reviewer roster changed again while checking current status.',
-    data: { active: [CANDIDATE_A], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [CANDIDATE_A.name] },
-  };
-  const { rerender } = render(
-    <ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" displayOnly rosterSnapshot={snapshot} onRetryRoster={onRetryRoster} />,
-  );
-  expect(await screen.findByText(CANDIDATE_A.name)).toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent(snapshot.error);
-  fireEvent.click(screen.getByRole('button', { name: /retry reviewer status/i }));
-  expect(onRetryRoster).toHaveBeenCalledTimes(1);
-
-  rerender(
-    <ReviewerSearchSection
-      requestId={REQ_A}
-      blobUrl="blob-a"
-      proposalKey="proposal-a"
-      displayOnly
-      rosterSnapshot={{ ...snapshot, authorityState: 'stale', reconciliationStopped: false, error: 'Dataverse status is stale.' }}
-      onRetryRoster={onRetryRoster}
-    />,
-  );
-  expect(screen.getByRole('status')).toHaveTextContent('Dataverse status is stale.');
-  expect(screen.getByRole('button', { name: /retry reviewer status/i })).toBeEnabled();
 });
 
 test('promotion progress and completion stay in a live status beside the action', async () => {

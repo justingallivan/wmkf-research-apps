@@ -17,10 +17,5 @@
  */
 
 module.exports = [
-  {
-    file: 'tests/unit/reviewer-warm-validation-service.test.js',
-    match: 'cannot-verify-history',
-    reason:
-      'Deliberately fake rotated-secret fixture for legacy-attestation fail-closed tests; the 41-char human-readable sentence is not a real credential.',
-  },
+  // No current-tree exemptions. Every future entry must carry a reason.
 ];

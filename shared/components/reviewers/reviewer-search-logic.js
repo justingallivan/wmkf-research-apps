@@ -13,7 +13,6 @@ import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
 import {
-  canonicalStoredReviewerCandidateKey,
   reviewerCandidateKey as _reviewerCandidateKey,
   reviewerSuggestionCandidateKey,
   withReviewerCandidateKey as _withReviewerCandidateKey,
@@ -21,9 +20,6 @@ import {
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
-import { REQUIRED_STAGES } from '../../../lib/services/reviewer-promotion-authority';
-import { LEGACY_SELECTION_PROJECTION_VERSION, canonicalIso } from '../../../lib/services/reviewer-stage-freshness';
-import { hasCandidateStaffIdentityConfirmation } from '../../../lib/utils/reviewer-identity-authority';
 import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
@@ -55,50 +51,9 @@ export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
 // client imports keep working while server (roster-store) + client share ONE impl.
 export const sanitizeInstitutionCOIDetails = _sanitizeInstitutionCOIDetails;
 
-function canonicalServerPlanCandidateKey(value) {
-  return canonicalStoredReviewerCandidateKey(value);
-}
-
-export function hasCurrentServerPromotionPlan(candidate, plan) {
-  const candidateKey = canonicalServerPlanCandidateKey(candidate?.candidateKey);
-  if (!candidateKey || plan?.candidateKey !== candidateKey) return false;
-  if (plan.cacheOutcome !== 'hit' || plan.promotionAuthority !== 'requires_promotion_checks') return false;
-  if (!Array.isArray(plan.currentStages) || !Array.isArray(plan.pendingStages) || !Array.isArray(plan.refreshes)) return false;
-  if (plan.pendingStages.length > 0 || plan.refreshes.length > 0) return false;
-  const currentStages = new Set(plan.currentStages);
-  return REQUIRED_STAGES.every((stage) => currentStages.has(stage));
-}
-
-// A narrow visual/checkbox bridge for older stored rows. It is intentionally
-// not promotion authority: current stage evidence remains absent, and every
-// mutation route derives its own fresh server snapshot before it can select or
-// promote the candidate.
-export function hasLegacyServerSelectionPlan(candidate, plan) {
-  const candidateKey = canonicalServerPlanCandidateKey(candidate?.candidateKey);
-  const legacy = plan?.legacySelection;
-  return !!candidateKey
-    && plan?.candidateKey === candidateKey
-    && plan?.cacheOutcome !== 'hit'
-    && plan?.promotionAuthority === 'blocked_refresh_required'
-    && legacy?.version === LEGACY_SELECTION_PROJECTION_VERSION
-    && legacy?.state === 'selectable'
-    && canonicalIso(legacy?.evidenceCheckedAt);
-}
-
-// The compatibility marker describes only the signed selection evidence. It
-// must not imply that every stage is current: promotion re-runs its current
-// server-side contact and conflict preflight.
-export function legacySelectionNotice(candidate, plan) {
-  if (!hasLegacyServerSelectionPlan(candidate, plan)) return null;
-  return {
-    evidenceCheckedAt: plan.legacySelection.evidenceCheckedAt,
-    message: `Selection evidence current as of ${plan.legacySelection.evidenceCheckedAt}; current contact and conflict checks run automatically when promoted.`,
-  };
-}
-
-export function isCandidateSelectable(c, serverPromotionPlan = null) {
-  return (hasCurrentServerPromotionPlan(c, serverPromotionPlan)
-      || hasLegacyServerSelectionPlan(c, serverPromotionPlan))
+export function isCandidateSelectable(c) {
+  const eligibilityStatus = c?.eligibilityStatus || c?.contactEnrichment?.eligibilityStatus || 'unknown';
+  return eligibilityStatus !== 'deceased'
     && getCandidatePromotionDecision(c)?.decision === 'ready'
     && getCandidateEmailReadiness(c)?.action === 'ready'
     && !c?.hasInstitutionCOI;
@@ -131,7 +86,7 @@ export function getCandidatePromotionDecision(candidate) {
     'contact_linked_elsewhere',
     'identity_conflict',
   ]).has(dataverseReason);
-  if (!hasCandidateStaffIdentityConfirmation(candidate) && dataverseNeedsIdentityChoice) {
+  if (candidate?.pdIdentityConfirmed !== true && dataverseNeedsIdentityChoice) {
     return {
       decision: 'needs_identity_confirmation',
       reason: dataverseReason,
@@ -139,7 +94,7 @@ export function getCandidatePromotionDecision(candidate) {
     };
   }
   const shared = projectReviewerContact(candidate, {
-    staffConfirmed: hasCandidateStaffIdentityConfirmation(candidate),
+    staffConfirmed: candidate?.pdIdentityConfirmed === true,
   });
   if (!candidate?.isApplicantRecommended || !candidate?.applicantKnownReviewer) {
     return shared;
@@ -326,7 +281,6 @@ export function mergeEnrichment(candidates, enrichmentResults) {
         || null,
       contactEnrichment,
       eligibilityStatus: e.eligibilityStatus || enriched.eligibilityStatus || c.eligibilityStatus || 'unknown',
-      eligibilityCheckStatus: e.eligibilityCheckStatus || enriched.eligibilityCheckStatus || c.eligibilityCheckStatus || null,
       eligibilityReason: e.eligibilityReason || enriched.eligibilityReason || c.eligibilityReason || null,
       eligibilityEvidence: e.eligibilityEvidence || enriched.eligibilityEvidence || c.eligibilityEvidence || null,
       // Institution COI re-evaluated server-side against the post-enrichment
@@ -510,7 +464,7 @@ function exactAddressReceiptMatches(candidate) {
 
 function candidateAuthorityScore(candidate) {
   let score = 0;
-  if (hasCandidateStaffIdentityConfirmation(candidate)) score += 100;
+  if (candidate?.pdIdentityConfirmed === true && candidate?.pdIdentityConfirmationId) score += 100;
   if (exactAddressReceiptMatches(candidate)) score += 50;
   if (candidate?.serverIdentityDecisionReceipt?.source === 'automated_resolver') score += 20;
   const emailSource = candidate?.emailSource || candidate?.contactEnrichment?.emailSource;
@@ -618,7 +572,7 @@ export function hasValidApplicantEnrichmentCache(
   // complete batch.
   return Array.from(canonicalRowsByKey.values()).every((c) => (
     c?.eligibilityStatus === 'deceased'
-      || hasCandidateStaffIdentityConfirmation(c)
+      || c?.pdIdentityConfirmed === true
       || c?.identityStatus === 'confirmed'
       || c?.identityStatus === 'probable'
       || c?.identityStatus === 'unresolved'
@@ -788,10 +742,6 @@ function pruneStaffIdentityConfirmation(confirmation) {
   return {
     confirmationId,
     source: 'staff_confirmed',
-    state: boundedText(confirmation.state, 40),
-    canonicalPersonId: boundedText(confirmation.canonicalPersonId, 80),
-    canonicalPersonEtag: boundedText(confirmation.canonicalPersonEtag, 240),
-    actorId: boundedText(confirmation.actorId, 120),
     normalizedName: boundedText(confirmation.normalizedName, 300),
     email: boundedText(confirmation.email, 320),
     website: boundedText(confirmation.website, 500),
@@ -884,9 +834,6 @@ export function pruneCandidateForRoster(c) {
       // roster reload. Bounded + stripped of raw payloads; persistable stays false.
       contactLeads: pruneContactLeads(e.contactLeads),
       eligibilityStatus: e.eligibilityStatus || c.eligibilityStatus || 'unknown',
-      eligibilityCheckStatus: ['complete', 'not_applicable', 'pending', 'incomplete', 'error'].includes(
-        e.eligibilityCheckStatus || c.eligibilityCheckStatus,
-      ) ? (e.eligibilityCheckStatus || c.eligibilityCheckStatus) : null,
       eligibilityReason: e.eligibilityReason || c.eligibilityReason || null,
       eligibilityEvidence: pruneEligibilityEvidence(e.eligibilityEvidence || c.eligibilityEvidence),
       dataverseContactEvidence: pruneDataverseContactEvidence(e.dataverseContactEvidence),
@@ -903,9 +850,6 @@ export function pruneCandidateForRoster(c) {
     // (the gate would only hold for the live run). Persist all three the group test reads.
     identityStatus: c.identityStatus || e.identity?.status || null,
     eligibilityStatus: c.eligibilityStatus || e.eligibilityStatus || 'unknown',
-    eligibilityCheckStatus: ['complete', 'not_applicable', 'pending', 'incomplete', 'error'].includes(
-      c.eligibilityCheckStatus || e.eligibilityCheckStatus,
-    ) ? (c.eligibilityCheckStatus || e.eligibilityCheckStatus) : null,
     eligibilityReason: c.eligibilityReason || e.eligibilityReason || null,
     eligibilityEvidence: pruneEligibilityEvidence(c.eligibilityEvidence || e.eligibilityEvidence),
     needsIdentification: !!c.needsIdentification,
@@ -937,9 +881,7 @@ export function pruneCandidateForRoster(c) {
     institutionCOIDetails: sanitizeInstitutionCOIDetails(c.institutionCOIDetails),
     hasCoauthorCOI: !!c.hasCoauthorCOI,
     coauthorships: Array.isArray(c.coauthorships) ? c.coauthorships : [],
-    coauthorCheckStatus: c.coauthorCheckStatus === 'complete'
-      || c.coauthorCheckStatus === 'incomplete'
-      || c.coauthorCheckStatus === 'not_applicable'
+    coauthorCheckStatus: c.coauthorCheckStatus === 'complete' || c.coauthorCheckStatus === 'incomplete'
       ? c.coauthorCheckStatus
       : null,
     coauthorCheckFailures: pruneCoauthorCheckFailures(c.coauthorCheckFailures),

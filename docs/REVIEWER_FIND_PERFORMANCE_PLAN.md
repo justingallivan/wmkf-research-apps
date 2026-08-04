@@ -1,9 +1,9 @@
 ---
 title: Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 domain: reviewer-workbench
-kind: plan
-status: active
-summary: "Implementation plan for instant cached Reviewer Find revisits, narrow authoritative revalidation, and explicit cold-search behavior."
+kind: history
+status: superseded
+summary: "Historical: superseded warm-revisit plan; implementation reverted to the pre-rollout baseline. Problem statement remains valid input for future work."
 canonical: false
 cataloged: 2026-08-02
 owner: product-engineering

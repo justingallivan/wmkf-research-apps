@@ -96,33 +96,6 @@ describe('reviewer eligibility evidence', () => {
       .toBe('"Roald Hoffmann" (site:cornell.edu OR site:chem.cornell.edu) ("passed away" OR died OR obituary OR "in memoriam" OR emeritus OR retired)');
   });
 
-  test('leaves eligibility incomplete when the candidate identity is unresolved', async () => {
-    const result = {
-      name: 'Unresolved Person',
-      contactEnrichment: {
-        identity: { status: 'unresolved' },
-        anchoredInstitutionDomains: ['university.edu'],
-      },
-    };
-    const searchOrganicResults = jest.fn();
-
-    await attachEligibilityEvidence(result, result, {
-      useSerpSearch: true,
-      credentials: { serpApiKey: 'test-key' },
-      searchOrganicResults,
-    });
-
-    expect(result).toMatchObject({
-      eligibilityStatus: 'unknown',
-      eligibilityCheckStatus: 'incomplete',
-      contactEnrichment: {
-        eligibilityStatus: 'unknown',
-        eligibilityCheckStatus: 'incomplete',
-      },
-    });
-    expect(searchOrganicResults).not.toHaveBeenCalled();
-  });
-
   test('requires a candidate-anchored first-party page before hard deceased classification', async () => {
     const result = {
       name: 'Patricia Thiel',

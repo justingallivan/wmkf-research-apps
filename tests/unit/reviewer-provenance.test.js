@@ -16,15 +16,6 @@ const {
 // the two can never drift apart silently again (S387).
 const { isCandidateSelectable } = require('../../shared/components/reviewers/reviewer-search-logic');
 
-const currentServerPromotionPlan = (candidateKey) => ({
-  candidateKey,
-  cacheOutcome: 'hit',
-  currentStages: ['applicant_anchor', 'identity', 'institution_domains', 'institution_coi', 'coauthor_coi', 'eligibility', 'contact', 'address_trust', 'roster_persistence'],
-  pendingStages: [],
-  refreshes: [],
-  promotionAuthority: 'requires_promotion_checks',
-});
-
 describe('reviewer provenance DTO helper', () => {
   test('maps literature candidates to ordered scholarly sources plus provenance kind for save', () => {
     const candidate = {
@@ -193,7 +184,6 @@ describe('referred provenance (S249)', () => {
 describe('applicant identity gate parity with promote-applicant-reviewer', () => {
   const applicant = (extra) => ({
     name: 'Applicant Pick',
-    candidateKey: 'suggestion:applicant-pick',
     email: 'applicant.pick@example.edu',
     emailSource: 'applicant_form',
     emailPersistAllowed: true,
@@ -228,44 +218,20 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
     expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
   });
 
-  test('a legacy marker without canonical person/version/actor evidence stays in identity review', () => {
-    const candidate = applicant({
-      institutionMismatch: true,
-      pdIdentityConfirmed: true,
-      pdIdentityConfirmationId: 'legacy-confirm-1',
-      staffIdentityConfirmation: {
-        confirmationId: 'legacy-confirm-1', source: 'staff_confirmed',
-      },
-    });
-    expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
-    expect(provenanceGroupOf(candidate)).toBe('needs_identity_review');
-    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(false);
-  });
-
   test('a resolved applicant row stays selectable in its own group', () => {
     for (const identityStatus of ['confirmed', 'probable']) {
       const candidate = applicant({ identityStatus });
       expect(requiresStaffIdentityConfirmation(candidate)).toBe(false);
       expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
-      expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
+      expect(isCandidateSelectable(candidate)).toBe(true);
     }
   });
 
   test('a staff-confirmed applicant row becomes selectable again', () => {
-    const candidate = applicant({
-      institutionMismatch: true,
-      pdIdentityConfirmed: true,
-      pdIdentityConfirmationId: 'confirm-1',
-      staffIdentityConfirmation: {
-        confirmationId: 'confirm-1', source: 'staff_confirmed', state: 'confirmed',
-        canonicalPersonId: '22222222-2222-4222-8222-222222222222',
-        canonicalPersonEtag: 'W/"person-v1"', actorId: 'system-1',
-        confirmedAt: '2026-08-02T00:00:00.000Z',
-      },
-    });
+    const candidate = applicant({ institutionMismatch: true, pdIdentityConfirmed: true });
     expect(requiresStaffIdentityConfirmation(candidate)).toBe(true);
     expect(provenanceGroupOf(candidate)).toBe('applicant_suggested');
-    expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey))).toBe(true);
+    expect(isCandidateSelectable(candidate)).toBe(true);
   });
 
   // The defect was a selectable card the server refuses. Assert the equivalence over the
@@ -282,8 +248,7 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
             });
             const serverWouldRefuse = requiresStaffIdentityConfirmation(candidate);
             const contactIdentityResolved = identityStatus === 'confirmed' || identityStatus === 'probable';
-            expect(isCandidateSelectable(candidate, currentServerPromotionPlan(candidate.candidateKey)))
-              .toBe(!serverWouldRefuse && contactIdentityResolved);
+            expect(isCandidateSelectable(candidate)).toBe(!serverWouldRefuse && contactIdentityResolved);
           }
         }
       }
