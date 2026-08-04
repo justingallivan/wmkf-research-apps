@@ -100,6 +100,52 @@ test('offers address trust only to the private reconciler, which reports staff a
   }));
 });
 
+test('runs the earliest pending deterministic address-trust stage before roster persistence', async () => {
+  planReviewerCandidateRefresh
+    .mockResolvedValueOnce(planned({
+      pendingStages: ['address_trust', 'roster_persistence'],
+      refreshes: [
+        { stage: 'address_trust', action: 'dedicated_address_action' },
+        { stage: 'roster_persistence', action: 'finalize_cached_evidence' },
+      ],
+    }))
+    .mockResolvedValueOnce(planned({ cacheOutcome: 'hit', pendingStages: [], refreshes: [] }));
+  refreshReviewerCandidateStage.mockResolvedValueOnce({
+    outcome: 'recorded', stage: 'address_trust', rosterVersion: UPDATED_AT,
+  });
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
+
+  expect(result).toMatchObject({ outcome: 'current', counts: { current: 1 } });
+  expect(refreshReviewerCandidateStage).toHaveBeenCalledTimes(1);
+  expect(refreshReviewerCandidateStage).toHaveBeenCalledWith(expect.objectContaining({
+    stage: 'address_trust',
+  }));
+});
+
+test('does not skip an earlier manual prerequisite to finalize a later stage', async () => {
+  planReviewerCandidateRefresh.mockResolvedValueOnce(planned({
+    pendingStages: ['contact', 'roster_persistence'],
+    refreshes: [
+      { stage: 'contact', action: 'operator_repair_required' },
+      { stage: 'roster_persistence', action: 'finalize_cached_evidence' },
+    ],
+  }));
+
+  const result = await reconcileReviewerStages({ requestId: REQUEST_ID, candidateKeys: [CANDIDATE_KEY] });
+
+  expect(result).toMatchObject({
+    outcome: 'action_required',
+    counts: { action_required: 1 },
+    candidates: [expect.objectContaining({
+      outcome: 'action_required',
+      code: 'operator_repair_required',
+      stage: 'contact',
+    })],
+  });
+  expect(refreshReviewerCandidateStage).not.toHaveBeenCalled();
+});
+
 test('keeps a request-scoped applicant person-link repair out of stage refresh and reports explicit staff action', async () => {
   planReviewerCandidateRefresh.mockResolvedValueOnce({
     outcome: 'action_required',
