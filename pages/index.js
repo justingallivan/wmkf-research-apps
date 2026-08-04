@@ -5,6 +5,7 @@ import { useSession, signOut } from 'next-auth/react';
 import ProfileSelector from '../shared/components/ProfileSelector';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
 import { useAppAccess } from '../shared/context/AppAccessContext';
+import { getAuthEnabled } from '../shared/utils/auth-enabled';
 
 export default function LandingPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -13,12 +14,10 @@ export default function LandingPage() {
   const { data: session } = useSession();
   const { hasAccess } = useAppAccess();
 
-  // Check if auth is enabled
+  // Check if auth is enabled — shared, deduped lookup (one /api/auth/status
+  // per page load across RequireAuth + Layout + this page, S398).
   useEffect(() => {
-    fetch('/api/auth/status')
-      .then(res => res.json())
-      .then(data => setAuthEnabled(data.enabled))
-      .catch(() => setAuthEnabled(false));
+    getAuthEnabled().then(setAuthEnabled);
   }, []);
 
   // Map registry entries to the format AppCard expects, filtered by access
