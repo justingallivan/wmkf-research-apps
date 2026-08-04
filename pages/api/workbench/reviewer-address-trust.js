@@ -46,6 +46,11 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
+  // model-override-warming:ignore reason=projection-only — this route calls only
+  // verifyPersonAndAddress / getAddressConflict / retryAddressCheck /
+  // createAddressRepairRequest, which reach projectColdReviewerContactEvidence
+  // (cached projection) and produceAddressTrustEvidence; the model-resolving
+  // sibling export produceReviewerContactEvidence is never invoked.
   const requestId = typeof req.body?.requestId === 'string' ? req.body.requestId.trim() : '';
   const candidateKey = typeof req.body?.candidateKey === 'string' ? req.body.candidateKey.trim() : '';
   const suggestionId = typeof req.body?.suggestionId === 'string' ? req.body.suggestionId.trim() : '';

@@ -14,6 +14,7 @@ import {
   EXECUTABLE_REVIEWER_REFRESH_STAGES,
   refreshReviewerCandidateStage,
 } from '../../../lib/services/workbench/reviewer-stage-refresh-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { canonicalStoredReviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -146,6 +147,10 @@ export default async function handler(req, res) {
   if (!parsed.valid) {
     return res.status(400).json(errorResponse(parsed));
   }
+
+  // A client-selected 'identity' stage refresh resolves an LLM model via
+  // ClaudeReviewerService.
+  await loadModelOverrides();
 
   try {
     return await withDalContext('workbench-reviewer-stage-refresh', async () => {

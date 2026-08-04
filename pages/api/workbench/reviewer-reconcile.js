@@ -14,6 +14,7 @@ import {
   MAX_REQUEST_CANDIDATES,
   reconcileReviewerStages,
 } from '../../../lib/services/workbench/reviewer-stage-reconciliation-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEST_FIELDS = new Set(['requestId', 'candidateKeys']);
@@ -115,6 +116,10 @@ export default async function handler(req, res) {
   if (!access) return;
   const parsed = parseRequest(req.body);
   if (!parsed.valid) return res.status(400).json({ success: false, outcome: 'rejected', error: parsed.error });
+
+  // Reconciliation can execute an identity-stage refresh, which resolves an
+  // LLM model via ClaudeReviewerService.
+  await loadModelOverrides();
 
   return withDalContext('workbench-reviewer-reconcile', async () => {
     try {

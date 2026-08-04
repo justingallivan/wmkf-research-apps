@@ -21,6 +21,7 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { saveCandidates } from '../../../lib/services/reviewer-finder/save-candidates-service';
+import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 
 // A promotion preflight can spend its bounded reconciliation window before
 // the normal Dataverse writes. Keep the route below the same Fluid Compute cap
@@ -34,6 +35,10 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
+
+  // Promotion preflight can reach an identity-stage refresh, which resolves an
+  // LLM model via ClaudeReviewerService.
+  await loadModelOverrides();
 
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
 

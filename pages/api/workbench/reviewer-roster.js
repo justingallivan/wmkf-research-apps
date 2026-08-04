@@ -114,6 +114,10 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
+  // model-override-warming:ignore reason=confirm-identity-model-free — the only
+  // import with a path to a model resolver is confirmStructuredRosterIdentity,
+  // which stays on projection/persistence helpers and never reaches
+  // produceReviewerContactEvidence or ClaudeReviewerService.
   const observation = observationFromRequest(req);
 
   // A valid header only creates a bounded correlation scope for the two warm
