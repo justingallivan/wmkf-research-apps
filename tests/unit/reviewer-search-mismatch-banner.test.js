@@ -71,13 +71,20 @@ test('applicant-referred mismatch banner attributes the applicant and never fabr
   const attribution = await screen.findByText(/The applicant listed/);
   expect(attribution).toBeInTheDocument();
   expect(screen.queryByText(/a different institution/)).not.toBeInTheDocument();
-  expect(screen.getByText(/could not be reconciled with it — see the identity note/)).toBeInTheDocument();
+  // Points at the "Why" note the card actually renders (from `reasoning`),
+  // not the separate optional identityNote field (Codex S400 review, LOW).
+  expect(screen.getByText(/could not be reconciled with it — see the “Why” note/)).toBeInTheDocument();
 });
 
-test('non-applicant mismatch with a present affiliation keeps Claude attribution and names the PubMed institution', async () => {
+test('non-applicant mismatch with a present affiliation keeps Claude attribution and names the evidence institution neutrally', async () => {
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
   await screen.findByText('Dr Search Result');
 
   expect(await screen.findByText(/Claude suggested/)).toBeInTheDocument();
+  // Source-neutral phrasing: the displayed affiliation may be ORCID/OpenAlex-
+  // sourced, so the banner must not attribute it to PubMed (Codex S400
+  // review, MEDIUM).
+  expect(screen.getByText(/linked evidence shows/)).toBeInTheDocument();
+  expect(screen.queryByText(/PubMed shows/)).not.toBeInTheDocument();
   expect(screen.getByText('Northwestern University Feinberg School of Medicine')).toBeInTheDocument();
 });

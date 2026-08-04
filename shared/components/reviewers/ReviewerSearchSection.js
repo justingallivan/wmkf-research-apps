@@ -419,8 +419,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <span className="font-medium">⚠️ Institution mismatch:</span>{' '}
               {c.isApplicantRecommended ? 'The applicant listed' : 'Claude suggested'} <strong>{c.suggestedInstitution}</strong>,{' '}
               {c.affiliation
-                ? <>but PubMed shows <strong>{c.affiliation.split(',')[0]}</strong>.</>
-                : <>but the matched publications could not be reconciled with it — see the identity note on this card.</>}
+                ? <>but linked evidence shows <strong>{c.affiliation.split(',')[0]}</strong>.</>
+                : <>but the matched publications could not be reconciled with it — see the “Why” note on this card.</>}
             </div>
           )}
           {hasExpertiseMismatch && Array.isArray(c.expertiseAreas) && c.expertiseAreas.length > 0 && (
