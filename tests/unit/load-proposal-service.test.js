@@ -7,6 +7,15 @@
  * current-cycle Phase I fallback, explicit historical override, bucket
  * dedupe, per-bucket listing failure tolerance, and each LoadProposalError
  * with its pinned httpStatus/body.
+ *
+ * Also covers the Step 1 proposal-blob-cache addition (S397,
+ * outputs/reviewer-find-warm-revisit-step0-findings.md "Step 1 — APPROVED"):
+ * deterministic cache path, head()-hit short-circuit, head()-miss/head()-error
+ * fall-through to download+put, and cache-key sensitivity to lastModified/
+ * size/fileKey-override. `file()` fixture fields (name/size/mimeType/
+ * lastModified/folder) mirror the exact shape GraphService.listFiles returns
+ * per-item (lib/services/graph-service.js:351-359: name, size,
+ * lastModified: item.lastModifiedDateTime, mimeType, webUrl, id, folder).
  */
 
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
@@ -26,7 +35,13 @@ jest.mock('../../lib/utils/sharepoint-buckets', () => ({
   getRequestSharePointBuckets: jest.fn(),
 }));
 const put = jest.fn();
-jest.mock('@vercel/blob', () => ({ put: (...a) => put(...a) }));
+const head = jest.fn();
+class BlobNotFoundError extends Error {}
+jest.mock('@vercel/blob', () => ({
+  put: (...a) => put(...a),
+  head: (...a) => head(...a),
+  BlobNotFoundError,
+}));
 // classifyFile now lives in its canonical service home (Stage 5 batch 2 —
 // plumbing-only mock retarget; the mocked classifier behavior is unchanged).
 jest.mock('../../lib/services/grant-reporting/classify-file', () => ({
@@ -60,7 +75,13 @@ beforeEach(() => {
     buffer: Buffer.from('x'), filename: 'picked.pdf', mimeType: 'application/pdf', size: 10,
   });
   put.mockResolvedValue({ url: 'https://blob.example/x.pdf' });
+  // Default: cache miss on every test unless a test overrides it, so the
+  // pre-existing golden-path/error-path assertions below (all written
+  // against the download+put behavior) are unaffected by the cache addition.
+  head.mockRejectedValue(new BlobNotFoundError('not found'));
 });
+
+const CACHE_PATH_RE = /^reviewer-finder\/1002836\/[0-9a-f]{16}\/[^/]+$/;
 
 test('404 LoadProposalError with default { error } body when the request is missing its number', async () => {
   grantRequestAdapter.getById.mockResolvedValue(null);
@@ -167,7 +188,7 @@ test('duplicate library::folder::name entries across buckets are deduped in allF
   expect(out.allFiles).toHaveLength(1);
 });
 
-test('golden path returns the exact payload and uploads with random suffix under reviewer-finder/<num>/', async () => {
+test('golden path (cache miss) downloads, uploads at the deterministic hashed path with no random suffix, and allows overwrite', async () => {
   listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   const out = await loadProposal({ requestId: REQ });
   expect(out).toEqual({
@@ -184,11 +205,84 @@ test('golden path returns the exact payload and uploads with random suffix under
       source: 'dynamics',
     })],
   });
+  expect(head).toHaveBeenCalledWith(expect.stringMatching(CACHE_PATH_RE));
   expect(put).toHaveBeenCalledWith(
-    'reviewer-finder/1002836/Proposal_1002836.pdf',
+    expect.stringMatching(CACHE_PATH_RE),
     expect.any(Buffer),
-    { access: 'public', contentType: 'application/pdf', addRandomSuffix: true },
+    {
+      access: 'public',
+      contentType: 'application/pdf',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    },
   );
+  // put must land at the exact path head() was checked against.
+  expect(put.mock.calls[0][0]).toBe(head.mock.calls[0][0]);
+});
+
+test('cache hit: returns the existing blob contract-identical, with no download or put', async () => {
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  head.mockResolvedValue({
+    url: 'https://blob.example/cached.pdf',
+    contentType: 'application/pdf',
+    size: 12345,
+    pathname: 'reviewer-finder/1002836/deadbeefdeadbeef/Proposal_1002836.pdf',
+  });
+  const out = await loadProposal({ requestId: REQ });
+  expect(out).toEqual({
+    success: true,
+    blobUrl: 'https://blob.example/cached.pdf',
+    filename: 'Proposal_1002836.pdf',
+    contentType: 'application/pdf',
+    size: 12345,
+    picked: 'akoya_request::F/Reviewer Materials::Proposal_1002836.pdf',
+    requestNumber: '1002836',
+    allFiles: [expect.objectContaining({
+      name: 'Proposal_1002836.pdf',
+      classification: 'proposal',
+      source: 'dynamics',
+    })],
+  });
+  expect(downloadFileByPath).not.toHaveBeenCalled();
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('a changed lastModified/size hashes to a different cache path (invalidates naturally)', async () => {
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  await loadProposal({ requestId: REQ });
+  const originalPath = head.mock.calls[0][0];
+
+  head.mockClear();
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf', { lastModified: '2026-02-01', size: 999 })]);
+  await loadProposal({ requestId: REQ });
+  const changedPath = head.mock.calls[0][0];
+
+  expect(changedPath).not.toBe(originalPath);
+});
+
+test('an explicit fileKey override picks its own file identity and therefore its own cache key', async () => {
+  listFiles.mockResolvedValue([
+    file('Proposal_1002836.pdf'),
+    file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+  ]);
+  await loadProposal({ requestId: REQ });
+  const canonicalPath = head.mock.calls[0][0];
+
+  head.mockClear();
+  const key = 'akoya_request::F/Phase I::ProjectDescription.pdf';
+  await loadProposal({ requestId: REQ, fileKey: key });
+  const overridePath = head.mock.calls[0][0];
+
+  expect(overridePath).not.toBe(canonicalPath);
+});
+
+test('head() throwing a non-not-found error still falls through to download (fail open)', async () => {
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  head.mockRejectedValue(new Error('transient network error'));
+  const out = await loadProposal({ requestId: REQ });
+  expect(downloadFileByPath).toHaveBeenCalled();
+  expect(put).toHaveBeenCalled();
+  expect(out.blobUrl).toBe('https://blob.example/x.pdf');
 });
 
 test('explicit fileKey override still permits deliberate historical analysis', async () => {

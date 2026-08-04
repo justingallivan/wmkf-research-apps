@@ -36,7 +36,12 @@ jest.mock('../../lib/utils/sharepoint-buckets', () => ({
 }));
 
 const put = jest.fn();
-jest.mock('@vercel/blob', () => ({ put: (...a) => put(...a) }));
+const head = jest.fn();
+jest.mock('@vercel/blob', () => ({
+  put: (...a) => put(...a),
+  head: (...a) => head(...a),
+  BlobNotFoundError: class BlobNotFoundError extends Error {},
+}));
 
 import handler from '../../pages/api/reviewer-finder/load-proposal';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -60,6 +65,10 @@ function post(body) {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ session: { user: {} } });
+  // Default: cache miss, so pre-existing tests (all written against the
+  // download+put path) are unaffected by the Step 1 blob-cache addition in
+  // lib/services/reviewer-finder/load-proposal-service.js.
+  head.mockRejectedValue(new Error('not found'));
 });
 
 test('rejects non-POST (405)', async () => {
