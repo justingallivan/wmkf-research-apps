@@ -105,7 +105,7 @@
     "@vercel/postgres": "^0.10.0",
     "balanced-match": "^1.0.2",
     "brace-expansion": "file:vendor/brace-expansion-compat",
-    "brace-expansion-upstream": "npm:brace-expansion@5.0.8",
+    "brace-expansion-upstream": "npm:brace-expansion@5.0.9",
     "busboy": "^1.6.0",
     "cors": "^2.8.6",
     "csv-parse": "^6.2.1",
