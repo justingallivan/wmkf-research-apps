@@ -119,7 +119,7 @@ stabilization findings.
 |------|---------|
 | `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` §"S399 addendum" | The four findings + first probe |
 | `lib/services/institution-affiliation-consistency.js` | Checker to probe locally (step 1) |
-| `lib/services/workbench/enrich-recommended-service.js:607-660,899-949` | Verdict derivation + withheld-fields DTO |
+| `lib/services/workbench/enrich-recommended-service.js:607-660,899-949` | Verdict derivation + withheld-fields DTO (line refs are pre-instrumentation; shifted up to ~62 lines while the S400 `TEMP S400` verdict trace is in — see directive addendum marker) |
 | `shared/components/reviewers/ReviewerSearchSection.js:419,1313-1386` | Mismatch banner, enrichRecommended, cache restore |
 | `lib/services/workbench/applicant-reviewers-service.js` | Increment D parallel slot ingestion (shipped) |
 | `lib/dataverse/adapters/reviewer-suggestion.js:647+` | `ensureApplicantRecommended` no-op skip (shipped) |
