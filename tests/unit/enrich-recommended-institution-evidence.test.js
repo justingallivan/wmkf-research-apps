@@ -12,10 +12,14 @@
  * resolver is stubbed (returns null = abstain), mirroring the captured
  * production behavior where every decorated byline resolution abstained.
  *
- * Spec pinned by the capture: the four same-institution byline pairs must
- * compare CONSISTENT after the byline-core fallback; the genuine
- * cross-institution pair (Northwestern byline vs listed Texas A&M) must stay
- * CONTRADICTED. The identity-confirmation gate is untouched by this seam.
+ * Current pinned behavior: ALL byline-vs-clean pairs compare CONTRADICTED —
+ * including the four same-institution pairs (the known false-mismatch class).
+ * A core-extraction fallback that flipped those four was REVERTED after the
+ * S400 Codex review: the borrowed aggregation-key extractor collapsed
+ * comma-qualified sibling institutions into false CONSISTENTs, a write-gate
+ * hazard. ACCEPTANCE SPEC for the future conservative extractor: the four
+ * same-institution pairs flip to true; the Northwestern-vs-Texas-A&M pair and
+ * every sibling attack below stay false.
  */
 
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
@@ -112,13 +116,17 @@ const CAPTURED = {
 };
 
 describe('institutionEvidenceConnectsIdentity — S400 captured operands', () => {
+  // CURRENT behavior: these four same-institution pairs compare false (the
+  // S400-attributed false-mismatch class). When the conservative segment-whole
+  // extractor lands, flip these expectations to true — that flip IS the
+  // acceptance test for the fix.
   test.each([
     ['UCSD', CAPTURED.ucsd],
     ['Columbia', CAPTURED.columbia],
     ['NC State', CAPTURED.ncstate],
     ['VUMC', CAPTURED.vumc],
-  ])('%s byline vs its listed institution is CONSISTENT via core fallback', async (_label, pair) => {
-    await expect(compare(pair.evidence, pair.listed)).resolves.toBe(true);
+  ])('%s byline vs its listed institution currently compares CONTRADICTED (known false-mismatch class)', async (_label, pair) => {
+    await expect(compare(pair.evidence, pair.listed)).resolves.toBe(false);
   });
 
   test('Northwestern byline vs listed Texas A&M stays CONTRADICTED', async () => {
@@ -138,14 +146,21 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
     await expect(compare(CAPTURED.columbia.evidence, null)).resolves.toBe(null);
   });
 
-  // Author adversarial pass (S400): the core fallback must not manufacture a
-  // false CONSISTENT for sibling institutions with highly similar names — the
-  // direct matcher's >0.9 similarity fallback runs before OpenAlex resolution.
+  // Sibling-institution attacks (S400 author pass + Codex review): any future
+  // same-institution widening at this seam must keep ALL of these false. The
+  // Codex-review set puts comma-delimited campus qualifiers on BOTH sides —
+  // the shape that collapsed the reverted aggregation-key extractor. (Note:
+  // the >0.9 string-similarity fallback lives in legacy institutionsMatch,
+  // NOT in institutionDirectMatch, which has no similarity calculation.)
   test.each([
     ['UCSD byline vs listed UCSF', CAPTURED.ucsd.evidence, 'University of California, San Francisco'],
     ['UCSF byline vs listed UCSD', 'Department of Medicine, University of California San Francisco, San Francisco, CA, USA.', 'University of California San Diego'],
     ['NC State byline vs NC Central', 'Department of Chemistry, North Carolina State University, Raleigh, NC, USA.', 'North Carolina Central University'],
     ['West Texas A&M byline vs Texas A&M', 'Department of X, West Texas A&M University, Canyon, TX, USA.', 'Texas A&M University'],
+    ['UC San Diego vs UC San Francisco (both comma-qualified)', 'University of California, San Diego', 'University of California, San Francisco'],
+    ['UT Austin vs UT Dallas (both comma-qualified)', 'University of Texas, Austin', 'University of Texas, Dallas'],
+    ['UW Madison vs UW Milwaukee (both comma-qualified)', 'University of Wisconsin, Madison', 'University of Wisconsin, Milwaukee'],
+    ['MGH campuses sharing a >50-char decorated prefix', 'Massachusetts General Hospital Department of Extended Translational Research Programs, Main Campus', 'Massachusetts General Hospital Department of Extended Translational Research Programs, West Campus'],
   ])('sibling institutions stay contradicted: %s', async (_label, evidence, listed) => {
     await expect(compare(evidence, listed, [listed])).resolves.toBe(false);
   });
