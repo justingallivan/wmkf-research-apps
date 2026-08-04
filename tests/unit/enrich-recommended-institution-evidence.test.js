@@ -138,6 +138,18 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
     await expect(compare(CAPTURED.columbia.evidence, null)).resolves.toBe(null);
   });
 
+  // Author adversarial pass (S400): the core fallback must not manufacture a
+  // false CONSISTENT for sibling institutions with highly similar names — the
+  // direct matcher's >0.9 similarity fallback runs before OpenAlex resolution.
+  test.each([
+    ['UCSD byline vs listed UCSF', CAPTURED.ucsd.evidence, 'University of California, San Francisco'],
+    ['UCSF byline vs listed UCSD', 'Department of Medicine, University of California San Francisco, San Francisco, CA, USA.', 'University of California San Diego'],
+    ['NC State byline vs NC Central', 'Department of Chemistry, North Carolina State University, Raleigh, NC, USA.', 'North Carolina Central University'],
+    ['West Texas A&M byline vs Texas A&M', 'Department of X, West Texas A&M University, Canyon, TX, USA.', 'Texas A&M University'],
+  ])('sibling institutions stay contradicted: %s', async (_label, evidence, listed) => {
+    await expect(compare(evidence, listed, [listed])).resolves.toBe(false);
+  });
+
   test('verdict reason: a decided contradiction names BOTH compared institutions', () => {
     const reason = institutionVerdictReason({
       contradictionSource: 'compared',
