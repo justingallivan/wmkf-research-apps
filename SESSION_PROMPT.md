@@ -38,12 +38,42 @@ without an owner pick from the increment options.
    contract for Connor reconciliation; repo-side Phases A/B buildable without
    the form. Queued under dependency-bound work.
 
+### Increment C — SHIPPED + PRODUCTION-VERIFIED (2026-08-04, same day)
+Owner picked C; built on branch `fix/require-auth-render-race` (deleted
+post-merge), main ff `912ab995 → 27aba5be`.
+- **Change**: RequireAuth keeps children mounted through session resolution
+  (the 'loading' spinner branch unmounted ProfileProvider+AppAccessProvider
+  mid-flight, discarding the in-flight app-access fetch); new
+  `shared/utils/auth-enabled.js` dedupes `/api/auth/status` across
+  RequireAuth + Layout + pages/index.js (in-flight promise memo, same
+  `window.__AUTH_ENABLED__` key).
+- **Review chain**: author adversarial pass → Codex adversarial
+  (needs-attention → 1 medium CONFIRMED: non-2xx JSON cached as persistent
+  "auth disabled", a regression vs the self-healing old inline code — fixed
+  in `27aba5be` with 503-then-success + invalid-shape regression tests).
+- **Verified**: owner Preview smoke on the branch alias (single status +
+  app-access in waterfall, no auth flash, sign-in gates); production
+  re-measurement post-promotion — gate went from 2–3 sequential rounds to
+  ONE app-access round-trip fired at t≈130ms; the stacked-slow-app-access
+  blowout mode (3.9s gate, pre-C load 3) is structurally eliminated. 6,790
+  tests green. **Cleanup pending**: the temporary Entra preview callback
+  (`…-git-fix-requi-f5589c-….vercel.app/api/auth/callback/azure-ad`) still
+  needs owner-run removal — restore command handed to owner 2026-08-04;
+  verify via `az ad app show` returning exactly four URIs before marking
+  this done.
+- **Known remaining (out of scope, attributed)**: `user-profiles` +
+  `user-preferences` still fetch twice — the second `session` response
+  landing with the real profileId re-fires ProfileProvider's init effect
+  (dependency `session?.user?.profileId`). Candidate for a future increment.
+
 ### Owner decision pending — next latency increment (pick ONE, tier-gated)
-- **C. Auth-waterfall fix** (RequireAuth render race + auth/status dedupe):
-  ~0.5–1.0s on every page. Recommended first; S395-adjacent, keep single-change.
 - **D. applicant-reviewers slot loop** (parallelize + skip no-op PATCH):
   ~1–2s on N=5 warm revisits. **D0** cheap precursor: attribute the ~2.9s
   N=0 fixed floor before sizing D.
+- **E (new, from post-C data): ProfileProvider double-fetch** — see
+  "Known remaining" above; tail cost [ASSUMED ~0.5–1s from the second
+  user-profiles+user-preferences pair in the post-C waterfalls; not a
+  gate-path measurement].
 - **B. exclusion-parse cache**: helps only the ~8% substantive requests; also
   largely obsoleted for new data if the structured-intake plan ships.
 

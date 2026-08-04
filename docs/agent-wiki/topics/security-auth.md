@@ -53,6 +53,20 @@ not a current authority.
 - `NEXTAUTH_URL` is the canonical public origin for NextAuth callbacks and the
   state-changing API Origin/Referer check. Do not point it at a new staff domain
   until the matching Azure/Entra redirect URI is configured and smoke-tested.
+- **Client auth-gate render contract (S398, `27aba5be`):** `RequireAuth` keeps
+  children mounted through `useSession()` 'loading' — it must NOT swap to a
+  spinner mid-resolution (that unmounted `ProfileProvider`+`AppAccessProvider`,
+  discarded the in-flight `/api/app-access`, and re-fetched on remount; ~0.3–2s
+  per page load). Children already render before any auth check completes
+  (designed no-flicker `!authEnabled` branch), so this widens nothing;
+  `'unauthenticated'` still tears down to the sign-in screen, and
+  `RequireAppAccess`/`AppAccessContext` stay the fail-closed content gates.
+  `/api/auth/status` lookups go through `shared/utils/auth-enabled.js`
+  (in-flight-promise dedupe across RequireAuth/Layout/index) — a non-2xx or
+  shape-invalid response is a RETRYABLE failure and must never be cached as
+  "auth disabled" (Codex adversarial finding, S398: a cached transient 503
+  disabled the client auth gate for the page lifetime). Regression tests:
+  `tests/unit/require-auth-render-race.test.js`.
 - A client-supplied id (`req.query`/`req.body`) that becomes a Dataverse selector
   must be GUID-validated at the route edge BEFORE the selector. `getRecord`/
   `updateRecord` interpolate the record id raw into the request URL
