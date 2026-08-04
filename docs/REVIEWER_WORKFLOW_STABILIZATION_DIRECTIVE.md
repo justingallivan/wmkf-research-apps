@@ -387,7 +387,7 @@ outage. Findings, each source-verified:
 1. **Misleading verdict copy (confirmed defect).** The needs-review card
    asserts "PubMed shows *a different institution*" while the DTO deliberately
    withholds the matched affiliation (`enrich-recommended-service.js:899-949`
-   nulls `affiliation`/`publications`/`publicationCount5yr` on exactly these
+   nulls `affiliation`/`publications`/`publicationCount5yr` on exactly these <!-- drain-table:ignore reason=dto-field-not-pg-table -->
    rows, so `ReviewerSearchSection.js:419` can only ever render its vague
    fallback). Separately, a comparison **error** is labeled a contradiction:
    the fail-closed catch (`enrich-recommended-service.js:642-648`) sets
