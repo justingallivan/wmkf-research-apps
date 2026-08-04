@@ -132,6 +132,18 @@ Claude config sync, and environment-specific operating notes.
   `EXTERNAL_LINK_SECRET`): `project-local-dev-auth-setup`. Editing `.env.local`
   does not reach an already-running `next dev` process — restart it after any
   change.
+- **Azure CLI is installed locally** (`/opt/homebrew/bin/az`, homebrew 2.89.0)
+  and, after the owner runs `az login` themselves (browser/MFA; auth is
+  per-user and expires), it can READ the Entra app registration
+  `WMK: SSO Authentication` (appId `a652a292-2574-434c-ae6f-aa01f61d82ad`),
+  e.g. its redirect URIs. [VERIFIED 2026-08-03 via `az ad app show` after
+  interactive `az login`.] Write access (adding/removing temporary
+  preview-smoke callbacks, historically done via Codex/Cloud Shell) is
+  [ASSUMED] — not yet exercised from this install. Home tenant `wmkeck.org`
+  signs in; the separate "Grant Application Portal" tenant demands extra MFA
+  [VERIFIED via 2026-08-03 `az login` output]. Treat any tenant-level write as
+  confirm-first and remove temporary callbacks after use (see
+  `project-vercel-cli-deploy-preview-auth`).
 - **Never run `rtk init` in this repo.** It replaces the condensed RTK block in
   root `CLAUDE.md` (between the `<!-- rtk-instructions v2 -->` markers) with a
   ~139-line command reference, pushing the file past the 200-line
