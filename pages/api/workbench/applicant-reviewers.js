@@ -24,13 +24,20 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// D0 TEMPORARY (S399): fixed-floor timing decomposition. Remove after D0.
+let _d0Invocations = 0;
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const d0T0 = Date.now();
+  const d0Cold = ++_d0Invocations === 1;
+
   const access = await requireAppAccess(req, res, 'reviewers');
+  const d0TGuard = Date.now();
   if (!access) return;
 
   const requestId = req.query.requestId ? String(req.query.requestId).trim() : '';
@@ -52,10 +59,17 @@ export default async function handler(req, res) {
   // resolution (check:model-override-warming contract); the service warms
   // again defensively but the gate requires the awaited call here.
   await loadModelOverrides();
+  const d0TOverrides = Date.now();
 
   return withDalContext('workbench-applicant-reviewers', async () => {
     try {
       const body = await ingestApplicantReviewers({ requestId, actingUserSystemId, userProfileId });
+      // D0 TEMPORARY (S399): remove after D0.
+      console.log(
+        `[applicant-reviewers timing] route cold=${d0Cold} guard=${d0TGuard - d0T0}ms ` +
+        `overrides=${d0TOverrides - d0TGuard}ms service=${Date.now() - d0TOverrides}ms ` +
+        `total=${Date.now() - d0T0}ms requestId=${requestId}`
+      );
       return res.status(200).json(body);
     } catch (err) {
       if (err instanceof ServiceHttpError) {
