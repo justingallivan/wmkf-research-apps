@@ -375,3 +375,49 @@ Stabilization is complete only when all are true:
 
 Until those criteria are met, label the reviewer workflow **stabilizing**, not
 finished or fully production-proved.
+
+## S399 addendum — enrichment identity-verdict findings (2026-08-04)
+
+Observed on request `1002903` after increment D's production smoke, then
+investigated read-only. A fresh owner-triggered enrichment run reproduced the
+same outcome: **all five applicant-referred reviewers flagged "Institution
+mismatch"** — so the verdicts are deterministic, not a transient provider
+outage. Findings, each source-verified:
+
+1. **Misleading verdict copy (confirmed defect).** The needs-review card
+   asserts "PubMed shows *a different institution*" while the DTO deliberately
+   withholds the matched affiliation (`enrich-recommended-service.js:899-949`
+   nulls `affiliation`/`publications`/`publicationCount5yr` on exactly these
+   rows, so `ReviewerSearchSection.js:419` can only ever render its vague
+   fallback). Separately, a comparison **error** is labeled a contradiction:
+   the fail-closed catch (`enrich-recommended-service.js:642-648`) sets
+   `institutionContradicted = true` when the checker throws, and the UI
+   renders that as an affirmative mismatch claim. Keep the fail-closed
+   posture; fix the copy to distinguish "couldn't verify (lookup failed)"
+   from "evidence contradicts", and surface the actual compared affiliation
+   when one exists.
+2. **No durable observability (confirmed gap).** Per-candidate verdict
+   provenance (checker returned false vs checker threw, and with what inputs)
+   exists only in the transient SSE progress stream (client keeps the last 6
+   lines; Vercel runtime logs proved unable to witness the SSE request at
+   all). One persisted reason code per verdict would have answered this
+   investigation in a single query.
+3. **Stale-cache replay without provenance (confirmed).** With a valid
+   applicant-enrichment cache the panel restores `recPhase='done'` and
+   replays persisted verdicts (`ReviewerSearchSection.js:1376-1386`) with no
+   indication of when they were produced. Related to the S397 enrichment-cache
+   staleness backlog item.
+4. **Silent no-op button risk (latent).** `enrichRecommended()`
+   (`ReviewerSearchSection.js:1314`) early-returns without any state change
+   when `blobUrl`/`proposalKey` are missing or a run is flagged in-flight; on
+   a cache-restored 'done' panel a no-op click is indistinguishable from an
+   instant successful run. (Did not bite in the observed run.)
+
+**Unresolved question:** whether the five `institutionContradicted` verdicts
+come from the checker genuinely returning false (over-strict OpenAlex-backed
+consistency, `lib/services/institution-affiliation-consistency.js`) or from a
+deterministic throw being mislabeled by finding 1's catch. **First probe next
+session:** run `createInstitutionConsistencyChecker().areConsistent(...)`
+locally against the five visible institution pairs (OpenAlex is keyless) to
+test the machinery; then decide whether finding 2's reason-code logging is
+needed to close it.
