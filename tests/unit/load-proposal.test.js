@@ -45,6 +45,7 @@ jest.mock('@vercel/blob', () => ({
 
 import handler from '../../pages/api/reviewer-finder/load-proposal';
 import { requireAppAccess } from '../../lib/utils/auth';
+import { BlobNotFoundError } from '@vercel/blob';
 
 const VALID_GUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -68,7 +69,7 @@ beforeEach(() => {
   // Default: cache miss, so pre-existing tests (all written against the
   // download+put path) are unaffected by the Step 1 blob-cache addition in
   // lib/services/reviewer-finder/load-proposal-service.js.
-  head.mockRejectedValue(new Error('not found'));
+  head.mockRejectedValue(new BlobNotFoundError('not found'));
 });
 
 test('rejects non-POST (405)', async () => {

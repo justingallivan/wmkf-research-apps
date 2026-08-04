@@ -71,9 +71,16 @@ beforeEach(() => {
   getRequestSharePointBuckets.mockResolvedValue([
     { library: 'akoya_request', folder: 'F', source: 'dynamics' },
   ]);
-  downloadFileByPath.mockResolvedValue({
-    buffer: Buffer.from('x'), filename: 'picked.pdf', mimeType: 'application/pdf', size: 10,
-  });
+  // filename/size mirror the picked file's own name/size (production-shaped:
+  // Graph's downloadFileByPath returns the file it was asked for, so
+  // `downloaded.filename` and `picked.name` are the same file, and the miss
+  // path's `size: downloaded.size` and the hit path's `size: cached.size`
+  // describe the same bytes) rather than a fixed, mismatched fixture name —
+  // otherwise a hit/miss parity test would silently pass by comparing two
+  // different payloads.
+  downloadFileByPath.mockImplementation(async (_library, _folder, name) => ({
+    buffer: Buffer.from('x'), filename: name, mimeType: 'application/pdf', size: 10,
+  }));
   put.mockResolvedValue({ url: 'https://blob.example/x.pdf' });
   // Default: cache miss on every test unless a test overrides it, so the
   // pre-existing golden-path/error-path assertions below (all written
@@ -194,7 +201,7 @@ test('golden path (cache miss) downloads, uploads at the deterministic hashed pa
   expect(out).toEqual({
     success: true,
     blobUrl: 'https://blob.example/x.pdf',
-    filename: 'picked.pdf',
+    filename: 'Proposal_1002836.pdf',
     contentType: 'application/pdf',
     size: 10,
     picked: 'akoya_request::F/Reviewer Materials::Proposal_1002836.pdf',
@@ -247,17 +254,62 @@ test('cache hit: returns the existing blob contract-identical, with no download 
   expect(put).not.toHaveBeenCalled();
 });
 
-test('a changed lastModified/size hashes to a different cache path (invalidates naturally)', async () => {
+test('cache hit payload is contract-identical to the cache miss payload for the same file', async () => {
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  // Miss: default head() rejects not-found; put() resolves to the fixed URL
+  // set in the outer beforeEach.
+  const missOut = await loadProposal({ requestId: REQ });
+
+  // Hit: head() now resolves, describing the exact same blob (same URL,
+  // same content-type/size as what the miss path just "uploaded" and
+  // returned) — the deterministic path means a real hit is always a
+  // description of the same bytes the miss path produced.
+  head.mockReset();
+  head.mockResolvedValue({
+    url: missOut.blobUrl,
+    contentType: missOut.contentType,
+    size: missOut.size,
+  });
+  const hitOut = await loadProposal({ requestId: REQ });
+
+  expect(hitOut).toEqual(missOut);
+});
+
+test('a changed lastModified hashes to a different cache path (invalidates naturally)', async () => {
   listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   await loadProposal({ requestId: REQ });
   const originalPath = head.mock.calls[0][0];
 
   head.mockClear();
-  listFiles.mockResolvedValue([file('Proposal_1002836.pdf', { lastModified: '2026-02-01', size: 999 })]);
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf', { lastModified: '2026-02-01' })]);
   await loadProposal({ requestId: REQ });
   const changedPath = head.mock.calls[0][0];
 
   expect(changedPath).not.toBe(originalPath);
+});
+
+test('a changed size hashes to a different cache path (invalidates naturally)', async () => {
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  await loadProposal({ requestId: REQ });
+  const originalPath = head.mock.calls[0][0];
+
+  head.mockClear();
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf', { size: 999 })]);
+  await loadProposal({ requestId: REQ });
+  const changedPath = head.mock.calls[0][0];
+
+  expect(changedPath).not.toBe(originalPath);
+});
+
+test('missing lastModified/size skips the cache check entirely and falls straight to download', async () => {
+  listFiles.mockResolvedValue([
+    file('Proposal_1002836.pdf', { lastModified: undefined, size: undefined }),
+  ]);
+  const out = await loadProposal({ requestId: REQ });
+  expect(head).not.toHaveBeenCalled();
+  expect(downloadFileByPath).toHaveBeenCalled();
+  expect(put).toHaveBeenCalled();
+  expect(out.blobUrl).toBe('https://blob.example/x.pdf');
 });
 
 test('an explicit fileKey override picks its own file identity and therefore its own cache key', async () => {
@@ -276,13 +328,31 @@ test('an explicit fileKey override picks its own file identity and therefore its
   expect(overridePath).not.toBe(canonicalPath);
 });
 
-test('head() throwing a non-not-found error still falls through to download (fail open)', async () => {
+test('head() throwing a non-not-found error still falls through to download (fail open) and warns', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
   head.mockRejectedValue(new Error('transient network error'));
   const out = await loadProposal({ requestId: REQ });
   expect(downloadFileByPath).toHaveBeenCalled();
   expect(put).toHaveBeenCalled();
   expect(out.blobUrl).toBe('https://blob.example/x.pdf');
+  expect(warnSpy).toHaveBeenCalledWith(
+    '[load-proposal] blob cache check failed (treating as miss):',
+    'transient network error',
+  );
+  warnSpy.mockRestore();
+});
+
+test('head() throwing BlobNotFoundError falls through to download without warning (normal cache miss)', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  listFiles.mockResolvedValue([file('Proposal_1002836.pdf')]);
+  head.mockRejectedValue(new BlobNotFoundError('not found'));
+  const out = await loadProposal({ requestId: REQ });
+  expect(downloadFileByPath).toHaveBeenCalled();
+  expect(put).toHaveBeenCalled();
+  expect(out.blobUrl).toBe('https://blob.example/x.pdf');
+  expect(warnSpy).not.toHaveBeenCalled();
+  warnSpy.mockRestore();
 });
 
 test('explicit fileKey override still permits deliberate historical analysis', async () => {
