@@ -2,8 +2,15 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-08-02 in source/tests on the current feature branch
-(not deployed). Migration 029 adds the
+**Last verified:** 2026-08-03 in current `main` source/tests plus signed-in
+production no-send behavior. The stage-evidence and request-level
+reconciliation implementation is deployed through `7072d52a`, but Production
+has an open outcome-classification incident: a deterministic contact/identity
+staff action can remain `failed_retryable`/queued and render **Refresh contact
+evidence** even though retry cannot make progress. See
+`docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`.
+
+Migration 029 adds the
 durable `blocked` status; migration 027 adds `ineligible`; migration 025 keeps
 mutations keyed by `candidate_key`. The live row-count note below predates
 migration 029 and is not a deployment claim. **Time-bounded incident supplement observed
@@ -12,26 +19,27 @@ claim that canonical roster terminal keys alone prevent every promoted or
 engaged applicant recommendation from resurfacing; details are in Migration
 disposition / gotchas and
 `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`. Mutable row state and the
-diagnosis built from it are not current proof. The Session 393 review pass is
-COMPLETE and owner-accepted (2026-08-01); re-probed 2026-08-01 and still true.
-Implementation work order: `SESSION_PROMPT.md`.
-**Slice A implementation status (not deployed):** source and focused tests on
-branch `codex/reviewer-find-stabilization-slice-a` now project authoritative
+diagnosis built from it are not current proof. The Session 393 review pass was
+complete and owner-accepted on 2026-08-01. Current incident handoff:
+`SESSION_PROMPT.md`.
+**Historical Slice A implementation status:** source and focused tests on
+branch `codex/reviewer-find-stabilization-slice-a` projected authoritative
 Dataverse engagement over every suggestion-anchored active roster row before
-the GET response reaches Find. This is branch evidence only, not a Production
-claim.
-**Live row count:** 164 at verification time.
+the GET response reaches Find. That wording records the historical pre-deploy
+state; current deployment truth is in the incident notice above.
+**Historical live row count:** 164 at the 2026-08-02 verification time; not
+re-probed for this documentation handoff.
 
-**Request 1003010 incident supplement (2026-08-01; branch-only fix, not yet
-deployed):** [VERIFIED via production read-only Dataverse/Postgres probes] one
+**Request 1003010 incident supplement (2026-08-01; fix now deployed):**
+[VERIFIED via production read-only Dataverse/Postgres probes] one
 active Ellen Zhong potential-reviewer person (`d9fd8a93-8845-f111-88b5-000d3a3065b8`)
 was projected as two active proposal-named roster rows carrying the same exact
 ORCID but different candidate keys and email evidence. The staff-attested row's
 address edit correctly changed the contact projection, but that made its older
 v3 automated token fail the contact digest before save could consume the new
 address receipt; the other alias retained the newly found unverified address.
-[VERIFIED via source + focused tests] branch
-`codex/reviewer-address-receipt-refresh` now permits recovery only from the
+[VERIFIED via source + focused tests; `3c4bf5c9` is an ancestor of current
+`main`] the deployed fix permits recovery only from the
 current request-scoped active/saved roster row when its server-owned identity
 digest still matches the submitted identity and its request/key-bound exact
 address receipt matches the submitted email. Identity evidence alone remains
@@ -108,8 +116,8 @@ per-request row cap (oldest `active`/`saved` evicted; never `excluded`,
 
 **Provenance semantics:** `candidate.provenance` is the durable render DTO for origin/grounding (`kind`, ordered `sources[]`, `seedRole`, `groundingWorkIds[]`). `source_kind` is a queryable copy of `provenance.kind`, not a Claude-vs-database flag. During the migration window, candidate JSON also keeps legacy `source`, `sources`, and `isClaudeSuggestion` fields for downstream compatibility.
 
-**Branch-only stage-evidence overlay (2026-08-02):** [VERIFIED via
-source/tests] `candidate` also carries bounded `stageFreshness` evidence and
+**Deployed stage-evidence overlay (2026-08-03):** [VERIFIED via
+source/tests and production no-send observation] `candidate` also carries bounded `stageFreshness` evidence and
 receipts for `applicant_anchor`, `identity`, `institution_domains`,
 `institution_coi`, `coauthor_coi`, `eligibility`, `contact`, `address_trust`,
 and `roster_persistence`. The terminal receipt is valid only for its exact
@@ -183,8 +191,9 @@ cold search emitted the new authority envelope.
   Dataverse before changing the Postgres row. Unanchored search results retain
   their Postgres working-state behavior. **[VERIFIED via source +
   `reviewer-warm-validation-service.test.js` and
-  `reviewer-roster-endpoint.test.js`, 2026-08-01; feature branch only, not
-  deployed]**
+  `reviewer-roster-endpoint.test.js`; deployed source reverified 2026-08-03.
+  The open retry/action classification defect is documented in the incident
+  handoff above.]**
 
 ## Write paths
 

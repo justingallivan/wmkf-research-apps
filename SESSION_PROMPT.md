@@ -1,175 +1,110 @@
-# Session Prompt: Reviewer Find stabilization — implementation (Codex)
+# Session Prompt: Reviewer Find production incident handoff (Session 394)
 
-> **Owner-directed handoff, 2026-08-01.** The Fable assessment session is
-> closed. Its findings were independently reviewed by Codex, corrected, and
-> **accepted by the owner**. This session implements. Run `/start` first.
+> **Owner-directed handoff, 2026-08-03.** The Reviewer Find warm-revisit
+> performance rollout is deployed but remains regressed. Do not treat earlier
+> “implemented,” “green,” or narrow adversarial-review results as proof that the
+> production workflow is fixed. Run `/start` first.
 
-## Read First (in this order)
+## Read first
 
 1. `CLAUDE.md` and the normal `/start` output.
-2. `outputs/reviewer-workflow-stabilization-fable-assessment.md` — **read §0
-   before anything else.** §0 records corrections that supersede the body; where
-   they conflict, §0 wins.
-3. `outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md` — the
-   verbatim review that produced those corrections.
-4. `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` — the standing
-   stabilization contract, now amended by the assessment's §4.
+2. `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` — the
+   current incident assessment and next-orchestrator priorities.
+3. `docs/REVIEWER_FIND_PERFORMANCE_PLAN.md` — design intent and implementation
+   history; its new incident notice supersedes old branch-only status text.
+4. `docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md` — producer contract; compare its
+   outcome semantics against the incident before changing code.
+5. `docs/atlas/postgres-reviewer-find-roster.md` and
+   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` for persistence and
+   UI lifecycle context.
 
-## Ownership and Safety Boundary
+## Current state
 
-- **Active owner:** Codex.
-- **Owned surface:** reviewer Find runtime — enrichment service, roster route,
-  promotion service, manual-reviewer service, the reviewer suggestion adapter,
-  and the Find client components, plus their tests.
-- **Tier:** this is Tier 1–3 runtime work. Create a fresh branch off `main`;
-  do not commit directly to `main`.
-- **Not authorized:** data repair, Production writes, deploys, sending email,
-  merging to `main`. Bring those back to the owner.
-- Read-only Production probes are allowed and two are already committed:
-  `scripts/probe-referral-path-exposure.mjs` and
-  `scripts/probe-exclusion-enforcement-exposure.mjs` (both read-only, both
-  filter AkoyaGO test records, both print denominators).
+- **[VERIFIED via Git]** branch is `main`; `main` and `origin/main` were at
+  `7072d52a` before the handoff documentation commit.
+- **[VERIFIED during deployment]** `7072d52a` reached a Ready production
+  deployment and was served at `https://applications.wmkeck.org`.
+- **[BROKEN]** the core owner requirement is not satisfied: an existing warm
+  roster can still expose per-candidate **Refresh contact evidence**, and a
+  request-level **Continue reconciliation** can loop on a deterministic
+  staff-action condition.
+- **[VERIFIED narrow recovery]** Request `1002903` / Katherine Ferrara regained
+  a selection checkbox after the final GUID/stage-order fixes. She was not
+  promoted or invited during verification.
+- **[VERIFIED remaining incident]** the same request's Kanaka Rajan row remains
+  retryable/queued even though the persistent institution/identity mismatch
+  requires a staff decision. Repeating reconciliation cannot change that
+  condition.
+- **[SAFETY]** no reviewer was selected, promoted, invited, or emailed in the
+  live verification. Preserve that no-send boundary.
 
-## What Is Settled (do not re-litigate)
+## Work completed in the closed session
 
-- **The defect.** Find decides "is this reviewer handled?" from Postgres roster
-  keys alone. Dataverse engagement (`selected`/`invited`/`accepted`/`declined`/
-  response/review/completed) never reaches the projection — **even though
-  `findApplicantRecommendedByRequest`'s `$select` already fetches every one of
-  those fields and `enrichRecommended` then discards them.** The fix needs no
-  new query.
-- **Two causes, not one.** Sorek-shaped rows (`selected=false, invited=true`)
-  resurface because `ad8e0299` replaced a `selectedOnly:true` read with a
-  disposition-only one. Isberg-shaped rows (`selected=true, invited=true`)
-  resurface because a legacy non-canonical `saved` roster twin cannot
-  terminalize the canonical active row. **Engagement projection fixes both;
-  restoring `selectedOnly` would fix only the first and would break the S264
-  design that applicant rows stay unselected until promoted.**
-- **Owner decision (2026-08-01):** engagement monotonicity applies to **every
-  roster row carrying a suggestion anchor**, not applicant-origin rows only.
-- **Live baseline**, Request `1002912`, probe 2026-08-01: 3 of 5 applicant
-  recommendations correctly actionable; Isberg and Sorek wrongly actionable;
-  Sorek renders twice via an orphan row whose suggestion 404s.
+The warm performance/reconciliation implementation spans 50 commits,
+`5b6757df..7072d52a`, and 142 files. Major delivered surfaces:
 
-## What Is NOT Settled (establish before relying on it)
+- cached-then-reconciled roster reads;
+- per-candidate/per-stage evidence receipts and freshness planning;
+- server-owned stage producers and targeted refresh route;
+- request-level bounded reconciliation and continuation;
+- fresh promotion-authority preflight;
+- legacy receipt/identity compatibility bridges;
+- deterministic, live-read, and no-send browser/test tooling; and
+- five production hotfixes ending at `7072d52a`.
 
-- **Door A's production occurrence.** 5 rows carry
-  `disposition=recommended + selected=true + staff_manual/referred`, but that
-  final state has at least two causal paths (§0 C2). Treat as candidates.
-  Dataverse audit history would resolve it. **Do not cite "5 occurrences" as
-  justification without establishing mutation order.**
-- **Finding C's specific causation.** The mechanism is confirmed from source;
-  whether person `0ae2bbf4` came through our button or direct Dynamics entry is
-  not determinable from metadata.
-- Whether Request `1002912`'s applicant cache is currently valid (§2 hop 9).
+Final focused verification passed 60 tests, scoped ESLint,
+`check:reviewer-find-warm-observation` plus self-test,
+`check:reviewer-find-cold-no-send` plus self-test, `check:types`, and the build.
+The final Opus 4.8 review covered only the stage-order hotfix; it was not a
+whole-feature approval.
 
-## Slice A — correctness core (this session)
+## Root cause still open
 
-Write the baseline-failing tests first; each must fail against current `main`.
+`projectReviewerContact` treats `institutionMismatch === true` as unresolved
+identity even with probable/exact-ORCID evidence. The contact producer records
+that as incomplete `missing_required_input`; reconciliation classifies it as
+retryable and queues it; `CandidateCard` renders the individual refresh action.
+This is an end-to-end outcome-contract defect, not a button-only problem and not
+something Dataverse latency will cure.
 
-1. **Engagement projection.** In `enrichRecommended`, partition
-   `recommendedRows` with an `isHandled(row)` predicate (selected ∨ invited ∨
-   accepted ∨ declined ∨ responseReceivedAt ∨ reviewReceivedAt ∨ completedAt).
-   Do not enrich handled rows; emit them as compact
-   `{suggestionId, candidateKey, name, stage}` entries. Project the same
-   engagement tuple from `ingestApplicantReviewers` (not just `selected` — Sorek
-   is `selected=false` and still handled).
-2. **`candidateKey` on every applicant DTO.** Canonicalize **once over the whole
-   outgoing array** — preserved, hydration-failure, needs-review, resolved,
-   handled. `hydrationFailureCandidate` is the third branch that currently omits
-   it (§0 C4). Two branch-local assertions are not sufficient; test the contract
-   over the complete payload.
-3. **W6 guard — the delicate one (§0 C3).** No path may write `selected=true`
-   onto a row carrying live engagement except the explicit Restore. Required
-   shape: validate engagement **before any person/contact mutation** in
-   `promoteApplicantReviewer`, then re-check atomically at the final selection
-   write bound to the suggestion ETag. `restore()` keeps its own ETag-bound
-   reset and must continue to work unchanged. **"Reset fields present" cannot be
-   the authority signal** — door A and Restore both carry
-   `ENGAGEMENT_STAMP_RESET`. Note `ensureStaffManualCandidate` calls
-   `updateRecord` directly and bypasses `updateLifecycle`, so an adapter-level
-   `updateLifecycle` guard alone misses it.
-4. **Manual-add contract (§0 C5).** Re-adding an applicant-recommended person
-   via referral/manual add must union provenance **without** selecting the row
-   and **without** resetting engagement — and must return a typed
-   `promotion_required` / `restore_required` response that the referral UI
-   renders as a remedy. Never return "Added" for a row that will not appear in
-   Invite.
-5. **Widen to all anchored rows (owner decision).** `displayRosterActive`
-   currently restores every non-applicant active roster row with no Dataverse
-   check, and `save-candidates` treats roster finalization as non-fatal after a
-   successful Dataverse write — so an engaged search-origin row can stay
-   actionable. Cover roster rows carrying a suggestion anchor, not just
-   applicant-origin ones.
+## Next work — status labeled
 
-**Golden workflows to assert:** W2 engagement monotonic (incl.
-`selected=false, declined=true` and `selected=true, invited=true`); W3
-confirmation persists on a fresh-enrichment candidate without reload and across
-an overlapping enrichment run; W6 both doors refused and Restore still working;
-plus a concurrent-decline race test.
+1. **[P0 / NOT STARTED]** Add a production-shaped Kanaka regression fixture and
+   prove the current code fails by returning retryable/queued.
+2. **[P0 / NOT STARTED]** Reconcile producer → receipt → planner → reconciler →
+   route → client outcome semantics. Deterministic missing input that requires a
+   person/institution decision must be `action_required`, not `retryable`.
+3. **[P0 / NOT STARTED]** Hide per-card refresh controls when no transient
+   server action can succeed; show only the exact staff workflow.
+4. **[P0 / DECISION REQUIRED]** Decide whether the Harvard Medical School /
+   Harvard University relationship is normalized as hierarchy-equivalent or
+   remains a staff confirmation. Either outcome must be terminal, not queued.
+5. **[P0 / VERIFY]** Run focused tests and no-send production read-only smoke on
+   Request `1002903`. Do not cold-search, promote, or email.
+6. **[P1 / NOT STARTED]** Remove misleading `Omitted — see note below`, clarify
+   topical-match percentage, and correct evidence-date semantics.
+7. **[P2 / DEFERRED]** Resume latency/background-continuation work only after
+   the outcome taxonomy is coherent and production-shaped acceptance cases pass.
 
-## Slice B — robustness (separate session, do not fold in)
+## Do not do
 
-Enrichment partial-success contract (§0 C7 — return recorded / skipped / failed
-suggestion IDs; render only authoritative rows actionable); restrict orphan
-restore to the current expected suggestion set. **Branch-only follow-up,
-2026-08-01:** `codex/reviewer-proposal-binding-refresh` implements the
-reload-stable proposal override as validated `?proposalFile=` navigation state;
-the route still re-lists the request's server-owned SharePoint files before
-accepting that opaque key, and same-key Blob refresh remains cache-stable.
-The same branch now also implements the automatic two-path default: exact
-`Reviewer Materials/Proposal_{Request#}.pdf` first, then exact active
-current-cycle `Phase I/ProjectDescription.pdf`; only neither/ambiguity requires
-the picker. Owner correction 2026-08-01: `Project Narrative.pdf` was named
-earlier in error. **This resolver change was merged and deployed through PR
-#107 on 2026-08-01.**
+- Do not instruct staff to refresh every reviewer.
+- Do not rerun searches to repair existing roster evidence.
+- Do not blindly revert the hotfix chain; Katherine-shaped recovery depends on
+  parts of it.
+- Do not treat Request `1002903` as a mutation fixture.
+- Do not send external emails. Request `1002914` remains the owner-designated
+  no-send Reviewer Find fixture if a later exact authorization permits its use.
 
-## Follow-up now implemented on a review branch
-
-- Decline-referral structured rows (Name · Institution · Email, one row
-  expanding to four) now replace the two prose textareas on
-  `codex/structured-decline-referrals`. The server validates the structured
-  rows and stores a versioned envelope in the existing memo; legacy free-text
-  referrals remain readable. Structured rows now close from the existing
-  durable candidate evidence: an exact-name `referred` candidate (plus exact
-  email when supplied) that is selected or engaged. No operational token is
-  written into `wmkf_sources`; failed/ambiguous adds and promotion/restore
-  remedies remain visible. Legacy prose is display-only and has a **Dismiss
-  resolved note** action that preserves the original text behind a versioned
-  prefix in `wmkf_declinereferral`. This branch is not yet merged or deployed.
-- Request `1002912`: the production person-data repair discussed earlier is
-  complete — the duplicate Chris Lima record was deactivated, the canonical
-  Christopher Lima record was corrected, and Kylie Walters was added
-  separately. Cynthia Wolberger's historical legacy memo still contains both
-  names; after this branch deploys, staff can dismiss that already-resolved
-  note. No further Lima/Walters person-record repair is pending here.
-- The reviewer-facing wording asks for the name as published and explicitly
-  says not to include degrees or titles.
-- Any unrelated legacy twin/orphan cleanup remains separate hygiene and
-  requires explicit Production-write authorization.
-
-## Gates and Definition of Done
-
-Run the gates for every surface touched, each gate and its `:self-test`
-sequentially. `check:status-enum-parity`, `check:route-service-boundary`,
-`check:dataverse-access-layer`, `check:trust-boundary-guid`, and `check:types`
-are the likely-relevant ones for this slice; run the full `check:*` set before
-declaring done. A red gate blocks completion.
-
-Done = the golden workflows pass, no path can move a reviewer backward without
-an explicit reset, handled reviewers are legible but not actionable, and the
-owner has an implementation summary. **Do not deploy or merge.**
-
-## Handoff Expected From Codex
+## Handoff summary
 
 ```text
-Owner: Codex
-Branch: <implementation branch off main>
-Status: complete | blocked
-Changed surfaces: <files>
-Commits: <hashes>
-Tests: <baseline-failing → passing, named>
-Gates: <run, all green>
-Dirty worktree: clean | listed
-Next owner/action: owner review, then independent review pass before deploy
+Previous owner: Codex orchestrator
+Branch/source head before handoff docs: main @ 7072d52a
+Status: production incident open; partial recovery only
+Primary incident case: Request 1002903 / Kanaka Rajan retry loop
+Known recovered case: Request 1002903 / Katherine Ferrara checkbox
+Production mutations in final verification: none
+Email sent: none
+Next owner/action: repair and test the outcome taxonomy before any further rollout
 ```

@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-02
 owner: product-engineering
 related:
+  - docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md
   - docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md
   - docs/REVIEWER_ANALYZE_CONTRACT_SPEC.md
   - docs/REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md
@@ -19,12 +20,16 @@ related:
 
 # Reviewer Find Warm-Revisit Performance and State-Coherence Plan
 
-> **Status (2026-08-03):** [VERIFIED via source/tests] the feature branch now
-> implements the manual-stage, cold applicant receipt, warm-read, bounded
-> reconciliation, and promotion-snapshot contracts summarized below. This
-> document records branch/source state only; it does not claim merge,
-> deployment, production enablement, production Dataverse/Postgres writes,
-> reviewer email, or an authenticated production-browser exercise.
+> **INCIDENT STATUS (2026-08-03):** [VERIFIED via Git, deployment checks,
+> signed-in no-send checks, user screenshots, and current source] the
+> implementation described here is merged, pushed, and deployed through
+> `7072d52a`. It remains **functionally incomplete in Production**: a
+> deterministic staff-action condition can be emitted as retryable/queued, and
+> the UI still offers a per-card **Refresh contact evidence** action that cannot
+> resolve that condition. See
+> `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`. Older
+> branch-only and pre-release statements below are retained as historical
+> design evidence and do not describe current deployment state.
 >
 > **Primary objective:** returning to a previously searched request should show its persisted candidates promptly and should not repeat proposal, model, publication, or contact work merely to reconstruct the screen.
 
@@ -43,6 +48,7 @@ Settled operating decisions from Justin and the primary agent on 2026-08-01:
 - **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Coauthor completeness:** fail closed by default and retry the failed candidate/author queries first. After retries are exhausted, a narrow audited staff override may permit an invitation only through a **[PLANNED]** reviewer COI-attestation-before-acceptance and possible-conflict hold flow; provider failure never becomes a clean negative.
 - **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Eligibility:** `eligibilityCheckStatus=complete` with `eligibilityStatus=unknown` may proceed subject to every other gate. Incomplete/error/missing blocks; deceased or authoritative ineligible blocks; emeritus is informational under current policy.
 - **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Warm refresh:** automatic background work is limited to inexpensive authoritative roster/Dataverse/Graph/canonical-version revalidation. Proposal download/parse, Claude, publication/coauthor discovery, uncertain external identity resolution, and contact discovery require explicit staff action in the warm UI.
+- **[VERIFIED via Justin's 2026-08-03 correction] Staff action is not a retry loop:** an actual identity/institution judgment may require staff, but a deterministic unmet-input condition must render that decision directly. Staff must not be asked to repeat a request-level or per-card refresh that cannot change the result.
 - **[VERIFIED via Justin and the primary agent's 2026-08-01 decision] Legacy evidence:** use a reviewed compatibility mapper. Promote only evidence demonstrably equivalent to the new receipt contract; ambiguous/missing evidence becomes `stage_missing`/`incomplete` and receives targeted refresh, never blanket grandfathering or mass recompute.
 - **[VERIFIED via the primary agent's 2026-08-01 decision] Warm measurement ownership:** the primary agent owns the measurement decision. Zero expensive calls, unsafe actions, stale overwrite, and full-batch refresh from one stale stage remain hard contracts; latency values remain hypotheses until shadow data supports SLOs.
 - **[VERIFIED via Justin, the primary agent, and current planning sources on 2026-08-01] Autonomous trigger:** `wmkf_triagestatus=Advancing` is a current-cycle visibility/routing patch, not the future trigger. Prior direction points to an authoritative internal Phase I→II/phase-advanced Dataverse event, but the exact event and autonomy level remain open.
@@ -60,7 +66,7 @@ Cold-search progressive delivery remains important, but it follows the warm-path
 
 ## Implementation snapshot — 2026-08-03
 
-[VERIFIED via source/tests] Current branch behavior is:
+[VERIFIED via source/tests] Current deployed source behavior is:
 
 | Contract surface | Implemented branch behavior |
 |---|---|
@@ -82,10 +88,9 @@ redesign existing public-Blob behavior in `load-proposal`; that retention or
 redesign was not authorized. This branch therefore makes no claim that generic
 explicit cold search has the new attestation/coordinator contract.
 
-The branch has not been merged to `main`, deployed, used for production
-Dataverse/Postgres writes, used to send reviewer email, or exercised through an
-authenticated production browser. Any enablement decision remains separate from
-this source/test reconciliation.
+This source was subsequently merged and deployed. Authenticated no-send checks
+found the production incident recorded above. No reviewer email was sent and no
+reviewer was selected, promoted, or invited during those checks.
 
 ## Historical baseline — Contract-reconcile Mode A: Step 0
 

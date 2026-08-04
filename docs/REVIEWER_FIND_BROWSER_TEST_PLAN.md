@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-02
 owner: product-engineering
 related:
+  - docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md
   - docs/REVIEWER_FIND_PERFORMANCE_PLAN.md
   - docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -16,7 +17,17 @@ related:
 
 # Reviewer Find Browser Test and Rehearsal Plan
 
-> **Status (2026-08-02):** [PARTIALLY IMPLEMENTED] Layers A and B, the scoped
+> **CURRENT STATUS (2026-08-03):** [INCIDENT OPEN] The implementation and its
+> browser/no-send tooling were subsequently merged and deployed. Live checks
+> repaired a Katherine-Ferrara-shaped legacy row but exposed a production gap
+> the layered plan did not cover: a deterministic staff-action condition is
+> rendered retryable/queued and retains a non-progressing per-card refresh
+> action. See
+> `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`. The
+> production-shaped outcome matrix must be added before this plan can be cited
+> as sufficient enablement evidence.
+>
+> **Historical status (2026-08-02):** [PARTIALLY IMPLEMENTED] Layers A and B, the scoped
 > warm-effect observation ledger, and the authenticated read-only Layer C runner
 > are built. The deterministic suite passes. A normal staff session and the
 > complete cached/reconciled observation ledger passed against exact Preview

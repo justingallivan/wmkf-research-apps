@@ -10,6 +10,21 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Reviewer Find warm-reconciliation rollout remains an open production incident (Session 394)
+
+**Milestone:** A 50-commit warm-revisit/reconciliation release reached Production, repaired several
+legacy-authority blockers, but failed the staff-facing no-loop contract and is handed off as open.
+**Sessions:** 394 (`5b6757df..7072d52a`; incident documentation follows).
+**Ship state:** cached roster reads, stage receipts/producers, promotion preflight, request-level
+reconciliation, and no-send test tooling are live. Five follow-up hotfixes restored the
+Katherine-Ferrara-shaped row on Request `1002903`; the Kanaka-Rajan-shaped row remains incorrectly
+retryable/queued and still exposes **Refresh contact evidence** even though only staff identity/
+institution action can resolve it. No reviewer was promoted, invited, or emailed during verification.
+**Why it matters:** green local contracts and a narrow final review did not prove the production
+outcome taxonomy; staff can still enter a no-progress reconciliation loop on an existing roster.
+**Pointers:** `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`;
+`SESSION_PROMPT.md`; `docs/REVIEWER_FIND_PERFORMANCE_PLAN.md`; head `7072d52a`.
+
 ## July 2026 — Reviewer address/identity gates repaired; four roster data sweeps (Session 387)
 
 **Milestone:** Reviewers who could not be invited at all became invitable, and the roster

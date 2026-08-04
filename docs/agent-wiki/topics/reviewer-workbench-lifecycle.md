@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-03
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -47,8 +47,16 @@ source_files:
   - lib/external/verify-suggestion-token.js
   - lib/services/review-receipt-guard.js
   - lib/services/reviewer-roster-store.js
+  - lib/services/workbench/reviewer-stage-reconciliation-service.js
+  - lib/services/workbench/reviewer-stage-refresh-service.js
+  - lib/services/workbench/reviewer-stage-producers/contact.js
+  - pages/api/workbench/reviewer-reconcile.js
+  - pages/api/workbench/reviewer-stage-refresh.js
   - lib/services/contact-enrichment-service.js
 canonical_docs:
+  - docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md
+  - docs/REVIEWER_FIND_PERFORMANCE_PLAN.md
+  - docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/postgres-reviewer-find-roster.md
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
@@ -81,6 +89,18 @@ update_triggers:
 Use this page for reviewer UI/workbench flows, durable roster behavior,
 cross-run deduplication, referral capture, address collection, lifecycle state,
 and staff-facing reviewer management.
+
+## Current Reviewer Find incident (2026-08-03)
+
+The warm-revisit/stage-reconciliation implementation is deployed through
+`7072d52a`, but it is not product-complete. Request `1002903` established both
+a narrow recovery (Katherine Ferrara regained selection authority) and a
+remaining loop (Kanaka Rajan is retryable/queued and shows **Refresh contact
+evidence** even though the persistent identity/institution condition requires a
+staff decision). The producer → receipt → planner → reconciler → UI outcome
+contract must distinguish `action_required` from truly transient `retryable`
+state. Current handoff and evidence:
+`docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`.
 
 **Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. **Phase 1 LIVE (S275):** the invite panel's respond-by is now a "days to respond" offset; `wmkf_respondoffsetdays` + `wmkf_reviewduedate` are written on first invite (`send-emails.js`) and edited via `/api/review-manager/campaign-config` (Reviewers-tab "Campaign settings"). Current-cycle invitation defaults are now edited in `/admin` as "Reviewer Campaign Timeline", stored in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`, and read by `InviteEmailModal` through `/api/review-manager/campaign-timeline-defaults`; request config overlays those defaults when present. **Phase 2 LIVE (S275):** per-recipient token TTL (`lib/external/reviewer-token-ttl.js` via `render-emails` — invitee/non-responder link caps at review-due+2d, accepted gets review-due+90d, fallback now+90); accepted-only "Release to reviewers" materials send (server-gated in `send-emails`, plus a one-click button on the **Track Reviewers** sub-tab, `ReviewerManagePanel.js`); and a `materials_not_sent` upload guard (`review-upload.js` self-token path → 403). **Phase 3 LIVE (S275):** `/api/cron/reviewer-reminders` (daily) sends two per-request opt-in reminders — respond-by (invited non-responders, deadline = emailSentAt + respondOffsetDays - lead, token-live, fire-once `wmkf_respondremindersentat`) and review-due (accepted/materials-sent/not-submitted, deadline = reviewDueDate - lead, fire-once via the existing `wmkf_remindersentat`). Both claim-before-send (If-Match) → at-most-once; the server `allowResend` re-mint clears the respond marker (the **manual "Re-invite already-invited" Invite-Reviewers-panel button (`ReviewerInvitePanel`) was removed S277** — the respond-by reminder is the nudge for invited non-responders; `allowResend` is retained only as the programmatic re-mint contract). Server-side render in `lib/external/reviewer-reminder-email.js`; service in `lib/services/reviewer-reminder-sweep.js`. **Phase 4 LIVE (S275; actual PD email + quota seeding S352):** quota → PD notify + selective decline. `lib/services/reviewer-quota.js` (called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the accept committed — moved off `respond.js` by the S350 accept-fast-response build) notifies the lead PD once when the accepted count first reaches `wmkf_desiredcount` — concurrency-gated by a conditional null→set of `wmkf_quotanotifiedat` (If-Match). **S352:** the notify now actually EMAILS the lead PD (`emailAdmins: true`, `explicitRecipients` = resolved PD only, no `category` fan-out; degrades to dashboard-alert-only when the PD email is unresolvable), and `wmkf_desiredcount` is settable end-to-end — admin "Reviewer quota" default (4) in the Reviewer Campaign Timeline settings, seeded non-clobbering on first invite send (`send-emails-service.js`, server-side default read only), and editable in the Campaign settings modal, which prefills due-date/quota from the admin defaults (`docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md`, Status: SHIPPED). `POST /api/review-manager/withdraw-sufficient` (the **Invite Reviewers** tab's "Release as no longer needed") writes `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` + clears `wmkf_respondremindersentat` on still-pending rows only (the §2.9 missing writer). **All four phases shipped.** See the two Atlas pages for the exact column list.
 
@@ -220,10 +240,20 @@ legacy free-text values visible, so no existing referral is lost. Until S349
 
 Applicant-suggested reviewers (`disposition=recommended` junction rows from `wmkf_potentialreviewer1..5`) are integrated into the main candidate list on the Find tab rather than shown in a separate bottom card. As of S264, ingestion creates these rows with `wmkf_selected=false`; the candidate pool is the PD-selected set, and applicant-suggested rows enter it only when a Program Director explicitly promotes the existing junction row.
 
-**Auto-enrichment + restore:** `ReviewerSearchSection` fires `POST /api/workbench/enrich-recommended` automatically via `useEffect` as soon as the proposal is loaded, the stable proposal key is known, applicant `recommended` slots are ready, and the durable roster GET has completed. The effect gates on `recPhase === 'idle'`, `recRunningRef.current === false`, `rosterLoaded === true`, and no valid same-proposal applicant cache. The cache key is `doc.data.picked` (`library::folder::name`) passed as `proposalKey`; Blob URL is intentionally not used because `load-proposal` returns a random-suffixed URL on each load. On a same-file reload, the cache is valid only when every currently expected recommendation either has its exact canonical `suggestion:<suggestionId>` active/ineligible row for the same `enrichedProposalKey`, the current `applicantEnrichmentCacheVersion`, and a terminal gate result, or its canonical key is already terminal by staff action (`excluded`/`saved`). The roster GET returns canonical saved applicant keys separately as `savedKeys`; excluded candidates supply their canonical keys. Those canonical terminal rows are subtracted from the expected set and filtered from fresh SSE results. Legacy, unversioned, older-version, or unrelated terminal rows cannot hide a missing expected row, and a partial non-terminal canonical batch still invalidates the cache. Active rows restore into the candidate list while ineligible rows restore into the separate Not eligible section. Every completed non-empty batch offers **Update applicant suggestions**, which explicitly reruns enrichment even when the cache is valid; the rerun preserves actor-bound staff confirmations instead of replacing them with automated output. Re-picking a different proposal changes `proposalKey`, so the old rows do not satisfy the cache gate and enrichment re-runs. The enrichment route reads by `wmkf_applicantdisposition=Recommended`, not by `wmkf_selected` or invitation/response lifecycle, so it currently verifies and surfaces both unpromoted and already-engaged applicant rows.
+**Current warm materialization + restore (2026-08-03):** the embedded
+`ReviewerFindPanel` owns a cached-then-reconciled roster read. Warm mount does
+not automatically prepare proposal bytes, run applicant enrichment, or launch
+provider work. Proposal preparation and applicant-input materialization are
+explicit staff actions, and an unchanged revisit restores active/ineligible/
+blocked/handled roster state from persisted evidence. A missing or stale stage
+is planned per candidate. Request-level reconciliation may run only executable
+server-owned repairs; deterministic identity/address decisions must be exposed
+as staff action. The open incident is that one such condition is still
+misclassified as retryable. The former automatic `useEffect` enrichment flow
+is historical and must not be restored as a warm repair mechanism.
 
-**CONFIRMED Production defect — owner-accepted 2026-08-01; Slice A implemented
-on a branch but not deployed.**
+**Historical Production defect — owner-accepted 2026-08-01; engagement
+projection subsequently deployed.**
 The roster-only terminal contract above is insufficient. Re-probed 2026-08-01
 and still live on Request `1002912`: Ralph Isberg holds a noncanonical saved row
 plus a canonical active applicant row while Dataverse reads
@@ -246,16 +276,16 @@ roster row carrying a suggestion anchor**, not applicant rows only. Work order:
 `SESSION_PROMPT.md`. Evidence and corrections:
 `outputs/reviewer-workflow-stabilization-fable-assessment.md` §0/§3 plus the
 verbatim independent review in
-`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. On branch
-`codex/reviewer-find-stabilization-slice-a`, applicant ingestion now projects
+`outputs/reviewer-workflow-codex-adversarial-review-2026-08-01.md`. The
+deployed implementation projects
 the engagement tuple, enrichment partitions handled rows before model work,
 and the roster GET makes one complete request-scoped Dataverse read for every
 suggestion-anchored visible roster row. Handled rows render only in a compact
 **Already handled** summary with Invite/Removed/Track navigation. An excluded
 row is also revalidated against Dataverse before it can return to active Find.
-Focused source tests are green;
-the signed-in no-send pilot and deployment remain open, so do not describe this
-as Production behavior yet.
+Focused source tests and later signed-in no-send checks covered this engagement
+projection. Do not confuse that historical repair with the separate open
+warm-reconciliation incident above.
 
 **Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
 
@@ -274,8 +304,7 @@ Exclusion removes an applicant row from the active roster; only a successful
 server promotion finalizes it `saved`, while an authoritative
 applicant-excluded collision finalizes it `blocked`.
 
-**Explicit applicant promotion (existing boundary is production-live; the W6
-engagement guard below is branch-only):**
+**Explicit applicant promotion (production-live):**
 `/api/workbench/promote-applicant-reviewer` validates request and
 suggestion ownership/disposition, requires the canonical
 request/`suggestion:<id>` roster row, and rechecks identity, eligibility, COI,
@@ -300,8 +329,8 @@ The explicit Restore path retains its separate ETag-bound reset authority.
 Manual/referral re-add of an applicant-recommended person unions provenance
 only: it never selects or clears lifecycle fields, and returns
 `promotion_required`, `restore_required`, or `already_handled` with an
-executable Find/Invite/Removed/Track remedy. **[VERIFIED via focused source tests on
-the Slice A branch, 2026-08-01; not deployed]**
+executable Find/Invite/Removed/Track remedy. **[VERIFIED via focused source tests
+and deployed source, reconciled 2026-08-03]**
 
 Find-discovered rows still receive their exact suggestion/person anchors after
 ordinary save. The read-only reconciler remains a legacy backstop: it requires

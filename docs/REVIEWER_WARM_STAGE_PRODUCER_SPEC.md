@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-02
 owner: product-engineering
 related:
+  - docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md
   - docs/REVIEWER_FIND_PERFORMANCE_PLAN.md
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - docs/audits/reviewer-warm-stage-producer-fable-review-2026-08-02.md
@@ -20,12 +21,17 @@ related:
 
 # Reviewer Find Authoritative Warm-Stage Producer Specification
 
-> **Status (2026-08-02):** [VERIFIED via source/tests] the branch implements
-> the authenticated manual producer path, cold applicant receipt emission, and
-> provider-free warm validation described here. This is branch/source truth,
-> not a claim that the feature is merged, deployed, or enabled in production.
-> The generic explicit-cold-search attestation/coordinator route remains
-> intentionally unwired; see **Implemented boundary and remaining work**.
+> **INCIDENT STATUS (2026-08-03):** [VERIFIED via Git, current source, deployed
+> no-send behavior, and user screenshots] this implementation is merged and
+> deployed through `7072d52a`, but its outcome contract is incomplete. A
+> `needs_identity_confirmation` contact projection can become incomplete
+> `missing_required_input`, then be classified as retryable/queued rather than
+> terminal `action_required`. That makes both request-level continuation and
+> the individual refresh control non-progressing for the Kanaka-Rajan-shaped
+> production row. See
+> `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`. The generic
+> explicit-cold-search attestation/coordinator route remains intentionally
+> unwired.
 >
 > **Objective:** connected cold applicant enrichment emits reusable
 > authoritative receipts for work it already performs; a later warm revisit reads those receipts
@@ -658,9 +664,9 @@ AbortController. Every success, error, and `finally` state update checks the
 current request generation. Navigation cannot attach a late result to another
 request.
 
-## Implemented boundary and remaining work
+## Deployed boundary and remaining work
 
-| Surface | Branch state |
+| Surface | Deployed source state |
 |---|---|
 | Manual repair | [VERIFIED via source/tests] The stage route exposes the eight executable stages named above. It uses a candidate-wide lease and exact CAS; another live stage lease returns `refresh_in_progress`, while an expired owner is durably recovered to the retryable outcome before a new attempt. |
 | Cold applicant persistence | [VERIFIED via source/tests] `enrich-recommended-service` binds proposal-dependent work to Graph metadata before and after analysis, emits projected receipts through `recordSurfacedWithStageEvidence`, and returns per-candidate recorded/partial/skipped accounting. An authority/version change is not recorded as current evidence. |
@@ -752,12 +758,12 @@ These do not block implementation of the normal fail-closed producer path:
    uses the existing bounded roster JSONB until measurements justify a
    separately reviewed migration.
 
-## Release boundary
+## Historical pre-release boundary (superseded 2026-08-03)
 
-[VERIFIED via source/tests] implementation and focused tests do not authorize
-a merge, deployment, promotion enablement, send, or production mutation. Any
-future enablement still requires an authorized authenticated dummy-request flow
-that proves:
+The following was the pre-release gate. The implementation was later merged and
+deployed, and the production incident proves that the gate lacked an explicit
+production-shaped assertion for deterministic `action_required` versus
+retryable outcomes. Retain these checks, but do not treat them as sufficient:
 
 1. connected cold applicant enrichment emits a fully current candidate without duplicate
    provider work;
@@ -767,8 +773,6 @@ that proves:
 5. one targeted refresh repairs only that candidate/stage; and
 6. promotion remains blocked on every incomplete/failed/unknown complement.
 
-Use request `1002914` for the authenticated no-send Reviewer Find pilot. It is
-an owner-designated D26 proposal that is not proceeding and is temporarily
-marked Advancing for this test. Do not use the
-existence of this specification as authorization to merge, deploy, send email,
-or mutate production data.
+Request `1002914` remains the owner-designated no-send Reviewer Find fixture.
+The existence of this specification is still not authorization to send email or
+mutate production data.
