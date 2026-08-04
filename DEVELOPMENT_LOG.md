@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Increment C: auth-gate render race fixed app-wide (Session 398)
+
+**Milestone:** the client auth gate stopped unmounting/remounting the provider subtree on every
+page load — the data burst now waits on ONE `app-access` round-trip instead of 2–3 stacked
+gating rounds, on every page of the suite.
+**Sessions:** 398 (also: client-side measurement pass resolving both S397 [ASSUMED]
+attributions; 3-agent dig; excluded-reviewers structured-intake plan for the Connor handshake;
+the vacuous "~90d observation window" gate voided — reviewer search runs ~twice/year).
+**Ship state:** main ff `912ab995 → 27aba5be`; `RequireAuth` keeps children mounted through
+session resolution; `shared/utils/auth-enabled.js` dedupes `/api/auth/status` (3 fetchers → 1,
+never caches non-2xx — Codex adversarial finding fixed pre-ship); owner Preview smoke + post-
+promotion production waterfalls verified; Entra callbacks restored to the four permanent URIs.
+**Why it matters:** second consecutive increment shipped under the post-S395 measure-first,
+one-change, tier-gated discipline; the render-race pattern (permissive-then-clamp gate
+discarding in-flight fetches) is now a documented anti-pattern in the security-auth wiki topic.
+**Pointers:** `docs/agent-wiki/topics/security-auth.md` "Client auth-gate render contract";
+`docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md`; commits `8a338d9d`, `27aba5be`, `766b6cd2`.
+
 ## August 2026 — First tier-gated latency increment ships: warm-revisit proposal blob cache (Session 397)
 
 **Milestone:** The post-incident incremental latency plan went from approval to a measured
