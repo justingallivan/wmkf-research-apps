@@ -87,11 +87,11 @@ doc — durable facts must be re-homed at closeout if the file is retired).
 - **Deferred backlog item (owner to prioritize)**: enrichment cache
   staleness on in-place proposal updates — PRE-EXISTING on main, verified
   not introduced by Step 1; fix shape recorded in the findings doc.
-- **Cleanup status**: Preview env var removed (verified); merged branch
-  deleted local+origin; temporary Entra callback restore to the four
-  permanent URIs was handed to the owner — VERIFY DONE before closeout
-  (`az ad app show --id a652a292-2574-434c-ae6f-aa01f61d82ad --query
-  "web.redirectUris"` must list exactly four).
+- **Cleanup status: COMPLETE.** Preview env var removed (verified via owner
+  `vercel env rm` output); merged branch deleted local+origin; Entra
+  registration restored to exactly the four permanent callbacks [VERIFIED
+  2026-08-04 via owner-run `az ad app update` + post-update `az ad app show`
+  listing four URIs]. No temporary scaffolding remains.
 
 ## Standing constraints
 
