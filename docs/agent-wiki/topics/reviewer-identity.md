@@ -166,6 +166,8 @@ Build considerations: the identity resolution pipeline crosses OpenAlex, ORCID, 
 
 ## Durable Memory
 
+- Holistic external research and proposed benchmark (research-only; no build
+  authorization): `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`.
 - Identity resolution spine: `project-reviewer-identity-resolution-phase1`, `reviewer-identity-fragmentation`. Historical S213 false-match rationale is in closed memory `project-reviewer-identity-resolution`.
 - ORCID and OpenAlex: `project-reviewer-self-report-orcid-sticky-confirmed`, `project-openalex-merge-use-orcid-works`.
 - Safety posture: `project-reviewer-verify-fail-dangerous`, `project-reviewer-field-aware-verification`.
