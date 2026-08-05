@@ -775,7 +775,12 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   `ReviewersTab.refreshAll`, which paints those rows `invited` on top of the `my-candidates`
   refetch (server-confirmed fact, not optimism; an `inviteRecorded:false` row deliberately keeps
   showing its true unstamped state). `refreshAll` validates the payload shape because it is handed
-  around as a bare callback. ReviewersTab's three loaders also gained a same-request newest-wins
+  around as a bare callback. Codex adversarial review (S401, medium): the overlay asserts a past
+  fact, so a concurrent lifecycle reset landing inside the refresh window — remove → restore
+  clears `wmkf_invited` via `ENGAGEMENT_STAMP_RESET` — would be repainted invited. Resolved by
+  time-bounding the overlay: any overlay-carrying refresh schedules one plain reconciling
+  `loadCandidates()` after `OVERLAY_RECONCILE_MS` (4s), so server truth unconditionally reasserts
+  for every resetting writer, current or future, without version-plumbing the send stream/DTO. ReviewersTab's three loaders also gained a same-request newest-wins
   generation guard (the S213-era `currentRequestIdRef` guard only covered cross-request
   navigation), so an older in-flight response can no longer repaint over a newer one. Tests:
   `tests/unit/reviewers-tab-post-send-refresh.test.js`, `tests/unit/invite-email-modal-capture.test.js`.

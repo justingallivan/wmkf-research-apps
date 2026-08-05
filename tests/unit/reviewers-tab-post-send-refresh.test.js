@@ -91,6 +91,7 @@ function mockFetchWithCandidates(candidatesImpl) {
 }
 
 afterEach(() => {
+  jest.useRealTimers();
   jest.clearAllMocks();
 });
 
@@ -131,6 +132,28 @@ test('a non-payload onRefresh argument (click event) is ignored — no overlay, 
   await waitFor(() => {
     expect(candidatesOf().every((c) => c.invited === false)).toBe(true);
   });
+});
+
+test('server truth reasserts after the overlay window (Codex S401: concurrent reset must not stay painted invited)', async () => {
+  jest.useFakeTimers();
+  // The refetch NEVER reflects the send — as if a concurrent remove → restore
+  // legitimately reset the row (ENGAGEMENT_STAMP_RESET clears wmkf_invited)
+  // while the send/refresh was in flight. The overlay may paint the row
+  // invited for the moment, but the reconciling refetch must repaint the
+  // server's reset state instead of letting the stale send fact stand.
+  mockFetchWithCandidates(() => Promise.resolve({ ok: true, json: async () => candidatesPayload(STALE_ROWS) }));
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(candidatesOf()).toHaveLength(2));
+
+  fireEvent.click(screen.getByRole('button', { name: 'refresh-confirmed' }));
+  await waitFor(() => expect(candidatesOf().find((c) => c.suggestionId === 's-1')?.invited).toBe(true));
+
+  await act(async () => {
+    jest.advanceTimersByTime(4100);
+  });
+
+  await waitFor(() => expect(candidatesOf().find((c) => c.suggestionId === 's-1')?.invited).toBe(false));
 });
 
 test('an older in-flight my-candidates response does not repaint over a newer one (same request)', async () => {

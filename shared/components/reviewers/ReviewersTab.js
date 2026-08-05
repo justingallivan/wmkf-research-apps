@@ -46,6 +46,16 @@ const SUB_TABS = [
 ];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
 
+// How long a confirmed-invite overlay is allowed to stand before a plain
+// refetch repaints pure server truth. The overlay asserts a PAST fact (the
+// send stamp existed when the send stream confirmed it), so a concurrent
+// lifecycle reset landing inside the refresh window — remove → restore clears
+// wmkf_invited (ENGAGEMENT_STAMP_RESET) — would otherwise be repainted as
+// invited until the next incidental refresh (Codex S401 adversarial finding).
+// Time-bounding the overlay closes that for EVERY resetting writer, current or
+// future, without version-plumbing the send stream and roster DTO.
+const OVERLAY_RECONCILE_MS = 4000;
+
 export default function ReviewersTab({ requestId, context, canManage = true, settings = {} }) {
   const router = useRouter();
   const [proposal, setProposal] = useState(null);
@@ -70,6 +80,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const candidatesGenRef = useRef(0);
   const reviewersGenRef = useRef(0);
   const referralsGenRef = useRef(0);
+  // Pending overlay-reconcile timer (see OVERLAY_RECONCILE_MS). Cleared on
+  // unmount so a late firing can't set state on a dead component; a firing
+  // that outlives a request navigation is already dropped by the loader's
+  // requestId guard.
+  const reconcileTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(reconcileTimerRef.current), []);
   // Per-referral inline action state for the Track Reviewers decline-referral
   // callout, keyed by the per-item referralId (with suggestionId as a legacy
   // fallback). Drives structured add/identity confirmation and legacy-note
@@ -217,6 +233,13 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
       ? { invitedSuggestionIds: confirmedInvites.invitedSuggestionIds, sentAt: confirmedInvites.sentAt || null }
       : null;
     loadCandidates(overlay);
+    if (overlay) {
+      // Server truth unconditionally reasserts shortly after any overlay —
+      // the reconciling refetch carries no overlay and, being the newest
+      // generation, wins over anything still in flight.
+      clearTimeout(reconcileTimerRef.current);
+      reconcileTimerRef.current = setTimeout(() => loadCandidates(), OVERLAY_RECONCILE_MS);
+    }
     loadReviewers();
     loadDeclineReferrals();
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);
