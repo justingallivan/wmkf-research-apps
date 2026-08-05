@@ -109,7 +109,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
-  APPLICANT_ENRICHMENT_CACHE_VERSION: 3,
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 4,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -203,7 +203,7 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
   expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({ applicantEnrichmentCacheVersion: 3 })],
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 4 })],
     { expectedUpdatedAt: null },
   );
 });
@@ -893,7 +893,10 @@ test('an institution contradiction overrides a probable identity verdict and lea
     email: null,
     hasInstitutionCOI: false,
   });
-  expect(candidate.reasoning).toMatch(/contradict the listed institution/i);
+  // S400 increment B: the contradiction copy names BOTH compared institutions
+  // instead of the old vague "contradict the listed institution".
+  expect(candidate.reasoning).toMatch(/place them at “Expected University”/);
+  expect(candidate.reasoning).toMatch(/could not be reconciled with their recorded affiliation “Different University”/);
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(writeIdentityDecision).not.toHaveBeenCalled();
   expect(setMatchReason).not.toHaveBeenCalled();
@@ -1167,6 +1170,10 @@ test('a resolved co-affiliation suppresses the string mismatch instead of creati
     needsIdentification: false,
     identityStatus: 'probable',
     email: 'reviewer@mit.edu',
+    // S400 increment D: the DTO carries the RECONCILED verdict — the cleared
+    // contradiction must not leave the stale pre-comparison mismatch flag
+    // (and its banner) on a verified card.
+    institutionMismatch: false,
   });
   expect(upsertByPotentialReviewer).toHaveBeenCalled();
 });
