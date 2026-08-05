@@ -175,6 +175,14 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           : c));
       }
       setCandidates(next);
+      if (confirmedInvites) {
+        // Server truth unconditionally reasserts shortly after the overlay
+        // actually paints. Starting this clock earlier would let a slow
+        // overlay-carrying response lose the newest-generation guard to its
+        // own reconciling refetch before the confirmed invite can render.
+        clearTimeout(reconcileTimerRef.current);
+        reconcileTimerRef.current = setTimeout(() => loadCandidates(), OVERLAY_RECONCILE_MS);
+      }
       setRemovedCandidates(Array.isArray(removed) ? removed : []);
     } catch {
       if (isCurrent()) {
@@ -233,13 +241,6 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
       ? { invitedSuggestionIds: confirmedInvites.invitedSuggestionIds, sentAt: confirmedInvites.sentAt || null }
       : null;
     loadCandidates(overlay);
-    if (overlay) {
-      // Server truth unconditionally reasserts shortly after any overlay —
-      // the reconciling refetch carries no overlay and, being the newest
-      // generation, wins over anything still in flight.
-      clearTimeout(reconcileTimerRef.current);
-      reconcileTimerRef.current = setTimeout(() => loadCandidates(), OVERLAY_RECONCILE_MS);
-    }
     loadReviewers();
     loadDeclineReferrals();
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);

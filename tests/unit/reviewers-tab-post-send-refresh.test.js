@@ -156,6 +156,38 @@ test('server truth reasserts after the overlay window (Codex S401: concurrent re
   await waitFor(() => expect(candidatesOf().find((c) => c.suggestionId === 's-1')?.invited).toBe(false));
 });
 
+test('a delayed overlay response paints before its reconcile window starts', async () => {
+  jest.useFakeTimers();
+  const overlayResponse = deferred();
+  let call = 0;
+  mockFetchWithCandidates(() => {
+    call += 1;
+    if (call === 2) return overlayResponse.promise;
+    return Promise.resolve({ ok: true, json: async () => candidatesPayload(STALE_ROWS) });
+  });
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(candidatesOf()).toHaveLength(2));
+
+  fireEvent.click(screen.getByRole('button', { name: 'refresh-confirmed' }));
+
+  // The overlay request remains in flight beyond the full reconcile interval.
+  // Its own timer must not start until the guarded response actually paints.
+  await act(async () => {
+    jest.advanceTimersByTime(4100);
+  });
+
+  await act(async () => {
+    overlayResponse.resolve({ ok: true, json: async () => candidatesPayload(STALE_ROWS) });
+  });
+  await waitFor(() => expect(candidatesOf().find((c) => c.suggestionId === 's-1')?.invited).toBe(true));
+
+  await act(async () => {
+    jest.advanceTimersByTime(4100);
+  });
+  await waitFor(() => expect(candidatesOf().find((c) => c.suggestionId === 's-1')?.invited).toBe(false));
+});
+
 test('an older in-flight my-candidates response does not repaint over a newer one (same request)', async () => {
   const first = deferred();
   let call = 0;
