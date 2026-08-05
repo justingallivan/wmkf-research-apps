@@ -328,11 +328,16 @@ matches leave the actionable/selectable/save lists and render in the **Already
 handled** summary as a "Re-found by search" entry keyed by the saved row's
 `suggestion:` anchor (so it folds into an existing handled entry for the same
 person rather than duplicating). A merely-'selected' saved row deliberately
-does NOT collapse its twin. Name-key matching can collapse a genuine namesake
-— accepted trade; the entry stays visible with stage + navigation, and manual
-add remains the namesake escape. `ReviewersTab` now passes the full
-`savedPool` (was `savedPoolNames`); the exclusion-union names derive inside
-the section. Also corrected: an `invited`-stage handled entry navigates to
+does NOT collapse its twin. Name-key matches are rejected when a shared
+anchor type CONFLICTS (same-name different-ORCID people stay separate —
+Codex adversarial finding); an anchor-less name match still collapses, the
+accepted ambiguous-namesake trade — the entry stays visible with stage +
+navigation, and manual add remains the namesake escape. `ReviewersTab` now
+passes `savedPool` (was `savedPoolNames`): active candidates PLUS declined
+removed rows (declines archive to `selected=false`, so they live only in
+`removedCandidates` — second Codex finding; `projectRemovedCandidates` now
+emits person/ORCID/Scholar anchors for them); staff-removed-not-declined rows
+stay out deliberately. Exclusion-union names derive inside the section. Also corrected: an `invited`-stage handled entry navigates to
 Invite (pending list) instead of Track, where an unaccepted person is not
 visible. Tests: `tests/unit/reviewer-rediscovery.test.js`,
 `tests/unit/reviewer-search-rediscovery.test.js`.

@@ -28,7 +28,7 @@
  *   - settings  : { signature } for the email templates
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ReviewerManagePanel from './ReviewerManagePanel';
@@ -93,6 +93,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const [referralActions, setReferralActions] = useState({});
 
   const reviewers = proposal?.reviewers || [];
+  const findSavedPool = useMemo(() => [
+    ...candidates,
+    ...removedCandidates.filter((candidate) => (
+      candidate?.declined || candidate?.responseType === 'declined'
+    )),
+  ], [candidates, removedCandidates]);
   // Candidates badge: saved candidates not yet invited (and not accepted/declined).
   const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
 
@@ -478,7 +484,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           proposalFileKey={proposalFileKey}
           proposalBindingReady={router.isReady !== false}
           onProposalFileKeyChange={persistProposalFileKey}
-          savedPool={candidates}
+          savedPool={findSavedPool}
           onSaved={refreshAll}
           onNavigate={selectSub}
         />

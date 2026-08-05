@@ -47,6 +47,23 @@ function normalizeOrcid(value) {
   return match ? match[0] : '';
 }
 
+const ANCHOR_TYPES = ['person', 'orcid', 'scholar', 'openalex'];
+
+function reviewerIdentityAnchors(row = {}) {
+  const enr = row.contactEnrichment && typeof row.contactEnrichment === 'object'
+    ? row.contactEnrichment
+    : {};
+  const person = row.potentialReviewerId || row.seedResolvedPotentialReviewerId;
+  const scholar = row.googleScholarId || enr.googleScholarId;
+  const openalex = row.openAlexId || row.openAlexAuthorId;
+  return {
+    person: person ? String(person).trim().toLowerCase() : '',
+    orcid: normalizeOrcid(row.orcid || enr.orcidId || enr.orcid || row.orcidUrl),
+    scholar: scholar ? String(scholar).trim().toLowerCase() : '',
+    openalex: openalex ? String(openalex).trim().toLowerCase() : '',
+  };
+}
+
 /**
  * Every identity key a row can be correlated on — unlike reviewerCandidateKey
  * (first anchor wins, for stable per-row identity), this returns ALL of them so
@@ -54,18 +71,11 @@ function normalizeOrcid(value) {
  * by orcid/scholar or nothing but a name).
  */
 export function reviewerIdentityMatchKeys(row = {}) {
-  const enr = row.contactEnrichment && typeof row.contactEnrichment === 'object'
-    ? row.contactEnrichment
-    : {};
+  const anchors = reviewerIdentityAnchors(row);
   const keys = [];
-  const person = row.potentialReviewerId || row.seedResolvedPotentialReviewerId;
-  if (person) keys.push(`person:${String(person).trim().toLowerCase()}`);
-  const orcid = normalizeOrcid(row.orcid || enr.orcidId || enr.orcid || row.orcidUrl);
-  if (orcid) keys.push(`orcid:${orcid}`);
-  const scholar = row.googleScholarId || enr.googleScholarId;
-  if (scholar) keys.push(`scholar:${String(scholar).trim().toLowerCase()}`);
-  const openalex = row.openAlexId || row.openAlexAuthorId;
-  if (openalex) keys.push(`openalex:${String(openalex).trim().toLowerCase()}`);
+  for (const type of ANCHOR_TYPES) {
+    if (anchors[type]) keys.push(`${type}:${anchors[type]}`);
+  }
   const name = normalizeReviewerName(row.name);
   if (name) keys.push(`name:${name}`);
   return keys;
@@ -86,6 +96,7 @@ export function buildEngagedSavedIndex(savedPool = []) {
       affiliation: row.affiliation || null,
       suggestionId: row.suggestionId || null,
       stage,
+      anchors: reviewerIdentityAnchors(row),
     };
     for (const key of reviewerIdentityMatchKeys(row)) {
       if (!index.has(key)) index.set(key, entry);
@@ -106,9 +117,25 @@ export function partitionRediscoveredCandidates(candidates = [], index) {
   const kept = [];
   const rediscovered = [];
   for (const candidate of list) {
-    const saved = reviewerIdentityMatchKeys(candidate)
-      .map((key) => index.get(key))
-      .find(Boolean) || null;
+    const candidateAnchors = reviewerIdentityAnchors(candidate);
+    let saved = null;
+    for (const key of reviewerIdentityMatchKeys(candidate)) {
+      const matched = index.get(key);
+      if (!matched) continue;
+      if (!key.startsWith('name:')) {
+        saved = matched;
+        break;
+      }
+      // A shared anchor type with different values is positive evidence that
+      // same-name rows are different people. Missing/non-overlapping anchors
+      // retain the deliberate ambiguous-namesake display-collapse trade.
+      const conflicts = ANCHOR_TYPES.some((type) => (
+        candidateAnchors[type]
+        && matched.anchors?.[type]
+        && candidateAnchors[type] !== matched.anchors[type]
+      ));
+      if (!conflicts) saved = matched;
+    }
     if (saved) rediscovered.push({ candidate, saved });
     else kept.push(candidate);
   }

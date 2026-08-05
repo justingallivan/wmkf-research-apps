@@ -42,6 +42,43 @@ test('a diacritic name variant matches via the normalized-name fallback key', ()
   expect(rediscovered).toHaveLength(1);
 });
 
+test('same-name people with different ORCIDs stay separate', () => {
+  const index = buildEngagedSavedIndex([{
+    ...savedInvited,
+    name: 'Alex Kim',
+    orcidUrl: 'https://orcid.org/0000-0001-1111-1111',
+  }]);
+  const fresh = { name: 'Alex Kim', orcid: '0000-0002-2222-2222' };
+  const { kept, rediscovered } = partitionRediscoveredCandidates([fresh], index);
+  expect(kept).toEqual([fresh]);
+  expect(rediscovered).toHaveLength(0);
+});
+
+test('a same-name match still collapses when one side has no anchors', () => {
+  const index = buildEngagedSavedIndex([{
+    ...savedInvited,
+    name: 'Alex Kim',
+    potentialReviewerId: null,
+    orcidUrl: null,
+  }]);
+  const fresh = { name: 'Alex Kim', orcid: '0000-0002-2222-2222' };
+  const { kept, rediscovered } = partitionRediscoveredCandidates([fresh], index);
+  expect(kept).toHaveLength(0);
+  expect(rediscovered).toHaveLength(1);
+});
+
+test('same-name people with the same ORCID collapse', () => {
+  const index = buildEngagedSavedIndex([{
+    ...savedInvited,
+    name: 'Alex Kim',
+    orcidUrl: 'https://orcid.org/0000-0001-1111-1111',
+  }]);
+  const fresh = { name: 'Alex Kim', orcid: '0000-0001-1111-1111' };
+  const { kept, rediscovered } = partitionRediscoveredCandidates([fresh], index);
+  expect(kept).toHaveLength(0);
+  expect(rediscovered).toHaveLength(1);
+});
+
 test('a merely-saved (selected, not yet engaged) row does NOT collapse its twin', () => {
   const merelySaved = { ...savedInvited, invited: false, selected: true };
   const index = buildEngagedSavedIndex([merelySaved]);

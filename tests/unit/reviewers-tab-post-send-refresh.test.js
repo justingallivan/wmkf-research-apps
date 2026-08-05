@@ -25,8 +25,8 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub() {
   return <div data-testid="manage-panel" />;
 });
-jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub() {
-  return <div data-testid="find-panel" />;
+jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub(props) {
+  return <div data-testid="find-panel" data-saved-pool={JSON.stringify(props.savedPool || [])} />;
 });
 jest.mock('../../shared/components/reviewers/ReviewerInvitePanel', () => function InvitePanelStub(props) {
   return (
@@ -52,8 +52,9 @@ jest.mock('../../shared/components/reviewers/CampaignConfigModal', () => functio
 });
 
 const mockPush = jest.fn();
+let mockSub = 'candidates';
 jest.mock('next/router', () => ({
-  useRouter: () => ({ query: { sub: 'candidates' }, pathname: '/workbench/[requestId]', push: mockPush }),
+  useRouter: () => ({ query: { sub: mockSub }, pathname: '/workbench/[requestId]', push: mockPush }),
 }));
 
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
@@ -92,6 +93,7 @@ function mockFetchWithCandidates(candidatesImpl) {
 
 afterEach(() => {
   jest.useRealTimers();
+  mockSub = 'candidates';
   jest.clearAllMocks();
 });
 
@@ -99,6 +101,31 @@ const STALE_ROWS = [
   { suggestionId: 's-1', name: 'Just Invited', invited: false, emailSentAt: null },
   { suggestionId: 's-2', name: 'Still Invitable', invited: false, emailSentAt: null },
 ];
+
+test('Find receives active candidates plus declined removed rows, but not staff-removed rows', async () => {
+  mockSub = 'find';
+  const active = { suggestionId: 's-active', name: 'Active Candidate' };
+  const declined = { suggestionId: 's-declined', name: 'Declined Candidate', declined: true };
+  const responseDeclined = { suggestionId: 's-response-declined', name: 'Response Declined', responseType: 'declined' };
+  const staffRemoved = { suggestionId: 's-removed', name: 'Staff Removed', declined: false, responseType: null };
+  mockFetchWithCandidates(() => Promise.resolve({
+    ok: true,
+    json: async () => ({
+      proposals: [{
+        proposalId: REQ,
+        candidates: [active],
+        removedCandidates: [declined, responseDeclined, staffRemoved],
+      }],
+    }),
+  }));
+
+  render(<ReviewersTab requestId={REQ} />);
+
+  await waitFor(() => {
+    const pool = JSON.parse(screen.getByTestId('find-panel').getAttribute('data-saved-pool'));
+    expect(pool).toEqual([active, declined, responseDeclined]);
+  });
+});
 
 test('a confirmed-invite refresh paints the sent rows invited even when the refetch returns a stale read', async () => {
   // The server read NEVER reflects the send in this test — the overlay alone
