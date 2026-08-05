@@ -28,9 +28,12 @@
  *
  * Props:
  *   - requestId      : the akoya_request GUID (always present)
- *   - savedPoolNames : names already saved to this request's Dataverse pool
- *                      (from ReviewersTab's my-candidates fetch), unioned into the
- *                      search exclude set so a re-search doesn't re-surface them.
+ *   - savedPool      : the request's saved candidate rows (from ReviewersTab's
+ *                      my-candidates fetch). Names union into the search exclude
+ *                      set so a re-search doesn't re-surface them; engagement
+ *                      fields (invited/accepted/declined/…) let the search
+ *                      section collapse re-discovered already-engaged people
+ *                      instead of rendering them as invitable cards.
  *   - proposalFileKey / onProposalFileKeyChange : reload-stable navigation
  *                      binding for a server-validated manual SharePoint choice.
  *   (context / canManage are passed by ReviewersTab but not needed here — the
@@ -52,7 +55,7 @@ function fileKeyOf(f) {
 
 export default function ReviewerFindPanel({
   requestId,
-  savedPoolNames = [],
+  savedPool = [],
   onSaved,
   onNavigate,
   canManage = true,
@@ -762,7 +765,7 @@ export default function ReviewerFindPanel({
         ingestLoading={ingest.loading}
         ingestError={ingest.error}
         onRetryIngestion={runIngestion}
-        savedPoolNames={savedPoolNames}
+        savedPool={savedPool}
         onSaved={onSaved}
         onNavigate={onNavigate}
         manualAddSlot={manualAddCard}

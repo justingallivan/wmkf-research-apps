@@ -315,6 +315,33 @@ Focused source tests and later signed-in no-send checks covered this engagement
 projection. Do not confuse that historical repair with the separate,
 now-reverted warm-reconciliation build described above.
 
+**Re-discovery reconciliation (S401, Kwong confusion 2026-08-04):** the server
+roster reconcile above only covers rows WITH a suggestion anchor — a fresh,
+unanchored search result for an already-engaged person rendered as a fully
+invitable card whenever discovery's exact normalized-name exclusion filter
+missed a name variant. Closed client-side at the display merge:
+`shared/utils/reviewer-rediscovery.js` indexes the saved pool's ENGAGED rows
+(stage beyond 'selected') by every identity key (person GUID, ORCID —
+extracted from `orcidUrl` too — Scholar id, OpenAlex id, diacritic-folded
+name), and `ReviewerSearchSection` partitions `displayCandidates` against it:
+matches leave the actionable/selectable/save lists and render in the **Already
+handled** summary as a "Re-found by search" entry keyed by the saved row's
+`suggestion:` anchor (so it folds into an existing handled entry for the same
+person rather than duplicating). A merely-'selected' saved row deliberately
+does NOT collapse its twin. Name-key matches are rejected when a shared
+anchor type CONFLICTS (same-name different-ORCID people stay separate —
+Codex adversarial finding); an anchor-less name match still collapses, the
+accepted ambiguous-namesake trade — the entry stays visible with stage +
+navigation, and manual add remains the namesake escape. `ReviewersTab` now
+passes `savedPool` (was `savedPoolNames`): active candidates PLUS declined
+removed rows (declines archive to `selected=false`, so they live only in
+`removedCandidates` — second Codex finding; `projectRemovedCandidates` now
+emits person/ORCID/Scholar anchors for them); staff-removed-not-declined rows
+stay out deliberately. Exclusion-union names derive inside the section. Also corrected: an `invited`-stage handled entry navigates to
+Invite (pending list) instead of Track, where an unaccepted person is not
+visible. Tests: `tests/unit/reviewer-rediscovery.test.js`,
+`tests/unit/reviewer-search-rediscovery.test.js`.
+
 **Unified candidate list:** Enriched applicant candidates (`recCandidates`) are prepended into `displayCandidates` so fresh enrichment wins over stale roster copies. Candidates with a resolved identity surface in the `applicant_suggested` provenance section — which appears after `cited_or_proposal_named` and `literature_retrieved` in that order — via `provenanceGroupOf` detecting `isApplicantRecommended: true` → `APPLICANT_SUGGESTED` kind. **Exception:** candidates where enrichment could not confirm identity (`needsIdentification: true`, typically when the applicant provided no affiliation) route to `needs_identity_review` instead — `provenanceGroupOf` checks `needsIdentification` before `APPLICANT_SUGGESTED` (reviewer-provenance.js:228 vs :231). The `applicant_suggested` section is selectable unless normal safety gates make a row read-only; selecting it calls `POST /api/workbench/promote-applicant-reviewer` with the existing `suggestionId` instead of `save-candidates`.
 
 **Roster persistence:** `/api/workbench/enrich-recommended` snapshots each

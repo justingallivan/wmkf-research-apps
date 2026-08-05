@@ -149,8 +149,11 @@ test('a handled suggestion-anchored roster row renders only in the Already handl
   expect(await screen.findByText('Already handled')).toBeInTheDocument();
   expect(screen.getByText('Already Invited Search Result')).toBeInTheDocument();
   expect(screen.queryByLabelText('Select Already Invited Search Result')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Open Track' }));
-  expect(onNavigate).toHaveBeenCalledWith('track');
+  // S401 correction: an invited-but-unaccepted person is NOT visible in Track
+  // (the review-manager GET behind it returns accepted reviewers only) — they
+  // live in the Invite tab's pending list, so the button routes there.
+  fireEvent.click(screen.getByRole('button', { name: 'Open Invite' }));
+  expect(onNavigate).toHaveBeenCalledWith('candidates');
 });
 
 test('a declined handled row navigates to Removed instead of Track', async () => {

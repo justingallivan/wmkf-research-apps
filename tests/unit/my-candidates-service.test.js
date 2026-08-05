@@ -136,7 +136,12 @@ describe('getMyCandidates', () => {
     potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
       select.includes('wmkf_organizationname')
         ? { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }] }
-        : { records: [] }
+        : { records: [{
+          wmkf_potentialreviewersid: PERSON_ID,
+          wmkf_orcid: '0000-0001-2345-6789',
+          wmkf_orcidurl: 'https://orcid.org/0000-0001-2345-6789',
+          wmkf_googlescholarid: 'scholar-x',
+        }] }
     ));
 
     const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
@@ -145,7 +150,11 @@ describe('getMyCandidates', () => {
     expect(out.proposals[0].candidates).toEqual([]);
     expect(out.proposals[0].removedCandidates).toEqual([expect.objectContaining({
       suggestionId: SUGGESTION_ID,
+      potentialReviewerId: PERSON_ID,
       name: 'Dr X',
+      orcid: '0000-0001-2345-6789',
+      orcidUrl: 'https://orcid.org/0000-0001-2345-6789',
+      googleScholarId: 'scholar-x',
       wasInvited: true,
       declined: true,
       responseType: 'declined',
