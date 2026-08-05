@@ -247,4 +247,86 @@ describe('InviteEmailModal capture-mode result display', () => {
     });
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/starts the normal reminder timeline/i));
   });
+
+  // S400 finding 2 (post-send refresh): onSent must carry the SERVER-confirmed
+  // invited rows so the parent can paint them on top of its refetch. A row the
+  // server flagged inviteRecorded:false ("sent but the wmkf_invited stamp
+  // failed — verify before retry") is genuinely still unstamped and must NOT be
+  // painted invited.
+  test('onSent receives confirmed invited ids and excludes inviteRecorded:false rows', async () => {
+    const draftS2 = { ...draft, suggestionId: 'S2', candidateName: 'Dr. Second', body: draft.body };
+    const onSent = jest.fn();
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/campaign-timeline-defaults') {
+        return mockJson({ timeline: {}, isDefault: true, malformed: false });
+      }
+      if (url === '/api/review-manager/render-emails') return mockJson({ drafts: [draft, draftS2] });
+      if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    readSseStream.mockImplementation(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: {
+          sent: [
+            { suggestionId: 'S1', candidateName: 'Dr. Test Reviewer', emailId: 'e1', inviteRecorded: true },
+            { suggestionId: 'S2', candidateName: 'Dr. Second', emailId: 'e2', inviteRecorded: false },
+          ],
+          failed: [],
+          skipped: [],
+        },
+      });
+    });
+
+    render(
+      <InviteEmailModal
+        candidates={[
+          { suggestionId: 'S1', name: 'Dr. Test Reviewer', email: 'reviewer@example.org' },
+          { suggestionId: 'S2', name: 'Dr. Second', email: 'second@example.org' },
+        ]}
+        settings={{ signature: 'Program Director' }}
+        onClose={jest.fn()}
+        onSent={onSent}
+      />,
+    );
+
+    await screen.findAllByDisplayValue('Invitation');
+    fireEvent.click(await screen.findByRole('button', { name: /send 2 invitations/i }));
+
+    await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+    expect(onSent).toHaveBeenCalledWith({
+      invitedSuggestionIds: ['S1'],
+      sentAt: expect.any(String),
+    });
+  });
+
+  test('onSent falls back to accumulated email_sent events when the stream ends without a result frame', async () => {
+    const onSent = jest.fn();
+    readSseStream.mockImplementation(async (_response, onEvent) => {
+      onEvent({
+        event: 'email_sent',
+        data: { suggestionId: 'S1', candidateName: 'Dr. Test Reviewer', emailId: 'e1', inviteRecorded: true },
+      });
+      // no `result` frame — e.g. the stream was cut after the last per-email event
+    });
+
+    render(
+      <InviteEmailModal
+        candidates={[{ suggestionId: 'S1', name: 'Dr. Test Reviewer', email: 'reviewer@example.org' }]}
+        settings={{ signature: 'Program Director' }}
+        onClose={jest.fn()}
+        onSent={onSent}
+      />,
+    );
+
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(await screen.findByRole('button', { name: /send 1 invitation/i }));
+
+    await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+    expect(onSent).toHaveBeenCalledWith({
+      invitedSuggestionIds: ['S1'],
+      sentAt: expect.any(String),
+    });
+  });
 });

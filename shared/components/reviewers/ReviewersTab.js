@@ -63,6 +63,13 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // keying contract changes or a request is reloaded in place.
   const currentRequestIdRef = useRef(requestId);
   currentRequestIdRef.current = requestId;
+  // Same-request overlap guards: two in-flight calls to the SAME loader (e.g. a
+  // mutation refresh racing a mount/prior refresh) must resolve newest-wins —
+  // without this, a slower stale response repaints over the fresh one. The
+  // requestId ref above only covers cross-request navigation.
+  const candidatesGenRef = useRef(0);
+  const reviewersGenRef = useRef(0);
+  const referralsGenRef = useRef(0);
   // Per-referral inline action state for the Track Reviewers decline-referral
   // callout, keyed by the per-item referralId (with suggestionId as a legacy
   // fallback). Drives structured add/identity confirmation and legacy-note
@@ -97,23 +104,25 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const loadReviewers = useCallback(async () => {
     if (!requestId) return;
     const rid = requestId;
+    const gen = ++reviewersGenRef.current;
+    const isCurrent = () => rid === currentRequestIdRef.current && gen === reviewersGenRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
-      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
+      if (!isCurrent()) return; // request changed or a newer load superseded this one
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Failed to load reviewers (${res.status})`);
       }
       setProposal((data.proposals && data.proposals[0]) || null);
     } catch (e) {
-      if (rid === currentRequestIdRef.current) {
+      if (isCurrent()) {
         setError(e.message);
         setProposal(null);
       }
     } finally {
-      if (rid === currentRequestIdRef.current) setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [requestId]);
 
@@ -123,26 +132,41 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
 
   // Saved-candidate roster (all selected suggestion rows for the request,
   // regardless of accepted) — the data behind the Candidates tab + its badge.
-  const loadCandidates = useCallback(async () => {
+  // confirmedInvites = { invitedSuggestionIds, sentAt } | null. When present
+  // (post-invite-send refresh), those rows are painted invited on top of the
+  // refetched roster: the send stream already confirmed their wmkf_invited
+  // stamp committed, so the overlay is server-confirmed fact — not optimism —
+  // and a read that lags the just-committed write can't re-render the rows as
+  // still invitable (S400 finding 2).
+  const loadCandidates = useCallback(async (confirmedInvites = null) => {
     if (!requestId) return;
     const rid = requestId;
+    const gen = ++candidatesGenRef.current;
+    const isCurrent = () => rid === currentRequestIdRef.current && gen === candidatesGenRef.current;
     setCandidatesLoading(true);
     try {
       const res = await fetch(`/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
-      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
+      if (!isCurrent()) return; // request changed or a newer load superseded this one
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
-      setCandidates(Array.isArray(rows) ? rows : []);
+      let next = Array.isArray(rows) ? rows : [];
+      if (confirmedInvites) {
+        const ids = new Set(confirmedInvites.invitedSuggestionIds);
+        next = next.map((c) => (ids.has(c.suggestionId)
+          ? { ...c, invited: true, emailSentAt: c.emailSentAt || confirmedInvites.sentAt || null }
+          : c));
+      }
+      setCandidates(next);
       setRemovedCandidates(Array.isArray(removed) ? removed : []);
     } catch {
-      if (rid === currentRequestIdRef.current) {
+      if (isCurrent()) {
         setCandidates([]);
         setRemovedCandidates([]);
       }
     } finally {
-      if (rid === currentRequestIdRef.current) setCandidatesLoading(false);
+      if (isCurrent()) setCandidatesLoading(false);
     }
   }, [requestId]);
 
@@ -157,13 +181,15 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const loadDeclineReferrals = useCallback(async () => {
     if (!requestId) return;
     const rid = requestId;
+    const gen = ++referralsGenRef.current;
+    const isCurrent = () => rid === currentRequestIdRef.current && gen === referralsGenRef.current;
     try {
       const res = await fetch(`/api/workbench/decline-referrals?requestId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
-      if (rid !== currentRequestIdRef.current) return; // request changed mid-flight — drop stale result
+      if (!isCurrent()) return; // request changed or a newer load superseded this one
       setDeclineReferrals(res.ok && Array.isArray(data.referrals) ? data.referrals : []);
     } catch {
-      if (rid === currentRequestIdRef.current) setDeclineReferrals([]);
+      if (isCurrent()) setDeclineReferrals([]);
     }
   }, [requestId]);
 
@@ -180,8 +206,17 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // refresh the other or the untouched tab shows stale state (Codex S213: removing
   // an accepted candidate refreshed only the candidates list, leaving the Invite
   // tab still showing the removed reviewer).
-  const refreshAll = useCallback(() => {
-    loadCandidates();
+  // Accepts an optional { invitedSuggestionIds, sentAt } payload from the
+  // post-invite-send path (see loadCandidates). refreshAll is handed around as a
+  // bare callback (onSaved/onRefresh/onClick), so anything that isn't that exact
+  // shape — click events included — is ignored rather than trusted.
+  const refreshAll = useCallback((confirmedInvites) => {
+    const overlay = confirmedInvites
+      && Array.isArray(confirmedInvites.invitedSuggestionIds)
+      && confirmedInvites.invitedSuggestionIds.length > 0
+      ? { invitedSuggestionIds: confirmedInvites.invitedSuggestionIds, sentAt: confirmedInvites.sentAt || null }
+      : null;
+    loadCandidates(overlay);
     loadReviewers();
     loadDeclineReferrals();
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);

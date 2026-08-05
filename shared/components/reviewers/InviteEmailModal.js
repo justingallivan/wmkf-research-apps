@@ -20,7 +20,10 @@
  *   - candidates : [{ suggestionId, name, email }] to invite (already filtered)
  *   - settings   : { signature }
  *   - allowResend: when true, the server re-sends to already-invited candidates
- *   - onClose, onSent
+ *   - onClose, onSent — onSent receives { invitedSuggestionIds, sentAt }: the
+ *     rows the server confirmed BOTH dispatched and lifecycle-stamped
+ *     (inviteRecorded !== false), so the parent can paint them invited on top
+ *     of its refetch rather than trusting the read to already reflect the send.
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -352,7 +355,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not record the manual invitation.');
       if (!mountedRef.current) return;
-      if (onSent) onSent();
+      // The PATCH above just stamped this row invited — same confirmed-fact
+      // overlay contract as the batch send path.
+      if (onSent) onSent({ invitedSuggestionIds: [draft.suggestionId], sentAt: new Date().toISOString() });
       onClose();
     } catch (e) {
       if (!mountedRef.current) return;
@@ -571,10 +576,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       });
       let final = null;
       let sawTerminalError = false;
+      // Local accumulator mirroring the email_sent events — the fallback source
+      // for the onSent payload if the stream ends without a `result` frame
+      // (React state can't be read back synchronously after the loop).
+      const sentEvents = [];
       await readSseStream(res, ({ event, data }) => {
         if (event === 'error') { sawTerminalError = true; setError(data?.message || 'Send failed'); return; }
         if (event === 'progress') setProgress((p) => ({ ...p, ...data }));
-        else if (event === 'email_sent') setResults((r) => ({ ...r, sent: [...r.sent, data] }));
+        else if (event === 'email_sent') { sentEvents.push(data); setResults((r) => ({ ...r, sent: [...r.sent, data] })); }
         else if (event === 'email_failed') setResults((r) => ({ ...r, failed: [...r.failed, data] }));
         else if (event === 'email_unconfirmed') setResults((r) => ({ ...r, unconfirmed: [...r.unconfirmed, data] }));
         else if (event === 'result') final = data;
@@ -591,7 +600,17 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         setStep('error');
       } else {
         setStep('sent');
-        if (onSent) onSent();
+        if (onSent) {
+          // Server-confirmed facts only: rows whose invitation dispatched AND had
+          // its wmkf_invited stamp recorded. A row with inviteRecorded === false
+          // ("sent but not recorded — verify before retry") must keep showing its
+          // true, unstamped state, so it is excluded from the overlay.
+          const confirmed = (final?.sent || sentEvents).filter((r) => r.inviteRecorded !== false);
+          onSent({
+            invitedSuggestionIds: confirmed.map((r) => r.suggestionId).filter(Boolean),
+            sentAt: new Date().toISOString(),
+          });
+        }
       }
     } catch (e) {
       setError(e.message);
