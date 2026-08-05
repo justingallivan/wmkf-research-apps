@@ -378,12 +378,40 @@ finished or fully production-proved.
 
 ## S399 addendum — enrichment identity-verdict findings (2026-08-04)
 
-> [STALE-ACCEPTED: lib/services/workbench/enrich-recommended-service.js — the
-> `fix/enrichment-identity-verdict` branch (increments A–E, S400) modifies this
-> file, so line refs in this addendum drift on the branch. Behavior claims in
-> findings 1–4 describe the PRE-FIX state the branch remediates. Full
-> reconciliation happens in the branch's docs pass after the Codex review
-> verdict, before promotion.]
+> **Branch remediation status (S400 docs pass; branch
+> `fix/enrichment-identity-verdict`, unmerged — statuses apply ON THE BRANCH,
+> not production, until promotion).** Findings below describe the pre-fix
+> state; line refs are pre-branch. Status per finding:
+> - Finding 1 (misleading copy): FIXED — contradiction provenance
+>   (`compared`/`comparison_error`/`prior_flag`) drives distinct reason copy;
+>   a decided contradiction names both compared strings ("their recorded
+>   affiliation" — it may be an enrichment override, not the applicant-listed
+>   value); a comparison error reads as "could not be completed / unverified";
+>   the banner attributes applicant-listed institutions to the applicant and
+>   no longer fabricates "PubMed shows a different institution" on withheld
+>   rows. RESIDUAL (recorded follow-up): the DTO still exposes only the
+>   boolean `institutionMismatch`, so the BANNER cannot distinguish a
+>   comparison error from a real contradiction — fixing that needs a
+>   structured verdict `{status, source}` through DTO→roster→card (Codex
+>   re-review finding 1, deferred with the extractor work below).
+> - Finding 2 (no durable observability): FIXED — permanent compact
+>   `[institution-verdict]` log per candidate (suggestionId, gate results,
+>   provenance, clipped compared strings).
+> - Finding 3 (stale-cache verdict replay): PARTIALLY FIXED —
+>   `APPLICANT_ENRICHMENT_CACHE_VERSION` 3→4 forces pre-fix rows through one
+>   fresh enrichment; the broader "no indication of verdict age" concern
+>   remains with the S397 cache-staleness backlog item.
+> - Finding 4 (silent no-op button): OPEN — not addressed on this branch.
+> - Underlying false-mismatch class: ATTRIBUTED but NOT YET FIXED. A byline
+>   core-extraction fallback was built and REVERTED (Codex review, HIGH: the
+>   borrowed aggregation-key extractor collapsed comma-qualified sibling
+>   institutions into false CONSISTENTs — a Dataverse write-gate hazard).
+>   Accepted follow-up: a conservative segment-whole extractor (≥3-segment
+>   byline guard, whole-segment extraction, no truncation/50-char paths) whose
+>   acceptance spec is pinned in
+>   `tests/unit/enrich-recommended-institution-evidence.test.js` (four
+>   captured pairs flip to true; all sibling attacks stay false), shipped
+>   together with the structured-verdict DTO above.
 >
 > S400 update: attribution CLOSED via a one-run production capture (TEMP
 > `[verdict-trace]` instrumentation, added and removed same-day; line refs
