@@ -1,118 +1,102 @@
-# Session 401 Prompt: Reviewer workflow product fixes (post-S400 queue)
+# Session 402 Prompt: Remaining reviewer product fixes (post-S401 queue)
 
-> **Handoff, 2026-08-04 (Session 400).** Production is healthy and carries the
-> S400 identity-verdict overhaul (merged `5e7379a1`, smoke-verified same day).
-> The S399 enrichment identity-verdict investigation is CLOSED with production
-> operand evidence; the warm-incident residual-data damage was found and
-> resolved. Three new product findings from the owner's evening usage are the
-> primary queue. Run `/start` first.
+> **Handoff, 2026-08-05 (Session 401).** Production is healthy and carries TWO
+> S401 merges, both smoke-relevant to the owner's next real usage: the
+> post-send roster repaint (merge `fb8e0f0a`) and the re-discovery engagement
+> collapse (merge `f36731f0`, deployed + verified Ready). Both went through
+> Codex adversarial review; every finding was remediated with pinned
+> regression tests. Run `/start` first.
 
-## Session 400 Summary
+## Session 401 Summary
 
-Full arc: two red gates fixed → identity-verdict attribution closed via
-temporary production operand trace (Codex-verified) → fix branch built,
-adversarially reviewed (one HIGH found and remediated by reduction), merged,
-deployed, smoke-verified → warm-incident residual data damage discovered,
-bounded, and resolved via fresh search → three new product findings triaged
-with code-level evidence.
+Owner-prioritized findings 2 and 1 from the S400 evening-usage triage were
+built, adversarially reviewed, remediated, merged, and deployed. All 57
+`/start` gates were green at session start; full suite grew 6,820 → 6,842.
 
 ### What Was Completed
 
-1. **Identity-verdict attribution CLOSED (evidence-first).** Local probes +
-   one owner-triggered production run with a temporary `[verdict-trace]`
-   (added `1a3c34ec`, removed byte-exact `7ed02548`) captured all five
-   compared operand pairs on request 1002903. Verdicts were genuine checker
-   `false` returns on raw PubMed byline evidence vs clean listed institutions
-   — resolver abstained (OpenAlex healthy), no throw, no cache replay, no
-   legacy carry-over. 4 of 5 are byline false mismatches; the 5th (Yubin
-   Zhou: Northwestern byline vs listed Texas A&M) is likely a correct flag
-   (namesake bleed, 50% verification confidence). Codex independently
-   verified. Evidence: `outputs/s400-institution-checker-probe-findings.md`
-   + `outputs/s400-verdict-trace-capture-2026-08-04.log` (gitignored).
-2. **Verdict overhaul SHIPPED to production (merge `5e7379a1`).** Honest
-   verdict copy with contradiction provenance (`compared`/`comparison_error`/
-   `prior_flag`; a decided contradiction names both compared strings; an
-   error never reads as a mismatch claim); permanent compact
-   `[institution-verdict]` log per candidate; success-path DTO writes the
-   reconciled verdict; banner attributes applicant-listed institutions to the
-   applicant + no fabricated "PubMed shows"; applicant-enrichment cache v4
-   (pre-fix rows re-enrich once). Review chain: author adversarial pass →
-   Codex adversarial review (REQUEST CHANGES: HIGH — the borrowed
-   `normalizeAffiliationForComparison` aggregation-key extractor collapses
-   comma-qualified sibling institutions into false CONSISTENTs at a Dataverse
-   write gate) → increment A REVERTED (`b5b5fe08`), copy nits fixed → Codex
-   re-review (needs-attention; finding 2 fixed = cache bump `50ed9469`,
-   finding 1 recorded as follow-up) → merged, smoke green (five
-   `[institution-verdict]` lines in prod logs, zero errors). Branch deleted.
-3. **Warm-incident residual data damage found + resolved.** Owner noticed
-   Shapiro's missing coauthor-COI flag; probes bounded the damage to exactly
-   10 rows on request 1002903 (warm stage-plan keys +
-   `coauthorCheckStatus: "not_applicable"` + zeroed COI; three complement
-   checks confirmed no other request affected). One owner-triggered fresh
-   Find search replaced the rows; Shapiro + 6 others flag again. Recorded in
-   `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` §"S400
-   addendum" with the revert-checklist lesson.
-4. **Codex research docs cherry-picked to main** (`97e433bc`, authored in the
-   owner's exploration worktree): reviewer identity/institution-resolution
-   research + strategy evaluation.
-5. **Three new product findings triaged with code evidence** (see Verified
-   Open below): re-discovery vs engagement reconciliation, post-send refresh
-   bug, unverified-card rescue dead end.
+1. **Post-send refresh bug (S400 finding 2) SHIPPED (merge `fb8e0f0a`).**
+   Investigation FIRST disproved the suspected "onSent fires before SSE/stamps
+   complete" race — every hop is awaited end-to-end (stamp PATCH →
+   `email_sent` → `result` → `res.end()` → client stream close → `onSent`);
+   the production mechanism remains unattributed. Shipped defense-in-depth:
+   InviteEmailModal.onSent passes `{ invitedSuggestionIds, sentAt }` (only
+   rows the stream confirmed dispatched AND stamped, `inviteRecorded !==
+   false`); ReviewersTab paints those rows invited on top of the refetch;
+   same-request newest-wins generation guards on all three loaders. Two Codex
+   adversarial rounds found real flaws in the hardening itself, both fixed:
+   (a) overlay could resurrect a concurrent remove→restore reset → 4s
+   reconciling refetch; (b) reconcile clock started at schedule-time and
+   could cancel a >4s overlay fetch → clock now starts at PAINT-time (fix
+   authored by Codex via rescue, reviewed by Claude).
+2. **Re-discovery engagement collapse (S400 finding 1) SHIPPED (merge
+   `f36731f0`).** New `shared/utils/reviewer-rediscovery.js`: index the saved
+   pool's ENGAGED rows (stage beyond 'selected') by every identity key
+   (person GUID, ORCID incl. from orcidUrl, Scholar, OpenAlex,
+   diacritic-folded name); ReviewerSearchSection partitions the display merge
+   — matches collapse into "Already handled" as "Re-found by search" entries
+   instead of invitable cards. Codex adversarial pass found two gaps, both
+   fixed (Codex-authored, Claude-reviewed): name-key matches now REJECT on a
+   conflicting shared anchor (same-name different-ORCID stays separate), and
+   declined people reach the pool (declines archive to `selected=false` —
+   `projectRemovedCandidates` now emits person/ORCID/Scholar anchors and
+   ReviewersTab's `findSavedPool` = active + declined removed rows;
+   staff-removed-not-declined stay out deliberately). Also corrected: an
+   invited-stage "Already handled" entry navigates to Invite, not Track (the
+   Track GET is accepted-only, `reviewers-service.js:191`); pinned test
+   updated with rationale.
+3. **Prop contract change:** ReviewersTab → ReviewerFindPanel →
+   ReviewerSearchSection now passes `savedPool` (full candidate rows);
+   `savedPoolNames` derives inside the section for the exclusion union.
+4. **Claim-evidence pilot:** the S400 "local state could not be read" issue
+   did NOT recur — the `--current` report ran cleanly (no eligible edit, no
+   row added, per its own instruction).
+5. **New memory:** `feedback-codex-delegation-review-vs-rescue-routing.md`
+   (review-shaped work must use `/codex:adversarial-review` user-invoked;
+   rescue prompts referencing review findings need the CODEX RESCUE HANDOFF +
+   `[INTENTIONAL-RESCUE]` preface).
 
 ### Commits (session, chronological)
-- `97bc5005` docs: fix red drain-table and harness-framing gates
-- `1a3c34ec` chore: TEMP S400 verdict-operand trace
-- `01c12ee9` docs: SESSION_PROMPT line-shift marker
-- `7ed02548` chore: remove S400 verdict trace (attribution closed)
-- branch `fix/enrichment-identity-verdict` (11 commits, merged `5e7379a1`,
-  deleted): increments A–E + A revert + copy fixes + cache bump + docs pass
-- `5a733032` / `d39a01c7` docs: containment-first follow-up design
-- `97e433bc` docs: reviewer identity resolution research (cherry-pick)
-- (this handoff commit) docs: incident addendum + Session 401 prompt
+- `66038fe3` fix: post-send confirmed-invite overlay + newest-wins guards
+- `c0e82410` fix: time-bound the overlay (Codex finding 1)
+- `9738ab2c` fix: paint-time reconcile clock (Codex finding 2, Codex-authored)
+- `f816ad4a` docs: wiki paint-time anchoring
+- `fb8e0f0a` MERGE fix/post-send-refresh → production
+- `7ea67e9a` feat: re-discovery engagement collapse
+- `d9578f41` fix: anchor-conflict rejection + declined pool (Codex-authored)
+- `f36731f0` MERGE fix/rediscovery-engagement-reconciliation → production
+- (this handoff commit) docs + memory
 
 ## Next Items
 
-### Verified Open (owner-prioritized, from S400 evening usage)
+### Verified Open (owner-prioritized, carried from S400 triage)
 
-1. **Re-discovery vs engagement reconciliation (owner proposal, agreed).**
-   Evidence: Kwong invite confusion 2026-08-04 — a fresh search re-surfaces
-   already-invited/declined people as fully invitable cards; the invite panel
-   then splits the selection ("Send invitation (2)" + "release 1") with no
-   explanation, and `send-emails-service.js:494` server-guards duplicates
-   (`already_invited`). Design sketch: at the post-search roster merge,
-   project engagement (`reviewerEngagementProjection`) onto re-discovered
-   matches and render a collapsed "re-discovered — already invited (pending)"
-   card class. Tier 1–2, branch.
-2. **Post-send refresh bug (client-only, class confirmed).** Evidence: after
-   send, invited candidates still showed invitable; a page reload showed all
-   promoted reviewers correctly in the Invite tab (server stamps landed).
-   `afterSent` → `onRefresh` → `refreshAll` is wired
-   (`ReviewerInvitePanel.js:333`, `ReviewersTab.js:432`) — suspect onSent
-   timing vs SSE `complete` / refetch race. Tier 1–2, small.
-3. **Unverified-suggestion cards have no rescue affordance.** Evidence:
-   request 1003046, Yamuna Krishnan — the "Unverified suggestions" section
-   renders `CandidateCard readOnly` with NO handlers
-   (`ReviewerSearchSection.js:2927`), while the identity-review section wires
-   the confirm-identity escape hatch (`:2811`, gated by
+1. **Unverified-suggestion cards have no rescue affordance.** Evidence:
+   request 1003046, Yamuna Krishnan; the "Unverified suggestions" section
+   renders `CandidateCard readOnly` with no handlers
+   (`ReviewerSearchSection.js:2964-2967` post-S401 lines), while the
+   identity-review section wires confirm-identity (`:2820-2852`,
    `canConfirmForPromotion`). Fix: plumb the same confirm + exclude
-   affordances into the unverified render site (modal + server path already
-   exist; keep bibliometrics dropped server-side on manual confirm). Tier
-   1–2.
-4. **Comparison fix (containment-first) + structured verdict DTO.** Evidence:
-   directive §S399 addendum per-finding status; acceptance tests pinned in
-   `tests/unit/enrich-recommended-institution-evidence.test.js` (four
-   captured pairs flip to true, all eight sibling attacks stay false).
-   Candidate 1: word-boundary containment (covers 4/4 captured rows,
-   probe-verified; West Texas A&M is its pinned adversarial case); fallback:
-   conservative segment-whole extractor. Ships WITH the structured verdict
-   `{status, source}` through DTO→roster→card (Codex re-review finding 1: the
-   banner boolean can't distinguish comparison error from contradiction).
-   NEVER reuse a lossy aggregation-key extractor at this seam (S400 HIGH).
+   affordances into the unverified render site (modal + server path exist;
+   keep bibliometrics dropped server-side on manual confirm). Tier 1–2.
+   Recommended next.
+2. **Comparison fix (containment-first) + structured verdict DTO.** Evidence:
+   directive §S399 addendum; acceptance tests pinned in
+   `tests/unit/enrich-recommended-institution-evidence.test.js`. Candidate 1:
+   word-boundary containment; fallback: conservative segment-whole extractor.
+   Ships WITH the structured verdict `{status, source}` through
+   DTO→roster→card. NEVER reuse a lossy aggregation-key extractor at this
+   seam (S400 HIGH). Deserves a fresh session — fail-closed constraints.
+3. **Invite-panel split copy (residual of the Kwong confusion).** Evidence:
+   `ReviewerInvitePanel.js` splits a mixed selection into "Send invitation
+   (N)" + "release M" with no explanation. The S401 collapse mostly prevents
+   mixed selections arising from re-discovery, but the copy is still
+   unexplained when it does occur. Small UX polish, optional.
 
 ### Verified Open (carried)
 
 1. **S399 finding 4 — silent no-op invite button** (directive addendum:
-   OPEN). Not addressed by the S400 branch.
+   OPEN). Untouched by both S401 branches.
 2. **Blob-cache hazard watch (passive).**
 
 ### Owner Decision Needed (carried)
@@ -122,10 +106,8 @@ with code-level evidence.
 2. **Increment E — ProfileProvider double-fetch**
    (`shared/context/ProfileContext.js:456-489`). [ASSUMED ~0.5–1s tail].
 3. **Latency secondary candidates from D0** (only if owner wants more).
-4. **Columbia enrichment contaminant**: S400 capture showed
-   "EKA University of Applied Sciences" in Konofagou's resolvedInstitutions —
-   unexplained; worth a look at orcid/openAlexAffiliation sources if identity
-   work continues.
+4. **Columbia enrichment contaminant**: S400 capture showed "EKA University
+   of Applied Sciences" in Konofagou's resolvedInstitutions — unexplained.
 
 ### Parked (carried)
 
@@ -137,41 +119,45 @@ with code-level evidence.
 ### Verify Before Acting
 
 1. **Any comparison-fix work**: read the directive §S399 addendum status
-   block + the wiki workbench topic hazard first; the fail-closed posture is
+   block + the wiki workbench topic hazard first; fail-closed posture is
    deliberate (`project-reviewer-verify-fail-dangerous`); false negatives
    tolerable at this seam, false positives are not (Dataverse write gate).
-2. **Claim-evidence pilot**: the S400 `/stop` report returned "local state
-   could not be read" — no observation row was added; check whether the
-   pilot state issue recurs.
+2. **Owner's next real usage is the behavioral validation** for both S401
+   ships: (a) after an invite send, sent rows must immediately show Invited
+   with no reload — pre-reload vs post-reload divergence means the overlay
+   painted something Dataverse doesn't hold (report immediately); (b) a
+   fresh search re-finding an engaged person must collapse into "Already
+   handled"; a genuine namesake must stay selectable.
 
 ### Do Not Reopen Without New Decision
 
 1. Reverted warm-reconciliation range `5b6757df..7072d52a` — never
-   merge/cherry-pick. Residual-data coda now in the incident doc.
-2. The reverted byline-core fallback (`e2342f92`, reverted `b5b5fe08`) — do
-   not restore; the containment-first follow-up supersedes it.
+   merge/cherry-pick.
+2. The reverted byline-core fallback (`e2342f92`, reverted `b5b5fe08`) — the
+   containment-first follow-up supersedes it.
 3. Request `1002903` mutation work — read-only absent new exact owner
-   authorization (page views + owner-triggered enrichment/search/invite runs
-   are fine — S397–400 protocol).
+   authorization (S397–401 protocol).
+4. The S400-suspected onSent/SSE post-send race — investigated S401, does not
+   exist in code (every hop awaited; see wiki workbench topic). Do not
+   re-chase; the shipped overlay covers the symptom class.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` §S399 addendum | Per-finding status + containment-first follow-up spec |
-| `tests/unit/enrich-recommended-institution-evidence.test.js` | Pinned acceptance spec + sibling attacks for the comparison fix |
-| `lib/services/workbench/enrich-recommended-service.js` | Verdict seam (provenance, log, DTO) — post-merge shape |
-| `shared/components/reviewers/ReviewerInvitePanel.js:305-333` | Invite/pending split, afterSent refresh |
-| `lib/services/review-manager/send-emails-service.js:490-495` | already_invited duplicate guard |
-| `shared/components/reviewers/ReviewerSearchSection.js:2779-2811,2927` | Rescue affordance gating vs unverified dead end |
-| `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md` §S400 addendum | Residual-data finding + revert-checklist lesson |
-| `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` | Codex research (docs-only; nothing implemented) |
-| `outputs/s400-*` (gitignored) | Probe findings + verbatim production operand capture |
+| `shared/utils/reviewer-rediscovery.js` | Engaged-saved index + anchor-conflict partition (S401) |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Display-merge partition, Already-handled render, unverified dead end (`:2964`) |
+| `shared/components/reviewers/ReviewersTab.js` | findSavedPool, loader generation guards, overlay reconcile timer |
+| `shared/components/reviewers/InviteEmailModal.js` | onSent `{invitedSuggestionIds, sentAt}` contract |
+| `lib/services/reviewer-finder/my-candidates-service.js:426` | Removed projection now carries identity anchors |
+| `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` §S399 addendum | Comparison follow-up spec + per-finding status |
+| `tests/unit/reviewer-rediscovery.test.js` + `reviewer-search-rediscovery.test.js` | S401 collapse contract |
+| `tests/unit/reviewers-tab-post-send-refresh.test.js` | Post-send overlay/timer/pool-wiring contract |
 
 ## Testing
 
 ```bash
 npm run check:types
-npx jest --testPathPatterns "enrich-recommended|mismatch-banner|reviewer-search-logic"
-npx jest                                # full suite, 6,820
+npx jest --testPathPatterns "reviewer-rediscovery|reviewer-search|reviewers-tab|invite-email"
+npx jest                                # full suite, 6,842
 ```
