@@ -1141,6 +1141,17 @@ describe('hasValidApplicantEnrichmentCache', () => {
     ], proposalKey, expected)).toBe(false);
   });
 
+  test('pre-S400 version-3 rows cannot satisfy the post-fix verdict contract (literal pin)', () => {
+    // Version 3 rows carry pre-fix verdict copy (vague "contradict the listed
+    // institution" reasoning / stale mismatch flags). The S400 bump to 4 must
+    // force them through a fresh enrichment — this pins the LITERAL version so
+    // a future constant change is a conscious decision, not an accident.
+    expect(APPLICANT_ENRICHMENT_CACHE_VERSION).toBe(4);
+    expect(hasValidApplicantEnrichmentCache([
+      { ...canonical, applicantEnrichmentCacheVersion: 3 },
+    ], proposalKey, expected)).toBe(false);
+  });
+
   test('retries transient hydration outages but caches stable conflicts and mismatches', () => {
     expect(hasValidApplicantEnrichmentCache([
       {

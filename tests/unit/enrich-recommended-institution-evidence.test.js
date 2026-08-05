@@ -61,7 +61,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
   loadReviewerRequestContext: jest.fn(),
 }));
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
-  APPLICANT_ENRICHMENT_CACHE_VERSION: 3, pruneCandidateForRoster: jest.fn(),
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 4, pruneCandidateForRoster: jest.fn(),
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   recordSurfaced: jest.fn(), findCandidateBySuggestion: jest.fn(),

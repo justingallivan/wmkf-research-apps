@@ -28,7 +28,10 @@ import {
 // Increment when applicant-recommended enrichment semantics change in a way
 // that requires existing roster JSON to be recomputed. Unversioned legacy rows
 // deliberately miss the cache once and are stamped by the enrichment service.
-export const APPLICANT_ENRICHMENT_CACHE_VERSION = 3;
+// v4 (S400): verdict copy overhaul — version-3 rows carry the pre-fix vague
+// "contradict the listed institution" reasoning (or a stale mismatch flag the
+// success path now reconciles) and must re-enrich rather than replay it.
+export const APPLICANT_ENRICHMENT_CACHE_VERSION = 4;
 
 /**
  * Merge contact-enrichment results (from /enrich-contacts) back onto the chosen

@@ -109,7 +109,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
 }));
 
 jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
-  APPLICANT_ENRICHMENT_CACHE_VERSION: 3,
+  APPLICANT_ENRICHMENT_CACHE_VERSION: 4,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -203,7 +203,7 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   expect(recordSurfaced).toHaveBeenCalledTimes(1);
   expect(recordSurfaced).toHaveBeenCalledWith(
     REQ,
-    [expect.objectContaining({ applicantEnrichmentCacheVersion: 3 })],
+    [expect.objectContaining({ applicantEnrichmentCacheVersion: 4 })],
     { expectedUpdatedAt: null },
   );
 });
