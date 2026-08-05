@@ -478,7 +478,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           proposalFileKey={proposalFileKey}
           proposalBindingReady={router.isReady !== false}
           onProposalFileKeyChange={persistProposalFileKey}
-          savedPoolNames={candidates.map((c) => c.name).filter(Boolean)}
+          savedPool={candidates}
           onSaved={refreshAll}
           onNavigate={selectSub}
         />

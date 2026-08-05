@@ -62,6 +62,11 @@ import {
   withReviewerCandidateKey,
 } from './reviewer-search-logic';
 import { reviewerEngagementProjection } from '../../utils/reviewer-engagement';
+import {
+  buildEngagedSavedIndex,
+  partitionRediscoveredCandidates,
+  REDISCOVERED_STAGE_LABELS,
+} from '../../utils/reviewer-rediscovery';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import {
@@ -892,7 +897,7 @@ export default function ReviewerSearchSection({
   ingestLoading = false,
   ingestError = null,
   onRetryIngestion,
-  savedPoolNames = [],
+  savedPool = [],
   onSaved,
   onNavigate,
   manualAddSlot = null,
@@ -900,6 +905,15 @@ export default function ReviewerSearchSection({
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
+  // Saved-pool projections: names feed the cross-run search exclusion union
+  // (S224); the engaged-row identity index collapses re-discovered
+  // already-engaged people at the display merge (S401 Kwong confusion —
+  // discovery's exact-name filter misses name variants; anchors don't).
+  const savedPoolNames = useMemo(
+    () => (Array.isArray(savedPool) ? savedPool : []).map((c) => c?.name).filter(Boolean),
+    [savedPool],
+  );
+  const engagedSavedIndex = useMemo(() => buildEngagedSavedIndex(savedPool), [savedPool]);
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
@@ -1418,7 +1432,15 @@ export default function ReviewerSearchSection({
       candidateKey: candKey(candidate),
       updatedAt: candidate.rosterUpdatedAt,
     })), [previousSearchCandidates]);
-  const displayCandidates = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+  // Re-discovery reconciliation (S401): a merged candidate whose identity
+  // anchors (or normalized name) match an ENGAGED saved-pool row leaves the
+  // actionable list here and joins the Already-handled section below as a
+  // "re-found by search" entry. Everything downstream (selection, save,
+  // provenance sections, unverified suppression) sees only the kept list.
+  const { kept: displayCandidates, rediscovered: rediscoveredEngaged } = useMemo(() => {
+    const merged = dedupeByName([...visibleRecCandidates, ...candidates, ...displayRosterActive].map((c) => withReviewerProvenance(c)));
+    return partitionRediscoveredCandidates(merged, engagedSavedIndex);
+  }, [visibleRecCandidates, candidates, displayRosterActive, engagedSavedIndex]);
   const handledReviewers = useMemo(() => dedupeByName([
     ...recHandled,
     ...rosterHandled,
@@ -1430,7 +1452,19 @@ export default function ReviewerSearchSection({
         name: row.applicantKnownReviewer?.name || row.name || 'Applicant-recommended reviewer',
         stage: reviewerEngagementProjection(row).stage,
       })),
-  ]), [recHandled, rosterHandled, recommended]);
+    // Keyed by the SAVED row's suggestion anchor (dedupe collapses on exact
+    // keys, not names) and appended LAST, so when the same person already has a
+    // suggestion-anchored handled entry above, that entry wins first-occurrence
+    // and this twin folds into it instead of listing the person twice.
+    ...rediscoveredEngaged.map(({ candidate, saved }) => ({
+      suggestionId: saved.suggestionId,
+      candidateKey: saved.suggestionId ? `suggestion:${saved.suggestionId}` : candKey(candidate),
+      name: saved.name || candidate.name,
+      affiliation: saved.affiliation || candidate.affiliation || null,
+      stage: saved.stage,
+      rediscovered: true,
+    })),
+  ]), [recHandled, rosterHandled, recommended, rediscoveredEngaged]);
   const incompleteCoiCandidates = dedupeByName([...displayCandidates, ...rosterIneligible])
     .filter((candidate) => candidate.coauthorCheckStatus === 'incomplete');
   const incompleteCoiNames = incompleteCoiCandidates.map((candidate) => candidate.name).filter(Boolean);
@@ -1462,7 +1496,14 @@ export default function ReviewerSearchSection({
   // verified row always wins over its unverified twin. Excluded names drop too —
   // they already have their own collapsed section.
   const knownNameKeys = new Set(
-    [...displayCandidates.map(candKey), ...rosterExcluded.map(candKey), ...rosterIneligible.map(candKey)].filter(Boolean)
+    [
+      ...displayCandidates.map(candKey),
+      // Re-discovered engaged rows left displayCandidates but are still known
+      // people — their unverified twins must stay suppressed.
+      ...rediscoveredEngaged.map(({ candidate }) => candKey(candidate)),
+      ...rosterExcluded.map(candKey),
+      ...rosterIneligible.map(candKey),
+    ].filter(Boolean)
   );
   const unverifiedToShow = unverified.filter((c) => !knownNameKeys.has(candKey(c)));
 
@@ -3006,17 +3047,25 @@ export default function ReviewerSearchSection({
         <ul className="space-y-2">
           {handledReviewers.map((reviewer) => (
             <li key={reviewer.candidateKey || reviewer.suggestionId || reviewer.name} className="flex items-center justify-between gap-3 text-sm border border-gray-200 rounded p-2">
-              <span>
+              <span className="min-w-0">
                 <span className="font-medium text-gray-900">{reviewer.name}</span>
-                <span className="ml-2 text-gray-500">{String(reviewer.stage || 'handled').replaceAll('_', ' ')}</span>
+                {reviewer.rediscovered && <Pill tone="blue">Re-found by search</Pill>}
+                <span className="ml-2 text-gray-500">
+                  {reviewer.rediscovered
+                    ? (REDISCOVERED_STAGE_LABELS[reviewer.stage] || String(reviewer.stage || 'handled').replaceAll('_', ' '))
+                    : String(reviewer.stage || 'handled').replaceAll('_', ' ')}
+                </span>
+                {reviewer.rediscovered && reviewer.affiliation && (
+                  <span className="block text-xs text-gray-400 truncate">{reviewer.affiliation}</span>
+                )}
               </span>
               <button
                 type="button"
-                onClick={() => onNavigate?.(['selected', 'declined'].includes(reviewer.stage) ? 'candidates' : 'track')}
+                onClick={() => onNavigate?.(['selected', 'declined', 'invited'].includes(reviewer.stage) ? 'candidates' : 'track')}
                 disabled={!onNavigate}
                 className="text-xs text-amber-900 underline whitespace-nowrap"
               >
-                {reviewer.stage === 'selected'
+                {['selected', 'invited'].includes(reviewer.stage)
                   ? 'Open Invite'
                   : reviewer.stage === 'declined'
                     ? 'Open Removed'
