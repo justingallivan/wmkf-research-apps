@@ -319,3 +319,32 @@ reconciler, route response, continuation list, and UI. They currently are not.
 - Required first read: this document, then `SESSION_PROMPT.md`,
   `docs/REVIEWER_FIND_PERFORMANCE_PLAN.md`, and
   `docs/REVIEWER_WARM_STAGE_PRODUCER_SPEC.md`
+
+## S400 addendum — residual data damage found and resolved (2026-08-04)
+
+The S396 revert restored the code baseline but did not repair roster rows the
+warm build had rewritten. Discovered S400 when the owner noticed Mikhail
+Shapiro's coauthor-COI flag missing on request 1002903.
+
+- **Blast radius (probe-verified, read-only SQL over `reviewer_find_roster`):**
+  exactly 10 rows, all on request 1002903, carried the warm rewrite signature —
+  stage-plan JSON keys (`stageFreshness`/`stageRefresh`/`warmCacheVersion`) plus
+  `coauthorCheckStatus: "not_applicable"` (a value only the warm build's code
+  ever wrote; `git log -S` confirms it entered and left with the warm commits)
+  and zeroed COI fields. Rows were last written 2026-08-03 16:09–17:09 PT,
+  before the 20:12 PT revert.
+- **No other request affected:** three widening complement checks — all 840
+  roster rows (98 intact coauthor-COI flags elsewhere), all 7 requests with
+  warm-window writes (the largest kept its 6 flags), and all 28 rows carrying
+  any warm-era JSON key — localized the destructive rewrite to 1002903 only.
+  The zeroing required the warm reconciliation flow to be *exercised* on a
+  request, which happened only on 1002903 (the S395/396 testing ground).
+- **Resolution:** one owner-triggered fresh Find search (2026-08-04 ~18:04 PT)
+  replaced the contaminated active rows via `removePreviousActiveSearchResults`
+  + fresh enrichment; post-search probe confirmed Shapiro and six others again
+  carry `hasCoauthorCOI: true` with `coauthorCheckStatus: "complete"`. No data
+  surgery was needed.
+- **Lesson for future revert-first responses:** a code revert does not revert
+  rows the reverted build wrote. Add a residual-data sweep (fingerprint the
+  reverted build's distinctive field values and grep the store) to the revert
+  checklist before declaring an incident fully closed.
