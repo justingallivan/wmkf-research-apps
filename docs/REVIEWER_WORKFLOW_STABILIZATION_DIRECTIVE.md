@@ -406,12 +406,23 @@ finished or fully production-proved.
 >   core-extraction fallback was built and REVERTED (Codex review, HIGH: the
 >   borrowed aggregation-key extractor collapsed comma-qualified sibling
 >   institutions into false CONSISTENTs — a Dataverse write-gate hazard).
->   Accepted follow-up: a conservative segment-whole extractor (≥3-segment
->   byline guard, whole-segment extraction, no truncation/50-char paths) whose
->   acceptance spec is pinned in
->   `tests/unit/enrich-recommended-institution-evidence.test.js` (four
->   captured pairs flip to true; all sibling attacks stay false), shipped
->   together with the structured-verdict DTO above.
+>   Accepted follow-up, candidate designs in preference order (owner
+>   reframing, 2026-08-04 post-smoke): (1) **word-boundary containment** —
+>   all four captured false rows share the property that the byline literally
+>   CONTAINS the listed institution verbatim, so "full listed name appears
+>   inside the evidence byline" is strictly more conservative than any
+>   extraction; its known adversarial case ("West Texas A&M University"
+>   contains "Texas A&M University" at a word boundary) is already in the
+>   pinned attack suite, which adjudicates any candidate mechanically;
+>   (2) fallback if containment cannot pass the attacks: a conservative
+>   segment-whole extractor (≥3-segment byline guard, whole-segment
+>   extraction, no truncation/50-char paths). Acceptance spec for either is
+>   pinned in `tests/unit/enrich-recommended-institution-evidence.test.js`
+>   (four captured pairs flip to true; all sibling attacks stay false),
+>   shipped together with the structured-verdict DTO above. Interim
+>   workaround: the confirm-identity affordance is durable — a staff
+>   confirmation takes the preservedConfirmed path on every later run, so the
+>   papercut is one click per candidate once, not per run.
 >
 > S400 update: attribution CLOSED via a one-run production capture (TEMP
 > `[verdict-trace]` instrumentation, added and removed same-day; line refs
