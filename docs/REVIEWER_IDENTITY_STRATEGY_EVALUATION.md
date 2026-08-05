@@ -28,6 +28,12 @@ Scope: strategy-level evaluation of reviewer identity/contact enrichment failure
 - `docs/REVIEWER_IDENTITY_RESOLUTION_PLAN.md`
 - `docs/REVIEWER_TRACK_B_IDENTITY_SPEC.md`
 
+Companion research: `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`
+steps beyond this request-specific code evaluation and surveys established
+entity-resolution, institution-linking, author-disambiguation, temporal
+affiliation, and contact-attribution approaches. It is research-only and does
+not authorize implementation.
+
 ## 1. Is Anchor Identity First The Correct Spine?
 
 Yes: anchor identity first, then enrich, else abstain is the correct spine.
