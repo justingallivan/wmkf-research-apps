@@ -25,6 +25,9 @@
  * search. NB: recent papers are NOT persisted (live-only during a search) — the
  * Scholar link is the way to pull them up again.
  *   - loading, onRefresh, settings ({ signature })
+ *     onRefresh(confirmedInvites?) — after an invite send it is called with the
+ *     modal's { invitedSuggestionIds, sentAt } payload (see InviteEmailModal
+ *     onSent) so the parent refetch can paint those rows invited.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -330,7 +333,10 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
     });
   };
 
-  const afterSent = () => { setSelected(new Set()); if (onRefresh) onRefresh(); };
+  // confirmedInvites = { invitedSuggestionIds, sentAt } from InviteEmailModal —
+  // forwarded so the parent refetch can paint the just-confirmed rows invited
+  // instead of trusting the read to already reflect the send.
+  const afterSent = (confirmedInvites) => { setSelected(new Set()); if (onRefresh) onRefresh(confirmedInvites); };
 
   return (
     <Card hover={false}>

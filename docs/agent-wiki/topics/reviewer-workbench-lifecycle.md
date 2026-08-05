@@ -769,6 +769,29 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   established post-loop best-effort lifecycle stamp; thank-you additionally refuses terminal rows.
   Durable per-dispatch deadline evidence is not part of the terminal-status branch and requires a
   separate design around ordered Dynamics email activities or an append-only dispatch entity.
+  **Post-send roster repaint (S401, fix for S400 finding 2):** `InviteEmailModal.onSent` now passes
+  `{ invitedSuggestionIds, sentAt }` — only rows the send stream confirmed BOTH dispatched and
+  lifecycle-stamped (`inviteRecorded !== false`) — through `ReviewerInvitePanel.afterSent` →
+  `ReviewersTab.refreshAll`, which paints those rows `invited` on top of the `my-candidates`
+  refetch (server-confirmed fact, not optimism; an `inviteRecorded:false` row deliberately keeps
+  showing its true unstamped state). `refreshAll` validates the payload shape because it is handed
+  around as a bare callback. Codex adversarial review (S401, medium): the overlay asserts a past
+  fact, so a concurrent lifecycle reset landing inside the refresh window — remove → restore
+  clears `wmkf_invited` via `ENGAGEMENT_STAMP_RESET` — would be repainted invited. Resolved by
+  time-bounding the overlay: when an overlay-carrying response actually PAINTS (passes the
+  generation/request guard), it schedules one plain reconciling `loadCandidates()` after
+  `OVERLAY_RECONCILE_MS` (4s), so server truth unconditionally reasserts for every resetting
+  writer, current or future, without version-plumbing the send stream/DTO. Paint-time (not
+  schedule-time) anchoring matters: a second Codex adversarial pass found that starting the clock
+  at schedule-time let a >4s overlay fetch be superseded by its own reconciler and never paint. ReviewersTab's three loaders also gained a same-request newest-wins
+  generation guard (the S213-era `currentRequestIdRef` guard only covered cross-request
+  navigation), so an older in-flight response can no longer repaint over a newer one. Tests:
+  `tests/unit/reviewers-tab-post-send-refresh.test.js`, `tests/unit/invite-email-modal-capture.test.js`.
+  NB the S400-suspected "onSent fires before the SSE stream / stamps complete" race was not found
+  [VERIFIED via S401 source trace of every hop: in-loop awaited stamp PATCH → `email_sent` →
+  `result` → `res.end()` → client `readSseStream` resolves at stream close → `onSent`]; the exact
+  production mechanism of the S400 observation therefore remains unattributed, and the shipped fix
+  hardens every client-side class regardless (stale-response clobber, read lagging the write).
   Rendering quality (also S340, `lib/utils/email-generator.js`): the greeting drops trailing
   name suffixes (Jr./Sr./III/PhD/MD) for the surname and falls back to "Dear Reviewer" on an empty
   name; `{{proposalAbstract}}` is soft-unwrapped (`softUnwrapProse`) so a fixed-column hard-wrapped
