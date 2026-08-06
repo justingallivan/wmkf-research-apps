@@ -124,6 +124,14 @@ jest.mock('exceljs', () => ({}));
 // App registry
 jest.mock('../../shared/config/appRegistry', () => ({
   ALL_APP_KEYS: ['reviewer-finder', 'review-manager', 'reviewers', 'dynamics-explorer', 'integrity-screener'],
+  // requireAppAccess names the guarded app in its 403/503 messages via
+  // APP_REGISTRY (legacy keys reviewer-finder/review-manager stay absent,
+  // mirroring the real registry).
+  APP_REGISTRY: [
+    { key: 'reviewers', name: 'Reviewers' },
+    { key: 'dynamics-explorer', name: 'Dynamics Explorer' },
+    { key: 'integrity-screener', name: 'Applicant Integrity Screener' },
+  ],
 }));
 
 // Integrity screener dependencies

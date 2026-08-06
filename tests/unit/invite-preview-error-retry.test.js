@@ -60,12 +60,12 @@ function openModal() {
 
 test('server error body: message + reassurance + working Retry', async () => {
   renderEmailsBehavior = () =>
-    response({ error: 'Could not verify your permissions; please retry' }, { ok: false, status: 503 });
+    response({ error: 'Could not verify your access to the Reviewers app; please retry' }, { ok: false, status: 503 });
   openModal();
 
   await waitFor(() =>
     expect(
-      screen.getByText(/Could not verify your permissions; please retry.*No emails have been sent — retrying is safe\./),
+      screen.getByText(/Could not verify your access to the Reviewers app; please retry.*No emails have been sent — retrying is safe\./),
     ).toBeTruthy(),
   );
   const before = renderEmailsCalls().length;
