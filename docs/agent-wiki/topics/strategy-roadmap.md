@@ -43,6 +43,15 @@ document inventory, and individual implementation plans do not establish priorit
 
 ## Durable Memory
 
+- **Reviewer matching sequencing (S403, 2026-08-06):** the Find-tab candidate-card
+  redesign AND the containment-first institution comparison fix are both downstream of
+  the fuzzy-matching model decision — the research's three-band decisions
+  (auto/review/reject) map onto the proposed card status band, so building either first
+  bakes in the wrong abstraction. Order: reconcile the two research docs → benchmark /
+  failure archive → normalizer consolidation + shared scorer (small independently
+  shippable increments) → card redesign → coauthor verdict → institution-COI sort +
+  audited override. Decisions and hazards in
+  `project-reviewer-card-simplification-direction`; S395 scope-accretion caution applies.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
