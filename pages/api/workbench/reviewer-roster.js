@@ -38,6 +38,10 @@ import {
   hasServerIdentityDecisionReceipt,
   verifyAutomatedIdentityAttestation,
 } from '../../../lib/services/reviewer-candidate-attestation';
+import { resolveProposalPI } from '../../../lib/services/proposal-pi-identity';
+import { fetchCoPIs } from '../../../lib/services/proposal-participants';
+import { DeduplicationService } from '../../../lib/services/deduplication-service';
+import { normalizeReviewerName } from '../../../lib/utils/reviewer-name-match';
 import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
@@ -136,6 +140,40 @@ function hasStoredStaffAuthority(candidate) {
     && confirmationId.length > 0
     && candidate?.staffIdentityConfirmation?.source === 'staff_confirmed'
     && candidate.staffIdentityConfirmation.confirmationId === confirmationId;
+}
+
+function dedupeProposalAuthorNames(names) {
+  const byNormalizedName = new Map();
+  for (const name of Array.isArray(names) ? names : []) {
+    const normalized = normalizeReviewerName(name);
+    if (normalized && !byNormalizedName.has(normalized)) byNormalizedName.set(normalized, name);
+  }
+  return Array.from(byNormalizedName.values());
+}
+
+async function findProposalAuthorMatch(requestId, candidates) {
+  // Co-investigators are server-derivable here from the canonical
+  // wmkf_apprequestperson Co-PI junction; no browser-carried proposal analysis is
+  // trusted. resolveProposalPI also supplies both contact and canonical PI name
+  // forms when available, covering a structured-name variant at this boundary.
+  const { piIdentity, coPIs } = await withDalContext(
+    'workbench-reviewer-roster-confirm-author-check',
+    async () => ({
+      piIdentity: await resolveProposalPI(requestId),
+      coPIs: await fetchCoPIs(requestId),
+    }),
+  );
+  const proposalAuthors = dedupeProposalAuthorNames([
+    piIdentity?.canonicalName,
+    piIdentity?.contactName,
+    ...coPIs,
+  ]);
+  if (proposalAuthors.length === 0) return null;
+  const authorFilter = DeduplicationService.filterProposalAuthors(
+    (Array.isArray(candidates) ? candidates : []).filter((candidate) => candidate?.name),
+    proposalAuthors,
+  );
+  return authorFilter.excluded[0] || null;
 }
 
 async function preserveStoredRosterAuthority(requestId, candidates) {
@@ -364,6 +402,24 @@ async function handlePatch(req, res, access) {
           code: 'applicant_hydration_required',
         });
       }
+    }
+    // Compare both the submitted name and the server-stored roster name. The
+    // latter closes a renamed-payload bypass for ephemeral unverified rows, which
+    // are recorded immediately before this rescue action.
+    let storedCandidate = null;
+    if (candidate.candidateKey) {
+      [storedCandidate] = await findCandidatesByKeys(requestId, [candidate.candidateKey]);
+    }
+    const proposalAuthorMatch = await findProposalAuthorMatch(
+      requestId,
+      [authoritativeCandidate, storedCandidate],
+    );
+    if (proposalAuthorMatch) {
+      return res.status(422).json({
+        success: false,
+        error: 'Proposal authors cannot be added as reviewers for their own request.',
+        code: 'proposal_author_candidate',
+      });
     }
     const manualCandidate = {
       ...authoritativeCandidate,

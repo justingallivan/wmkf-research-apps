@@ -326,6 +326,15 @@ export default async function handler(req, res) {
         }
 
         verifiedCandidates = authorFilterResult.filtered;
+
+        // Unverified suggestions are now rescuable through staff identity
+        // confirmation, so they must cross the same PI/co-investigator boundary
+        // as verified candidates before any response list can expose them.
+        const unverifiedAuthorFilterResult = DeduplicationService.filterProposalAuthors(
+          discoveryResults.unverified,
+          proposalAuthors
+        );
+        discoveryResults.unverified = unverifiedAuthorFilterResult.filtered;
       }
     }
 

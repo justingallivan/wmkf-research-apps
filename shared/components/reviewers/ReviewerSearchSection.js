@@ -916,7 +916,7 @@ export default function ReviewerSearchSection({
   const engagedSavedIndex = useMemo(() => buildEngagedSavedIndex(savedPool), [savedPool]);
   const [progress, setProgress] = useState([]);
   const [candidates, setCandidates] = useState([]);
-  const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (read-only)
+  const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (not selectable; rescuable via confirm-identity or excludable)
   const [analysis, setAnalysis] = useState(null);
   // `selected` is keyed by the stable per-candidate correlation key, not by a
   // normalized name or flat array index. Same-name people must remain separate
@@ -1268,7 +1268,11 @@ export default function ReviewerSearchSection({
         ...deceasedCandidates.map(pruneCandidateForRoster),
         ...prev,
       ]));
-      setUnverified(unverifiedKept.map((c) => withReviewerProvenance(c)));
+      // Stamp the stable candidate key NOW (like keyedKept above): the rescue
+      // flow records the row on the roster and then confirms identity with
+      // possibly-edited contact fields, and only a carried stamp keeps both
+      // requests (and local state) on one key.
+      setUnverified(unverifiedKept.map((c) => withReviewerCandidateKey(withReviewerProvenance(c))));
       setBlockedReferredSeeds(blockedReferredRaw);
       if (enrichFailed) {
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
@@ -1544,6 +1548,34 @@ export default function ReviewerSearchSection({
       setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
   }, [requestId]);
+
+  // Exclude an ephemeral unverified suggestion. Same durable PATCH (the server
+  // exclude is an upsert, so no prior roster row is needed), but the rollback
+  // differs from excludeCandidate: the row never left `unverified` — it is only
+  // masked while its key sits in rosterExcluded — so a failure must NOT restore
+  // it into rosterActive (it was never active).
+  const excludeUnverifiedCandidate = useCallback(async (cand) => {
+    const key = candKey(cand);
+    if (!key || !requestId) return;
+    const pruned = pruneCandidateForRoster(cand);
+    const nameAlreadyInRoster = rosterNames.includes(cand.name);
+    setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
+    setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
+    try {
+      const res = await fetch('/api/workbench/reviewer-roster', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action: 'exclude', candidate: pruned }),
+      });
+      if (!res.ok) throw new Error('exclude failed');
+    } catch {
+      setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+      if (!nameAlreadyInRoster) {
+        setRosterNames((prev) => prev.filter((name) => name !== cand.name));
+      }
+      setRosterNote("Couldn't exclude that reviewer — please try again.");
+    }
+  }, [requestId, rosterNames]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {
@@ -1828,6 +1860,22 @@ export default function ReviewerSearchSection({
     const key = candKey(cand);
     if (!key || !requestId) return;
     const myGen = genRef.current;
+    // An unverified Claude suggestion is ephemeral — it was never recorded on
+    // the durable roster (S224), but confirm_identity only updates an existing
+    // ACTIVE roster row. Record it first so the attestation has a row to bind
+    // to; recordSurfaced upserts, so a re-run after a partial failure is safe.
+    const wasUnverified = unverified.some((u) => candKey(u) === key);
+    if (wasUnverified) {
+      const recordRes = await fetch('/api/workbench/reviewer-roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, candidates: [pruneCandidateForRoster(cand)] }),
+      });
+      const recordData = await recordRes.json().catch(() => ({}));
+      if (!recordRes.ok || !recordData.success) {
+        throw new Error(recordData.error || 'Could not add this suggestion to the request roster. Please retry.');
+      }
+    }
     const confirmedCandidate = {
       ...cand,
       ...updates,
@@ -1856,9 +1904,16 @@ export default function ReviewerSearchSection({
     // The confirmation write has already committed. Keep that server truth in
     // the card even if the following address-evidence write fails and the modal
     // stays open for a retry.
+    if (wasUnverified) {
+      // The suggestion is now a durable active roster row: move it out of the
+      // ephemeral Unverified section so the confirmed card renders (and stays
+      // rescuable through the normal needs-identity-review machinery).
+      setUnverified((prev) => prev.filter((u) => candKey(u) !== key));
+      setRosterActive((prev) => dedupeByName([authoritativeConfirmed, ...prev]));
+    }
     applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
     await verifyAddressContact(authoritativeConfirmed, updates, evidence);
-  }, [requestId, verifyAddressContact, applyAuthoritativeRosterCandidate]);
+  }, [requestId, unverified, verifyAddressContact, applyAuthoritativeRosterCandidate]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
@@ -2961,12 +3016,29 @@ export default function ReviewerSearchSection({
                   {unverifiedToShow.length > 0 && (
                     <details className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Unverified suggestions ({unverifiedToShow.length}) — couldn't confirm these in the literature; not selectable
+                        Unverified suggestions ({unverifiedToShow.length}) — couldn't confirm these in the literature; not selectable until you confirm one
                       </summary>
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        If you recognize one, use “This is the right person” to confirm their
+                        identity and correct the contact — that adds them to the candidate
+                        list. Exclude sets one aside so searches stop suggesting the name.
+                      </p>
                       <div className="space-y-2 mt-2">
-                        {unverifiedToShow.map((c, i) => (
-                          <CandidateCard key={`unv-${c.name}-${i}`} candidate={c} readOnly />
-                        ))}
+                        {unverifiedToShow.map((c) => {
+                          // Same rescue gate as the needs-identity-review section, minus the
+                          // promotion-decision check (an unverified row is by definition
+                          // unresolved + email-less, which that check always admits).
+                          const canRescue = !c.hasInstitutionCOI
+                            && (c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) !== 'deceased';
+                          return <CandidateCard
+                            key={`unv-${candKey(c)}`}
+                            candidate={c}
+                            readOnly
+                            onExclude={excludeUnverifiedCandidate}
+                            onConfirmIdentity={canRescue ? (cand) => setConfirmingContact(cand) : undefined}
+                            canManage={canManage}
+                          />;
+                        })}
                       </div>
                     </details>
                   )}
