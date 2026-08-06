@@ -397,7 +397,7 @@ export default function ReviewerFindPanel({
             lookupResult: lookup,
             resolution: null,
             error: lookup.outcome === 'candidates'
-              ? 'This may be an existing person — select a match below (or “Create new instead”), then click “Add reviewer” again.'
+              ? 'This may be an existing person — select a match below and click “Confirm and Add”, or “Disconfirm” if none of these is the same person.'
               : 'Existing records conflict for this person — choose “Create new person” below if this really is someone else.',
           }));
           return;
@@ -431,6 +431,14 @@ export default function ReviewerFindPanel({
 
   const createDespiteLookup = () => {
     setManual((prev) => ({ ...prev, resolution: { mode: 'create_new' }, error: null }));
+  };
+
+  // "Disconfirm" on the ambiguous-candidates card: staff assert none of the
+  // matches is this person. Closes the card AND records create_new — without
+  // the resolution, the next submit would re-run the lookup and re-open the
+  // same card in a loop.
+  const disconfirmLookup = () => {
+    setManual((prev) => ({ ...prev, lookupResult: null, resolution: { mode: 'create_new' }, error: null }));
   };
 
   const renderContext = (context) => {
@@ -575,7 +583,7 @@ export default function ReviewerFindPanel({
           <div className="border border-amber-200 bg-amber-50 rounded p-3 text-sm">
             <p className="font-medium text-amber-900">Confirm existing person</p>
             <p className="text-xs text-amber-800 mt-1">
-              This may already be a known person. Select the matching person below (or choose “Create new instead”), then click “Add reviewer”.
+              This may already be a known person. Select the matching person below and click “Confirm and Add” — or “Disconfirm” if none of these is the same person.
             </p>
             <div className="mt-2 space-y-2">
               {(lookupDecision.candidates || []).map((candidate, idx) => {
@@ -592,16 +600,16 @@ export default function ReviewerFindPanel({
                     type="button"
                     key={key}
                     onClick={() => chooseResolution(resolution)}
-                    className={`w-full text-left border rounded p-2 cursor-pointer ${selected ? 'border-gray-900 bg-white' : 'border-amber-200 bg-white/70 hover:border-amber-400 hover:bg-white'}`}
+                    className={`w-full text-left border rounded p-2 cursor-pointer ${selected ? 'border-emerald-300 bg-emerald-50' : 'border-amber-200 bg-white/70 hover:border-amber-400 hover:bg-white'}`}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-gray-900">{candidate.context?.name || 'Existing person'}</span>
+                      <span className={`font-medium ${selected ? 'text-emerald-900' : 'text-gray-900'}`}>{candidate.context?.name || 'Existing person'}</span>
                       <span className="flex items-center gap-2 whitespace-nowrap">
                         <span className="text-xs text-gray-500">
                           {candidate.source}{candidate.matchKey ? ` · ${candidate.matchKey}` : ''}
                           {candidate.context?.active === false ? ' · inactive' : ''}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded border ${selected ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300'}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded border ${selected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}>
                           {selected ? '✓ Selected' : 'Use this person'}
                         </span>
                       </span>
@@ -611,9 +619,19 @@ export default function ReviewerFindPanel({
                 );
               })}
             </div>
-            <button type="button" onClick={createDespiteLookup} className="mt-2 px-2 py-1 rounded border border-gray-300 text-xs bg-white text-gray-700">
-              Create new instead
-            </button>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={!canManage || manual.saving || !manual.resolution}
+                title={!manual.resolution ? 'Select the matching person above first' : undefined}
+                className="px-2 py-1 rounded text-xs bg-emerald-700 text-white border border-emerald-700 disabled:opacity-50"
+              >
+                Confirm and Add
+              </button>
+              <button type="button" onClick={disconfirmLookup} className="px-2 py-1 rounded border border-gray-300 text-xs bg-white text-gray-700">
+                Disconfirm
+              </button>
+            </div>
           </div>
         )}
         {lookupDecision?.outcome === 'conflict' && (

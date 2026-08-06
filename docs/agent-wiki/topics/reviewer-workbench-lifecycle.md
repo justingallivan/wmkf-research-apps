@@ -251,10 +251,17 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   the confirm control (click → `chooseResolution` → "Add reviewer" re-submits
   with it). Pre-S403 that card looked like a static info box and an unresolved
   submit silently re-rendered the amber box (`saving:false`, no message) — the
-  owner read it as "no option to confirm". Fixed with an explicit "Use this
-  person"/"✓ Selected" pill on each card, helper text under the heading, and
-  an inline error on unresolved submit (candidates AND conflict outcomes).
-  Same silent-no-op family as S399 finding 4. Tests:
+  owner read it as "no option to confirm". Fixed (owner-directed design): each
+  card carries a "Use this person" pill; selecting turns the card emerald
+  (matching the "✓ Existing linked reviewer record" boxes) with "✓ Selected";
+  the card footer offers **Confirm and Add** (type=submit, disabled until a
+  selection) and **Disconfirm** — which closes the card AND records
+  `{mode:'create_new'}` so the next submit doesn't re-lookup and re-open the
+  same card in a loop ("Create new instead" was removed from this outcome;
+  the `confident` and `conflict` outcomes keep their original buttons).
+  Unresolved submit (candidates AND conflict outcomes) surfaces an inline
+  instruction instead of the old silent no-op. Same silent-no-op family as
+  S399 finding 4. Tests:
   `tests/unit/reviewer-find-panel-manual-add-confirm.test.js`.
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and

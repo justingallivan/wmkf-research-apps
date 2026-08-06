@@ -95,19 +95,27 @@ test('ambiguous lookup on submit surfaces an explicit instruction instead of a s
   expect(manualPosts).toHaveLength(0);
 });
 
-test('candidate card shows "Use this person", flips to selected, and submit posts the resolution', async () => {
+test('selecting a candidate turns the card green and "Confirm and Add" posts the resolution', async () => {
   const posts = [];
   mockFetch({ onManualPost: (body) => posts.push(body) });
   await renderPanelAndSubmit();
 
-  const useButton = await screen.findByText('Use this person');
-  fireEvent.click(useButton.closest('button'));
+  // Confirm and Add is disabled until a candidate is selected.
+  const confirmButton = await screen.findByRole('button', { name: 'Confirm and Add' });
+  expect(confirmButton.disabled).toBe(true);
+
+  const useButton = screen.getByText('Use this person');
+  const card = useButton.closest('button');
+  fireEvent.click(card);
   expect(screen.getByText('✓ Selected')).toBeTruthy();
+  // Selected card matches the "✓ Existing linked reviewer record" green.
+  expect(card.className).toContain('bg-emerald-50');
   // Choosing a resolution clears the instruction error.
   expect(screen.queryByText(/select a match below/i)).toBeNull();
+  expect(confirmButton.disabled).toBe(false);
 
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /add reviewer/i }));
+    fireEvent.click(confirmButton);
   });
 
   expect(posts).toHaveLength(1);
@@ -117,18 +125,21 @@ test('candidate card shows "Use this person", flips to selected, and submit post
   });
 });
 
-test('"Create new instead" clears the instruction and submit posts create_new', async () => {
+test('"Disconfirm" closes the card and submit posts create_new', async () => {
   const posts = [];
   mockFetch({ onManualPost: (body) => posts.push(body) });
   await renderPanelAndSubmit();
 
-  fireEvent.click(await screen.findByText('Create new instead'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Disconfirm' }));
+  // Card closes and the instruction clears.
+  expect(screen.queryByText('Confirm existing person')).toBeNull();
   expect(screen.queryByText(/select a match below/i)).toBeNull();
 
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: /add reviewer/i }));
   });
 
+  // No re-lookup loop: the recorded create_new resolution submits directly.
   expect(posts).toHaveLength(1);
   expect(posts[0].resolution).toEqual({ mode: 'create_new' });
 });
