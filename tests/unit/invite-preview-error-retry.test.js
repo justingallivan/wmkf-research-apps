@@ -14,6 +14,11 @@
  *      the status code instead of a raw parse error.
  *   3. A network failure (fetch rejects) surfaces the reachability message
  *      with the same Retry affordance.
+ *
+ * Extended for Plan v3 (S404,
+ * outputs/plan-manage-panel-preview-retry-2026-08-06.md) UI pin 5 (single-
+ * flight: at most one render fetch in flight per modal at a time) and pin 6
+ * (Retry disable while its render is pending, re-enabled once it settles).
  */
 
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
@@ -98,4 +103,58 @@ test('network failure surfaces the reachability message with Retry', async () =>
 
   await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
   expect(screen.getByRole('button', { name: /Retry/ })).toBeTruthy();
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  return { promise, resolve };
+}
+
+test('pin 6: Retry is disabled while its render is pending and re-enables once the render settles', async () => {
+  renderEmailsBehavior = () => response({ error: 'boom' }, { ok: false, status: 503 });
+  openModal();
+  const retryButton = await screen.findByRole('button', { name: /Retry/ });
+  expect(retryButton).not.toBeDisabled();
+
+  const pending = deferred();
+  global.fetch.mockImplementation(async (url) => {
+    const u = String(url);
+    if (u.includes('/api/review-manager/render-emails')) return pending.promise;
+    return response({});
+  });
+  fireEvent.click(retryButton);
+  await waitFor(() => expect(retryButton).toBeDisabled());
+
+  // The banner (and its Retry button) unmounts while `error` is cleared mid-render
+  // and remounts as a new node once the failure lands — re-query rather than
+  // reuse the pre-render reference, which would now be a detached stale node.
+  pending.resolve(response({ error: 'still broken' }, { ok: false, status: 503 }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /Retry/ })).not.toBeDisabled());
+});
+
+test('pin 5: single-flight — a pending render cannot be re-triggered into a second concurrent fetch', async () => {
+  renderEmailsBehavior = () => response({ error: 'boom' }, { ok: false, status: 503 });
+  openModal();
+  const retryButton = await screen.findByRole('button', { name: /Retry/ });
+
+  let calls = 0;
+  const pending = deferred();
+  global.fetch.mockImplementation(async (url) => {
+    const u = String(url);
+    if (u.includes('/api/review-manager/render-emails')) { calls += 1; return pending.promise; }
+    return response({});
+  });
+  fireEvent.click(retryButton);
+  await waitFor(() => expect(calls).toBe(1));
+  expect(retryButton).toBeDisabled();
+
+  // Disabled by the DOM: a click while pending must not fire onClick, so no
+  // second overlapping fetch (and no second durable render/token-mint call).
+  fireEvent.click(retryButton);
+  expect(calls).toBe(1);
+
+  pending.resolve(response({ drafts: [] }));
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull());
+  expect(calls).toBe(1);
 });

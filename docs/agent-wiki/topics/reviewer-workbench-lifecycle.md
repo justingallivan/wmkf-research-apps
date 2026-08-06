@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-03
+last_verified: 2026-08-06
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -13,6 +13,8 @@ source_files:
   - lib/seed/email-defaults/reviewer-templates.js
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/InviteEmailModal.js
+  - shared/components/reviewers/render-preview-failure.js
+  - lib/services/review-manager/render-emails-service.js
   - shared/components/reviewers/ReviewerFindPanel.js
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerManagePanel.js
@@ -283,34 +285,92 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   readiness/address-trust semantics live here
   (`project-reviewer-verify-fail-dangerous`). A `ready` email chip stays inert.
   Tests: `tests/unit/reviewer-card-warning-badges-clickable.test.js`.
-- **Invite-preview failure banner: cause + reassurance + Retry (S404, owner
-  report 2026-08-06):** rendering invite previews failed twice in production
-  (the fail-closed 503 "Unable to verify application access; please retry"
-  from `requireAppAccess` — its Dataverse app-grant lookup threw — and the
-  bare "Failed to render previews" fallback when the response had no JSON
-  body). Previews always render before anything sends, so these failures are
-  safe to retry, but the banner said neither that nothing was sent nor how to
-  recover. Fixed on branch `fix/invite-preview-error-retry`: shared wording in
-  `shared/components/reviewers/render-preview-failure.js` (server message or
-  status code + "No emails have been sent — retrying is safe."; distinct
-  network-unreachable message), an inline **↻ Retry** button on
-  `InviteEmailModal`'s banner gated by a `previewFailed` flag (never offered
-  on send-path errors), and a JSON-parse guard in `ReviewerManagePanel`'s
-  `handlePreview` (its compose step already retries via the Preview button).
-  The shared guard messages were also reworded (`lib/utils/auth.js`), after
-  three rounds of owner feedback ("application" reads as a GRANT application;
-  "permissions to what?"; "she's IN the app and it worked before" — any
-  mention of the user's access misleads, because the 503 is the SERVER's
-  Dataverse grant query failing while the user is already inside the app).
-  The 503 text is owner-set VERBATIM (do not wordsmith it): "I'm having
-  trouble accessing the server. This is usually a temporary blip. Please
-  press retry and if the problem doesn't resolve, contact an administrator."
-  The 403 (grant row genuinely absent) says "Your account does not have
-  access to the Reviewers app", named via `appDisplayName`: the first
-  requested key present in `APP_REGISTRY` (legacy alternates like
-  `review-manager` are registry-absent, so the canonical name wins), falling
-  back to "this app" for unregistered namespaces or key-less guards.
-  Tests: `tests/unit/invite-preview-error-retry.test.js` (3, stash-verified).
+- **Invite/manage-preview failure banner + retry, and send-time reviewer-link
+  token authority (S404, owner report 2026-08-06; Plan v3 +
+  Claude-review-amendments, `outputs/plan-manage-panel-preview-retry-2026-08-06.md`):**
+  rendering invite previews failed twice in production (the fail-closed 503
+  "Unable to verify application access; please retry" from `requireAppAccess`
+  — its Dataverse app-grant lookup threw — and the bare "Failed to render
+  previews" fallback when the response had no JSON body). A first pass
+  (v1/v2) added client-only retry/reopen guards; Codex's v2 adversarial review
+  returned **NO-SHIP**: a render containing `{{externalLink}}` mints a fresh
+  JWT and overwrites the recipient's durable `wmkf_externaltokenhash`
+  (`render-emails-service.js`), so client generation/epoch guards suppress
+  stale CLIENT writes but cannot order two durable RENDER calls (or two
+  clients) racing for the same recipient — an older still-open preview could
+  ship a dead link. v3 ships client UX and server token authority together,
+  as one increment:
+  - **Both modals — retry + single-flight:** shared wording in
+    `shared/components/reviewers/render-preview-failure.js` (server message or
+    status code + "No emails have been sent — retrying is safe."; distinct
+    network-unreachable message), and a `previewFailed`-gated **↻ Retry**
+    button on `InviteEmailModal` and `ReviewerManagePanel`'s compose banner —
+    never offered on a send-path error. Each modal serializes render calls
+    through a `renderTailRef` promise chain so at most one `render-emails`
+    fetch is ever in flight per modal; a superseding call collapses queued
+    duplicates to the latest request rather than starting a second
+    overlapping (and durable-token-rotating) render. `rendering` state
+    disables Preview/Retry while a render is queued or in flight.
+  - **`ReviewerManagePanel` modal-session epoch:** `EmailModal` keeps a
+    monotonic `modalSessionRef`, bumped on every open/close transition (never
+    reset). `handlePreview` and `handleSend` capture the epoch at entry and
+    check it after every `await` before touching state — a response from an
+    earlier open/close session (e.g. closed, reopened with a different
+    selection, then the stale response lands) can never repopulate the
+    current session's drafts or post the wrong suggestion IDs. This is the
+    regression pin for the second Codex v1 HIGH finding (stale-recipient
+    repopulation after close/reopen).
+  - **Send-time token authority (the server-authoritative half — client
+    guards suppress stale writes but cannot order durable state):**
+    `render-emails-service.js` stamps every draft (including skipped rows,
+    for a uniform DTO) with `externalLinkExpected` — whether the source
+    template requested `{{externalLink}}` in its subject OR body; a mint
+    failure still stamps `true` with an empty link so the send-time gate
+    (not a silently-broken email) catches it. Both modals carry
+    `externalLinkExpected` through edits and post it back on `send-emails`.
+    `send-emails-service.js` extracts the reviewer JWT(s) from the FINAL
+    edited draft's subject+body (not body-only — a placeholder in the
+    subject must match the extraction domain or the gate is an unrecoverable
+    fail-closed dead-end) immediately before
+    `DynamicsService.createAndSendEmail`, with no intervening `await`, and
+    fails that recipient closed via `email_failed`/`failed[]` (batch
+    continues) on: zero JWTs when one was expected
+    (`external_link_missing`), more than one distinct JWT
+    (`external_link_ambiguous`), a missing/non-boolean
+    `externalLinkExpected` marker (`external_link_expectation_missing` —
+    this also covers a draft rendered before this shipped; the PD must
+    re-render, not resend blind), a token that fails `verifySuggestionToken`
+    with `reason==='hash_mismatch'` (`external_link_superseded` — a later
+    render replaced this one), any other verifier failure or exception
+    (`external_link_invalid`), or a verified token whose
+    `suggestionId`/`requestId` doesn't case-insensitively match this
+    recipient/request (`external_link_recipient_mismatch`). A template with
+    no placeholder and no manually-introduced reviewer URL
+    (`externalLinkExpected:false`, 0 JWTs) skips verification entirely and
+    dispatches normally. A later successful render may still supersede an
+    already-in-flight send under existing latest-link-wins token semantics
+    (including the narrow verify→dispatch TOCTOU window) — this is accepted,
+    not a residual gap; only a send that ATTEMPTS a recipient with an
+    already-superseded durable link is guaranteed to fail closed.
+  - The shared guard messages were also reworded (`lib/utils/auth.js`), after
+    three rounds of owner feedback ("application" reads as a GRANT application;
+    "permissions to what?"; "she's IN the app and it worked before" — any
+    mention of the user's access misleads, because the 503 is the SERVER's
+    Dataverse grant query failing while the user is already inside the app).
+    The 503 text is owner-set VERBATIM (do not wordsmith it): "I'm having
+    trouble accessing the server. This is usually a temporary blip. Please
+    press retry and if the problem doesn't resolve, contact an administrator."
+    The 403 (grant row genuinely absent) says "Your account does not have
+    access to the Reviewers app", named via `appDisplayName`: the first
+    requested key present in `APP_REGISTRY` (legacy alternates like
+    `review-manager` are registry-absent, so the canonical name wins), falling
+    back to "this app" for unregistered namespaces or key-less guards.
+  Tests: `tests/unit/invite-preview-error-retry.test.js`,
+  `tests/unit/manage-panel-preview-error-retry.test.js`,
+  `tests/unit/render-emails-service.test.js`,
+  `tests/unit/send-emails-service.test.js`,
+  `tests/integration/send-emails-route.test.js`,
+  `tests/unit/reviewer-email-token-authority.test.js`.
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
   treats conversion measurement as remaining work
@@ -892,6 +952,13 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   established post-loop best-effort lifecycle stamp; thank-you additionally refuses terminal rows.
   Durable per-dispatch deadline evidence is not part of the terminal-status branch and requires a
   separate design around ordered Dynamics email activities or an append-only dispatch entity.
+  **This `missing_secure_link`/`unresolved_placeholder` gate is INVITATION-ONLY and regex-based** (a
+  presence check on the rendered body, run before recipient/attachment resolution). It is layered
+  UNDER, not replaced by, the ALL-TEMPLATE send-time token-authority gate added in S404 (see above):
+  that gate runs later, immediately before dispatch, applies to every templateType whose draft
+  carries `externalLinkExpected`, and additionally verifies the embedded JWT is current and
+  recipient-matching via `verifySuggestionToken` — it is what catches a syntactically-present but
+  stale/superseded/foreign link that this earlier presence check cannot.
   **Post-send roster repaint (S401, fix for S400 finding 2):** `InviteEmailModal.onSent` now passes
   `{ invitedSuggestionIds, sentAt }` — only rows the send stream confirmed BOTH dispatched and
   lifecycle-stamped (`inviteRecorded !== false`) — through `ReviewerInvitePanel.afterSent` →

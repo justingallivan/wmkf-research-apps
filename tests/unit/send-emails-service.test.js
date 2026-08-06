@@ -16,6 +16,17 @@ const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
+// S404 Plan v3 send-time token authority gate. Default: current, recipient-
+// matching token — the happy path every pre-existing test in this file
+// exercises. Tests of the gate itself (describe block below) override this
+// per-call with mockResolvedValueOnce / mockImplementationOnce.
+const verifySuggestionToken = jest.fn(async () => ({
+  ok: true,
+  payload: { suggestionId: SUG_OK, requestId: REQUEST_ID },
+}));
+jest.mock('../../lib/external/verify-suggestion-token', () => ({
+  verifySuggestionToken: (...a) => verifySuggestionToken(...a),
+}));
 
 const findById = jest.fn(async (id) => SUGGESTIONS[id] ?? null);
 const updateLifecycle = jest.fn(async () => {});
@@ -135,13 +146,21 @@ async function run(requestBody) {
 }
 const names = (emitted) => emitted.map((e) => e.event);
 const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
+// A real three-base64url-segment shape (content is irrelevant — verifySuggestionToken
+// is mocked above) so both the invitation body-integrity gate AND the S404 send-time
+// token-authority gate's extraction regex match it.
+const TOKEN = 'aaa.bbb.ccc';
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
+// externalLinkExpected:true matches the render-emails-service stamp for a
+// template that referenced {{externalLink}} — the S404 gate below then calls
+// the (mocked, default-happy) verifySuggestionToken before dispatch.
 const draft = (id) => ({
   suggestionId: id,
   subject: 'S',
-  body: 'B\nhttps://reviews.example.org/external/review/tok-1',
+  body: `B\nhttps://reviews.example.org/external/review/${TOKEN}`,
+  externalLinkExpected: true,
 });
 
 describe('send-emails-service — fail-closed templateType', () => {
@@ -334,7 +353,8 @@ describe('send-emails-service — invitation body-integrity gate', () => {
       drafts: [{
         suggestionId: SUG_OK,
         subject: 'Invitation',
-        body: 'Please respond:\nhttps://reviews.example.org/external/review/tok-1',
+        body: `Please respond:\nhttps://reviews.example.org/external/review/${TOKEN}`,
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });
@@ -414,6 +434,7 @@ describe('send-emails-service — invitation body-integrity gate', () => {
         suggestionId: SUG_OK,
         subject: 'S',
         body: 'No link here.',
+        externalLinkExpected: false,
       }],
       templateType: 'materials',
     });
@@ -497,6 +518,191 @@ describe('send-emails-service — address action gate', () => {
       reason: 'email_research_only',
       emailConfidence: { action: 'research_only' },
     });
+  });
+});
+
+// S2-S4 (Plan v3, S404): send-time token authority gate. Immediately before
+// dispatch, the final edited draft's subject+body is scanned for reviewer
+// JWT(s); externalLinkExpected (the render-time stamp) plus the extraction
+// count select the decision-table outcome from
+// outputs/plan-manage-panel-preview-retry-2026-08-06.md. S1 (the render-time
+// stamp itself) is pinned in render-emails-service.test.js. S5-S7 (overlapped/
+// interleaved/timed-out durable-hash races) are pinned in
+// reviewer-email-token-authority.test.js.
+describe('send-emails-service — send-time token authority gate (S404 Plan v3)', () => {
+  test('S2: one embedded JWT (with ?action=) is passed verbatim to verifySuggestionToken', async () => {
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(verifySuggestionToken).toHaveBeenCalledWith(TOKEN);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('S2: a JWT located in the SUBJECT with none in the body is extracted and verified (extraction domain matches the stamp domain)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: `Your link: https://reviews.example.org/external/review/${TOKEN}`,
+        body: 'No link in the body — the subject carried it instead.',
+        externalLinkExpected: true,
+      }],
+      templateType: 'materials',
+    });
+    expect(verifySuggestionToken).toHaveBeenCalledWith(TOKEN);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('S2: repeated identical copies of the same JWT verify once (dedup)', async () => {
+    const body = `Body: https://reviews.example.org/external/review/${TOKEN} again: https://reviews.example.org/external/review/${TOKEN}`;
+    await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body, externalLinkExpected: true }],
+      templateType: 'invitation',
+    });
+    expect(verifySuggestionToken).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('S2: two DISTINCT JWTs fail the row closed (external_link_ambiguous), no dispatch', async () => {
+    const body = `Body: https://reviews.example.org/external/review/${TOKEN} and: https://reviews.example.org/external/review/xxx.yyy.zzz`;
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body, externalLinkExpected: true }],
+      templateType: 'invitation',
+    });
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_ambiguous' });
+  });
+
+  test('S2: a verified token whose payload suggestionId does not match this recipient fails external_link_recipient_mismatch', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: 'someone-else', requestId: REQUEST_ID } });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_recipient_mismatch' });
+  });
+
+  test('S2: a verified token whose payload requestId does not match this recipient\'s request fails external_link_recipient_mismatch', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_OK, requestId: 'some-other-request' } });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_recipient_mismatch' });
+  });
+
+  test('S2: suggestionId/requestId match is case-insensitive', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({
+      ok: true,
+      payload: { suggestionId: SUG_OK.toUpperCase(), requestId: REQUEST_ID.toUpperCase() },
+    });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('S3: externalLinkExpected:false with no reviewer URL dispatches without calling verifySuggestionToken', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.', externalLinkExpected: false }],
+      templateType: 'materials',
+    });
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('S3: externalLinkExpected:false plus a manually-introduced reviewer URL DOES call verifySuggestionToken', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'S',
+        body: `Manually pasted:\nhttps://reviews.example.org/external/review/${TOKEN}`,
+        externalLinkExpected: false,
+      }],
+      templateType: 'materials',
+    });
+    expect(verifySuggestionToken).toHaveBeenCalledWith(TOKEN);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('S4: zero JWTs when one was expected fails external_link_missing, no dispatch, batch continues to a healthy sibling', async () => {
+    // Invitation's pre-existing body-integrity gate already skips a link-less
+    // body as missing_secure_link before this gate is reached (see the
+    // "never runs before the invitation body-integrity gate" pin below) — use
+    // a non-invitation templateType to exercise THIS gate's own missing case.
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const SUG_OK2 = '55555555-5555-4555-8555-555555555555';
+    SUGGESTIONS[SUG_OK2] = suggestion(SUG_OK2, { wmkf_accepted: true });
+    PERSONS[`person-${SUG_OK2}`] = person(`person-${SUG_OK2}`);
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_OK2, requestId: REQUEST_ID } });
+    const emitted = await run({
+      drafts: [
+        { suggestionId: SUG_OK, subject: 'S', body: 'No link here.', externalLinkExpected: true },
+        draft(SUG_OK2),
+      ],
+      templateType: 'materials',
+    });
+    const r = resultOf(emitted);
+    expect(r.failed).toEqual([
+      expect.objectContaining({
+        suggestionId: SUG_OK,
+        code: 'external_link_missing',
+        error: expect.stringContaining('missing or no longer valid'),
+      }),
+    ]);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_OK2]);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('S4: a missing/non-boolean externalLinkExpected marker fails external_link_expectation_missing (deploy-transition draft — a render predating this gate)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: `Body:\nhttps://reviews.example.org/external/review/${TOKEN}` }],
+      templateType: 'materials',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_expectation_missing' });
+  });
+
+  test('S4: verifySuggestionToken reason hash_mismatch maps to external_link_superseded with the superseded-copy message', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({ ok: false, reason: 'hash_mismatch' });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      code: 'external_link_superseded',
+      error: 'This email’s secure reviewer link was replaced by a newer preview. Regenerate the preview and send this recipient again.',
+    });
+  });
+
+  test.each(['revoked', 'token_expires_passed', 'not_found', 'invalid_signature', 'expired'])(
+    'S4: verifySuggestionToken reason %s maps to external_link_invalid with the generic message',
+    async (reason) => {
+      verifySuggestionToken.mockResolvedValueOnce({ ok: false, reason });
+      const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+      expect(createAndSendEmail).not.toHaveBeenCalled();
+      expect(resultOf(emitted).failed[0]).toMatchObject({
+        suggestionId: SUG_OK,
+        code: 'external_link_invalid',
+        error: 'This email’s secure reviewer link is missing or no longer valid. Regenerate the preview and send this recipient again.',
+      });
+    },
+  );
+
+  test('S4: a verifySuggestionToken exception is a per-row failure (external_link_invalid), not a terminal batch error', async () => {
+    verifySuggestionToken.mockRejectedValueOnce(new Error('Dataverse read failed'));
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(names(emitted)).not.toContain('error');
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({ suggestionId: SUG_OK, code: 'external_link_invalid' });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('the token gate never runs before the invitation body-integrity gate (missing link short-circuits earlier, as skipped not failed)', async () => {
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'S', body: 'No link here.', externalLinkExpected: true }],
+      templateType: 'invitation',
+    });
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({ suggestionId: SUG_OK, reason: 'missing_secure_link' });
   });
 });
 

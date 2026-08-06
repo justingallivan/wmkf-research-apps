@@ -162,6 +162,10 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // True only when the last preview render failed — gates the banner's Retry
   // button so it never offers to re-render on a send-path error.
   const [previewFailed, setPreviewFailed] = useState(false);
+  // True whenever a render is queued or in flight (single-flight serialization
+  // below) — disables Preview/Retry so a click can't start a second overlapping
+  // durable render call while one is already outstanding.
+  const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
@@ -259,41 +263,70 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // the latest invocation may apply its result — a slower older response must not
   // overwrite a newer one's drafts.
   const renderGenRef = useRef(0);
-  const renderPreviews = useCallback(async () => {
+  // Single-flight serialization (v3): renderGenRef alone stops a stale response
+  // from being APPLIED, but a superseding call could still start a second,
+  // overlapping durable render (and durable token-mint) call while an older one
+  // is still in flight. renderTailRef chains every call so only one fetch is ever
+  // outstanding — a superseding call's run is appended after the current tail and
+  // skips its own fetch entirely if a still-newer generation has queued behind it
+  // by the time its turn comes up.
+  const renderTailRef = useRef(Promise.resolve());
+  const renderPreviews = useCallback(() => {
     // Wait for the template load to settle before the first render — rendering with
     // the initial EMPTY skeleton trips the render-emails 400 guard and flashes it
     // until the real template lands. Once loaded, the effect re-fires (templateLoaded
     // is in the deps below) with the resolved template.
-    if (!templateLoaded) return;
+    if (!templateLoaded) return renderTailRef.current;
     const gen = ++renderGenRef.current;
-    setError(null); setPreviewFailed(false); setRawDrafts([]); setManualLinkCopyState({});
-    setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
-    try {
-      const res = await fetch('/api/review-manager/render-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionIds,
-          templateType: 'invitation',
-          template,
-          settings: { signature: settings.signature || '' },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (gen !== renderGenRef.current) return; // superseded by a newer render
-      if (!res.ok) {
-        // Carry the composed message through the shared catch; the flag
-        // distinguishes a server reply from a network/transport failure.
-        const failure = new Error(renderPreviewFailureMessage({ status: res.status, serverMessage: data.error }));
-        failure.isPreviewFailure = true;
-        throw failure;
+    // Snapshot the inputs at call time — by the time this run's turn comes up in
+    // the tail, `suggestionIds`/`template`/settings may have moved on for a newer
+    // call, but this run must use what was current when IT was queued.
+    const snapshotIds = suggestionIds;
+    const snapshotTemplate = template;
+    const snapshotSignature = settings.signature || '';
+    setRendering(true);
+    const run = renderTailRef.current.then(async () => {
+      if (gen !== renderGenRef.current) return; // superseded before its turn — skip the fetch
+      setError(null); setPreviewFailed(false); setRawDrafts([]); setManualLinkCopyState({});
+      setProgress({ current: 0, total: snapshotIds.length, message: 'Rendering previews…' });
+      try {
+        const res = await fetch('/api/review-manager/render-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suggestionIds: snapshotIds,
+            templateType: 'invitation',
+            template: snapshotTemplate,
+            settings: { signature: snapshotSignature },
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (gen !== renderGenRef.current) return; // superseded by a newer render
+        if (!res.ok) {
+          // Carry the composed message through the shared catch; the flag
+          // distinguishes a server reply from a network/transport failure.
+          const failure = new Error(renderPreviewFailureMessage({ status: res.status, serverMessage: data.error }));
+          failure.isPreviewFailure = true;
+          throw failure;
+        }
+        setRawDrafts(data.drafts || []);
+      } catch (e) {
+        if (gen !== renderGenRef.current) return;
+        setError(e.isPreviewFailure ? e.message : RENDER_PREVIEW_NETWORK_MESSAGE);
+        setPreviewFailed(true);
       }
-      setRawDrafts(data.drafts || []);
-    } catch (e) {
-      if (gen !== renderGenRef.current) return;
-      setError(e.isPreviewFailure ? e.message : RENDER_PREVIEW_NETWORK_MESSAGE);
-      setPreviewFailed(true);
-    }
+    });
+    renderTailRef.current = run;
+    run.finally(() => {
+      // Only clear `rendering` when this run is still the tail (no newer call has
+      // queued behind it), the component is still mounted, and no newer
+      // generation exists — otherwise a superseded run's settle would flip
+      // `rendering` off while the real latest run is still pending its turn.
+      if (run === renderTailRef.current && mountedRef.current && gen === renderGenRef.current) {
+        setRendering(false);
+      }
+    });
+    return run;
   }, [suggestionIds, settings.signature, template, templateLoaded]);
 
   // Render previews on open and again if the loaded template differs from the
@@ -560,7 +593,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          drafts: sendable.map((d) => ({ suggestionId: d.suggestionId, subject: d.subject, body: d.body })),
+          drafts: sendable.map((d) => ({
+            suggestionId: d.suggestionId,
+            subject: d.subject,
+            body: d.body,
+            externalLinkExpected: d.externalLinkExpected,
+          })),
           templateType: 'invitation',
           attachmentUrls: [],
           markAsSent: true,
@@ -647,7 +685,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 <button
                   type="button"
                   onClick={renderPreviews}
-                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100"
+                  disabled={rendering}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   ↻ Retry
                 </button>

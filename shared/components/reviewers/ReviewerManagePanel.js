@@ -320,15 +320,41 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     });
   };
   const [isUploading, setIsUploading] = useState(false);
+  // True only when the last preview render failed — gates the compose banner's
+  // Retry button so it never offers to re-render on a send-path error.
+  const [previewFailed, setPreviewFailed] = useState(false);
+  // True whenever a preview render is queued or in flight — disables the
+  // footer Preview button and the Retry button.
+  const [rendering, setRendering] = useState(false);
+  // Synchronous single-flight lock for handlePreview, keyed to the modal-session
+  // epoch that was current when a render was started. A second call for the SAME
+  // session returns immediately; a stale finally (from a session that has since
+  // closed/reopened) must not clear a newer session's lock or `rendering` state.
+  const renderingEpochRef = useRef(null);
+  // Serializes preview-render execution across close/reopen sessions (not just
+  // across same-session clicks): a render kicked off just before close, and a
+  // new render kicked off right after reopen, would otherwise both mint/rotate
+  // the durable reviewer token for the same recipient with no ordering. Chaining
+  // every render onto this tail guarantees at most one fetch is ever in flight.
+  const renderTailRef = useRef(Promise.resolve());
+  // Monotonic modal-session id, bumped on every isOpen transition (open AND
+  // close) and never reset. A response for an earlier open/close session can
+  // never mutate a later session's state — see handlePreview/handleSend.
+  const modalSessionRef = useRef(0);
 
-  // Reset email compose state when modal opens.
+  // Reset email compose state when the modal opens or closes; bump the modal
+  // session on every transition so an in-flight response from a prior session
+  // can never mutate current state.
   useEffect(() => {
+    modalSessionRef.current += 1;
     if (isOpen) {
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
       setDrafts([]);
       setSentResults({ sent: [], failed: [], skipped: [] });
       setError(null);
+      setPreviewFailed(false);
+      setRendering(false);
     }
   }, [isOpen]);
 
@@ -546,47 +572,89 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     return ap - bp || String(a.name).localeCompare(String(b.name));
   });
 
-  const handlePreview = async () => {
-    setError(null);
-    setDrafts([]);
-    setProgress({ current: 0, total: 0, message: 'Rendering previews...' });
+  // Single-flight + modal-session guarded preview render (v3). Returns the
+  // scheduled promise; callers (the Preview/Retry buttons) don't need to await it.
+  const handlePreview = () => {
+    const epoch = modalSessionRef.current;
+    // Reentrancy guard: a second call for the SAME session (same-tick double
+    // click, or Retry clicked while its own render is still pending) is a no-op —
+    // at most one fetch per modal session may execute at a time.
+    if (renderingEpochRef.current === epoch) return renderTailRef.current;
+    // Set the lock synchronously (before setRendering) so two same-tick clicks
+    // can't both observe an unlocked ref.
+    renderingEpochRef.current = epoch;
+    setRendering(true);
 
-    try {
-      const response = await fetch('/api/review-manager/render-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionIds: reviewers.map(r => r.suggestionId),
-          templateType,
-          template: currentTemplate,
-          settings: {
-            signature: settings.signature || '',
-            reviewDueDate: emailFields.reviewDueDate || settings.reviewDueDate || '',
-            customFields: {
-              proposalSendDate: emailFields.proposalSendDate || '',
-              // honorarium intentionally omitted — render-emails injects the
-              // Dataverse ground-truth amount server-side (S199).
-            },
-          },
-        }),
-      });
+    // Snapshot the request inputs now — a queued run (waiting on a prior,
+    // still-closing session's tail) must use what was current when IT was
+    // requested, not whatever the compose form holds by the time its turn comes.
+    const snapshotSuggestionIds = reviewers.map(r => r.suggestionId);
+    const snapshotTemplateType = templateType;
+    const snapshotTemplate = currentTemplate;
+    const snapshotSettings = {
+      signature: settings.signature || '',
+      reviewDueDate: emailFields.reviewDueDate || settings.reviewDueDate || '',
+      customFields: {
+        proposalSendDate: emailFields.proposalSendDate || '',
+        // honorarium intentionally omitted — render-emails injects the
+        // Dataverse ground-truth amount server-side (S199).
+      },
+    };
 
-      // Tolerate a non-JSON body (gateway timeout / crashed function) — the
-      // status-code message below beats a raw JSON parse error in the banner.
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const failure = new Error(renderPreviewFailureMessage({ status: response.status, serverMessage: data.error }));
-        failure.isPreviewFailure = true;
-        throw failure;
+    const run = renderTailRef.current.then(async () => {
+      // Superseded before its turn (the session closed/reopened while this run
+      // waited behind a prior session's tail) — skip the fetch entirely.
+      if (modalSessionRef.current !== epoch) return;
+
+      setError(null);
+      setDrafts([]);
+      setPreviewFailed(false);
+      setProgress({ current: 0, total: 0, message: 'Rendering previews...' });
+
+      try {
+        const response = await fetch('/api/review-manager/render-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suggestionIds: snapshotSuggestionIds,
+            templateType: snapshotTemplateType,
+            template: snapshotTemplate,
+            settings: snapshotSettings,
+          }),
+        });
+        if (modalSessionRef.current !== epoch) return;
+
+        // Tolerate a non-JSON body (gateway timeout / crashed function) — the
+        // status-code message below beats a raw JSON parse error in the banner.
+        const data = await response.json().catch(() => ({}));
+        if (modalSessionRef.current !== epoch) return;
+        if (!response.ok) {
+          const failure = new Error(renderPreviewFailureMessage({ status: response.status, serverMessage: data.error }));
+          failure.isPreviewFailure = true;
+          throw failure;
+        }
+
+        setDrafts(data.drafts || []);
+        setStep('preview');
+      } catch (err) {
+        if (modalSessionRef.current !== epoch) return;
+        // The compose step keeps its Preview button visible, so the retry
+        // affordance already exists here; only the message needed help.
+        setError(err.isPreviewFailure ? err.message : RENDER_PREVIEW_NETWORK_MESSAGE);
+        setPreviewFailed(true);
       }
-
-      setDrafts(data.drafts || []);
-      setStep('preview');
-    } catch (err) {
-      // The compose step keeps its Preview button visible, so the retry
-      // affordance already exists here; only the message needed help.
-      setError(err.isPreviewFailure ? err.message : RENDER_PREVIEW_NETWORK_MESSAGE);
-    }
+    });
+    renderTailRef.current = run;
+    run.finally(() => {
+      // Clear the lock/rendering only if both the lock epoch and the current
+      // modal epoch still equal the captured value — a stale run's finally must
+      // never clear a newer session's lock or state.
+      if (renderingEpochRef.current === epoch && modalSessionRef.current === epoch) {
+        renderingEpochRef.current = null;
+        setRendering(false);
+      }
+    });
+    return run;
   };
 
   const updateDraft = (suggestionId, field, value) => {
@@ -620,6 +688,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     );
     if (!ok) return;
 
+    // Captured before any async work: a response arriving after this modal
+    // session closed/reopened must not mutate the current session's state.
+    const epoch = modalSessionRef.current;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
     setError(null);
@@ -643,12 +714,14 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             suggestionId: d.suggestionId,
             subject: d.subject,
             body: d.body,
+            externalLinkExpected: d.externalLinkExpected,
           })),
           templateType,
           attachmentUrls,
           markAsSent: true,
         }),
       });
+      if (modalSessionRef.current !== epoch) return;
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -657,6 +730,10 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
 
       while (true) {
         const { value, done } = await reader.read();
+        if (modalSessionRef.current !== epoch) {
+          try { reader.cancel(); } catch (e) { /* best-effort */ }
+          return;
+        }
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -694,6 +771,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
         }
       }
     } catch (err) {
+      if (modalSessionRef.current !== epoch) return;
       setError(err.message);
       setStep('preview');
     }
@@ -717,7 +795,19 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
           {step === 'compose' && (
             <div className="space-y-4">
               {error && (
-                <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
+                <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm flex items-start justify-between gap-3">
+                  <span>{error}</span>
+                  {previewFailed && (
+                    <button
+                      type="button"
+                      onClick={handlePreview}
+                      disabled={rendering}
+                      className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                    >
+                      ↻ Retry
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Template Type Selector */}
@@ -1109,7 +1199,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 >
                   {templateSaved ? 'Saved ✓' : 'Save Template'}
                 </button>
-                <Button onClick={handlePreview}>
+                <Button onClick={handlePreview} disabled={rendering}>
                   Preview {reviewers.filter(r => r.email).length} Email{reviewers.filter(r => r.email).length !== 1 ? 's' : ''}
                 </Button>
               </>
