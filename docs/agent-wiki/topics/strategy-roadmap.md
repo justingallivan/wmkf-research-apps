@@ -47,11 +47,16 @@ document inventory, and individual implementation plans do not establish priorit
   redesign AND the containment-first institution comparison fix are both downstream of
   the fuzzy-matching model decision — the research's three-band decisions
   (auto/review/reject) map onto the proposed card status band, so building either first
-  bakes in the wrong abstraction. Order: reconcile the two research docs → benchmark /
-  failure archive → normalizer consolidation + shared scorer (small independently
-  shippable increments) → card redesign → coauthor verdict → institution-COI sort +
-  audited override. Decisions and hazards in
-  `project-reviewer-card-simplification-direction`; S395 scope-accretion caution applies.
+  bakes in the wrong abstraction. Reconciliation DONE (S404, 2026-08-06): confirmed
+  Claude×Codex consensus in `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`
+  — six owner questions pend there (§4) before the benchmark starts. Remaining order:
+  benchmark / failure archive (150–300-case falsification suite) → normalizer
+  consolidation + shared scorer (small independently shippable increments; decision-specific
+  models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
+  card redesign → coauthor verdict → institution-COI sort + audited override. Decisions
+  and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
+  caution applies; high-risk automation stays review-only until the representative
+  benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.

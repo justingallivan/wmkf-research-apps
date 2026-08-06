@@ -1,5 +1,23 @@
 # Session 404 Prompt: Fuzzy-matching reconciliation (now the gate for the card redesign)
 
+> **S404 interim update (2026-08-06, mid-session).** Next Item 1 is **DONE**: the
+> fuzzy-matching reconciliation reached a confirmed Claude×Codex consensus —
+> `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` (committed
+> `205bba54` with the working draft). Two Codex rounds: round 1 "CONSENSUS: YES
+> (amended shape)", round 2 "CONFIRMED" on the final document. All Codex
+> amendments accepted (falsification suite never calibrates production
+> thresholds; consolidation via characterization tests, not a blanket refactor;
+> shared FS scoring primitives with decision-specific models + fail-closed
+> vetoes; institution-first). **Six owner questions** now pend in §4 of that doc
+> (precision floor, review capacity, ROR namespace, benchmark investment,
+> affiliation representation, contact-attribution semantics); five nits in §5.
+> Note: requested `--model sol-5.6` was rejected by the Codex account; both
+> rounds ran on the Codex CLI default model — owner may want a re-run when that
+> model is available. Downstream next steps: benchmark build (Next Item 2)
+> awaits owner answers, then normalizer consolidation + scorer increments, then
+> the card redesign. Session then pivoted to an owner-reported bug (in
+> progress at handoff time; see /stop update below if present).
+
 > **Handoff, 2026-08-06 (Session 403).** Production is healthy and carries three
 > S403 UI fixes (`bc85ec8`, `ceb5ee1`, `e58d2d5`); the last deploy reached READY.
 > The session began on the deferred fuzzy-matching reconciliation, was pulled
