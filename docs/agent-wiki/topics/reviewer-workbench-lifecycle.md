@@ -283,6 +283,21 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   readiness/address-trust semantics live here
   (`project-reviewer-verify-fail-dangerous`). A `ready` email chip stays inert.
   Tests: `tests/unit/reviewer-card-warning-badges-clickable.test.js`.
+- **Invite-preview failure banner: cause + reassurance + Retry (S404, owner
+  report 2026-08-06):** rendering invite previews failed twice in production
+  (the fail-closed 503 "Unable to verify application access; please retry"
+  from `requireAppAccess` — its Dataverse app-grant lookup threw — and the
+  bare "Failed to render previews" fallback when the response had no JSON
+  body). Previews always render before anything sends, so these failures are
+  safe to retry, but the banner said neither that nothing was sent nor how to
+  recover. Fixed on branch `fix/invite-preview-error-retry`: shared wording in
+  `shared/components/reviewers/render-preview-failure.js` (server message or
+  status code + "No emails have been sent — retrying is safe."; distinct
+  network-unreachable message), an inline **↻ Retry** button on
+  `InviteEmailModal`'s banner gated by a `previewFailed` flag (never offered
+  on send-path errors), and a JSON-parse guard in `ReviewerManagePanel`'s
+  `handlePreview` (its compose step already retries via the Preview button).
+  Tests: `tests/unit/invite-preview-error-retry.test.js` (3, stash-verified).
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
   treats conversion measurement as remaining work

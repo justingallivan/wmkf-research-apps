@@ -34,6 +34,7 @@ import {
   canTransitionToTerminal,
 } from './reviewer-modes';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
+import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
 // (React-free + unit-tested). Re-export the pipeline so existing importers of
@@ -570,15 +571,21 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
         }),
       });
 
-      const data = await response.json();
+      // Tolerate a non-JSON body (gateway timeout / crashed function) — the
+      // status-code message below beats a raw JSON parse error in the banner.
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to render previews');
+        const failure = new Error(renderPreviewFailureMessage({ status: response.status, serverMessage: data.error }));
+        failure.isPreviewFailure = true;
+        throw failure;
       }
 
       setDrafts(data.drafts || []);
       setStep('preview');
     } catch (err) {
-      setError(err.message);
+      // The compose step keeps its Preview button visible, so the retry
+      // affordance already exists here; only the message needed help.
+      setError(err.isPreviewFailure ? err.message : RENDER_PREVIEW_NETWORK_MESSAGE);
     }
   };
 

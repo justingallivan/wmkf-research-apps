@@ -30,6 +30,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
+import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
@@ -158,6 +159,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
   const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
+  // True only when the last preview render failed — gates the banner's Retry
+  // button so it never offers to re-render on a send-path error.
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
@@ -262,7 +266,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     // is in the deps below) with the resolved template.
     if (!templateLoaded) return;
     const gen = ++renderGenRef.current;
-    setError(null); setRawDrafts([]); setManualLinkCopyState({});
+    setError(null); setPreviewFailed(false); setRawDrafts([]); setManualLinkCopyState({});
     setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
     try {
       const res = await fetch('/api/review-manager/render-emails', {
@@ -277,11 +281,18 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       });
       const data = await res.json().catch(() => ({}));
       if (gen !== renderGenRef.current) return; // superseded by a newer render
-      if (!res.ok) throw new Error(data.error || 'Failed to render previews');
+      if (!res.ok) {
+        // Carry the composed message through the shared catch; the flag
+        // distinguishes a server reply from a network/transport failure.
+        const failure = new Error(renderPreviewFailureMessage({ status: res.status, serverMessage: data.error }));
+        failure.isPreviewFailure = true;
+        throw failure;
+      }
       setRawDrafts(data.drafts || []);
     } catch (e) {
       if (gen !== renderGenRef.current) return;
-      setError(e.message);
+      setError(e.isPreviewFailure ? e.message : RENDER_PREVIEW_NETWORK_MESSAGE);
+      setPreviewFailed(true);
     }
   }, [suggestionIds, settings.signature, template, templateLoaded]);
 
@@ -629,7 +640,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {error && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">{error}</div>}
+          {error && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3 flex items-start justify-between gap-3">
+              <span>{error}</span>
+              {previewFailed && (
+                <button
+                  type="button"
+                  onClick={renderPreviews}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100"
+                >
+                  ↻ Retry
+                </button>
+              )}
+            </div>
+          )}
 
           {step === 'preview' && (
             <>
