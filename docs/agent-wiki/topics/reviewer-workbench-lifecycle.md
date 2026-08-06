@@ -439,6 +439,24 @@ email activity and returned `emailId`. Owner goal and decisions:
 
 **Re-verify removed intentionally:** The "Re-verify" button was dropped because enrichment output is static within a cycle (COI computed against a fixed proposal author list; PubMed/Scholar data stable over weeks). The valid re-run use case is error recovery ("Try again"). Keep the general re-verify path retired; if a re-resolve-after-edit pattern is ever needed, see the Future Work section in `reviewer-identity.md`.
 
+**Unverified-suggestion rescue (S402):** the Find tab's collapsed "Unverified
+suggestions" section (Claude suggestions the searched databases couldn't
+verify) is no longer a dead end — each card carries the same S285
+confirm-identity affordance as the needs-identity-review section, plus
+Exclude. The load-bearing ordering: these rows are EPHEMERAL (deliberately
+never recorded on `reviewer_find_roster`, S224) while the server
+`confirm_identity` action only updates an existing ACTIVE roster row, so
+`confirmIdentityContact` first POSTs the row to the roster (upsert;
+`preserveStoredRosterAuthority` makes a retry after partial failure safe),
+then confirms, then moves it from the ephemeral `unverified` state into
+`rosterActive`, where the existing just-confirmed → selectable machinery
+applies. Keys are stamped with `withReviewerCandidateKey` when unverified
+rows land in state so the record POST and confirm PATCH agree on one key even
+after the PD edits affiliation in the modal. Exclude reuses the durable PATCH
+(server `setExcluded` is already an upsert) via a dedicated handler whose
+failure rollback must NOT restore the row into `rosterActive` (it was never
+active). Pinned: `tests/unit/reviewer-search-unverified-rescue.test.js`.
+
 **Exact applicant-linked person hydration (production-live; authenticated
 Request `1002912` visual check passed 2026-07-31):** populated
 `akoya_request.wmkf_potentialreviewer1..5` slots are exact
