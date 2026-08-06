@@ -1,103 +1,101 @@
-# Session 402 Prompt: Remaining reviewer product fixes (post-S401 queue)
+# Session 403 Prompt: Fuzzy-matching research reconciliation + reviewer queue
 
-> **Handoff, 2026-08-05 (Session 401).** Production is healthy and carries TWO
-> S401 merges, both smoke-relevant to the owner's next real usage: the
-> post-send roster repaint (merge `fb8e0f0a`) and the re-discovery engagement
-> collapse (merge `f36731f0`, deployed + verified Ready). Both went through
-> Codex adversarial review; every finding was remediated with pinned
-> regression tests. Run `/start` first.
+> **Handoff, 2026-08-05 (Session 402).** Production is healthy and carries the
+> S402 merge (`53366b95`): the unverified-suggestion rescue affordance plus its
+> Codex-adversarial-review hardening (proposal-author boundary + phantom-
+> exclusion rollback). Deployment reached READY. The owner then commissioned an
+> INDEPENDENT fuzzy-matching research pass (five web sweeps + in-repo
+> inventory) and explicitly deferred its reconciliation against the Codex
+> research doc to THIS session. Run `/start` first.
 
-## Session 401 Summary
+## Session 402 Summary
 
-Owner-prioritized findings 2 and 1 from the S400 evening-usage triage were
-built, adversarially reviewed, remediated, merged, and deployed. All 57
-`/start` gates were green at session start; full suite grew 6,820 → 6,842.
+All 57 `/start` gates were green at session start. Full suite grew
+6,842 → 6,849 [VERIFIED via full jest run at handoff].
 
 ### What Was Completed
 
-1. **Post-send refresh bug (S400 finding 2) SHIPPED (merge `fb8e0f0a`).**
-   Investigation FIRST disproved the suspected "onSent fires before SSE/stamps
-   complete" race — every hop is awaited end-to-end (stamp PATCH →
-   `email_sent` → `result` → `res.end()` → client stream close → `onSent`);
-   the production mechanism remains unattributed. Shipped defense-in-depth:
-   InviteEmailModal.onSent passes `{ invitedSuggestionIds, sentAt }` (only
-   rows the stream confirmed dispatched AND stamped, `inviteRecorded !==
-   false`); ReviewersTab paints those rows invited on top of the refetch;
-   same-request newest-wins generation guards on all three loaders. Two Codex
-   adversarial rounds found real flaws in the hardening itself, both fixed:
-   (a) overlay could resurrect a concurrent remove→restore reset → 4s
-   reconciling refetch; (b) reconcile clock started at schedule-time and
-   could cancel a >4s overlay fetch → clock now starts at PAINT-time (fix
-   authored by Codex via rescue, reviewed by Claude).
-2. **Re-discovery engagement collapse (S400 finding 1) SHIPPED (merge
-   `f36731f0`).** New `shared/utils/reviewer-rediscovery.js`: index the saved
-   pool's ENGAGED rows (stage beyond 'selected') by every identity key
-   (person GUID, ORCID incl. from orcidUrl, Scholar, OpenAlex,
-   diacritic-folded name); ReviewerSearchSection partitions the display merge
-   — matches collapse into "Already handled" as "Re-found by search" entries
-   instead of invitable cards. Codex adversarial pass found two gaps, both
-   fixed (Codex-authored, Claude-reviewed): name-key matches now REJECT on a
-   conflicting shared anchor (same-name different-ORCID stays separate), and
-   declined people reach the pool (declines archive to `selected=false` —
-   `projectRemovedCandidates` now emits person/ORCID/Scholar anchors and
-   ReviewersTab's `findSavedPool` = active + declined removed rows;
-   staff-removed-not-declined stay out deliberately). Also corrected: an
-   invited-stage "Already handled" entry navigates to Invite, not Track (the
-   Track GET is accepted-only, `reviewers-service.js:191`); pinned test
-   updated with rationale.
-3. **Prop contract change:** ReviewersTab → ReviewerFindPanel →
-   ReviewerSearchSection now passes `savedPool` (full candidate rows);
-   `savedPoolNames` derives inside the section for the exclusion union.
-4. **Claim-evidence pilot:** the S400 "local state could not be read" issue
-   did NOT recur — the `--current` report ran cleanly (no eligible edit, no
-   row added, per its own instruction).
-5. **New memory:** `feedback-codex-delegation-review-vs-rescue-routing.md`
-   (review-shaped work must use `/codex:adversarial-review` user-invoked;
-   rescue prompts referencing review findings need the CODEX RESCUE HANDOFF +
-   `[INTENTIONAL-RESCUE]` preface).
+1. **Unverified-suggestion rescue affordance (S400 finding 3, request 1003046)
+   SHIPPED (merge `53366b95`).** The Find tab's "Unverified suggestions"
+   cards (ephemeral Claude suggestions the databases couldn't verify) gained
+   the S285 confirm-identity + exclude affordances. Load-bearing mechanics:
+   unverified rows are ephemeral (never on `reviewer_find_roster`, S224) while
+   server `confirm_identity` only updates an existing ACTIVE row, so
+   `confirmIdentityContact` records the row on the roster FIRST (upsert;
+   retry-safe via `preserveStoredRosterAuthority`), then confirms, then moves
+   it into `rosterActive`. Keys stamped with `withReviewerCandidateKey` at
+   state time so record POST + confirm PATCH agree even after modal
+   affiliation edits. Feature commit `f23d83d` (5 pinned tests,
+   stash-verified to fail pre-fix).
+2. **Codex adversarial review → both findings fixed (commit `9bef570`;
+   Codex-authored via rescue, Claude-reviewed and committed).**
+   (a) HIGH: proposal authors could be rescued past the exclusion boundary —
+   `filterProposalAuthors` now also covers `discoveryResults.unverified` in
+   discover.js, and `confirm_identity` re-checks submitted AND server-stored
+   names against the server-resolved PI (`resolveProposalPI`) plus the
+   canonical `wmkf_apprequestperson` Co-PI junction (`fetchCoPIs`), rejecting
+   with 422 `proposal_author_candidate`. Codex closed a renamed-payload
+   bypass and achieved full co-investigator coverage (no PI-only limit).
+   (b) MEDIUM: failed unverified exclude left the name in `rosterNames`,
+   phantom-suppressing later searches — rollback now restores prior
+   membership; pinned test asserts the next search's `excludedNames` payload.
+3. **Deployed to production, READY verified** (Vercel inspect polled to
+   `● Ready`). Post-merge targeted suites green.
+4. **Fuzzy-matching independent research (owner-commissioned).** Five
+   parallel web-research agents (record-linkage frameworks, person-name
+   matching, author disambiguation, institution resolution, LLM-era matching
+   + decision design) plus a full in-repo matching inventory. Position paper:
+   `outputs/fuzzy-matching-independent-research-fable-2026-08-05.md`
+   (force-added; `outputs/` is gitignored by default). Headline findings:
+   the repo has 14 name-normalizer definitions (8 distinct algorithms), 11
+   institution normalizers (6 distinct), TWO independent nickname maps, ~25
+   boolean predicates, no Jaro-Winkler/frequency/rare-token weighting
+   anywhere; the field's answer is Fellegi–Sunter additive evidence scoring
+   with three-band decisions (auto/review/reject), registry-first institution
+   linking (ROR), and nickname dictionaries for Chris↔Christopher.
+   Recommendation shape: benchmark-first (UC adversarial matrix + failure
+   archive), consolidate normalizers, one shared scorer at our scale (borrow
+   Splink's MODEL not its engine). Research-only; nothing authorized.
+5. **Wiki updates:** reviewer-workbench-lifecycle (S402 rescue mechanics +
+   author-boundary hardening), reviewer-identity (pointer).
 
 ### Commits (session, chronological)
-- `66038fe3` fix: post-send confirmed-invite overlay + newest-wins guards
-- `c0e82410` fix: time-bound the overlay (Codex finding 1)
-- `9738ab2c` fix: paint-time reconcile clock (Codex finding 2, Codex-authored)
-- `f816ad4a` docs: wiki paint-time anchoring
-- `fb8e0f0a` MERGE fix/post-send-refresh → production
-- `7ea67e9a` feat: re-discovery engagement collapse
-- `d9578f41` fix: anchor-conflict rejection + declined pool (Codex-authored)
-- `f36731f0` MERGE fix/rediscovery-engagement-reconciliation → production
-- (this handoff commit) docs + memory
+- `f23d83d` feat: rescue affordance on unverified-suggestion cards
+- `9bef570` fix: author-boundary + phantom-exclusion gaps (Codex-authored)
+- `53366b95` MERGE fix/unverified-suggestion-rescue → production
+- (this handoff commit) docs + research artifact
 
 ## Next Items
 
-### Verified Open (owner-prioritized, carried from S400 triage)
+### Verified Open (owner-prioritized)
 
-1. **Unverified-suggestion cards have no rescue affordance.** Evidence:
-   request 1003046, Yamuna Krishnan; the "Unverified suggestions" section
-   renders `CandidateCard readOnly` with no handlers
-   (`ReviewerSearchSection.js:2964-2967` post-S401 lines), while the
-   identity-review section wires confirm-identity (`:2820-2852`,
-   `canConfirmForPromotion`). Fix: plumb the same confirm + exclude
-   affordances into the unverified render site (modal + server path exist;
-   keep bibliometrics dropped server-side on manual confirm). Tier 1–2.
-   Recommended next.
-2. **Comparison fix (containment-first) + structured verdict DTO.** Evidence:
-   directive §S399 addendum; acceptance tests pinned in
-   `tests/unit/enrich-recommended-institution-evidence.test.js`. Candidate 1:
-   word-boundary containment; fallback: conservative segment-whole extractor.
-   Ships WITH the structured verdict `{status, source}` through
-   DTO→roster→card. NEVER reuse a lossy aggregation-key extractor at this
-   seam (S400 HIGH). Deserves a fresh session — fail-closed constraints.
-3. **Invite-panel split copy (residual of the Kwong confusion).** Evidence:
-   `ReviewerInvitePanel.js` splits a mixed selection into "Send invitation
-   (N)" + "release M" with no explanation. The S401 collapse mostly prevents
-   mixed selections arising from re-discovery, but the copy is still
-   unexplained when it does occur. Small UX polish, optional.
+1. **Reconcile the two fuzzy-matching research docs.** Owner explicitly
+   deferred this to next session (2026-08-05 conversation). Inputs:
+   `outputs/fuzzy-matching-independent-research-fable-2026-08-05.md`
+   (Claude, independent) vs
+   `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`
+   (Codex, 2026-08-04). Deliverable: agreements, disagreements, what each
+   found the other missed, and a merged position for owner decision. The
+   Claude doc ends with 4 owner questions (precision floor, review-queue
+   capacity, ROR as canonical namespace, benchmark investment) — surface
+   them in the reconciliation. Research/decision work; no build authorized.
+2. **Comparison fix (containment-first) + structured verdict DTO** (carried
+   from S400/S401). Evidence: directive §S399 addendum; acceptance tests
+   pinned in `tests/unit/enrich-recommended-institution-evidence.test.js`.
+   NOTE: overlaps conceptually with item 1's strategy — consider whether the
+   reconciliation should shape this fix before building it piecemeal.
+3. **Invite-panel split copy** (carried; small UX polish, optional).
 
 ### Verified Open (carried)
 
 1. **S399 finding 4 — silent no-op invite button** (directive addendum:
-   OPEN). Untouched by both S401 branches.
+   OPEN). Untouched by S401/S402 branches.
 2. **Blob-cache hazard watch (passive).**
+3. **Optional hardening from S402 review (non-blocking):** (a) narrow
+   fail-open corner in the author check — PI contact read fails AND no
+   co-PIs → empty author set skips the server check (discover filter remains
+   primary; posture tolerates false negatives); (b) endpoint tests pin the
+   PI-variant path but not the co-PI or stored-name paths (same code path).
 
 ### Owner Decision Needed (carried)
 
@@ -106,8 +104,8 @@ built, adversarially reviewed, remediated, merged, and deployed. All 57
 2. **Increment E — ProfileProvider double-fetch**
    (`shared/context/ProfileContext.js:456-489`). [ASSUMED ~0.5–1s tail].
 3. **Latency secondary candidates from D0** (only if owner wants more).
-4. **Columbia enrichment contaminant**: S400 capture showed "EKA University
-   of Applied Sciences" in Konofagou's resolvedInstitutions — unexplained.
+4. **Columbia enrichment contaminant** ("EKA University of Applied
+   Sciences" in Konofagou's resolvedInstitutions — unexplained, S400).
 
 ### Parked (carried)
 
@@ -118,46 +116,44 @@ built, adversarially reviewed, remediated, merged, and deployed. All 57
 
 ### Verify Before Acting
 
-1. **Any comparison-fix work**: read the directive §S399 addendum status
-   block + the wiki workbench topic hazard first; fail-closed posture is
-   deliberate (`project-reviewer-verify-fail-dangerous`); false negatives
-   tolerable at this seam, false positives are not (Dataverse write gate).
-2. **Owner's next real usage is the behavioral validation** for both S401
-   ships: (a) after an invite send, sent rows must immediately show Invited
-   with no reload — pre-reload vs post-reload divergence means the overlay
-   painted something Dataverse doesn't hold (report immediately); (b) a
-   fresh search re-finding an engaged person must collapse into "Already
-   handled"; a genuine namesake must stay selectable.
+1. **Behavioral validation on owner's next real usage — now THREE checks:**
+   (a) post-send rows show Invited with no reload (S401); (b) a re-found
+   engaged person collapses into "Already handled", a namesake stays
+   selectable (S401); (c) an unverified-suggestion card shows "✓ This is the
+   right person → edit & add" + "✕ Exclude", and confirming one lands it in
+   the candidate list (S402). Report divergences immediately.
+2. **Any comparison-fix work**: read the directive §S399 addendum status
+   block + wiki workbench hazard first; fail-closed posture is deliberate
+   (`project-reviewer-verify-fail-dangerous`).
 
 ### Do Not Reopen Without New Decision
 
 1. Reverted warm-reconciliation range `5b6757df..7072d52a` — never
    merge/cherry-pick.
-2. The reverted byline-core fallback (`e2342f92`, reverted `b5b5fe08`) — the
+2. Reverted byline-core fallback (`e2342f92`, reverted `b5b5fe08`) — the
    containment-first follow-up supersedes it.
 3. Request `1002903` mutation work — read-only absent new exact owner
-   authorization (S397–401 protocol).
-4. The S400-suspected onSent/SSE post-send race — investigated S401, does not
-   exist in code (every hop awaited; see wiki workbench topic). Do not
-   re-chase; the shipped overlay covers the symptom class.
+   authorization.
+4. S400-suspected onSent/SSE post-send race — disproven S401; do not
+   re-chase.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/utils/reviewer-rediscovery.js` | Engaged-saved index + anchor-conflict partition (S401) |
-| `shared/components/reviewers/ReviewerSearchSection.js` | Display-merge partition, Already-handled render, unverified dead end (`:2964`) |
-| `shared/components/reviewers/ReviewersTab.js` | findSavedPool, loader generation guards, overlay reconcile timer |
-| `shared/components/reviewers/InviteEmailModal.js` | onSent `{invitedSuggestionIds, sentAt}` contract |
-| `lib/services/reviewer-finder/my-candidates-service.js:426` | Removed projection now carries identity anchors |
-| `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md` §S399 addendum | Comparison follow-up spec + per-finding status |
-| `tests/unit/reviewer-rediscovery.test.js` + `reviewer-search-rediscovery.test.js` | S401 collapse contract |
-| `tests/unit/reviewers-tab-post-send-refresh.test.js` | Post-send overlay/timer/pool-wiring contract |
+| `outputs/fuzzy-matching-independent-research-fable-2026-08-05.md` | Claude independent fuzzy-matching position (S402) — reconcile next |
+| `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` | Codex research doc (2026-08-04) — the other reconciliation input |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Rescue flow (`confirmIdentityContact`, `excludeUnverifiedCandidate`), unverified render site |
+| `pages/api/workbench/reviewer-roster.js` | `confirm_identity` author boundary (`findProposalAuthorMatch`, 422 `proposal_author_candidate`) |
+| `pages/api/reviewer-finder/discover.js` | Unverified list now crosses `filterProposalAuthors` |
+| `tests/unit/reviewer-search-unverified-rescue.test.js` | S402 rescue + rollback contract (5 tests) |
+| `tests/unit/reviewer-discover-unverified-author-filter.test.js` | Discover-level author-filter pin |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | S402 mechanics entry |
 
 ## Testing
 
 ```bash
 npm run check:types
-npx jest --testPathPatterns "reviewer-rediscovery|reviewer-search|reviewers-tab|invite-email"
-npx jest                                # full suite, 6,842
+npx jest --testPathPatterns "reviewer-search|reviewer-roster|reviewer-discover"
+npx jest                                # full suite, 6,849
 ```
