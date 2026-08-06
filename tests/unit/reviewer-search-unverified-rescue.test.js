@@ -12,7 +12,7 @@
  * on the roster FIRST — and must not attempt the confirmation if that record
  * write fails.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
 import { readSseStream } from '../../shared/components/reviewers/sse';
 
@@ -64,6 +64,30 @@ function mockSearchStreams() {
     })
     .mockImplementationOnce(async (_response, onEvent) => {
       onEvent({ event: 'result', data: { ranked: [], unverified: [unverifiedSuggestion] } });
+    });
+}
+
+function mockSearchStreamsWithRankedCandidate() {
+  const rankedCandidate = {
+    name: 'Active Reviewer',
+    email: 'active@example.edu',
+    affiliation: 'Example U',
+    identityStatus: 'confirmed',
+    verificationStatus: 'verified',
+    verified: true,
+  };
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', keywords: 'chemistry', authorInstitution: 'Example U' } },
+      });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [rankedCandidate], unverified: [unverifiedSuggestion] } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'complete', data: { type: 'complete', results: [rankedCandidate] } });
     });
 }
 
@@ -234,25 +258,39 @@ test('excluding an unverified suggestion persists the durable exclusion and move
   expect(patches[0].candidate.candidateKey).toBeTruthy();
 });
 
-test('a failed exclusion rolls back to the Unverified section (never into the active list)', async () => {
+test('a failed exclusion restores the prior name membership before the next search payload', async () => {
+  const analyzeBodies = [];
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
-    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/analyze') {
+      analyzeBodies.push(JSON.parse(options.body));
+      return Promise.resolve(response({}));
+    }
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return Promise.resolve(response({ success: true, recorded: 1 }));
+    }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       return Promise.resolve(response({ error: 'store unavailable' }, false));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
-  mockSearchStreams();
+  mockSearchStreamsWithRankedCandidate();
+  mockSearchStreamsWithRankedCandidate();
 
   await runSearchToUnverified();
-  fireEvent.click(screen.getByRole('button', { name: /exclude/i }));
+  const unverifiedCard = screen.getByText('Yamuna Krishnan').closest('.border');
+  fireEvent.click(within(unverifiedCard).getByRole('button', { name: /exclude/i }));
 
   await waitFor(() => expect(screen.getByText(/Couldn't exclude that reviewer/)).toBeInTheDocument());
   // Back in Unverified; NOT promoted into an actionable/selectable card.
   expect(screen.getByText(/Unverified suggestions \(1\)/)).toBeInTheDocument();
   expect(screen.queryByText(/Excluded \(1\)/)).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Select Yamuna Krishnan')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /run another search/i }));
+  await waitFor(() => expect(analyzeBodies).toHaveLength(2));
+  expect(analyzeBodies[1].excludedNames).not.toContain('Yamuna Krishnan');
 });

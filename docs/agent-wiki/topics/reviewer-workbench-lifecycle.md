@@ -455,7 +455,19 @@ rows land in state so the record POST and confirm PATCH agree on one key even
 after the PD edits affiliation in the modal. Exclude reuses the durable PATCH
 (server `setExcluded` is already an upsert) via a dedicated handler whose
 failure rollback must NOT restore the row into `rosterActive` (it was never
-active). Pinned: `tests/unit/reviewer-search-unverified-rescue.test.js`.
+active) and must restore `rosterNames` to its prior membership (else the
+failed exclude phantom-suppresses the name from every later search).
+Adversarial-review hardening (same session): discover.js applies
+`filterProposalAuthors` to the unverified list too (rescuable rows must cross
+the same PI/co-investigator boundary as verified ones), and `confirm_identity`
+re-checks both the submitted and server-stored candidate names against the
+server-resolved PI (`resolveProposalPI`) plus the canonical
+`wmkf_apprequestperson` Co-PI junction (`fetchCoPIs`), rejecting matches with
+422 `proposal_author_candidate` — no browser-carried proposal analysis is
+trusted at that boundary. Pinned:
+`tests/unit/reviewer-search-unverified-rescue.test.js`,
+`tests/unit/reviewer-discover-unverified-author-filter.test.js`,
+`tests/unit/reviewer-roster-endpoint.test.js`.
 
 **Exact applicant-linked person hydration (production-live; authenticated
 Request `1002912` visual check passed 2026-07-31):** populated

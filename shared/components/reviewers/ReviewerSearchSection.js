@@ -1558,6 +1558,7 @@ export default function ReviewerSearchSection({
     const key = candKey(cand);
     if (!key || !requestId) return;
     const pruned = pruneCandidateForRoster(cand);
+    const nameAlreadyInRoster = rosterNames.includes(cand.name);
     setRosterExcluded((prev) => dedupeByName([pruned, ...prev]));
     setRosterNames((prev) => Array.from(new Set([...prev, cand.name])));
     try {
@@ -1569,9 +1570,12 @@ export default function ReviewerSearchSection({
       if (!res.ok) throw new Error('exclude failed');
     } catch {
       setRosterExcluded((prev) => prev.filter((c) => candKey(c) !== key));
+      if (!nameAlreadyInRoster) {
+        setRosterNames((prev) => prev.filter((name) => name !== cand.name));
+      }
       setRosterNote("Couldn't exclude that reviewer — please try again.");
     }
-  }, [requestId]);
+  }, [requestId, rosterNames]);
 
   // Promote an excluded candidate back to the active, selectable list.
   const promoteCandidate = useCallback(async (cand) => {

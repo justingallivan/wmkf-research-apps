@@ -13,6 +13,18 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => {
     verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
   };
 });
+const mockResolveProposalPI = jest.fn(async () => ({
+  resolved: true,
+  canonicalName: 'Patricia Investigator',
+  contactName: 'Patricia Investigator',
+}));
+const mockFetchCoPIs = jest.fn(async () => ['Casey Collaborator']);
+jest.mock('../../lib/services/proposal-pi-identity', () => ({
+  resolveProposalPI: (...args) => mockResolveProposalPI(...args),
+}));
+jest.mock('../../lib/services/proposal-participants', () => ({
+  fetchCoPIs: (...args) => mockFetchCoPIs(...args),
+}));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
   recordSurfaced: jest.fn(async () => 0),
@@ -739,6 +751,23 @@ describe('PATCH', () => {
       { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
     );
     expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity rejects a rescued candidate matching the server-resolved PI name variant', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: { name: 'P. Investigator', email: 'pi@example.edu' },
+    } }, r);
+
+    expect(mockResolveProposalPI).toHaveBeenCalledWith(REQ);
+    expect(r.statusCode).toBe(422);
+    expect(r.body).toMatchObject({
+      success: false,
+      code: 'proposal_author_candidate',
+    });
+    expect(store.confirmIdentity).not.toHaveBeenCalled();
   });
 
   it('confirm_identity keeps applicant identity evidence from the server row', async () => {
