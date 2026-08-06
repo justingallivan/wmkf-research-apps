@@ -388,7 +388,18 @@ export default function ReviewerFindPanel({
         } else if (lookup.outcome === 'none') {
           resolution = { mode: 'create_new' };
         } else {
-          setManual((prev) => ({ ...prev, saving: false, lookupResult: lookup, resolution: null }));
+          // Ambiguous (candidates) or conflict: staff must decide. Surface an
+          // explicit instruction — returning without a message here made the
+          // Add button look like a silent no-op.
+          setManual((prev) => ({
+            ...prev,
+            saving: false,
+            lookupResult: lookup,
+            resolution: null,
+            error: lookup.outcome === 'candidates'
+              ? 'This may be an existing person — select a match below (or “Create new instead”), then click “Add reviewer” again.'
+              : 'Existing records conflict for this person — choose “Create new person” below if this really is someone else.',
+          }));
           return;
         }
       }
@@ -563,6 +574,9 @@ export default function ReviewerFindPanel({
         {lookupDecision?.outcome === 'candidates' && (
           <div className="border border-amber-200 bg-amber-50 rounded p-3 text-sm">
             <p className="font-medium text-amber-900">Confirm existing person</p>
+            <p className="text-xs text-amber-800 mt-1">
+              This may already be a known person. Select the matching person below (or choose “Create new instead”), then click “Add reviewer”.
+            </p>
             <div className="mt-2 space-y-2">
               {(lookupDecision.candidates || []).map((candidate, idx) => {
                 const key = `${candidate.source}-${candidate.reviewerId || candidate.contactId || idx}`;
@@ -578,13 +592,18 @@ export default function ReviewerFindPanel({
                     type="button"
                     key={key}
                     onClick={() => chooseResolution(resolution)}
-                    className={`w-full text-left border rounded p-2 ${selected ? 'border-gray-900 bg-white' : 'border-amber-200 bg-white/70'}`}
+                    className={`w-full text-left border rounded p-2 cursor-pointer ${selected ? 'border-gray-900 bg-white' : 'border-amber-200 bg-white/70 hover:border-amber-400 hover:bg-white'}`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="font-medium text-gray-900">{candidate.context?.name || 'Existing person'}</span>
-                      <span className="text-xs text-gray-500">
-                        {candidate.source}{candidate.matchKey ? ` · ${candidate.matchKey}` : ''}
-                        {candidate.context?.active === false ? ' · inactive' : ''}
+                      <span className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="text-xs text-gray-500">
+                          {candidate.source}{candidate.matchKey ? ` · ${candidate.matchKey}` : ''}
+                          {candidate.context?.active === false ? ' · inactive' : ''}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded border ${selected ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300'}`}>
+                          {selected ? '✓ Selected' : 'Use this person'}
+                        </span>
                       </span>
                     </span>
                     {renderContext(candidate.context) && <span className="block text-xs text-gray-600 mt-1">{renderContext(candidate.context)}</span>}

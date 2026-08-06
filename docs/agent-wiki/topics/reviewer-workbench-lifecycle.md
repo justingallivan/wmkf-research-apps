@@ -245,6 +245,17 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   unused) — a colleague reported it "did nothing" (the tab hop was unreliable /
   the pre-filled card sat below the fold), so it was replaced with this in-place
   flow. Tests: `tests/unit/reviewers-tab-referral-add.test.js`.
+- **Find-tab Add-or-Refer "Confirm existing person" affordance (S403, owner
+  report 2026-08-06):** in `ReviewerFindPanel`'s manual-add card, when the
+  identity lookup returns ambiguous `candidates`, the candidate card itself is
+  the confirm control (click → `chooseResolution` → "Add reviewer" re-submits
+  with it). Pre-S403 that card looked like a static info box and an unresolved
+  submit silently re-rendered the amber box (`saving:false`, no message) — the
+  owner read it as "no option to confirm". Fixed with an explicit "Use this
+  person"/"✓ Selected" pill on each card, helper text under the heading, and
+  an inline error on unresolved submit (candidates AND conflict outcomes).
+  Same silent-no-op family as S399 finding 4. Tests:
+  `tests/unit/reviewer-find-panel-manual-add-confirm.test.js`.
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
   treats conversion measurement as remaining work
