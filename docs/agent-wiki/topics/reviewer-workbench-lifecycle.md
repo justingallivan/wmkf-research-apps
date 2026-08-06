@@ -297,14 +297,18 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   `InviteEmailModal`'s banner gated by a `previewFailed` flag (never offered
   on send-path errors), and a JSON-parse guard in `ReviewerManagePanel`'s
   `handlePreview` (its compose step already retries via the Preview button).
-  The shared guard messages were also reworded (`lib/utils/auth.js`):
-  "application access" reads as a GRANT application at a grants foundation, so
-  the 503 now says "Could not verify your access to the Reviewers app; please
-  retry" and the 403 "Your account does not have access to the Reviewers app"
-  — the app name resolves via `appDisplayName`: the first requested key
-  present in `APP_REGISTRY` (legacy alternates like `review-manager` are
-  registry-absent, so the canonical name wins), falling back to "this app"
-  for unregistered namespaces or key-less guards.
+  The shared guard messages were also reworded (`lib/utils/auth.js`), after
+  three rounds of owner feedback ("application" reads as a GRANT application;
+  "permissions to what?"; "she's IN the app and it worked before"). The 503 is
+  the SERVER's Dataverse grant query failing, not anything about the user, so
+  it now blames the system: "A temporary system error kept us from checking
+  your access to the Reviewers app. Your account is unaffected — please retry
+  in a moment". The 403 (grant row genuinely absent) says "Your account does
+  not have access to the Reviewers app". The app name resolves via
+  `appDisplayName`: the first requested key present in `APP_REGISTRY` (legacy
+  alternates like `review-manager` are registry-absent, so the canonical name
+  wins), falling back to "this app" for unregistered namespaces or key-less
+  guards.
   Tests: `tests/unit/invite-preview-error-retry.test.js` (3, stash-verified).
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
