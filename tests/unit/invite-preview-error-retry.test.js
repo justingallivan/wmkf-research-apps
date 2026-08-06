@@ -61,14 +61,14 @@ function openModal() {
 test('server error body: message + reassurance + working Retry', async () => {
   renderEmailsBehavior = () =>
     response(
-      { error: 'A temporary system error kept us from checking your access to the Reviewers app. Your account is unaffected — please retry in a moment' },
+      { error: "I'm having trouble accessing the server. This is usually a temporary blip. Please press retry and if the problem doesn't resolve, contact an administrator." },
       { ok: false, status: 503 },
     );
   openModal();
 
   await waitFor(() =>
     expect(
-      screen.getByText(/A temporary system error kept us from checking your access to the Reviewers app.*No emails have been sent — retrying is safe\./),
+      screen.getByText(/I'm having trouble accessing the server.*No emails have been sent — retrying is safe\./),
     ).toBeTruthy(),
   );
   const before = renderEmailsCalls().length;
