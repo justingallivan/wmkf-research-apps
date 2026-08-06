@@ -263,6 +263,26 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   instruction instead of the old silent no-op. Same silent-no-op family as
   S399 finding 4. Tests:
   `tests/unit/reviewer-find-panel-manual-add-confirm.test.js`.
+- **Warning badges route to their remedy (S403, owner report 2026-08-06):** on
+  `CandidateCard`, "⚠ Email needs confirmation" / "⚠ Research only" /
+  "⛔ Address conflict must be resolved", the "⚠ Address verification
+  required" / "⛔ Address conflict" pill, "⚠ Verified email required", and
+  "⚠ Identity review required" are now buttons opening the same remedy the
+  card already offered below (`onEdit` / `onReviewAddressConflict` /
+  `onConfirmIdentity`) — the remedy links sit low in the card and read as
+  decoration. The two full-width banners ("⚠ Dataverse identity needs review"
+  → confirm-identity, "⚠ Existing linked reviewer record needs repair" →
+  `onRequestRepair`) are wired the same way. `Pill` renders a `<button>` only
+  when passed `onClick`. Load-bearing: three derived handlers
+  (`openAddressRemedy`, `openIdentityRemedy`, `openRepairRemedy`) are the
+  SINGLE source for both the badge and the lower control — the controls were
+  rewritten to call them, so the two cannot drift — and each is null whenever
+  its control would not render (`!canManage`, `identityUnverified`,
+  `conflictRecordUnavailable`, or the repair-eligibility disjunction), so a
+  badge never offers a dead or gating-bypassing action. Routing only; no
+  readiness/address-trust semantics live here
+  (`project-reviewer-verify-fail-dangerous`). A `ready` email chip stays inert.
+  Tests: `tests/unit/reviewer-card-warning-badges-clickable.test.js`.
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
   treats conversion measurement as remaining work

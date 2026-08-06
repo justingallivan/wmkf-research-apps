@@ -109,7 +109,12 @@ function Spinner() {
   return <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />;
 }
 
-function Pill({ children, tone = 'gray' }) {
+// A Pill renders as a button when `onClick` is supplied, so a warning that has
+// a remedy on the card is itself the way to reach it (the remedy links sit low
+// in the card and read as decoration). Without onClick it stays a plain span —
+// callers pass null when the remedy is unavailable (read-only, unresolved
+// identity, missing conflict record), so a pill never offers a dead action.
+function Pill({ children, tone = 'gray', onClick = null, title }) {
   const tones = {
     gray: 'bg-gray-100 text-gray-700',
     red: 'bg-red-100 text-red-700',
@@ -118,7 +123,13 @@ function Pill({ children, tone = 'gray' }) {
     purple: 'bg-purple-100 text-purple-700',
     green: 'bg-green-100 text-green-700',
   };
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`}>{children}</span>;
+  const base = `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tones[tone] || tones.gray}`;
+  if (!onClick) return <span className={base} title={title}>{children}</span>;
+  return (
+    <button type="button" onClick={onClick} title={title} className={`${base} underline underline-offset-2 hover:brightness-95 cursor-pointer`}>
+      {children}
+    </button>
+  );
 }
 
 // Stable per-row id across roster splices + selection. Identity anchors win;
@@ -288,6 +299,20 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const identityUnverified = needsIdentityConfirmation
     && promotionDecision?.reason === 'identity_not_resolved';
 
+  // Warning-badge → remedy routing. These mirror the gating of the remedy
+  // controls rendered lower in the card EXACTLY; when a remedy is unavailable
+  // the handler is null and the badge stays a plain, non-clickable pill.
+  // Routing only — no readiness/trust semantics are decided here.
+  const openAddressRemedy = (canManage && (onEdit || onReviewAddressConflict) && !identityUnverified
+    && c.conflictRecordUnavailable !== true)
+    ? () => (c.addressConflictPending && onReviewAddressConflict ? onReviewAddressConflict(c) : onEdit?.(c))
+    : null;
+  const openIdentityRemedy = (onConfirmIdentity && canManage) ? () => onConfirmIdentity(c) : null;
+  const openRepairRemedy = (canManage && onRequestRepair
+    && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair))
+    ? () => onRequestRepair(c)
+    : null;
+
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
     : hasAnyMismatch ? 'border-orange-300 bg-orange-50'
@@ -347,25 +372,43 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               {!knownReviewer.email && <div>No stored email address</div>}
             </div>
           )}
-          {knownReviewer && knownReviewer.status !== 'known' && (
-            <div className="mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800">
-              ⚠ Existing linked reviewer record needs repair: {
-                knownReviewer.status === 'inactive'
-                  ? 'the person record is inactive'
-                  : knownReviewer.status === 'email_conflict'
-                    ? 'the stored email is owned by another or ambiguous reviewer record'
-                    : 'the person record could not be loaded'
-              }.
-            </div>
-          )}
-          {!identityUnverified && dataverseEvidence?.status === 'review_required' && (
-            <div
-              className="mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800"
-              title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}
-            >
-              ⚠ Dataverse identity needs review
-            </div>
-          )}
+          {knownReviewer && knownReviewer.status !== 'known' && (() => {
+            const banner = 'mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800';
+            const detail = knownReviewer.status === 'inactive'
+              ? 'the person record is inactive'
+              : knownReviewer.status === 'email_conflict'
+                ? 'the stored email is owned by another or ambiguous reviewer record'
+                : 'the person record could not be loaded';
+            const text = `⚠ Existing linked reviewer record needs repair: ${detail}.`;
+            if (!openRepairRemedy) return <div className={banner}>{text}</div>;
+            return (
+              <button
+                type="button"
+                onClick={openRepairRemedy}
+                className={`${banner} block w-full text-left underline underline-offset-2 hover:brightness-95 cursor-pointer`}
+                title="Create a durable repair request if neither address can be verified safely"
+              >
+                {text}
+              </button>
+            );
+          })()}
+          {!identityUnverified && dataverseEvidence?.status === 'review_required' && (() => {
+            const banner = 'mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800';
+            const checkedTitle = dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined;
+            if (!openIdentityRemedy) {
+              return <div className={banner} title={checkedTitle}>⚠ Dataverse identity needs review</div>;
+            }
+            return (
+              <button
+                type="button"
+                onClick={openIdentityRemedy}
+                className={`${banner} block w-full text-left underline underline-offset-2 hover:brightness-95 cursor-pointer`}
+                title={`${checkedTitle ? `${checkedTitle}. ` : ''}Confirm this is the right person and correct the contact.`}
+              >
+                ⚠ Dataverse identity needs review
+              </button>
+            );
+          })()}
           {!identityUnverified && dataverseInstitutions.length > 0 && (
             <div className={`mt-1 text-xs ${dataverseInstitutions.length > 1 ? 'text-amber-700' : 'text-gray-500'}`}>
               {dataverseInstitutions.length > 1
@@ -478,13 +521,29 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {eligibilityStatus === 'emeritus' && <Pill tone="amber">Emeritus / retired</Pill>}
             {previousResult && <Pill tone="blue">Previously found</Pill>}
             {identityUnverified && (
-              <Pill tone="amber">⚠ Identity review required</Pill>
+              <Pill
+                tone="amber"
+                onClick={openIdentityRemedy}
+                title={openIdentityRemedy ? 'Confirm this is the right person and correct the contact' : undefined}
+              >
+                ⚠ Identity review required
+              </Pill>
             )}
             {missingVerifiedEmail && (
-              <Pill tone="amber">⚠ Verified email required</Pill>
+              <Pill
+                tone="amber"
+                onClick={openAddressRemedy}
+                title={openAddressRemedy ? 'Add a verified email for this reviewer' : undefined}
+              >
+                ⚠ Verified email required
+              </Pill>
             )}
             {needsAddressVerification && (
-              <Pill tone={emailReadiness.action === 'blocked' ? 'red' : 'amber'}>
+              <Pill
+                tone={emailReadiness.action === 'blocked' ? 'red' : 'amber'}
+                onClick={openAddressRemedy}
+                title={openAddressRemedy ? 'Review the evidence, correct the address if needed, and verify the exact person and address' : undefined}
+              >
                 {emailReadiness.action === 'blocked' ? '⛔ Address conflict' : '⚠ Address verification required'}
               </Pill>
             )}
@@ -560,8 +619,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                   )}
                 </>
               )}
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded border ${
+              {/* Not-ready readiness states are themselves the way into the
+                  remedy (Verify / edit address); 'ready' stays a plain chip. */}
+              {(() => {
+                const chipClass = `inline-flex items-center gap-1 px-2 py-1 rounded border ${
                   emailAction === 'ready'
                     ? 'bg-green-50 text-green-800 border-green-200'
                     : emailAction === 'blocked'
@@ -571,12 +632,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                       : emailAction === 'quick_check'
                         ? 'bg-amber-50 text-amber-800 border-amber-200'
                         : 'bg-gray-50 text-gray-600 border-gray-200'
-                }`}
-                title={emailAction === 'missing'
+                }`;
+                const chipTitle = emailAction === 'missing'
                   ? emailActionReason
-                  : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`}
-              >
-                {emailAction === 'ready'
+                  : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`;
+                const label = emailAction === 'ready'
                   ? '✓ High-confidence email'
                   : emailAction === 'blocked'
                     ? '⛔ Address conflict must be resolved'
@@ -584,8 +644,20 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                     ? '⚠ Research only'
                     : emailAction === 'quick_check'
                       ? '⚠ Email needs confirmation'
-                    : 'Email not found'}
-              </span>
+                    : 'Email not found';
+                const clickable = emailAction !== 'ready' && openAddressRemedy;
+                if (!clickable) return <span className={chipClass} title={chipTitle}>{label}</span>;
+                return (
+                  <button
+                    type="button"
+                    onClick={openAddressRemedy}
+                    className={`${chipClass} underline underline-offset-2 hover:brightness-95 cursor-pointer`}
+                    title={`${chipTitle} — click to verify / edit the address.`}
+                  >
+                    {label}
+                  </button>
+                );
+              })()}
               {website && (
                 <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100" title="Faculty / personal website">
                   🔗 Website
@@ -795,13 +867,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Manual contact edit (manage-only): correct a wrong email/website
                 (or affiliation/h-index) by hand. A typed email is stamped manual
                 → quick check at invite (per-recipient acknowledgement). */}
-            {canManage && (onEdit || onReviewAddressConflict) && !identityUnverified
-              && c.conflictRecordUnavailable !== true && (
+            {openAddressRemedy && (
               <button
                 type="button"
-                onClick={() => (c.addressConflictPending && onReviewAddressConflict
-                  ? onReviewAddressConflict(c)
-                  : onEdit?.(c))}
+                onClick={openAddressRemedy}
                 className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
                 title={needsAddressVerification
                   ? 'Review the evidence, correct the address if needed, and verify the exact person and address'
@@ -819,10 +888,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 ↻ Retry conflict check
               </button>
             )}
-            {canManage && onRequestRepair && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair) && (
+            {openRepairRemedy && (
               <button
                 type="button"
-                onClick={() => onRequestRepair(c)}
+                onClick={openRepairRemedy}
                 className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
                 title="Create a durable repair request if neither address can be verified safely"
               >
@@ -832,10 +901,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Needs-identity-review escape hatch: a PD who recognizes the person can
                 confirm identity + correct the contact, which makes the row selectable
                 and lets it pass the save gate (bibliometrics still dropped server-side). */}
-            {onConfirmIdentity && canManage && (
+            {openIdentityRemedy && (
               <button
                 type="button"
-                onClick={() => onConfirmIdentity(c)}
+                onClick={openIdentityRemedy}
                 className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
                 title="If you recognize this person, confirm their identity and correct the email/website, then add them to the candidate list"
               >
