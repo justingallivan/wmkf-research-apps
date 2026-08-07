@@ -16,7 +16,7 @@ const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...a) => createAndSendEmail(...a) },
 }));
-// S404 Plan v3 send-time token authority gate. Default: current, recipient-
+// S404 Plan v4 send-time token authority gate. Default: current, recipient-
 // matching token — the happy path every pre-existing test in this file
 // exercises. Tests of the gate itself (describe block below) override this
 // per-call with mockResolvedValueOnce / mockImplementationOnce.
@@ -26,6 +26,11 @@ const verifySuggestionToken = jest.fn(async () => ({
 }));
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: (...a) => verifySuggestionToken(...a),
+}));
+const mintAndStore = jest.fn(async () => ({ jwt: 'aaa.bbb.ccc' }));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: (...a) => mintAndStore(...a),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
 }));
 
 const findById = jest.fn(async (id) => SUGGESTIONS[id] ?? null);
@@ -134,6 +139,7 @@ beforeEach(() => {
   CYCLE_CODE = null;
   CYCLE = null;
   delete process.env.REVIEWER_EMAIL_DELIVERY_MODE;
+  mintAndStore.mockResolvedValue({ jwt: TOKEN });
 });
 
 async function run(requestBody) {
@@ -475,6 +481,7 @@ describe('send-emails-service — address action gate', () => {
         confirmedLowConfidenceIds: [SUG_OK],
       });
       expect(createAndSendEmail).not.toHaveBeenCalled();
+      expect(mintAndStore).not.toHaveBeenCalled();
       expect(resultOf(emitted).skipped[0]).toMatchObject({
         suggestionId: SUG_OK,
         reason: 'address_conflict_pending',
@@ -521,18 +528,19 @@ describe('send-emails-service — address action gate', () => {
   });
 });
 
-// S2-S4 (Plan v3, S404): send-time token authority gate. Immediately before
-// dispatch, the final edited draft's subject+body is scanned for reviewer
-// JWT(s); externalLinkExpected (the render-time stamp) plus the extraction
-// count select the decision-table outcome from
-// outputs/plan-manage-panel-preview-retry-2026-08-06.md. S1 (the render-time
-// stamp itself) is pinned in render-emails-service.test.js. S5-S7 (overlapped/
-// interleaved/timed-out durable-hash races) are pinned in
-// reviewer-email-token-authority.test.js.
-describe('send-emails-service — send-time token authority gate (S404 Plan v3)', () => {
+// v4 send-time token authority: final draft shape is checked, real legacy/edit
+// tokens retain the v3 verification gate, and the authoritative token is then
+// minted and substituted immediately before dispatch.
+describe('send-emails-service — send-time token authority gate (S404 Plan v4)', () => {
   test('S2: one embedded JWT (with ?action=) is passed verbatim to verifySuggestionToken', async () => {
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
     expect(verifySuggestionToken).toHaveBeenCalledWith(TOKEN);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUG_OK,
+      requestId: REQUEST_ID,
+      expiresAt: expect.any(Date),
+      actingUserSystemId: 'u-1',
+    }));
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(emitted).sent).toHaveLength(1);
   });
@@ -604,6 +612,7 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v3)'
       templateType: 'materials',
     });
     expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(emitted).sent).toHaveLength(1);
   });
@@ -702,7 +711,58 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v3)'
       templateType: 'invitation',
     });
     expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(resultOf(emitted).skipped[0]).toMatchObject({ suggestionId: SUG_OK, reason: 'missing_secure_link' });
+  });
+
+  test('a send-time mint failure is a per-row email_failed and healthy siblings continue', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const SUG_OK2 = '55555555-5555-4555-8555-555555555555';
+    SUGGESTIONS[SUG_OK2] = suggestion(SUG_OK2, { wmkf_accepted: true });
+    PERSONS[`person-${SUG_OK2}`] = person(`person-${SUG_OK2}`);
+    verifySuggestionToken
+      .mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_OK, requestId: REQUEST_ID } })
+      .mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_OK2, requestId: REQUEST_ID } });
+    mintAndStore
+      .mockRejectedValueOnce(new Error('hash write failed'))
+      .mockResolvedValueOnce({ jwt: TOKEN });
+
+    const emitted = await run({
+      drafts: [draft(SUG_OK), draft(SUG_OK2)],
+      templateType: 'materials',
+    });
+
+    expect(names(emitted)).not.toContain('error');
+    expect(resultOf(emitted).failed).toEqual([
+      expect.objectContaining({
+        suggestionId: SUG_OK,
+        code: 'external_link_mint_failed',
+        error: 'This email’s secure reviewer link could not be created. Try sending this recipient again.',
+      }),
+    ]);
+    expect(resultOf(emitted).sent.map((row) => row.suggestionId)).toEqual([SUG_OK2]);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('send-time substitution changes only JWT path segments in edited subject and body', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    mintAndStore.mockResolvedValueOnce({ jwt: 'new.jwt.sig' });
+    const subject = `Prefix https://reviews.example.org/external/review/${TOKEN}?action=accept suffix`;
+    const body = `Before\nhttps://reviews.example.org/external/review/${TOKEN}?x=1\nAfter`;
+
+    await run({
+      drafts: [{ suggestionId: SUG_OK, subject, body, externalLinkExpected: true }],
+      templateType: 'materials',
+    });
+
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: 'Prefix https://reviews.example.org/external/review/new.jwt.sig?action=accept suffix',
+      body: expect.stringContaining('Before'),
+    }));
+    const html = createAndSendEmail.mock.calls[0][0].body;
+    expect(html).toContain('https://reviews.example.org/external/review/new.jwt.sig?x=1');
+    expect(html).toContain('After');
+    expect(html).not.toContain(TOKEN);
   });
 });
 

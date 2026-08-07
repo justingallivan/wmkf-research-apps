@@ -332,10 +332,9 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // closed/reopened) must not clear a newer session's lock or `rendering` state.
   const renderingEpochRef = useRef(null);
   // Serializes preview-render execution across close/reopen sessions (not just
-  // across same-session clicks): a render kicked off just before close, and a
-  // new render kicked off right after reopen, would otherwise both mint/rotate
-  // the durable reviewer token for the same recipient with no ordering. Chaining
-  // every render onto this tail guarantees at most one fetch is ever in flight.
+  // across same-session clicks): a render kicked off just before close and a
+  // new render kicked off right after reopen must still apply in session order.
+  // Chaining every render onto this tail guarantees at most one fetch in flight.
   const renderTailRef = useRef(Promise.resolve());
   // Monotonic modal-session id, bumped on every isOpen transition (open AND
   // close) and never reset. A response for an earlier open/close session can

@@ -35,8 +35,9 @@ from the Workbench; the current UI does not ask staff to download or forward `.e
    engagement in `wmkf_appreviewersuggestion`. Bibliometrics live on the person; there is no
    `wmkf_appresearcher` sidecar.
 5. **Invite in the Workbench** — `ReviewerInvitePanel` opens `InviteEmailModal`. The modal calls
-   `/api/review-manager/render-emails` to mint secure links and render editable drafts, then calls
-   `/api/review-manager/send-emails` to send through Dynamics/Microsoft 365 and advance lifecycle
+   `/api/review-manager/render-emails` to render editable drafts with a non-live link placeholder,
+   then calls `/api/review-manager/send-emails` to mint/substitute the live recipient link, send
+   through Dynamics/Microsoft 365, and advance lifecycle
    state. Candidates without a sendable email remain blocked.
 6. **Track response and review** — accepted reviewers move through the external portal, materials,
    review intake, and Workbench closeout lifecycle.
@@ -87,10 +88,10 @@ not remove the route without first verifying external callers and migration obli
 - `shared/components/reviewers/ReviewerInvitePanel.js` — saved-candidate invitation list and gates.
 - `shared/components/reviewers/InviteEmailModal.js` — preview/edit/send orchestration.
 - `pages/api/review-manager/render-emails.js` and
-  `lib/services/review-manager/render-emails-service.js` — authoritative draft rendering and token
-  minting.
+  `lib/services/review-manager/render-emails-service.js` — read-only authoritative draft rendering.
 - `pages/api/review-manager/send-emails.js` and
-  `lib/services/review-manager/send-emails-service.js` — Dynamics/M365 delivery and lifecycle writes.
+  `lib/services/review-manager/send-emails-service.js` — live token mint/substitution,
+  Dynamics/M365 delivery, and lifecycle writes.
 - `lib/services/contact-enrichment-service.js` — tier orchestration for contact resolution.
 - `lib/utils/reviewer-invite.js` — invitation-readiness trust policy.
 

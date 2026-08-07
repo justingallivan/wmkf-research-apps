@@ -89,12 +89,16 @@ jest.mock('../../lib/utils/safe-fetch', () => ({
   isAllowedUrl: jest.fn(() => true),
 }));
 
-// send-emails-service.js (S404 send-time token authority gate) imports this,
-// which transitively imports `jose` (ESM-only, not Jest-transformable). Stub
-// it so the module import doesn't pull in jose; this isolation test's drafts
+// send-emails-service.js (S404 send-time token authority gate) imports these,
+// which transitively import `jose` (ESM-only, not Jest-transformable). Stub
+// them so the module import doesn't pull in jose; this isolation test's drafts
 // never carry a real reviewer JWT, so the gate is not exercised here.
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(async () => ({ ok: false, reason: 'not_found' })),
+}));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: jest.fn(),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
 }));
 
 // ---------------------------------------------------------------------------

@@ -2,12 +2,10 @@
  * @jest-environment node
  *
  * Reviewer email send-time token authority: durable-state concurrency
- * contract (Plan v3, S404 — outputs/plan-manage-panel-preview-retry-2026-08-06.md,
- * pins S5-S7). Exercises the REAL render-emails-service and send-emails-service
- * together against a controlled in-memory durable hash store, proving the
- * send-time gate — not client generation/epoch guards — is what orders two
- * racing durable renders. S1-S4 (the gate's own decision table) are pinned in
- * render-emails-service.test.js and send-emails-service.test.js.
+ * contract (Plan v4, S404). Exercises the REAL render-emails-service and
+ * send-emails-service together against one controlled durable hash store.
+ * Rendering must never write that store; sending must mint the authoritative
+ * token after any legacy-token verification and substitute only that JWT.
  *
  * The harness mocks Dataverse transport but uses the REAL `hashToken` (SHA-256
  * of the JWT text), and the mocked `verifySuggestionToken` consults the same
@@ -18,7 +16,7 @@
 
 const { hashToken } = require('../../lib/services/external-token');
 
-// ---- the ONE durable authority both render (writer) and send (reader) touch ----
+// ---- the ONE durable authority send writes and dispatch assertions read ----
 let durableHashBySuggestion; // Map<suggestionId, hash>
 let mintCounter;
 
@@ -44,27 +42,34 @@ jest.mock('../../lib/services/proposal-participants', () => ({ fetchCoPIs: jest.
 jest.mock('../../lib/services/honorarium-config', () => ({ getHonorariumAmount: jest.fn(async () => 500) }));
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => null) }));
 
-// The one durable write path: every mint produces a fresh JWT (embedding the
-// suggestionId + a monotonic render tag so the test can tell mints apart) and
-// overwrites this recipient's stored hash — exactly what render-emails-service
-// documents ("each render produces a fresh JWT and overwrites the prior hash").
+const SEND_TIME_TOKEN_PLACEHOLDER_JWT = 'send_time_token.pending_authority.not_live';
+const buildSendTimeExternalUrlPlaceholder = jest.fn(() => (
+  `https://reviews.example.org/external/review/${SEND_TIME_TOKEN_PLACEHOLDER_JWT}`
+));
+
+// The one durable write path: send-time minting produces a fresh JWT and
+// overwrites this recipient's stored hash.
 const mintAndStore = jest.fn(async ({ suggestionId }) => {
   mintCounter += 1;
-  const jwt = `${suggestionId}.r${mintCounter}.sig`;
+  const jwt = `${suggestionId}.send${mintCounter}.sig`;
   durableHashBySuggestion.set(suggestionId, hashToken(jwt));
   return { jwt, url: `https://reviews.example.org/external/review/${jwt}` };
 });
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: (...a) => mintAndStore(...a),
+  buildSendTimeExternalUrlPlaceholder: (...a) => buildSendTimeExternalUrlPlaceholder(...a),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT,
 }));
 
 // send-emails-service dependencies -------------------------------------------
 // The dispatch-time assertion the plan requires: extract every dispatched
 // JWT and assert its hash still equals the durable store AT DISPATCH TIME.
+let dispatchedJwts;
 const createAndSendEmail = jest.fn(async (payload) => {
   const match = String(payload.body).match(/\/external\/review\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/);
   expect(match).toBeTruthy();
   const jwt = match[1];
+  dispatchedJwts.push(jwt);
   const [suggestionId] = jwt.split('.');
   expect(hashToken(jwt)).toBe(durableHashBySuggestion.get(suggestionId));
   return { emailId: 'email-1' };
@@ -132,6 +137,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   durableHashBySuggestion = new Map();
   mintCounter = 0;
+  dispatchedJwts = [];
   SUGGESTIONS = {};
   PERSONS = {};
   findById.mockImplementation(async (id) => SUGGESTIONS[id] ?? null);
@@ -145,8 +151,7 @@ beforeEach(() => {
   }));
 });
 
-// Render a single suggestion and return its ready draft (mints/rotates the
-// durable hash as a side effect via the mocked mintAndStore above).
+// Render returns non-live placeholders and must not touch durable authority.
 async function render(suggestionIds) {
   const out = await renderEmails({
     suggestionIds,
@@ -168,83 +173,83 @@ async function send(drafts) {
 }
 const resultOf = (emitted) => emitted.find((e) => e.event === 'result')?.data;
 
-describe('S5: overlapped superseding render', () => {
-  test('sending the FIRST render dispatches the untouched recipient and fails the superseded one closed', async () => {
+describe('v4 preview authority', () => {
+  test('repeated and overlapping renders do not mint or rotate durable hashes', async () => {
     const SUG_A = 'aaaaaaaa-0000-0000-0000-00000000000a';
     const SUG_B = 'bbbbbbbb-0000-0000-0000-00000000000b';
     SUGGESTIONS = { [SUG_A]: suggestion(SUG_A), [SUG_B]: suggestion(SUG_B) };
     PERSONS = { [`person-${SUG_A}`]: person('a'), [`person-${SUG_B}`]: person('b') };
 
-    // Render A: mints tokens for both recipients.
     const draftsA = await render([SUG_A, SUG_B]);
+    const draftsB = await render([SUG_B]);
 
-    // Overlapping Render B: re-renders (and re-mints) ONLY the B recipient
-    // before A's send — durableHashBySuggestion[SUG_B] is now B's newer hash.
-    await render([SUG_B]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(durableHashBySuggestion.size).toBe(0);
+    for (const d of [...draftsA, ...draftsB]) {
+      expect(`${d.subject}\n${d.body}`).toContain(SEND_TIME_TOKEN_PLACEHOLDER_JWT);
+    }
 
-    // Send the FIRST render's drafts (both recipients, B's link now stale).
     const emitted = await send(draftsA);
     const r = resultOf(emitted);
-
-    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_A]);
-    expect(r.failed).toEqual([expect.objectContaining({ suggestionId: SUG_B, code: 'external_link_superseded' })]);
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1); // only SUG_A ever reached Dynamics
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_A, SUG_B]);
+    expect(r.failed).toEqual([]);
+    expect(mintAndStore).toHaveBeenCalledTimes(2);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('S6: two-client interleaving', () => {
-  test('Client A\'s stale send fails closed with zero dispatches; Client B\'s current send dispatches once', async () => {
+describe('v4 two-client sequential sends', () => {
+  test('each client receives a fresh authoritative token at its own send boundary', async () => {
     const SUG_X = 'cccccccc-0000-0000-0000-00000000000c';
     SUGGESTIONS = { [SUG_X]: suggestion(SUG_X) };
     PERSONS = { [`person-${SUG_X}`]: person('x') };
 
-    const draftsClientA = await render([SUG_X]); // token A minted; durable hash = hash(A)
-    const draftsClientB = await render([SUG_X]); // token B minted; durable hash = hash(B), superseding A
+    const draftsClientA = await render([SUG_X]);
+    const draftsClientB = await render([SUG_X]);
 
     const emittedA = await send(draftsClientA);
-    const rA = resultOf(emittedA);
-    expect(rA.sent).toEqual([]);
-    expect(rA.failed).toEqual([expect.objectContaining({ suggestionId: SUG_X, code: 'external_link_superseded' })]);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-
     const emittedB = await send(draftsClientB);
-    const rB = resultOf(emittedB);
-    expect(rB.sent.map((s) => s.suggestionId)).toEqual([SUG_X]);
-    expect(rB.failed).toEqual([]);
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emittedA).sent.map((s) => s.suggestionId)).toEqual([SUG_X]);
+    expect(resultOf(emittedB).sent.map((s) => s.suggestionId)).toEqual([SUG_X]);
+    expect(dispatchedJwts).toHaveLength(2);
+    expect(dispatchedJwts[0]).not.toBe(dispatchedJwts[1]);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('S7: timed-out first request is not "no durable write"', () => {
-  test('a late-landing first render still supersedes an intervening retry\'s token; only a fresh render after that sends cleanly', async () => {
+describe('v4 rotate-after-verification race', () => {
+  test('durable hash rotated after verification read but before dispatch cannot send the stale JWT', async () => {
     const SUG_Y = 'dddddddd-0000-0000-0000-00000000000d';
     SUGGESTIONS = { [SUG_Y]: suggestion(SUG_Y) };
     PERSONS = { [`person-${SUG_Y}`]: person('y') };
+    const staleJwt = `${SUG_Y}.legacy.sig`;
+    const interveningJwt = `${SUG_Y}.intervening.sig`;
+    durableHashBySuggestion.set(SUG_Y, hashToken(staleJwt));
+    verifySuggestionToken.mockImplementationOnce(async (jwt) => {
+      // The verifier reads and accepts the then-current durable hash.
+      expect(jwt).toBe(staleJwt);
+      expect(hashToken(jwt)).toBe(durableHashBySuggestion.get(SUG_Y));
+      // Another writer rotates authority after that read but before send resumes.
+      durableHashBySuggestion.set(SUG_Y, hashToken(interveningJwt));
+      return { ok: true, payload: { suggestionId: SUG_Y, requestId: REQUEST_ID } };
+    });
+    const legacyDraft = {
+      suggestionId: SUG_Y,
+      subject: 'Materials',
+      body: `Hello,\nhttps://reviews.example.org/external/review/${staleJwt}?action=accept`,
+      externalLinkExpected: true,
+    };
 
-    // The FIRST request (conceptually issued first) is withheld by the client
-    // as timed out; the PD retries, and that retry's render lands (and mints)
-    // first in real time.
-    const draftsRetryB = await render([SUG_Y]); // token B; durable hash = hash(B)
-
-    // The "late" first request now finally lands server-side (its durable
-    // write was never actually lost — a timeout is a client-side belief, not
-    // a durable-state fact) and supersedes B.
-    await render([SUG_Y]); // token A(second call); durable hash = hash(A), superseding B
-
-    // Sending the retry's (now-stale) drafts must fail closed with ZERO dispatches.
-    const emittedB = await send(draftsRetryB);
-    const rB = resultOf(emittedB);
-    expect(rB.sent).toEqual([]);
-    expect(rB.failed).toEqual([expect.objectContaining({ suggestionId: SUG_Y, code: 'external_link_superseded' })]);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-
-    // A fresh render C is current and dispatches cleanly, satisfying the
-    // dispatch-time hash assertion inside the createAndSendEmail mock.
-    const draftsC = await render([SUG_Y]);
-    const emittedC = await send(draftsC);
-    const rC = resultOf(emittedC);
-    expect(rC.sent.map((s) => s.suggestionId)).toEqual([SUG_Y]);
-    expect(rC.failed).toEqual([]);
+    const emitted = await send([legacyDraft]);
+    const r = resultOf(emitted);
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([SUG_Y]);
+    expect(r.failed).toEqual([]);
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(dispatchedJwts).toHaveLength(1);
+    expect(dispatchedJwts[0]).not.toBe(staleJwt);
+    expect(dispatchedJwts[0]).not.toBe(interveningJwt);
+    expect(hashToken(dispatchedJwts[0])).toBe(durableHashBySuggestion.get(SUG_Y));
+    expect(createAndSendEmail.mock.calls[0][0].body).toContain('?action=accept');
   });
 });

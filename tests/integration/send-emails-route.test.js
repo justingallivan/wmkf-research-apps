@@ -86,7 +86,7 @@ jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
-// S404 Plan v3 send-time token authority gate. This route-integration file
+// S404 Plan v4 send-time token authority gate. This route-integration file
 // exercises many pre-existing send-path contracts unrelated to the gate, so
 // rather than hand-crafting a real JWT per test, the mock decodes the
 // suggestionId/requestId straight out of the fake token text (see `TOKEN_FOR`
@@ -100,6 +100,11 @@ const verifySuggestionToken = jest.fn(async (jwt) => {
 });
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: (...a) => verifySuggestionToken(...a),
+}));
+const mintAndStore = jest.fn(async () => ({ jwt: 'token.value.sig' }));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: (...a) => mintAndStore(...a),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
 }));
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
@@ -186,6 +191,7 @@ beforeEach(() => {
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
   process.env.NEXTAUTH_SECRET = 'send-emails-route-test-signing-secret';
+  mintAndStore.mockResolvedValue({ jwt: 'token.value.sig' });
 });
 afterAll(() => {
   if (ORIGINAL_NEXTAUTH_SECRET === undefined) delete process.env.NEXTAUTH_SECRET;
@@ -833,12 +839,12 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
   });
 });
 
-// S4 (Plan v3, S404): the route integration pin for the send-time token
+// S4 (Plan v4, S404): the route integration pin for the send-time token
 // authority gate's SSE wire shape and result -> complete terminal order. The
 // gate's decision-table branches themselves are pinned in
 // send-emails-service.test.js; this file confirms the same failure surfaces
 // correctly through the real SSE shell (pages/api/review-manager/send-emails.js).
-describe('send-emails — send-time token authority gate SSE wire shape (S404 Plan v3)', () => {
+describe('send-emails — send-time token authority gate SSE wire shape (S404 Plan v4)', () => {
   test('a stale/superseded reviewer link fails only that recipient via email_failed{code}, dispatches no email for it, and the batch still ends result -> complete', async () => {
     const freshId = 'e7777777-7777-4777-8777-777777777777';
     SUGGESTIONS = {

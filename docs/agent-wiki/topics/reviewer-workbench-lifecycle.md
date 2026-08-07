@@ -128,7 +128,7 @@ Record of truth for the increment (gitignored working doc):
 `outputs/reviewer-find-warm-revisit-step0-findings.md`; durable summary in
 `SESSION_PROMPT.md` "incremental plan ACTIVE" section.
 
-**Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. **Phase 1 LIVE (S275):** the invite panel's respond-by is now a "days to respond" offset; `wmkf_respondoffsetdays` + `wmkf_reviewduedate` are written on first invite (`send-emails.js`) and edited via `/api/review-manager/campaign-config` (Reviewers-tab "Campaign settings"). Current-cycle invitation defaults are now edited in `/admin` as "Reviewer Campaign Timeline", stored in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`, and read by `InviteEmailModal` through `/api/review-manager/campaign-timeline-defaults`; request config overlays those defaults when present. **Phase 2 LIVE (S275):** per-recipient token TTL (`lib/external/reviewer-token-ttl.js` via `render-emails` — invitee/non-responder link caps at review-due+2d, accepted gets review-due+90d, fallback now+90); accepted-only "Release to reviewers" materials send (server-gated in `send-emails`, plus a one-click button on the **Track Reviewers** sub-tab, `ReviewerManagePanel.js`); and a `materials_not_sent` upload guard (`review-upload.js` self-token path → 403). **Phase 3 LIVE (S275):** `/api/cron/reviewer-reminders` (daily) sends two per-request opt-in reminders — respond-by (invited non-responders, deadline = emailSentAt + respondOffsetDays - lead, token-live, fire-once `wmkf_respondremindersentat`) and review-due (accepted/materials-sent/not-submitted, deadline = reviewDueDate - lead, fire-once via the existing `wmkf_remindersentat`). Both claim-before-send (If-Match) → at-most-once; the server `allowResend` re-mint clears the respond marker (the **manual "Re-invite already-invited" Invite-Reviewers-panel button (`ReviewerInvitePanel`) was removed S277** — the respond-by reminder is the nudge for invited non-responders; `allowResend` is retained only as the programmatic re-mint contract). Server-side render in `lib/external/reviewer-reminder-email.js`; service in `lib/services/reviewer-reminder-sweep.js`. **Phase 4 LIVE (S275; actual PD email + quota seeding S352):** quota → PD notify + selective decline. `lib/services/reviewer-quota.js` (called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the accept committed — moved off `respond.js` by the S350 accept-fast-response build) notifies the lead PD once when the accepted count first reaches `wmkf_desiredcount` — concurrency-gated by a conditional null→set of `wmkf_quotanotifiedat` (If-Match). **S352:** the notify now actually EMAILS the lead PD (`emailAdmins: true`, `explicitRecipients` = resolved PD only, no `category` fan-out; degrades to dashboard-alert-only when the PD email is unresolvable), and `wmkf_desiredcount` is settable end-to-end — admin "Reviewer quota" default (4) in the Reviewer Campaign Timeline settings, seeded non-clobbering on first invite send (`send-emails-service.js`, server-side default read only), and editable in the Campaign settings modal, which prefills due-date/quota from the admin defaults (`docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md`, Status: SHIPPED). `POST /api/review-manager/withdraw-sufficient` (the **Invite Reviewers** tab's "Release as no longer needed") writes `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` + clears `wmkf_respondremindersentat` on still-pending rows only (the §2.9 missing writer). **All four phases shipped.** See the two Atlas pages for the exact column list.
+**Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config (offset/due-date/reminder toggles+leads/desired-count/quota-notified-at) lives on `akoya_request`; the per-reviewer fire-once respond-reminder marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion`. **Phase 1 LIVE (S275):** the invite panel's respond-by is now a "days to respond" offset; `wmkf_respondoffsetdays` + `wmkf_reviewduedate` are written on first invite (`send-emails.js`) and edited via `/api/review-manager/campaign-config` (Reviewers-tab "Campaign settings"). Current-cycle invitation defaults are now edited in `/admin` as "Reviewer Campaign Timeline", stored in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`, and read by `InviteEmailModal` through `/api/review-manager/campaign-timeline-defaults`; request config overlays those defaults when present. **Phase 2 LIVE (S275; issuance moved at S404 v4):** per-recipient token TTL (`lib/external/reviewer-token-ttl.js` via `send-emails` immediately before dispatch — invitee/non-responder link caps at review-due+2d, accepted gets review-due+90d, fallback now+90); accepted-only "Release to reviewers" materials send (server-gated in `send-emails`, plus a one-click button on the **Track Reviewers** sub-tab, `ReviewerManagePanel.js`); and a `materials_not_sent` upload guard (`review-upload.js` self-token path → 403). **Phase 3 LIVE (S275):** `/api/cron/reviewer-reminders` (daily) sends two per-request opt-in reminders — respond-by (invited non-responders, deadline = emailSentAt + respondOffsetDays - lead, token-live, fire-once `wmkf_respondremindersentat`) and review-due (accepted/materials-sent/not-submitted, deadline = reviewDueDate - lead, fire-once via the existing `wmkf_remindersentat`). Both claim-before-send (If-Match) → at-most-once; the server `allowResend` re-mint clears the respond marker (the **manual "Re-invite already-invited" Invite-Reviewers-panel button (`ReviewerInvitePanel`) was removed S277** — the respond-by reminder is the nudge for invited non-responders; `allowResend` is retained only as the programmatic re-mint contract). Server-side render in `lib/external/reviewer-reminder-email.js`; service in `lib/services/reviewer-reminder-sweep.js`. **Phase 4 LIVE (S275; actual PD email + quota seeding S352):** quota → PD notify + selective decline. `lib/services/reviewer-quota.js` (called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the accept committed — moved off `respond.js` by the S350 accept-fast-response build) notifies the lead PD once when the accepted count first reaches `wmkf_desiredcount` — concurrency-gated by a conditional null→set of `wmkf_quotanotifiedat` (If-Match). **S352:** the notify now actually EMAILS the lead PD (`emailAdmins: true`, `explicitRecipients` = resolved PD only, no `category` fan-out; degrades to dashboard-alert-only when the PD email is unresolvable), and `wmkf_desiredcount` is settable end-to-end — admin "Reviewer quota" default (4) in the Reviewer Campaign Timeline settings, seeded non-clobbering on first invite send (`send-emails-service.js`, server-side default read only), and editable in the Campaign settings modal, which prefills due-date/quota from the admin defaults (`docs/REVIEWER_QUOTA_PD_EMAIL_PLAN.md`, Status: SHIPPED). `POST /api/review-manager/withdraw-sufficient` (the **Invite Reviewers** tab's "Release as no longer needed") writes `withdrawn_sufficient` + `wmkf_withdrawnsufficientat` + clears `wmkf_respondremindersentat` on still-pending rows only (the §2.9 missing writer). **All four phases shipped.** See the two Atlas pages for the exact column list.
 
 ## Find → Invite promotion contract (production-live)
 
@@ -286,20 +286,19 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   (`project-reviewer-verify-fail-dangerous`). A `ready` email chip stays inert.
   Tests: `tests/unit/reviewer-card-warning-badges-clickable.test.js`.
 - **Invite/manage-preview failure banner + retry, and send-time reviewer-link
-  token authority (S404, owner report 2026-08-06; Plan v3 +
+  token authority (S404, owner report 2026-08-06; Plan v4 +
   Claude-review-amendments, `outputs/plan-manage-panel-preview-retry-2026-08-06.md`):**
   rendering invite previews failed twice in production (the fail-closed 503
   "Unable to verify application access; please retry" from `requireAppAccess`
   — its Dataverse app-grant lookup threw — and the bare "Failed to render
   previews" fallback when the response had no JSON body). A first pass
   (v1/v2) added client-only retry/reopen guards; Codex's v2 adversarial review
-  returned **NO-SHIP**: a render containing `{{externalLink}}` mints a fresh
-  JWT and overwrites the recipient's durable `wmkf_externaltokenhash`
-  (`render-emails-service.js`), so client generation/epoch guards suppress
-  stale CLIENT writes but cannot order two durable RENDER calls (or two
-  clients) racing for the same recipient — an older still-open preview could
-  ship a dead link. v3 ships client UX and server token authority together,
-  as one increment:
+  returned **NO-SHIP** because render-time minting let two previews overwrite
+  the same recipient's durable hash. v3 added a final-draft verifier but
+  explicitly accepted the verify→dispatch TOCTOU. Codex later re-reported that
+  accepted window as a no-ship HIGH without new evidence; the owner directed
+  the v4 fix. v4 removes preview writes and moves final mint/substitution to
+  send time:
   - **Both modals — retry + single-flight:** shared wording in
     `shared/components/reviewers/render-preview-failure.js` (server message or
     status code + "No emails have been sent — retrying is safe."; distinct
@@ -309,7 +308,7 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     through a `renderTailRef` promise chain so at most one `render-emails`
     fetch is ever in flight per modal; a superseding call collapses queued
     duplicates to the latest request rather than starting a second
-    overlapping (and durable-token-rotating) render. `rendering` state
+    overlapping render. `rendering` state
     disables Preview/Retry while a render is queued or in flight.
   - **`ReviewerManagePanel` modal-session epoch:** `EmailModal` keeps a
     monotonic `modalSessionRef`, bumped on every open/close transition (never
@@ -320,38 +319,23 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     current session's drafts or post the wrong suggestion IDs. This is the
     regression pin for the second Codex v1 HIGH finding (stale-recipient
     repopulation after close/reopen).
-  - **Send-time token authority (the server-authoritative half — client
-    guards suppress stale writes but cannot order durable state):**
-    `render-emails-service.js` stamps every draft (including skipped rows,
-    for a uniform DTO) with `externalLinkExpected` — whether the source
-    template requested `{{externalLink}}` in its subject OR body; a mint
-    failure still stamps `true` with an empty link so the send-time gate
-    (not a silently-broken email) catches it. Both modals carry
-    `externalLinkExpected` through edits and post it back on `send-emails`.
-    `send-emails-service.js` extracts the reviewer JWT(s) from the FINAL
-    edited draft's subject+body (not body-only — a placeholder in the
-    subject must match the extraction domain or the gate is an unrecoverable
-    fail-closed dead-end) immediately before
-    `DynamicsService.createAndSendEmail`, with no intervening `await`, and
-    fails that recipient closed via `email_failed`/`failed[]` (batch
-    continues) on: zero JWTs when one was expected
-    (`external_link_missing`), more than one distinct JWT
-    (`external_link_ambiguous`), a missing/non-boolean
-    `externalLinkExpected` marker (`external_link_expectation_missing` —
-    this also covers a draft rendered before this shipped; the PD must
-    re-render, not resend blind), a token that fails `verifySuggestionToken`
-    with `reason==='hash_mismatch'` (`external_link_superseded` — a later
-    render replaced this one), any other verifier failure or exception
-    (`external_link_invalid`), or a verified token whose
-    `suggestionId`/`requestId` doesn't case-insensitively match this
-    recipient/request (`external_link_recipient_mismatch`). A template with
-    no placeholder and no manually-introduced reviewer URL
-    (`externalLinkExpected:false`, 0 JWTs) skips verification entirely and
-    dispatches normally. A later successful render may still supersede an
-    already-in-flight send under existing latest-link-wins token semantics
-    (including the narrow verify→dispatch TOCTOU window) — this is accepted,
-    not a residual gap; only a send that ATTEMPTS a recipient with an
-    already-superseded durable link is guaranteed to fail closed.
+  - **Send-time token authority:** `render-emails-service.js` remains the
+    `externalLinkExpected` producer but is now read-only: it substitutes the
+    JWT-shaped, deliberately non-live `SEND_TIME_TOKEN_PLACEHOLDER_JWT`, and
+    repeated previews never rotate `wmkf_externaltokenhash`. Both modals carry
+    the expectation stamp and final PD-edited subject/body to `send-emails`.
+    After all recipient confidence/lifecycle guards (so a `blocked` row never
+    mints), `send-emails-service.js` extracts the final subject+body JWTs,
+    retains `verifySuggestionToken` as defense-in-depth for any real
+    legacy/edited JWT, computes the unchanged accepted/due-date expiry, then
+    calls `mintAndStore` and substitutes **only** JWT path segments in subject
+    and body. No application `await` separates the completed final mint from
+    invoking Dynamics dispatch. Missing/ambiguous/invalid/foreign links and
+    mint failures remain per-row `email_failed {code,error}`; healthy siblings
+    continue. A no-link draft (`externalLinkExpected:false`, zero URLs) neither
+    verifies nor mints. Research-only invite rows no longer expose a preview-
+    minted manual link; the modal fails closed and points staff to address
+    verification or the separate token-regeneration workflow.
   - The shared guard messages were also reworded (`lib/utils/auth.js`), after
     three rounds of owner feedback ("application" reads as a GRANT application;
     "permissions to what?"; "she's IN the app and it worked before" — any
@@ -956,9 +940,8 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   presence check on the rendered body, run before recipient/attachment resolution). It is layered
   UNDER, not replaced by, the ALL-TEMPLATE send-time token-authority gate added in S404 (see above):
   that gate runs later, immediately before dispatch, applies to every templateType whose draft
-  carries `externalLinkExpected`, and additionally verifies the embedded JWT is current and
-  recipient-matching via `verifySuggestionToken` — it is what catches a syntactically-present but
-  stale/superseded/foreign link that this earlier presence check cannot.
+  carries `externalLinkExpected`, and mints/substitutes the final recipient-bound JWT after
+  defense-in-depth verification of any real legacy/edited token.
   **Post-send roster repaint (S401, fix for S400 finding 2):** `InviteEmailModal.onSent` now passes
   `{ invitedSuggestionIds, sentAt }` — only rows the send stream confirmed BOTH dispatched and
   lifecycle-stamped (`inviteRecorded !== false`) — through `ReviewerInvitePanel.afterSent` →

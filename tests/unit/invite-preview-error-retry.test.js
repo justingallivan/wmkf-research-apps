@@ -150,7 +150,7 @@ test('pin 5: single-flight — a pending render cannot be re-triggered into a se
   expect(retryButton).toBeDisabled();
 
   // Disabled by the DOM: a click while pending must not fire onClick, so no
-  // second overlapping fetch (and no second durable render/token-mint call).
+  // second overlapping fetch (and no second server preview call).
   fireEvent.click(retryButton);
   expect(calls).toBe(1);
 

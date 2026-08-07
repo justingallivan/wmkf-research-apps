@@ -3,8 +3,9 @@
  * review (Workbench Candidates tab). Deliberately NOT the Review Manager
  * EmailModal (which is coupled to localStorage templates and materials
  * attachments). This one is invitation-only:
- *   render-emails (templateType:'invitation', mints the accept/decline magic
- *   link via {{externalLink}}) → editable preview → send-emails
+ *   render-emails (templateType:'invitation', previews the accept/decline link
+ *   position via {{externalLink}}) → editable preview → send-emails (mints and
+ *   substitutes the live recipient token immediately before dispatch)
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
  *
@@ -173,11 +174,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [abstractDraft, setAbstractDraft] = useState('');
   const [abstractSaving, setAbstractSaving] = useState(false);
   const [abstractError, setAbstractError] = useState(null);
-  // Per-recipient clipboard feedback for the manual recovery path offered only
-  // when the server classifies an address as research-only. The render service
-  // already minted the link using the normal invitation expiry policy; copying
-  // it does not send email or stamp the suggestion invited. A separate,
-  // confirmed action records the invitation only after staff sends it.
+  // Per-recipient clipboard feedback retained for backwards-compatible drafts.
+  // New previews do not mint live links; research-only rows point staff to
+  // address verification or the explicit token-regeneration workflow instead.
   const [manualLinkCopyState, setManualLinkCopyState] = useState({});
   // Per-recipient state for the S387 staff address attestation offered on the same
   // research-only rows: suggestionId -> { verifying, error }.
@@ -265,8 +264,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const renderGenRef = useRef(0);
   // Single-flight serialization (v3): renderGenRef alone stops a stale response
   // from being APPLIED, but a superseding call could still start a second,
-  // overlapping durable render (and durable token-mint) call while an older one
-  // is still in flight. renderTailRef chains every call so only one fetch is ever
+  // overlapping render call while an older one is still in flight.
+  // renderTailRef chains every call so only one fetch is ever
   // outstanding — a superseding call's run is appended after the current tail and
   // skips its own fetch entirely if a still-newer generation has queued behind it
   // by the time its turn comes up.
@@ -835,8 +834,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 The app will not send to an address found only through web search. If you check it
                                 against an independent source — the institution directory, their lab page, previous
                                 correspondence — record that below and it becomes sendable. To use a different
-                                address, use Edit contact after closing this window. Or copy the secure link below
-                                and paste it into a message you send yourself.
+                                address, use Edit contact after closing this window.
                               </p>
                               {/* S387: the in-app recovery. Edit contact cannot fix the common case
                                   (the verified address is the one already stored — CandidateEditModal
@@ -944,7 +942,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 </div>
                               ) : (
                                 <p className="mt-2 text-red-700">
-                                  A secure link could not be generated. Close this window and try again.
+                                  Secure links are now minted only at send time, so a live manual link is not available in this preview.
+                                  Verify the address above to enable in-app sending, or use the separate reviewer token regeneration workflow
+                                  when manual delivery is required.
                                 </p>
                               )}
                             </div>

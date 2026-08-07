@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-01
+last_verified: 2026-08-06
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -30,7 +30,9 @@ source_files:
   - lib/services/review-draft-service.js
   - lib/external/review-engagement-state.js
   - pages/api/review-manager/send-emails.js
+  - lib/services/review-manager/render-emails-service.js
   - lib/services/review-manager/send-emails-service.js
+  - lib/external/token-lifecycle.js
   - pages/api/review-manager/regenerate-token.js
   - pages/api/review-manager/revoke-token.js
   - pages/api/review-manager/release-settings.js
@@ -320,7 +322,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   external party), so any 32+ char throwaway string works for local-only testing. Set one
   in `.env.local` (`openssl rand -hex 32` or similar) and restart `next dev`; combined with
   `REVIEWER_EMAIL_DELIVERY_MODE=capture` (not prod-blocked locally), the full
-  preview→render→mint→capture-send→portal-view pipeline now runs end-to-end on
+  preview→render-with-non-live-placeholder→send-time-mint→capture-send→portal-view pipeline now runs end-to-end on
   `localhost:3000`. See memory `project-local-dev-auth-setup` for the full local-auth
   checklist this session had to rediscover.
 - **E2E harness runs against a real build, not `next dev`.** The Playwright
@@ -361,8 +363,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **Materials/release email is portal-link-only by default (S327).** The materials
   template's `{{externalLink}}` placeholder (seeded body,
   `lib/seed/email-defaults/reviewer-templates.js`) is rendered server-side by
-  `pages/api/review-manager/render-emails.js` into the reviewer's tokenized
-  portal link for every send, regardless of the setting below — so a reviewer
+  `pages/api/review-manager/render-emails.js` into a deliberately non-live URL
+  placeholder for staff preview; `send-emails-service.js` mints and substitutes
+  the authoritative reviewer token immediately before dispatch, regardless of
+  the setting below — so a reviewer
   can always reach the proposal via their secure link even with no attachment.
   A single admin-configurable boolean, `reviewer.release.attach_proposal_email`
   (`wmkf_appsystemsettings`, default `false`, read/write via

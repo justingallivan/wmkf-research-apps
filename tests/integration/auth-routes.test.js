@@ -28,13 +28,17 @@ jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => jest.fn(() => Promise.resolve(true)),
 }));
 
-// send-emails-service.js (S404 send-time token authority gate) imports this,
-// which transitively imports `jose` (ESM-only, not Jest-transformable). This
+// send-emails-service.js (S404 send-time token authority gate) imports these,
+// which transitively import `jose` (ESM-only, not Jest-transformable). This
 // auth-gating suite never exercises real drafts far enough to reach the gate
 // (its send-emails body has no `drafts` key, so the service 400s before the
 // gate runs) — stub the module so the import itself doesn't pull in jose.
 jest.mock('../../lib/external/verify-suggestion-token', () => ({
   verifySuggestionToken: jest.fn(async () => ({ ok: false, reason: 'not_found' })),
+}));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: jest.fn(),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
 }));
 
 // Vercel Blob
