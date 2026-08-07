@@ -14,14 +14,17 @@ sample.
 ## Evidence
 
 - Artifact:
-  `ror-claim-resolver-2026-08-07-v11.results.jsonl`
+  `ror-claim-resolver-2026-08-07-v13.results.jsonl`
 - SHA-256:
-  `9f7acc4ead71adaaddde8b32089a0b5a5000bcfdc48bb8c103b0bb8442e757df`
+  `853bc2504dc58f342cd9f04f526464f3f5c2cbf39f81ecfe014b6cbee1cc7159`
 - Machine-readable summary:
-  `ror-claim-resolver-2026-08-07-v11.summary.json`
+  `ror-claim-resolver-2026-08-07-v13.summary.json`
 - Frozen substrate: all v2 case, label, canonical-entity, runner, candidate-
   contract, and relationship hashes in `../manifest.json`
-- Focused tests: 33/33 green
+- Focused tests: 34/34 green
+- Machine provenance: ROR API v2, explicit `single_search`, adapter
+  `ror-api-claim-candidates/v1`, observed 2026-08-07, source commit
+  `1b9b055f2bf8fa4972be40b233267b57d49df20f`
 - Live ROR API requests: 151
 - Logical affiliation candidate sets: 160
 - Benchmark-process adapter cache hits: 44
@@ -46,8 +49,8 @@ provider policy still require shadow measurement.
 - acronym collision disambiguation using compatible parent-family evidence;
 - pair consistency for same, related, and distinct registry identities;
 - provider failure and insufficient score/margin abstention.
-- exact-request cache separation, bounded fallback/request budgets, whole-run
-  deadlines, and queued/backoff cancellation.
+- exact-request cache separation, bounded fallback/request budgets, whole-
+  public-resolution deadlines, and queued/backoff cancellation.
 
 ROR `chosen:true`, provider score, and result order never decide the outcome.
 Candidate retrieval and local decision authority remain separate contracts.

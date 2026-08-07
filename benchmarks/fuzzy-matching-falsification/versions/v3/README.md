@@ -29,7 +29,8 @@ the skip reason only.
   result lacks reliable exact/chosen lexical evidence.
 - An unmatched explicit acronym can trigger a narrow contradiction probe even
   after a strong primary result. The combined ordinary-query union is capped at
-  three, and the whole resolution has a hard provider-request budget.
+  three. One hard provider-request budget and deadline cover the entire public
+  resolution, including every organization span or both comparison operands.
 - Explicit predecessor/successor and office-to-parent records are hydrated by
   ROR id when needed.
 - Requests have per-fetch and whole-resolution deadlines, abort-aware queue/
@@ -50,10 +51,12 @@ organization names. The adapter accepts an optional server-side
 ## Frozen result
 
 The accepted live run is
-`results/ror-claim-resolver-2026-08-07-v11.results.jsonl` (SHA-256
-`9f7acc4ead71adaaddde8b32089a0b5a5000bcfdc48bb8c103b0bb8442e757df`).
+`results/ror-claim-resolver-2026-08-07-v13.results.jsonl` (SHA-256
+`853bc2504dc58f342cd9f04f526464f3f5c2cbf39f81ecfe014b6cbee1cc7159`).
 The machine-readable counts and hash are persisted beside it in
-`results/ror-claim-resolver-2026-08-07-v11.summary.json`.
+`results/ror-claim-resolver-2026-08-07-v13.summary.json`; accepted summaries
+also pin API and adapter versions, retrieval strategies, observation date, and
+the source commit used for the run.
 
 - 166 total cases
 - 141/141 labeled institution cases passed
