@@ -1,225 +1,223 @@
-# Session 406 Prompt: Matching roadmap unblocked — comparator runs / consolidation next; invite-panel UX shipped
+# Session 407 Prompt: Codex leads institution resolution; comparator #1 done and corrected
 
-> **Handoff, 2026-08-07 (Session 405).** The fuzzy-matching track moved from
-> "waiting on owner" to "benchmarked with a frozen baseline" in one session:
-> the owner answered all six consensus questions, the 166-case falsification
-> suite was built AND executed (incumbent baseline frozen), both follow-up
-> adjudications were settled, and two owner-approved agent builds merged
-> (Google-search-link affordance; normalizer characterization groundwork).
-> Separately, an owner discoverability report led to an invite-panel UX fix
-> (always-visible release button, no internal scrollbar). SEVEN pushes to
-> main, all deployed. Full suite 7,079 green at handoff. Run `/start` first.
+> **Handoff, 2026-08-07 (Session 406).** One owner-reported UI bug fixed, the
+> first comparator executed against the frozen falsification suite, and the
+> institution-resolution architecture handed to **Codex** after two adversarial
+> reviews. Both reviews returned `needs-attention`; **all nine findings were
+> verified against source and accepted**, and two of them corrected numbers I had
+> already published. Eight pushes to main, all deployed. Suite 7,081 green.
+> Run `/start` first.
 
-## Session 405 Summary
+## Session 406 Summary
 
-All 57 `/start` gates were green at start; suite grew 6,910 → 7,079.
+Started with one red gate (`check:drain-table-mentions`), fixed it first.
+Suite 7,079 → 7,081.
 
 ### What Was Completed
 
-1. **Six owner answers recorded (`e323ee5f`)** —
-   `outputs/fuzzy-matching-owner-answers-2026-08-06.md` (owner-verbatim +
-   labeled operationalizations). Headlines: no near-zero precision floor
-   (checkpoints self-correct; ambiguity must WIDEN checks — union-over-
-   ambiguity COI with human adjudication); review volume tolerated not
-   accepted (cut per-item cost); ROR namespace YES (registry ≠ decision
-   authority); falsification suite approved / 1–2k benchmark parked
-   (high-risk automation stays review-only); all concurrent affiliations
-   shown + COI-screened, recency-ranked; contact = dated evidence ledger,
-   no binary "verified" flag.
-2. **Falsification suite built (`108db648`)** —
-   `benchmarks/fuzzy-matching-falsification/`: 166 cases (120 sampled UC
-   adversarial matrix, full 335 via `--full`; 46 curated from documented
-   failures — S400 operands, Tsai/Nakano, Noe/Clementi, Laederach, Zhou,
-   Kwong, Smirnova/Chen, Shih shapes, EKA). PII lint enforces
-   placeholder-only emails; jest-invisible.
-3. **Incumbent baseline frozen (`21264463`)** — owner authorized execution
-   ("use sonnet to execute the suite"). Keyed OpenAlex; two invalid runs
-   discarded (keyless throttling; a quoted-key env bug that made the
-   resolver look like it abstained on everything). Result: 89 pass / 64
-   fail (60 real + 4 judge naming artifacts) / 12 skipped. **Incumbent is
-   "safe but blind": zero wrong-entity resolutions anywhere, but 36/47
-   positive institution resolutions abstain.** No S400 drift; Zhou
-   namesake-bleed demonstrated live. Full analysis:
-   `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`.
-4. **Adjudications settled (`ac716891`)** — Zhou fixture = `review`
-   regardless of biographical truth; EKA-class provenance-less affiliations
-   = quarantine-for-review (owner decisions 2026-08-07, recorded in the
-   owner-answers addendum). Zero `assumed` labels remain.
-5. **Agent builds merged (`5098aa7a`)** — (a) "Search Google ↗" (quoted
-   name + institution) in `CandidateEditModal` + Find-tab `CandidateCard`
-   (`lib/utils/google-search-url.js`); (b)
-   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` + 158 characterization
-   tests (`tests/unit/normalizer-characterization/`) — **the research
-   memo's institution count was falsified: 9 definitions, not 11, no
-   byte-identical pair** (inventory §6); person 14 confirmed; pins the live
-   UC-containment false positive across `institutionsMatch`
-   implementations. Jest now excludes `.claude/worktrees/` (`6f962063`).
-6. **Invite-panel UX fix (`787e973f`)** — owner report (request 1002959
-   quota email): the "Review & release N as no longer needed" link only
-   appeared after selecting a pending invitee and was unfindable. Now
-   always visible, disabled with tooltip until a still-pending invitee is
-   checked; invite list's internal `max-h` scrollbar removed (card grows,
-   page scrolls). Pinned by
-   `tests/unit/reviewer-invite-panel-release-button.test.js`.
+1. **Red gate cleared (`6547ecbe`)** — S405's normalizer inventory mentioned the
+   drained `researchers.normalized_name` without a same-line annotation.
+   Reflowed; no factual change.
+2. **Reviewer rollup: ended engagements no longer read as pending (`28ba935f`)** —
+   owner report on request 1002959 (released one invitee, card still said "2
+   pending"). Root cause: neither release path archives the row.
+   `withdraw-sufficient-service.js:265` writes only
+   `responseType: 'withdrawn_sufficient'`, so the row fell through the exclusive
+   bucket chain into `pending`; `terminal-transition-service.js:106` writes a
+   terminal `reviewStatus` on an **accepted** row, inflating `accepted` the same
+   way. Added one exclusive `released` bucket ordered before `accepted`. Display
+   buckets ONLY — the selected-only counts feeding `deriveWorkRemaining` are
+   unchanged and pinned by assertion. Also **registered the pair in
+   `check:status-enum-parity`**, which previously covered only
+   `deriveWorkRemaining ⇔ WORK_REMAINING_LABEL` and so passed vacuously here;
+   falsified it (6 → 7 live invariants).
+3. **Comparator #1 executed — ROR affiliation `chosen:true` (`dcd516f1`)** —
+   new `adapters-ror.js` + a parameterized `run-comparator.js`. `run.js`,
+   `judge()`, and `cases/` byte-identical to the baseline run. 141 institution
+   cases judged, 25 skipped (ROR is an org registry only), 0 errors, 40s.
+4. **Doc fan-out (`32a6f8c2`)** — reconciled the roadmap wiki's "comparator runs
+   NOT done"; the research memo's bare-`UCSD` probe was **confirmed and widened
+   n=1 → n=7** (all seven bare UC acronyms abstain).
+5. **Codex review #1 → published corrections (`95016e11`, `cda32868`)** — see
+   below; the interpretation layer was wrong in four places.
+6. **Runtime/deployment assessment (`5e34ce08`)** — answered "can S2AFF run on
+   Vercel" and "how does this work per candidate/search/cycle".
+7. **Codex review #2 → handoff, Codex takes the lead (`165efdc0`)** — the
+   assessment was superseded; Codex owns the model.
 
-### Commits (chronological)
-`e323ee5f` owner answers · `108db648` suite build · `21264463` baseline
-freeze · `ac716891` adjudications · `27d2aaa1`/`99af1d1a` search link +
-merge · `6f962063` jest worktree fix · `1b66366e`/`5098aa7a`
-characterization + merge · `cf01b235` doc reconcile · `787e973f`
-invite-panel UX.
+### The two review outcomes (read these before quoting any figure)
+
+**Comparator #1 result, as corrected.** ROR is the incumbent's mirror image:
+15% abstention vs 85%, institution recall 30/47 vs 11/47, flips 8/11 of the S400
+byline false mismatches (keeps the one genuine flag) — but produces **64 unsafe
+resolutions end-to-end / 44 matcher-attributable, vs the incumbent's 0**.
+**Neither system passes the falsification bar.** ROR is disqualified as a sole
+auto-resolver; it is an *unvalidated candidate signal* only.
+
+What review #1 corrected in my analysis:
+- Safety was **understated** — I counted exact-string VETO messages, which
+  missed 6 unsafe UCSD resolutions (a comma). Root cause worth remembering: I
+  documented that exact-string weakness for *positive* cases and applied it only
+  in the direction that helped recall, never the direction that exposed danger.
+- Three relationship cases (byline-013/014, hier-007) are **predetermined** by
+  the same-ROR-id-only pair rule and are out of the identity aggregate.
+  Documenting circularity in prose did not make the aggregate like-for-like.
+- The naming-artifact set is **unadjudicated** pending canonical ROR ids;
+  inst-uc-109 is a *distinct record* (UCOP `00dmfq477` ≠ UC System `00pjdza24`).
+  "uc-parent 3/3" and "53/88" withdrawn. The incumbent baseline got a matching
+  addendum — its own 4 artifacts carry the same caveat (±2 on its "60 real").
+- "Viable as a signal inside a scorer" → **unvalidated candidate signal**, and
+  the S2AFF skip recommendation **withdrawn**.
+
+**Architecture: Codex now leads.** My tiered design made exact-alias lookup
+*decisive*, which reproduces the exact failure comparator #1 had just proved
+disqualifying, and it could not observe domain evidence at all — contradicting
+that same report's own finding. Architecture of record is Codex's
+**claim-oriented pipeline**: parse organization spans + evidence →
+candidate-union retrieval from a **compact** ROR index → **non-overridable
+vetoes** (multi-org, sibling, domain, country, type, granularity) →
+provenance-aware scoring → abstain. Governing principle: **exact aliases are
+retrieval evidence, not decision authority; vetoes run before scoring.**
+
+### Commits
+- `6547ecbe` drain-gate annotation
+- `28ba935f` released-bucket fix + status-enum-parity pair registered
+- `dcd516f1` ROR comparator executed and frozen
+- `32a6f8c2` comparator status fan-out
+- `95016e11` ROR report corrected after review #1
+- `cda32868` incumbent baseline artifact addendum
+- `5e34ce08` runtime/deployment assessment
+- `165efdc0` handoff — Codex takes the lead
 
 ## Next Items
 
 ### Verified Open
 
-1. **Comparator runs — #1 DONE (S406), two still queued.**
-   **ROR `chosen:true` executed and recorded** (`benchmarks/fuzzy-matching-falsification/baseline/ror-chosen-2026-08-07.{md,jsonl}`),
-   then **corrected after a Codex adversarial review returned
-   needs-attention** — read the correction note at the top of the report
-   before quoting any figure. Net: ROR is the incumbent's mirror image
-   (15% vs 85% abstention, 3× recall, flips 8/11 S400 byline mismatches)
-   but produces **64 unsafe resolutions end-to-end / 44 matcher-attributable
-   vs the incumbent's 0**. Neither system passes the bar; ROR is
-   disqualified as a sole auto-resolver and is an *unvalidated candidate
-   signal* only.
-   Still open, both queued and neither waived:
-   - **(a) Pinned ROR dump + local exact-alias baseline** (consensus step 2)
-     — do this FIRST. Offline, dependency-free, no rate limit, and it
-     unlocks ROR-id judging (which makes the currently-unadjudicated naming
-     artifacts decidable) plus the relationships graph (which a
-     relationship-aware pair adapter needs to measure hierarchy at all).
-   - **(b) S2AFF** — the "skip it" recommendation from earlier in S406 was
-     **WITHDRAWN**: S2AFF is parse → high-recall ROR retrieval → LightGBM
-     rerank → margin-based abstention, i.e. the closest existing analogue
-     to the scorer we intend to build. Needs a pinned Python 3.10/3.11 venv
-     (local is 3.14; no uv/pyenv/conda) plus multi-GB S3 model artifacts and
-     an sdist-only kenlm C++ build. Budget it its own session.
-   Also outstanding from the review: a **relationship-aware pair adapter**
-   (the same-ROR-id-only rule cannot express hierarchy) and **canonical
-   expected ROR ids in the cases**, which together would retire the
-   artifact-adjudication problem across both runs. Both are now on the
-   critical path per the handoff below, not deferred cleanup.
-
-   **CODEX OWNS THE INSTITUTION-RESOLUTION MODEL** (owner decision
-   2026-08-07). Claude's runtime/deployment assessment went to adversarial
-   review, came back needs-attention on all five findings, and is
-   **superseded**; the architecture of record is Codex's claim-oriented
-   pipeline (parse spans + evidence → candidate-union retrieval from a
-   compact ROR index → non-overridable vetoes → provenance-aware scoring →
-   abstain). Read
-   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md` first —
-   it carries Codex's model, Claude's six refinements, the frozen-harness
-   constraints, and the evidence trail. The superseded assessment
-   (`outputs/institution-resolution-runtime-architecture-2026-08-07.md`)
-   is banner-marked; do not build from it.
-   Codex's sequence: (a) hoist the resolver + bounded single-flight +
-   telemetry as the first reversible increment — treat it as the
-   measurement vehicle, not a perf fix; (b) compact-ROR-index size
-   experiment; (c) pinned ROR dump for benchmarking, NOT yet as production
-   substrate; (d) run and resource-profile S2AFF before choosing between
-   reimplementation and a batch/warm service.
-   Claude is off this surface.
-2. **Normalizer consolidation, seam by seam** (consensus step 1 proper) —
-   now unblocked by the characterization tests. Start with the two
-   byte-identical `normalizeName` copies (lowest risk), then the
-   diverged-docstring `ContactParser.normalizeNameForMatch`. Evidence:
-   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes.
-3. **Token-lifecycle redesign** (per-suggestion lease/generation OR
-   multiple concurrently-valid tokens). Founding requirement = S404 final
-   Codex finding (mint→dispatch non-atomicity), owner accepted shipping
-   with residual. Evidence:
-   `outputs/plan-manage-panel-preview-retry-2026-08-06.md` final
-   adjudication. Unscheduled — needs its own plan + review.
-4. **S399 finding 4 — silent no-op invite button.** [Carried; was VERIFIED
-   open at `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md:404` as of
-   S403; not touched S404/S405.]
-5. **Repair-request reason code ambiguity** (`conflictRecordUnavailable`
-   files under `address_conflict_pending`). [Carried from S403; small.]
-6. **EKA contaminant root cause** — the *handling* is decided
-   (quarantine-for-review) but how it got into `resolvedInstitutions` is
-   untraced. [Carried.]
-7. **postcss moderate advisory** (Dependabot 62; likely needs a `next`
-   upgrade). [Carried; still flagged on every push.]
-8. **Increment E — ProfileProvider double-fetch**
-   (`shared/context/ProfileContext.js:456-489`). [ASSUMED ~0.5–1s tail;
-   carried.]
+1. **Institution-resolution model — CODEX OWNS THIS. Claude is off the surface.**
+   Evidence: `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`
+   (read first — Codex's model, Claude's six refinements, frozen-harness
+   constraints, evidence trail). Codex's sequence: **(a)** hoist the resolver +
+   bounded single-flight + telemetry as the first reversible increment — a
+   *measurement vehicle*, not a perf fix; **(b)** compact-ROR-index size
+   experiment; **(c)** pinned ROR dump for benchmarking, **NOT** yet as
+   production substrate; **(d)** run and resource-profile S2AFF before choosing
+   between reimplementation and a batch/warm service.
+   Now on the critical path (both were review findings): **canonical expected ROR
+   ids in the cases** and a **relationship-aware pair adapter**.
+2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
+   Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes;
+   158 characterization tests already green. Start with the two byte-identical
+   `normalizeName` copies, then `ContactParser.normalizeNameForMatch`.
+3. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
+   concurrently-valid tokens). Evidence:
+   `outputs/plan-manage-panel-preview-retry-2026-08-06.md` final adjudication.
+   Unscheduled — needs its own plan + review.
+4. **S399 finding 4 — silent no-op invite button.** [VERIFIED still OPEN this
+   session: `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md:404` reads
+   "Finding 4 (silent no-op button): OPEN — not addressed on this branch."]
+5. **Repair-request reason code ambiguity** (`conflictRecordUnavailable` files
+   under `address_conflict_pending`). [Carried from S403; small.]
+6. **EKA contaminant root cause** — handling decided (quarantine-for-review),
+   provenance into `resolvedInstitutions` untraced. [Carried.]
+7. **postcss moderate advisory** (Dependabot 62; likely needs a `next` upgrade).
+   [Carried; still flagged on every push.]
+8. **Increment E — ProfileProvider double-fetch.** [ASSUMED ~0.5–1s tail;
+   anchor VERIFIED present this session at `shared/context/ProfileContext.js:456`.]
+9. **Vercel CLI is outdated** — local `58.5.1`, current `58.7.1+` [VERIFIED by
+   running `vercel --version`]. Flagged in both Codex reviews; matters only for
+   accurate Large-Functions behavior. Trivial: `npm i -g vercel@latest`.
 
 ### Owner Decision Needed
 
-_None gating the roadmap._ Optional curiosities: Zhou biographical ground
-truth (gates nothing — fixture settled); S404 invite-panel split copy +
-S402 optional hardening (carried, non-blocking).
+_None gating the roadmap._ The S2AFF env-build cost (pinned 3.10/3.11 venv,
+multi-GB S3 artifacts, sdist-only kenlm C++ build) is a real cost decision, but
+it now arrives via Codex's step (d) rather than as a standalone ask.
 
 ### Verify Before Acting
 
-1. **Owner's next real usage should validate three fresh UI changes:**
-   (a) the always-visible release button + no-scrollbar invite list
-   (deployed `787e973f` — owner was about to release 2 pending invitees on
-   request 1002959; ask how it went); (b) the Search Google ↗ link during
-   adjudication; (c) still unreported from S401: post-send rows show
-   Invited with no reload, and re-found engaged person collapses into
-   "Already handled".
-2. **Before ANY suite re-run or comparator run**: read
-   `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`
-   environment section — load env with `set -a; . .env.local; set +a`
-   (grep/cut gluing quotes onto `OPENALEX_API_KEY` silently breaks every
-   call → uniform abstention masquerading as results); judge target-name
-   comparison is exact-string (4 known artifact fails).
-3. **Any matching/normalizer work**: the inventory
-   (`docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`) is now the authoritative
-   count (institution 9, NOT the research memo's 11); read
-   `feedback-latency-plan-scope-accretion-postmortem` before expanding
-   scope; consolidation must keep the 158 characterization tests green or
-   change them deliberately with the caller named.
+1. **Owner UI validation — one item resolved, three still unreported.**
+   RESOLVED: the always-visible release button was used on request 1002959; it
+   worked, and surfaced the pending-count bug now fixed in `28ba935f`.
+   STILL UNVALIDATED: (a) the corrected card counts (a released reviewer should
+   now read `4 accepted · 1 pending · 1 released`; **"6 found" deliberately stays
+   6** — `total` counts everyone ever engaged and sets the bar width, and the
+   workRemaining hint still says "awaiting" by design); (b) the Search Google ↗
+   link during adjudication; (c) from S401 — post-send rows showing Invited with
+   no reload, and a re-found engaged person collapsing into "Already handled".
+2. **Before ANY suite re-run or comparator run** — read
+   `benchmarks/fuzzy-matching-falsification/README.md` "Executing" first.
+   Hazards: load env with `set -a; . .env.local; set +a` (quote-glued
+   `OPENALEX_API_KEY` silently kills every call → **uniform abstention is a
+   broken credential, not a result**); `run.js`/`judge()`/`cases/` are **frozen
+   for comparability** — changing the judge (e.g. to ROR-id comparison) resets
+   the comparison and requires re-running every prior system; `run-comparator.js`
+   **refuses to overwrite a frozen slug**; the suite must stay jest-invisible
+   (`npx jest --listTests`). Artifact counts are **unadjudicated** in both runs
+   (ROR 7, incumbent 4) — the old "4 known artifact fails" phrasing is stale.
+3. **Any matching/normalizer work** — `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`
+   is authoritative (institution 9, NOT the memo's 11); read
+   `feedback-latency-plan-scope-accretion-postmortem` before expanding scope;
+   consolidation must keep the 158 characterization tests green or change them
+   deliberately with the caller named.
 4. **The S404 invite pipeline notes still apply** if invites misbehave:
-   `outputs/plan-manage-panel-preview-retry-2026-08-06.md`
-   (deploy-transition re-preview; adjudicated latest-link-wins residual).
+   `outputs/plan-manage-panel-preview-retry-2026-08-06.md`.
 
 ### Parked
 
 1. **Representative 1–2k benchmark** — owner-parked; consequence accepted:
-   high-risk automation stays review-only until it exists.
+   high-risk automation stays review-only until it exists. Nothing in the new
+   model changes this — abstention is a product requirement, not a fallback.
 2. **Card redesign build** — follows the scorer
    (`project-reviewer-card-simplification-direction`).
-3. **Excluded-reviewers intake Phases A/B** — awaiting Justin×Connor
-   reconciliation. [Carried.]
-4. **Candidate B (exclusion-parse cache)** — largely obsoleted if
-   structured intake ships. [Carried.]
+3. **Excluded-reviewers intake Phases A/B** — awaiting Justin×Connor. [Carried.]
+4. **Candidate B (exclusion-parse cache)** — largely obsoleted if structured
+   intake ships. [Carried.]
+5. **Six stale agent worktrees** exist (`git worktree list`), incl.
+   `.claude/worktrees/claude-sonnet-doc-audit`. Prune when convenient.
 
 ### Do Not Reopen Without New Decision
 
-1. **Mint→dispatch non-atomicity** — owner adjudicated 2026-08-06: fix
-   belongs to the token-lifecycle redesign (Verified Open #3).
-2. **Research-only manual-copy link** — degraded fail-closed by owner
-   decision.
-3. **Merging the modal's two attestation checkboxes / two URL fields** —
-   separate by design; reinforced by owner's Q6 (no binary verified flag).
-4. **Zhou fixture label** and **EKA handling** — settled 2026-08-07 (see
-   owner-answers addendum); only new owner input reopens them.
-5. Reverted warm-reconciliation range `5b6757df..7072d52a`; reverted
-   byline-core fallback (`e2342f92`); request `1002903` mutation work; S400
-   onSent/SSE race (disproven); client-side institution-COI verdicts.
-   [All carried.]
+1. **Claude's tiered institution-resolution design** — superseded 2026-08-07;
+   the assessment is banner-marked. Exact-alias-as-decision is the specific
+   defect. Do not build from it.
+2. **"Resolve-at-save-time may dominate the design"** — withdrawn: resolution
+   already happens at discovery (`discover.js:292`) *and* the save-time COI gate
+   (`save-candidates-service.js:681`).
+3. **Mint→dispatch non-atomicity** — belongs to the token-lifecycle redesign
+   (Verified Open #3).
+4. **Research-only manual-copy link** — degraded fail-closed by owner decision.
+5. **Merging the modal's two attestation checkboxes / two URL fields** —
+   separate by design (owner Q6: no binary verified flag).
+6. **Zhou fixture label** and **EKA handling** — settled 2026-08-07.
+7. Reverted warm-reconciliation range `5b6757df..7072d52a`; reverted byline-core
+   fallback (`e2342f92`); request `1002903` mutation work; S400 onSent/SSE race
+   (disproven); client-side institution-COI verdicts. [All carried.]
+
+> NOT here on purpose: **"S2AFF never deploys" is REOPENED** — profile it before
+> deciding between reimplementation and a batch/warm service (Codex step (d)).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | Six owner answers + 2026-08-07 addendum (adjudications, build approvals) |
-| `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, schema, denominators, execution hazards |
-| `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md` | Frozen incumbent baseline + "what a successor must beat" |
+| `outputs/institution-resolution-handoff-to-codex-2026-08-07.md` | **START HERE for matching work** — Codex's model, Claude's six refinements, harness constraints |
+| `benchmarks/fuzzy-matching-falsification/baseline/ror-chosen-2026-08-07.md` | Comparator #1 — read the CORRECTION banner before quoting any figure |
+| `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md` | Frozen incumbent baseline + 2026-08-07 artifact addendum |
+| `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, denominators, execution hazards, what remains queued |
+| `benchmarks/fuzzy-matching-falsification/run-comparator.js` | Generic comparator driver (refuses to overwrite a frozen slug) |
+| `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | **SUPERSEDED** — retained for the reasoning trail only |
+| `lib/services/reviewer-rollup.js` | Progress buckets incl. the new `released`; `deriveWorkRemaining` |
+| `shared/components/workbench/ReviewerStatusIndicator.js` | Sole consumer of `progress` (parity-gated) |
 | `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` | AUTHORITATIVE normalizer counts, callers, equivalence classes |
-| `tests/unit/normalizer-characterization/` | 158 behavior-pinning tests (consolidation prerequisite) |
-| `lib/utils/google-search-url.js` | Search-link helper (CandidateEditModal + CandidateCard) |
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Always-visible release button; no internal scroll |
-| `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` | The governing consensus (questions preserved verbatim, §4 annotated) |
+| `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | The six owner answers this all serves |
 
 ## Testing
 
 ```bash
 npm run check:types
-npx jest --testPathPatterns "google-search-url|reviewer-invite-panel|normalizer-characterization"
-npx jest                                # full suite, 7,079
-node benchmarks/fuzzy-matching-falsification/validate-cases.js   # suite schema lint
+npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
+npx jest --testPathPatterns "reviewer-rollup|ReviewerStatus|normalizer-characterization"
+npx jest                                                          # full suite, 7,081
+node benchmarks/fuzzy-matching-falsification/validate-cases.js    # suite schema lint
+npx jest --listTests | grep -c fuzzy-matching                     # must be 0
 ```

@@ -20,14 +20,14 @@
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md
-- Delegated work: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-codex-delegation-review-vs-rescue-routing.md; ../docs/AGENT_COLLABORATION_PLAN.md
+- Delegated work: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md; ../docs/AGENT_COLLABORATION_PLAN.md
 - Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; reference-vercel-sensitive-env-unreadable.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md (S395 debacle — scope accretion, tier-gate skip, fail-closed over legacy data, revert-first)
 - Git / releases: feedback-verify-branch-before-git-action.md; project-commit-directly-to-main.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md
-- Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-thoroughness-default.md; feedback-truncation-is-breakage-not-completion.md
+- Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-thoroughness-default.md; feedback-truncation-is-breakage-not-completion.md; feedback-apply-measurement-artifacts-in-both-directions.md
 - Review posture: feedback-self-review-before-delegating-review.md; feedback-author-adversarial-pass-first.md; feedback-dont-self-certify-convergence.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md; feedback-user-facing-error-copy-voice.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
