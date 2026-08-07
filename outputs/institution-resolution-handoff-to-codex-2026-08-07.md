@@ -1,21 +1,27 @@
 # Handoff — institution resolution architecture → Codex lead (S406, 2026-08-07)
 
 **Owner:** Codex (design lead, from this point)
-**Branch:** `codex/institution-resolver-measurement`
+**Branch:** PR #113 merged; compact-index measurement continued on
+`codex/compact-ror-index-experiment`
 **Status:** Architecture direction set by Codex's adversarial review; Claude's
 assessment superseded. The first reversible measurement increment is
-implemented in PR #113; production resolver authority was live-verified as
+implemented and merged in PR #113; production resolver authority was live-verified as
 `legacy-default` on 2026-08-07, so promotion does not enable `shadow` or
-`combined`. The claim-oriented resolver/scorer remains planned.
+`combined`. The pinned ROR v2.11 compact-index experiment is complete and
+measurement-only; the claim-oriented resolver/scorer remains planned.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
-single-flight, aggregate runtime metrics, tests, and current-state docs.
+single-flight, aggregate runtime metrics, and an offline compact-index
+builder/measurement. No production index asset or resolver/scorer was wired.
 **Verification:** 47 affected resolver/runtime tests and 159 broader
 reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
 green; type check and all
-relevant source/Atlas/wiki/doc gates plus paired self-tests green.
+relevant source/Atlas/wiki/doc gates plus paired self-tests green. The compact
+index build is deterministic across two runs; its targeted tests and lint pass.
 **Next owner/action:** keep production authority on `legacy-default` unless the
-owner separately authorizes shadow observation; run the compact-ROR-index size
-experiment next. Claude remains off this surface.
+owner separately authorizes shadow observation. Use pinned ROR v2.11 only as an
+offline benchmark substrate next: version the benchmark deliberately, add
+canonical expected ROR ids, and make pair evaluation relationship-aware before
+running a new local comparator. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -37,8 +43,13 @@ authority.** Vetoes run *before* scoring.
 Superseded from Claude's assessment, do not build from these:
 - the three-tier design (exact-alias lookup as a *decisive* tier);
 - "~110k ROR records" (live count is **132,706 active**, verified 2026-08-07);
-- shipping the raw ROR dump as a bundled static asset (raw JSON exceeds
-  Vercel's 250 MB standard function limit before app code);
+- treating the raw or compact JSON as an already-approved bundled static asset.
+  The 304.9 MB raw JSON exceeds Vercel's 250 MB standard path. Vercel offers a
+  Large Functions/Fluid Compute path up to 5 GB, but this project's eligibility
+  and configuration were not verified. The v2.11 measurement also found that
+  the 80.4 MB compact JSON reached about 0.61 GB immediate post-parse process RSS
+  while its input buffer remained referenced. Runtime packaging, steady-state
+  memory, concurrency, and cold-start behavior remain unproven together;
 - measuring cardinality from saved Dataverse candidates (survivorship-biased);
 - "resolve-at-save may dominate the design" (withdrawn — resolution already
   happens at discovery *and* the save-time COI gate);
@@ -127,6 +138,7 @@ the review.
 | `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | Claude's assessment — **superseded**, retained for the reasoning trail |
 | `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` | Comparator list; S2AFF architecture description |
 | `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | The six owner answers this all serves (Q1: ambiguity must WIDEN checks) |
+| `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Pinned release, deterministic compact-index sizes, component costs, and fresh-process load/memory evidence |
 
 ## Standing constraint
 

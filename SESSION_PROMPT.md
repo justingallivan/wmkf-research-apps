@@ -1,4 +1,4 @@
-# Session 407 Prompt: Codex leads institution resolution; comparator #1 done and corrected
+# Session 407 Prompt: Codex leads institution resolution; compact ROR index measured
 
 > **Handoff, 2026-08-07 (Session 406).** One owner-reported UI bug fixed, the
 > first comparator executed against the frozen falsification suite, and the
@@ -44,6 +44,14 @@ Suite 7,079 → 7,081.
    Vercel" and "how does this work per candidate/search/cycle".
 7. **Codex review #2 → handoff, Codex takes the lead (`165efdc0`)** — the
    assessment was superseded; Codex owns the model.
+8. **Measurement increment promoted, then compact-index sizing completed** —
+   PR #113 merged as `18533dac` with transition docs in `3ccd60be`; production
+   remained `legacy-default`. The next branch pinned ROR v2.11 by immutable
+   Zenodo record/checksum and reproducibly built a retrieval-only index. Full
+   results are in
+   `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`: 80.4 MB plain /
+   24.7 MB Brotli, but about 0.61 GB immediate post-parse process RSS with the
+   input buffer retained, so no request-path asset is authorized.
 
 ### The two review outcomes (read these before quoting any figure)
 
@@ -102,12 +110,15 @@ retrieval evidence, not decision authority; vetoes run before scoring.**
    aggregate metric record reports provider calls/cache reuse. It remains a
    *measurement vehicle*, not a perf claim. Production resolver authority was
    live-verified as `legacy-default` on 2026-08-07; merging/deploying this slice
-   does not enable `shadow` or `combined`. Next: **(b)** compact-ROR-index size
-   experiment; **(c)** pinned ROR dump for benchmarking, **NOT** yet as
-   production substrate; **(d)** run and resource-profile S2AFF before choosing
-   between reimplementation and a batch/warm service.
-   Now on the critical path (both were review findings): **canonical expected ROR
-   ids in the cases** and a **relationship-aware pair adapter**.
+   does not enable `shadow` or `combined`. **Step (b) is complete:** pinned ROR
+   v2.11 contains 135,710 records (132,706 active); the full retrieval-only
+   index is 80.4 MB plain / 24.7 MB Brotli and reaches about 0.61 GB immediate
+   post-parse process RSS with its input buffer retained. No production asset is
+   wired or authorized.
+   Next: **(c)** use that pinned release strictly for a deliberately versioned
+   offline benchmark revision, adding **canonical expected ROR ids** and a
+   **relationship-aware pair adapter**; **(d)** run and resource-profile S2AFF
+   before choosing between reimplementation and a batch/warm service.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
    Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes;
    158 characterization tests already green. Start with the two byte-identical
@@ -209,6 +220,7 @@ it now arrives via Codex's step (d) rather than as a standalone ask.
 | `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md` | Frozen incumbent baseline + 2026-08-07 artifact addendum |
 | `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, denominators, execution hazards, what remains queued |
 | `benchmarks/fuzzy-matching-falsification/run-comparator.js` | Generic comparator driver (refuses to overwrite a frozen slug) |
+| `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Completed v2.11 size/load measurement; explains why no production JSON asset is authorized |
 | `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | **SUPERSEDED** — retained for the reasoning trail only |
 | `lib/services/reviewer-rollup.js` | Progress buckets incl. the new `released`; `deriveWorkRemaining` |
 | `shared/components/workbench/ReviewerStatusIndicator.js` | Sole consumer of `progress` (parity-gated) |

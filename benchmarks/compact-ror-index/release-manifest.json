@@ -1,0 +1,20 @@
+{
+  "release": "v2.11",
+  "schemaVersion": "2.1",
+  "publicationDate": "2026-08-03",
+  "recordCount": 135710,
+  "zenodoRecordId": "21773148",
+  "doi": "10.5281/zenodo.21773148",
+  "conceptDoi": "10.5281/zenodo.6347574",
+  "zip": {
+    "name": "v2.11-2026-08-03-ror-data.zip",
+    "bytes": 35648847,
+    "checksum": "md5:8bfb0dc82affb46f331899a7341d34f3",
+    "url": "https://zenodo.org/api/records/21773148/files/v2.11-2026-08-03-ror-data.zip/content"
+  },
+  "json": {
+    "name": "v2.11-2026-08-03-ror-data.json",
+    "bytes": 304865777,
+    "checksum": "sha256:5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+  }
+}

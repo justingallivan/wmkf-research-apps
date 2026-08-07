@@ -13,6 +13,8 @@ source_files:
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
+  - outputs/institution-resolution-handoff-to-codex-2026-08-07.md
+  - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -26,6 +28,7 @@ watch_paths:
   - SESSION_PROMPT.md
   - docs/**/*ROADMAP*.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
+  - benchmarks/compact-ror-index/**
 update_triggers:
   - roadmap or phasing changes
   - cross-capability architecture changes
@@ -103,10 +106,14 @@ document inventory, and individual implementation plans do not establish priorit
   index → non-overridable vetoes (multi-org, sibling, domain, country, type,
   granularity) → provenance-aware scoring → abstain. Governing principle:
   exact aliases are RETRIEVAL EVIDENCE, NOT DECISION AUTHORITY, and vetoes run
-  before scoring. Corrected facts: ROR has **132,706 active records**
-  [VERIFIED via live API 2026-08-07], and the raw dump exceeds Vercel's 250 MB
-  standard function limit — so a compact compiled index, size-measured before
-  bundling, replaces "ship the dump as a static asset". Handoff (Codex's model
+  before scoring. Corrected facts: pinned ROR v2.11 has **135,710 total /
+  132,706 active records** [VERIFIED via the checksum-pinned 2026-08-03 dump].
+  Its 304.9 MB raw JSON exceeds Vercel's 250 MB standard path. Vercel offers a
+  Large Functions/Fluid Compute path up to 5 GB, but this project's eligibility
+  and configuration are unverified. The completed compact-index experiment
+  measured 80.4 MB plain / 24.7 MB Brotli and about 0.61 GB immediate post-parse
+  process RSS with the input buffer still referenced; no request-path asset is
+  authorized. Handoff (Codex's model
   + Claude's six refinements + frozen-harness constraints):
   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`; the
   superseded assessment is banner-marked and must not be built from. Codex's
@@ -114,9 +121,10 @@ document inventory, and individual implementation plans do not establish priorit
   aggregate telemetry is BUILT in PR #113; production resolver authority was
   live-verified as `legacy-default` on 2026-08-07, so promotion does not enable
   `shadow` or `combined`**
-  (measurement vehicle, not a performance claim) → compact-index size
-  experiment → pinned dump for benchmarking only → run and resource-profile
-  S2AFF. Both
+  (measurement vehicle, not a performance claim) → **compact-index size
+  experiment COMPLETE** (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`)
+  → pinned v2.11 offline benchmark revision with canonical expected ROR ids and
+  relationship-aware pair evaluation → run and resource-profile S2AFF. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -130,7 +138,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  comparator #2 (owner's choice: S2AFF vs pinned-ROR-dump alias baseline) → normalizer
+  pinned-v2.11 local comparator revision → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

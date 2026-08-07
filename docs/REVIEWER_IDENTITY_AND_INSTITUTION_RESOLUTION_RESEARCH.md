@@ -3,7 +3,7 @@ title: Reviewer Identity and Institution Resolution Research
 domain: reviewer-identity
 kind: decision
 status: active
-summary: "Research-only strategy for institution resolution, reviewer identity, current affiliation, and contact attribution; no build is authorized."
+summary: "Research foundation for reviewer identity and institution resolution; current build authority lives in the Codex handoff."
 canonical: false
 cataloged: 2026-08-04
 owner: product-engineering
@@ -21,10 +21,16 @@ Date: 2026-08-04
 
 ## Status and boundary
 
-This document records external research and a proposed evaluation strategy. It
-does **not** authorize implementation, schema changes, provider adoption,
-production writes, CRM Account linking, or changes to the existing fail-closed
-identity gates.
+This document records the external research and original evaluation strategy.
+It no longer governs implementation authorization: subsequent owner decisions
+authorized the frozen falsification suite, comparator runs, PR #113's reversible
+measurement plumbing, and the offline compact-ROR-index size experiment. Current
+authority and sequencing live in
+`outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+
+This research memo itself does **not** authorize schema changes, provider
+adoption, production writes, CRM Account linking, a bundled ROR asset, or
+changes to the existing fail-closed identity gates.
 
 The purpose is to step back from individual heuristics and define the problem
 before more code is written. Any later build should begin with an owner-approved
@@ -450,7 +456,7 @@ No typeahead, cache, or automatic Account linking is proposed here.
 
 ## Decision record
 
-As of 2026-08-04:
+Historical boundary — as of 2026-08-04:
 
 - **Accepted as research direction:** decompose the four decisions; use
   multi-stage candidate generation and structured scoring; preserve negative
@@ -461,8 +467,13 @@ As of 2026-08-04:
   person-disambiguation architectural reference.
 - **Rejected as sufficient:** provider rank 1, one fuzzy score, topic similarity,
   or a single current-looking publication/profile.
-- **Not authorized:** implementation, dependency adoption, schema work,
-  production experimentation, or changes to live identity/write gates.
+- **Not authorized by this memo:** implementation, dependency adoption, schema
+  work, production experimentation, or changes to live identity/write gates.
+
+Subsequent current state (2026-08-07): owner-authorized measurement work has
+started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
+pinned ROR v2.11 size experiment is complete and offline-only. No schema,
+production asset, resolver/scorer authority, or identity/write gate changed.
 
 ## Primary sources
 
