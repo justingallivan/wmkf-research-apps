@@ -547,6 +547,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
 
           {!!onVerifyAddress && (requireAddressVerification || confirmMode || formData.email.trim().toLowerCase() !== String(candidate.email || '').trim().toLowerCase()) && (
             <div className="space-y-3 rounded-md bg-blue-50 border border-blue-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-900">Email address</p>
               <label className="flex items-start gap-2">
                 <input
                   type="checkbox"
@@ -555,7 +556,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
                   className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
                 />
                 <span className="text-xs text-blue-900">
-                  I verified that this is the correct person and that {formData.email.trim() || 'the address above'} is their address.
+                  {formData.email.trim() || 'The address above'} belongs to this person — I checked the evidence below.
                 </span>
               </label>
               <div>
@@ -581,6 +582,16 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
                     placeholder="https://..."
                     className="w-full px-2 py-1.5 text-sm border border-blue-200 rounded-md"
                   />
+                  <p className="mt-1 text-[11px] text-blue-700">The page you checked — kept as a record of this verification.</p>
+                  {!evidenceUrl.trim() && !!formData.website.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceUrl(formData.website.trim())}
+                      className="mt-1 text-[11px] font-medium text-blue-700 underline hover:text-blue-900"
+                    >
+                      Use the Website URL below
+                    </button>
+                  )}
                 </div>
               )}
               {(evidenceType === 'direct_correspondence' || evidenceType === 'other') && (
@@ -607,6 +618,16 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               placeholder="https://..."
             />
+            <p className="mt-1 text-xs text-gray-500">Shown on the reviewer’s card.</p>
+            {!formData.website.trim() && !!evidenceUrl.trim() && (
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, website: evidenceUrl.trim() })}
+                className="mt-1 text-xs font-medium text-blue-600 underline hover:text-blue-800"
+              >
+                Same as the evidence link above
+              </button>
+            )}
           </div>
 
           {/* Board-writeup identity (S308) — only on the saved-candidate edit (not
@@ -649,18 +670,24 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           )}
 
           {confirmMode && (
-            <label className="flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 p-3">
-              <input
-                type="checkbox"
-                checked={identityConfirmed}
-                onChange={(e) => setIdentityConfirmed(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
-              />
-              <span className="text-xs text-amber-800">
-                I’ve verified this is the correct person. The auto-suggested ORCID and metrics
-                won’t be carried over. Verify the exact address separately above.
-              </span>
-            </label>
+            <div className="space-y-2 rounded-md bg-amber-50 border border-amber-200 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">Right person?</p>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={identityConfirmed}
+                  onChange={(e) => setIdentityConfirmed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-xs text-amber-800">
+                  This is the person I intend to add.
+                </span>
+              </label>
+              <p className="text-[11px] text-amber-700">
+                The profile data found automatically under this name — ORCID, citation counts —
+                wasn’t verified as theirs, so it won’t be saved with them.
+              </p>
+            </div>
           )}
 
           {!confirmMode && (

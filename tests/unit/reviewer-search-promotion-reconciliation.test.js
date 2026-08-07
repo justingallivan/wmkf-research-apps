@@ -216,7 +216,7 @@ test('verify contact sends every confirmation-bound field and promotes the serve
   fireEvent.click(await screen.findByRole('button', { name: /verify \/ edit address/i }));
   fireEvent.change(screen.getByText('Affiliation').parentElement.querySelector('input'), { target: { value: 'Current Department' } });
   fireEvent.change(screen.getByText('Website').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
-  fireEvent.click(screen.getByLabelText(/I verified that this is the correct person/i));
+  fireEvent.click(screen.getByLabelText(/belongs to this person — I checked the evidence below/i));
   fireEvent.change(screen.getByText('Evidence link').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
