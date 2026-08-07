@@ -48,8 +48,9 @@ This is the continuation entry point for the
   the exact legacy objects. Observer failures are contained. Explicit
   `combined` mode adapts safe W2 rescues into the established result contract
   with a `probable` ceiling; no tracked production setting enables it.
-- The W2 batch now owns one request-bounded institution resolver on
-  `codex/institution-resolver-measurement` (not yet merged/deployed). Settled
+- The W2 batch implementation in PR #113 owns one request-bounded institution
+  resolver. Production resolver authority was live-verified as `legacy-default`
+  on 2026-08-07; promotion does not enable `shadow` or `combined`. Settled
   identities and definitive misses reuse across candidates; concurrent calls
   single-flight only when their normalized institution/country key and
   `AbortSignal` are identical. One aggregate, PII-free runtime log reports

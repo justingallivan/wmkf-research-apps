@@ -3,17 +3,19 @@
 **Owner:** Codex (design lead, from this point)
 **Branch:** `codex/institution-resolver-measurement`
 **Status:** Architecture direction set by Codex's adversarial review; Claude's
-assessment superseded. The first reversible measurement increment is built on
-the feature branch but is not yet merged or deployed; the claim-oriented
-resolver/scorer remains planned.
+assessment superseded. The first reversible measurement increment is
+implemented in PR #113; production resolver authority was live-verified as
+`legacy-default` on 2026-08-07, so promotion does not enable `shadow` or
+`combined`. The claim-oriented resolver/scorer remains planned.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
 single-flight, aggregate runtime metrics, tests, and current-state docs.
 **Verification:** 47 affected resolver/runtime tests and 159 broader
 reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
 green; type check and all
 relevant source/Atlas/wiki/doc gates plus paired self-tests green.
-**Next owner/action:** verify and promote the measurement increment, then run
-the compact-ROR-index size experiment. Claude remains off this surface.
+**Next owner/action:** keep production authority on `legacy-default` unless the
+owner separately authorizes shadow observation; run the compact-ROR-index size
+experiment next. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -88,7 +90,7 @@ the review.
      cannot express hierarchy, so parent/child consistency is unmeasured.
 
 6. **Treat the first increment as a measurement vehicle, not a perf fix.**
-   **BUILT on `codex/institution-resolver-measurement`, not yet merged/deployed:**
+   **BUILT in PR #113; production authority remains `legacy-default`:**
    `evaluateSuggestionsWithRuntimeSeam` now creates one resolver for the W2
    batch (`lib/services/reviewer-identity-runtime.js:364,384`), while the
    single-suggestion entry point retains a per-call default. The resolver
