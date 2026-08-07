@@ -21,8 +21,8 @@
 >    analogue to the architecture we intend to build, not "the same class" as a
 >    chosen-only endpoint.
 >
-> The original figures are retained inline as struck claims where they were
-> published, so the record shows what was corrected rather than quietly
+> The original figures are retained inline as explicitly withdrawn claims where
+> they were published, so the record shows what was corrected rather than quietly
 > restating it.
 
 Second authorized execution of the falsification suite (owner: comparator runs,

@@ -34,6 +34,19 @@ name rendering ("University of California San Diego" without the comma;
 "…Office of the President"/"…System" for the system; CSULA without the
 comma). Real incumbent failures: **60**.
 
+> **[ADDENDUM 2026-08-07 — this artifact classification is UNADJUDICATED.]** It
+> is name-based, and the cases carry `ror_id: null` by design, so "correct
+> institution, different rendering" was inferred from display strings rather
+> than proven by entity id. The comparator run found this reasoning unsafe for
+> at least one case of the identical class: ROR's "…Office of the President"
+> resolves to `00dmfq477`, a **distinct ROR record** from the UC System's
+> `00pjdza24` — a granularity question, not punctuation. The UC-system pair here
+> is very likely the same question. The "60 real failures" figure therefore has
+> an uncertainty of up to ±2 pending canonical expected ROR ids. See
+> `ror-chosen-2026-08-07.md` → "Naming artifacts" and "Review record". The
+> as-run numbers above are left unchanged — this is a classification note, not
+> a restatement.
+
 ## The incumbent's profile in one line
 
 **Safe but blind.** Zero wrong-entity resolutions anywhere (no
