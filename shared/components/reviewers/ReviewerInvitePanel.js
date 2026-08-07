@@ -373,7 +373,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
             reviewer accepts they appear in the <span className="font-medium">Track Reviewers</span> tab.
           </p>
 
-          <ul className="divide-y divide-gray-100 max-h-[34rem] overflow-y-auto">
+          <ul className="divide-y divide-gray-100">
             {candidates.map((c) => (
               <li key={c.suggestionId} className="py-3 flex items-start gap-3">
                 {/* No email ⇒ can't be invited (send-emails skips no_email). Block
@@ -543,16 +543,25 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
             >
               Send invitation{selectedNotInvited.length > 0 ? ` (${selectedNotInvited.length})` : ''}
             </button>
-            {selectedPending.length > 0 && (
-              <button
-                type="button"
-                onClick={handleWithdraw}
-                className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Review and edit the 'no longer needed' note, then send it and close these pending invitations"
-              >
-                {`Review & release ${selectedPending.length} as no longer needed`}
-              </button>
-            )}
+            {/* Always visible (disabled until a still-pending invitee is checked) —
+                owner discoverability report 2026-08-07: the appear-on-selection
+                version was unfindable when the quota email said to release
+                pending invitees. */}
+            <button
+              type="button"
+              onClick={handleWithdraw}
+              disabled={selectedPending.length === 0}
+              className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+              title={
+                selectedPending.length === 0
+                  ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
+                  : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
+              }
+            >
+              {selectedPending.length > 0
+                ? `Review & release ${selectedPending.length} as no longer needed`
+                : 'Release pending invites as no longer needed'}
+            </button>
             <span className="text-xs text-gray-400">{invitable.length} invitable · {acceptedCount} accepted</span>
           </div>
         </>
