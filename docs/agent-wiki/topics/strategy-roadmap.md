@@ -56,8 +56,14 @@ document inventory, and individual implementation plans do not establish priorit
   affordance, unbuilt); ROR namespace YES; falsification suite approved as next work /
   representative benchmark parked; all concurrent affiliations shown and COI-screened,
   recency-ranked; contact status is a dated evidence ledger, no binary verified flag.
-  Benchmark unblocked. Remaining order:
-  benchmark / failure archive (150–300-case falsification suite) → normalizer
+  Falsification suite BUILT S405 per owner "build but don't execute" —
+  `benchmarks/fuzzy-matching-falsification/` (166 cases: 120 sampled UC adversarial
+  matrix, full 335 via `--full`, + 46 curated real/policy fixtures; jest-invisible;
+  `run.js` refuses without adapters and is unverified by execution). Incumbent
+  baseline freeze + comparator runs NOT done — separate owner go required; two
+  assumed-label cases pend owner adjudication (Zhou namesake, EKA contaminant), see
+  the suite README. Remaining order:
+  baseline freeze / comparator execution of the suite → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

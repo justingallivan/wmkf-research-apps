@@ -39,8 +39,10 @@ corrected the altitude — order by what most rapidly reduces complexity.
   as a confirmed Claude×Codex consensus,
   `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`; its six §4 owner
   questions ANSWERED S405 (2026-08-06) —
-  `outputs/fuzzy-matching-owner-answers-2026-08-06.md` — benchmark unblocked → benchmark /
-  adversarial matrix + failure archive (Shih's Harvard case is row one) → normalizer
+  `outputs/fuzzy-matching-owner-answers-2026-08-06.md`; falsification suite BUILT
+  S405 but NOT EXECUTED (owner: build, don't execute) at
+  `benchmarks/fuzzy-matching-falsification/` (Shih cases included) → suite
+  execution/baseline freeze (needs owner go) → normalizer
   consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.

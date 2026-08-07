@@ -84,9 +84,16 @@ modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
 
 ### Verified Open
 
-1. **Benchmark: adversarial matrix + failure archive** — starts once item 1
-   above is answered. Shape fixed by the consensus doc (150–300 falsification
-   cases; Shih row-one is an owner nit). [VERIFIED via consensus §1 step 0.]
+1. **Benchmark: adversarial matrix + failure archive — BUILT S405, NOT
+   EXECUTED** (owner: "build the falsification suite but don't execute").
+   `benchmarks/fuzzy-matching-falsification/`: 166 cases (120 generated UC
+   adversarial matrix — full matrix 335 via `--full` — + 46 curated from
+   documented failures), schema lint green, jest picks up nothing there.
+   `run.js` refuses to run without adapters and is syntax-checked but
+   unverified by execution. NOT done: incumbent baseline freeze, comparator
+   runs — needs a separate owner go. Two `label_status: assumed` cases need
+   owner adjudication (Yubin Zhou namesake; EKA contaminant handling) — see
+   the suite README.
 2. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
    concurrently-valid tokens). Founding requirement = final Codex review
    finding (mint→dispatch non-atomicity) + its test list; owner accepted
