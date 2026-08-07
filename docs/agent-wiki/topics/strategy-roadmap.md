@@ -71,19 +71,32 @@ document inventory, and individual implementation plans do not establish priorit
   `baseline/ror-chosen-2026-08-07.md`): ROR affiliation `chosen:true` is the
   incumbent's MIRROR IMAGE** — 15% abstention vs 85%, institution recall 30/47
   vs 11/47, flips 8/11 of the S400 byline false mismatches (keeps the one genuine
-  flag) — but fires **40 attributable wrong-entity vetoes vs the incumbent's 0**,
-  confidently resolving self-contradictory strings ("University of California,
-  Berkeley (UCLA)" → Berkeley at score 1.0). NEITHER system passes the
-  falsification bar; ROR is disqualified as a sole auto-resolver, viable as a
-  signal inside a scorer. Also established: out-of-band domain evidence must be a
-  first-class scorer input (the uc-sibling-domain family discriminates neither
-  system — no affiliation-string API accepts it), and self-contradiction detection
-  is a distinct missing capability in both. **Comparator #2 (S2AFF) SCOPED, NOT
-  RUN** — heavy old Python stack + multi-GB S3 artifacts vs local Python 3.14, no
-  uv/pyenv; recommendation is to skip it for the pinned-ROR-dump exact-alias
-  baseline (offline, dependency-free, unlocks ROR-id judging + hierarchy
-  relationships and would retire all 11 exact-string naming artifacts across both
-  runs). Owner decision pending. Both
+  flag) — but produces **64 unsafe resolutions end-to-end / 44 attributable to
+  the affiliation string, vs the incumbent's 0**, confidently resolving
+  self-contradictory strings ("University of California, Berkeley (UCLA)" →
+  Berkeley at score 1.0). NEITHER system passes the falsification bar; ROR is
+  disqualified as a sole auto-resolver and is an **unvalidated candidate signal**
+  for a scorer (nothing in the run put it inside one). Also established:
+  out-of-band domain evidence must be a first-class scorer input, and
+  self-contradiction detection is a distinct missing capability in both.
+  **REPORT CORRECTED 2026-08-07 after Codex adversarial review** (verdict
+  needs-attention): safety is now derived from result semantics, not exact-string
+  VETO counts — the original "40" missed 6 UCSD resolutions to a comma-less name;
+  three relationship cases (byline-013/014, hier-007) are excluded from the
+  identity aggregate as predetermined by the same-ROR-id-only pair rule; the
+  naming-artifact set is unadjudicated pending canonical ROR ids (inst-uc-109 is
+  a distinct record — UCOP `00dmfq477` ≠ UC System `00pjdza24` — so the earlier
+  "uc-parent 3/3" and "53/88" figures are withdrawn). Evidence limit: the
+  institution slice is 15 real / 126 synthetic and ALL 64 unsafe resolutions are
+  synthetic — the mechanism transfers to production (the S400 shape), the
+  magnitude does not. **Comparator #2 (S2AFF) IS ON THE QUEUE — the earlier
+  "skip it" recommendation was WITHDRAWN in review.** S2AFF is parse →
+  high-recall ROR retrieval → LightGBM rerank → margin-based abstention, the
+  closest existing analogue to the scorer we intend to build, so it is the most
+  informative remaining comparator, not the least. Needs a pinned Python
+  3.10/3.11 venv (local is 3.14, no uv/pyenv) and its own session. Recommended
+  order: pinned-ROR-dump exact-alias baseline FIRST (offline, dependency-free,
+  unlocks ROR-id judging + hierarchy relationships), then S2AFF. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never

@@ -21,16 +21,28 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
   judged (25 person/contact/affiliation cases skipped — ROR is an org registry
   only). Headline: ROR is the incumbent's **mirror image** — 15% abstention vs
   85%, ~3× the institution recall, flips 8/11 of the S400 byline false
-  mismatches — but fires **40 attributable wrong-entity vetoes** where the
-  incumbent fired zero, resolving self-contradictory strings like "University of
-  California, Berkeley (UCLA)" at score 1.0. **Neither system passes the
-  falsification bar.** ROR is disqualified as a sole auto-resolver, viable as a
-  signal inside a scorer.
-- **Comparator #2 (S2AFF) SCOPED, NOT RUN** — heavy old Python stack (torch,
+  mismatches — but produces **64 unsafe resolutions end-to-end (44 attributable
+  to the affiliation string alone)** where the incumbent produced zero, resolving
+  self-contradictory strings like "University of California, Berkeley (UCLA)" at
+  score 1.0. **Neither system passes the falsification bar.** ROR is disqualified
+  as a sole auto-resolver; it is an **unvalidated candidate signal** for a scorer
+  (nothing in the run put it inside one).
+  **The report was CORRECTED 2026-08-07 after Codex adversarial review** — safety
+  is now derived from result semantics rather than exact-string VETO counts (the
+  original "40" missed 6 UCSD resolutions to a comma-less name), three
+  relationship cases are excluded from the identity aggregate as predetermined by
+  the same-ROR-id-only pair rule, and the naming-artifact set is marked
+  unadjudicated pending canonical ROR ids. Read the correction note at the top of
+  the report before quoting any figure.
+- **Comparator #2 (S2AFF) ON THE QUEUE, NOT YET RUN** — an earlier
+  "skip it" recommendation was **withdrawn** in review: S2AFF is parse →
+  high-recall ROR retrieval → LightGBM rerank → margin-based abstention, i.e. the
+  closest existing analogue to the scorer we intend to build, not "the same
+  class" as a chosen-only endpoint. Cost: heavy old Python stack (torch,
   simpletransformers, sdist-only kenlm) + multi-GB S3 model artifacts against
-  local Python 3.14 with no uv/pyenv/conda. Owner cost decision; recommendation
-  and reasoning in the ROR report's tail. Threshold calibration remains out of
-  scope for this suite entirely.
+  local Python 3.14 with no uv/pyenv/conda, so it needs a pinned 3.10/3.11 venv
+  and its own session. Threshold calibration remains out of scope for this suite
+  entirely.
 - `run.js` has now executed once; three harness fixes were made during that
   run (see its inline comments and the baseline report). Known sharp edge:
   target-name judging is exact-string — compare normalized names or ROR ids
@@ -127,8 +139,15 @@ node validate-cases.js                                # schema lint
 ```
 
 Done: incumbent baseline, ROR `chosen:true`. Remaining from the consensus §1
-step-0 comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`):
-S2AFF (scoped, owner decision — see above) and the **local exact-alias baseline
-over a pinned ROR dump** (consensus step 2), which is offline, dependency-free,
-and would additionally unlock ROR-id-based judging + hierarchy relationships —
-the recommended next comparator.
+step-0 comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`),
+both queued, neither waived:
+
+1. **Pinned ROR dump + local exact-alias baseline** (consensus step 2) —
+   recommended first: offline, dependency-free, no rate limit, and it unlocks
+   ROR-id-based judging (making the artifact set adjudicable) plus the
+   relationships graph (letting a pair adapter express hierarchy).
+2. **S2AFF** — needs a pinned Python 3.10/3.11 venv; own session.
+
+A relationship-aware pair adapter is a prerequisite for measuring
+hierarchy/parent-child consistency at all; the current same-ROR-id-only rule
+cannot express it.

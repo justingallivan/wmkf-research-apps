@@ -73,12 +73,32 @@ invite-panel UX.
 
 ### Verified Open
 
-1. **Comparator runs on the frozen suite** (consensus step 0 completion):
-   ROR affiliation API `chosen:true`-only and S2AFF against the same 166
-   cases, recorded next to the incumbent baseline. Evidence: baseline
-   report "What a successor must beat"; comparator list in
-   `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`.
-   S2AFF may need a Python env — scope that before promising it.
+1. **Comparator runs — #1 DONE (S406), two still queued.**
+   **ROR `chosen:true` executed and recorded** (`benchmarks/fuzzy-matching-falsification/baseline/ror-chosen-2026-08-07.{md,jsonl}`),
+   then **corrected after a Codex adversarial review returned
+   needs-attention** — read the correction note at the top of the report
+   before quoting any figure. Net: ROR is the incumbent's mirror image
+   (15% vs 85% abstention, 3× recall, flips 8/11 S400 byline mismatches)
+   but produces **64 unsafe resolutions end-to-end / 44 matcher-attributable
+   vs the incumbent's 0**. Neither system passes the bar; ROR is
+   disqualified as a sole auto-resolver and is an *unvalidated candidate
+   signal* only.
+   Still open, both queued and neither waived:
+   - **(a) Pinned ROR dump + local exact-alias baseline** (consensus step 2)
+     — do this FIRST. Offline, dependency-free, no rate limit, and it
+     unlocks ROR-id judging (which makes the currently-unadjudicated naming
+     artifacts decidable) plus the relationships graph (which a
+     relationship-aware pair adapter needs to measure hierarchy at all).
+   - **(b) S2AFF** — the "skip it" recommendation from earlier in S406 was
+     **WITHDRAWN**: S2AFF is parse → high-recall ROR retrieval → LightGBM
+     rerank → margin-based abstention, i.e. the closest existing analogue
+     to the scorer we intend to build. Needs a pinned Python 3.10/3.11 venv
+     (local is 3.14; no uv/pyenv/conda) plus multi-GB S3 model artifacts and
+     an sdist-only kenlm C++ build. Budget it its own session.
+   Also outstanding from the review: a **relationship-aware pair adapter**
+   (the same-ROR-id-only rule cannot express hierarchy) and **canonical
+   expected ROR ids in the cases**, which together would retire the
+   artifact-adjudication problem across both runs.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper) —
    now unblocked by the characterization tests. Start with the two
    byte-identical `normalizeName` copies (lowest risk), then the
