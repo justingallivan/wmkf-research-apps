@@ -74,6 +74,22 @@ function adapterFor(map) {
 }
 
 describe('falsification suite v3 frozen boundary', () => {
+  test('benchmark compatibility paths execute the promoted shared production core', () => {
+    const pairs = [
+      ['decision-contract', 'versions/v3/decision-contract'],
+      ['location-evidence', 'versions/v3/location-evidence'],
+      ['organization-parser', 'versions/v3/organization-parser'],
+      ['text-evidence', 'versions/v3/text-evidence'],
+      ['ror-candidate-adapter', 'versions/v3/adapters-ror-api'],
+      ['ror-decision-resolver', 'versions/v3/resolver'],
+    ];
+    for (const [sharedName, benchmarkPath] of pairs) {
+      expect(require(`../../../lib/services/institution-resolution/${sharedName}`)).toBe(
+        require(`../../../benchmarks/fuzzy-matching-falsification/${benchmarkPath}`),
+      );
+    }
+  });
+
   test('pins every v2 input consumed by the final-decision benchmark', () => {
     const baseDir = path.resolve(
       __dirname,
