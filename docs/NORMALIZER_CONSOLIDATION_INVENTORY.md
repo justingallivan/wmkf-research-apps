@@ -44,9 +44,9 @@ No honorific strip, no diacritic fold, no reordering.
   `normalizeName`, but that import is shadowed — see §1.2, the class defines
   its OWN static `normalizeName` with an identical body and the class method
   is what every internal caller (`this.normalizeName`) actually invokes.
-  (Historical note in the file: extracted from the Postgres-era
-  `DatabaseService#normalizeName` for the `researchers.normalized_name`
-  keyed-lookup column.)
+  (Historical note in the file: extracted from `DatabaseService#normalizeName`
+  for the drained Postgres-era `researchers.normalized_name` keyed-lookup
+  column.)
 - Semantic identity: **byte-identical** to §1.2 (deduplication-service.js's
   own static method). Two independent copies of the same four-step pipeline.
 
