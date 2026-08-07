@@ -795,6 +795,9 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       expect(payload.message).toMatch(/contact an administrator/i);
       // Never implies the user's own access is at fault.
       expect(payload.message).not.toMatch(/your (access|permission)/i);
+      // The Explorer has no retry button — an error is a plain chat bubble — so
+      // the copy must not tell the user to press one.
+      expect(payload.message).not.toMatch(/press retry|retry button/i);
       // Correlates with the server log line.
       expect(payload.requestId).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,

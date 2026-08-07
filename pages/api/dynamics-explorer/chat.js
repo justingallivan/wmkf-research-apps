@@ -311,7 +311,9 @@ export default async function handler(req, res) {
 // subject, plain words, and a retry → administrator action ladder. It never
 // implies the user's own access is in doubt.
 
-const RETRY_LADDER = 'Please press retry, and if the problem doesn\'t resolve, contact an administrator.';
+// "press retry" would name a button the Explorer does not have — an error
+// message is a plain chat bubble, and the only recovery is asking again.
+const RETRY_LADDER = 'Please try asking again, and if the problem doesn\'t resolve, contact an administrator.';
 
 /**
  * Map a top-level chat failure to user-facing copy.
