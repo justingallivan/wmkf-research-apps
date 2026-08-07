@@ -98,7 +98,13 @@ modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
    Zhou fixture = `review` regardless of biographical truth (question open,
    gates nothing); EKA-class provenance-less affiliations =
    quarantine-for-review (owner decision). Search-link + normalizer
-   characterization builds delegated to agents 2026-08-07.
+   characterization BOTH MERGED 2026-08-07 (push `5098aa7a`, suite 7,075
+   green): "Search Google ↗" in CandidateEditModal + Find-tab card
+   (`lib/utils/google-search-url.js`); step-1 groundwork in
+   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` + 158 characterization
+   tests (`tests/unit/normalizer-characterization/`) — memo's institution
+   count FALSIFIED (9 found, not 11; discrepancy flagged in the inventory
+   §6). Jest now excludes `.claude/worktrees/` (haste-map collisions).
 2. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
    concurrently-valid tokens). Founding requirement = final Codex review
    finding (mint→dispatch non-atomicity) + its test list; owner accepted

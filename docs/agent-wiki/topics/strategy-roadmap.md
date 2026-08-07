@@ -71,9 +71,17 @@ document inventory, and individual implementation plans do not establish priorit
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
-  presented as fact; COI-widening only). Owner also approved ("use agents to
-  build", 2026-08-07): the Q2 Google-search-link affordance and step-1 normalizer
-  characterization groundwork. Remaining order: comparator runs → normalizer
+  presented as fact; COI-widening only). Owner-approved agent builds BOTH MERGED
+  2026-08-07 (push `5098aa7a`, full suite 7,075 green): the Q2 Google-search-link
+  affordance (`lib/utils/google-search-url.js`; "Search Google ↗" in
+  CandidateEditModal + Find-tab CandidateCard) and step-1 normalizer groundwork —
+  `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` (authoritative counts: person 14
+  defs confirmed; institution 9 defs, NOT the memo's 11 — discrepancy flagged in
+  its §6) + 158 characterization tests in `tests/unit/normalizer-characterization/`
+  pinning per-seam behavior, incl. the live UC-containment false-positive
+  divergence across institutionsMatch implementations. Jest excludes
+  `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
+  comparator runs → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions
