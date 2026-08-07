@@ -366,6 +366,22 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   `tests/unit/send-emails-service.test.js`,
   `tests/integration/send-emails-route.test.js`,
   `tests/unit/reviewer-email-token-authority.test.js`.
+- **Confirm-reviewer modal coherence (S404, owner report 2026-08-06):**
+  `CandidateEditModal`'s confirm flow stacked two checkboxes both opening
+  "I verified this is the correct person" (they attest DIFFERENT verdicts:
+  the blue box = contact/address attestation with evidence; the amber box =
+  identity confirmation whose unverified auto-found ORCID/metrics are
+  deliberately dropped), plus twin URL fields (Evidence link = verification
+  provenance, frozen with the attestation; Website = contact-card field).
+  Fixed: plain headers ("Email address" / "Right person?"), the ORCID drop
+  explained in plain words, and cross-fill affordances between the two URL
+  fields (each renders only when it would do something). The two verdicts and
+  the two stored URLs remain SEPARATE by design — identity ≠ contact
+  attribution (fuzzy-matching consensus §1) and an audit record must not
+  drift when the contact card is later edited. Gating unchanged
+  (save disabled until identity ticked; evidence requirements intact).
+  Tests: `tests/unit/candidate-edit-modal-coherence.test.js` (3,
+  stash-verified).
 - Origin of the direction: the former Fable holistic-review P3.1; the
   reconciled implementation plan now records the shipped surface as F1.1 and
   treats conversion measurement as remaining work
