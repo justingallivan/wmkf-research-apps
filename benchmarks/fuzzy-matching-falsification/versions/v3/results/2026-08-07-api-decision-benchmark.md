@@ -14,17 +14,17 @@ sample.
 ## Evidence
 
 - Artifact:
-  `ror-claim-resolver-2026-08-07-v13.results.jsonl`
+  `ror-claim-resolver-2026-08-07-v14.results.jsonl`
 - SHA-256:
-  `853bc2504dc58f342cd9f04f526464f3f5c2cbf39f81ecfe014b6cbee1cc7159`
+  `9e2f031e6a5f8f72e84c74138f8e213ffb24881f6573f3ab6d7e2992b50128ed`
 - Machine-readable summary:
-  `ror-claim-resolver-2026-08-07-v13.summary.json`
+  `ror-claim-resolver-2026-08-07-v14.summary.json`
 - Frozen substrate: all v2 case, label, canonical-entity, runner, candidate-
   contract, and relationship hashes in `../manifest.json`
-- Focused tests: 34/34 green
+- Focused tests: 35/35 green
 - Machine provenance: ROR API v2, explicit `single_search`, adapter
   `ror-api-claim-candidates/v1`, observed 2026-08-07, source commit
-  `1b9b055f2bf8fa4972be40b233267b57d49df20f`
+  `cd6e436b5cff55f2a498ba15b95594a2ace8c3cb`
 - Live ROR API requests: 151
 - Logical affiliation candidate sets: 160
 - Benchmark-process adapter cache hits: 44

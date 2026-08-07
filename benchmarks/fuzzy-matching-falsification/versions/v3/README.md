@@ -35,7 +35,7 @@ the skip reason only.
   ROR id when needed.
 - Requests have per-fetch and whole-resolution deadlines, abort-aware queue/
   pacing/backoff waits, a capped `Retry-After`, adapter-instance caching,
-  same-signal single-flight, and transient-only 429/5xx retries.
+  same-public-resolution single-flight, and transient-only 429/5xx retries.
 - Provider failure and ambiguity fail closed to review. ROR rank, score, and
   `chosen:true` remain retrieval provenance, never decision authority.
 
@@ -51,10 +51,10 @@ organization names. The adapter accepts an optional server-side
 ## Frozen result
 
 The accepted live run is
-`results/ror-claim-resolver-2026-08-07-v13.results.jsonl` (SHA-256
-`853bc2504dc58f342cd9f04f526464f3f5c2cbf39f81ecfe014b6cbee1cc7159`).
+`results/ror-claim-resolver-2026-08-07-v14.results.jsonl` (SHA-256
+`9e2f031e6a5f8f72e84c74138f8e213ffb24881f6573f3ab6d7e2992b50128ed`).
 The machine-readable counts and hash are persisted beside it in
-`results/ror-claim-resolver-2026-08-07-v13.summary.json`; accepted summaries
+`results/ror-claim-resolver-2026-08-07-v14.summary.json`; accepted summaries
 also pin API and adapter versions, retrieval strategies, observation date, and
 the source commit used for the run.
 

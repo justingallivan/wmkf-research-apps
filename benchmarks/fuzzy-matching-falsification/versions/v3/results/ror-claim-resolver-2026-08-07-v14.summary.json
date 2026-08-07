@@ -32,8 +32,8 @@
       "successor-hydration",
       "parent-hydration"
     ],
-    "source_commit": "1b9b055f2bf8fa4972be40b233267b57d49df20f"
+    "source_commit": "cd6e436b5cff55f2a498ba15b95594a2ace8c3cb"
   },
-  "result_file": "ror-claim-resolver-2026-08-07-v13.results.jsonl",
-  "result_sha256": "853bc2504dc58f342cd9f04f526464f3f5c2cbf39f81ecfe014b6cbee1cc7159"
+  "result_file": "ror-claim-resolver-2026-08-07-v14.results.jsonl",
+  "result_sha256": "9e2f031e6a5f8f72e84c74138f8e213ffb24881f6573f3ab6d7e2992b50128ed"
 }

@@ -98,9 +98,9 @@ describe('falsification suite v3 frozen boundary', () => {
   test('pins the accepted result hash and strips skipped-case payloads', () => {
     const resultPath = path.resolve(
       __dirname,
-      '../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v13.results.jsonl',
+      '../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v14.results.jsonl',
     );
-    const summary = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v13.summary.json');
+    const summary = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v14.summary.json');
     const bytes = fs.readFileSync(resultPath);
     expect(crypto.createHash('sha256').update(bytes).digest('hex')).toBe(summary.result_sha256);
     const skipped = bytes.toString('utf8').trim().split('\n').map(JSON.parse)
@@ -116,7 +116,7 @@ describe('falsification suite v3 frozen boundary', () => {
       strategies: [
         'affiliation-single-search', 'ordinary-query', 'successor-hydration', 'parent-hydration',
       ],
-      source_commit: '1b9b055f2bf8fa4972be40b233267b57d49df20f',
+      source_commit: 'cd6e436b5cff55f2a498ba15b95594a2ace8c3cb',
     });
   });
 });
