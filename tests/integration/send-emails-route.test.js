@@ -86,6 +86,26 @@ jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
+// S404 Plan v4 send-time token authority gate. This route-integration file
+// exercises many pre-existing send-path contracts unrelated to the gate, so
+// rather than hand-crafting a real JWT per test, the mock decodes the
+// suggestionId/requestId straight out of the fake token text (see `TOKEN_FOR`
+// below) — every existing draft already embeds its own real suggestionId and
+// this file's REQUEST is always `req-1`, so the gate passes generically
+// without per-test wiring. Tests of the gate's OWN failure modes (a separate
+// describe block below) override this per-call.
+const verifySuggestionToken = jest.fn(async (jwt) => {
+  const [suggestionId, requestId] = String(jwt).split('.');
+  return { ok: true, payload: { suggestionId, requestId } };
+});
+jest.mock('../../lib/external/verify-suggestion-token', () => ({
+  verifySuggestionToken: (...a) => verifySuggestionToken(...a),
+}));
+const mintAndStore = jest.fn(async () => ({ jwt: 'token.value.sig' }));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: (...a) => mintAndStore(...a),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
+}));
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 
@@ -171,6 +191,7 @@ beforeEach(() => {
   if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
   process.env.NEXTAUTH_SECRET = 'send-emails-route-test-signing-secret';
+  mintAndStore.mockResolvedValue({ jwt: 'token.value.sig' });
 });
 afterAll(() => {
   if (ORIGINAL_NEXTAUTH_SECRET === undefined) delete process.env.NEXTAUTH_SECRET;
@@ -199,13 +220,20 @@ async function run(body) {
   await handler(req, res);
   return res;
 }
+// Fake three-segment token whose first two segments the mocked
+// verifySuggestionToken above decodes back into suggestionId/requestId — real
+// JWT structure/signing is irrelevant here since verification is mocked.
+const TOKEN_FOR = (id, requestId = 'req-1') => `${id}.${requestId}.sig`;
 // Body carries a secure-review link by default so invitation-templateType
 // drafts clear the body-integrity gate (missing_secure_link / unresolved_placeholder)
 // and exercise the real send path — tests of the gate itself override body.
+// externalLinkExpected:true matches the render-emails-service stamp for a
+// template that referenced {{externalLink}}.
 const draft = (id = SUG_1) => ({
   suggestionId: id,
   subject: 'S',
-  body: 'B\nhttps://reviews.example.org/external/review/tok-1',
+  body: `B\nhttps://reviews.example.org/external/review/${TOKEN_FOR(id)}`,
+  externalLinkExpected: true,
 });
 
 describe('send-emails — reviewer portal HTML links', () => {
@@ -227,11 +255,13 @@ describe('send-emails — reviewer portal HTML links', () => {
   });
 
   test('invitation secure URL renders one paired action set with a generic fallback link', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_1, requestId: 'req-1' } });
     await run({
       drafts: [{
         suggestionId: SUG_1,
         subject: 'S',
-        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value\n\nThank you',
+        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value.sig\n\nThank you',
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });
@@ -239,14 +269,14 @@ describe('send-emails — reviewer portal HTML links', () => {
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect((htmlBodySent().match(/Yes, I Can Review/g) || [])).toHaveLength(1);
     expect((htmlBodySent().match(/No, Not This Time/g) || [])).toHaveLength(1);
-    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=accept');
-    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value?action=decline');
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value.sig?action=accept');
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value.sig?action=decline');
     expect(htmlBodySent()).not.toContain('Start Review');
     expect(htmlBodySent()).toContain(
       'This secure link is unique to you and was sent by W. M. Keck Foundation Program Director Dr. Program Director'
     );
     expect(htmlBodySent()).toContain('mailto:pd@wmkeck.org');
-    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value');
+    expect(htmlBodySent()).toContain('https://reviews.wmkeck.org/external/review/token.value.sig');
     expect(htmlBodySent()).toContain('<table role="presentation"');
     expect(htmlBodySent()).toContain('<td width="48%" align="center" valign="middle"');
     expect(htmlBodySent()).toContain('line-height:20px');
@@ -255,6 +285,7 @@ describe('send-emails — reviewer portal HTML links', () => {
   });
 
   test('excess blank lines before the reviewer portal call-to-action are collapsed', async () => {
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_1, requestId: 'req-1' } });
     await run({
       drafts: [{
         suggestionId: SUG_1,
@@ -269,8 +300,9 @@ describe('send-emails — reviewer portal HTML links', () => {
           '',
           '',
           'Please use your secure personal link to accept or decline this invitation:',
-          'https://reviews.wmkeck.org/external/review/token.value',
+          'https://reviews.wmkeck.org/external/review/token.value.sig',
         ].join('\n'),
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });
@@ -282,11 +314,14 @@ describe('send-emails — reviewer portal HTML links', () => {
   });
 
   test('ordinary URLs still render as plain links', async () => {
+    // TOKEN_FOR(SUG_1) already decodes correctly through the default mock —
+    // no per-call override needed here.
     await run({
       drafts: [{
         suggestionId: SUG_1,
         subject: 'S',
-        body: 'Read more: https://example.org/info\nSecure link: https://reviews.example.org/external/review/tok-1',
+        body: `Read more: https://example.org/info\nSecure link: https://reviews.example.org/external/review/${TOKEN_FOR(SUG_1)}`,
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });
@@ -298,17 +333,19 @@ describe('send-emails — reviewer portal HTML links', () => {
   test('a thankyou body with an external-review URL renders a plain link, not a button', async () => {
     // thankyou has no configured label → resolver returns '' → button suppressed.
     // The URL must still render (as a plain link), never be dropped or shown as a CTA.
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_1, requestId: 'req-1' } });
     await run({
       drafts: [{
         suggestionId: SUG_1,
         subject: 'Thank you',
-        body: 'Thanks! Your secure link if needed:\nhttps://reviews.wmkeck.org/external/review/token.value',
+        body: 'Thanks! Your secure link if needed:\nhttps://reviews.wmkeck.org/external/review/token.value.sig',
+        externalLinkExpected: true,
       }],
       templateType: 'thankyou',
     });
 
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    expect(htmlBodySent()).toContain('<a href="https://reviews.wmkeck.org/external/review/token.value">https://reviews.wmkeck.org/external/review/token.value</a>');
+    expect(htmlBodySent()).toContain('<a href="https://reviews.wmkeck.org/external/review/token.value.sig">https://reviews.wmkeck.org/external/review/token.value.sig</a>');
     expect(htmlBodySent()).not.toContain('<table role="presentation"');
     expect(htmlBodySent()).not.toContain('Start Review');
     expect(htmlBodySent()).not.toContain('Respond to Invitation');
@@ -316,6 +353,7 @@ describe('send-emails — reviewer portal HTML links', () => {
 
   test('materials body renders before the portal action and ends with the security fallback', async () => {
     SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_accepted: true }) };
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_1, requestId: 'req-1' } });
     await run({
       drafts: [{
         suggestionId: SUG_1,
@@ -326,7 +364,7 @@ describe('send-emails — reviewer portal HTML links', () => {
           'Thank you for agreeing to review the proposal.',
           '',
           'Please use your secure reviewer link:',
-          'https://reviews.wmkeck.org/external/review/token.value',
+          'https://reviews.wmkeck.org/external/review/token.value.sig',
           '',
           'This link is unique to you.',
           '',
@@ -337,6 +375,7 @@ describe('send-emails — reviewer portal HTML links', () => {
           'W.M. Keck Foundation',
           'Los Angeles',
         ].join('\n'),
+        externalLinkExpected: true,
       }],
       templateType: 'materials',
     });
@@ -372,12 +411,14 @@ describe('send-emails — capture delivery mode', () => {
     process.env.REVIEWER_EMAIL_DELIVERY_MODE = 'capture';
     delete process.env.VERCEL_ENV;
     PERSON = basePerson({ _wmkf_contact_value: null });
+    verifySuggestionToken.mockResolvedValueOnce({ ok: true, payload: { suggestionId: SUG_1, requestId: 'req-1' } });
 
     const res = await run({
       drafts: [{
         suggestionId: SUG_1,
         subject: 'Invitation',
-        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value',
+        body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value.sig',
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });
@@ -406,7 +447,7 @@ describe('send-emails — capture delivery mode', () => {
       to: 'rev@example.org',
       htmlBody: expect.stringContaining('Yes, I Can Review'),
     });
-    expect(r.sent[0].capturedEmail.htmlBody).toContain('https://reviews.wmkeck.org/external/review/token.value');
+    expect(r.sent[0].capturedEmail.htmlBody).toContain('https://reviews.wmkeck.org/external/review/token.value.sig');
   });
 
   test('capture mode is refused in Vercel production before send or lifecycle writes', async () => {
@@ -795,5 +836,65 @@ describe('send-emails — mid-stream failure sequence (real send-time exception,
     expect(seq).toContain('email_failed');
     const r = resultOf(res);
     expect(r.stats).toMatchObject({ sent: 0, failed: 1, unconfirmed: 0 });
+  });
+});
+
+// S4 (Plan v4, S404): the route integration pin for the send-time token
+// authority gate's SSE wire shape and result -> complete terminal order. The
+// gate's decision-table branches themselves are pinned in
+// send-emails-service.test.js; this file confirms the same failure surfaces
+// correctly through the real SSE shell (pages/api/review-manager/send-emails.js).
+describe('send-emails — send-time token authority gate SSE wire shape (S404 Plan v4)', () => {
+  test('a stale/superseded reviewer link fails only that recipient via email_failed{code}, dispatches no email for it, and the batch still ends result -> complete', async () => {
+    const freshId = 'e7777777-7777-4777-8777-777777777777';
+    SUGGESTIONS = {
+      [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1 }),
+      [freshId]: baseSuggestion({ wmkf_appreviewersuggestionid: freshId }),
+    };
+    // SUG_1's token verifies as superseded (hash_mismatch); freshId's is untouched
+    // and uses the default decode-based mock (which matches genuinely).
+    verifySuggestionToken.mockImplementationOnce(async () => ({ ok: false, reason: 'hash_mismatch' }));
+
+    const res = await run({ drafts: [draft(SUG_1), draft(freshId)], templateType: 'invitation' });
+    const seq = events(res).map((e) => e.event);
+
+    expect(seq).not.toContain('error');
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    expect(seq).toContain('email_failed');
+    expect(seq.indexOf('email_failed')).toBeLessThan(seq.indexOf('result'));
+
+    const r = resultOf(res);
+    expect(r.stats).toMatchObject({ sent: 1, failed: 1, unconfirmed: 0, total: 2 });
+    expect(r.sent.map((s) => s.suggestionId)).toEqual([freshId]);
+    expect(r.failed).toEqual([{
+      suggestionId: SUG_1,
+      candidateName: 'Dr. Reviewer',
+      candidateEmail: 'rev@example.org',
+      code: 'external_link_superseded',
+      error: 'This email’s secure reviewer link was replaced by a newer preview. Regenerate the preview and send this recipient again.',
+    }]);
+    // Only one recipient's draft ever reached Dynamics.
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('a draft missing the externalLinkExpected marker (pre-S404 render) fails external_link_expectation_missing before dispatch', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
+    const res = await run({
+      drafts: [{
+        suggestionId: SUG_1,
+        subject: 'S',
+        body: `Body:\nhttps://reviews.example.org/external/review/${TOKEN_FOR(SUG_1)}`,
+        // no externalLinkExpected field — simulates a draft rendered before S404 shipped
+      }],
+      templateType: 'materials',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+    const seq = events(res).map((e) => e.event);
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    expect(resultOf(res).failed[0]).toMatchObject({
+      suggestionId: SUG_1,
+      code: 'external_link_expectation_missing',
+    });
   });
 });

@@ -9,8 +9,8 @@
  * Request body:
  *   - suggestionIds: string[]
  *   - templateType: 'invitation' | 'materials' | 'followup' | 'thankyou' (validated; the
- *     caller supplies subject/body. 'invitation' carries {{externalLink}} → a magic accept/
- *     decline link is minted, same placeholder-driven path as materials.)
+ *     caller supplies subject/body. 'invitation' carries {{externalLink}} → a non-live
+ *     preview URL; send-emails mints/substitutes the live accept/decline token.)
  *   - template: { subject, body }
  *   - settings: { signature, reviewerFormLink, customFields, ... }
  *
@@ -20,7 +20,7 @@
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
  * dispatch → auth guard → rate limit → input validation → withDalContext →
- * one service call → result/error→HTTP mapping. All rendering/minting logic
+ * one service call → result/error→HTTP mapping. All rendering logic
  * lives in lib/services/review-manager/render-emails-service.js.
  * NOTE (pinned): the 405 sends NO Allow header — characterized behavior.
  */

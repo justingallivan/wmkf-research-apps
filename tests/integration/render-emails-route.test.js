@@ -24,8 +24,12 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 
 const mintAndStore = jest.fn();
+const buildSendTimeExternalUrlPlaceholder = jest.fn(() => (
+  'https://reviews.example.org/external/review/send_time_token.pending_authority.not_live'
+));
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: (...args) => mintAndStore(...args),
+  buildSendTimeExternalUrlPlaceholder: (...args) => buildSendTimeExternalUrlPlaceholder(...args),
 }));
 
 jest.mock('../../lib/services/dynamics-service', () => ({

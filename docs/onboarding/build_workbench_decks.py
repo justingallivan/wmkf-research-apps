@@ -367,7 +367,7 @@ def build_tech():
 
     section_slide(prs, "9", SPINE[8])
     content_slide(prs, "STEP 9", "Sending the invitation", [
-        "render-emails mints the accept/decline magic link ({{externalLink}}); send-emails delivers via Dynamics.",
+        "render-emails previews a non-live {{externalLink}} position; send-emails mints/substitutes the live link and delivers via Dynamics.",
         "Duplicate-send guard: shouldSkipDuplicateInvitation (lib/utils/reviewer-invite.js).",
         "Attachment safety is SERVER-authoritative:",
         (1, "recipientMayReceiveAttachments gates on recipient wmkf_accepted, NOT caller templateType."),
@@ -385,7 +385,7 @@ def build_tech():
     section_slide(prs, "11", SPINE[10])
     content_slide(prs, "STEP 11", "Track Reviewers + token TTL + reminders", [
         "Release/materials send mints a long-lived token (~review-due + 90d); only accepted reviewers receive it.",
-        "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via render-emails).",
+        "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via send-emails).",
         "Reminders cron: /api/cron/reviewer-reminders (daily) → lib/services/reviewer-reminder-sweep.js.",
         (1, "respond-by: deadline = emailSentAt + respondOffsetDays - lead; fire-once wmkf_respondremindersentat."),
         (1, "review-due: deadline = reviewDueDate - lead; fire-once via existing wmkf_remindersentat. Claim-before-send (If-Match)."),

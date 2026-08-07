@@ -3,8 +3,9 @@
  * review (Workbench Candidates tab). Deliberately NOT the Review Manager
  * EmailModal (which is coupled to localStorage templates and materials
  * attachments). This one is invitation-only:
- *   render-emails (templateType:'invitation', mints the accept/decline magic
- *   link via {{externalLink}}) → editable preview → send-emails
+ *   render-emails (templateType:'invitation', previews the accept/decline link
+ *   position via {{externalLink}}) → editable preview → send-emails (mints and
+ *   substitutes the live recipient token immediately before dispatch)
  *   (templateType:'invitation' → sets invited+emailSentAt, no status bump;
  *   skips already-invited unless allowResend).
  *
@@ -30,6 +31,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
+import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
@@ -149,6 +151,14 @@ export function applySubjectTiming(subject, timing) {
     .trim();
 }
 
+// Bounded per-render network timeout for /api/review-manager/render-emails.
+// This modal unmounts on close (unlike ReviewerManagePanel's EmailModal), so a
+// hung render can't wedge a later session — but within one open session, Retry
+// must still recover, so a stuck fetch needs a ceiling. Since d040a7a3 preview
+// renders are read-only server-side (no token minting), aborting here can
+// never strand a durable write.
+export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
+
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
@@ -158,6 +168,13 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [template, setTemplate] = useState(EMPTY_TEMPLATES.invitation); // resolved invitation template (admin default + per-PD override), loaded on open
   const [templateLoaded, setTemplateLoaded] = useState(false); // gate the first render until the template load settles (see renderPreviews) — the initial `template` is the EMPTY skeleton
   const [error, setError] = useState(null);
+  // True only when the last preview render failed — gates the banner's Retry
+  // button so it never offers to re-render on a send-path error.
+  const [previewFailed, setPreviewFailed] = useState(false);
+  // True whenever a render is queued or in flight (single-flight serialization
+  // below) — disables Preview/Retry so a click can't start a second overlapping
+  // durable render call while one is already outstanding.
+  const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
@@ -165,11 +182,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [abstractDraft, setAbstractDraft] = useState('');
   const [abstractSaving, setAbstractSaving] = useState(false);
   const [abstractError, setAbstractError] = useState(null);
-  // Per-recipient clipboard feedback for the manual recovery path offered only
-  // when the server classifies an address as research-only. The render service
-  // already minted the link using the normal invitation expiry policy; copying
-  // it does not send email or stamp the suggestion invited. A separate,
-  // confirmed action records the invitation only after staff sends it.
+  // Per-recipient clipboard feedback retained for backwards-compatible drafts.
+  // New previews do not mint live links; research-only rows point staff to
+  // address verification or the explicit token-regeneration workflow instead.
   const [manualLinkCopyState, setManualLinkCopyState] = useState({});
   // Per-recipient state for the S387 staff address attestation offered on the same
   // research-only rows: suggestionId -> { verifying, error }.
@@ -181,7 +196,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      // This modal unmounts on close, so a still-outstanding render's fetch
+      // would otherwise dangle past PREVIEW_RENDER_TIMEOUT_MS for no reason —
+      // abort it immediately.
+      if (activeRenderAbortRef.current) {
+        activeRenderAbortRef.current.abort();
+        activeRenderAbortRef.current = null;
+      }
+    };
   }, []);
 
   // Stable across renders (candidates is a fresh array each parent render, so a
@@ -255,34 +279,90 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // the latest invocation may apply its result — a slower older response must not
   // overwrite a newer one's drafts.
   const renderGenRef = useRef(0);
-  const renderPreviews = useCallback(async () => {
+  // Single-flight serialization (v3): renderGenRef alone stops a stale response
+  // from being APPLIED, but a superseding call could still start a second,
+  // overlapping render call while an older one is still in flight.
+  // renderTailRef chains every call so only one fetch is ever
+  // outstanding — a superseding call's run is appended after the current tail and
+  // skips its own fetch entirely if a still-newer generation has queued behind it
+  // by the time its turn comes up.
+  const renderTailRef = useRef(Promise.resolve());
+  // The AbortController for whatever render-emails fetch is currently
+  // outstanding, if any — the unmount cleanup below aborts it so a hung
+  // request can't outlive the component, and PREVIEW_RENDER_TIMEOUT_MS aborts
+  // it if it's still running in-session so Retry can recover.
+  const activeRenderAbortRef = useRef(null);
+  const renderPreviews = useCallback(() => {
     // Wait for the template load to settle before the first render — rendering with
     // the initial EMPTY skeleton trips the render-emails 400 guard and flashes it
     // until the real template lands. Once loaded, the effect re-fires (templateLoaded
     // is in the deps below) with the resolved template.
-    if (!templateLoaded) return;
+    if (!templateLoaded) return renderTailRef.current;
     const gen = ++renderGenRef.current;
-    setError(null); setRawDrafts([]); setManualLinkCopyState({});
-    setProgress({ current: 0, total: suggestionIds.length, message: 'Rendering previews…' });
-    try {
-      const res = await fetch('/api/review-manager/render-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionIds,
-          templateType: 'invitation',
-          template,
-          settings: { signature: settings.signature || '' },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (gen !== renderGenRef.current) return; // superseded by a newer render
-      if (!res.ok) throw new Error(data.error || 'Failed to render previews');
-      setRawDrafts(data.drafts || []);
-    } catch (e) {
-      if (gen !== renderGenRef.current) return;
-      setError(e.message);
-    }
+    // Snapshot the inputs at call time — by the time this run's turn comes up in
+    // the tail, `suggestionIds`/`template`/settings may have moved on for a newer
+    // call, but this run must use what was current when IT was queued.
+    const snapshotIds = suggestionIds;
+    const snapshotTemplate = template;
+    const snapshotSignature = settings.signature || '';
+    setRendering(true);
+    const run = renderTailRef.current.then(async () => {
+      if (gen !== renderGenRef.current) return; // superseded before its turn — skip the fetch
+      setError(null); setPreviewFailed(false); setRawDrafts([]); setManualLinkCopyState({});
+      setProgress({ current: 0, total: snapshotIds.length, message: 'Rendering previews…' });
+
+      // Bound this fetch so a hung request can't leave Retry permanently
+      // disabled within this open session. Also aborted on unmount below.
+      // Preview renders are read-only server-side since d040a7a3, so aborting
+      // here never strands a durable write.
+      const controller = new AbortController();
+      activeRenderAbortRef.current = controller;
+      const timeoutId = setTimeout(() => controller.abort(), PREVIEW_RENDER_TIMEOUT_MS);
+
+      try {
+        const res = await fetch('/api/review-manager/render-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suggestionIds: snapshotIds,
+            templateType: 'invitation',
+            template: snapshotTemplate,
+            settings: { signature: snapshotSignature },
+          }),
+          signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (gen !== renderGenRef.current) return; // superseded by a newer render
+        if (!res.ok) {
+          // Carry the composed message through the shared catch; the flag
+          // distinguishes a server reply from a network/transport failure.
+          const failure = new Error(renderPreviewFailureMessage({ status: res.status, serverMessage: data.error }));
+          failure.isPreviewFailure = true;
+          throw failure;
+        }
+        setRawDrafts(data.drafts || []);
+      } catch (e) {
+        if (gen !== renderGenRef.current || !mountedRef.current) return;
+        // A timeout or unmount abort surfaces as AbortError, which — like any
+        // other non-server failure — falls through to the network message.
+        setError(e.isPreviewFailure ? e.message : RENDER_PREVIEW_NETWORK_MESSAGE);
+        setPreviewFailed(true);
+      } finally {
+        clearTimeout(timeoutId);
+        if (activeRenderAbortRef.current === controller) activeRenderAbortRef.current = null;
+      }
+    });
+    renderTailRef.current = run;
+    run.finally(() => {
+      // Only clear `rendering` when this run is still the tail (no newer call has
+      // queued behind it), the component is still mounted, and no newer
+      // generation exists — otherwise a superseded run's settle would flip
+      // `rendering` off while the real latest run is still pending its turn.
+      if (run === renderTailRef.current && mountedRef.current && gen === renderGenRef.current) {
+        setRendering(false);
+      }
+    });
+    return run;
   }, [suggestionIds, settings.signature, template, templateLoaded]);
 
   // Render previews on open and again if the loaded template differs from the
@@ -549,7 +629,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          drafts: sendable.map((d) => ({ suggestionId: d.suggestionId, subject: d.subject, body: d.body })),
+          drafts: sendable.map((d) => ({
+            suggestionId: d.suggestionId,
+            subject: d.subject,
+            body: d.body,
+            externalLinkExpected: d.externalLinkExpected,
+          })),
           templateType: 'invitation',
           attachmentUrls: [],
           markAsSent: true,
@@ -629,7 +714,21 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {error && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3">{error}</div>}
+          {error && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm mb-3 flex items-start justify-between gap-3">
+              <span>{error}</span>
+              {previewFailed && (
+                <button
+                  type="button"
+                  onClick={renderPreviews}
+                  disabled={rendering}
+                  className="shrink-0 px-2.5 py-1 rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  ↻ Retry
+                </button>
+              )}
+            </div>
+          )}
 
           {step === 'preview' && (
             <>
@@ -772,8 +871,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 The app will not send to an address found only through web search. If you check it
                                 against an independent source — the institution directory, their lab page, previous
                                 correspondence — record that below and it becomes sendable. To use a different
-                                address, use Edit contact after closing this window. Or copy the secure link below
-                                and paste it into a message you send yourself.
+                                address, use Edit contact after closing this window.
                               </p>
                               {/* S387: the in-app recovery. Edit contact cannot fix the common case
                                   (the verified address is the one already stored — CandidateEditModal
@@ -881,7 +979,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                                 </div>
                               ) : (
                                 <p className="mt-2 text-red-700">
-                                  A secure link could not be generated. Close this window and try again.
+                                  Secure links are now minted only at send time, so a live manual link is not available in this preview.
+                                  Verify the address above to enable in-app sending, or use the separate reviewer token regeneration workflow
+                                  when manual delivery is required.
                                 </p>
                               )}
                             </div>

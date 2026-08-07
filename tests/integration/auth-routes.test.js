@@ -28,6 +28,19 @@ jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => jest.fn(() => Promise.resolve(true)),
 }));
 
+// send-emails-service.js (S404 send-time token authority gate) imports these,
+// which transitively import `jose` (ESM-only, not Jest-transformable). This
+// auth-gating suite never exercises real drafts far enough to reach the gate
+// (its send-emails body has no `drafts` key, so the service 400s before the
+// gate runs) — stub the module so the import itself doesn't pull in jose.
+jest.mock('../../lib/external/verify-suggestion-token', () => ({
+  verifySuggestionToken: jest.fn(async () => ({ ok: false, reason: 'not_found' })),
+}));
+jest.mock('../../lib/external/token-lifecycle', () => ({
+  mintAndStore: jest.fn(),
+  SEND_TIME_TOKEN_PLACEHOLDER_JWT: 'send_time_token.pending_authority.not_live',
+}));
+
 // Vercel Blob
 jest.mock('@vercel/blob', () => ({
   put: jest.fn(() => Promise.resolve({ url: 'https://test.public.blob.vercel-storage.com/test.pdf' })),
@@ -124,6 +137,14 @@ jest.mock('exceljs', () => ({}));
 // App registry
 jest.mock('../../shared/config/appRegistry', () => ({
   ALL_APP_KEYS: ['reviewer-finder', 'review-manager', 'reviewers', 'dynamics-explorer', 'integrity-screener'],
+  // requireAppAccess names the guarded app in its 403/503 messages via
+  // APP_REGISTRY (legacy keys reviewer-finder/review-manager stay absent,
+  // mirroring the real registry).
+  APP_REGISTRY: [
+    { key: 'reviewers', name: 'Reviewers' },
+    { key: 'dynamics-explorer', name: 'Dynamics Explorer' },
+    { key: 'integrity-screener', name: 'Applicant Integrity Screener' },
+  ],
 }));
 
 // Integrity screener dependencies

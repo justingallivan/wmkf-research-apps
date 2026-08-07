@@ -4,9 +4,8 @@
  *
  * Adapters + helpers mocked; covers the per-recipient skip semantics inside
  * one result ({ drafts[], stats } with skipped:'no_email' + emailConfidence
- * on every row), BEST-EFFORT per-recipient token minting (mint only when the
- * template references {{externalLink}}; a mint failure yields an empty link,
- * never a throw), and the 404 no-reviewers domain error.
+ * on every row), non-live send-time link placeholders without durable token
+ * minting, and the 404 no-reviewers domain error.
  */
 
 const findById = jest.fn();
@@ -31,8 +30,12 @@ jest.mock('../../lib/services/honorarium-config', () => ({
   getHonorariumAmount: jest.fn(async () => 500),
 }));
 const mintAndStore = jest.fn();
+const buildSendTimeExternalUrlPlaceholder = jest.fn(() => (
+  'https://reviews.example.org/external/review/send_time_token.pending_authority.not_live'
+));
 jest.mock('../../lib/external/token-lifecycle', () => ({
   mintAndStore: (...a) => mintAndStore(...a),
+  buildSendTimeExternalUrlPlaceholder: (...a) => buildSendTimeExternalUrlPlaceholder(...a),
 }));
 
 const SUG1 = '22222222-2222-4222-8222-222222222222';
@@ -74,7 +77,6 @@ const TEMPLATE = { subject: 'Review request', body: 'Hello reviewer' };
 beforeEach(() => {
   jest.clearAllMocks();
   getRequestById.mockResolvedValue(request);
-  mintAndStore.mockResolvedValue({ url: 'https://x/review?token=abc' });
 });
 
 test('per-recipient skip: no-email recipient yields skipped:"no_email" row inside one result; stats split', async () => {
@@ -108,9 +110,9 @@ test('invitation render refuses a research-only search address', async () => {
   expect(out.drafts[0]).toMatchObject({
     skipped: 'email_research_only',
     emailConfidence: { action: 'research_only' },
-    manualLink: 'https://x/review?token=abc',
+    manualLink: null,
   });
-  expect(mintAndStore).toHaveBeenCalledTimes(1);
+  expect(mintAndStore).not.toHaveBeenCalled();
 });
 
 test('post-engagement render does not re-gate a research-only source', async () => {
@@ -128,7 +130,7 @@ test('post-engagement render does not re-gate a research-only source', async () 
 });
 
 test.each(['invitation', 'materials', 'followup', 'thankyou'])(
-  'pending person-scoped address conflict blocks %s rendering before token mint',
+  'pending person-scoped address conflict blocks %s preview before draft creation',
   async (templateType) => {
     findById.mockResolvedValueOnce(suggestion());
     getReviewerByIdWithSelect.mockResolvedValueOnce(person({
@@ -169,29 +171,30 @@ test.each(['invitation', 'materials', 'followup', 'thankyou'])(
   },
 );
 
-test('mint only when the template references {{externalLink}}; failure is BEST-EFFORT per recipient (empty link, no throw)', async () => {
-  // No placeholder → no mint at all.
+test('render never mints; a placeholder template receives the non-live send-time URL', async () => {
+  // No placeholder → no URL placeholder and no mint.
   findById.mockResolvedValueOnce(suggestion());
   getReviewerByIdWithSelect.mockResolvedValueOnce(person());
   await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
   expect(mintAndStore).not.toHaveBeenCalled();
+  expect(buildSendTimeExternalUrlPlaceholder).not.toHaveBeenCalled();
 
-  // Placeholder present → mint per recipient; one failure leaves that link "".
+  // Placeholder present → one pure preview URL shared across recipient drafts;
+  // durable minting remains send-owned.
   findById.mockResolvedValueOnce(suggestion()).mockResolvedValueOnce(suggestion());
   getReviewerByIdWithSelect.mockResolvedValueOnce(person()).mockResolvedValueOnce(person({ wmkf_name: 'Dr. Bob' }));
-  mintAndStore
-    .mockResolvedValueOnce({ url: 'https://x/review?token=ok' })
-    .mockRejectedValueOnce(new Error('hash write failed'));
   const out = await renderEmails({
     suggestionIds: [SUG1, SUG2],
     template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
     settings: {},
     actingUserSystemId: 'su-1',
   });
-  expect(mintAndStore).toHaveBeenCalledTimes(2);
-  expect(out.drafts[0].body).toContain('https://x/review?token=ok');
-  expect(out.drafts[1].body).not.toContain('undefined');
-  expect(out.stats.ready).toBe(2); // mint failure never skips or fails the render
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(buildSendTimeExternalUrlPlaceholder).toHaveBeenCalledTimes(1);
+  for (const rendered of out.drafts) {
+    expect(rendered.body).toContain('/external/review/send_time_token.pending_authority.not_live');
+  }
+  expect(out.stats.ready).toBe(2);
 });
 
 test('no suggestion rows resolve → RenderEmailsError 404 with the pinned message', async () => {
@@ -209,4 +212,111 @@ test('hydration failures are per-recipient best-effort (person lookup failure �
   getReviewerByIdWithSelect.mockRejectedValueOnce(new Error('person 404'));
   const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
   expect(out.drafts[0].skipped).toBe('no_email'); // null person → no email → skip
+});
+
+// S1 (Plan v4, S404): externalLinkExpected render-time metadata stamp — every
+// draft (including skipped rows, for a uniform DTO) carries whether the
+// SOURCE TEMPLATE requested {{externalLink}} in its subject or body. Preview
+// substitution is non-live; send-time owns the authoritative mint.
+describe('externalLinkExpected render-time stamp (S404 Plan v4)', () => {
+  test('placeholder in body yields externalLinkExpected:true on the ready draft', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
+      settings: {},
+      actingUserSystemId: null,
+    });
+    expect(out.drafts[0].externalLinkExpected).toBe(true);
+  });
+
+  test('placeholder in SUBJECT ONLY also yields externalLinkExpected:true (extraction domain must match)', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Your link: {{externalLink}}', body: 'Hello' },
+      settings: {},
+      actingUserSystemId: null,
+    });
+    expect(out.drafts[0].externalLinkExpected).toBe(true);
+  });
+
+  test('no placeholder anywhere yields externalLinkExpected:false; no mint attempted', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+    expect(out.drafts[0].externalLinkExpected).toBe(false);
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  test('placeholder preview stamps true and carries only the non-live send-time URL', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
+      settings: {},
+      actingUserSystemId: null,
+    });
+    expect(out.drafts[0].externalLinkExpected).toBe(true);
+    expect(out.drafts[0].body).toBe(
+      'Link: https://reviews.example.org/external/review/send_time_token.pending_authority.not_live'
+    );
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  test('every skip shape (no_email, address_conflict_pending, email_research_only) also carries the stamp', async () => {
+    // no_email
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailaddress: null }));
+    const noEmail = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
+      settings: {},
+      actingUserSystemId: null,
+    });
+    expect(noEmail.drafts[0]).toMatchObject({ skipped: 'no_email', externalLinkExpected: true });
+
+    // address_conflict_pending
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({
+      wmkf_addresstruststatejson: JSON.stringify({
+        version: 1,
+        email: 'jane@uni.edu',
+        status: 'conflict_pending',
+        attestation: null,
+        conflict: {
+          reason: 'email_mismatch',
+          storedEmail: 'jane@uni.edu',
+          foundEmail: 'jane.roe@uni.edu',
+          source: 'institution_page',
+          requestId: REQ,
+          candidateKey: `suggestion:${SUG1}`,
+          detectedAt: '2026-07-31T12:00:00.000Z',
+        },
+        resolution: null,
+      }),
+    }));
+    const blocked = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
+      settings: {},
+      actingUserSystemId: null,
+    });
+    expect(blocked.drafts[0]).toMatchObject({ skipped: 'address_conflict_pending', externalLinkExpected: true });
+
+    // email_research_only (invitation only)
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailsource: 'serp_search' }));
+    const researchOnly = await renderEmails({
+      suggestionIds: [SUG1],
+      template: { subject: 'Invite', body: 'Link: {{externalLink}}' },
+      settings: {},
+      templateType: 'invitation',
+      actingUserSystemId: null,
+    });
+    expect(researchOnly.drafts[0]).toMatchObject({ skipped: 'email_research_only', externalLinkExpected: true });
+  });
 });

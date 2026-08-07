@@ -31,7 +31,7 @@ Do not:
 ## The failures (S275, owner-flagged; eroded trust by repeated reversals)
 
 1. Claimed the reviewer portal shows the "agree-in-principle / hold" view this cycle. WRONG: the old hold/readiness path was later removed (`lib/external/proposal-readiness.js` and `shared/components/external/HoldView.js` no longer exist); the current producer is `lib/external/review-engagement-state.js::computeEngagementState()` (extracted from the context route S301; still called by `pages/api/external/review/[token]/context.js`), which falls through accepted reviewers to `stage2a`. I read a **consumer** and never re-read the current **producer**.
-2. Claimed the reviewer magic link "stays valid 90 days throughout the process." WRONG: `pages/api/review-manager/render-emails.js` re-mints the JWT on every email containing `{{externalLink}}` and overwrites the stored hash — "latest link wins"; prior links stop verifying. Never read the mint path before asserting permanence (it was even stated in the file's own comment).
+2. Claimed the reviewer magic link "stays valid 90 days throughout the process." WRONG: the current producer is `lib/services/review-manager/send-emails-service.js`, which re-mints the JWT for each dispatched draft carrying an external-review link and overwrites the stored hash — "latest link wins"; prior links stop verifying. Preview rendering became read-only in S404 v4. Never assert permanence without reading the current mint producer.
 
 Both were caught by the owner / Codex, not self-review — because self-review is blind to its own premise. Pattern identical to [[feedback-falsify-not-confirm]], but the surface is internal-behavior-in-conversation.
 

@@ -29,7 +29,7 @@
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-thoroughness-default.md; feedback-truncation-is-breakage-not-completion.md
 - Review posture: feedback-self-review-before-delegating-review.md; feedback-author-adversarial-pass-first.md; feedback-dont-self-certify-convergence.md
-- Tone / user context: feedback-no-performative-contrition.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md
+- Tone / user context: feedback-no-performative-contrition.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md; feedback-user-facing-error-copy-voice.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 
 ## Task Routing
