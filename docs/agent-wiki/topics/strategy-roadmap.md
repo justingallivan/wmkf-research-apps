@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-30
+last_verified: 2026-08-07
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -110,9 +110,12 @@ document inventory, and individual implementation plans do not establish priorit
   + Claude's six refinements + frozen-harness constraints):
   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`; the
   superseded assessment is banner-marked and must not be built from. Codex's
-  sequence: resolver hoist + single-flight + telemetry (measurement vehicle,
-  reversible) → compact-index size experiment → pinned dump for benchmarking
-  only → run and resource-profile S2AFF. Both
+  sequence: **resolver hoist + cancellation-safe single-flight + PII-free
+  aggregate telemetry is BUILT on
+  `codex/institution-resolver-measurement`, not yet merged/deployed**
+  (measurement vehicle, not a performance claim) → compact-index size
+  experiment → pinned dump for benchmarking only → run and resource-profile
+  S2AFF. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never

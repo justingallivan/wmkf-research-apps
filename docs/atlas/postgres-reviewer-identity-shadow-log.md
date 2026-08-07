@@ -15,6 +15,10 @@ cohort observation impossible after the fact. Rows support arm-disagreement,
 authoritative combined-outcome, and error reporting, grouped by `run_id` (one
 UUID per resolver batch).
 
+The request-batch resolver's aggregate cache/provider-call metrics are separate
+PII-free `console.info` telemetry. They are not stored in this table and do not
+change its schema, retention, or reader contract.
+
 ## Source of truth
 
 - Schema: `lib/db/migrations/026_reviewer_identity_shadow_log.sql` (fresh-install mirror: `scripts/setup-database.js` v36 block).

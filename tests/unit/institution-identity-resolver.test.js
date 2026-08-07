@@ -253,6 +253,82 @@ describe('createInstitutionIdentityResolver', () => {
     expect(second).toBe(first);
     expect(service.searchInstitutions).toHaveBeenCalledTimes(1);
     expect(service.getInstitution).toHaveBeenCalledTimes(1);
+    expect(resolver.metrics).toMatchObject({
+      resolveCalls: 2,
+      cacheHits: 1,
+      singleFlightHits: 0,
+      providerSearches: 1,
+      providerHydrations: 1,
+      resolved: 1,
+      cacheSize: 1,
+      inFlightSize: 0,
+    });
+    expect(Object.isFrozen(resolver.metrics)).toBe(true);
+  });
+
+  test('single-flights concurrent identical lookups in the same cancellation scope', async () => {
+    let releaseSearch;
+    const service = {
+      searchInstitutions: jest.fn(() => new Promise((resolve) => {
+        releaseSearch = () => resolve([INSTITUTIONS.broad]);
+      })),
+      getInstitution: jest.fn(async () => INSTITUTIONS.broad),
+    };
+    const resolver = createInstitutionIdentityResolver({ openAlexService: service });
+
+    const first = resolver.resolve('Broad Institute');
+    const second = resolver.resolve(' broad institute ');
+
+    expect(service.searchInstitutions).toHaveBeenCalledTimes(1);
+    expect(resolver.metrics).toMatchObject({
+      resolveCalls: 2,
+      singleFlightHits: 1,
+      inFlightSize: 1,
+    });
+    releaseSearch();
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(secondResult).toBe(firstResult);
+    expect(service.getInstitution).toHaveBeenCalledTimes(1);
+    expect(resolver.metrics).toMatchObject({
+      providerSearches: 1,
+      providerHydrations: 1,
+      resolved: 1,
+      cacheSize: 1,
+      inFlightSize: 0,
+    });
+  });
+
+  test('does not let one abort scope cancel an independent lookup', async () => {
+    const releaseSearches = [];
+    const service = {
+      searchInstitutions: jest.fn(() => new Promise((resolve) => {
+        releaseSearches.push(() => resolve([INSTITUTIONS.broad]));
+      })),
+      getInstitution: jest.fn(async () => INSTITUTIONS.broad),
+    };
+    const resolver = createInstitutionIdentityResolver({ openAlexService: service });
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+
+    const first = resolver.resolve('Broad Institute', { signal: firstController.signal });
+    const second = resolver.resolve('Broad Institute', { signal: secondController.signal });
+
+    expect(service.searchInstitutions).toHaveBeenCalledTimes(2);
+    expect(resolver.metrics).toMatchObject({
+      singleFlightHits: 0,
+      inFlightSize: 2,
+    });
+    const firstExpectation = expect(first).rejects.toThrow('first_lookup_cancelled');
+    const secondExpectation = expect(second).resolves.toMatchObject({
+      openAlexId: INSTITUTIONS.broad.openAlexId,
+    });
+    firstController.abort(new Error('first_lookup_cancelled'));
+    releaseSearches.forEach((release) => release());
+    await firstExpectation;
+    await secondExpectation;
+    expect(resolver.metrics.cacheSize).toBe(1);
+    expect(resolver.metrics.inFlightSize).toBe(0);
   });
 
   test('empty, garbage, and uncorroborated inputs abstain', async () => {

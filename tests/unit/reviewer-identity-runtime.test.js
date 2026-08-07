@@ -25,6 +25,7 @@ const {
   evaluateWithRuntimeSeam,
   evaluateWorksFirstSuggestion,
   normalizeResolverMode,
+  reportInstitutionResolverMetrics,
 } = _internals;
 
 describe('reviewer identity runtime seam', () => {
@@ -337,6 +338,215 @@ describe('reviewer identity runtime seam', () => {
     expect(first.runId).toEqual(expect.any(String));
     expect(first.runId).toBe(second.runId);
     expect(first.candidateKey).not.toBe(second.candidateKey);
+  });
+
+  test('batch default W2 resolver reuses institutions and emits data-minimized metrics', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    const candidates = [suggestion, { ...suggestion }];
+    jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
+      totalCount: 1,
+      records: [{
+        authorships: [{
+          openAlexAuthorId: 'https://openalex.org/A1',
+          displayName: 'William Harcombe',
+          orcid: '0000-0001-8445-2052',
+          raw: {
+            raw_author_name: 'Will Harcombe',
+            institutions: [{ id: 'https://openalex.org/I1' }],
+          },
+        }],
+      }],
+    });
+    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
+      openAlexId: 'https://openalex.org/I1',
+      displayName: 'University of Minnesota',
+      country: 'US',
+    }]);
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
+      openAlexId: 'https://openalex.org/I1',
+      displayName: 'University of Minnesota',
+      country: 'US',
+      associatedInstitutions: [],
+    });
+    jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
+      openAlexId: 'https://openalex.org/A1',
+      displayName: 'William Harcombe',
+      orcid: '0000-0001-8445-2052',
+      lastKnownInstitutionId: 'https://openalex.org/I1',
+      worksCount: 100,
+    });
+
+    const results = await evaluateSuggestionsWithRuntimeSeam(candidates, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      createAnchorsMatch: () => async () => true,
+      onShadowComparison: jest.fn(),
+    });
+
+    expect(results).toEqual([legacyResult, legacyResult]);
+    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
+    expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
+    const metricsCall = info.mock.calls.find(
+      ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
+    );
+    expect(metricsCall).toBeDefined();
+    expect(metricsCall[1]).toMatchObject({
+      runId: expect.any(String),
+      resolverMode: RESOLVER_MODE.SHADOW,
+      candidateCount: 2,
+      batchDurationMs: expect.any(Number),
+      resolveCalls: 2,
+      cacheHits: 1,
+      singleFlightHits: 0,
+      providerSearches: 1,
+      providerHydrations: 1,
+      resolved: 1,
+      definitiveMisses: 0,
+      providerFailures: 0,
+      cacheSize: 1,
+      inFlightSize: 0,
+    });
+    const serialized = JSON.stringify(metricsCall[1]);
+    expect(serialized).not.toContain('Harcombe');
+    expect(serialized).not.toContain('Minnesota');
+    expect(serialized).not.toContain('0000-0001-8445-2052');
+  });
+
+  test('combined batches share the W2 resolver, adapt rescues, and isolate per-row fallback', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    const candidates = [suggestion, { ...suggestion }];
+    const firstLegacy = { status: 'abstain', reason: 'first-legacy-safe-result' };
+    const secondLegacy = { status: 'abstain', reason: 'second-legacy-safe-result' };
+    jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
+      totalCount: 3,
+      records: ['one', 'two', 'three'].map((suffix) => ({
+        doi: `https://doi.org/10.1000/harcombe-${suffix}`,
+        authorships: [{
+          openAlexAuthorId: 'https://openalex.org/A1',
+          displayName: 'William Harcombe',
+          orcid: '0000-0001-8445-2052',
+          raw: {
+            raw_author_name: 'Will Harcombe',
+            institutions: [{ id: 'https://openalex.org/I1' }],
+          },
+        }],
+      })),
+    });
+    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
+      openAlexId: 'https://openalex.org/I1',
+      displayName: 'University of Minnesota',
+      country: 'US',
+      ror: 'https://ror.org/017zqws13',
+    }]);
+    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
+      openAlexId: 'https://openalex.org/I1',
+      displayName: 'University of Minnesota',
+      country: 'US',
+      ror: 'https://ror.org/017zqws13',
+      associatedInstitutions: [],
+    });
+    jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
+      openAlexId: 'https://openalex.org/A1',
+      displayName: 'William Harcombe',
+      orcid: '0000-0001-8445-2052',
+      lastKnownInstitutionId: 'https://openalex.org/I1',
+      worksCount: 100,
+    });
+    const getAuthorByOrcid = jest.fn()
+      .mockResolvedValueOnce({
+        openAlexId: 'https://openalex.org/A1',
+        displayName: 'Will Harcombe',
+        orcid: '0000-0001-8445-2052',
+        lastKnownInstitution: 'University of Minnesota',
+      })
+      .mockImplementationOnce(() => new Promise(() => {}));
+
+    const results = await evaluateSuggestionsWithRuntimeSeam(candidates, {}, {
+      mode: RESOLVER_MODE.COMBINED,
+      shadowTimeoutMs: 10,
+      evaluateLegacy: jest.fn()
+        .mockResolvedValueOnce(firstLegacy)
+        .mockResolvedValueOnce(secondLegacy),
+      createAnchorsMatch: () => async () => false,
+      getAuthorByOrcid,
+      onShadowComparison: jest.fn(),
+      onShadowError: jest.fn(),
+    });
+
+    expect(results[0]).toMatchObject({
+      status: 'probable',
+      orcid: '0000-0001-8445-2052',
+      selectedRecord: { openAlexId: 'https://openalex.org/A1' },
+    });
+    expect(results[1]).toBe(secondLegacy);
+    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
+    expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
+    const metricsCall = info.mock.calls.find(
+      ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
+    );
+    expect(metricsCall?.[1]).toMatchObject({
+      resolverMode: RESOLVER_MODE.COMBINED,
+      candidateCount: 2,
+      resolveCalls: 2,
+      cacheHits: 1,
+      providerSearches: 1,
+    });
+  });
+
+  test('institution resolver measurement logging and metric access are failure-isolated', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {
+      throw new Error('logging unavailable');
+    });
+    expect(() => reportInstitutionResolverMetrics({
+      institutionResolver: { metrics: { resolveCalls: 1 } },
+    })).not.toThrow();
+
+    const throwingResolver = {
+      get metrics() {
+        throw new Error('metrics unavailable');
+      },
+    };
+    const result = await evaluateSuggestionsWithRuntimeSeam([suggestion], {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+      onShadowComparison: jest.fn(),
+      institutionResolver: throwingResolver,
+    });
+    expect(result).toEqual([legacyResult]);
+  });
+
+  test('institution resolver metrics use an explicit PII-free field allowlist', () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    reportInstitutionResolverMetrics({
+      institutionResolver: {
+        metrics: {
+          resolveCalls: 1,
+          rawQuery: 'University of Minnesota',
+          candidateName: 'Will Harcombe',
+        },
+      },
+      runId: 'Will Harcombe | University of Minnesota',
+      resolverMode: RESOLVER_MODE.SHADOW,
+      candidateCount: 1,
+      batchDurationMs: 2,
+    });
+
+    const entry = info.mock.calls[0][1];
+    expect(entry).toMatchObject({
+      runId: null,
+      resolveCalls: 1,
+      candidateCount: 1,
+      batchDurationMs: 2,
+    });
+    expect(entry).not.toHaveProperty('rawQuery');
+    expect(entry).not.toHaveProperty('candidateName');
+    expect(JSON.stringify(entry)).not.toContain('Minnesota');
+    expect(JSON.stringify(entry)).not.toContain('Harcombe');
   });
 
   test('a throwing durable logger cannot change the legacy result', async () => {

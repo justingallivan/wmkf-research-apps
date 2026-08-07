@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-02
+last_verified: 2026-08-07
 owner: product-engineering
 related:
   - lib/services/
@@ -100,9 +100,9 @@ If you're touching a service or utility, read its header before this catalog. If
   to Reviewer Finder ingestion.
 - **`discovery-service.js`** — Multi-database literature search orchestration.
 - **`deduplication-service.js`** — Name matching, duplicate merge, COI filtering, ranking.
-- **`institution-identity-resolver.js`** — W0 OpenAlex institution resolver with per-run settled caching, unique-strongest name/country selection, structured associated-institution output, and `null` on ambiguity or provider failure. W1 callers use it to narrow pre-existing COI matches and corroborate affiliation consistency.
+- **`institution-identity-resolver.js`** — W0 OpenAlex institution resolver with per-instance settled caching, same-abort-scope single-flight, immutable aggregate counters, unique-strongest name/country selection, structured associated-institution output, and `null` on ambiguity or provider failure. W1 callers use it to narrow pre-existing COI matches and corroborate affiliation consistency; provider failures and aborts never become cache entries.
 - **`institution-affiliation-consistency.js`** — W1 direct-id or one-hop-associated institution consistency helper for identity corroboration and mismatch alerts. It is intentionally separate from COI and must never widen the hard-drop set.
-- **`reviewer-identity-runtime.js`** — Server-owned W2 runtime seam for non-biomedical/PubMed-off Track-A verification and server-computed enrichment reconciliation. Default and unknown modes return the legacy identity result exactly; `shadow` returns legacy after hard-bounded redacted comparisons; explicit owner-gated `combined` adapts W2 decisions with a `probable` ceiling. Default observers await the non-throwing durable logger so normal inserts settle before function completion.
+- **`reviewer-identity-runtime.js`** — Server-owned W2 runtime seam for non-biomedical/PubMed-off Track-A verification and server-computed enrichment reconciliation. Default and unknown modes return the legacy identity result exactly; `shadow` returns legacy after hard-bounded redacted comparisons; explicit owner-gated `combined` adapts W2 decisions with a `probable` ceiling. Batch W2 evaluation owns one request-bounded institution resolver and emits one PII-free aggregate cache/provider-call metric log; default comparison observers still await the non-throwing durable logger so normal inserts settle before function completion.
 - **`reviewer-identity-shadow-log.js`** — Best-effort Postgres persistence for resolver comparisons (`reviewer_identity_shadow_log`, migration 026). Whitelisted data-minimized scalars only (pseudonymous hashed candidate key, decisions, reason, anchors-agree, error code); awaited inserts are capped at 2 seconds, always resolve, and circuit-break after repeated failure. Non-authoritative: no application decision reader; the canonical operator report is `scripts/report-reviewer-identity-shadow-log.js`, and retention/cap cleanup runs in the daily maintenance cron.
 - **`reviewer-works-first.js`** / **`reviewer-works-first-authoritative.js`** — Shared works-first resolver, exact sparse-fragment/byline-ORCID equivalence, W4.1 evidence-bundle builder/parser, and authoritative-result adapter used by the frozen evaluator and runtime seam. Uses byline-filtered works plus W0 institution identities; same-ORCID fragments may collapse, every distinct-ORCID set goes to review, and automated rescues cap at `probable`.
 - **`contact-enrichment-service.js`** — Tiered contact lookup with identity anchoring, structured scholarly-email evidence, and Dataverse writeback.

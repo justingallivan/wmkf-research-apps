@@ -1,16 +1,19 @@
 # Handoff — institution resolution architecture → Codex lead (S406, 2026-08-07)
 
 **Owner:** Codex (design lead, from this point)
-**Branch:** `main`
+**Branch:** `codex/institution-resolver-measurement`
 **Status:** Architecture direction set by Codex's adversarial review; Claude's
-assessment superseded. No runtime code changed. Nothing built yet.
-**Changed surfaces:** documentation only —
-`outputs/institution-resolution-runtime-architecture-2026-08-07.md` (assessment,
-now banner-marked superseded), this note, `SESSION_PROMPT.md`.
-**Commits:** `5e34ce08` (assessment), plus this handoff.
-**Verification:** doc gates green. No tests affected — no runtime change.
-**Dirty worktree:** none.
-**Next owner/action:** Codex owns the model. Claude is off this surface.
+assessment superseded. The first reversible measurement increment is built on
+the feature branch but is not yet merged or deployed; the claim-oriented
+resolver/scorer remains planned.
+**Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
+single-flight, aggregate runtime metrics, tests, and current-state docs.
+**Verification:** 47 affected resolver/runtime tests and 159 broader
+reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
+green; type check and all
+relevant source/Atlas/wiki/doc gates plus paired self-tests green.
+**Next owner/action:** verify and promote the measurement increment, then run
+the compact-ROR-index size experiment. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -56,7 +59,7 @@ the review.
 2. **Domain evidence has no transport today — this is a concrete API change.**
    `createInstitutionIdentityResolver().resolve(affiliation, { countryCode,
    signal })` has **no parameter for domain evidence**
-   (`lib/services/institution-identity-resolver.js:145`). The cases carry it as
+   (`lib/services/institution-identity-resolver.js:217`). The cases carry it as
    `input.domain_evidence`, and the harness's `institutionResolve` adapter is
    handed the whole `input` object — so the suite can exercise a new signature
    the moment the resolver accepts one. Changing this boundary is a prerequisite
@@ -85,15 +88,18 @@ the review.
      cannot express hierarchy, so parent/child consistency is unmeasured.
 
 6. **Treat the first increment as a measurement vehicle, not a perf fix.**
-   Claude flagged and deliberately deferred the resolver-hoist defect
-   (`lib/services/reviewer-identity-runtime.js:78` constructs the resolver
-   *inside* the per-suggestion function — loops at `:324`/`:337` — so that path
-   gets a fresh empty cache per candidate and zero cross-candidate reuse;
-   `save-candidates-service.js:681` and `discover.js:292` correctly construct
-   once per request). Codex is right to promote it to first **because** it pairs
-   it with telemetry and stays reversible. Keep that pairing: the value is the
-   instrumented before/after, and `feedback-latency-plan-scope-accretion-postmortem`
-   (S395) applies directly to this surface.
+   **BUILT on `codex/institution-resolver-measurement`, not yet merged/deployed:**
+   `evaluateSuggestionsWithRuntimeSeam` now creates one resolver for the W2
+   batch (`lib/services/reviewer-identity-runtime.js:364,384`), while the
+   single-suggestion entry point retains a per-call default. The resolver
+   single-flights only identical normalized institution/country keys sharing
+   the same `AbortSignal`, caches only settled resolutions/definitive misses,
+   and exposes aggregate counters (`institution-identity-resolver.js:217,261`).
+   One data-minimized batch log reports calls, provider searches/hydrations,
+   cache/single-flight hits, outcomes, cache size, and elapsed batch time; it
+   changes no comparison row or reviewer response. This measures reuse; it does
+   not establish a performance improvement. The
+   `feedback-latency-plan-scope-accretion-postmortem` (S395) still applies.
 
 ## Harness constraints Codex should not trip over
 
