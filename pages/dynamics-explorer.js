@@ -309,7 +309,10 @@ function DynamicsExplorer() {
                 setMessages(prev => [...prev, {
                   id: ++messageIdRef.current,
                   role: 'assistant',
-                  content: `**Error:** ${parsed.message}`,
+                  // The reference id matches the server log line for this
+                  // request — it's what an administrator needs to find the
+                  // underlying error, which never reaches the browser.
+                  content: `**Error:** ${parsed.message}${parsed.requestId ? `\n\nReference: \`${parsed.requestId}\`` : ''}`,
                   timestamp: Date.now(),
                   isError: true,
                 }]);

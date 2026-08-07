@@ -719,4 +719,75 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).not.toContain('wmkf_ai_run');
     expect(toolResult).not.toContain('SHOULD_NOT_REACH_CLAUDE');
   });
+
+  // Top-level failure copy. A top-level throw used to emit the bare string
+  // "Query failed", which named neither what broke nor what to do, and gave the
+  // user nothing to quote when escalating. Owner-reported 2026-08-07.
+  describe('top-level failure reporting', () => {
+    /** Reassemble the SSE `error` event payload from res.write calls. */
+    const errorEvent = (res) => {
+      const stream = res.write.mock.calls.map(c => c[0]).join('');
+      const blocks = stream.split('\n\n').filter(Boolean);
+      const errBlock = blocks.find(b => b.startsWith('event: error'));
+      if (!errBlock) return null;
+      const dataLine = errBlock.split('\n').find(l => l.startsWith('data: '));
+      return JSON.parse(dataLine.slice(6));
+    };
+
+    const runWithStreamError = async (err) => {
+      mockStream.mockReset().mockRejectedValue(err);
+      const req = createMockReq({
+        method: 'POST',
+        body: { messages: [{ role: 'user', content: 'find all interactions with Texas Tech' }] },
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      return errorEvent(res);
+    };
+
+    test('does not emit the bare "Query failed" string, and carries a reference id', async () => {
+      const payload = await runWithStreamError(new Error('boom'));
+
+      expect(payload).not.toBeNull();
+      expect(payload.message).not.toBe('Query failed');
+      // Plain-language, system-as-subject, with the retry → administrator ladder.
+      expect(payload.message).toMatch(/temporary blip/i);
+      expect(payload.message).toMatch(/contact an administrator/i);
+      // Never implies the user's own access is at fault.
+      expect(payload.message).not.toMatch(/your (access|permission)/i);
+      // Correlates with the server log line.
+      expect(payload.requestId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    test('keeps the raw provider error server-side', async () => {
+      const payload = await runWithStreamError(
+        Object.assign(new Error('Claude API error 500: internal-detail-leak'), { status: 500 }),
+      );
+
+      expect(JSON.stringify(payload)).not.toContain('internal-detail-leak');
+    });
+
+    test('distinguishes an overloaded provider from a timeout', async () => {
+      const overloaded = await runWithStreamError(
+        Object.assign(new Error('Claude API error 529 after 3 attempts: overloaded'), { status: 529 }),
+      );
+      expect(overloaded.message).toMatch(/overloaded/i);
+
+      const timedOut = await runWithStreamError(new Error('Claude API timeout after 60000ms'));
+      expect(timedOut.message).toMatch(/took too long/i);
+      // A timeout is the one case with a useful self-service next step.
+      expect(timedOut.message).toMatch(/date range|single organization/i);
+      expect(timedOut.message).not.toMatch(/overloaded/i);
+    });
+
+    test('reports a rate-limited provider as capacity, not as user fault', async () => {
+      const payload = await runWithStreamError(
+        Object.assign(new Error('Claude API error 429 after 3 attempts: rate limit'), { status: 429 }),
+      );
+      expect(payload.message).toMatch(/too many requests/i);
+      expect(payload.message).not.toMatch(/your /i);
+    });
+  });
 });

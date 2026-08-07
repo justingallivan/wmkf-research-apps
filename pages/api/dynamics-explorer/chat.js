@@ -37,7 +37,6 @@ import {
 } from '../../../lib/utils/ai-payload-boundary';
 import { getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { estimateCostCents } from '../../../lib/utils/usage-logger';
 import { LLMClient } from '../../../lib/services/llm-client';
 import {
@@ -100,6 +99,10 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Minted before the try so the failure handler can quote the same id the
+  // server-side log carries — the user's "reference" for an escalation.
+  const requestId = crypto.randomUUID();
+
   try {
     const { messages, sessionId } = req.body;
     const claudeApiKey = process.env.CLAUDE_API_KEY;
@@ -120,7 +123,6 @@ export default async function handler(req, res) {
       getUserRole(userProfileId),
       getActiveRestrictions(),
     ]);
-    const requestId = crypto.randomUUID();
     return await withDynamicsContext({ restrictions, requestId }, async () => {
     // A7 Part 3: CRM records returned as tool_result are untrusted — applicant-
     // and staff-authored free-text fields can carry injection payloads that get
@@ -279,14 +281,66 @@ export default async function handler(req, res) {
     sendEvent('complete', { rounds: round, maxRoundsReached: true, suggestFeedback: true });
     });
   } catch (error) {
-    console.error('Dynamics Explorer chat error:', error);
+    console.error(`Dynamics Explorer chat error [requestId=${requestId}]:`, error);
     sendEvent('error', {
-      message: BASE_CONFIG.ERROR_MESSAGES.QUERY_FAILED,
+      message: describeChatFailure(error),
+      requestId,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   } finally {
     res.end();
   }
+}
+
+// ─── Top-level failure copy ───
+//
+// Tool failures never reach this path — they are classified by
+// classifyToolError and fed back into the agent loop. Everything that DOES
+// reach the outer catch is infrastructure: the Claude call, the role/
+// restriction load, or the taxonomy build. A single "Query failed" string told
+// the user nothing about which, and left nothing to quote when escalating.
+//
+// The raw error stays server-side (logged above with the same requestId).
+// Copy follows the house voice for transient failures: the system is the
+// subject, plain words, and a retry → administrator action ladder. It never
+// implies the user's own access is in doubt.
+
+const RETRY_LADDER = 'Please press retry, and if the problem doesn\'t resolve, contact an administrator.';
+
+/**
+ * Map a top-level chat failure to user-facing copy.
+ * @param {Error & { status?: number }} error
+ * @returns {string}
+ */
+function describeChatFailure(error) {
+  const status = typeof error?.status === 'number' ? error.status : null;
+  const raw = String(error?.message || '');
+  const isAbort = error?.name === 'AbortError' || /\baborted\b/i.test(raw);
+  const isTimeout = /\btimeout\b/i.test(raw);
+
+  if (isTimeout || isAbort) {
+    return 'That question took too long to answer, so I stopped it. Narrowing it usually '
+      + 'helps — name a single organization, or add a date range. '
+      + 'No data was changed. ' + RETRY_LADDER;
+  }
+
+  if (status === 429) {
+    return 'The AI service is handling too many requests at the moment, so it turned '
+      + 'mine away. This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  if (status === 529 || status === 503) {
+    return 'The AI service is temporarily overloaded and couldn\'t take my request. '
+      + 'This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  if (status !== null) {
+    return 'I\'m having trouble reaching the AI service, so I couldn\'t work through '
+      + 'your question. This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  return 'Something went wrong on my side before I could finish your question. '
+    + 'This is usually a temporary blip. ' + RETRY_LADDER;
 }
 
 // ─── Auto-detection ───
