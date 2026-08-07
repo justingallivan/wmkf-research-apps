@@ -10,6 +10,28 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Reviewer tokens mint at send time; invite-pipeline error UX (Session 404)
+
+**Milestone:** reviewer portal tokens are no longer minted by preview rendering — previews are
+read-only (JWT-shaped non-live placeholder) and `send-emails` mints/substitutes the
+authoritative token immediately before dispatch, with per-recipient fail-closed verification.
+Plus the invite-failure UX overhaul that started it: retryable failure banners with
+owner-verbatim copy, and the fuzzy-matching Claude×Codex consensus recorded.
+**Sessions:** 404 (owner-reported 503 incident → 4 adversarial Codex rounds → pipeline
+hardening; confirm-reviewer modal coherence; fuzzy-matching consensus with six owner
+questions pending).
+**Ship state:** main `bc03c688 → b5aaa5e2` via merges `a9d4e3dd` + `ff06fbb8`, both deployed
+READY; suite 6,860 → 6,910; accepted residual (latest-link-wins mint→dispatch window) and the
+token-lifecycle redesign follow-up recorded in the plan's adjudication entry.
+**Why it matters:** kills the preview-rotation race class outright (any preview used to
+invalidate every previously issued link for that recipient); establishes the error-copy voice
+rule (system blames itself, plain words, retry→admin ladder); the consensus doc now gates the
+whole reviewer-matching roadmap.
+**Pointers:** `outputs/plan-manage-panel-preview-retry-2026-08-06.md` (v1→v4 + adjudication);
+`outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`;
+`.claude-memory/feedback-user-facing-error-copy-voice.md`; commits `d040a7a3`, `8b66beb3`,
+`ffd19eca`.
+
 ## August 2026 — Increment C: auth-gate render race fixed app-wide (Session 398)
 
 **Milestone:** the client auth gate stopped unmounting/remounting the provider subtree on every
