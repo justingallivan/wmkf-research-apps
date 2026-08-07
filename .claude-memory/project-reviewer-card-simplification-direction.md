@@ -40,9 +40,10 @@ corrected the altitude — order by what most rapidly reduces complexity.
   `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`; its six §4 owner
   questions ANSWERED S405 (2026-08-06) —
   `outputs/fuzzy-matching-owner-answers-2026-08-06.md`; falsification suite BUILT
-  S405 but NOT EXECUTED (owner: build, don't execute) at
-  `benchmarks/fuzzy-matching-falsification/` (Shih cases included) → suite
-  execution/baseline freeze (needs owner go) → normalizer
+  and incumbent baseline FROZEN S405 (owner authorized) at
+  `benchmarks/fuzzy-matching-falsification/` — incumbent "safe but blind"
+  (0 wrong entities, 36/47 positives abstain), see
+  `baseline/incumbent-2026-08-06.md` → comparator runs → normalizer
   consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.

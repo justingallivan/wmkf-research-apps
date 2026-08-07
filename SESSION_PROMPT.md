@@ -84,16 +84,18 @@ modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
 
 ### Verified Open
 
-1. **Benchmark: adversarial matrix + failure archive — BUILT S405, NOT
-   EXECUTED** (owner: "build the falsification suite but don't execute").
-   `benchmarks/fuzzy-matching-falsification/`: 166 cases (120 generated UC
-   adversarial matrix — full matrix 335 via `--full` — + 46 curated from
-   documented failures), schema lint green, jest picks up nothing there.
-   `run.js` refuses to run without adapters and is syntax-checked but
-   unverified by execution. NOT done: incumbent baseline freeze, comparator
-   runs — needs a separate owner go. Two `label_status: assumed` cases need
-   owner adjudication (Yubin Zhou namesake; EKA contaminant handling) — see
-   the suite README.
+1. **Benchmark: falsification suite BUILT + incumbent baseline FROZEN S405**
+   (owner authorized execution same session: "use sonnet to execute the
+   suite"). `benchmarks/fuzzy-matching-falsification/`: 166 cases (120
+   sampled UC matrix, full 335 via `--full`, + 46 curated). Baseline
+   (keyed OpenAlex): 89 pass / 64 fail (60 real + 4 judge naming artifacts)
+   / 12 skipped — incumbent is "safe but blind": ZERO wrong-entity
+   resolutions but 36/47 positive-resolution failures (blanket abstention);
+   byline false-mismatch class reproduces with no S400 drift; person-005
+   (Zhou) namesake-bleed DEMONSTRATED (incumbent matched at 50% confidence).
+   Full analysis: `baseline/incumbent-2026-08-06.md`. NOT done: comparator
+   runs (ROR chosen:true, S2AFF). Owner adjudication still pending: Zhou
+   namesake ground truth; EKA contaminant handling.
 2. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
    concurrently-valid tokens). Founding requirement = final Codex review
    finding (mint→dispatch non-atomicity) + its test list; owner accepted

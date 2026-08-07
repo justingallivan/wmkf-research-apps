@@ -7,17 +7,24 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
 
 ## Status — read before touching
 
-- **BUILT, NEVER EXECUTED.** "Execute" = running any matching system
-  (incumbent predicates, ROR, S2AFF, a future scorer) against the cases.
-  None of that has happened: **no incumbent baseline has been frozen, no
-  comparator has run, nothing here calibrates anything.** That work is the
-  consensus step-0 baseline freeze and needs its own owner go-ahead.
-  (Interpretation of "don't execute" recorded here deliberately — if the
-  owner meant something narrower, correct this file.)
-- Consequence: `run.js` is **syntax-checked but unverified by execution**.
-  Its scoring logic (`judge`) has never run; expect to shake out bugs on the
-  first authorized execution. `validate-cases.js` (schema lint, touches no
-  matching code) HAS run and passes.
+- **BUILT S405; INCUMBENT BASELINE FROZEN same session** (owner authorized
+  execution: "use sonnet to execute the suite", 2026-08-06). The incumbent
+  production predicates were run against all cases via
+  `adapters-incumbent.js` — results and analysis in
+  `baseline/incumbent-2026-08-06.{results.jsonl,md}`. Headline: 89 pass /
+  64 fail (60 real + 4 judge naming artifacts) / 12 skipped; zero
+  wrong-entity resolutions — the incumbent is "safe but blind" (blanket
+  abstention). No S400 drift. Comparator runs (ROR `chosen:true`, S2AFF)
+  have NOT happened; threshold calibration remains out of scope for this
+  suite entirely.
+- `run.js` has now executed once; three harness fixes were made during that
+  run (see its inline comments and the baseline report). Known sharp edge:
+  target-name judging is exact-string — compare normalized names or ROR ids
+  in future runs. `validate-cases.js` (schema lint) passes.
+- Executions hit live keyed OpenAlex: load env with
+  `set -a; . .env.local; set +a` (grep/cut extraction glues quotes onto the
+  key and silently breaks every call — see the baseline report's discarded
+  runs).
 - Jest does not pick this directory up (`testMatch` covers only `tests/`,
   `shared/**/__tests__`, `pages/**/__tests__`; verified via
   `npx jest --listTests`). Keep it that way — no `*.test.js` names here.

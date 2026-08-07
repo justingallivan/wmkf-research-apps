@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
- * Falsification-suite runner — BUILT, DELIBERATELY NOT EXECUTED.
+ * Falsification-suite runner.
  *
- * Owner decision 2026-08-06 (S405): build the suite but do not execute it.
- * "Execute" means running any matching system — the incumbent predicates or a
- * candidate scorer — against the cases. Accordingly this runner ships with NO
- * adapters wired and refuses to run until one is passed in a later,
- * separately-authorized session (the consensus step-0 baseline freeze).
+ * First executed 2026-08-06 (S405, owner-authorized) to freeze the incumbent
+ * baseline — see baseline/incumbent-2026-08-06.md. Ships with no adapters of
+ * its own and refuses to run bare; each system under test supplies an
+ * adapter set (the incumbent's lives in adapters-incumbent.js).
  *
- * Contract for that later session:
+ * Adapter contract:
  *   const { runSuite } = require('./run');
  *   runSuite({
  *     institutionResolve:        async (input) => ({ outcome, target, multiOrg }),
@@ -29,8 +28,10 @@
  * outcome. Cases with label_status "assumed" are reported separately — they
  * are owner-adjudication items, not settled ground truth.
  *
- * THIS FILE IS SYNTAX-CHECKED BUT HAS NEVER BEEN RUN. Treat the scoring
- * logic as unverified until the first authorized execution.
+ * Judging sharp edge: target-name comparison is exact-string; provider name
+ * renderings that differ only in punctuation score as fails (4 known cases
+ * in the 2026-08-06 baseline). Prefer normalized-name or ROR-id comparison
+ * once the pinned ROR dump exists.
  */
 
 const fs = require('fs');
@@ -82,6 +83,20 @@ function judge(c, actual) {
   if (resolvedName && banned.includes(resolvedName)) {
     failures.push(`VETO: resolved to banned entity "${resolvedName}"`);
   }
+  // Harness fix (2026-08-06, baseline-freeze run): the original judge() never
+  // compared the resolved target's NAME against expected.target.name for
+  // 'resolve'-kind cases — it only checked the veto list. A case that
+  // resolves to outcome 'resolved' but the WRONG institution (not on the veto
+  // list) would have scored a silent pass. Skipped when expected.target is
+  // null/absent (abstention expected, nothing to compare) or is the
+  // structural "MULTIPLE" sentinel (multi-org cases; the incumbent has no
+  // multi-org output shape to compare against).
+  if (c.kind === 'resolve' && exp.outcome === 'resolved'
+    && exp.target?.name && exp.target.name !== 'MULTIPLE') {
+    if (resolvedName !== exp.target.name) {
+      failures.push(`target.name: expected "${exp.target.name}", got ${JSON.stringify(resolvedName)}`);
+    }
+  }
   if (exp.current) {
     const got = new Set(actual.current ?? []);
     for (const inst of exp.current) {
@@ -94,9 +109,8 @@ function judge(c, actual) {
 async function runSuite(adapters, { onResult } = {}) {
   if (!adapters || Object.keys(adapters).length === 0) {
     throw new Error(
-      'No adapters wired. Execution of this suite is deferred by owner decision ' +
-      '2026-08-06 (build, don\'t execute) — wire an adapter set in a session where ' +
-      'the baseline freeze / comparator run is explicitly authorized.'
+      'No adapters wired. Pass an adapter set for the system under test — ' +
+      'e.g. require("./adapters-incumbent") — or use run-baseline.js.'
     );
   }
   const cases = loadCases();
@@ -105,12 +119,34 @@ async function runSuite(adapters, { onResult } = {}) {
     const adapterName = ADAPTER_BY_KIND[c.kind];
     const adapter = adapters[adapterName];
     if (!adapter) {
-      results.push({ id: c.id, status: 'skipped', reason: `no ${adapterName} adapter` });
+      // Harness fix (2026-08-06, baseline-freeze run): this branch omitted the
+      // onResult callback, so a driver that streams results via onResult
+      // (rather than reading the final `results` array) silently lost every
+      // no-adapter-wired case — all 6 affiliation-current.jsonl cases here.
+      const noAdapterResult = { id: c.id, status: 'skipped', reason: `no ${adapterName} adapter` };
+      results.push(noAdapterResult);
+      if (onResult) onResult(noAdapterResult, c);
       continue;
     }
     let result;
     try {
       const actual = await adapter(c.input);
+      // Harness fix (2026-08-06, baseline-freeze run): an adapter may itself
+      // decide a case has no runnable incumbent seam (e.g. structural
+      // placeholders it can't compare, or a predicate that isn't
+      // require()-able read-only). It signals this with `{ skipped: true,
+      // reason }` rather than an outcome, and it is counted as skipped, not
+      // judged pass/fail. This was unreachable before any adapter existed.
+      if (actual && actual.skipped) {
+        result = {
+          id: c.id,
+          status: 'skipped',
+          reason: actual.reason || `${adapterName} adapter declined this case`,
+        };
+        results.push(result);
+        if (onResult) onResult(result, c);
+        continue;
+      }
       const failures = judge(c, actual);
       result = {
         id: c.id,
