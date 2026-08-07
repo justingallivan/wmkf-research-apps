@@ -69,10 +69,12 @@ modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
 
 ### Owner Decision Needed (gates the reviewer roadmap)
 
-1. **Answer the six fuzzy-matching questions** —
-   `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` §4.
-   Everything downstream (benchmark → consolidation/scorer → card redesign)
-   waits on these. [VERIFIED: consensus doc committed; no answers recorded.]
+1. ~~**Answer the six fuzzy-matching questions**~~ — **DONE S405
+   (2026-08-06)**: all six answered, owner-verbatim record in
+   `outputs/fuzzy-matching-owner-answers-2026-08-06.md`. Falsification suite
+   approved as next work on this track; representative benchmark parked
+   (high-risk automation stays review-only). Benchmark item below is
+   unblocked.
 2. **postcss moderate advisory** (Dependabot 62; likely needs a `next`
    upgrade). [Carried; still open on the repo's security tab.]
 3. **Increment E — ProfileProvider double-fetch**

@@ -49,7 +49,14 @@ document inventory, and individual implementation plans do not establish priorit
   (auto/review/reject) map onto the proposed card status band, so building either first
   bakes in the wrong abstraction. Reconciliation DONE (S404, 2026-08-06): confirmed
   Claude×Codex consensus in `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`
-  — six owner questions pend there (§4) before the benchmark starts. Remaining order:
+  — its six §4 owner questions were ANSWERED S405 (2026-08-06), owner-verbatim record in
+  `outputs/fuzzy-matching-owner-answers-2026-08-06.md`: no near-zero precision floor
+  (union-over-ambiguity COI with human adjudication instead of suppression); review
+  volume tolerated not accepted (cut per-item cost; owner suggested a Google-search-link
+  affordance, unbuilt); ROR namespace YES; falsification suite approved as next work /
+  representative benchmark parked; all concurrent affiliations shown and COI-screened,
+  recency-ranked; contact status is a dated evidence ledger, no binary verified flag.
+  Benchmark unblocked. Remaining order:
   benchmark / failure archive (150–300-case falsification suite) → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →

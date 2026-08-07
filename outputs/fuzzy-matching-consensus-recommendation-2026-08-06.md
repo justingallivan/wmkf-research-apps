@@ -43,6 +43,11 @@ Independently reached by both: Fellegi–Sunter additive evidence weights with t
 
 ## 4. Open questions for the owner (decision inputs, not blockers to accepting the shape)
 
+> **Status update 2026-08-06 (S405): all six ANSWERED** — see
+> `outputs/fuzzy-matching-owner-answers-2026-08-06.md` (owner-verbatim record).
+> The questions below are preserved verbatim as the text Codex confirmed in
+> round 2; do not edit them in place.
+
 1. **Precision floor** for fully-automatic decisions (auto-collapse, auto-COI-drop, auto-link). Both agents' prior: ~zero tolerance for sibling-campus and person-merge errors that can reach an invite or payment; abstain-and-review is always the fallback.
 2. **Review capacity**: acceptable human-review volume per search/cycle before bands must be re-tuned.
 3. **ROR as canonical namespace** for research-institution identity (distinct from CRM/legal Accounts). Step 2 assumes yes.

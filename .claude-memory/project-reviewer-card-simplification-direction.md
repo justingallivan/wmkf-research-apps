@@ -37,8 +37,9 @@ corrected the altitude — order by what most rapidly reduces complexity.
 
 - **Sequence (step 1 DONE S404, 2026-08-06):** fuzzy-matching reconciliation — completed
   as a confirmed Claude×Codex consensus,
-  `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`; six owner questions
-  pend in its §4 before the benchmark starts → benchmark /
+  `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`; its six §4 owner
+  questions ANSWERED S405 (2026-08-06) —
+  `outputs/fuzzy-matching-owner-answers-2026-08-06.md` — benchmark unblocked → benchmark /
   adversarial matrix + failure archive (Shih's Harvard case is row one) → normalizer
   consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
