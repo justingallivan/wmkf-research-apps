@@ -111,8 +111,9 @@ document inventory, and individual implementation plans do not establish priorit
   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`; the
   superseded assessment is banner-marked and must not be built from. Codex's
   sequence: **resolver hoist + cancellation-safe single-flight + PII-free
-  aggregate telemetry is BUILT on
-  `codex/institution-resolver-measurement`, not yet merged/deployed**
+  aggregate telemetry is BUILT in PR #113; production resolver authority was
+  live-verified as `legacy-default` on 2026-08-07, so promotion does not enable
+  `shadow` or `combined`**
   (measurement vehicle, not a performance claim) → compact-index size
   experiment → pinned dump for benchmarking only → run and resource-profile
   S2AFF. Both
