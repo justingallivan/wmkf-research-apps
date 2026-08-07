@@ -94,9 +94,25 @@ document inventory, and individual implementation plans do not establish priorit
   high-recall ROR retrieval → LightGBM rerank → margin-based abstention, the
   closest existing analogue to the scorer we intend to build, so it is the most
   informative remaining comparator, not the least. Needs a pinned Python
-  3.10/3.11 venv (local is 3.14, no uv/pyenv) and its own session. Recommended
-  order: pinned-ROR-dump exact-alias baseline FIRST (offline, dependency-free,
-  unlocks ROR-id judging + hierarchy relationships), then S2AFF. Both
+  3.10/3.11 venv (local is 3.14, no uv/pyenv) and its own session.
+  **CODEX OWNS THE INSTITUTION-RESOLUTION MODEL from 2026-08-07 (owner
+  decision).** Claude's runtime/deployment assessment was superseded by
+  adversarial review (needs-attention, five findings accepted); the
+  architecture of record is Codex's claim-oriented pipeline — parse
+  organization spans + evidence → candidate-union retrieval from a COMPACT ROR
+  index → non-overridable vetoes (multi-org, sibling, domain, country, type,
+  granularity) → provenance-aware scoring → abstain. Governing principle:
+  exact aliases are RETRIEVAL EVIDENCE, NOT DECISION AUTHORITY, and vetoes run
+  before scoring. Corrected facts: ROR has **132,706 active records**
+  [VERIFIED via live API 2026-08-07], and the raw dump exceeds Vercel's 250 MB
+  standard function limit — so a compact compiled index, size-measured before
+  bundling, replaces "ship the dump as a static asset". Handoff (Codex's model
+  + Claude's six refinements + frozen-harness constraints):
+  `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`; the
+  superseded assessment is banner-marked and must not be built from. Codex's
+  sequence: resolver hoist + single-flight + telemetry (measurement vehicle,
+  reversible) → compact-index size experiment → pinned dump for benchmarking
+  only → run and resource-profile S2AFF. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never

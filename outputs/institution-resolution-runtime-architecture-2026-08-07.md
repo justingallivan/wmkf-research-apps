@@ -1,6 +1,33 @@
 # Institution resolution at runtime — deployment assessment (S406, 2026-08-07)
 
-**Status: ASSESSMENT FOR REVIEW. Not a decision, not a plan of record.** Written
+> ## ⚠️ SUPERSEDED 2026-08-07 — DO NOT BUILD FROM THIS DOCUMENT
+>
+> Went to Codex adversarial review (`--base cda32868`), returned
+> **needs-attention** with five findings, **all accepted**. The architecture of
+> record is now Codex's **claim-oriented pipeline**, and **Codex owns this
+> surface** (owner decision, 2026-08-07). See
+> `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+>
+> Specifically wrong here, retained only for the reasoning trail:
+> - **§5's tiered design makes exact-alias lookup DECISIVE**, which reproduces
+>   the exact failure comparator #1 proved disqualifying — `"University of
+>   California, Berkeley (UCLA)"` would alias-hit Berkeley and resolve without
+>   ever reaching a veto. Vetoes must run *before* scoring; aliases are
+>   retrieval evidence, not decision authority.
+> - **§5 cannot observe domain evidence at all**, contradicting this same
+>   session's finding that out-of-band domain evidence must be a first-class
+>   input.
+> - **§4's proposed measurement is survivorship-biased** — saved Dataverse rows
+>   exclude the unresolved/rejected/COI-dropped candidates that create the load
+>   (`reviewer_find_roster` carries `status IN ('active','excluded','saved')`).
+> - **"~110k ROR records" is wrong** — live count is **132,706 active**
+>   (verified 2026-08-07); the raw dump exceeds Vercel's 250 MB standard
+>   function limit, so §5's bundled-static-asset tier is unfounded.
+> - **Alternative 4 (resolve-at-save) is withdrawn** — resolution already
+>   happens at discovery *and* the save-time COI gate.
+> - **"S2AFF never deploys" is reopened** — profile it before deciding.
+
+**Status: ASSESSMENT FOR REVIEW — SUPERSEDED (see banner). Not a decision, not a plan of record.** Written
 to answer two owner questions during S406: (1) can S2AFF run in our Vercel
 setup, and (2) how would any of this work per candidate / per search / per
 cycle. Seeking a challenge on the reasoning and, explicitly, **better

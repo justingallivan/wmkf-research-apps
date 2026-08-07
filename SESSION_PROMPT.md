@@ -98,7 +98,28 @@ invite-panel UX.
    Also outstanding from the review: a **relationship-aware pair adapter**
    (the same-ROR-id-only rule cannot express hierarchy) and **canonical
    expected ROR ids in the cases**, which together would retire the
-   artifact-adjudication problem across both runs.
+   artifact-adjudication problem across both runs. Both are now on the
+   critical path per the handoff below, not deferred cleanup.
+
+   **CODEX OWNS THE INSTITUTION-RESOLUTION MODEL** (owner decision
+   2026-08-07). Claude's runtime/deployment assessment went to adversarial
+   review, came back needs-attention on all five findings, and is
+   **superseded**; the architecture of record is Codex's claim-oriented
+   pipeline (parse spans + evidence → candidate-union retrieval from a
+   compact ROR index → non-overridable vetoes → provenance-aware scoring →
+   abstain). Read
+   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md` first —
+   it carries Codex's model, Claude's six refinements, the frozen-harness
+   constraints, and the evidence trail. The superseded assessment
+   (`outputs/institution-resolution-runtime-architecture-2026-08-07.md`)
+   is banner-marked; do not build from it.
+   Codex's sequence: (a) hoist the resolver + bounded single-flight +
+   telemetry as the first reversible increment — treat it as the
+   measurement vehicle, not a perf fix; (b) compact-ROR-index size
+   experiment; (c) pinned ROR dump for benchmarking, NOT yet as production
+   substrate; (d) run and resource-profile S2AFF before choosing between
+   reimplementation and a batch/warm service.
+   Claude is off this surface.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper) —
    now unblocked by the characterization tests. Start with the two
    byte-identical `normalizeName` copies (lowest risk), then the
