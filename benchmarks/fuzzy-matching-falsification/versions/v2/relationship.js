@@ -1,6 +1,11 @@
 'use strict';
 
-const INVERSE = Object.freeze({ child: 'parent', parent: 'child' });
+const INVERSE = Object.freeze({
+  child: 'parent',
+  parent: 'child',
+  predecessor: 'successor',
+  successor: 'predecessor',
+});
 
 function relationshipBetween(left, right) {
   if (!left || !right) return null;

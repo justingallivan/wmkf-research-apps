@@ -9,8 +9,9 @@ pins those files byte-for-byte.
 The 141 institution cases gain canonical expected ROR IDs from the checksum-
 pinned ROR v2.11 dump. Resolve cases measure candidate recall. Pair cases
 measure candidate recall on both operands and whether returned ROR records
-expose the expected `same`, `parent`, `child`, `related`, `successor`, or
-`distinct` relationship.
+expose the expected `same`, `parent`, `child`, `related`, `successor`,
+`predecessor`, or `distinct` relationship. Directional values describe the
+right-hand institution relative to the left-hand institution.
 
 The remaining 25 person/contact/affiliation cases are skipped because this
 version only evaluates institution candidate generation.

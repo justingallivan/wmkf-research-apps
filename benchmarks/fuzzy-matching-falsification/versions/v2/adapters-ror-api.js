@@ -51,7 +51,10 @@ function createRorCandidateAdapter({
     if (clientId) headers['Client-Id'] = clientId;
     const response = await fetchImpl(url, { headers, signal });
     if (response.status === 429 || response.status >= 500) {
-      const retryAfter = Number(response.headers.get('retry-after'));
+      const retryAfterHeader = response.headers.get('retry-after');
+      const retryAfter = retryAfterHeader == null || retryAfterHeader === ''
+        ? Number.NaN
+        : Number(retryAfterHeader);
       const error = new Error(`ROR ${response.status}`);
       error.retryable = true;
       error.retryAfterMs = Number.isFinite(retryAfter) && retryAfter >= 0

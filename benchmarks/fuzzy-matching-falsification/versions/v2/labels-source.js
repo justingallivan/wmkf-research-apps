@@ -46,7 +46,7 @@ const PAIR_LABELS = Object.freeze({
   'inst-hier-002': pair(
     'https://ror.org/03vek6s52',
     'https://ror.org/03vek6s52',
-    'successor',
+    'predecessor',
     'https://ror.org/03wevmz92'
   ),
   'inst-hier-007': pair('https://ror.org/02vm5rt34', 'https://ror.org/05dq2gs74', 'related'),

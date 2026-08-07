@@ -1,3 +1,7 @@
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const manifest = require('../../../benchmarks/fuzzy-matching-falsification/versions/v2/manifest.json');
 const {
   createCandidateSet,
   normalizeCandidate,
@@ -40,6 +44,19 @@ function set(...candidates) {
 }
 
 describe('falsification suite v2 candidate contract', () => {
+  test('fails CI if any frozen v1 input changes at the byte level', () => {
+    const baseDir = path.resolve(
+      __dirname,
+      '../../../benchmarks/fuzzy-matching-falsification/versions/v2',
+      manifest.base_suite,
+    );
+    for (const [relativePath, expectedHash] of Object.entries(manifest.base_files_sha256)) {
+      const bytes = fs.readFileSync(path.join(baseDir, relativePath));
+      const actualHash = crypto.createHash('sha256').update(bytes).digest('hex');
+      expect(actualHash).toBe(expectedHash);
+    }
+  });
+
   test('overlays all 141 institution cases without replacing the frozen base cases', () => {
     const cases = loadCases();
     expect(cases).toHaveLength(166);
@@ -82,6 +99,15 @@ describe('falsification suite v2 candidate contract', () => {
     }, set(harvard), set(dana));
     expect(judged.failures).toEqual([]);
     expect(judged).not.toHaveProperty('consistent');
+  });
+
+  test('describes successor and predecessor relationships right-relative-to-left', () => {
+    const harvard = candidate('https://ror.org/03vek6s52');
+    const medicalSchool = candidate('https://ror.org/03wevmz92', [{
+      id: harvard.ror_id, type: 'successor', label: 'Harvard University',
+    }]);
+    expect(relationshipBetween(harvard, medicalSchool)).toBe('predecessor');
+    expect(relationshipBetween(medicalSchool, harvard)).toBe('successor');
   });
 
   test('fails closed when the expected candidate is absent', () => {
@@ -202,14 +228,16 @@ describe('ROR API v2 candidate adapter', () => {
     const fetchImpl = jest.fn()
       .mockResolvedValueOnce(response({}, 503))
       .mockResolvedValueOnce(response(bodyFor()));
+    const sleep = jest.fn(async () => {});
     const adapter = createRorCandidateAdapter({
       fetchImpl,
       paceMs: 0,
-      backoffBaseMs: 0,
-      sleep: async () => {},
+      backoffBaseMs: 1000,
+      sleep,
     });
     const result = await adapter.institutionCandidates({ affiliation_string: 'Harvard' });
     expect(result.provenance).toMatchObject({ request_count: 2, retry_count: 1 });
+    expect(sleep).toHaveBeenCalledWith(1000);
 
     const failing = createRorCandidateAdapter({
       fetchImpl: async () => response({}, 503),

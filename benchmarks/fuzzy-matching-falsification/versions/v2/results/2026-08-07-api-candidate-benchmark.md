@@ -10,7 +10,8 @@ separate local veto/scoring layer.
 ## Frozen inputs and claim
 
 - v1's 166 cases, runner, and judge stayed byte-identical; `manifest.json` pins
-  all seven base files by SHA-256.
+  all seven base files by SHA-256, and the focused Jest suite enforces those
+  hashes in CI.
 - v2 overlays canonical ROR IDs on the same 141 institution cases using 29
   selected records from checksum-pinned ROR v2.11 (`2026-08-03`).
 - Resolve cases judge candidate recall by ROR ID. Pair cases additionally judge
@@ -33,8 +34,8 @@ The ROR run made 127 actual HTTP attempts after exact-query reuse and needed no
 retries. The full immutable artifacts are
 `ror-api-single-search-2026-08-07.results.jsonl` and
 `incumbent-2026-08-07.results.jsonl`. Their SHA-256 hashes are respectively
-`eb7f3a7a8cee0078cdef3d63e85fee40d7cde21c5fce36991d32994ad5734f70`
-and `e1c352a4d132b353b1e5430709a218525e4ab585c69bd65c1eaab6b39706d62f`.
+`a0c931493848aab7f38bcf10612a4b2461a03313d29064d67a11e6dd1b24d2be`
+and `508c3f32a5b7d638669a6211f71e196f52d933fd0c645583357d2785e9833455`.
 
 ## What failed
 

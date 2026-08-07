@@ -13,7 +13,7 @@
 {"id":"inst-byline-013","kind":"pair-consistency","listed_ror_id":"https://ror.org/05dq2gs74","evidence_source_ror_id":"https://ror.org/02vm5rt34","evidence_canonical_ror_id":"https://ror.org/02vm5rt34","expected_relationship":"related"}
 {"id":"inst-byline-014","kind":"pair-consistency","listed_ror_id":"https://ror.org/00hj8s172","evidence_source_ror_id":"https://ror.org/01esghr10","evidence_canonical_ror_id":"https://ror.org/01esghr10","expected_relationship":"related"}
 {"id":"inst-hier-001","kind":"pair-consistency","listed_ror_id":"https://ror.org/03vek6s52","evidence_source_ror_id":"https://ror.org/02jzgtq86","evidence_canonical_ror_id":"https://ror.org/02jzgtq86","expected_relationship":"related"}
-{"id":"inst-hier-002","kind":"pair-consistency","listed_ror_id":"https://ror.org/03vek6s52","evidence_source_ror_id":"https://ror.org/03wevmz92","evidence_canonical_ror_id":"https://ror.org/03vek6s52","expected_relationship":"successor"}
+{"id":"inst-hier-002","kind":"pair-consistency","listed_ror_id":"https://ror.org/03vek6s52","evidence_source_ror_id":"https://ror.org/03wevmz92","evidence_canonical_ror_id":"https://ror.org/03vek6s52","expected_relationship":"predecessor"}
 {"id":"inst-hier-003","kind":"resolve","expected_ror_ids":["https://ror.org/02jzgtq86","https://ror.org/03vek6s52"],"must_not_ror_ids":[]}
 {"id":"inst-hier-004","kind":"resolve","expected_ror_ids":["https://ror.org/02jbv0t02"],"must_not_ror_ids":["https://ror.org/01an7q238"]}
 {"id":"inst-hier-005","kind":"resolve","expected_ror_ids":["https://ror.org/01kbfgm16"],"must_not_ror_ids":[]}
