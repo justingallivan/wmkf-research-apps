@@ -27,6 +27,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
 
 // Local value helpers for the merge picker. Mirror the service's norm/isSet
 // (reviewer-merge.js) so the UI's email-default and orphan detection agree with
@@ -487,6 +488,20 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {(() => {
+            const googleSearchUrl = buildGoogleSearchUrl(candidate.name, formData.affiliation);
+            return googleSearchUrl ? (
+              <a
+                href={googleSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+                title="Search Google for this name and institution"
+              >
+                Search Google ↗
+              </a>
+            ) : null;
+          })()}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
             <input

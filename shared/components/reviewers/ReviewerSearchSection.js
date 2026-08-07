@@ -69,6 +69,7 @@ import {
 } from '../../utils/reviewer-rediscovery';
 import { rankByRelevance } from '../../../lib/utils/relevance-score';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
+import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
 import {
   PROVENANCE_KINDS,
   provenanceGroupOf,
@@ -862,6 +863,20 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {!identityUnverified && (
               <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? "Open this researcher's Google Scholar profile" : 'Search Google Scholar for this researcher'}>
                 🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
+              </a>
+            )}
+            {/* One-click Google search for the person + notional institution, so staff
+                don't have to hand-compose the search they already run to verify a
+                suggestion (owner request, fuzzy-matching-owner-answers Q2). */}
+            {buildGoogleSearchUrl(c.name, c.affiliation) && (
+              <a
+                href={buildGoogleSearchUrl(c.name, c.affiliation)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                title="Search Google for this name and institution"
+              >
+                Search Google ↗
               </a>
             )}
             {/* Manual contact edit (manage-only): correct a wrong email/website
