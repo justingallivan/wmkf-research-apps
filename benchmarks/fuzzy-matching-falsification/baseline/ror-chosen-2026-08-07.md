@@ -182,9 +182,13 @@ instead of display strings would retire all 11 artifacts across both runs.**
   Saba University School of Medicine, B.J. Medical College, and other unrelated
   medical schools. A striking miss for a major institution, and the direct cause
   of the hier-002 failure above.
-- **Bare acronyms return zero results** (`UCSB`, `UCR`), where the incumbent's
-  OpenAlex-backed path resolved them. The two systems fail on *different* inputs,
-  which is the argument for combining signals rather than choosing one.
+- **Every bare campus acronym abstains** — all seven in the suite (UCLA, UCSD,
+  UCSF, UCI, UCSB, UCSC, UCR) return no chosen record; `UCSB` was verified to
+  return literally `number_of_results: 0`. The incumbent's OpenAlex-backed path
+  resolved UCSB and UCR. This confirms and widens the 2026-08-04 research probe
+  (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`, which observed
+  it for UCSD alone) from n=1 to n=7. The two systems fail on *different* inputs —
+  the argument for combining signals rather than choosing one.
 - **Decorated bylines resolve cleanly** — the full S400 failure shape
   (`"Department of Chemistry, University of California, Berkeley, Berkeley, CA
   94720, USA"`) returns Berkeley at score 1.0. This is the single most

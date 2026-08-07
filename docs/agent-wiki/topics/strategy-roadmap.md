@@ -67,7 +67,23 @@ document inventory, and individual implementation plans do not establish priorit
   confidence where design says review). Hazards for the next run: load env with
   `set -a; . .env.local; set +a` (quoted-key extraction silently kills every
   OpenAlex call → uniform abstention masquerading as results); exact-string
-  target-name judging. Comparator runs (ROR chosen:true, S2AFF) NOT done. Both
+  target-name judging. **COMPARATOR #1 DONE 2026-08-07 (S406,
+  `baseline/ror-chosen-2026-08-07.md`): ROR affiliation `chosen:true` is the
+  incumbent's MIRROR IMAGE** — 15% abstention vs 85%, institution recall 30/47
+  vs 11/47, flips 8/11 of the S400 byline false mismatches (keeps the one genuine
+  flag) — but fires **40 attributable wrong-entity vetoes vs the incumbent's 0**,
+  confidently resolving self-contradictory strings ("University of California,
+  Berkeley (UCLA)" → Berkeley at score 1.0). NEITHER system passes the
+  falsification bar; ROR is disqualified as a sole auto-resolver, viable as a
+  signal inside a scorer. Also established: out-of-band domain evidence must be a
+  first-class scorer input (the uc-sibling-domain family discriminates neither
+  system — no affiliation-string API accepts it), and self-contradiction detection
+  is a distinct missing capability in both. **Comparator #2 (S2AFF) SCOPED, NOT
+  RUN** — heavy old Python stack + multi-GB S3 artifacts vs local Python 3.14, no
+  uv/pyenv; recommendation is to skip it for the pinned-ROR-dump exact-alias
+  baseline (offline, dependency-free, unlocks ROR-id judging + hierarchy
+  relationships and would retire all 11 exact-string naming artifacts across both
+  runs). Owner decision pending. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -81,7 +97,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  comparator runs → normalizer
+  comparator #2 (owner's choice: S2AFF vs pinned-ROR-dump alias baseline) → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

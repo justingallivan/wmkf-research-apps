@@ -115,7 +115,10 @@ local data dump when an application needs control over matching criteria.
 matters:
 
 - Affiliation matching for `UCSD` returned no result even though the UC San
-  Diego ROR record contains `UCSD` as an acronym.
+  Diego ROR record contains `UCSD` as an acronym. [CONFIRMED AND GENERALIZED by
+  the 2026-08-07 comparator run, `benchmarks/fuzzy-matching-falsification/baseline/ror-chosen-2026-08-07.md`:
+  **all seven** bare UC campus acronyms (UCLA, UCSD, UCSF, UCI, UCSB, UCSC, UCR)
+  abstain under `chosen:true`; UCSB returns literally zero results. n=1 → n=7.]
 - Ordinary name search for `UCSD` did return UC San Diego first.
 - Affiliation matching for `University of California` ranked Touro University
   California first and the University of California system third. It did not
