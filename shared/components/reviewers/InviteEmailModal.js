@@ -151,6 +151,14 @@ export function applySubjectTiming(subject, timing) {
     .trim();
 }
 
+// Bounded per-render network timeout for /api/review-manager/render-emails.
+// This modal unmounts on close (unlike ReviewerManagePanel's EmailModal), so a
+// hung render can't wedge a later session — but within one open session, Retry
+// must still recover, so a stuck fetch needs a ceiling. Since d040a7a3 preview
+// renders are read-only server-side (no token minting), aborting here can
+// never strand a durable write.
+export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
+
 export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
@@ -188,7 +196,16 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+      // This modal unmounts on close, so a still-outstanding render's fetch
+      // would otherwise dangle past PREVIEW_RENDER_TIMEOUT_MS for no reason —
+      // abort it immediately.
+      if (activeRenderAbortRef.current) {
+        activeRenderAbortRef.current.abort();
+        activeRenderAbortRef.current = null;
+      }
+    };
   }, []);
 
   // Stable across renders (candidates is a fresh array each parent render, so a
@@ -270,6 +287,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   // skips its own fetch entirely if a still-newer generation has queued behind it
   // by the time its turn comes up.
   const renderTailRef = useRef(Promise.resolve());
+  // The AbortController for whatever render-emails fetch is currently
+  // outstanding, if any — the unmount cleanup below aborts it so a hung
+  // request can't outlive the component, and PREVIEW_RENDER_TIMEOUT_MS aborts
+  // it if it's still running in-session so Retry can recover.
+  const activeRenderAbortRef = useRef(null);
   const renderPreviews = useCallback(() => {
     // Wait for the template load to settle before the first render — rendering with
     // the initial EMPTY skeleton trips the render-emails 400 guard and flashes it
@@ -288,6 +310,15 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
       if (gen !== renderGenRef.current) return; // superseded before its turn — skip the fetch
       setError(null); setPreviewFailed(false); setRawDrafts([]); setManualLinkCopyState({});
       setProgress({ current: 0, total: snapshotIds.length, message: 'Rendering previews…' });
+
+      // Bound this fetch so a hung request can't leave Retry permanently
+      // disabled within this open session. Also aborted on unmount below.
+      // Preview renders are read-only server-side since d040a7a3, so aborting
+      // here never strands a durable write.
+      const controller = new AbortController();
+      activeRenderAbortRef.current = controller;
+      const timeoutId = setTimeout(() => controller.abort(), PREVIEW_RENDER_TIMEOUT_MS);
+
       try {
         const res = await fetch('/api/review-manager/render-emails', {
           method: 'POST',
@@ -298,6 +329,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
             template: snapshotTemplate,
             settings: { signature: snapshotSignature },
           }),
+          signal: controller.signal,
         });
         const data = await res.json().catch(() => ({}));
         if (gen !== renderGenRef.current) return; // superseded by a newer render
@@ -310,9 +342,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
         }
         setRawDrafts(data.drafts || []);
       } catch (e) {
-        if (gen !== renderGenRef.current) return;
+        if (gen !== renderGenRef.current || !mountedRef.current) return;
+        // A timeout or unmount abort surfaces as AbortError, which — like any
+        // other non-server failure — falls through to the network message.
         setError(e.isPreviewFailure ? e.message : RENDER_PREVIEW_NETWORK_MESSAGE);
         setPreviewFailed(true);
+      } finally {
+        clearTimeout(timeoutId);
+        if (activeRenderAbortRef.current === controller) activeRenderAbortRef.current = null;
       }
     });
     renderTailRef.current = run;

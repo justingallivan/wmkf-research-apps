@@ -265,6 +265,14 @@ export function TokenActionsMenu({
 const EMAIL_FIELDS_STORAGE_KEY = 'review_manager_email_fields';
 const ATTACHMENTS_STORAGE_KEY = 'review_manager_attachments';
 
+// Bounded per-render network timeout for /api/review-manager/render-emails.
+// Since d040a7a3 preview renders are read-only server-side (no token
+// minting), so aborting a stuck request client-side can no longer strand a
+// durable write — this exists purely to recover the UI (release the
+// single-flight lock + tail) from a request that never settles, not to
+// coordinate with any server-side cancellation.
+export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
+
 function fileKeyOf(file) {
   return `${file.library}::${file.folder}::${file.name}`;
 }
@@ -340,12 +348,26 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // close) and never reset. A response for an earlier open/close session can
   // never mutate a later session's state — see handlePreview/handleSend.
   const modalSessionRef = useRef(0);
+  // The AbortController for whatever render-emails fetch is currently
+  // outstanding (if any), so close/reopen can abort it immediately instead of
+  // leaving it to the PREVIEW_RENDER_TIMEOUT_MS ceiling. Aborting settles that
+  // fetch's promise, which is what actually releases renderTailRef for the
+  // next session — without this, EmailModal staying mounted across close
+  // means a hung render's tail blocks every later session until it times out.
+  const activeRenderAbortRef = useRef(null);
 
   // Reset email compose state when the modal opens or closes; bump the modal
   // session on every transition so an in-flight response from a prior session
   // can never mutate current state.
   useEffect(() => {
     modalSessionRef.current += 1;
+    // Abort any render still outstanding from the session that just ended —
+    // this modal stays mounted across close, so a wedged fetch would otherwise
+    // hold renderTailRef forever and block every future session's preview.
+    if (activeRenderAbortRef.current) {
+      activeRenderAbortRef.current.abort();
+      activeRenderAbortRef.current = null;
+    }
     if (isOpen) {
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
@@ -610,6 +632,15 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setPreviewFailed(false);
       setProgress({ current: 0, total: 0, message: 'Rendering previews...' });
 
+      // Bound this fetch so a hung request can't wedge renderTailRef forever —
+      // EmailModal stays mounted when closed, so without this a stuck render
+      // would block every later session's preview too (only close/reopen abort,
+      // above, gets there sooner). Preview renders are read-only server-side
+      // since d040a7a3, so aborting here never strands a durable write.
+      const controller = new AbortController();
+      activeRenderAbortRef.current = controller;
+      const timeoutId = setTimeout(() => controller.abort(), PREVIEW_RENDER_TIMEOUT_MS);
+
       try {
         const response = await fetch('/api/review-manager/render-emails', {
           method: 'POST',
@@ -620,6 +651,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
             template: snapshotTemplate,
             settings: snapshotSettings,
           }),
+          signal: controller.signal,
         });
         if (modalSessionRef.current !== epoch) return;
 
@@ -639,8 +671,13 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
         if (modalSessionRef.current !== epoch) return;
         // The compose step keeps its Preview button visible, so the retry
         // affordance already exists here; only the message needed help.
+        // A timeout/close abort surfaces as AbortError, which — like any other
+        // non-server failure — falls through to the network message below.
         setError(err.isPreviewFailure ? err.message : RENDER_PREVIEW_NETWORK_MESSAGE);
         setPreviewFailed(true);
+      } finally {
+        clearTimeout(timeoutId);
+        if (activeRenderAbortRef.current === controller) activeRenderAbortRef.current = null;
       }
     });
     renderTailRef.current = run;

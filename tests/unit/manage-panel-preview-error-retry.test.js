@@ -7,11 +7,43 @@
  * v2 numbering); this file covers the manage-panel variants of pins 1, 2, 3,
  * 4, and 5. Pin 6 (InviteEmailModal Retry disable) lives in
  * invite-preview-error-retry.test.js.
+ *
+ * Bounded-timeout / release-tail-on-close coverage (Codex adversarial review,
+ * medium severity, 2026-08-06): EmailModal stays MOUNTED when closed, so a
+ * render whose fetch never settles (no AbortController/timeout, pre-fix) left
+ * renderTailRef permanently chained — every later session's preview queued
+ * behind it forever. The fix aborts the in-flight render on close/reopen and
+ * bounds every render at PREVIEW_RENDER_TIMEOUT_MS. These tests use a fetch
+ * that never resolves/rejects on its own (the point — it must be recovered
+ * from, not eventually settled by the mock).
  */
 
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { act } from 'react';
 import { TextDecoder as NodeTextDecoder } from 'util';
-import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
+import ReviewerManagePanel, { PREVIEW_RENDER_TIMEOUT_MS } from '../../shared/components/reviewers/ReviewerManagePanel';
+import { RENDER_PREVIEW_NETWORK_MESSAGE } from '../../shared/components/reviewers/render-preview-failure';
+
+// A render-emails response that never resolves or rejects on its own — only
+// settles if the caller's AbortSignal fires. Mirrors real fetch() semantics
+// for an AbortController-bound request.
+function hangingRenderEmails(init) {
+  return new Promise((resolve, reject) => {
+    const signal = init && init.signal;
+    if (!signal) return;
+    if (signal.aborted) {
+      reject(makeAbortError());
+      return;
+    }
+    signal.addEventListener('abort', () => reject(makeAbortError()));
+  });
+}
+
+function makeAbortError() {
+  const e = new Error('The operation was aborted.');
+  e.name = 'AbortError';
+  return e;
+}
 
 // jsdom's test environment does not provide TextDecoder; ReviewerManagePanel's
 // handleSend reads the send-emails SSE stream through one. Polyfill locally
@@ -313,4 +345,135 @@ test('pin 5: a pending render disables Preview/Retry and a click while pending c
     }],
   }));
   await waitFor(() => expect(screen.queryByText(/retrying is safe/)).toBeNull());
+});
+
+// Bounded-timeout / abort-on-close --------------------------------------
+
+test('a hung render (fetch never settles on its own) does not block a later session after close/reopen', async () => {
+  let calls = 0;
+  global.fetch = jest.fn(async (url, init) => {
+    const u = String(url);
+    if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: false });
+    if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+    if (u === '/api/review-manager/render-emails') {
+      calls += 1;
+      if (calls === 1) return hangingRenderEmails(init); // never resolves/rejects unless aborted
+      return mockJson({
+        drafts: [{
+          suggestionId: REVIEWER_A.suggestionId,
+          candidateName: REVIEWER_A.name,
+          candidateEmail: REVIEWER_A.email,
+          subject: 'S',
+          body: 'B',
+        }],
+      });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  renderPanel();
+  openReleaseModal();
+  fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+  await waitFor(() => expect(calls).toBe(1));
+
+  // Close while the first render is still hung — the fix aborts it here
+  // rather than leaving it to the timeout ceiling.
+  fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+  // Reopen: the new session must be able to start (and complete) a FRESH
+  // render — the old, never-settling tail must not still be blocking it.
+  fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+
+  await waitFor(() => expect(calls).toBe(2));
+  await screen.findByRole('button', { name: /send 1 email/i });
+});
+
+test('a hung render times out, surfaces the network-failure banner, and Retry recovers', async () => {
+  jest.useFakeTimers();
+  try {
+    let calls = 0;
+    global.fetch = jest.fn(async (url, init) => {
+      const u = String(url);
+      if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: false });
+      if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (u === '/api/review-manager/render-emails') {
+        calls += 1;
+        if (calls === 1) return hangingRenderEmails(init); // never resolves/rejects unless aborted
+        return mockJson({
+          drafts: [{
+            suggestionId: REVIEWER_A.suggestionId,
+            candidateName: REVIEWER_A.name,
+            candidateEmail: REVIEWER_A.email,
+            subject: 'S',
+            body: 'B',
+          }],
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    renderPanel();
+    openReleaseModal();
+    fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+    await waitFor(() => expect(calls).toBe(1));
+
+    // Elapse the render's bounded timeout without closing the modal.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(PREVIEW_RENDER_TIMEOUT_MS);
+    });
+
+    await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
+    const retryButton = screen.getByRole('button', { name: /Retry/ });
+    expect(retryButton).not.toBeDisabled();
+
+    fireEvent.click(retryButton);
+    await waitFor(() => expect(calls).toBe(2));
+    await screen.findByRole('button', { name: /send 1 email/i });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('epoch-guard pin: a stale render settling after close/reopen must not clobber the new session\'s rendering state', async () => {
+  let calls = 0;
+  global.fetch = jest.fn(async (url, init) => {
+    const u = String(url);
+    if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: false });
+    if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+    if (u === '/api/review-manager/render-emails') {
+      calls += 1;
+      if (calls === 1) return hangingRenderEmails(init); // settles only when its epoch's abort fires
+      return new Promise(() => {}); // the new session's render: genuinely pending for this test
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  renderPanel();
+  openReleaseModal();
+  fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+  await waitFor(() => expect(calls).toBe(1));
+
+  // Close (aborts the first session's controller, bumping the epoch) and
+  // reopen into a new session whose render is still genuinely in flight.
+  fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+  const previewButton2 = await screen.findByRole('button', { name: /preview 1 email/i });
+  fireEvent.click(previewButton2);
+  await waitFor(() => expect(calls).toBe(2));
+
+  // Let the first session's abort-triggered rejection (and its `finally`)
+  // settle in the background — pre-fix this promise never settled at all, so
+  // this race was unreachable; the fix's abort makes it real, and the
+  // pre-existing epoch guard in `finally` must still hold.
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  // The second (current) session's render is still genuinely pending — its
+  // Preview button must stay disabled; the first session's stale settle must
+  // not have reset `rendering` out from under it.
+  expect(previewButton2).toBeDisabled();
 });

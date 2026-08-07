@@ -22,6 +22,7 @@
  */
 
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act } from 'react';
 
 jest.mock('../../shared/components/reviewers/email-template-store', () => ({
   EMPTY_TEMPLATES: { invitation: { subject: '', body: '' } },
@@ -29,11 +30,33 @@ jest.mock('../../shared/components/reviewers/email-template-store', () => ({
   saveEmailTemplates: async () => {},
 }));
 
-import InviteEmailModal from '../../shared/components/reviewers/InviteEmailModal';
+import InviteEmailModal, { PREVIEW_RENDER_TIMEOUT_MS } from '../../shared/components/reviewers/InviteEmailModal';
 import {
   renderPreviewFailureMessage,
   RENDER_PREVIEW_NETWORK_MESSAGE,
 } from '../../shared/components/reviewers/render-preview-failure';
+
+// A render-emails response that never resolves or rejects on its own — only
+// settles if the caller's AbortSignal fires (mirrors real fetch() semantics
+// for an AbortController-bound request). Used to exercise
+// PREVIEW_RENDER_TIMEOUT_MS without an injected/shortened timeout.
+function hangingRenderEmails(init) {
+  return new Promise((resolve, reject) => {
+    const signal = init && init.signal;
+    if (!signal) return;
+    if (signal.aborted) {
+      reject(makeAbortError());
+      return;
+    }
+    signal.addEventListener('abort', () => reject(makeAbortError()));
+  });
+}
+
+function makeAbortError() {
+  const e = new Error('The operation was aborted.');
+  e.name = 'AbortError';
+  return e;
+}
 
 const CANDIDATES = [{ suggestionId: 's-1', name: 'Jane Roe', email: 'jane@example.edu' }];
 
@@ -157,4 +180,41 @@ test('pin 5: single-flight — a pending render cannot be re-triggered into a se
   pending.resolve(response({ drafts: [] }));
   await waitFor(() => expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull());
   expect(calls).toBe(1);
+});
+
+test('a hung render times out within the open session, and Retry re-enables and recovers', async () => {
+  jest.useFakeTimers();
+  try {
+    let calls = 0;
+    global.fetch = jest.fn(async (url, init) => {
+      const u = String(url);
+      if (u.includes('/api/review-manager/render-emails')) {
+        calls += 1;
+        if (calls === 1) return hangingRenderEmails(init); // never resolves/rejects unless aborted
+        return response({
+          drafts: [{ suggestionId: 's-1', candidateName: 'Jane Roe', candidateEmail: 'jane@example.edu', subject: 'S', body: 'B' }],
+        });
+      }
+      return response({});
+    });
+
+    openModal();
+    await waitFor(() => expect(calls).toBe(1));
+
+    // Elapse the render's bounded timeout without closing the modal — this
+    // modal unmounts on close, so the in-session recovery is what matters here.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(PREVIEW_RENDER_TIMEOUT_MS);
+    });
+
+    await waitFor(() => expect(screen.getByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeTruthy());
+    const retryButton = screen.getByRole('button', { name: /Retry/ });
+    expect(retryButton).not.toBeDisabled();
+
+    fireEvent.click(retryButton);
+    await waitFor(() => expect(calls).toBe(2));
+    await waitFor(() => expect(screen.queryByText(RENDER_PREVIEW_NETWORK_MESSAGE)).toBeNull());
+  } finally {
+    jest.useRealTimers();
+  }
 });

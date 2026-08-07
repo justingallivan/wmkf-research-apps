@@ -335,7 +335,18 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     continue. A no-link draft (`externalLinkExpected:false`, zero URLs) neither
     verifies nor mints. Research-only invite rows no longer expose a preview-
     minted manual link; the modal fails closed and points staff to address
-    verification or the separate token-regeneration workflow.
+    verification or the separate token-regeneration workflow. Owner decision
+    2026-08-06: "send from own mailbox" is NOT a priority — the manual-copy
+    link stays degraded fail-closed with no replacement affordance planned;
+    do not re-open without a new owner decision.
+  - **Bounded render timeout (Codex post-build finding 2):** every
+    render-emails fetch in both modals carries an `AbortController` with
+    `PREVIEW_RENDER_TIMEOUT_MS` (45s), and the manage-panel close transition
+    aborts any outstanding render — a hung fetch can no longer wedge
+    `renderTailRef` for later sessions (the modal stays mounted across close).
+    An abort surfaces as the network-failure banner with Retry enabled. Safe
+    because renders are read-only server-side since `d040a7a3` — aborting
+    cannot strand a durable write. Epoch guards still gate every settle.
   - The shared guard messages were also reworded (`lib/utils/auth.js`), after
     three rounds of owner feedback ("application" reads as a GRANT application;
     "permissions to what?"; "she's IN the app and it worked before" — any
