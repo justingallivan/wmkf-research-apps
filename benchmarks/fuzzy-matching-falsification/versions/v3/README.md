@@ -16,8 +16,9 @@ policy.
 The decision contract emits only ROR ids, numeric scores, boolean/numeric
 features, reason codes, veto codes, and a one-way input hash. Raw affiliation
 strings and organization names are forbidden in decision output. The outer
-benchmark artifact still contains the frozen case input and expected labels so
-the run remains independently auditable.
+benchmark artifact contains frozen inputs and expected labels only for the 141
+in-scope institution cases. Skipped person/contact cases retain identifiers and
+the skip reason only.
 
 ## Retrieval policy
 
@@ -26,15 +27,21 @@ the run remains independently auditable.
 - ROR affiliation `single_search` is primary.
 - Ordinary `query` with `all_status` is a bounded fallback when the primary
   result lacks reliable exact/chosen lexical evidence.
-- An unmatched explicit acronym or a documented location synonym can trigger
-  a narrow contradiction probe even after a strong primary result.
+- An unmatched explicit acronym can trigger a narrow contradiction probe even
+  after a strong primary result. The combined ordinary-query union is capped at
+  three, and the whole resolution has a hard provider-request budget.
 - Explicit predecessor/successor and office-to-parent records are hydrated by
   ROR id when needed.
-- Requests are time-bounded, paced, cached within the adapter instance,
-  same-signal single-flighted, and retried only for 429/5xx responses while
-  honoring `Retry-After`.
+- Requests have per-fetch and whole-resolution deadlines, abort-aware queue/
+  pacing/backoff waits, a capped `Retry-After`, adapter-instance caching,
+  same-signal single-flight, and transient-only 429/5xx retries.
 - Provider failure and ambiguity fail closed to review. ROR rank, score, and
   `chosen:true` remain retrieval provenance, never decision authority.
+
+Locality aliases are decision evidence rather than query rewrites. Each is
+scoped to a ROR id and carries an authoritative source in
+`location-evidence.js`; the current UC San Diego/La Jolla entry points to UC San
+Diego's [official address directory](https://blink.ucsd.edu/technology/help-desk/directory/address.html).
 
 Aggregate metrics contain counts only. They never contain raw queries or
 organization names. The adapter accepts an optional server-side
@@ -43,16 +50,18 @@ organization names. The adapter accepts an optional server-side
 ## Frozen result
 
 The accepted live run is
-`results/ror-claim-resolver-2026-08-07-v8.results.jsonl` (SHA-256
-`9604d59dee5b8d65b19e26a5ea8a7a2fe62346b0b50e05aa390a8af60c6026bb`).
+`results/ror-claim-resolver-2026-08-07-v11.results.jsonl` (SHA-256
+`9f7acc4ead71adaaddde8b32089a0b5a5000bcfdc48bb8c103b0bb8442e757df`).
+The machine-readable counts and hash are persisted beside it in
+`results/ror-claim-resolver-2026-08-07-v11.summary.json`.
 
 - 166 total cases
 - 141/141 labeled institution cases passed
 - 0 failed, 0 errored, 0 wrong automatic resolutions
 - 25 non-institution cases intentionally skipped
-- 160 candidate sets used 140 provider requests because 61 logical lookups
-  were served from the request-scoped cache
-- 36 bounded ordinary-query lookups, 5 successor hydrations, 0 retries, and 0
+- 160 candidate sets used 151 provider requests because 44 logical lookups
+  were served from the benchmark process's adapter-instance cache
+- 30 bounded ordinary-query lookups, 5 successor hydrations, 0 retries, and 0
   provider failures
 - maximum returned union: 30 candidates
 

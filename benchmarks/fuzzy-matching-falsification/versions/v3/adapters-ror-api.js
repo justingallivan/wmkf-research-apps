@@ -15,15 +15,17 @@ const {
   createCandidateSet,
   normalizeCandidate,
 } = require('../v2/candidate-contract');
-const { ordinaryFallbackQueries, supplementalEvidenceQueries } = require('./organization-parser');
+const crypto = require('crypto');
+const { ordinaryFallbackQueries } = require('./organization-parser');
 const {
   candidateSignals,
   explicitAcronyms,
   hasStrongLexicalMatch,
-  normalizeText,
 } = require('./text-evidence');
 
 const ROR_ENDPOINT = 'https://api.ror.org/v2/organizations';
+const MAX_HYDRATIONS = 4;
+const MAX_ORDINARY_QUERIES = 3;
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function throwIfAborted(signal) {
@@ -39,19 +41,31 @@ function ordinaryUrl(query) {
   return `${ROR_ENDPOINT}?query=${encodeURIComponent(value)}&all_status`;
 }
 
+function requestKey(url) {
+  return crypto.createHash('sha256').update(url).digest('hex');
+}
+
 function createRorCandidateUnionAdapter({
   fetchImpl = global.fetch,
   sleep = defaultSleep,
   paceMs = 250,
   maxAttempts = 4,
   backoffBaseMs = 1000,
+  maxRetryDelayMs = 5000,
+  maxProviderRequestsPerResolution = 24,
   requestTimeoutMs = 8000,
+  resolutionTimeoutMs = 20000,
   clientId = process.env.ROR_CLIENT_ID || null,
   observedOn = new Date().toISOString().slice(0, 10),
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
-  if (!Number.isFinite(requestTimeoutMs) || requestTimeoutMs <= 0) {
-    throw new Error('requestTimeoutMs must be positive');
+  for (const [name, value] of Object.entries({
+    maxRetryDelayMs, maxProviderRequestsPerResolution, requestTimeoutMs, resolutionTimeoutMs,
+  })) {
+    if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be positive`);
+  }
+  if (!Number.isInteger(maxProviderRequestsPerResolution)) {
+    throw new Error('maxProviderRequestsPerResolution must be an integer');
   }
   const cache = new Map();
   const inFlight = new Map();
@@ -73,7 +87,30 @@ function createRorCandidateUnionAdapter({
   let queue = Promise.resolve();
   let nextAt = 0;
 
-  async function fetchOnce(url, signal) {
+  async function withAbort(promise, signal) {
+    throwIfAborted(signal);
+    let onAbort;
+    const aborted = new Promise((resolve, reject) => {
+      onAbort = () => reject(signal.reason || new Error('Aborted'));
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      return await Promise.race([promise, aborted]);
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  async function wait(ms, signal) {
+    throwIfAborted(signal);
+    if (ms <= 0) return;
+    await withAbort(sleep(ms), signal);
+    throwIfAborted(signal);
+  }
+
+  async function fetchOnce(url, signal, budget) {
+    if (budget.remaining <= 0) throw new Error('ROR per-resolution request budget exhausted');
+    budget.remaining -= 1;
     counters.provider_requests += 1;
     const headers = {
       Accept: 'application/json',
@@ -101,39 +138,43 @@ function createRorCandidateUnionAdapter({
     return body;
   }
 
-  async function retrieve(url, signal) {
+  async function retrieve(url, signal, budget) {
     let requestCount = 0;
     let lastError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       throwIfAborted(signal);
-      await sleep(Math.max(0, nextAt - Date.now()));
+      await wait(Math.max(0, nextAt - Date.now()), signal);
       throwIfAborted(signal);
       nextAt = Date.now() + paceMs;
       try {
         requestCount += 1;
-        return { body: await fetchOnce(url, signal), requestCount };
+        return { body: await fetchOnce(url, signal, budget), requestCount };
       } catch (error) {
         if (signal?.aborted) throw signal.reason || error;
         lastError = error;
         if (!error.retryable || attempt === maxAttempts - 1) throw error;
         counters.retries += 1;
-        await sleep(error.retryAfterMs ?? backoffBaseMs * (2 ** attempt));
+        const retryDelay = Math.min(
+          maxRetryDelayMs,
+          error.retryAfterMs ?? backoffBaseMs * (2 ** attempt),
+        );
+        await wait(retryDelay, signal);
       }
     }
     throw lastError;
   }
 
-  async function responseFor(key, url, signal) {
+  async function responseFor(url, signal, flightScope, budget) {
+    const key = requestKey(url);
     throwIfAborted(signal);
     if (cache.has(key)) {
       counters.cache_hits += 1;
       return { body: cache.get(key), requestCount: 0, cacheHit: true, singleFlightHit: false };
     }
-    const signalKey = signal || withoutSignal;
     let flights = inFlight.get(key);
-    if (flights?.has(signalKey)) {
+    if (flights?.has(flightScope)) {
       counters.single_flight_hits += 1;
-      const settled = await flights.get(signalKey);
+      const settled = await withAbort(flights.get(flightScope), signal);
       throwIfAborted(signal);
       return { body: settled.body, requestCount: 0, cacheHit: false, singleFlightHit: true };
     }
@@ -141,10 +182,11 @@ function createRorCandidateUnionAdapter({
       flights = new Map();
       inFlight.set(key, flights);
     }
-    const run = () => retrieve(url, signal);
-    const flight = queue.then(run, run);
-    queue = flight.then(() => undefined, () => undefined);
-    flights.set(signalKey, flight);
+    const run = () => retrieve(url, signal, budget);
+    const queuedRun = queue.then(run, run);
+    queue = queuedRun.then(() => undefined, () => undefined);
+    const flight = withAbort(queuedRun, signal);
+    flights.set(flightScope, flight);
     try {
       const settled = await flight;
       cache.set(key, settled.body);
@@ -154,17 +196,17 @@ function createRorCandidateUnionAdapter({
       throw error;
     } finally {
       const current = inFlight.get(key);
-      if (current?.get(signalKey) === flight) current.delete(signalKey);
+      if (current?.get(flightScope) === flight) current.delete(flightScope);
       if (current?.size === 0) inFlight.delete(key);
     }
   }
 
-  async function lookup({ key, url, strategy, signal, parse }) {
+  async function lookup({ url, strategy, signal, flightScope, budget, parse }) {
     if (strategy === 'affiliation-single-search') counters.affiliation_lookups += 1;
     if (strategy === 'ordinary-query') counters.ordinary_query_lookups += 1;
     if (strategy === 'successor-hydration') counters.successor_hydrations += 1;
     if (strategy === 'parent-hydration') counters.parent_hydrations += 1;
-    const response = await responseFor(key, url, signal);
+    const response = await responseFor(url, signal, flightScope, budget);
     const organizations = parse(response.body);
     if (!Array.isArray(organizations)) throw new Error(`ROR malformed ${strategy} response`);
     return {
@@ -207,12 +249,20 @@ function createRorCandidateUnionAdapter({
       return emptySet;
     }
 
+    const deadline = AbortSignal.timeout(resolutionTimeoutMs);
+    const operationSignal = input.signal
+      ? AbortSignal.any([input.signal, deadline])
+      : deadline;
+    const flightScope = input.signal || withoutSignal;
+    const budget = { remaining: maxProviderRequestsPerResolution };
     const lookups = [];
+    const affiliationUrl = `${ROR_ENDPOINT}?affiliation=${encodeURIComponent(affiliation)}&single_search`;
     const affiliationLookup = await lookup({
-      key: `affiliation:${normalizeText(affiliation)}`,
-      url: `${ROR_ENDPOINT}?affiliation=${encodeURIComponent(affiliation)}&single_search`,
+      url: affiliationUrl,
       strategy: 'affiliation-single-search',
-      signal: input.signal,
+      signal: operationSignal,
+      flightScope,
+      budget,
       parse: (body) => body.items,
     });
     lookups.push(affiliationLookup);
@@ -231,14 +281,15 @@ function createRorCandidateUnionAdapter({
     const ordinaryQueries = [...new Set([
       ...(!reliablePrimary ? ordinaryFallbackQueries(affiliation) : []),
       ...supplementalQueries,
-      ...supplementalEvidenceQueries(affiliation),
-    ])];
+    ])].slice(0, MAX_ORDINARY_QUERIES);
     for (const query of ordinaryQueries) {
+        const url = ordinaryUrl(query);
         const ordinary = await lookup({
-          key: `query:${normalizeText(query)}`,
-          url: ordinaryUrl(query),
+          url,
           strategy: 'ordinary-query',
-          signal: input.signal,
+          signal: operationSignal,
+          flightScope,
+          budget,
           parse: (body) => body.items,
         });
         lookups.push(ordinary);
@@ -252,14 +303,18 @@ function createRorCandidateUnionAdapter({
         if (relationship.type === 'successor') successorIds.add(relationship.ror_id);
       }
     }
+    if (successorIds.size > MAX_HYDRATIONS) {
+      throw new Error('ROR successor hydration limit exceeded');
+    }
     for (const successorId of successorIds) {
       if (candidates.some((candidate) => candidate.ror_id === successorId)) continue;
       const suffix = successorId.slice('https://ror.org/'.length);
       const successor = await lookup({
-        key: `ror:${suffix}`,
         url: `${ROR_ENDPOINT}/${suffix}`,
         strategy: 'successor-hydration',
-        signal: input.signal,
+        signal: operationSignal,
+        flightScope,
+        budget,
         parse: (body) => [body],
       });
       lookups.push(successor);
@@ -272,14 +327,18 @@ function createRorCandidateUnionAdapter({
           .filter((relationship) => relationship.type === 'parent')
           .map((relationship) => relationship.ror_id)
       )));
+      if (parentIds.size > MAX_HYDRATIONS) {
+        throw new Error('ROR parent hydration limit exceeded');
+      }
       for (const parentId of parentIds) {
         if (candidates.some((candidate) => candidate.ror_id === parentId)) continue;
         const suffix = parentId.slice('https://ror.org/'.length);
         const parent = await lookup({
-          key: `ror:${suffix}`,
           url: `${ROR_ENDPOINT}/${suffix}`,
           strategy: 'parent-hydration',
-          signal: input.signal,
+          signal: operationSignal,
+          flightScope,
+          budget,
           parse: (body) => [body],
         });
         lookups.push(parent);

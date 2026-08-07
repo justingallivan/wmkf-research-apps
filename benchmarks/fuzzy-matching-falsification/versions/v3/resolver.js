@@ -3,16 +3,24 @@
 const { assertCandidateInput } = require('../v2/candidate-contract');
 const { relationshipBetween } = require('../v2/relationship');
 const { createDecision } = require('./decision-contract');
-const { organizationSpans } = require('./organization-parser');
+const { localityAliases } = require('./location-evidence');
+const { parseOrganizationSpans } = require('./organization-parser');
 const {
   candidateSignals,
   containsPhrase,
   normalizeText,
   parentAcronymScope,
+  STATE_NAMES_BY_CODE,
 } = require('./text-evidence');
 
 const MIN_SCORE = 130;
 const MIN_MARGIN = 10;
+const LOCATION_NOISE = new Set([
+  ...Object.keys(STATE_NAMES_BY_CODE).map((value) => normalizeText(value)),
+  ...Object.values(STATE_NAMES_BY_CODE).map((value) => normalizeText(value)),
+  'canada', 'mexico', 'uk', 'united kingdom', 'united states',
+  'united states of america', 'us', 'usa',
+]);
 
 function parentIds(candidate) {
   return new Set((candidate.relationships || [])
@@ -48,9 +56,36 @@ function predecessorSignal(candidate, allCandidates, input) {
   ));
 }
 
+function explicitLocationConflict(candidate, input, features) {
+  if (features.successor_from_predecessor) return false;
+  const parts = String(input.affiliation_string || '')
+    .split(',')
+    .map((part) => normalizeText(part))
+    .filter(Boolean);
+  if (parts.length < 2) return false;
+  const candidateNames = (candidate.names || []).map((name) => normalizeText(name.value));
+  const possibleLocations = parts.filter((part) => {
+    if (LOCATION_NOISE.has(part) || /\d/.test(part)) return false;
+    if (/\b(department|dept|division|faculty|program|school|university|college|institute|hospital|laboratory|lab|center|centre)\b/.test(part)) {
+      return false;
+    }
+    if (candidateNames.some((name) => name === part || containsPhrase(name, part))) return false;
+    return part.split(' ').length <= 4;
+  });
+  if (!possibleLocations.length) return false;
+  const cities = [
+    ...(candidate.locations || []).map((location) => normalizeText(location.city)).filter(Boolean),
+    ...localityAliases(candidate).map(normalizeText),
+  ];
+  return !possibleLocations.some((location) => (
+    cities.some((city) => containsPhrase(city, location) || containsPhrase(location, city))
+  ));
+}
+
 function scoreCandidate(candidate, allCandidates, input) {
   const features = candidateSignals(candidate, input);
   features.successor_from_predecessor = predecessorSignal(candidate, allCandidates, input);
+  features.explicit_location_conflict = explicitLocationConflict(candidate, input, features);
   features.parent_acronym_scope = parentAcronymScope(candidate, input);
   const normalizedInput = normalizeText(input.affiliation_string);
   features.system_scope = /\b(system|office of the president)\b/.test(normalizedInput)
@@ -82,6 +117,7 @@ function scoreCandidate(candidate, allCandidates, input) {
     : Array.isArray(input.domain_evidence) ? input.domain_evidence : [input.domain_evidence];
   if (domains.length && !features.domain_match) vetoes.push('domain_conflict');
   if (input.country_code && !features.country_match) vetoes.push('country_conflict');
+  if (features.explicit_location_conflict) vetoes.push('location_conflict');
   if (candidate.status && candidate.status !== 'active') vetoes.push('inactive_without_canonicalization');
   if (inferredTypeConflict(candidate, input.affiliation_string)
     && !features.exact_name) vetoes.push('type_conflict');
@@ -226,7 +262,16 @@ function createInstitutionDecisionResolver({ candidateAdapter }) {
 
   async function resolveDetailed(input = {}) {
     assertCandidateInput(input);
-    const spans = organizationSpans(input.affiliation_string);
+    const parsed = parseOrganizationSpans(input.affiliation_string);
+    if (parsed.issue) {
+      return {
+        decision: createDecision({
+          outcome: 'review', reasons: [parsed.issue], evaluations: [], input,
+        }),
+        selectedCandidates: [],
+      };
+    }
+    const spans = parsed.spans;
     if (!spans.length) {
       return {
         decision: createDecision({

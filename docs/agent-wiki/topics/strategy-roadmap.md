@@ -146,8 +146,9 @@ document inventory, and individual implementation plans do not establish priorit
   contradiction probes, non-overridable vetoes, provenance-aware scoring,
   abstention, and relationship-aware pair policy. Its accepted live run passes
   all 141 labeled institution cases with 0 failures, 0 provider errors, and 0
-  wrong automatic resolutions; 160 candidate sets used 140 ROR requests after
-  61 request-local cache hits. This clears the frozen falsification bar, not
+  wrong automatic resolutions; 160 candidate sets used 151 ROR requests after
+  44 benchmark-process cache hits. This does not predict production request-
+  scoped reuse. It clears the frozen falsification bar, not
   representative production calibration or rollout capacity. Production stays
   `legacy-default`, and no application module imports v3. Report:
   `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.

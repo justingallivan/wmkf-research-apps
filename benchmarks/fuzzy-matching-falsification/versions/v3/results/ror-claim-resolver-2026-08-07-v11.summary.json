@@ -1,0 +1,25 @@
+{
+  "total": 166,
+  "pass": 141,
+  "fail": 0,
+  "error": 0,
+  "skipped": 25,
+  "wrong_auto_resolutions": 0,
+  "assumedLabelCases": [],
+  "adapter_metrics": {
+    "affiliation_lookups": 160,
+    "cache_hits": 44,
+    "candidate_sets": 160,
+    "candidates_returned": 1675,
+    "max_candidates_returned": 30,
+    "ordinary_query_lookups": 30,
+    "parent_hydrations": 0,
+    "provider_failures": 0,
+    "provider_requests": 151,
+    "retries": 0,
+    "single_flight_hits": 0,
+    "successor_hydrations": 5
+  },
+  "result_file": "ror-claim-resolver-2026-08-07-v11.results.jsonl",
+  "result_sha256": "9f7acc4ead71adaaddde8b32089a0b5a5000bcfdc48bb8c103b0bb8442e757df"
+}

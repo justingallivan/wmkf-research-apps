@@ -494,8 +494,9 @@ a candidate source and separately validates the need for local vetoes. The
 benchmark-only v3 claim-oriented resolver now adds bounded fallback/probes,
 non-overridable vetoes, local scoring, abstention, and relationship-aware pair
 policy; its accepted live run passes all 141 labeled institution cases with 0
-failures, 0 provider errors, and 0 wrong automatic resolutions. It used 140 ROR
-requests for 160 candidate sets after request-local reuse. This clears the
+failures, 0 provider errors, and 0 wrong automatic resolutions. It used 151 ROR
+requests for 160 candidate sets after 44 benchmark-process cache hits; that
+does not predict production request-scoped reuse. This clears the
 frozen falsification bar, not representative production calibration or rollout
 capacity. No schema, production adapter, resolver/scorer authority, or
 identity/write gate changed; production remains `legacy-default`.

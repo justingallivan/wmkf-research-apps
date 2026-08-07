@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { loadCases } = require('../v2/run');
@@ -20,8 +21,9 @@ async function main() {
   }
   const candidateAdapter = require(adapterArg.startsWith('.') ? adapterArg : `./${adapterArg}`);
   const outputPath = path.join(OUT_DIR, `${slug}.results.jsonl`);
-  if (fs.existsSync(outputPath)) {
-    console.error(`Refusing to overwrite existing results: ${outputPath}`);
+  const summaryPath = path.join(OUT_DIR, `${slug}.summary.json`);
+  if (fs.existsSync(outputPath) || fs.existsSync(summaryPath)) {
+    console.error(`Refusing to overwrite existing result slug: ${slug}`);
     process.exit(2);
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -30,27 +32,40 @@ async function main() {
   const { summary } = await runSuite(candidateAdapter, {
     onResult(result) {
       const c = byId.get(result.id);
-      lines.push(JSON.stringify({
+      const record = {
         id: result.id,
         file: c?._file,
         family: c?.family,
         kind: c?.kind,
-        origin: c?.origin,
-        label_status: c?.label_status,
-        input: c?.input,
-        expected_v1: c?.expected,
-        expected_v2: c?.v2,
         status: result.status,
         reason: result.reason,
-        failures: result.failures,
-        actual: result.actual,
-        error: result.error,
-      }));
+      };
+      if (result.status !== 'skipped') {
+        Object.assign(record, {
+          origin: c?.origin,
+          label_status: c?.label_status,
+          input: c?.input,
+          expected_v1: c?.expected,
+          expected_v2: c?.v2,
+          failures: result.failures,
+          actual: result.actual,
+          error: result.error,
+        });
+      }
+      lines.push(JSON.stringify(record));
     },
   });
-  fs.writeFileSync(outputPath, `${lines.join('\n')}\n`);
-  console.log(JSON.stringify(summary, null, 2));
+  const resultBytes = `${lines.join('\n')}\n`;
+  fs.writeFileSync(outputPath, resultBytes);
+  const persistedSummary = {
+    ...summary,
+    result_file: path.basename(outputPath),
+    result_sha256: crypto.createHash('sha256').update(resultBytes).digest('hex'),
+  };
+  fs.writeFileSync(summaryPath, `${JSON.stringify(persistedSummary, null, 2)}\n`);
+  console.log(JSON.stringify(persistedSummary, null, 2));
   console.log(`Wrote ${lines.length} result lines to ${outputPath}`);
+  console.log(`Wrote summary to ${summaryPath}`);
 }
 
 main().catch((error) => {

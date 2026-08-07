@@ -1,7 +1,22 @@
 'use strict';
 
+const { localityAliases } = require('./location-evidence');
+
+const STATE_NAMES_BY_CODE = Object.freeze({
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas',
+  KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts',
+  MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana',
+  NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico',
+  NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma',
+  OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
+  VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  DC: 'District of Columbia',
+});
 const ACRONYM_STOP_WORDS = new Set([
-  'CA', 'IL', 'MA', 'NC', 'NY', 'TN', 'TX', 'UC', 'UK', 'US', 'USA',
+  ...Object.keys(STATE_NAMES_BY_CODE), 'UC', 'UK', 'US', 'USA',
 ]);
 
 function collapseDottedInitialisms(value) {
@@ -28,8 +43,10 @@ function containsPhrase(haystack, needle) {
 function normalizedClaimVariants(value) {
   const normalized = normalizeText(value);
   const variants = new Set([normalized]);
-  if (/^nc state university$/.test(normalized)) {
-    variants.add('north carolina state university');
+  const stateUniversity = normalized.match(/^([a-z]{2}) state university$/);
+  const stateName = stateUniversity && STATE_NAMES_BY_CODE[stateUniversity[1].toUpperCase()];
+  if (stateName) {
+    variants.add(`${normalizeText(stateName)} state university`);
   }
   return [...variants].filter(Boolean);
 }
@@ -95,10 +112,11 @@ function candidateSignals(candidate, evidence = {}) {
   const normalizedDomains = domains.map((domain) => String(domain).trim().toLowerCase());
   const domainMatch = normalizedDomains.length > 0
     && normalizedDomains.some((domain) => candidate.domains?.some((value) => value.toLowerCase() === domain));
-  const cities = (candidate.locations || []).map((location) => location.city).filter(Boolean);
-  const cityAliases = new Set(cities.map(normalizeText));
-  if (cityAliases.has('san diego')) cityAliases.add('la jolla');
-  const cityMatch = [...cityAliases].some((city) => containsPhrase(text, city));
+  const cities = [
+    ...(candidate.locations || []).map((location) => location.city).filter(Boolean),
+    ...localityAliases(candidate),
+  ];
+  const cityMatch = cities.some((city) => containsPhrase(text, city));
   const country = String(evidence.country_code || '').trim().toUpperCase();
   const countryMatch = !!country && candidate.locations?.some((location) => location.country_code === country);
 
@@ -146,4 +164,5 @@ module.exports = {
   normalizeText,
   normalizedClaimVariants,
   parentAcronymScope,
+  STATE_NAMES_BY_CODE,
 };

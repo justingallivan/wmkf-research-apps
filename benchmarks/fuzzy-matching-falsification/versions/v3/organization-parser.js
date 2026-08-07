@@ -1,20 +1,35 @@
 'use strict';
 
-const { collapseDottedInitialisms, explicitAcronyms, normalizeText } = require('./text-evidence');
+const {
+  collapseDottedInitialisms,
+  explicitAcronyms,
+  normalizeText,
+  STATE_NAMES_BY_CODE,
+} = require('./text-evidence');
 
 const ORG_TERM = /\b(university|college|institute|institution|hospital|laboratory|lab|school|center|centre|system|foundation|academy|health)\b/i;
-const STATE_UNIVERSITY_EXPANSIONS = new Map([
-  ['NC', 'North Carolina'],
-]);
+const MAX_ORGANIZATION_SPANS = 5;
 
-function organizationSpans(value) {
+function organizationLike(value) {
+  return ORG_TERM.test(value) || explicitAcronyms(value).length > 0;
+}
+
+function brandedConjunction(value) {
+  return /\b(department|dept|division|faculty|program)\b[^,]*\band\b[^,]*(?:,|$)/i.test(value)
+    || /\b(institute|center|centre|school)\s+of\s+.+\s+and\s+.+/i.test(value);
+}
+
+function parseOrganizationSpans(value) {
   const text = String(value || '').trim();
-  if (!text) return [];
+  if (!text) return { spans: [], issue: null };
   const spans = [];
   for (const semicolonPart of text.split(/\s*;\s*/).filter(Boolean)) {
     const andParts = semicolonPart.split(/\s+and\s+/i);
-    if (andParts.length > 1 && andParts.every((part) => ORG_TERM.test(part))) {
-      spans.push(...andParts);
+    if (andParts.length > 1 && !brandedConjunction(semicolonPart)) {
+      if (!andParts.every(organizationLike)) {
+        return { spans: [], issue: 'unparsed_organization_conjunction' };
+      }
+      spans.push(...andParts.map((part) => part.trim()));
     } else {
       spans.push(semicolonPart);
     }
@@ -25,7 +40,14 @@ function organizationSpans(value) {
     const key = normalizeText(trimmed);
     if (key && !unique.has(key)) unique.set(key, trimmed);
   }
-  return [...unique.values()].slice(0, 5);
+  if (unique.size > MAX_ORGANIZATION_SPANS) {
+    return { spans: [], issue: 'organization_span_overflow' };
+  }
+  return { spans: [...unique.values()], issue: null };
+}
+
+function organizationSpans(value) {
+  return parseOrganizationSpans(value).spans;
 }
 
 function ordinaryFallbackQueries(value) {
@@ -50,8 +72,8 @@ function ordinaryFallbackQueries(value) {
   }
   const unique = new Map();
   const stateUniversity = text.match(/^([A-Z]{2})\s+State University$/);
-  if (stateUniversity && STATE_UNIVERSITY_EXPANSIONS.has(stateUniversity[1])) {
-    queries.push(`${STATE_UNIVERSITY_EXPANSIONS.get(stateUniversity[1])} State University`);
+  if (stateUniversity && STATE_NAMES_BY_CODE[stateUniversity[1]]) {
+    queries.push(`${STATE_NAMES_BY_CODE[stateUniversity[1]]} State University`);
   }
   for (const query of queries) {
     const key = normalizeText(query);
@@ -60,15 +82,4 @@ function ordinaryFallbackQueries(value) {
   return [...unique.values()].slice(0, 3);
 }
 
-function supplementalEvidenceQueries(value) {
-  const normalized = normalizeText(value);
-  const queries = [];
-  if (containsWholePhrase(normalized, 'la jolla')) queries.push('UCSD');
-  return queries;
-}
-
-function containsWholePhrase(haystack, needle) {
-  return ` ${haystack} `.includes(` ${needle} `);
-}
-
-module.exports = { ordinaryFallbackQueries, organizationSpans, supplementalEvidenceQueries };
+module.exports = { ordinaryFallbackQueries, organizationSpans, parseOrganizationSpans };

@@ -54,8 +54,9 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
   API candidate union, local veto/scoring decision contract, and relationship-
   aware pair policy without changing v1/v2. The accepted v3 live run passes all
   141 institution labels with **0 failures, 0 provider errors, and 0 wrong
-  automatic resolutions**. It used 140 provider requests for 160 candidate
-  sets after request-local reuse. This clears the frozen falsification bar but
+  automatic resolutions**. It used 151 provider requests for 160 candidate
+  sets after 44 benchmark-process cache hits. This clears the frozen
+  falsification bar but
   is benchmark-only, not production threshold or deployment evidence. See
   `versions/v3/results/2026-08-07-api-decision-benchmark.md`.
 - `run.js` has now executed once; three harness fixes were made during that

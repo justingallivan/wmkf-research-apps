@@ -148,8 +148,9 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    organization-span parsing, bounded ordinary-query and contradiction probes,
    non-overridable vetoes, provenance-aware scoring, and relationship-aware pair
    policy pass all 141 labeled institution cases with 0 failures, 0 provider
-   errors, and 0 wrong automatic resolutions. The accepted live run used 140
-   ROR requests for 160 candidate sets after 61 request-local cache hits; see
+   errors, and 0 wrong automatic resolutions. The accepted live run used 151
+   ROR requests for 160 candidate sets after 44 benchmark-process cache hits;
+   this does not predict production request-scoped reuse. See
    `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.
    This clears the frozen falsification bar but does not establish production
    thresholds, peak-burst capacity, or deployment readiness. **Next (f):** move

@@ -13,9 +13,12 @@ const {
   assertDecision,
 } = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/decision-contract');
 const {
+  LOCALITY_EVIDENCE,
+} = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/location-evidence');
+const {
   ordinaryFallbackQueries,
   organizationSpans,
-  supplementalEvidenceQueries,
+  parseOrganizationSpans,
 } = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/organization-parser');
 const {
   createInstitutionDecisionResolver,
@@ -83,6 +86,28 @@ describe('falsification suite v3 frozen boundary', () => {
       expect(actual).toBe(expectedHash);
     }
   });
+
+  test('requires every curated locality alias to carry authoritative provenance', () => {
+    for (const evidence of Object.values(LOCALITY_EVIDENCE)) {
+      expect(evidence.aliases.length).toBeGreaterThan(0);
+      expect(evidence.sources.length).toBeGreaterThan(0);
+      expect(evidence.sources.every((source) => source.startsWith('https://'))).toBe(true);
+    }
+  });
+
+  test('pins the accepted result hash and strips skipped-case payloads', () => {
+    const resultPath = path.resolve(
+      __dirname,
+      '../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v11.results.jsonl',
+    );
+    const summary = require('../../../benchmarks/fuzzy-matching-falsification/versions/v3/results/ror-claim-resolver-2026-08-07-v11.summary.json');
+    const bytes = fs.readFileSync(resultPath);
+    expect(crypto.createHash('sha256').update(bytes).digest('hex')).toBe(summary.result_sha256);
+    const skipped = bytes.toString('utf8').trim().split('\n').map(JSON.parse)
+      .filter((row) => row.status === 'skipped');
+    expect(skipped).toHaveLength(25);
+    expect(skipped.every((row) => !('input' in row) && !('expected_v1' in row))).toBe(true);
+  });
 });
 
 describe('organization parsing and controlled fallback', () => {
@@ -94,6 +119,14 @@ describe('organization parsing and controlled fallback', () => {
       .toEqual(['Broad Institute of MIT and Harvard, Cambridge, MA']);
     expect(organizationSpans('Alpha University and Beta Institute and Gamma College'))
       .toEqual(['Alpha University', 'Beta Institute', 'Gamma College']);
+    expect(organizationSpans('Harvard University and MIT'))
+      .toEqual(['Harvard University', 'MIT']);
+    expect(parseOrganizationSpans('Harvard and MIT')).toMatchObject({
+      spans: [], issue: 'unparsed_organization_conjunction',
+    });
+    expect(parseOrganizationSpans(
+      'A University; B University; C University; D University; E University; F University',
+    )).toMatchObject({ spans: [], issue: 'organization_span_overflow' });
   });
 
   test('normalizes dotted acronyms and bounds ordinary-query variants', () => {
@@ -103,8 +136,8 @@ describe('organization parsing and controlled fallback', () => {
     expect(ordinaryFallbackQueries('Harvard Medical School, Boston, MA').length).toBeLessThanOrEqual(3);
     expect(ordinaryFallbackQueries('NC State University'))
       .toContain('North Carolina State University');
-    expect(supplementalEvidenceQueries('UC Berkeley, La Jolla, California'))
-      .toEqual(['UCSD']);
+    expect(ordinaryFallbackQueries('CA State University'))
+      .toContain('California State University');
   });
 });
 
@@ -173,6 +206,61 @@ describe('ROR v3 candidate-union adapter', () => {
     expect(result.candidates.map((item) => item.ror_id)).toContain(ucla.id);
   });
 
+  test('does not conflate punctuation-distinct ROR request URLs in its cache', async () => {
+    const plain = organization('https://ror.org/0168r3w48', 'UC San Diego');
+    const dotted = organization('https://ror.org/042nb2s44', 'U.C. San Diego');
+    const fetchImpl = jest.fn(async (url) => response({
+      items: [{ organization: url.includes('U.C.') ? dotted : plain }],
+    }));
+    const adapter = createRorCandidateUnionAdapter({ fetchImpl, paceMs: 0, sleep: async () => {} });
+    const first = await adapter.institutionCandidates({ affiliation_string: 'UC San Diego' });
+    const second = await adapter.institutionCandidates({ affiliation_string: 'U.C. San Diego' });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(first.candidates[0].ror_id).toBe(plain.id);
+    expect(second.candidates[0].ror_id).toBe(dotted.id);
+  });
+
+  test('single-flights only the same exact URL in the same cancellation scope', async () => {
+    let release;
+    let startedResolve;
+    const started = new Promise((resolve) => { startedResolve = resolve; });
+    const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
+    const fetchImpl = jest.fn(async () => new Promise((resolve) => {
+      release = resolve;
+      startedResolve();
+    }));
+    const adapter = createRorCandidateUnionAdapter({ fetchImpl, paceMs: 0 });
+    const first = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+    const second = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+    await started;
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    release(response({ items: [{ organization: harvard }] }));
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(adapter.metrics.single_flight_hits).toBe(1);
+  });
+
+  test('caps the combined ordinary-query union and total provider request budget', async () => {
+    const fetchImpl = jest.fn(async () => response({ items: [] }));
+    const adapter = createRorCandidateUnionAdapter({ fetchImpl, paceMs: 0, sleep: async () => {} });
+    await adapter.institutionCandidates({
+      affiliation_string: 'AA BB CC DD EE FF GG HH II JJ Research Group',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+
+    const budgetedFetch = jest.fn(async () => response({ items: [] }));
+    const budgeted = createRorCandidateUnionAdapter({
+      fetchImpl: budgetedFetch,
+      maxProviderRequestsPerResolution: 2,
+      paceMs: 0,
+      sleep: async () => {},
+    });
+    await expect(budgeted.institutionCandidates({
+      affiliation_string: 'AA BB CC DD EE Research Group',
+    }))
+      .rejects.toThrow('request budget exhausted');
+    expect(budgetedFetch).toHaveBeenCalledTimes(2);
+  });
+
   test('falls back exponentially when Retry-After is absent', async () => {
     const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
     const fetchImpl = jest.fn()
@@ -191,6 +279,38 @@ describe('ROR v3 candidate-union adapter', () => {
     ]));
   });
 
+  test('caps Retry-After and cancels while waiting in retry backoff', async () => {
+    const ok = response({ items: [] });
+    const cappedFetch = jest.fn()
+      .mockResolvedValueOnce(response({}, 429, '9999'))
+      .mockResolvedValue(ok);
+    const cappedSleep = jest.fn(async () => {});
+    const capped = createRorCandidateUnionAdapter({
+      fetchImpl: cappedFetch, paceMs: 0, maxRetryDelayMs: 5000, sleep: cappedSleep,
+    });
+    await capped.institutionCandidates({ affiliation_string: 'Unknown University' });
+    expect(cappedSleep).toHaveBeenCalledWith(5000);
+
+    const controller = new AbortController();
+    let providerStartedResolve;
+    const providerStarted = new Promise((resolve) => { providerStartedResolve = resolve; });
+    const retrying = createRorCandidateUnionAdapter({
+      fetchImpl: jest.fn(async () => {
+        providerStartedResolve();
+        return response({}, 503);
+      }),
+      paceMs: 0,
+      sleep: async () => new Promise(() => {}),
+    });
+    const pending = retrying.institutionCandidates({
+      affiliation_string: 'Unknown University', signal: controller.signal,
+    });
+    await providerStarted;
+    await Promise.resolve();
+    controller.abort(new Error('cancelled during backoff'));
+    await expect(pending).rejects.toThrow('cancelled during backoff');
+  });
+
   test('honors cancellation even when a response is already cached', async () => {
     const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
     const fetchImpl = jest.fn(async () => response({ items: [{ organization: harvard }] }));
@@ -204,6 +324,31 @@ describe('ROR v3 candidate-union adapter', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  test('cancels a queued lookup before the earlier provider request finishes', async () => {
+    let releaseFirst;
+    let firstStartedResolve;
+    const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+    const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
+    const fetchImpl = jest.fn(async () => new Promise((resolve) => {
+      releaseFirst = resolve;
+      firstStartedResolve();
+    }));
+    const adapter = createRorCandidateUnionAdapter({
+      fetchImpl, paceMs: 0, requestTimeoutMs: 1000, resolutionTimeoutMs: 1000,
+    });
+    const first = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+    await firstStarted;
+    const controller = new AbortController();
+    const second = adapter.institutionCandidates({
+      affiliation_string: 'MIT', signal: controller.signal,
+    });
+    controller.abort(new Error('queued cancellation'));
+    await expect(second).rejects.toThrow('queued cancellation');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    releaseFirst(response({ items: [{ organization: harvard }] }));
+    await first;
+  });
+
   test('bounds a stalled provider request and records the failure', async () => {
     const fetchImpl = jest.fn(async (url, { signal }) => new Promise((resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), { once: true });
@@ -214,6 +359,21 @@ describe('ROR v3 candidate-union adapter', () => {
     await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
       .rejects.toMatchObject({ name: 'TimeoutError' });
     expect(adapter.metrics).toMatchObject({ provider_failures: 1, provider_requests: 1 });
+  });
+
+  test('bounds the whole resolution independently of the per-request timeout', async () => {
+    const fetchImpl = jest.fn(async (url, { signal }) => new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+    const adapter = createRorCandidateUnionAdapter({
+      fetchImpl,
+      paceMs: 0,
+      requestTimeoutMs: 1000,
+      resolutionTimeoutMs: 5,
+      sleep: async () => {},
+    });
+    await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
+      .rejects.toMatchObject({ name: 'TimeoutError' });
   });
 });
 
@@ -289,18 +449,25 @@ describe('veto-first institution decisions', () => {
     });
   });
 
-  test('recognizes a documented locality alias as contradictory sibling evidence', async () => {
-    const ucsd = candidate('https://ror.org/0168r3w48', 'University of California San Diego', {
-      aliases: ['UC San Diego'], acronyms: ['UCSD'], city: 'San Diego',
-      relationships: [{ id: UC_PARENT, type: 'parent', label: 'University of California System' }],
-    });
+  test('vetoes contradictory explicit location evidence without a fixture alias', async () => {
     const input = 'Department of Physics, UC Berkeley, La Jolla, California, USA';
     const resolver = createInstitutionDecisionResolver({
-      candidateAdapter: adapterFor({ [normalizeText(input)]: [berkeley, ucsd] }),
+      candidateAdapter: adapterFor({ [normalizeText(input)]: [berkeley] }),
     });
-    await expect(resolver.resolve({ affiliation_string: input })).resolves.toMatchObject({
-      outcome: 'review', selected_ror_ids: [], reasons: ['sibling_conflict'],
+    const decision = await resolver.resolve({ affiliation_string: input });
+    expect(decision).toMatchObject({ outcome: 'review', selected_ror_ids: [] });
+    expect(decision.evaluations[0].vetoes).toContain('location_conflict');
+
+    const ucsd = candidate('https://ror.org/0168r3w48', 'University of California San Diego', {
+      aliases: ['UC San Diego'], city: 'San Diego',
+      relationships: [{ id: UC_PARENT, type: 'parent', label: 'University of California System' }],
     });
+    const positive = 'University of California San Diego, La Jolla, California, USA';
+    const positiveResolver = createInstitutionDecisionResolver({
+      candidateAdapter: adapterFor({ [normalizeText(positive)]: [ucsd] }),
+    });
+    await expect(positiveResolver.resolve({ affiliation_string: positive }))
+      .resolves.toMatchObject({ outcome: 'resolved', selected_ror_ids: [ucsd.ror_id] });
   });
 
   test('canonicalizes an explicit office-of-president claim to its hydrated parent', async () => {
@@ -402,6 +569,31 @@ describe('veto-first institution decisions', () => {
     await expect(partial.resolve({ affiliation_string: input })).resolves.toMatchObject({
       outcome: 'review', selected_ror_ids: [],
     });
+
+    const mit = candidate('https://ror.org/042nb2s44', 'Massachusetts Institute of Technology', {
+      acronyms: ['MIT'],
+    });
+    const acronymSpan = createInstitutionDecisionResolver({
+      candidateAdapter: adapterFor({
+        'harvard university': [harvard],
+        mit: [mit],
+      }),
+    });
+    await expect(acronymSpan.resolve({ affiliation_string: 'Harvard University and MIT' }))
+      .resolves.toMatchObject({
+        outcome: 'resolved', selected_ror_ids: [harvard.ror_id, mit.ror_id].sort(),
+      });
+  });
+
+  test('fails closed for unparsed conjunctions and span overflow before retrieval', async () => {
+    const candidateAdapter = adapterFor({});
+    const resolver = createInstitutionDecisionResolver({ candidateAdapter });
+    await expect(resolver.resolve({ affiliation_string: 'Harvard and MIT' }))
+      .resolves.toMatchObject({ outcome: 'review', reasons: ['unparsed_organization_conjunction'] });
+    await expect(resolver.resolve({
+      affiliation_string: 'A University; B University; C University; D University; E University; F University',
+    })).resolves.toMatchObject({ outcome: 'review', reasons: ['organization_span_overflow'] });
+    expect(candidateAdapter.institutionCandidates).not.toHaveBeenCalled();
   });
 
   test('fails closed on provider errors', async () => {

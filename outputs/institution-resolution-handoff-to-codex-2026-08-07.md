@@ -29,9 +29,10 @@ index build is deterministic across two runs; its targeted tests and lint pass.
 The candidate overlay validates all 141 institution labels against seven frozen
 base hashes and 29 pinned ROR records; eight focused contract/adapter tests pass,
 and both 166-case v2 comparator runs completed with zero provider errors.
-The v3 focused suite is 24/24 green; its accepted 166-case run is 141/141 for
-the in-scope institution labels with 25 expected skips and used 140 provider
-requests for 160 candidate sets after request-local reuse.
+The v3 focused suite is 33/33 green; its accepted 166-case run is 141/141 for
+the in-scope institution labels with 25 expected skips and used 151 provider
+requests for 160 candidate sets after 44 benchmark-process cache hits. That
+does not predict production request-scoped reuse.
 **Next owner/action:** keep production authority on `legacy-default` unless the
 owner separately authorizes shadow observation. The next build is a production
 request-scoped adapter behind the existing legacy/shadow seam, preserving the

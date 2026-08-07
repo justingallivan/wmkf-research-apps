@@ -14,22 +14,25 @@ sample.
 ## Evidence
 
 - Artifact:
-  `ror-claim-resolver-2026-08-07-v8.results.jsonl`
+  `ror-claim-resolver-2026-08-07-v11.results.jsonl`
 - SHA-256:
-  `9604d59dee5b8d65b19e26a5ea8a7a2fe62346b0b50e05aa390a8af60c6026bb`
+  `9f7acc4ead71adaaddde8b32089a0b5a5000bcfdc48bb8c103b0bb8442e757df`
+- Machine-readable summary:
+  `ror-claim-resolver-2026-08-07-v11.summary.json`
 - Frozen substrate: all v2 case, label, canonical-entity, runner, candidate-
   contract, and relationship hashes in `../manifest.json`
-- Focused tests: 24/24 green
-- Live ROR API requests: 140
+- Focused tests: 33/33 green
+- Live ROR API requests: 151
 - Logical affiliation candidate sets: 160
-- Request-local cache hits: 61
-- Ordinary-query lookups: 36
+- Benchmark-process adapter cache hits: 44
+- Ordinary-query lookups: 30
 - Successor hydrations: 5
 - Retries/provider failures: 0/0
 - Largest deduplicated candidate union: 30
 
 The request count is lower than the candidate-set count because repeated
-institution evidence reused the adapter's bounded in-memory cache. It is not a
+institution evidence reused the benchmark process's bounded in-memory cache.
+That reuse is not evidence for a production request-scoped hit rate. It is not a
 cycle-volume forecast: production burst rate, fallback frequency, latency, and
 provider policy still require shadow measurement.
 
@@ -43,6 +46,8 @@ provider policy still require shadow measurement.
 - acronym collision disambiguation using compatible parent-family evidence;
 - pair consistency for same, related, and distinct registry identities;
 - provider failure and insufficient score/margin abstention.
+- exact-request cache separation, bounded fallback/request budgets, whole-run
+  deadlines, and queued/backoff cancellation.
 
 ROR `chosen:true`, provider score, and result order never decide the outcome.
 Candidate retrieval and local decision authority remain separate contracts.
