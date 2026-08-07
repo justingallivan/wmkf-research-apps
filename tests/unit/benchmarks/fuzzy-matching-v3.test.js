@@ -141,6 +141,8 @@ describe('organization parsing and controlled fallback', () => {
     expect(organizationSpans(
       'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.',
     )).toHaveLength(1);
+    expect(organizationSpans('University of California, San Francisco, School of Medicine'))
+      .toEqual(['University of California, San Francisco, School of Medicine']);
     expect(parseOrganizationSpans('Harvard and MIT')).toMatchObject({
       spans: [], issue: 'unparsed_organization_conjunction',
     });
@@ -250,13 +252,43 @@ describe('ROR v3 candidate-union adapter', () => {
       startedResolve();
     }));
     const adapter = createRorCandidateUnionAdapter({ fetchImpl, paceMs: 0 });
-    const first = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
-    const second = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+    const resolutionScope = adapter.beginResolution();
+    const options = { resolutionScope };
+    const first = adapter.institutionCandidates({ affiliation_string: 'Harvard University' }, options);
+    const second = adapter.institutionCandidates({ affiliation_string: 'Harvard University' }, options);
     await started;
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     release(response({ items: [{ organization: harvard }] }));
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
     expect(adapter.metrics.single_flight_hits).toBe(1);
+  });
+
+  test('does not share an earlier internal deadline across separate no-signal resolutions', async () => {
+    jest.useFakeTimers();
+    try {
+      const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
+      const fetchImpl = jest.fn(async (url, { signal }) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(response({ items: [{ organization: harvard }] })), 20);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        }, { once: true });
+      }));
+      const adapter = createRorCandidateUnionAdapter({
+        fetchImpl, paceMs: 0, requestTimeoutMs: 1000, resolutionTimeoutMs: 30,
+      });
+      const first = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+      await jest.advanceTimersByTimeAsync(18);
+      const second = adapter.institutionCandidates({ affiliation_string: 'Harvard University' });
+      await jest.advanceTimersByTimeAsync(3);
+      await expect(first).resolves.toMatchObject({ provider: 'ror-api-v2-union' });
+      await jest.advanceTimersByTimeAsync(20);
+      await expect(second).resolves.toMatchObject({ provider: 'ror-api-v2-union' });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(adapter.metrics.single_flight_hits).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('caps the combined ordinary-query union and total provider request budget', async () => {

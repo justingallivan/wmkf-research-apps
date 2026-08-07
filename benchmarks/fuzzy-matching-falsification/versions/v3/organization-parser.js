@@ -9,6 +9,7 @@ const {
 
 const ORG_TERM = /\b(university|college|institute|institution|hospital|laboratory|lab|school|center|centre|system|foundation|academy|health)\b/i;
 const COMMA_ORG_TERM = /\b(university|institute|institution|hospital|laboratory|lab|school|center|centre|system|foundation|academy|health)\b|\bcollege\s+of\b|\bcollege$/i;
+const GENERIC_ACADEMIC_SUBUNIT = /^(?:school|college|faculty)\s+of\s+(?:arts(?:\s+and\s+sciences)?|business|dentistry|education|engineering|health\s+sciences?|humanities|law|management|medicine|nursing|pharmacy|public\s+health|public\s+policy|sciences?|social\s+work)$/i;
 const MAX_ORGANIZATION_SPANS = 5;
 const BRAND_NOISE = new Set([
   'academy', 'center', 'centre', 'college', 'foundation', 'health', 'hospital',
@@ -22,6 +23,7 @@ function organizationLike(value) {
 
 function commaOrganizationLike(value) {
   const trimmed = String(value || '').trim();
+  if (GENERIC_ACADEMIC_SUBUNIT.test(trimmed)) return false;
   return COMMA_ORG_TERM.test(trimmed)
     || (/^[A-Z][A-Z0-9.]{1,10}$/.test(trimmed) && explicitAcronyms(trimmed).length > 0);
 }

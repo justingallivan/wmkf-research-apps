@@ -73,7 +73,6 @@ function createRorCandidateUnionAdapter({
   const cache = new Map();
   const inFlight = new Map();
   const resolutionScopes = new WeakSet();
-  const withoutSignal = Symbol('ror-v3-without-signal');
   const counters = {
     affiliation_lookups: 0,
     cache_hits: 0,
@@ -97,9 +96,10 @@ function createRorCandidateUnionAdapter({
       budget: { remaining: maxProviderRequestsPerResolution },
       callerSignal: signal || null,
       failureRecorded: false,
-      flightScope: signal || withoutSignal,
+      flightScope: null,
       operationSignal: signal ? AbortSignal.any([signal, deadlineSignal]) : deadlineSignal,
     };
+    scope.flightScope = scope;
     resolutionScopes.add(scope);
     return scope;
   }
