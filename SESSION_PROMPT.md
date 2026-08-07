@@ -1,186 +1,184 @@
-# Session 405 Prompt: Fuzzy-matching owner answers → benchmark; token-lifecycle redesign queued
+# Session 406 Prompt: Matching roadmap unblocked — comparator runs / consolidation next; invite-panel UX shipped
 
-> **Handoff, 2026-08-06 (Session 404).** A three-act session: (1) the
-> fuzzy-matching reconciliation reached a confirmed Claude×Codex consensus —
-> six owner questions now gate the benchmark; (2) an owner-reported production
-> bug (invite-preview 503s) was diagnosed as a transient Dataverse blip and
-> grew, through four adversarial review rounds, into a shipped hardening of the
-> whole invite-email pipeline including send-time token minting; (3) an
-> owner-reported UX confusion in the confirm-reviewer modal was fixed. TWO
-> production merges (`a9d4e3dd`, `ff06fbb8`), both deployed READY. Full suite
-> 6,910 green at handoff. Run `/start` first.
+> **Handoff, 2026-08-07 (Session 405).** The fuzzy-matching track moved from
+> "waiting on owner" to "benchmarked with a frozen baseline" in one session:
+> the owner answered all six consensus questions, the 166-case falsification
+> suite was built AND executed (incumbent baseline frozen), both follow-up
+> adjudications were settled, and two owner-approved agent builds merged
+> (Google-search-link affordance; normalizer characterization groundwork).
+> Separately, an owner discoverability report led to an invite-panel UX fix
+> (always-visible release button, no internal scrollbar). SEVEN pushes to
+> main, all deployed. Full suite 7,079 green at handoff. Run `/start` first.
 
-## Session 404 Summary
+## Session 405 Summary
 
-All 57 `/start` gates were green at start; suite grew 6,860 → 6,910.
+All 57 `/start` gates were green at start; suite grew 6,910 → 7,079.
 
 ### What Was Completed
 
-1. **Fuzzy-matching reconciliation — DONE (was Next Item 1).**
-   `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` (committed
-   `205bba54`): Codex round 1 "CONSENSUS: YES (amended)", round 2 "CONFIRMED".
-   Shape: four-decision decomposition (institution/person/affiliation/contact)
-   + shared Fellegi–Sunter primitives with decision-specific models and
-   fail-closed vetoes; falsification suite (150–300) never calibrates
-   production thresholds; institution-first. **Six owner questions pend in its
-   §4** (precision floor, review capacity, ROR namespace, benchmark
-   investment, affiliation representation, contact-attribution semantics).
-   Note: requested Codex model `sol-5.6` was rejected by the account; both
-   rounds ran on the CLI default model.
-2. **Invite-preview 503 incident (owner's boss, Request #1003000) — RESOLVED.**
-   Diagnosis: `requireAppAccess`'s fail-closed 503 when its Dataverse
-   app-grant lookup throws (superusers bypass it — why Justin never saw it).
-   Prod probe was clean; her retry later succeeded → transient blip, closed.
-3. **Invite pipeline hardening shipped (merge `a9d4e3dd`, deployed READY).**
-   Eight commits on `fix/invite-preview-error-retry`: preview-failure banners
-   with ↻ Retry in BOTH email modals (`shared/components/reviewers/
-   render-preview-failure.js` shared wording, "No emails have been sent —
-   retrying is safe"); owner-VERBATIM 503 copy in `lib/utils/auth.js` ("I'm
-   having trouble accessing the server…" — do not wordsmith, see
-   `feedback-user-facing-error-copy-voice`); 403 names the app via
-   `appDisplayName`; single-flight rendering + modal-session epoch guards;
-   **send-time token minting** — previews are read-only (JWT-shaped non-live
-   placeholder; `send-emails-service.js` verifies any real legacy/edited JWT
-   then mints/substitutes the authoritative token as the last await before
-   dispatch); 45s AbortController render timeout so a hung fetch can't wedge
-   the modal. Process: plan v1→v4 with four `/codex:adversarial-review`
-   rounds; full record in `outputs/plan-manage-panel-preview-retry-2026-08-06.md`.
-4. **Confirm-reviewer modal coherence (merge `ff06fbb8`, deployed READY).**
-   Owner report: twin "I verified…" checkboxes, ORCID engineer-speak, twin URL
-   fields. Fixed in `CandidateEditModal`: "Email address" / "Right person?"
-   headers, plain ORCID-drop explanation, Evidence-link↔Website cross-fill.
-   Verdicts and stored URLs stay separate by design (identity ≠ contact
-   attribution). Owner decision: research-only manual-copy link stays degraded
-   fail-closed ("send from own mailbox" NOT a priority).
-5. **Memory/wiki:** new `feedback-user-facing-error-copy-voice` (3 rounds of
-   copy correction distilled); big S404 block in
-   `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`; consensus status
-   reconciled into `strategy-roadmap.md` and
-   `project-reviewer-card-simplification-direction`.
+1. **Six owner answers recorded (`e323ee5f`)** —
+   `outputs/fuzzy-matching-owner-answers-2026-08-06.md` (owner-verbatim +
+   labeled operationalizations). Headlines: no near-zero precision floor
+   (checkpoints self-correct; ambiguity must WIDEN checks — union-over-
+   ambiguity COI with human adjudication); review volume tolerated not
+   accepted (cut per-item cost); ROR namespace YES (registry ≠ decision
+   authority); falsification suite approved / 1–2k benchmark parked
+   (high-risk automation stays review-only); all concurrent affiliations
+   shown + COI-screened, recency-ranked; contact = dated evidence ledger,
+   no binary "verified" flag.
+2. **Falsification suite built (`108db648`)** —
+   `benchmarks/fuzzy-matching-falsification/`: 166 cases (120 sampled UC
+   adversarial matrix, full 335 via `--full`; 46 curated from documented
+   failures — S400 operands, Tsai/Nakano, Noe/Clementi, Laederach, Zhou,
+   Kwong, Smirnova/Chen, Shih shapes, EKA). PII lint enforces
+   placeholder-only emails; jest-invisible.
+3. **Incumbent baseline frozen (`21264463`)** — owner authorized execution
+   ("use sonnet to execute the suite"). Keyed OpenAlex; two invalid runs
+   discarded (keyless throttling; a quoted-key env bug that made the
+   resolver look like it abstained on everything). Result: 89 pass / 64
+   fail (60 real + 4 judge naming artifacts) / 12 skipped. **Incumbent is
+   "safe but blind": zero wrong-entity resolutions anywhere, but 36/47
+   positive institution resolutions abstain.** No S400 drift; Zhou
+   namesake-bleed demonstrated live. Full analysis:
+   `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`.
+4. **Adjudications settled (`ac716891`)** — Zhou fixture = `review`
+   regardless of biographical truth; EKA-class provenance-less affiliations
+   = quarantine-for-review (owner decisions 2026-08-07, recorded in the
+   owner-answers addendum). Zero `assumed` labels remain.
+5. **Agent builds merged (`5098aa7a`)** — (a) "Search Google ↗" (quoted
+   name + institution) in `CandidateEditModal` + Find-tab `CandidateCard`
+   (`lib/utils/google-search-url.js`); (b)
+   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` + 158 characterization
+   tests (`tests/unit/normalizer-characterization/`) — **the research
+   memo's institution count was falsified: 9 definitions, not 11, no
+   byte-identical pair** (inventory §6); person 14 confirmed; pins the live
+   UC-containment false positive across `institutionsMatch`
+   implementations. Jest now excludes `.claude/worktrees/` (`6f962063`).
+6. **Invite-panel UX fix (`787e973f`)** — owner report (request 1002959
+   quota email): the "Review & release N as no longer needed" link only
+   appeared after selecting a pending invitee and was unfindable. Now
+   always visible, disabled with tooltip until a still-pending invitee is
+   checked; invite list's internal `max-h` scrollbar removed (card grows,
+   page scrolls). Pinned by
+   `tests/unit/reviewer-invite-panel-release-button.test.js`.
 
 ### Commits (chronological)
-`205bba54` consensus doc · `bc03c688` parking · `b0948437` Retry banner ·
-`482dfd3c`/`ad0ba71a`/`aae3a09e`/`23f15e1d` 503/403 copy iterations ·
-`302bb785` plan v3 build · `d040a7a3` send-time mint (v4) · `a836f4d4`
-adjudication · `8b66beb3` render abort · `a9d4e3dd` MERGE 1 · `ffd19eca`
-modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
+`e323ee5f` owner answers · `108db648` suite build · `21264463` baseline
+freeze · `ac716891` adjudications · `27d2aaa1`/`99af1d1a` search link +
+merge · `6f962063` jest worktree fix · `1b66366e`/`5098aa7a`
+characterization + merge · `cf01b235` doc reconcile · `787e973f`
+invite-panel UX.
 
 ## Next Items
 
-### Owner Decision Needed (gates the reviewer roadmap)
-
-1. ~~**Answer the six fuzzy-matching questions**~~ — **DONE S405
-   (2026-08-06)**: all six answered, owner-verbatim record in
-   `outputs/fuzzy-matching-owner-answers-2026-08-06.md`. Falsification suite
-   approved as next work on this track; representative benchmark parked
-   (high-risk automation stays review-only). Benchmark item below is
-   unblocked.
-2. **postcss moderate advisory** (Dependabot 62; likely needs a `next`
-   upgrade). [Carried; still open on the repo's security tab.]
-3. **Increment E — ProfileProvider double-fetch**
-   (`shared/context/ProfileContext.js:456-489`). [ASSUMED ~0.5–1s tail; carried.]
-4. **Columbia enrichment contaminant** ("EKA University of Applied Sciences",
-   S400, unexplained). [Carried.]
-
 ### Verified Open
 
-1. **Benchmark: falsification suite BUILT + incumbent baseline FROZEN S405**
-   (owner authorized execution same session: "use sonnet to execute the
-   suite"). `benchmarks/fuzzy-matching-falsification/`: 166 cases (120
-   sampled UC matrix, full 335 via `--full`, + 46 curated). Baseline
-   (keyed OpenAlex): 89 pass / 64 fail (60 real + 4 judge naming artifacts)
-   / 12 skipped — incumbent is "safe but blind": ZERO wrong-entity
-   resolutions but 36/47 positive-resolution failures (blanket abstention);
-   byline false-mismatch class reproduces with no S400 drift; person-005
-   (Zhou) namesake-bleed DEMONSTRATED (incumbent matched at 50% confidence).
-   Full analysis: `baseline/incumbent-2026-08-06.md`. NOT done: comparator
-   runs (ROR chosen:true, S2AFF). Both adjudications SETTLED 2026-08-07:
-   Zhou fixture = `review` regardless of biographical truth (question open,
-   gates nothing); EKA-class provenance-less affiliations =
-   quarantine-for-review (owner decision). Search-link + normalizer
-   characterization BOTH MERGED 2026-08-07 (push `5098aa7a`, suite 7,075
-   green): "Search Google ↗" in CandidateEditModal + Find-tab card
-   (`lib/utils/google-search-url.js`); step-1 groundwork in
-   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` + 158 characterization
-   tests (`tests/unit/normalizer-characterization/`) — memo's institution
-   count FALSIFIED (9 found, not 11; discrepancy flagged in the inventory
-   §6). Jest now excludes `.claude/worktrees/` (haste-map collisions).
-2. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
-   concurrently-valid tokens). Founding requirement = final Codex review
-   finding (mint→dispatch non-atomicity) + its test list; owner accepted
-   shipping with the residual documented. Evidence:
-   `outputs/plan-manage-panel-preview-retry-2026-08-06.md` final adjudication
-   entry. Unscheduled — needs its own plan + review when picked up.
-3. **S399 finding 4 — silent no-op invite button.** [Carried; VERIFIED still
-   open at directive `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md:404`
-   as of S403; not touched this session — the S404 invite-modal work was the
-   preview/render path, not this button's no-op.]
-4. **Repair-request reason code ambiguity** (`conflictRecordUnavailable` files
-   under `address_conflict_pending`). [Carried from S403; small fix, offered
-   and not taken up.]
-5. **Invite-panel split copy** (small UX polish, optional). [Carried.]
-6. **S402 optional hardening** (author-check fail-open corner; co-PI/stored-
-   name endpoint paths untested). [Carried, non-blocking.]
+1. **Comparator runs on the frozen suite** (consensus step 0 completion):
+   ROR affiliation API `chosen:true`-only and S2AFF against the same 166
+   cases, recorded next to the incumbent baseline. Evidence: baseline
+   report "What a successor must beat"; comparator list in
+   `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`.
+   S2AFF may need a Python env — scope that before promising it.
+2. **Normalizer consolidation, seam by seam** (consensus step 1 proper) —
+   now unblocked by the characterization tests. Start with the two
+   byte-identical `normalizeName` copies (lowest risk), then the
+   diverged-docstring `ContactParser.normalizeNameForMatch`. Evidence:
+   `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes.
+3. **Token-lifecycle redesign** (per-suggestion lease/generation OR
+   multiple concurrently-valid tokens). Founding requirement = S404 final
+   Codex finding (mint→dispatch non-atomicity), owner accepted shipping
+   with residual. Evidence:
+   `outputs/plan-manage-panel-preview-retry-2026-08-06.md` final
+   adjudication. Unscheduled — needs its own plan + review.
+4. **S399 finding 4 — silent no-op invite button.** [Carried; was VERIFIED
+   open at `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md:404` as of
+   S403; not touched S404/S405.]
+5. **Repair-request reason code ambiguity** (`conflictRecordUnavailable`
+   files under `address_conflict_pending`). [Carried from S403; small.]
+6. **EKA contaminant root cause** — the *handling* is decided
+   (quarantine-for-review) but how it got into `resolvedInstitutions` is
+   untraced. [Carried.]
+7. **postcss moderate advisory** (Dependabot 62; likely needs a `next`
+   upgrade). [Carried; still flagged on every push.]
+8. **Increment E — ProfileProvider double-fetch**
+   (`shared/context/ProfileContext.js:456-489`). [ASSUMED ~0.5–1s tail;
+   carried.]
+
+### Owner Decision Needed
+
+_None gating the roadmap._ Optional curiosities: Zhou biographical ground
+truth (gates nothing — fixture settled); S404 invite-panel split copy +
+S402 optional hardening (carried, non-blocking).
 
 ### Verify Before Acting
 
-1. **Behavioral validation, owner's next real usage — now TWO unreported
-   checks:** (a) post-send rows show Invited with no reload (S401); (b) a
-   re-found engaged person collapses into "Already handled" (S401). Check (c)
-   — unverified-suggestion confirm affordances (S402) — was EXERCISED tonight
-   (the boss used the confirm modal for Yael David/MSKCC and it worked well
-   enough to critique its copy); treat (c) as informally validated.
-2. **The S404 invite pipeline is freshly deployed.** If invites misbehave this
-   week, read `outputs/plan-manage-panel-preview-retry-2026-08-06.md` first —
-   especially the deploy-transition note (drafts rendered pre-deploy fail
-   `external_link_expectation_missing` until re-previewed) and the accepted
-   latest-link-wins residual (do NOT re-report the mint→dispatch window as a
-   bug; it's adjudicated).
-3. **Any matching/normalizer work**: read
-   `feedback-latency-plan-scope-accretion-postmortem` FIRST (S395 shape).
-4. **Any comparison-fix work**: directive §S399 addendum + workbench hazard;
-   fail-closed posture deliberate (`project-reviewer-verify-fail-dangerous`).
+1. **Owner's next real usage should validate three fresh UI changes:**
+   (a) the always-visible release button + no-scrollbar invite list
+   (deployed `787e973f` — owner was about to release 2 pending invitees on
+   request 1002959; ask how it went); (b) the Search Google ↗ link during
+   adjudication; (c) still unreported from S401: post-send rows show
+   Invited with no reload, and re-found engaged person collapses into
+   "Already handled".
+2. **Before ANY suite re-run or comparator run**: read
+   `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`
+   environment section — load env with `set -a; . .env.local; set +a`
+   (grep/cut gluing quotes onto `OPENALEX_API_KEY` silently breaks every
+   call → uniform abstention masquerading as results); judge target-name
+   comparison is exact-string (4 known artifact fails).
+3. **Any matching/normalizer work**: the inventory
+   (`docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`) is now the authoritative
+   count (institution 9, NOT the research memo's 11); read
+   `feedback-latency-plan-scope-accretion-postmortem` before expanding
+   scope; consolidation must keep the 158 characterization tests green or
+   change them deliberately with the caller named.
+4. **The S404 invite pipeline notes still apply** if invites misbehave:
+   `outputs/plan-manage-panel-preview-retry-2026-08-06.md`
+   (deploy-transition re-preview; adjudicated latest-link-wins residual).
 
 ### Parked
 
-1. **Card redesign build** — after owner answers + benchmark
+1. **Representative 1–2k benchmark** — owner-parked; consequence accepted:
+   high-risk automation stays review-only until it exists.
+2. **Card redesign build** — follows the scorer
    (`project-reviewer-card-simplification-direction`).
-2. **Excluded-reviewers intake Phases A/B** — awaiting Justin×Connor
+3. **Excluded-reviewers intake Phases A/B** — awaiting Justin×Connor
    reconciliation. [Carried.]
-3. **Candidate B (exclusion-parse cache)** — largely obsoleted if structured
-   intake ships. [Carried.]
+4. **Candidate B (exclusion-parse cache)** — largely obsoleted if
+   structured intake ships. [Carried.]
 
 ### Do Not Reopen Without New Decision
 
-1. **Mint→dispatch non-atomicity** — owner adjudicated 2026-08-06: ship with
-   residual; fix belongs to the token-lifecycle redesign (Verified Open #2).
-2. **Research-only manual-copy link** — stays degraded fail-closed; owner:
-   "send from own mailbox" not a priority.
-3. Merging the two attestation checkboxes or the two URL fields in
-   `CandidateEditModal` — verdicts/facts are separate by design (consensus §1).
-4. Reverted warm-reconciliation range `5b6757df..7072d52a`; reverted
-   byline-core fallback (`e2342f92`); request `1002903` mutation work;
-   S400 onSent/SSE race (disproven); selectively-clickable warning badges;
-   client-side institution-COI verdicts. [All carried.]
+1. **Mint→dispatch non-atomicity** — owner adjudicated 2026-08-06: fix
+   belongs to the token-lifecycle redesign (Verified Open #3).
+2. **Research-only manual-copy link** — degraded fail-closed by owner
+   decision.
+3. **Merging the modal's two attestation checkboxes / two URL fields** —
+   separate by design; reinforced by owner's Q6 (no binary verified flag).
+4. **Zhou fixture label** and **EKA handling** — settled 2026-08-07 (see
+   owner-answers addendum); only new owner input reopens them.
+5. Reverted warm-reconciliation range `5b6757df..7072d52a`; reverted
+   byline-core fallback (`e2342f92`); request `1002903` mutation work; S400
+   onSent/SSE race (disproven); client-side institution-COI verdicts.
+   [All carried.]
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` | Joint consensus; §4 = the six owner questions |
-| `outputs/plan-manage-panel-preview-retry-2026-08-06.md` | v1→v4 plan + reviews + final adjudication (token residual) |
-| `lib/services/review-manager/send-emails-service.js` | Send-time token authority gate (mint at dispatch) |
-| `lib/services/review-manager/render-emails-service.js` | Read-only previews; `externalLinkExpected` stamp |
-| `lib/external/token-lifecycle.js` | `SEND_TIME_TOKEN_PLACEHOLDER_JWT`, mintAndStore |
-| `lib/utils/auth.js` | Owner-verbatim 503; `appDisplayName` 403 |
-| `shared/components/reviewers/render-preview-failure.js` | Shared preview-failure wording (exported strings owner-locked) |
-| `shared/components/reviewers/CandidateEditModal.js` | Confirm-reviewer modal (S404 coherence pass) |
-| `.claude-memory/feedback-user-facing-error-copy-voice.md` | Error-copy voice lesson (3 owner rounds) |
+| `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | Six owner answers + 2026-08-07 addendum (adjudications, build approvals) |
+| `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, schema, denominators, execution hazards |
+| `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md` | Frozen incumbent baseline + "what a successor must beat" |
+| `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` | AUTHORITATIVE normalizer counts, callers, equivalence classes |
+| `tests/unit/normalizer-characterization/` | 158 behavior-pinning tests (consolidation prerequisite) |
+| `lib/utils/google-search-url.js` | Search-link helper (CandidateEditModal + CandidateCard) |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Always-visible release button; no internal scroll |
+| `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md` | The governing consensus (questions preserved verbatim, §4 annotated) |
 
 ## Testing
 
 ```bash
 npm run check:types
-npx jest --testPathPatterns "invite-preview|manage-panel-preview|token-authority|candidate-edit-modal"
-npx jest                                # full suite, 6,910
+npx jest --testPathPatterns "google-search-url|reviewer-invite-panel|normalizer-characterization"
+npx jest                                # full suite, 7,079
+node benchmarks/fuzzy-matching-falsification/validate-cases.js   # suite schema lint
 ```

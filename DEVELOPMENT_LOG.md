@@ -10,6 +10,24 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Matching roadmap unblocked: owner answers, falsification suite, incumbent baseline (Session 405)
+
+**Milestone:** the reviewer-matching track went from "waiting on owner" to benchmarked in one
+session — all six consensus questions answered (owner-verbatim record), the 166-case
+falsification suite built, and the incumbent baseline frozen against live keyed OpenAlex.
+**Sessions:** 405 (answers → suite build → owner-authorized execution → adjudications →
+two agent builds merged → invite-panel discoverability fix from a live owner report).
+**Ship state:** main `e323ee5f → 787e973f` (7 pushes, all deployed); suite 6,910 → 7,079;
+baseline 89/64/12 — incumbent "safe but blind" (zero wrong-entity resolutions, 36/47
+positives abstain); normalizer inventory falsified the memo's institution count (9, not 11);
+"Search Google ↗" adjudication link + always-visible release-pending button live.
+**Why it matters:** the whole consolidation→scorer→card-redesign sequence now has its
+decision inputs, its regression asset, and the bar a successor must beat; the owner's
+risk frame (ambiguity widens checks; recall of the right person is the objective) is durable.
+**Pointers:** `outputs/fuzzy-matching-owner-answers-2026-08-06.md`;
+`benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`;
+`docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`; commits `21264463`, `5098aa7a`, `787e973f`.
+
 ## August 2026 — Reviewer tokens mint at send time; invite-pipeline error UX (Session 404)
 
 **Milestone:** reviewer portal tokens are no longer minted by preview rendering — previews are
