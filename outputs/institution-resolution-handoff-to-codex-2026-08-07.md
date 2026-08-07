@@ -10,14 +10,17 @@ implemented and merged in PR #113; production resolver authority was live-verifi
 `combined`. The pinned ROR v2.11 compact-index experiment is complete and
 measurement-only. Owner decision 2026-08-07: the live candidate-retrieval plan
 uses ROR's official API, not a bundled local index; the claim-oriented
-resolver/scorer remains planned. The versioned candidate benchmark is also
-complete: canonical ROR-id and relationship labels are pinned without changing
-v1, and ROR API plus incumbent were both rerun under the new candidate-
-retrieval claim.
+resolver/scorer is now implemented and passing in a benchmark-only v3 overlay.
+The versioned candidate benchmark pins canonical ROR-id and relationship labels
+without changing v1; ROR API plus incumbent were rerun under the candidate-
+retrieval claim, then the API candidate-union + veto/scorer comparator passed
+all 141 institution labels with zero failures, provider errors, or wrong
+automatic resolutions. Production remains `legacy-default`.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
 single-flight, aggregate runtime metrics, an offline compact-index
 builder/measurement, and benchmark-only candidate adapters/contracts. No
-production index asset or resolver/scorer was wired.
+production index asset or resolver/scorer was wired; v3 is not imported by the
+application.
 **Verification:** 47 affected resolver/runtime tests and 159 broader
 reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
 green; type check and all
@@ -26,14 +29,18 @@ index build is deterministic across two runs; its targeted tests and lint pass.
 The candidate overlay validates all 141 institution labels against seven frozen
 base hashes and 29 pinned ROR records; eight focused contract/adapter tests pass,
 and both 166-case v2 comparator runs completed with zero provider errors.
+The v3 focused suite is 35/35 green; its accepted 166-case run is 141/141 for
+the in-scope institution labels with 25 expected skips and used 151 provider
+requests for 160 candidate sets after 44 benchmark-process cache hits. That
+does not predict production request-scoped reuse.
 **Next owner/action:** keep production authority on `legacy-default` unless the
-owner separately authorizes shadow observation. Build the next benchmark-only
-slice: organization-span parsing, controlled ordinary-query fallback, and
-non-overridable veto/scoring behavior over the frozen candidate contract. Do
-not use ROR's chosen flag or rank as the verdict. Only after that comparator
-passes should a production request-scoped adapter be wired behind the existing
-legacy/shadow seam. Keep pinned ROR v2.11 only as the offline label and
-relationship substrate. Claude remains off this surface.
+owner separately authorizes shadow observation. The next build is a production
+request-scoped adapter behind the existing legacy/shadow seam, preserving the
+passing v3 contracts, aggregate PII-free metrics, cancellation, pacing, retry,
+and fail-closed behavior. ROR's chosen flag and rank remain retrieval evidence,
+not verdicts. Add the ROR→OpenAlex identifier bridge only after local resolution;
+it may validate but never select a candidate. Keep pinned ROR v2.11 only as the
+offline label and relationship substrate. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -54,7 +61,7 @@ retrieval evidence, not decision authority.** Vetoes run *before* scoring.
 
 ## Owner decision: ROR API for live retrieval (2026-08-07)
 
-[BENCHMARK CONTRACT IMPLEMENTED; PRODUCTION ADAPTER PLANNED] The live app will
+[BENCHMARK RESOLVER PASSING; PRODUCTION ADAPTER PLANNED] The live app will
 query ROR from the server instead of packaging or loading the raw/compact
 dataset. The current compact-index artifacts remain offline-only and untracked.
 

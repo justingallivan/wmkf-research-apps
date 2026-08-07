@@ -46,9 +46,19 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
 - **PINNED ROR v2.11 + COMPACT-INDEX SIZE EXPERIMENT COMPLETE 2026-08-07** —
   the immutable release/checksum, deterministic builder, and results live in
   `../compact-ror-index/`. The full retrieval-only JSON is 80.4 MB plain /
-  24.7 MB Brotli and remains offline-only. No local comparator, canonical-id
-  case revision, relationship-aware pair adapter, or production asset is built
-  by that measurement.
+  24.7 MB Brotli and remains offline-only. No production asset was built by
+  that measurement; the later v2/v3 overlays use the official ROR API and keep
+  the dump only as frozen label/relationship evidence.
+- **COMPARATORS #3–4 COMPLETE 2026-08-07** — `versions/v2/` pins canonical ROR
+  ids and a verdict-free candidate contract; `versions/v3/` adds the bounded
+  API candidate union, local veto/scoring decision contract, and relationship-
+  aware pair policy without changing v1/v2. The accepted v3 live run passes all
+  141 institution labels with **0 failures, 0 provider errors, and 0 wrong
+  automatic resolutions**. It used 151 provider requests for 160 candidate
+  sets after 44 benchmark-process cache hits. This clears the frozen
+  falsification bar but
+  is benchmark-only, not production threshold or deployment evidence. See
+  `versions/v3/results/2026-08-07-api-decision-benchmark.md`.
 - `run.js` has now executed once; three harness fixes were made during that
   run (see its inline comments and the baseline report). Known sharp edge:
   target-name judging is exact-string — compare normalized names or ROR ids
@@ -146,17 +156,14 @@ node run-comparator.js ./adapters-ror <slug>          # any comparator; refuses 
 node validate-cases.js                                # schema lint
 ```
 
-Done: incumbent baseline, ROR `chosen:true`. Remaining from the consensus §1
-step-0 comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`),
-both queued, neither waived:
+Done: incumbent baseline, ROR `chosen:true`, canonical-id candidate benchmark
+v2, and claim-oriented decision benchmark v3. Remaining from the consensus §1
+comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`):
 
-1. **Pinned ROR v2.11 local baseline** (consensus step 2) — source and compact
-   sizing are done in `../compact-ror-index/`; the remaining work is the local
-   adapter plus a deliberately versioned case/judge revision with canonical
-   ROR ids and relationship-aware pair semantics. It remains offline,
-   dependency-free, and rate-limit-free.
-2. **S2AFF** — needs a pinned Python 3.10/3.11 venv; own session.
+1. **S2AFF** — needs a pinned Python 3.10/3.11 venv; own session. It remains a
+   challenger/profile, not a dependency for the now-passing API decision
+   comparator.
 
-A relationship-aware pair adapter is a prerequisite for measuring
-hierarchy/parent-child consistency at all; the current same-ROR-id-only rule
-cannot express it.
+Production wiring remains a separate owner-gated slice behind
+`legacy-default`/shadow. The v3 relationship-aware comparator is not imported
+by the application.

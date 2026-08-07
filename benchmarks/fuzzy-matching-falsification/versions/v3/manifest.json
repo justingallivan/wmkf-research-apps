@@ -1,0 +1,12 @@
+{
+  "schema_version": "falsification-suite-v3-manifest/v1",
+  "base_suite": "../v2",
+  "base_files_sha256": {
+    "manifest.json": "9a3a6e3462313fc399db413d65d6276702abb3792880896a763b840f2296b32c",
+    "case-labels.jsonl": "abf3f71613c1953bc771d79e5f2490812adecf442698990a91d6df62f4c59802",
+    "canonical-entities.json": "34915bc5535a3fd7c0975f3c2c4fb17d50119cbcb0112d6a0946ed780d710763",
+    "run.js": "3e8178469bef463d7c79eee220ecc083ee54a6149392220b302a7709d258e1b7",
+    "candidate-contract.js": "96d7a28e11ea6bc3365b9a12d8616e06dd18e78e0e6133af484272edf75e347c",
+    "relationship.js": "a9f516a33da88008896d0231dcb0c67ec10693a372909bfe97b465852bf163e3"
+  }
+}
