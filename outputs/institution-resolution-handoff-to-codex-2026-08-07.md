@@ -1,8 +1,8 @@
 # Handoff — institution resolution architecture → Codex lead (S406, 2026-08-07)
 
 **Owner:** Codex (design lead, from this point)
-**Branch:** PR #113 merged; compact-index measurement continued on
-`codex/compact-ror-index-experiment`
+**Branch:** PR #113 merged; production adapter work continues on
+`codex/ror-api-production-shadow`
 **Status:** Architecture direction set by Codex's adversarial review; Claude's
 assessment superseded. The first reversible measurement increment is
 implemented and merged in PR #113; production resolver authority was live-verified as
@@ -10,17 +10,20 @@ implemented and merged in PR #113; production resolver authority was live-verifi
 `combined`. The pinned ROR v2.11 compact-index experiment is complete and
 measurement-only. Owner decision 2026-08-07: the live candidate-retrieval plan
 uses ROR's official API, not a bundled local index; the claim-oriented
-resolver/scorer is now implemented and passing in a benchmark-only v3 overlay.
+resolver/scorer is implemented and passing in v3, and that exact decision core
+is now shared with a production request-scoped adapter on the current branch.
 The versioned candidate benchmark pins canonical ROR-id and relationship labels
 without changing v1; ROR API plus incumbent were rerun under the candidate-
 retrieval claim, then the API candidate-union + veto/scorer comparator passed
 all 141 institution labels with zero failures, provider errors, or wrong
-automatic resolutions. Production remains `legacy-default`.
+automatic resolutions. The production adapter branch is not yet merged or
+deployed, and Production remains `legacy-default`.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
 single-flight, aggregate runtime metrics, an offline compact-index
-builder/measurement, and benchmark-only candidate adapters/contracts. No
-production index asset or resolver/scorer was wired; v3 is not imported by the
-application.
+builder/measurement, shared claim-oriented ROR candidate/decision contracts,
+and a production ROR→OpenAlex identity bridge. No production index asset,
+schema, persistence path, or mode setting was added. Existing W1 callers remain
+on the incumbent OpenAlex resolver.
 **Verification:** 47 affected resolver/runtime tests and 159 broader
 reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
 green; type check and all
@@ -32,15 +35,18 @@ and both 166-case v2 comparator runs completed with zero provider errors.
 The v3 focused suite is 35/35 green; its accepted 166-case run is 141/141 for
 the in-scope institution labels with 25 expected skips and used 151 provider
 requests for 160 candidate sets after 44 benchmark-process cache hits. That
-does not predict production request-scoped reuse.
+does not predict production request-scoped reuse. On the production-adapter
+branch, 87 focused bridge/runtime/v2/v3 tests and 175 broader affected caller
+tests pass; lint, type checking, and diff checks are clean before final review.
 **Next owner/action:** keep production authority on `legacy-default` unless the
-owner separately authorizes shadow observation. The next build is a production
-request-scoped adapter behind the existing legacy/shadow seam, preserving the
-passing v3 contracts, aggregate PII-free metrics, cancellation, pacing, retry,
-and fail-closed behavior. ROR's chosen flag and rank remain retrieval evidence,
-not verdicts. Add the ROR→OpenAlex identifier bridge only after local resolution;
-it may validate but never select a candidate. Keep pinned ROR v2.11 only as the
-offline label and relationship substrate. Claude remains off this surface.
+owner separately authorizes shadow observation. Review and promote the current
+request-scoped adapter slice, then profile S2AFF as the next challenger. The
+adapter preserves the passing v3 contracts, aggregate PII-free metrics,
+cancellation, pacing, retry, and fail-closed behavior. ROR's chosen flag and
+rank remain retrieval evidence, not verdicts. The ROR→OpenAlex bridge runs only
+after local resolution; it validates the selected ROR and never selects a
+candidate. Keep pinned ROR v2.11 only as the offline label and relationship
+substrate. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -61,9 +67,10 @@ retrieval evidence, not decision authority.** Vetoes run *before* scoring.
 
 ## Owner decision: ROR API for live retrieval (2026-08-07)
 
-[BENCHMARK RESOLVER PASSING; PRODUCTION ADAPTER PLANNED] The live app will
-query ROR from the server instead of packaging or loading the raw/compact
-dataset. The current compact-index artifacts remain offline-only and untracked.
+[PRODUCTION ADAPTER IMPLEMENTED ON BRANCH; NOT MERGED/DEPLOYED] In explicit
+shadow/combined mode, the live app will query ROR from the server instead of
+packaging or loading the raw/compact dataset. The current compact-index
+artifacts remain offline-only and untracked. Legacy remains the default.
 
 Minimum live contract:
 
@@ -112,7 +119,10 @@ That is fewer than roughly 15,000 primary affiliation calls per cycle before
 user additions, selective ordinary-query fallbacks, retries, and duplicate
 reuse. A fallback for every default candidate would raise the primary-plus-
 fallback bound toward 30,000 calls before user additions. ROR currently
-documents 2,000 requests per five minutes per IP; depending on fallback rate,
+documents 2,000 requests per five minutes per IP. New client-id registration is
+temporarily paused, and ROR says no current rate limit differs based on
+client-id presence; after registration resumes, its published Q3 2026 policy is
+2,000/5 minutes with identification versus 50/5 minutes without. Depending on fallback rate,
 roughly 66–133 fifteen-candidate searches in one five-minute window would reach
 that ceiling before retries. Therefore peak burst rate is the operational gate;
 total cycle volume does not justify a production local index or persistent
@@ -180,17 +190,16 @@ the review.
      the still-planned WMKF consistency policy.
 
 6. **Treat the first increment as a measurement vehicle, not a perf fix.**
-   **BUILT in PR #113; production authority remains `legacy-default`:**
-   `evaluateSuggestionsWithRuntimeSeam` now creates one resolver for the W2
-   batch (`lib/services/reviewer-identity-runtime.js:364,384`), while the
-   single-suggestion entry point retains a per-call default. The resolver
-   single-flights only identical normalized institution/country keys sharing
-   the same `AbortSignal`, caches only settled resolutions/definitive misses,
-   and exposes aggregate counters (`institution-identity-resolver.js:217,261`).
-   One data-minimized batch log reports calls, provider searches/hydrations,
-   cache/single-flight hits, outcomes, cache size, and elapsed batch time; it
-   changes no comparison row or reviewer response. This measures reuse; it does
-   not establish a performance improvement. The
+   **BUILT in PR #113; extended on the current branch; production authority
+   remains `legacy-default`:** `evaluateSuggestionsWithRuntimeSeam` creates one
+   request-scoped ROR resolver for the W2 batch, and single/existing-result
+   shadow operations create their own instance. The ROR adapter reuses settled
+   API responses, shares only cancellation-safe internal work, and the identity
+   bridge caches only settled resolutions/definitive misses. One data-minimized
+   batch log reports ROR requests/candidate sets/cache reuse, OpenAlex
+   hydrations, outcomes, cache size, and elapsed batch time; it changes no
+   comparison row or reviewer response. This measures reuse; it does not
+   establish a performance improvement. The
    `feedback-latency-plan-scope-accretion-postmortem` (S395) still applies.
 
 ## Harness constraints Codex should not trip over
@@ -223,6 +232,8 @@ the review.
 | `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | The six owner answers this all serves (Q1: ambiguity must WIDEN checks) |
 | `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Pinned release, deterministic compact-index sizes, component costs, and fresh-process load/memory evidence |
 | `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md` | 128/141 ROR API vs 84/141 incumbent candidate/relationship run; 71/124 ROR resolve cases also contained a vetoed final-resolution candidate |
+| `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md` | Passing 141-label claim-oriented decision benchmark now shared by production and benchmark wrappers |
+| `lib/services/institution-resolution/ror-institution-identity-resolver.js` | Request-scoped production bridge: one locally selected ROR id → matching OpenAlex identity or null |
 | [ROR REST API documentation](https://ror.readme.io/docs/rest-api) | Official endpoints, per-IP rate limit, client-identification policy, heartbeat/status guidance |
 | [ROR affiliation documentation](https://ror.readme.io/docs/api-affiliation) | Affiliation matching contract and explicit warning that automatic matching can be wrong |
 

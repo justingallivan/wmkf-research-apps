@@ -52,16 +52,19 @@ describe('reviewer identity runtime seam', () => {
       decision: 'bind',
       anchor: 'orcid:0000-0001-8445-2052',
     }));
+    const createInstitutionResolver = jest.fn();
 
     const result = await evaluateWithRuntimeSeam(suggestion, {}, {
       mode: undefined,
       evaluateLegacy,
       evaluateWorksFirst,
+      createInstitutionResolver,
     });
 
     expect(result).toBe(legacyResult);
     expect(evaluateLegacy).toHaveBeenCalledTimes(1);
     expect(evaluateWorksFirst).not.toHaveBeenCalled();
+    expect(createInstitutionResolver).not.toHaveBeenCalled();
   });
 
   test.each(['w2', 'cutover', 'enabled', 'garbage'])(
@@ -85,6 +88,7 @@ describe('reviewer identity runtime seam', () => {
     const callerSignal = new AbortController().signal;
     let shadowSignal;
     const options = { signal: callerSignal, proposalInfo: { title: 'Microbes' } };
+    const createInstitutionResolver = jest.fn();
     const result = await evaluateWithRuntimeSeam(suggestion, options, {
       mode: RESOLVER_MODE.SHADOW,
       evaluateLegacy: jest.fn(async (_candidate, receivedOptions) => {
@@ -104,10 +108,12 @@ describe('reviewer identity runtime seam', () => {
           reason: 'unique_orcid_institution_cluster',
         };
       }),
+      createInstitutionResolver,
       onShadowComparison,
     });
 
     expect(result).toBe(legacyResult);
+    expect(createInstitutionResolver).not.toHaveBeenCalled();
     expect(callOrder).toEqual(['legacy', 'shadow']);
     expect(onShadowComparison).toHaveBeenCalledWith(expect.objectContaining({
       candidateKey: expect.stringMatching(/^[a-f0-9]{16}$/),
@@ -343,6 +349,38 @@ describe('reviewer identity runtime seam', () => {
   test('batch default W2 resolver reuses institutions and emits data-minimized metrics', async () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const candidates = [suggestion, { ...suggestion }];
+    const institutionResolver = {
+      resolve: jest.fn(async () => ({
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'University of Minnesota',
+        country: 'US',
+        ror: 'https://ror.org/017zqws13',
+        associatedInstitutions: [],
+      })),
+      metrics: {
+        resolveCalls: 2,
+        cacheHits: 1,
+        singleFlightHits: 0,
+        providerSearches: 1,
+        providerHydrations: 1,
+        resolved: 1,
+        definitiveMisses: 0,
+        providerFailures: 0,
+        cacheSize: 1,
+        inFlightSize: 0,
+        rorProviderRequests: 1,
+        rorAffiliationLookups: 1,
+        rorCandidateSets: 1,
+        rorCandidatesReturned: 1,
+        rorMaxCandidatesReturned: 1,
+        rorOrdinaryQueryLookups: 0,
+        rorRetries: 0,
+        rorCacheHits: 1,
+        rorSingleFlightHits: 0,
+        openAlexHydrations: 1,
+      },
+    };
+    const createInstitutionResolver = jest.fn(() => institutionResolver);
     jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
       totalCount: 1,
       records: [{
@@ -357,17 +395,6 @@ describe('reviewer identity runtime seam', () => {
         }],
       }],
     });
-    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-    }]);
-    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-      associatedInstitutions: [],
-    });
     jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
       openAlexId: 'https://openalex.org/A1',
       displayName: 'William Harcombe',
@@ -379,13 +406,20 @@ describe('reviewer identity runtime seam', () => {
     const results = await evaluateSuggestionsWithRuntimeSeam(candidates, {}, {
       mode: RESOLVER_MODE.SHADOW,
       evaluateLegacy: jest.fn(async () => legacyResult),
+      createInstitutionResolver,
       createAnchorsMatch: () => async () => true,
       onShadowComparison: jest.fn(),
     });
 
     expect(results).toEqual([legacyResult, legacyResult]);
-    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
-    expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
+    expect(createInstitutionResolver).toHaveBeenCalledTimes(1);
+    expect(institutionResolver.resolve).toHaveBeenCalledTimes(2);
+    expect(institutionResolver.resolve).toHaveBeenNthCalledWith(
+      1,
+      'University of Minnesota',
+      { signal: expect.any(AbortSignal) },
+    );
+    expect(JSON.stringify(institutionResolver.resolve.mock.calls)).not.toContain('Harcombe');
     const metricsCall = info.mock.calls.find(
       ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
     );
@@ -405,6 +439,13 @@ describe('reviewer identity runtime seam', () => {
       providerFailures: 0,
       cacheSize: 1,
       inFlightSize: 0,
+      rorProviderRequests: 1,
+      rorAffiliationLookups: 1,
+      rorCandidateSets: 1,
+      rorCandidatesReturned: 1,
+      rorMaxCandidatesReturned: 1,
+      rorCacheHits: 1,
+      openAlexHydrations: 1,
     });
     const serialized = JSON.stringify(metricsCall[1]);
     expect(serialized).not.toContain('Harcombe');
@@ -417,6 +458,21 @@ describe('reviewer identity runtime seam', () => {
     const candidates = [suggestion, { ...suggestion }];
     const firstLegacy = { status: 'abstain', reason: 'first-legacy-safe-result' };
     const secondLegacy = { status: 'abstain', reason: 'second-legacy-safe-result' };
+    const institutionResolver = {
+      resolve: jest.fn(async () => ({
+        openAlexId: 'https://openalex.org/I1',
+        displayName: 'University of Minnesota',
+        country: 'US',
+        ror: 'https://ror.org/017zqws13',
+        associatedInstitutions: [],
+      })),
+      metrics: {
+        resolveCalls: 2,
+        cacheHits: 1,
+        providerSearches: 1,
+      },
+    };
+    const createInstitutionResolver = jest.fn(() => institutionResolver);
     jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
       totalCount: 3,
       records: ['one', 'two', 'three'].map((suffix) => ({
@@ -431,19 +487,6 @@ describe('reviewer identity runtime seam', () => {
           },
         }],
       })),
-    });
-    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-      ror: 'https://ror.org/017zqws13',
-    }]);
-    jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-      ror: 'https://ror.org/017zqws13',
-      associatedInstitutions: [],
     });
     jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
       openAlexId: 'https://openalex.org/A1',
@@ -467,6 +510,7 @@ describe('reviewer identity runtime seam', () => {
       evaluateLegacy: jest.fn()
         .mockResolvedValueOnce(firstLegacy)
         .mockResolvedValueOnce(secondLegacy),
+      createInstitutionResolver,
       createAnchorsMatch: () => async () => false,
       getAuthorByOrcid,
       onShadowComparison: jest.fn(),
@@ -479,8 +523,8 @@ describe('reviewer identity runtime seam', () => {
       selectedRecord: { openAlexId: 'https://openalex.org/A1' },
     });
     expect(results[1]).toBe(secondLegacy);
-    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
-    expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
+    expect(createInstitutionResolver).toHaveBeenCalledTimes(1);
+    expect(institutionResolver.resolve).toHaveBeenCalledTimes(2);
     const metricsCall = info.mock.calls.find(
       ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
     );
@@ -518,6 +562,23 @@ describe('reviewer identity runtime seam', () => {
       institutionResolver: throwingResolver,
     });
     expect(result).toEqual([legacyResult]);
+  });
+
+  test('default resolver construction failures are shadow-isolated', async () => {
+    const onShadowError = jest.fn();
+    const result = await evaluateSuggestionsWithRuntimeSeam([suggestion], {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      createInstitutionResolver: jest.fn(() => {
+        throw new Error('ROR client unavailable');
+      }),
+      onShadowError,
+    });
+
+    expect(result).toEqual([legacyResult]);
+    expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'ROR client unavailable',
+    }));
   });
 
   test('institution resolver metrics use an explicit PII-free field allowlist', () => {

@@ -50,12 +50,18 @@ This is the continuation entry point for the
   with a `probable` ceiling; no tracked production setting enables it.
 - The W2 batch implementation in PR #113 owns one request-bounded institution
   resolver. Production resolver authority was live-verified as `legacy-default`
-  on 2026-08-07; promotion does not enable `shadow` or `combined`. Settled
-  identities and definitive misses reuse across candidates; concurrent calls
-  single-flight only when their normalized institution/country key and
-  `AbortSignal` are identical. One aggregate, PII-free runtime log reports
-  cache/provider-call counts and batch duration without changing comparison
-  rows or reviewer results.
+  on 2026-08-07; promotion does not enable `shadow` or `combined`.
+- **Claim-oriented ROR adapter `[IMPLEMENTED ON
+  codex/ror-api-production-shadow; NOT YET MERGED OR DEPLOYED]`:** the frozen v3
+  ROR API candidate/decision core is now shared by the benchmark and a
+  production request-scoped bridge. ROR candidate rank and `chosen` remain
+  retrieval evidence only; local parsing, vetoes, scoring, and abstention select
+  at most one ROR id. OpenAlex then hydrates only that selected id and must echo
+  the same ROR. Ambiguity, multi-organization results, provider failure, missing
+  hydration, or mismatch return no new identity. Existing W1 COI callers stay on
+  the incumbent OpenAlex resolver. One aggregate, PII-free batch log reports
+  request/cache/candidate/hydration counts and duration without changing
+  comparison rows or reviewer results.
 - **W4.1 `[PERSISTENCE BUILT BEHIND COMBINED]`:** W2 emits ORCID, matched-byline
   DOI, ROR, and exact OpenAlex-fragment anchors. The server-owned enrichment
   decision carries them to the existing `wmkf_identityverifiedanchorsjson`
@@ -98,11 +104,16 @@ from passing as misses.
 
 ## Next product choice
 
-The remaining product gate is an owner-approved
+First merge and deploy the independently safe ROR shadow-adapter slice; that
+does not change live decisions while production remains `legacy-default`. The
+remaining runtime product gate is an owner-approved
 `REVIEWER_IDENTITY_RESOLVER_MODE=combined` cutover after reviewing durable
 shadow observations. Migration 026 is already live; do not couple its applied
 state to a mode change. `shadow` remains available for comparison-only
 observation; `w2`, `cutover`, typos, and unset values fail back to legacy. The
+next model experiment after this slice is the separately scoped S2AFF challenger
+profile; the representative 1–2k benchmark remains parked, so high-risk
+automation remains review-only. The
 separate open policy questions are whether to add any umbrella
 organization beyond HHMI/Broad and whether the benchmark should credit a
 correct-but-flagged bind for fragmented famous names. The buy-vs-build question

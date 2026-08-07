@@ -51,6 +51,8 @@ corrected the altitude — order by what most rapidly reduces complexity.
   comparator DONE (v3 141/141 institution labels, 0 wrong automatic resolutions),
   see `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`
   → production request-scoped shadow adapter + post-resolution ROR→OpenAlex bridge
+  IMPLEMENTED ON `codex/ror-api-production-shadow` (not merged/deployed;
+  Production remains legacy-default)
   → S2AFF profile →
   normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →

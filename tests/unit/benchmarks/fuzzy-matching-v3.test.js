@@ -430,6 +430,29 @@ describe('ROR v3 candidate-union adapter', () => {
     expect(adapter.metrics).toMatchObject({ provider_failures: 1, provider_requests: 1 });
   });
 
+  test('does not cache a malformed successful provider response', async () => {
+    const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response({}))
+      .mockResolvedValueOnce(response({
+        items: [{ organization: harvard, chosen: true }],
+      }));
+    const adapter = createRorCandidateUnionAdapter({
+      fetchImpl, paceMs: 0, sleep: async () => {},
+    });
+
+    await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
+      .rejects.toThrow('ROR malformed affiliation-single-search response');
+    await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
+      .resolves.toMatchObject({ candidates: [{ ror_id: 'https://ror.org/03vek6s52' }] });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(adapter.metrics).toMatchObject({
+      cache_hits: 0,
+      provider_failures: 1,
+      provider_requests: 2,
+    });
+  });
+
   test('bounds the whole resolution independently of the per-request timeout', async () => {
     const fetchImpl = jest.fn(async (url, { signal }) => new Promise((resolve, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason), { once: true });
