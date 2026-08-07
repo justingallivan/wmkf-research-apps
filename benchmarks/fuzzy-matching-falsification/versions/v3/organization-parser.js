@@ -14,6 +14,12 @@ function organizationLike(value) {
   return ORG_TERM.test(value) || explicitAcronyms(value).length > 0;
 }
 
+function commaOrganizationLike(value) {
+  const trimmed = String(value || '').trim();
+  return ORG_TERM.test(trimmed)
+    || (/^[A-Z][A-Z0-9.]{1,10}$/.test(trimmed) && explicitAcronyms(trimmed).length > 0);
+}
+
 function brandedConjunction(value) {
   return /\b(department|dept|division|faculty|program)\b[^,]*\band\b[^,]*(?:,|$)/i.test(value)
     || /\b(institute|center|centre|school)\s+of\s+.+\s+and\s+.+/i.test(value);
@@ -24,12 +30,19 @@ function parseOrganizationSpans(value) {
   if (!text) return { spans: [], issue: null };
   const spans = [];
   for (const semicolonPart of text.split(/\s*;\s*/).filter(Boolean)) {
+    const commaParts = semicolonPart.split(/\s*,\s*/).filter(Boolean);
+    if (commaParts.filter(commaOrganizationLike).length > 1) {
+      return { spans: [], issue: 'unparsed_multi_organization_delimiter' };
+    }
     const andParts = semicolonPart.split(/\s+and\s+/i);
-    if (andParts.length > 1 && !brandedConjunction(semicolonPart)) {
-      if (!andParts.every(organizationLike)) {
+    if (andParts.length > 1) {
+      if (andParts.every(organizationLike)) {
+        spans.push(...andParts.map((part) => part.trim()));
+      } else if (brandedConjunction(semicolonPart)) {
+        spans.push(semicolonPart);
+      } else {
         return { spans: [], issue: 'unparsed_organization_conjunction' };
       }
-      spans.push(...andParts.map((part) => part.trim()));
     } else {
       spans.push(semicolonPart);
     }

@@ -24,6 +24,9 @@ const {
 } = require('./text-evidence');
 
 const ROR_ENDPOINT = 'https://api.ror.org/v2/organizations';
+const API_VERSION = 'v2';
+const ADAPTER_VERSION = 'ror-api-claim-candidates/v1';
+const AFFILIATION_STRATEGY = 'single_search';
 const MAX_HYDRATIONS = 4;
 const MAX_ORDINARY_QUERIES = 3;
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -69,6 +72,7 @@ function createRorCandidateUnionAdapter({
   }
   const cache = new Map();
   const inFlight = new Map();
+  const resolutionScopes = new WeakSet();
   const withoutSignal = Symbol('ror-v3-without-signal');
   const counters = {
     affiliation_lookups: 0,
@@ -86,6 +90,38 @@ function createRorCandidateUnionAdapter({
   };
   let queue = Promise.resolve();
   let nextAt = 0;
+
+  function beginResolution({ signal } = {}) {
+    const deadlineSignal = AbortSignal.timeout(resolutionTimeoutMs);
+    const scope = {
+      budget: { remaining: maxProviderRequestsPerResolution },
+      callerSignal: signal || null,
+      failureRecorded: false,
+      flightScope: signal || withoutSignal,
+      operationSignal: signal ? AbortSignal.any([signal, deadlineSignal]) : deadlineSignal,
+    };
+    resolutionScopes.add(scope);
+    return scope;
+  }
+
+  function requireResolutionScope(input, suppliedScope) {
+    if (suppliedScope != null) {
+      if (!resolutionScopes.has(suppliedScope)) {
+        throw new Error('resolutionScope must come from beginResolution()');
+      }
+      if (input.signal && suppliedScope.callerSignal !== input.signal) {
+        throw new Error('resolutionScope signal does not match candidate input signal');
+      }
+      return suppliedScope;
+    }
+    return beginResolution({ signal: input.signal });
+  }
+
+  function recordResolutionFailure(scope) {
+    if (scope.callerSignal?.aborted || scope.failureRecorded) return;
+    scope.failureRecorded = true;
+    counters.provider_failures += 1;
+  }
 
   async function withAbort(promise, signal) {
     throwIfAborted(signal);
@@ -164,8 +200,9 @@ function createRorCandidateUnionAdapter({
     throw lastError;
   }
 
-  async function responseFor(url, signal, flightScope, budget) {
+  async function responseFor(url, resolution) {
     const key = requestKey(url);
+    const { operationSignal: signal, flightScope, budget } = resolution;
     throwIfAborted(signal);
     if (cache.has(key)) {
       counters.cache_hits += 1;
@@ -191,9 +228,6 @@ function createRorCandidateUnionAdapter({
       const settled = await flight;
       cache.set(key, settled.body);
       return { ...settled, cacheHit: false, singleFlightHit: false };
-    } catch (error) {
-      if (!signal?.aborted) counters.provider_failures += 1;
-      throw error;
     } finally {
       const current = inFlight.get(key);
       if (current?.get(flightScope) === flight) current.delete(flightScope);
@@ -201,12 +235,12 @@ function createRorCandidateUnionAdapter({
     }
   }
 
-  async function lookup({ url, strategy, signal, flightScope, budget, parse }) {
+  async function lookup({ url, strategy, resolution, parse }) {
     if (strategy === 'affiliation-single-search') counters.affiliation_lookups += 1;
     if (strategy === 'ordinary-query') counters.ordinary_query_lookups += 1;
     if (strategy === 'successor-hydration') counters.successor_hydrations += 1;
     if (strategy === 'parent-hydration') counters.parent_hydrations += 1;
-    const response = await responseFor(url, signal, flightScope, budget);
+    const response = await responseFor(url, resolution);
     const organizations = parse(response.body);
     if (!Array.isArray(organizations)) throw new Error(`ROR malformed ${strategy} response`);
     return {
@@ -231,15 +265,25 @@ function createRorCandidateUnionAdapter({
     };
   }
 
-  async function institutionCandidates(input = {}) {
+  async function institutionCandidates(input = {}, { resolutionScope } = {}) {
     assertCandidateInput(input);
+    const resolution = requireResolutionScope(input, resolutionScope);
+    try {
+      return await institutionCandidatesInScope(input, resolution);
+    } catch (error) {
+      recordResolutionFailure(resolution);
+      throw error;
+    }
+  }
+
+  async function institutionCandidatesInScope(input, resolution) {
     const affiliation = String(input.affiliation_string || '').trim();
     if (!affiliation) {
       const emptySet = createCandidateSet({
         provider: 'ror-api-v2-union',
         candidates: [],
         provenance: {
-          api_version: 'v2', adapter_version: 'ror-api-claim-candidates/v1',
+          api_version: API_VERSION, adapter_version: ADAPTER_VERSION,
           observed_on: observedOn, input_hash: candidateInputHash(input),
           strategies: ['affiliation-single-search'], request_count: 0, retry_count: 0,
           cache_hit: false, single_flight_hit: false,
@@ -249,20 +293,12 @@ function createRorCandidateUnionAdapter({
       return emptySet;
     }
 
-    const deadline = AbortSignal.timeout(resolutionTimeoutMs);
-    const operationSignal = input.signal
-      ? AbortSignal.any([input.signal, deadline])
-      : deadline;
-    const flightScope = input.signal || withoutSignal;
-    const budget = { remaining: maxProviderRequestsPerResolution };
     const lookups = [];
     const affiliationUrl = `${ROR_ENDPOINT}?affiliation=${encodeURIComponent(affiliation)}&single_search`;
     const affiliationLookup = await lookup({
       url: affiliationUrl,
       strategy: 'affiliation-single-search',
-      signal: operationSignal,
-      flightScope,
-      budget,
+      resolution,
       parse: (body) => body.items,
     });
     lookups.push(affiliationLookup);
@@ -287,9 +323,7 @@ function createRorCandidateUnionAdapter({
         const ordinary = await lookup({
           url,
           strategy: 'ordinary-query',
-          signal: operationSignal,
-          flightScope,
-          budget,
+          resolution,
           parse: (body) => body.items,
         });
         lookups.push(ordinary);
@@ -312,9 +346,7 @@ function createRorCandidateUnionAdapter({
       const successor = await lookup({
         url: `${ROR_ENDPOINT}/${suffix}`,
         strategy: 'successor-hydration',
-        signal: operationSignal,
-        flightScope,
-        budget,
+        resolution,
         parse: (body) => [body],
       });
       lookups.push(successor);
@@ -336,9 +368,7 @@ function createRorCandidateUnionAdapter({
         const parent = await lookup({
           url: `${ROR_ENDPOINT}/${suffix}`,
           strategy: 'parent-hydration',
-          signal: operationSignal,
-          flightScope,
-          budget,
+          resolution,
           parse: (body) => [body],
         });
         lookups.push(parent);
@@ -352,8 +382,8 @@ function createRorCandidateUnionAdapter({
       provider: 'ror-api-v2-union',
       candidates,
       provenance: {
-        api_version: 'v2',
-        adapter_version: 'ror-api-claim-candidates/v1',
+        api_version: API_VERSION,
+        adapter_version: ADAPTER_VERSION,
         observed_on: observedOn,
         input_hash: candidateInputHash(input),
         strategies,
@@ -372,7 +402,20 @@ function createRorCandidateUnionAdapter({
     return candidateSet;
   }
 
-  const adapter = { institutionCandidates };
+  const adapter = {
+    beginResolution,
+    institutionCandidates,
+    metadata: Object.freeze({
+      adapter_version: ADAPTER_VERSION,
+      affiliation_strategy: AFFILIATION_STRATEGY,
+      api_version: API_VERSION,
+      endpoint: ROR_ENDPOINT,
+      observed_on: observedOn,
+      strategies: Object.freeze([
+        'affiliation-single-search', 'ordinary-query', 'successor-hydration', 'parent-hydration',
+      ]),
+    }),
+  };
   Object.defineProperty(adapter, 'metrics', {
     enumerable: true,
     get: () => Object.freeze({ ...counters }),
@@ -383,8 +426,10 @@ function createRorCandidateUnionAdapter({
 const defaultAdapter = createRorCandidateUnionAdapter();
 
 const exported = {
+  beginResolution: defaultAdapter.beginResolution,
   createRorCandidateUnionAdapter,
   institutionCandidates: defaultAdapter.institutionCandidates,
+  metadata: defaultAdapter.metadata,
   ordinaryUrl,
 };
 Object.defineProperty(exported, 'metrics', {

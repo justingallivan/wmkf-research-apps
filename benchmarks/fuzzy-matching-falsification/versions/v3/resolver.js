@@ -260,7 +260,13 @@ function createInstitutionDecisionResolver({ candidateAdapter }) {
     throw new Error('candidateAdapter must export institutionCandidates(input)');
   }
 
-  async function resolveDetailed(input = {}) {
+  function beginResolution(signal) {
+    return typeof candidateAdapter.beginResolution === 'function'
+      ? candidateAdapter.beginResolution({ signal })
+      : null;
+  }
+
+  async function resolveDetailed(input = {}, { resolutionScope = null } = {}) {
     assertCandidateInput(input);
     const parsed = parseOrganizationSpans(input.affiliation_string);
     if (parsed.issue) {
@@ -284,7 +290,8 @@ function createInstitutionDecisionResolver({ candidateAdapter }) {
     for (const span of spans) {
       const spanInput = { ...input, affiliation_string: span };
       try {
-        const candidateSet = await candidateAdapter.institutionCandidates(spanInput);
+        const options = resolutionScope ? { resolutionScope } : undefined;
+        const candidateSet = await candidateAdapter.institutionCandidates(spanInput, options);
         settled.push(decideSingle(spanInput, candidateSet));
       } catch (error) {
         if (input.signal?.aborted) throw input.signal.reason || error;
@@ -323,12 +330,20 @@ function createInstitutionDecisionResolver({ candidateAdapter }) {
   }
 
   async function resolve(input = {}) {
-    return (await resolveDetailed(input)).decision;
+    const resolutionScope = beginResolution(input.signal);
+    return (await resolveDetailed(input, { resolutionScope })).decision;
   }
 
   async function compare({ listed, evidence, signal } = {}) {
-    const left = await resolveDetailed({ affiliation_string: listed, signal });
-    const right = await resolveDetailed({ affiliation_string: evidence, signal });
+    const resolutionScope = beginResolution(signal);
+    const left = await resolveDetailed(
+      { affiliation_string: listed, signal },
+      { resolutionScope },
+    );
+    const right = await resolveDetailed(
+      { affiliation_string: evidence, signal },
+      { resolutionScope },
+    );
     if (left.decision.outcome !== 'resolved' || right.decision.outcome !== 'resolved'
       || left.selectedCandidates.length !== 1 || right.selectedCandidates.length !== 1) {
       return {

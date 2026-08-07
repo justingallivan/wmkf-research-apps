@@ -2,12 +2,21 @@
 'use strict';
 
 const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { loadCases } = require('../v2/run');
 const { runSuite } = require('./run');
 
 const OUT_DIR = path.join(__dirname, 'results');
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
+
+function sourceCommit() {
+  return execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  }).trim();
+}
 
 async function main() {
   const [adapterArg, slug] = process.argv.slice(2);
@@ -59,6 +68,10 @@ async function main() {
   fs.writeFileSync(outputPath, resultBytes);
   const persistedSummary = {
     ...summary,
+    adapter_provenance: {
+      ...candidateAdapter.metadata,
+      source_commit: sourceCommit(),
+    },
     result_file: path.basename(outputPath),
     result_sha256: crypto.createHash('sha256').update(resultBytes).digest('hex'),
   };

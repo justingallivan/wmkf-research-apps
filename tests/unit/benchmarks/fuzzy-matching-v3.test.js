@@ -121,6 +121,10 @@ describe('organization parsing and controlled fallback', () => {
       .toEqual(['Alpha University', 'Beta Institute', 'Gamma College']);
     expect(organizationSpans('Harvard University and MIT'))
       .toEqual(['Harvard University', 'MIT']);
+    expect(organizationSpans('Massachusetts Institute of Technology and Harvard University'))
+      .toEqual(['Massachusetts Institute of Technology', 'Harvard University']);
+    expect(parseOrganizationSpans('Harvard University, Massachusetts Institute of Technology'))
+      .toMatchObject({ spans: [], issue: 'unparsed_multi_organization_delimiter' });
     expect(parseOrganizationSpans('Harvard and MIT')).toMatchObject({
       spans: [], issue: 'unparsed_organization_conjunction',
     });
@@ -309,6 +313,7 @@ describe('ROR v3 candidate-union adapter', () => {
     await Promise.resolve();
     controller.abort(new Error('cancelled during backoff'));
     await expect(pending).rejects.toThrow('cancelled during backoff');
+    expect(retrying.metrics.provider_failures).toBe(0);
   });
 
   test('honors cancellation even when a response is already cached', async () => {
@@ -374,6 +379,73 @@ describe('ROR v3 candidate-union adapter', () => {
     });
     await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
       .rejects.toMatchObject({ name: 'TimeoutError' });
+    expect(adapter.metrics.provider_failures).toBe(1);
+  });
+
+  test('shares the request budget and deadline across every span in one public resolution', async () => {
+    const budgetedFetch = jest.fn(async () => response({ items: [] }));
+    const budgetedAdapter = createRorCandidateUnionAdapter({
+      fetchImpl: budgetedFetch,
+      maxProviderRequestsPerResolution: 3,
+      paceMs: 0,
+      sleep: async () => {},
+    });
+    const budgetedResolver = createInstitutionDecisionResolver({ candidateAdapter: budgetedAdapter });
+    await expect(budgetedResolver.resolve({
+      affiliation_string: 'Alpha University and Beta University',
+    })).resolves.toMatchObject({
+      outcome: 'review', reasons: ['provider_failure'], selected_ror_ids: [],
+    });
+    expect(budgetedFetch).toHaveBeenCalledTimes(3);
+    expect(budgetedAdapter.metrics).toMatchObject({ provider_failures: 1, provider_requests: 3 });
+
+    const pairFetch = jest.fn(async () => response({ items: [] }));
+    const pairAdapter = createRorCandidateUnionAdapter({
+      fetchImpl: pairFetch,
+      maxProviderRequestsPerResolution: 3,
+      paceMs: 0,
+      sleep: async () => {},
+    });
+    const pairResolver = createInstitutionDecisionResolver({ candidateAdapter: pairAdapter });
+    await expect(pairResolver.compare({
+      listed: 'Alpha University', evidence: 'Beta University',
+    })).resolves.toMatchObject({ outcome: 'review' });
+    expect(pairFetch).toHaveBeenCalledTimes(3);
+    expect(pairAdapter.metrics).toMatchObject({ provider_failures: 1, provider_requests: 3 });
+
+    jest.useFakeTimers();
+    try {
+      const alpha = organization('https://ror.org/000000001', 'Alpha University');
+      const beta = organization('https://ror.org/000000002', 'Beta University');
+      const timedFetch = jest.fn(async (url, { signal }) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(response({
+          items: [{ organization: url.includes('Alpha') ? alpha : beta }],
+        })), 8);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        }, { once: true });
+      }));
+      const timedAdapter = createRorCandidateUnionAdapter({
+        fetchImpl: timedFetch,
+        paceMs: 0,
+        requestTimeoutMs: 1000,
+        resolutionTimeoutMs: 10,
+      });
+      const timedResolver = createInstitutionDecisionResolver({ candidateAdapter: timedAdapter });
+      const pending = timedResolver.resolve({
+        affiliation_string: 'Alpha University and Beta University',
+      });
+      await jest.advanceTimersByTimeAsync(8);
+      await jest.advanceTimersByTimeAsync(3);
+      await expect(pending).resolves.toMatchObject({
+        outcome: 'review', reasons: ['provider_failure'], selected_ror_ids: [],
+      });
+      expect(timedFetch).toHaveBeenCalledTimes(2);
+      expect(timedAdapter.metrics.provider_failures).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -576,6 +648,7 @@ describe('veto-first institution decisions', () => {
     const acronymSpan = createInstitutionDecisionResolver({
       candidateAdapter: adapterFor({
         'harvard university': [harvard],
+        'massachusetts institute of technology': [mit],
         mit: [mit],
       }),
     });
@@ -583,6 +656,11 @@ describe('veto-first institution decisions', () => {
       .resolves.toMatchObject({
         outcome: 'resolved', selected_ror_ids: [harvard.ror_id, mit.ror_id].sort(),
       });
+    await expect(acronymSpan.resolve({
+      affiliation_string: 'Massachusetts Institute of Technology and Harvard University',
+    })).resolves.toMatchObject({
+      outcome: 'resolved', selected_ror_ids: [harvard.ror_id, mit.ror_id].sort(),
+    });
   });
 
   test('fails closed for unparsed conjunctions and span overflow before retrieval', async () => {
@@ -590,6 +668,11 @@ describe('veto-first institution decisions', () => {
     const resolver = createInstitutionDecisionResolver({ candidateAdapter });
     await expect(resolver.resolve({ affiliation_string: 'Harvard and MIT' }))
       .resolves.toMatchObject({ outcome: 'review', reasons: ['unparsed_organization_conjunction'] });
+    await expect(resolver.resolve({
+      affiliation_string: 'Harvard University, Massachusetts Institute of Technology',
+    })).resolves.toMatchObject({
+      outcome: 'review', reasons: ['unparsed_multi_organization_delimiter'],
+    });
     await expect(resolver.resolve({
       affiliation_string: 'A University; B University; C University; D University; E University; F University',
     })).resolves.toMatchObject({ outcome: 'review', reasons: ['organization_span_overflow'] });
