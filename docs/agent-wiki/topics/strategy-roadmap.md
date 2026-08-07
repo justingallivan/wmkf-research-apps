@@ -114,12 +114,12 @@ document inventory, and individual implementation plans do not establish priorit
   principle: ROR `chosen:true`, search rank, and exact aliases are RETRIEVAL
   EVIDENCE, NOT DECISION AUTHORITY, and vetoes run before scoring. **Owner
   decision 2026-08-07: the live app uses API lookup and does not bundle a local
-  ROR index.** The API adapter must send institution evidence only, retain
-  out-of-band domain/country/type/hierarchy evidence for local vetoes, and fall
+  ROR index.** The API adapter implemented on
+  `codex/ror-api-production-shadow` sends institution evidence only, retains
+  out-of-band domain/country/type/hierarchy evidence for local vetoes, and falls
   back to no new resolution on provider failure or ambiguity. The current
-  resolver is a single-winner OpenAlex resolver and must not be reused as the
-  candidate-union interface; extract/reuse only its request-scoped cache,
-  single-flight, cancellation, and metrics pattern. The new interface returns
+  W1 resolver remains a single-winner OpenAlex resolver and is not reused as the
+  candidate-union interface. The new shared interface returns
   candidate ROR records with no verdict, explicitly requests API v2
   `single_search`, bounds concurrency/time/retries, and supports the `Client-Id`
   header when ROR policy requires it. Only after local resolution may a
@@ -128,8 +128,12 @@ document inventory, and individual implementation plans do not establish priorit
   Owner volume is fewer than 1,000 review requests
   per cycle × about 15 default candidates plus user additions. Each unique
   affiliation needs one primary call and may need one selective query fallback;
-  ROR's documented 2,000-request/five-minute limit therefore makes measured
-  fallback and peak burst rates the operational metrics, not total cycle volume.
+  ROR's documented 2,000-request/five-minute per-IP limit therefore makes
+  measured fallback and peak burst rates the operational metrics, not total
+  cycle volume. New client-id registration is temporarily paused; ROR says no
+  current rate limit differs by client-id presence, while its published
+  post-pause policy is 2,000/5 minutes with identification versus 50/5 minutes
+  without. The adapter sends the optional non-secret `Client-Id` when set.
   **CANDIDATE BENCHMARK v2 COMPLETE 2026-08-07:** the manifest preserves v1
   runner/case bytes by hash; 141 institution cases now have canonical ROR ids
   and pinned relationship labels; the verdict-free adapter contract includes
@@ -141,7 +145,7 @@ document inventory, and individual implementation plans do not establish priorit
   validating the candidate-source choice and the separate need for local
   vetoes—not a final resolver. Report:
   `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`.
-  **DECISION BENCHMARK v3 COMPLETE 2026-08-07:** the benchmark-only API
+  **DECISION BENCHMARK v3 COMPLETE 2026-08-07:** the API
   candidate union now adds organization-span parsing, bounded query fallback and
   contradiction probes, non-overridable vetoes, provenance-aware scoring,
   abstention, and relationship-aware pair policy. Its accepted live run passes
@@ -149,8 +153,11 @@ document inventory, and individual implementation plans do not establish priorit
   wrong automatic resolutions; 160 candidate sets used 151 ROR requests after
   44 benchmark-process cache hits. This does not predict production request-
   scoped reuse. It clears the frozen falsification bar, not
-  representative production calibration or rollout capacity. Production stays
-  `legacy-default`, and no application module imports v3. Report:
+  representative production calibration or rollout capacity. Its decision core
+  is now shared with the request-scoped production bridge on
+  `codex/ror-api-production-shadow`; benchmark v3 paths are thin compatibility
+  wrappers. The branch is not merged or deployed, and Production stays
+  `legacy-default`. Report:
   `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.
   Corrected facts: pinned ROR v2.11 has **135,710 total /
   132,706 active records** [VERIFIED via the checksum-pinned 2026-08-03 dump].
@@ -172,11 +179,10 @@ document inventory, and individual implementation plans do not establish priorit
   (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → **pinned v2.11
   offline candidate benchmark COMPLETE** with canonical expected ROR ids,
   relationship-aware pair evaluation, and a frozen verdict-free contract →
-  **claim-oriented API decision benchmark v3 COMPLETE** → next build the
-  production request-scoped ROR API adapter behind the legacy-default/shadow
-  seam, preserving the passing contracts and adding the post-resolution
-  ROR→OpenAlex identifier bridge → run and
-  resource-profile S2AFF as a challenger. Both
+  **claim-oriented API decision benchmark v3 COMPLETE** → **production
+  request-scoped ROR API adapter + post-resolution ROR→OpenAlex bridge
+  IMPLEMENTED ON `codex/ror-api-production-shadow`; review/promotion remains**
+  → run and resource-profile S2AFF as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -190,7 +196,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  production shadow adapter + ROR→OpenAlex bridge → S2AFF profile → normalizer
+  review/promote production shadow adapter → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

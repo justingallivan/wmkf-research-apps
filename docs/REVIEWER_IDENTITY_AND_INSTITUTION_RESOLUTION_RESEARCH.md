@@ -484,22 +484,28 @@ Historical boundary — as of 2026-08-04:
 Subsequent current state (2026-08-07): owner-authorized measurement work has
 started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
 pinned ROR v2.11 size experiment is complete and offline-only. The owner selected
-the ROR API for eventual live candidate retrieval, with no production local
+the ROR API for live candidate retrieval, with no production local
 index or initially planned cross-request database cache. The deliberately
 versioned candidate benchmark is now complete: canonical ROR ids and
 relationships are pinned, ROR API v2 single-search passed 128/141 institution
 cases versus the incumbent bridge's 84/141, and 71/124 ROR resolve cases also
 contained a candidate forbidden as the final resolution. That validates ROR as
 a candidate source and separately validates the need for local vetoes. The
-benchmark-only v3 claim-oriented resolver now adds bounded fallback/probes,
+v3 claim-oriented resolver adds bounded fallback/probes,
 non-overridable vetoes, local scoring, abstention, and relationship-aware pair
 policy; its accepted live run passes all 141 labeled institution cases with 0
 failures, 0 provider errors, and 0 wrong automatic resolutions. It used 151 ROR
 requests for 160 candidate sets after 44 benchmark-process cache hits; that
 does not predict production request-scoped reuse. This clears the
 frozen falsification bar, not representative production calibration or rollout
-capacity. No schema, production adapter, resolver/scorer authority, or
-identity/write gate changed; production remains `legacy-default`.
+capacity. On branch `codex/ror-api-production-shadow`, that same decision core
+is shared with a request-scoped production adapter behind the existing seam.
+Only one locally selected ROR id can be hydrated through OpenAlex, and the
+hydrated record must echo the same ROR; failures and ambiguity return no new
+identity. The branch adds no schema or write path and has not been merged or
+deployed. A value-redacted Production env pull on 2026-08-07 confirmed
+`REVIEWER_IDENTITY_RESOLVER_MODE` is present and non-empty but normalizes to
+`legacy`, so authority remains legacy-only.
 
 ## Primary sources
 

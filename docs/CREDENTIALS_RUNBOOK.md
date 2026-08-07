@@ -6,7 +6,7 @@ status: canonical
 summary: "*Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-08-07
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -130,6 +130,7 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 | `ORCID_CLIENT_ID` | Researcher contact lookup **+ identity-spine verification (OpenAlex+ORCID Track-A)** | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
 | `OPENALEX_API_KEY` | OpenAlex author/institution/work lookup authentication and rate-limit budget | [OpenAlex API key](https://openalex.org/settings/api) | Free daily budget |
+| `ROR_CLIENT_ID` | Optional, non-secret ROR API client identifier sent as `Client-Id` by the claim-oriented institution resolver when set. New registration is temporarily paused; ROR currently applies no rate-limit difference based on client-id presence and says it will not do so before registration resumes. The published future policy is 2,000 requests/5 minutes with identification versus 50/5 minutes without. | [ROR client ID](https://ror.readme.io/docs/client-id) | Free; optional while registration is paused |
 | `SERP_API_KEY` | Reviewer contact lookup + PubPeer + news (integrity). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
 
 > **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
@@ -142,6 +143,8 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 > server-side in each runtime environment. `OPENALEX_POLITE_MAILTO` remains only
 > as an optional monitored contact in the User-Agent; it does not authenticate or
 > increase the request budget. Never expose the API key to client code.
+> `ROR_CLIENT_ID` is identification, not authentication or authorization, and
+> is not a secret. The resolver remains functional when it is unset.
 
 ### Optional — Per-App Model Overrides
 
@@ -179,7 +182,7 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | `WAVE1_BACKEND_APP_ACCESS` | Dispatch flag for app-access backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `WAVE1_BACKEND_PREFS` | Dispatch flag for user-preferences backend. Default Dataverse since 2026-05-12. | `dataverse` (implicit) |
 | `DEBUG_REVIEWER_FINDER` | Verbose logging for Reviewer Finder pipeline | unset |
-| `REVIEWER_IDENTITY_RESOLVER_MODE` | Server-owned W2 identity resolver seam. `shadow` runs works-first comparison telemetry but still returns the exact legacy result. `combined` is the explicit owner-gated authoritative adapter. Unknown values, including `w2`/`cutover`, fail back to legacy. | unset / `legacy`; do not set `combined` in a deployed environment without owner-approved cutover |
+| `REVIEWER_IDENTITY_RESOLVER_MODE` | Server-owned W2 identity resolver seam. `shadow` runs works-first comparison telemetry but still returns the exact legacy result. `combined` is the explicit owner-gated authoritative adapter. Unknown values, including `w2`/`cutover`, fail back to legacy. | Unset or any legacy-normalizing value is safe. Production has a non-empty legacy-normalizing value as of 2026-08-07; its sensitive raw value is intentionally undocumented. Do not set `combined` in a deployed environment without owner-approved cutover. |
 | `REVIEWER_PAGE_EMAIL_TIER_ENABLED` | Enables the guarded faculty/profile-page email recovery tier in `ContactEnrichmentService._attachEmailFromResolvedPage()`. The tier is SSRF-bound to anchored institution domains and only runs when no trusted email is present. | unset/`false` locally; production enabled 2026-07-03 |
 | `REVIEW_SYNTHESIS_AUTOMATION_ENABLED` | Master rollout gate for `/api/cron/drain-review-syntheses`. The route authenticates and returns an inert `automation_disabled` response unless the value is exactly `true`. Migration 028, signed-in verification, and the bounded automatic production smoke completed 2026-07-28; Production is deliberately set to exact `true`. | Production: `true`; unset/anything else disables |
 | `DRAIN_BATCH_SIZE` | Intake drain cron batch size for `/api/cron/drain-submissions`. | `5` |

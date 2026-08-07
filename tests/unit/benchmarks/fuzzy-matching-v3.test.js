@@ -74,6 +74,22 @@ function adapterFor(map) {
 }
 
 describe('falsification suite v3 frozen boundary', () => {
+  test('benchmark compatibility paths execute the promoted shared production core', () => {
+    const pairs = [
+      ['decision-contract', 'versions/v3/decision-contract'],
+      ['location-evidence', 'versions/v3/location-evidence'],
+      ['organization-parser', 'versions/v3/organization-parser'],
+      ['text-evidence', 'versions/v3/text-evidence'],
+      ['ror-candidate-adapter', 'versions/v3/adapters-ror-api'],
+      ['ror-decision-resolver', 'versions/v3/resolver'],
+    ];
+    for (const [sharedName, benchmarkPath] of pairs) {
+      expect(require(`../../../lib/services/institution-resolution/${sharedName}`)).toBe(
+        require(`../../../benchmarks/fuzzy-matching-falsification/${benchmarkPath}`),
+      );
+    }
+  });
+
   test('pins every v2 input consumed by the final-decision benchmark', () => {
     const baseDir = path.resolve(
       __dirname,
@@ -412,6 +428,29 @@ describe('ROR v3 candidate-union adapter', () => {
     await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
       .rejects.toMatchObject({ name: 'TimeoutError' });
     expect(adapter.metrics).toMatchObject({ provider_failures: 1, provider_requests: 1 });
+  });
+
+  test('does not cache a malformed successful provider response', async () => {
+    const harvard = organization('https://ror.org/03vek6s52', 'Harvard University');
+    const fetchImpl = jest.fn()
+      .mockResolvedValueOnce(response({}))
+      .mockResolvedValueOnce(response({
+        items: [{ organization: harvard, chosen: true }],
+      }));
+    const adapter = createRorCandidateUnionAdapter({
+      fetchImpl, paceMs: 0, sleep: async () => {},
+    });
+
+    await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
+      .rejects.toThrow('ROR malformed affiliation-single-search response');
+    await expect(adapter.institutionCandidates({ affiliation_string: 'Harvard University' }))
+      .resolves.toMatchObject({ candidates: [{ ror_id: 'https://ror.org/03vek6s52' }] });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(adapter.metrics).toMatchObject({
+      cache_hits: 0,
+      provider_failures: 1,
+      provider_requests: 2,
+    });
   });
 
   test('bounds the whole resolution independently of the per-request timeout', async () => {

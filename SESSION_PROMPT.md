@@ -119,14 +119,15 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    index is 80.4 MB plain / 24.7 MB Brotli and reaches about 0.61 GB immediate
    post-parse process RSS with its input buffer retained. No production asset is
    wired or authorized.
-   **Step (c) is now owner-decided:** use ROR's official API for live
-   candidate retrieval through a server-only adapter; do not bundle the dump or
+   **Step (c) is owner-decided and implemented on the current branch:** use
+   ROR's official API for live candidate retrieval through a server-only
+   adapter; do not bundle the dump or
    compact index. The existing single-identity OpenAlex resolver cannot serve as
-   that candidate adapter: reuse or extract only its request-scoped cache,
-   single-flight, cancellation, and metrics pattern for a new ROR candidate-set
-   interface. The adapter must send only institution
-   affiliation evidence, respect provider timeout/rate-limit/retry behavior,
-   and treat provider failure, ambiguity, or a safety veto as no new resolution
+   that candidate adapter, so its W1 callers remain unchanged while the v3
+   candidate-set and decision contracts are shared from
+   `lib/services/institution-resolution/`. The adapter sends only institution
+   affiliation evidence, respects provider timeout/rate-limit/retry behavior,
+   and treats provider failure, ambiguity, or a safety veto as no new resolution
    so legacy/review behavior remains authoritative. ROR `chosen:true` and rank
    are candidates only; out-of-band domain/country/type/hierarchy evidence must
    still reach the veto/scoring layer. At the owner-provided volume of fewer
@@ -134,9 +135,12 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    search plus user-recommended reviewers, cycle volume is under roughly 15,000
    primary affiliation lookups before user additions, selective query fallbacks,
    retries, and request-local reuse. Peak five-minute traffic, not cycle total,
-   is the operational limit to measure. Re-verify ROR's live rate/client-id
-   policy before rollout and support its `Client-Id` header when required. No
-   cross-request database cache is planned initially. **Step (d) is complete:**
+   is the operational limit to measure. ROR's official policy was re-verified
+   2026-08-07: the overall API ceiling remains 2,000 requests/5 minutes per IP;
+   new client-id registration is temporarily paused, no current rate limit
+   differs by client-id presence, and the planned post-pause unidentified limit
+   is 50/5 minutes. The adapter supports the optional non-secret `Client-Id`
+   header. No cross-request database cache is planned initially. **Step (d) is complete:**
    `versions/v2/` pins the v1 runner and case bytes by hash, adds canonical ROR ids and
    pinned relationship labels, freezes a verdict-free candidate-set contract,
    and reruns both prior systems under the new claim. ROR API v2 single-search
@@ -144,7 +148,7 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    relationship) versus the incumbent bridge's 84/141, with zero provider
    errors. A forbidden final-resolution ROR id was nevertheless present in
    71/124 ROR resolve candidate sets, proving that retrieval cannot be decision
-   authority. **Step (e) is complete in the benchmark-only v3 overlay:**
+   authority. **Step (e) first completed in the v3 benchmark overlay:**
    organization-span parsing, bounded ordinary-query and contradiction probes,
    non-overridable vetoes, provenance-aware scoring, and relationship-aware pair
    policy pass all 141 labeled institution cases with 0 failures, 0 provider
@@ -153,12 +157,19 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    this does not predict production request-scoped reuse. See
    `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.
    This clears the frozen falsification bar but does not establish production
-   thresholds, peak-burst capacity, or deployment readiness. **Next (f):** move
-   the proven contracts into a production request-scoped adapter behind
-   `legacy-default`/shadow, without changing authority. Only a locally resolved
-   ROR id may then be hydrated through OpenAlex to supply the OpenAlex institution
-   id the works-first path requires; hydration may not select among ROR
-   candidates, and failure returns review/no bind. **(g)** Run and
+   thresholds, peak-burst capacity, or deployment readiness. **Step (f) is
+   implemented on `codex/ror-api-production-shadow`, not yet merged or
+   deployed:** the v3 contracts are shared with a production request-scoped ROR
+   adapter behind `legacy-default`/shadow. Only one locally resolved ROR id is
+   hydrated through OpenAlex to supply the institution id works-first requires;
+   hydration cannot select among candidates and must echo the same ROR. Failure,
+   ambiguity, and multi-organization results return review/no bind. Existing W1
+   callers remain on the incumbent OpenAlex resolver. Focused resolver/runtime/
+   benchmark coverage is green, the broader affected caller suite is green, and
+   type checking passes. A value-redacted Production env pull on 2026-08-07
+   confirmed `REVIEWER_IDENTITY_RESOLVER_MODE` is present and non-empty but
+   normalizes to `legacy`, so this branch does not change current outputs.
+   **Next (g):** finish review/promotion of this slice, then run and
    resource-profile S2AFF as a challenger before deciding whether any learned or
    warm-service component is warranted.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
@@ -180,15 +191,11 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    [Carried; still flagged on every push.]
 8. **Increment E — ProfileProvider double-fetch.** [ASSUMED ~0.5–1s tail;
    anchor VERIFIED present this session at `shared/context/ProfileContext.js:456`.]
-9. **Vercel CLI is outdated** — local `58.5.1`, current `58.7.1+` [VERIFIED by
-   running `vercel --version`]. Flagged in both Codex reviews; matters only for
-   accurate Large-Functions behavior. Trivial: `npm i -g vercel@latest`.
-
 ### Owner Decision Needed
 
 _None gating the roadmap._ The S2AFF env-build cost (pinned 3.10/3.11 venv,
 multi-GB S3 artifacts, sdist-only kenlm C++ build) is a real cost decision, but
-it now arrives via Codex's step (f) rather than as a standalone ask.
+it now arrives via Codex's step (g) rather than as a standalone ask.
 
 ### Verify Before Acting
 
@@ -209,8 +216,9 @@ it now arrives via Codex's step (f) rather than as a standalone ask.
    for v1 comparability**. The ROR-id reset happened in the separate
    `versions/v2/` overlay, whose manifest pins v1 and whose comparator reran
    both ROR and incumbent. Both versioned drivers refuse to overwrite frozen
-   slugs; the benchmark directory must stay jest-invisible (`npx jest
-   --listTests`). Do not move v2's candidate-recall counts back into v1's
+   slugs; the benchmark artifact directory must stay jest-invisible (unit tests
+   under `tests/unit/benchmarks/` are legitimate). Do not move v2's
+   candidate-recall counts back into v1's
    final-outcome claim.
 3. **Any matching/normalizer work** — `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`
    is authoritative (institution 9, NOT the memo's 11); read
@@ -265,6 +273,7 @@ it now arrives via Codex's step (f) rather than as a standalone ask.
 | `benchmarks/fuzzy-matching-falsification/run-comparator.js` | Generic comparator driver (refuses to overwrite a frozen slug) |
 | `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Completed v2.11 size/load measurement; offline evidence only after the owner selected ROR API lookup for live retrieval |
 | `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md` | Canonical-ID candidate/relationship comparator, both rerun systems, misses, and next veto/scorer gate |
+| `lib/services/institution-resolution/ror-institution-identity-resolver.js` | Request-scoped production ROR decision → verified OpenAlex identity bridge; shadow/combined only |
 | `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | **SUPERSEDED** — retained for the reasoning trail only |
 | `lib/services/reviewer-rollup.js` | Progress buckets incl. the new `released`; `deriveWorkRemaining` |
 | `shared/components/workbench/ReviewerStatusIndicator.js` | Sole consumer of `progress` (parity-gated) |
@@ -277,7 +286,7 @@ it now arrives via Codex's step (f) rather than as a standalone ask.
 npm run check:types
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
 npx jest --testPathPatterns "reviewer-rollup|ReviewerStatus|normalizer-characterization"
-npx jest                                                          # full suite, 7,087
+npx jest                                                          # full suite, 7,098
 node benchmarks/fuzzy-matching-falsification/validate-cases.js    # suite schema lint
-npx jest --listTests | grep -c fuzzy-matching                     # must be 0
+npx jest --listTests | grep -c 'benchmarks/fuzzy-matching-falsification' # must be 0
 ```
