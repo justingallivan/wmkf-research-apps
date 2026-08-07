@@ -14,9 +14,23 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
   `baseline/incumbent-2026-08-06.{results.jsonl,md}`. Headline: 89 pass /
   64 fail (60 real + 4 judge naming artifacts) / 12 skipped; zero
   wrong-entity resolutions — the incumbent is "safe but blind" (blanket
-  abstention). No S400 drift. Comparator runs (ROR `chosen:true`, S2AFF)
-  have NOT happened; threshold calibration remains out of scope for this
-  suite entirely.
+  abstention). No S400 drift.
+- **COMPARATOR #1 RUN S406 (2026-08-07): ROR affiliation `chosen:true`** —
+  `adapters-ror.js` via `run-comparator.js`; results and analysis in
+  `baseline/ror-chosen-2026-08-07.{results.jsonl,md}`. 141 institution cases
+  judged (25 person/contact/affiliation cases skipped — ROR is an org registry
+  only). Headline: ROR is the incumbent's **mirror image** — 15% abstention vs
+  85%, ~3× the institution recall, flips 8/11 of the S400 byline false
+  mismatches — but fires **40 attributable wrong-entity vetoes** where the
+  incumbent fired zero, resolving self-contradictory strings like "University of
+  California, Berkeley (UCLA)" at score 1.0. **Neither system passes the
+  falsification bar.** ROR is disqualified as a sole auto-resolver, viable as a
+  signal inside a scorer.
+- **Comparator #2 (S2AFF) SCOPED, NOT RUN** — heavy old Python stack (torch,
+  simpletransformers, sdist-only kenlm) + multi-GB S3 model artifacts against
+  local Python 3.14 with no uv/pyenv/conda. Owner cost decision; recommendation
+  and reasoning in the ROR report's tail. Threshold calibration remains out of
+  scope for this suite entirely.
 - `run.js` has now executed once; three harness fixes were made during that
   run (see its inline comments and the baseline report). Known sharp edge:
   target-name judging is exact-string — compare normalized names or ROR ids
@@ -97,11 +111,24 @@ No `assumed` labels remain (`validate-cases.js` reports none):
    fact; counts toward COI only in the widening direction (Q1). The
    untraced root cause remains a carried bug.
 
-## Executing later (not now)
+## Executing
 
-`runSuite(adapters)` in `run.js` takes one adapter set per system under test
-and refuses to run with none wired. The first authorized execution should:
-freeze the incumbent predicates as baseline, run comparators (ROR
-`chosen:true` only, S2AFF, local exact-alias baseline), and record results —
-per the consensus §1 step 0 and the comparator/metric lists in
-`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`.
+`runSuite(adapters)` in `run.js` takes one adapter set per system under test and
+refuses to run with none wired. `run.js`, `judge()`, and `cases/` are **frozen for
+comparability** — every run to date has used byte-identical harness and cases, so
+naming artifacts are reported per-run rather than normalized away. Changing the
+judge (e.g. to ROR-id comparison) resets the comparison and requires re-running
+every prior system.
+
+```bash
+node run-baseline.js                                  # frozen incumbent driver (2026-08-06)
+node run-comparator.js ./adapters-ror <slug>          # any comparator; refuses to overwrite a slug
+node validate-cases.js                                # schema lint
+```
+
+Done: incumbent baseline, ROR `chosen:true`. Remaining from the consensus §1
+step-0 comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`):
+S2AFF (scoped, owner decision — see above) and the **local exact-alias baseline
+over a pinned ROR dump** (consensus step 2), which is offline, dependency-free,
+and would additionally unlock ROR-id-based judging + hierarchy relationships —
+the recommended next comparator.
