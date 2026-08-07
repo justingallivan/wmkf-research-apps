@@ -556,6 +556,52 @@ describe('LLMClient.stream', () => {
     ]);
   });
 
+  // Thinking blocks arrive empty from content_block_start and are filled by
+  // thinking_delta / signature_delta. Dropping those deltas left the block
+  // empty, and a caller that echoes the assistant turn back (the Dynamics
+  // Explorer agent loop) got a 400 from the API — "each thinking block must
+  // contain thinking" — which broke every multi-round query. Owner-reported
+  // 2026-08-07; confirmed in production logs.
+  test('accumulates thinking and signature deltas so the block can be echoed back', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'let me ' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'check' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig123' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tu_1', name: 'q' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', usage: { output_tokens: 2 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    const thinking = r.content.find(b => b.type === 'thinking');
+    // The API rejects an echoed thinking block whose text is empty.
+    expect(thinking.thinking).toBe('let me check');
+    expect(thinking.signature).toBe('sig123');
+    // Never the string "undefined" from appending to a missing field.
+    expect(thinking.thinking).not.toMatch(/undefined/);
+    // Thinking must not be mistaken for assistant text.
+    expect(r.text).toBe('');
+  });
+
+  test('accumulates thinking deltas when the start event omits the fields', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'abc' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', usage: { output_tokens: 1 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    expect(r.content.find(b => b.type === 'thinking').thinking).toBe('abc');
+  });
+
   test('rebuilds fallback body with stream flag and fallback temperature on 529', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
