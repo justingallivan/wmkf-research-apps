@@ -14,13 +14,17 @@ const customJestConfig = {
     '<rootDir>/.next.nosync/',
     '<rootDir>/node_modules/',
     '<rootDir>/node_modules.nosync/',
-    '<rootDir>/tests/e2e/' // E2E tests handled separately
+    '<rootDir>/tests/e2e/', // E2E tests handled separately
+    '<rootDir>/.claude/worktrees/' // agent worktrees (full repo copies)
   ],
   // iCloud-exclusion artifacts (*.nosync). Without this, Jest's haste map
   // scans node_modules.nosync/ and aborts on duplicate package names.
+  // Agent worktrees (.claude/worktrees/) are full repo copies and collide
+  // the same way (duplicate vendor/ packages) while an agent is working.
   modulePathIgnorePatterns: [
     '<rootDir>/node_modules\\.nosync/',
     '<rootDir>/\\.next\\.nosync/',
+    '<rootDir>/\\.claude/worktrees/',
   ],
   collectCoverageFrom: [
     'shared/**/*.{js,jsx}',
