@@ -48,6 +48,13 @@ This is the continuation entry point for the
   the exact legacy objects. Observer failures are contained. Explicit
   `combined` mode adapts safe W2 rescues into the established result contract
   with a `probable` ceiling; no tracked production setting enables it.
+- The W2 batch now owns one request-bounded institution resolver on
+  `codex/institution-resolver-measurement` (not yet merged/deployed). Settled
+  identities and definitive misses reuse across candidates; concurrent calls
+  single-flight only when their normalized institution/country key and
+  `AbortSignal` are identical. One aggregate, PII-free runtime log reports
+  cache/provider-call counts and batch duration without changing comparison
+  rows or reviewer results.
 - **W4.1 `[PERSISTENCE BUILT BEHIND COMBINED]`:** W2 emits ORCID, matched-byline
   DOI, ROR, and exact OpenAlex-fragment anchors. The server-owned enrichment
   decision carries them to the existing `wmkf_identityverifiedanchorsjson`

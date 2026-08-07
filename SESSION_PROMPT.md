@@ -96,9 +96,12 @@ retrieval evidence, not decision authority; vetoes run before scoring.**
 1. **Institution-resolution model — CODEX OWNS THIS. Claude is off the surface.**
    Evidence: `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`
    (read first — Codex's model, Claude's six refinements, frozen-harness
-   constraints, evidence trail). Codex's sequence: **(a)** hoist the resolver +
-   bounded single-flight + telemetry as the first reversible increment — a
-   *measurement vehicle*, not a perf fix; **(b)** compact-ROR-index size
+   constraints, evidence trail). **Step (a) is now implemented on
+   `codex/institution-resolver-measurement` (not yet merged or deployed):** the
+   W2 batch owns one request-bounded resolver, identical same-abort-scope calls
+   single-flight, settled results reuse across candidates, and one PII-free
+   aggregate metric record reports provider calls/cache reuse. It remains a
+   *measurement vehicle*, not a perf claim. Next: **(b)** compact-ROR-index size
    experiment; **(c)** pinned ROR dump for benchmarking, **NOT** yet as
    production substrate; **(d)** run and resource-profile S2AFF before choosing
    between reimplementation and a batch/warm service.
@@ -217,7 +220,7 @@ it now arrives via Codex's step (d) rather than as a standalone ask.
 npm run check:types
 npm run check:status-enum-parity && npm run check:status-enum-parity:self-test
 npx jest --testPathPatterns "reviewer-rollup|ReviewerStatus|normalizer-characterization"
-npx jest                                                          # full suite, 7,081
+npx jest                                                          # full suite, 7,087
 node benchmarks/fuzzy-matching-falsification/validate-cases.js    # suite schema lint
 npx jest --listTests | grep -c fuzzy-matching                     # must be 0
 ```
