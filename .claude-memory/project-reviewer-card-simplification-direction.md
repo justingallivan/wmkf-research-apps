@@ -4,7 +4,7 @@ description: The card's 15 banners are a symptom of a matching layer with ~25 sc
 type: project
 status: active
 scope: reviewer
-last_verified: 2026-08-07 via current card/save gates, owner decisions, and institution candidate benchmark v2
+last_verified: 2026-08-07 via current card/save gates, owner decisions, and institution decision benchmark v3
 ---
 
 ## Recall Rule
@@ -47,8 +47,11 @@ corrected the altitude — order by what most rapidly reduces complexity.
   candidate benchmark v2 DONE (ROR API 128/141 vs incumbent 84/141; retrieval
   still not decision authority), see
   `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`
-  → organization-span
-  parsing + controlled query fallback + veto/scorer comparator → S2AFF profile →
+  → organization-span parsing + controlled query fallback + veto/scorer
+  comparator DONE (v3 141/141 institution labels, 0 wrong automatic resolutions),
+  see `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`
+  → production request-scoped shadow adapter + post-resolution ROR→OpenAlex bridge
+  → S2AFF profile →
   normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.

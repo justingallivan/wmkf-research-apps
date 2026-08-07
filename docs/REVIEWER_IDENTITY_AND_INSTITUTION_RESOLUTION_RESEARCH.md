@@ -484,15 +484,21 @@ Historical boundary — as of 2026-08-04:
 Subsequent current state (2026-08-07): owner-authorized measurement work has
 started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
 pinned ROR v2.11 size experiment is complete and offline-only. The owner selected
-the ROR API for planned live candidate retrieval, with no production local
+the ROR API for eventual live candidate retrieval, with no production local
 index or initially planned cross-request database cache. The deliberately
 versioned candidate benchmark is now complete: canonical ROR ids and
 relationships are pinned, ROR API v2 single-search passed 128/141 institution
 cases versus the incumbent bridge's 84/141, and 71/124 ROR resolve cases also
 contained a candidate forbidden as the final resolution. That validates ROR as
-a candidate source and separately validates the need for local vetoes; it does
-not validate a final resolver. No schema, production adapter, resolver/scorer
-authority, or identity/write gate changed.
+a candidate source and separately validates the need for local vetoes. The
+benchmark-only v3 claim-oriented resolver now adds bounded fallback/probes,
+non-overridable vetoes, local scoring, abstention, and relationship-aware pair
+policy; its accepted live run passes all 141 labeled institution cases with 0
+failures, 0 provider errors, and 0 wrong automatic resolutions. It used 140 ROR
+requests for 160 candidate sets after request-local reuse. This clears the
+frozen falsification bar, not representative production calibration or rollout
+capacity. No schema, production adapter, resolver/scorer authority, or
+identity/write gate changed; production remains `legacy-default`.
 
 ## Primary sources
 

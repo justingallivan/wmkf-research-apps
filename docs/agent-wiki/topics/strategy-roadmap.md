@@ -16,6 +16,7 @@ source_files:
   - outputs/institution-resolution-handoff-to-codex-2026-08-07.md
   - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
   - benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md
+  - benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -31,6 +32,7 @@ watch_paths:
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - benchmarks/compact-ror-index/**
   - benchmarks/fuzzy-matching-falsification/versions/v2/**
+  - benchmarks/fuzzy-matching-falsification/versions/v3/**
 update_triggers:
   - roadmap or phasing changes
   - cross-capability architecture changes
@@ -139,6 +141,16 @@ document inventory, and individual implementation plans do not establish priorit
   validating the candidate-source choice and the separate need for local
   vetoes—not a final resolver. Report:
   `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`.
+  **DECISION BENCHMARK v3 COMPLETE 2026-08-07:** the benchmark-only API
+  candidate union now adds organization-span parsing, bounded query fallback and
+  contradiction probes, non-overridable vetoes, provenance-aware scoring,
+  abstention, and relationship-aware pair policy. Its accepted live run passes
+  all 141 labeled institution cases with 0 failures, 0 provider errors, and 0
+  wrong automatic resolutions; 160 candidate sets used 140 ROR requests after
+  61 request-local cache hits. This clears the frozen falsification bar, not
+  representative production calibration or rollout capacity. Production stays
+  `legacy-default`, and no application module imports v3. Report:
+  `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.
   Corrected facts: pinned ROR v2.11 has **135,710 total /
   132,706 active records** [VERIFIED via the checksum-pinned 2026-08-03 dump].
   Its 304.9 MB raw JSON exceeds Vercel's 250 MB standard path. Vercel offers a
@@ -158,10 +170,11 @@ document inventory, and individual implementation plans do not establish priorit
   experiment COMPLETE and retained offline-only**
   (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → **pinned v2.11
   offline candidate benchmark COMPLETE** with canonical expected ROR ids,
-  relationship-aware pair evaluation, and a frozen verdict-free contract → add
-  organization-span parsing, controlled query fallback, and evaluate the
-  non-overridable veto/scorer → only then build the production request-scoped
-  ROR API adapter behind the legacy-default/shadow seam → run and
+  relationship-aware pair evaluation, and a frozen verdict-free contract →
+  **claim-oriented API decision benchmark v3 COMPLETE** → next build the
+  production request-scoped ROR API adapter behind the legacy-default/shadow
+  seam, preserving the passing contracts and adding the post-resolution
+  ROR→OpenAlex identifier bridge → run and
   resource-profile S2AFF as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
@@ -176,7 +189,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  parser/query-fallback + veto/scorer comparator → production shadow adapter → S2AFF profile → normalizer
+  production shadow adapter + ROR→OpenAlex bridge → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

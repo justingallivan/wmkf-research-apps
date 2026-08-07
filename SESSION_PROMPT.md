@@ -144,13 +144,20 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    relationship) versus the incumbent bridge's 84/141, with zero provider
    errors. A forbidden final-resolution ROR id was nevertheless present in
    71/124 ROR resolve candidate sets, proving that retrieval cannot be decision
-   authority. **Next (e):** add organization-span parsing, controlled ordinary-
-   query fallback, and the non-overridable veto/scorer comparator; only after it
-   passes should a production request-scoped adapter be built behind
-   `legacy-default`/shadow. Only a locally resolved
+   authority. **Step (e) is complete in the benchmark-only v3 overlay:**
+   organization-span parsing, bounded ordinary-query and contradiction probes,
+   non-overridable vetoes, provenance-aware scoring, and relationship-aware pair
+   policy pass all 141 labeled institution cases with 0 failures, 0 provider
+   errors, and 0 wrong automatic resolutions. The accepted live run used 140
+   ROR requests for 160 candidate sets after 61 request-local cache hits; see
+   `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`.
+   This clears the frozen falsification bar but does not establish production
+   thresholds, peak-burst capacity, or deployment readiness. **Next (f):** move
+   the proven contracts into a production request-scoped adapter behind
+   `legacy-default`/shadow, without changing authority. Only a locally resolved
    ROR id may then be hydrated through OpenAlex to supply the OpenAlex institution
    id the works-first path requires; hydration may not select among ROR
-   candidates, and failure returns review/no bind. **(f)** Run and
+   candidates, and failure returns review/no bind. **(g)** Run and
    resource-profile S2AFF as a challenger before deciding whether any learned or
    warm-service component is warranted.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).

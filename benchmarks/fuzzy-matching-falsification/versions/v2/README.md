@@ -20,8 +20,9 @@ This version does **not** measure final institution resolution accuracy. The
 candidate contract forbids verdict fields. ROR `chosen:true`, matching score,
 and rank are retained only as provider provenance. A forbidden sibling or
 parent may legitimately appear in a high-recall candidate set; v2 records that
-presence, while the planned local veto/scoring benchmark must decide whether it
-can become authoritative.
+presence. At the time v2 was frozen, a local veto/scoring benchmark still had
+to decide whether any candidate could become authoritative; `../v3/` now
+implements and passes that separate claim without changing v2.
 
 Product-policy consistency is also separate from registry relationship. For
 example, ROR marks both Dana-Farber↔Harvard and VUMC↔Vanderbilt as `related`,
