@@ -3,6 +3,12 @@
 Date: 2026-08-06 (Session 404)
 Status: **consensus reached** — Claude (Fable) endorsed Codex's amended shape in full; Codex declared "CONSENSUS: YES" (round 1) and confirmed against this final document (round 2). Decision work only; **nothing here authorizes implementation, dependency adoption, schema work, or changes to live identity/write gates.**
 
+> **Historical boundary, updated 2026-08-07:** the decomposition, veto, scoring,
+> abstention, and benchmark principles below remain research inputs. The local
+> ROR dump proposed for live candidate retrieval in step 2 is superseded by the
+> owner's server-side ROR API decision. The dump is offline-only. Current build
+> authority is `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+
 Inputs reconciled:
 - `outputs/fuzzy-matching-independent-research-fable-2026-08-05.md` (Claude, independent)
 - `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` (Codex, 2026-08-04)

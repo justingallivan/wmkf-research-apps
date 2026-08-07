@@ -1,4 +1,4 @@
-# Session 407 Prompt: Codex leads institution resolution; compact ROR index measured
+# Session 407 Prompt: Codex leads institution resolution; ROR API selected for live retrieval
 
 > **Handoff, 2026-08-07 (Session 406).** One owner-reported UI bug fixed, the
 > first comparator executed against the frozen falsification suite, and the
@@ -82,10 +82,13 @@ What review #1 corrected in my analysis:
 disqualifying, and it could not observe domain evidence at all — contradicting
 that same report's own finding. Architecture of record is Codex's
 **claim-oriented pipeline**: parse organization spans + evidence →
-candidate-union retrieval from a **compact** ROR index → **non-overridable
+candidate-union retrieval from the **server-side ROR API** → **non-overridable
 vetoes** (multi-org, sibling, domain, country, type, granularity) →
-provenance-aware scoring → abstain. Governing principle: **exact aliases are
-retrieval evidence, not decision authority; vetoes run before scoring.**
+provenance-aware scoring → abstain. Governing principle: **ROR `chosen:true`,
+search rank, and exact aliases are retrieval evidence, not decision authority;
+vetoes run before scoring.** Owner decision 2026-08-07: do not ship a local ROR
+index in the live app. Keep the pinned dump and compact-index output strictly
+offline for reproducible benchmark labels, relationship checks, and experiments.
 
 ### Commits
 - `6547ecbe` drain-gate annotation
@@ -115,10 +118,33 @@ retrieval evidence, not decision authority; vetoes run before scoring.**
    index is 80.4 MB plain / 24.7 MB Brotli and reaches about 0.61 GB immediate
    post-parse process RSS with its input buffer retained. No production asset is
    wired or authorized.
-   Next: **(c)** use that pinned release strictly for a deliberately versioned
-   offline benchmark revision, adding **canonical expected ROR ids** and a
-   **relationship-aware pair adapter**; **(d)** run and resource-profile S2AFF
-   before choosing between reimplementation and a batch/warm service.
+   **Step (c) is now owner-decided:** use ROR's official API for live
+   candidate retrieval through a server-only adapter; do not bundle the dump or
+   compact index. The existing single-identity OpenAlex resolver cannot serve as
+   that candidate adapter: reuse or extract only its request-scoped cache,
+   single-flight, cancellation, and metrics pattern for a new ROR candidate-set
+   interface. The adapter must send only institution
+   affiliation evidence, respect provider timeout/rate-limit/retry behavior,
+   and treat provider failure, ambiguity, or a safety veto as no new resolution
+   so legacy/review behavior remains authoritative. ROR `chosen:true` and rank
+   are candidates only; out-of-band domain/country/type/hierarchy evidence must
+   still reach the veto/scoring layer. At the owner-provided volume of fewer
+   than 1,000 review requests per cycle and about 15 default candidates per
+   search plus user-recommended reviewers, cycle volume is under roughly 15,000
+   primary affiliation lookups before user additions, selective query fallbacks,
+   retries, and request-local reuse. Peak five-minute traffic, not cycle total,
+   is the operational limit to measure. Re-verify ROR's live rate/client-id
+   policy before rollout and support its `Client-Id` header when required. No
+   cross-request database cache is planned initially. Next: **(d)** deliberately version the
+   offline benchmark against pinned v2.11, add **canonical expected ROR ids**
+   and a **relationship-aware pair adapter**, and freeze the candidate/veto
+   input contract; **(e)** build and evaluate the API-backed candidate union plus
+   veto/scorer behavior behind `legacy-default`/shadow. Only a locally resolved
+   ROR id may then be hydrated through OpenAlex to supply the OpenAlex institution
+   id the works-first path requires; hydration may not select among ROR
+   candidates, and failure returns review/no bind. **(f)** Run and
+   resource-profile S2AFF as a challenger before deciding whether any learned or
+   warm-service component is warranted.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
    Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes;
    158 characterization tests already green. Start with the two byte-identical
@@ -146,7 +172,7 @@ retrieval evidence, not decision authority; vetoes run before scoring.**
 
 _None gating the roadmap._ The S2AFF env-build cost (pinned 3.10/3.11 venv,
 multi-GB S3 artifacts, sdist-only kenlm C++ build) is a real cost decision, but
-it now arrives via Codex's step (d) rather than as a standalone ask.
+it now arrives via Codex's step (f) rather than as a standalone ask.
 
 ### Verify Before Acting
 
@@ -208,8 +234,8 @@ it now arrives via Codex's step (d) rather than as a standalone ask.
    fallback (`e2342f92`); request `1002903` mutation work; S400 onSent/SSE race
    (disproven); client-side institution-COI verdicts. [All carried.]
 
-> NOT here on purpose: **"S2AFF never deploys" is REOPENED** — profile it before
-> deciding between reimplementation and a batch/warm service (Codex step (d)).
+> NOT here on purpose: **"S2AFF never deploys" is REOPENED** — profile it as a
+> challenger after the API-backed resolver is benchmarkable (Codex step (f)).
 
 ## Key Files Reference
 
@@ -220,7 +246,7 @@ it now arrives via Codex's step (d) rather than as a standalone ask.
 | `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md` | Frozen incumbent baseline + 2026-08-07 artifact addendum |
 | `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, denominators, execution hazards, what remains queued |
 | `benchmarks/fuzzy-matching-falsification/run-comparator.js` | Generic comparator driver (refuses to overwrite a frozen slug) |
-| `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Completed v2.11 size/load measurement; explains why no production JSON asset is authorized |
+| `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Completed v2.11 size/load measurement; offline evidence only after the owner selected ROR API lookup for live retrieval |
 | `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | **SUPERSEDED** — retained for the reasoning trail only |
 | `lib/services/reviewer-rollup.js` | Progress buckets incl. the new `released`; `deriveWorkRemaining` |
 | `shared/components/workbench/ReviewerStatusIndicator.js` | Sole consumer of `progress` (parity-gated) |

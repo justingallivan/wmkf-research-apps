@@ -28,6 +28,10 @@ measurement plumbing, and the offline compact-ROR-index size experiment. Current
 authority and sequencing live in
 `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
 
+Owner decision 2026-08-07: production candidate retrieval will use ROR's
+server-side API. The pinned dump remains an offline benchmark/relationship
+substrate; neither raw nor compact ROR data is approved as a live app asset.
+
 This research memo itself does **not** authorize schema changes, provider
 adoption, production writes, CRM Account linking, a bundled ROR asset, or
 changes to the existing fail-closed identity gates.
@@ -112,9 +116,11 @@ and parent/child/related relationships. These are valuable resolver features.
 [ROR data structure](https://ror.readme.io/docs/ror-data-structure)
 
 [RESEARCH] ROR's own matching guidance distinguishes interactive search from
-automatic affiliation matching and explicitly warns consumers not to choose a
-result solely because it has the highest confidence score. It recommends the
-local data dump when an application needs control over matching criteria.
+automatic affiliation matching and explicitly warns that automatic matching
+can return an incorrect organization. The affiliation endpoint is intended for
+programmatic matching, while ordinary query is intended for structured
+name/identifier retrieval. The local data dump remains available when an
+application needs full offline control.
 [ROR matching guidance](https://ror.readme.io/docs/matching)
 
 [LOCAL OBSERVATION, 2026-08-04] Live ROR probes exposed why this distinction
@@ -132,8 +138,9 @@ matters:
   abstain; a consumer taking rank 1 would make a severe error.
 - Decorated or punctuated variants produced materially different rankings.
 
-Conclusion: use ROR as the canonical entity catalogue and feature source. Do
-not delegate the final institution decision to its search rank.
+Conclusion: use ROR as the canonical entity catalogue and feature source. The
+owner subsequently selected its API for live candidate retrieval. Do not
+delegate the final institution decision to `chosen:true`, score, or search rank.
 
 ### S2AFF: strongest directly testable baseline
 
@@ -166,11 +173,15 @@ containing our actual hazards.
 
 ### Evaluated institution approach
 
-The strongest candidate design is:
+The strongest candidate design, updated by the 2026-08-07 owner decision, is:
 
 1. Parse organization spans, subunits, location, and domains.
-2. Form a candidate **union** from exact normalized official names, aliases,
-   acronyms, domains, character n-grams/BM25, and related ROR nodes.
+2. Query ROR's affiliation endpoint for messy text and use ordinary query as a
+   controlled recall fallback for structured names/acronyms; union and
+   deduplicate the returned ROR records without selecting a winner. Request API
+   v2 `single_search` explicitly. Keep domain, country, type, and hierarchy
+   evidence available to the local decision layer even when the retrieval
+   endpoint cannot accept it.
 3. Rerank using structured features rather than a single fuzzy score.
 4. Apply hard contradictions and calibrated decision thresholds.
 5. Return `resolved`, `ambiguous/review`, or `no match` with an evidence
@@ -472,8 +483,10 @@ Historical boundary — as of 2026-08-04:
 
 Subsequent current state (2026-08-07): owner-authorized measurement work has
 started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
-pinned ROR v2.11 size experiment is complete and offline-only. No schema,
-production asset, resolver/scorer authority, or identity/write gate changed.
+pinned ROR v2.11 size experiment is complete and offline-only. The owner selected
+the ROR API for planned live candidate retrieval, with no production local
+index or initially planned cross-request database cache. No schema, production adapter,
+resolver/scorer authority, or identity/write gate changed.
 
 ## Primary sources
 
@@ -483,6 +496,8 @@ production asset, resolver/scorer authority, or identity/write gate changed.
 - [S2AFF repository and evaluation](https://github.com/allenai/S2AFF)
 - [S2AND paper](https://arxiv.org/abs/2103.07534)
 - [ROR matching guidance](https://ror.readme.io/docs/matching)
+- [ROR REST API and rate limits](https://ror.readme.io/docs/rest-api)
+- [ROR affiliation matching](https://ror.readme.io/docs/api-affiliation)
 - [ROR data structure](https://ror.readme.io/docs/ror-data-structure)
 - [OpenAlex institution parsing](https://help.openalex.org/hc/en-us/articles/24831328396311-Institutions-and-Raw-Affiliation-String-Parsing)
 - [OpenAlex author disambiguation](https://help.openalex.org/hc/en-us/articles/24347048891543-Author-disambiguation)

@@ -102,11 +102,29 @@ document inventory, and individual implementation plans do not establish priorit
   decision).** Claude's runtime/deployment assessment was superseded by
   adversarial review (needs-attention, five findings accepted); the
   architecture of record is Codex's claim-oriented pipeline — parse
-  organization spans + evidence → candidate-union retrieval from a COMPACT ROR
-  index → non-overridable vetoes (multi-org, sibling, domain, country, type,
-  granularity) → provenance-aware scoring → abstain. Governing principle:
-  exact aliases are RETRIEVAL EVIDENCE, NOT DECISION AUTHORITY, and vetoes run
-  before scoring. Corrected facts: pinned ROR v2.11 has **135,710 total /
+  organization spans + evidence → candidate-union retrieval from ROR's
+  **server-side API** → non-overridable vetoes (multi-org, sibling, domain,
+  country, type, granularity) → provenance-aware scoring → abstain. Governing
+  principle: ROR `chosen:true`, search rank, and exact aliases are RETRIEVAL
+  EVIDENCE, NOT DECISION AUTHORITY, and vetoes run before scoring. **Owner
+  decision 2026-08-07: the live app uses API lookup and does not bundle a local
+  ROR index.** The API adapter must send institution evidence only, retain
+  out-of-band domain/country/type/hierarchy evidence for local vetoes, and fall
+  back to no new resolution on provider failure or ambiguity. The current
+  resolver is a single-winner OpenAlex resolver and must not be reused as the
+  candidate-union interface; extract/reuse only its request-scoped cache,
+  single-flight, cancellation, and metrics pattern. The new interface returns
+  candidate ROR records with no verdict, explicitly requests API v2
+  `single_search`, bounds concurrency/time/retries, and supports the `Client-Id`
+  header when ROR policy requires it. Only after local resolution may a
+  ROR→OpenAlex hydration bridge supply the OpenAlex id works-first needs; failure
+  means review/no bind. No cross-request persistent cache is initially planned.
+  Owner volume is fewer than 1,000 review requests
+  per cycle × about 15 default candidates plus user additions. Each unique
+  affiliation needs one primary call and may need one selective query fallback;
+  ROR's documented 2,000-request/five-minute limit therefore makes measured
+  fallback and peak burst rates the operational metrics, not total cycle volume.
+  Corrected facts: pinned ROR v2.11 has **135,710 total /
   132,706 active records** [VERIFIED via the checksum-pinned 2026-08-03 dump].
   Its 304.9 MB raw JSON exceeds Vercel's 250 MB standard path. Vercel offers a
   Large Functions/Fluid Compute path up to 5 GB, but this project's eligibility
@@ -122,9 +140,13 @@ document inventory, and individual implementation plans do not establish priorit
   live-verified as `legacy-default` on 2026-08-07, so promotion does not enable
   `shadow` or `combined`**
   (measurement vehicle, not a performance claim) → **compact-index size
-  experiment COMPLETE** (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`)
-  → pinned v2.11 offline benchmark revision with canonical expected ROR ids and
-  relationship-aware pair evaluation → run and resource-profile S2AFF. Both
+  experiment COMPLETE and retained offline-only**
+  (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → pinned v2.11
+  offline benchmark revision with canonical expected ROR ids,
+  relationship-aware pair evaluation, and a frozen candidate/veto input contract
+  → build the server-only ROR API candidate adapter → evaluate the API-backed
+  veto/scorer pipeline behind the legacy-default/shadow seam → run and
+  resource-profile S2AFF as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -138,7 +160,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  pinned-v2.11 local comparator revision → S2AFF profile → normalizer
+  pinned-v2.11 offline comparator contract → ROR API adapter/veto-scorer → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

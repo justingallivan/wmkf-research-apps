@@ -8,7 +8,9 @@ assessment superseded. The first reversible measurement increment is
 implemented and merged in PR #113; production resolver authority was live-verified as
 `legacy-default` on 2026-08-07, so promotion does not enable `shadow` or
 `combined`. The pinned ROR v2.11 compact-index experiment is complete and
-measurement-only; the claim-oriented resolver/scorer remains planned.
+measurement-only. Owner decision 2026-08-07: the live candidate-retrieval plan
+uses ROR's official API, not a bundled local index; the claim-oriented
+resolver/scorer remains planned.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
 single-flight, aggregate runtime metrics, and an offline compact-index
 builder/measurement. No production index asset or resolver/scorer was wired.
@@ -18,10 +20,13 @@ green; type check and all
 relevant source/Atlas/wiki/doc gates plus paired self-tests green. The compact
 index build is deterministic across two runs; its targeted tests and lint pass.
 **Next owner/action:** keep production authority on `legacy-default` unless the
-owner separately authorizes shadow observation. Use pinned ROR v2.11 only as an
-offline benchmark substrate next: version the benchmark deliberately, add
-canonical expected ROR ids, and make pair evaluation relationship-aware before
-running a new local comparator. Claude remains off this surface.
+owner separately authorizes shadow observation. First version the benchmark,
+add canonical expected ROR ids, make pair evaluation relationship-aware, and
+freeze the candidate/veto input contract. Then build a server-only ROR API
+candidate adapter and evaluate the API-backed veto/scorer pipeline behind that
+seam; do not use ROR's chosen flag or rank as the verdict. Keep pinned ROR v2.11
+only as the offline label and relationship substrate. Claude remains off this
+surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -32,13 +37,72 @@ not Claude's tiered design.
 
 ## What Codex's review established (the model to build from)
 
-Parse organization spans and evidence → retrieve a **candidate union** from a
-compact ROR index → apply explicit **non-overridable vetoes** (multi-org,
+Parse organization spans and evidence → retrieve a **candidate union** from
+ROR's server-side API → apply explicit **non-overridable vetoes** (multi-org,
 sibling, domain, country, type, granularity) → score survivors with
 provenance-aware features → abstain.
 
-Governing principle: **exact aliases are retrieval evidence, not decision
-authority.** Vetoes run *before* scoring.
+Governing principle: **ROR `chosen:true`, search rank, and exact aliases are
+retrieval evidence, not decision authority.** Vetoes run *before* scoring.
+
+## Owner decision: ROR API for live retrieval (2026-08-07)
+
+[PLANNED] The live app will query ROR from the server instead of packaging or
+loading the raw/compact dataset. The current compact-index artifacts remain
+offline-only and untracked.
+
+Minimum live contract:
+
+1. Use ROR's affiliation endpoint for messy affiliation text and the ordinary
+   query endpoint only as a candidate-recall fallback for structured names or
+   explicit acronyms. The affiliation request must explicitly select API v2's
+   `single_search` strategy rather than inherit a changeable default. Union and
+   deduplicate returned ROR ids. Neither endpoint's rank, score, nor
+   `chosen:true` flag may resolve an institution by itself.
+2. Send only institution-affiliation evidence required for retrieval. Do not
+   send reviewer names, email/contact fields, proposal text, or candidate keys.
+   Carry domain, country, type, and hierarchy evidence separately into local
+   vetoes/scoring because the affiliation endpoint cannot consume all of it.
+3. Add a candidate-set interface that returns ROR records plus retrieval
+   provenance and **no institution verdict**. The current
+   `createInstitutionIdentityResolver` is not this interface: it chooses one
+   OpenAlex-backed identity and the works-first adapter wraps it in a singleton.
+   Reuse or extract only its request-scoped cache/single-flight/cancellation/
+   metrics pattern so normalized duplicate candidate lookups share work inside
+   the same safe cancellation scope. Keep existing W1 callers on their current
+   resolver until separately migrated. Start without a cross-request database
+   cache; add one only if measured peak traffic or latency establishes a need.
+4. Bound concurrency and time, honor `Retry-After`, and retry only transient
+   429/5xx failures. Provider timeout, exhaustion, malformed response, no
+   candidate, ambiguity, or any veto returns no new resolution; it must not
+   weaken the legacy/review result or manufacture a COI clearance.
+5. Keep telemetry aggregate and PII-free. Record provider calls, reuse,
+   latency, response class, candidate counts, and abstention/failure counts;
+   never log raw queries or returned organization names.
+6. Treat ROR API behavior as a drifting external dependency. Pin API v2 plus
+   explicit `single_search` request construction and response parsing in tests;
+   record API version, strategy, and observation date in comparator artifacts.
+   Before rollout, re-verify the published rate/client-identification policy and
+   ensure the adapter can send the `Client-Id` header when registration/policy
+   requires it. Preserve the pinned dump for stable expected ids and
+   relationship assertions.
+7. The works-first path currently requires one OpenAlex institution id. Only
+   after local vetoes/scoring produce one `resolved` ROR id may a separate
+   hydration step look that ROR up in OpenAlex, verify the returned ROR, and pass
+   its OpenAlex id onward. That hydration is an identifier bridge, never a
+   candidate selector. Missing/mismatched hydration returns review/no bind.
+
+Capacity basis: the owner reports fewer than 1,000 review requests per cycle,
+with about 15 default candidates per search plus user-recommended reviewers.
+That is fewer than roughly 15,000 primary affiliation calls per cycle before
+user additions, selective ordinary-query fallbacks, retries, and duplicate
+reuse. A fallback for every default candidate would raise the primary-plus-
+fallback bound toward 30,000 calls before user additions. ROR currently
+documents 2,000 requests per five minutes per IP; depending on fallback rate,
+roughly 66–133 fifteen-candidate searches in one five-minute window would reach
+that ceiling before retries. Therefore peak burst rate is the operational gate;
+total cycle volume does not justify a production local index or persistent
+cache by itself.
 
 Superseded from Claude's assessment, do not build from these:
 - the three-tier design (exact-alias lookup as a *decisive* tier);
@@ -84,13 +148,13 @@ the review.
    20/20 "safe"). The moment domain evidence is consumable it becomes a real
    scoreboard. Treat movement there as the signal that the domain veto works.
 
-4. **The versioned envelope needs an explicit staleness policy.** The
-   input/evidence-hash + ROR-release + resolver-version envelope is right, but
-   it creates an invalidation surface: a ROR release or resolver bump makes
-   *every* envelope stale at once. Decide up front which fields trigger
-   recompute and whether invalidation is lazy or eager. At this volume lazy
-   recompute on read is almost certainly correct — but name the cost in the
-   design rather than discovering it on the first ROR release.
+4. **The versioned envelope needs explicit API provenance.** The API-backed
+   result needs input/evidence hash + adapter version + API v2 + explicit
+   `single_search` + observation date.
+   Because no cross-request persistent cache is planned initially,
+   release-wide invalidation is not yet a live storage problem. If durable
+   caching is later justified, specify which fields trigger lazy recomputation
+   before adding the schema.
 
 5. **Two comparator-#1 review findings are now on the critical path**, not
    deferred cleanup:
@@ -139,6 +203,8 @@ the review.
 | `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` | Comparator list; S2AFF architecture description |
 | `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | The six owner answers this all serves (Q1: ambiguity must WIDEN checks) |
 | `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Pinned release, deterministic compact-index sizes, component costs, and fresh-process load/memory evidence |
+| [ROR REST API documentation](https://ror.readme.io/docs/rest-api) | Official endpoints, per-IP rate limit, client-identification policy, heartbeat/status guidance |
+| [ROR affiliation documentation](https://ror.readme.io/docs/api-affiliation) | Affiliation matching contract and explicit warning that automatic matching can be wrong |
 
 ## Standing constraint
 

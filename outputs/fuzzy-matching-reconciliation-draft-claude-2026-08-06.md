@@ -3,6 +3,11 @@
 Date: 2026-08-06 (Session 404)
 Status: working draft. Inputs: `outputs/fuzzy-matching-independent-research-fable-2026-08-05.md` (Claude) and `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` (Codex, 2026-08-04). Decision work only; no build authorized.
 
+> **Historical boundary, updated 2026-08-07:** this draft's local-ROR-dump
+> retrieval proposal is superseded by the owner's server-side ROR API decision.
+> The dump is offline-only. Current build authority is
+> `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+
 ## 1. Agreements (both docs, independently reached)
 
 1. **Fellegi–Sunter is the recommended scoring model**: additive field-level evidence weights, graded agreement levels, term-frequency/rarity adjustment, negative evidence as first-class weights.
