@@ -186,7 +186,7 @@ evictable, and insufficient for a person-scoped send gate.
 | A failed conflict write never turns a one-sided roster receipt into an inferred A/B adjudication or promotion authority. | direct trust action, both promotion services, retry | all three promotion doors block while the roster flag is true and no pending person bundle exists |
 | A conflict receipt resolves only a real, current `conflict_pending` person bundle with the exact stored/found tuple. | retry service, person trust parser | no-bundle and changed-tuple complements remain blocked or project pending state |
 | The request-scoped unavailable flag clears only after the corresponding person write succeeds or a fresh authoritative read shows that the contradiction disappeared. | retry service, roster store | Dataverse failure retains the flag; vanished/stored-address-missing cases clear without a person write |
-| Every visible warning/block has at least one rendered action whose server endpoint can complete or advance the remedy. | decision DTO, card/modal | total reason/action table test; unknown-code fallback test |
+| Every visible warning/block has at least one rendered action whose server endpoint can complete or advance the remedy. | decision DTO, card/modal | complete reason/action table test; unknown-code fallback test |
 | A system or permission failure leaves the candidate retryable and never masquerades as a domain conflict. | routes/services/client | retry state, generation guard, and partial-success tests |
 | Address adjudication never creates or links a CRM Contact. | address-trust service | contact adapter not called in positive and negative tests |
 
@@ -386,7 +386,7 @@ stable code plus server-approved remediation descriptors:
 
 The descriptors control presentation only. Action endpoints reauthorize and
 revalidate; a client cannot obtain permission by posting an action label. The UI
-has a total mapping for known actions and a safe unknown-code fallback:
+has a complete mapping for known actions and a safe unknown-code fallback:
 **Retry check** plus **Create repair request**. An unknown code never disappears,
 falls through to “ready,” or renders as a dead badge.
 
@@ -444,8 +444,11 @@ only prose.
 
 ### Verify person and exact address
 
-The modal states: “I verified that this is the correct person and that
-`address@example.edu` is their address.” Staff select an evidence type. For a
+<!-- assertion-exempt: quoted-example -->
+The modal states (reworded S404 for coherence with the separate identity
+checkbox; the original copy read “I verified that this is the correct person
+and that … is their address”): “`address@example.edu` belongs to this person —
+I checked the evidence below.” Staff select an evidence type. For a
 paper, the card's complete paper list remains visible and each paper link can be
 used as the evidence URL.
 
