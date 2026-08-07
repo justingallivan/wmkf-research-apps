@@ -67,9 +67,13 @@ document inventory, and individual implementation plans do not establish priorit
   confidence where design says review). Hazards for the next run: load env with
   `set -a; . .env.local; set +a` (quoted-key extraction silently kills every
   OpenAlex call → uniform abstention masquerading as results); exact-string
-  target-name judging. Comparator runs (ROR chosen:true, S2AFF) NOT done; two
-  assumed-label cases pend owner adjudication (Zhou ground truth, EKA contaminant
-  handling). Remaining order: comparator runs on the frozen suite → normalizer
+  target-name judging. Comparator runs (ROR chosen:true, S2AFF) NOT done. Both
+  assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
+  (correct regardless of biographical ground truth, which stays open); EKA-class
+  provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
+  presented as fact; COI-widening only). Owner also approved ("use agents to
+  build", 2026-08-07): the Q2 Google-search-link affordance and step-1 normalizer
+  characterization groundwork. Remaining order: comparator runs → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

@@ -90,14 +90,17 @@ institution form.
   ledger at all — all 6 skipped. The owner's Q5 policy has no existing
   machinery.
 
-## Assumed-label cases (owner adjudication pending)
+## Assumed-label cases at run time (both settled 2026-08-07, next day)
 
 - **person-005 (Yubin Zhou): FAIL** — the incumbent RESOLVED the
   50%-confidence Northwestern-byline candidate as a match; the design label
   says a 50%-confidence match with a contradicting institution must reach a
   human. This is the live namesake-bleed hazard, now demonstrated, not just
-  suspected.
+  suspected. *(Label settled `verified`/`review` by owner 2026-08-07 — the
+  run's headline therefore effectively reads 89 pass / 65 fail on settled
+  labels; this report keeps the as-run numbers.)*
 - **affil-004 (EKA contaminant): skipped** (no affiliation adapter).
+  *(Product behavior settled 2026-08-07: quarantine-for-review.)*
 
 ## Skips (12, denominator honesty)
 

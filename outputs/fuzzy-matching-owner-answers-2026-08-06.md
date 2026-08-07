@@ -152,11 +152,30 @@ still point-in-time.
 1. **The benchmark gate is open.** Consensus §1 step 0 — the 150–300-case
    falsification suite + UC adversarial matrix — is approved as next work on
    this track. Nothing else in the sequence is unblocked until it exists.
+   *(Update S405: suite BUILT and, after a follow-up owner authorization
+   same session, EXECUTED — incumbent baseline frozen; see
+   `benchmarks/fuzzy-matching-falsification/baseline/incumbent-2026-08-06.md`.)*
 2. **Representative benchmark: parked indefinitely**; high-risk automation
    stays review-only as the accepted steady state.
 3. **Candidate small increment (not started, not scheduled):** the
    Google-search link in the review UI (Q2). Fits the S395 small-ship
    discipline; needs owner scheduling like any other work item.
+   *(Update 2026-08-07: owner approved; build delegated to an agent.)*
 4. Q1/Q5/Q6 answers reshape the decision-model design inputs (union-over-
    ambiguity COI, all-affiliations representation, evidence-ledger contact
    contract) for consensus steps 2, 5, and 6 when those are reached.
+
+## Addendum — follow-up owner decisions, 2026-08-07
+
+- **Zhou fixture (person-005):** owner accepted the recommendation that
+  expected `review` is correct independent of the byline's biographical
+  ground truth; label converted `assumed` → `verified`. The biographical
+  question stays open, gating nothing.
+- **Provenance-less affiliations (affil-004, EKA contaminant):**
+  **quarantine-for-review** is the decided product handling — shown labeled
+  as unverifiable, never silently dropped, never presented or COI-screened
+  as fact; counts toward COI only in the widening direction (per Q1). Root
+  cause of the contaminant remains an open carried bug.
+- **Next build items approved ("use agents to build"):** the Q2
+  Google-search-link affordance, and consensus step-1 GROUNDWORK
+  (normalizer inventory + characterization tests, no consolidation edits).

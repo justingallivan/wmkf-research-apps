@@ -83,17 +83,19 @@ first-class correct answer. PII discipline: no real email addresses in
 tracked fixtures — structural `<placeholders>` or reserved example domains
 only (`validate-cases.js` enforces this).
 
-## Owner-adjudication list (label_status: assumed)
+## Owner-adjudication list — CLEARED (owner decisions 2026-08-07)
 
-Ground truth never established; expected labels are design-intent `review`:
+No `assumed` labels remain (`validate-cases.js` reports none):
 
-1. **person-005 / inst-byline-012 — Yubin Zhou** (request 1002903): is the
-   Northwestern Feinberg byline his (recent move/joint role) or a namesake's?
-   S400 left it open; verification confidence was 50%.
-2. **affil-004 — EKA University of Applied Sciences** contaminant on the
-   Columbia candidate: origin untraced (carried SESSION_PROMPT item). Also a
-   product question: is quarantine-for-review (vs silent drop) the right
-   handling for provenance-less affiliations?
+1. **person-005 (Yubin Zhou): settled as `review`** — correct regardless of
+   the byline's biographical ground truth (a 50%-confidence match with a
+   contradicting institution must reach a human either way). The
+   biographical question itself stays open but gates nothing.
+2. **affil-004 (EKA contaminant): quarantine-for-review is the decided
+   product behavior** for provenance-less affiliations — shown labeled
+   unverifiable, never silently dropped, never presented/COI-screened as
+   fact; counts toward COI only in the widening direction (Q1). The
+   untraced root cause remains a carried bug.
 
 ## Executing later (not now)
 

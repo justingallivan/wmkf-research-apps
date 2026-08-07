@@ -94,8 +94,11 @@ modal coherence · `ff06fbb8` MERGE 2 · `b5aaa5e2` stale-quote reconcile.
    byline false-mismatch class reproduces with no S400 drift; person-005
    (Zhou) namesake-bleed DEMONSTRATED (incumbent matched at 50% confidence).
    Full analysis: `baseline/incumbent-2026-08-06.md`. NOT done: comparator
-   runs (ROR chosen:true, S2AFF). Owner adjudication still pending: Zhou
-   namesake ground truth; EKA contaminant handling.
+   runs (ROR chosen:true, S2AFF). Both adjudications SETTLED 2026-08-07:
+   Zhou fixture = `review` regardless of biographical truth (question open,
+   gates nothing); EKA-class provenance-less affiliations =
+   quarantine-for-review (owner decision). Search-link + normalizer
+   characterization builds delegated to agents 2026-08-07.
 2. **Token-lifecycle redesign** (per-suggestion lease/generation OR multiple
    concurrently-valid tokens). Founding requirement = final Codex review
    finding (mint→dispatch non-atomicity) + its test list; owner accepted
