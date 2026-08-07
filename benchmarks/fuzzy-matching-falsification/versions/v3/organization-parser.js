@@ -8,7 +8,13 @@ const {
 } = require('./text-evidence');
 
 const ORG_TERM = /\b(university|college|institute|institution|hospital|laboratory|lab|school|center|centre|system|foundation|academy|health)\b/i;
+const COMMA_ORG_TERM = /\b(university|institute|institution|hospital|laboratory|lab|school|center|centre|system|foundation|academy|health)\b|\bcollege\s+of\b|\bcollege$/i;
 const MAX_ORGANIZATION_SPANS = 5;
+const BRAND_NOISE = new Set([
+  'academy', 'center', 'centre', 'college', 'foundation', 'health', 'hospital',
+  'institute', 'institution', 'lab', 'laboratory', 'of', 'school', 'system', 'the',
+  'university',
+]);
 
 function organizationLike(value) {
   return ORG_TERM.test(value) || explicitAcronyms(value).length > 0;
@@ -16,8 +22,17 @@ function organizationLike(value) {
 
 function commaOrganizationLike(value) {
   const trimmed = String(value || '').trim();
-  return ORG_TERM.test(trimmed)
+  return COMMA_ORG_TERM.test(trimmed)
     || (/^[A-Z][A-Z0-9.]{1,10}$/.test(trimmed) && explicitAcronyms(trimmed).length > 0);
+}
+
+function sharesDepartmentBrand(parts) {
+  const brandSets = parts.map((part) => new Set(
+    normalizeText(part).split(' ').filter((token) => token && !BRAND_NOISE.has(token)),
+  ));
+  return brandSets.length > 1 && [...brandSets[0]].some((token) => (
+    brandSets.slice(1).every((tokens) => tokens.has(token))
+  ));
 }
 
 function brandedConjunction(value) {
@@ -31,7 +46,10 @@ function parseOrganizationSpans(value) {
   const spans = [];
   for (const semicolonPart of text.split(/\s*;\s*/).filter(Boolean)) {
     const commaParts = semicolonPart.split(/\s*,\s*/).filter(Boolean);
-    if (commaParts.filter(commaOrganizationLike).length > 1) {
+    const commaOrganizations = commaParts.filter(commaOrganizationLike);
+    const departmentHierarchy = /^(department|dept|division|faculty|program)\b/i.test(semicolonPart)
+      && sharesDepartmentBrand(commaOrganizations);
+    if (commaOrganizations.length > 1 && !departmentHierarchy) {
       return { spans: [], issue: 'unparsed_multi_organization_delimiter' };
     }
     const andParts = semicolonPart.split(/\s+and\s+/i);

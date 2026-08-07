@@ -125,6 +125,11 @@ describe('organization parsing and controlled fallback', () => {
       .toEqual(['Massachusetts Institute of Technology', 'Harvard University']);
     expect(parseOrganizationSpans('Harvard University, Massachusetts Institute of Technology'))
       .toMatchObject({ spans: [], issue: 'unparsed_multi_organization_delimiter' });
+    expect(organizationSpans('Texas A&M University, College Station, TX, USA'))
+      .toEqual(['Texas A&M University, College Station, TX, USA']);
+    expect(organizationSpans(
+      'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.',
+    )).toHaveLength(1);
     expect(parseOrganizationSpans('Harvard and MIT')).toMatchObject({
       spans: [], issue: 'unparsed_organization_conjunction',
     });
