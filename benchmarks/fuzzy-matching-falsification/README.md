@@ -43,6 +43,12 @@ owner answers in `outputs/fuzzy-matching-owner-answers-2026-08-06.md`.
   local Python 3.14 with no uv/pyenv/conda, so it needs a pinned 3.10/3.11 venv
   and its own session. Threshold calibration remains out of scope for this suite
   entirely.
+- **PINNED ROR v2.11 + COMPACT-INDEX SIZE EXPERIMENT COMPLETE 2026-08-07** —
+  the immutable release/checksum, deterministic builder, and results live in
+  `../compact-ror-index/`. The full retrieval-only JSON is 80.4 MB plain /
+  24.7 MB Brotli and remains offline-only. No local comparator, canonical-id
+  case revision, relationship-aware pair adapter, or production asset is built
+  by that measurement.
 - `run.js` has now executed once; three harness fixes were made during that
   run (see its inline comments and the baseline report). Known sharp edge:
   target-name judging is exact-string — compare normalized names or ROR ids
@@ -87,8 +93,10 @@ substitution families. The full 9-sibling cross product is **335 cases**;
 regenerate with `node generate-uc-matrix.js --full` when a run wants
 exhaustive coverage. The generator is deterministic — same table, same bytes.
 
-`ror_id` is null everywhere by design: populating it belongs to the
-pinned-ROR-dump work (consensus step 2); guessing IDs would fabricate values.
+`ror_id` is null everywhere in this frozen revision by design. ROR v2.11 is now
+pinned, but populating ids changes the benchmark contract and must happen in a
+deliberately versioned revision with every prior comparator rerun; guessing ids
+or editing these frozen cases in place would fabricate comparability.
 
 ## Case schema
 
@@ -142,10 +150,11 @@ Done: incumbent baseline, ROR `chosen:true`. Remaining from the consensus §1
 step-0 comparator list (`docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md`),
 both queued, neither waived:
 
-1. **Pinned ROR dump + local exact-alias baseline** (consensus step 2) —
-   recommended first: offline, dependency-free, no rate limit, and it unlocks
-   ROR-id-based judging (making the artifact set adjudicable) plus the
-   relationships graph (letting a pair adapter express hierarchy).
+1. **Pinned ROR v2.11 local baseline** (consensus step 2) — source and compact
+   sizing are done in `../compact-ror-index/`; the remaining work is the local
+   adapter plus a deliberately versioned case/judge revision with canonical
+   ROR ids and relationship-aware pair semantics. It remains offline,
+   dependency-free, and rate-limit-free.
 2. **S2AFF** — needs a pinned Python 3.10/3.11 venv; own session.
 
 A relationship-aware pair adapter is a prerequisite for measuring

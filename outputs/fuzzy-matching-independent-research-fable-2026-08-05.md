@@ -5,6 +5,11 @@ Author: Claude (Fable), independent of `docs/REVIEWER_IDENTITY_AND_INSTITUTION_R
 
 Status: research and opinion only. Nothing here authorizes implementation, dependency adoption, schema work, or changes to live identity/write gates.
 
+> **Historical boundary, updated 2026-08-07:** this independent position's
+> locally-held ROR-dump recommendation is superseded by the owner's server-side
+> ROR API decision. The dump is offline-only. Current build authority is
+> `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+
 Evidence basis: five parallel web-research sweeps (record-linkage frameworks; person-name matching; academic author disambiguation; institution resolution; modern LLM-era matching and decision design) plus a full inventory of the matching code this repository has actually accumulated. Source URLs are cited inline; claims marked [directional] came from preprints or vendor material and should be re-verified before load-bearing use.
 
 ---

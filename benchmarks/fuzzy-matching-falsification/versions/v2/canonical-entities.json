@@ -1,0 +1,3241 @@
+{
+  "schema_version": "ror-canonical-entities/v1",
+  "source": {
+    "release": "v2.11-2026-08-03",
+    "sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+  },
+  "organizations": [
+    {
+      "id": "https://ror.org/000e0be47",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "NU"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Northwestern University"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "IL",
+            "country_subdivision_name": "Illinois",
+            "lat": 42.04114,
+            "lng": -87.69006,
+            "name": "Evanston"
+          },
+          "geonames_id": 4891382
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Center for Light Energy Activated Redox Processes",
+          "type": "child",
+          "id": "https://ror.org/004x7d471"
+        },
+        {
+          "label": "International Institute for Nanotechnology",
+          "type": "child",
+          "id": "https://ror.org/00rncr820"
+        },
+        {
+          "label": "Chan Zuckerberg Biohub Chicago",
+          "type": "child",
+          "id": "https://ror.org/014nxkk19"
+        },
+        {
+          "label": "Central DuPage Hospital",
+          "type": "related",
+          "id": "https://ror.org/00g1rc256"
+        },
+        {
+          "label": "Jesse Brown VA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/049qtwc86"
+        },
+        {
+          "label": "John H. Stroger, Jr. Hospital of Cook County",
+          "type": "related",
+          "id": "https://ror.org/05626m728"
+        },
+        {
+          "label": "Lurie Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/03a6zw892"
+        },
+        {
+          "label": "Northwestern Medicine Lake Forest Hospital",
+          "type": "related",
+          "id": "https://ror.org/03fhrtz10"
+        },
+        {
+          "label": "Northwestern Memorial Hospital",
+          "type": "related",
+          "id": "https://ror.org/009543z50"
+        },
+        {
+          "label": "Shirley Ryan AbilityLab",
+          "type": "related",
+          "id": "https://ror.org/02ja0m249"
+        },
+        {
+          "label": "Northwestern University in Qatar",
+          "type": "related",
+          "id": "https://ror.org/006m74d95"
+        },
+        {
+          "label": "Northwestern Medicine",
+          "type": "related",
+          "id": "https://ror.org/04fzwnh64"
+        },
+        {
+          "label": "Robert H. Lurie Comprehensive Cancer Center of Northwestern University",
+          "type": "related",
+          "id": "https://ror.org/02p4far57"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/00d9ah105",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Merced"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "acronym"
+          ],
+          "value": "UCM"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Merced"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Merced"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Merced"
+        }
+      ],
+      "domains": [
+        "ucmerced.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 37.30216,
+            "lng": -120.48297,
+            "name": "Merced"
+          },
+          "geonames_id": 5372253
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Sevilleta Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/01qcacz92"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/00hj8s172",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "CU"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Columbia College"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Columbia University"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Columbia University in the City of New York"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "King's College"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de Columbia"
+        }
+      ],
+      "domains": [
+        "columbia.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "NY",
+            "country_subdivision_name": "New York",
+            "lat": 40.71427,
+            "lng": -74.00597,
+            "name": "New York"
+          },
+          "geonames_id": 5128581
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Lamont-Doherty Earth Observatory",
+          "type": "child",
+          "id": "https://ror.org/02e2tgs60"
+        },
+        {
+          "label": "ICAP Global Health",
+          "type": "child",
+          "id": "https://ror.org/01f0vkh84"
+        },
+        {
+          "label": "Chan Zuckerberg Biohub New York",
+          "type": "child",
+          "id": "https://ror.org/0263t7p64"
+        },
+        {
+          "label": "Bassett Healthcare Network",
+          "type": "related",
+          "id": "https://ror.org/04qvzh720"
+        },
+        {
+          "label": "Bassett Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05fk0de79"
+        },
+        {
+          "label": "Columbia University Irving Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01esghr10"
+        },
+        {
+          "label": "Greenwich Hospital",
+          "type": "related",
+          "id": "https://ror.org/036qtaj98"
+        },
+        {
+          "label": "Harlem Hospital Center",
+          "type": "related",
+          "id": "https://ror.org/00tz4k675"
+        },
+        {
+          "label": "Helen Hayes Hospital",
+          "type": "related",
+          "id": "https://ror.org/02k4w3g59"
+        },
+        {
+          "label": "Holy Name Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05fnpxf31"
+        },
+        {
+          "label": "Manhattan Eye, Ear and Throat Hospital",
+          "type": "related",
+          "id": "https://ror.org/008a4de11"
+        },
+        {
+          "label": "NewYork–Presbyterian Hospital",
+          "type": "related",
+          "id": "https://ror.org/03gzbrs57"
+        },
+        {
+          "label": "Nyack Hospital",
+          "type": "related",
+          "id": "https://ror.org/0378zg266"
+        },
+        {
+          "label": "St. Francis Hospital",
+          "type": "related",
+          "id": "https://ror.org/00mj4n083"
+        },
+        {
+          "label": "Stamford Hospital",
+          "type": "related",
+          "id": "https://ror.org/05jr4qt09"
+        },
+        {
+          "label": "Union Theological Seminary",
+          "type": "related",
+          "id": "https://ror.org/05jesdm52"
+        },
+        {
+          "label": "United States Science Support Program",
+          "type": "related",
+          "id": "https://ror.org/032x9hy18"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/00pjdza24",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UC"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California System"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie"
+        }
+      ],
+      "domains": [
+        "universityofcalifornia.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 37.80437,
+            "lng": -122.2708,
+            "name": "Oakland"
+          },
+          "geonames_id": 5378538
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Center for Information Technology Research in the Interest of Society",
+          "type": "child",
+          "id": "https://ror.org/00zv0wd17"
+        },
+        {
+          "label": "University of California Division of Agriculture and Natural Resources",
+          "type": "child",
+          "id": "https://ror.org/03t0t6y08"
+        },
+        {
+          "label": "University of California, Berkeley",
+          "type": "child",
+          "id": "https://ror.org/01an7q238"
+        },
+        {
+          "label": "University of California, Davis",
+          "type": "child",
+          "id": "https://ror.org/05rrcem69"
+        },
+        {
+          "label": "University of California, Irvine",
+          "type": "child",
+          "id": "https://ror.org/04gyf1771"
+        },
+        {
+          "label": "University of California, Los Angeles",
+          "type": "child",
+          "id": "https://ror.org/046rm7j60"
+        },
+        {
+          "label": "University of California, Merced",
+          "type": "child",
+          "id": "https://ror.org/00d9ah105"
+        },
+        {
+          "label": "University of California, Riverside",
+          "type": "child",
+          "id": "https://ror.org/03nawhv43"
+        },
+        {
+          "label": "University of California San Diego",
+          "type": "child",
+          "id": "https://ror.org/0168r3w48"
+        },
+        {
+          "label": "University of California, San Francisco",
+          "type": "child",
+          "id": "https://ror.org/043mz5j54"
+        },
+        {
+          "label": "University of California, Santa Barbara",
+          "type": "child",
+          "id": "https://ror.org/02t274463"
+        },
+        {
+          "label": "University of California, Santa Cruz",
+          "type": "child",
+          "id": "https://ror.org/03s65by71"
+        },
+        {
+          "label": "University of California Natural Reserve System",
+          "type": "child",
+          "id": "https://ror.org/04nmjep87"
+        },
+        {
+          "label": "University of California Office of the President",
+          "type": "child",
+          "id": "https://ror.org/00dmfq477"
+        },
+        {
+          "label": "Lawrence Berkeley National Laboratory",
+          "type": "child",
+          "id": "https://ror.org/02jbv0t02"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/0168r3w48",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC San Diego"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "acronym"
+          ],
+          "value": "UCSD"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "label",
+            "ror_display"
+          ],
+          "value": "University of California San Diego"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "University of California, San Diego"
+        }
+      ],
+      "domains": [
+        "ucsd.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 32.71571,
+            "lng": -117.16472,
+            "name": "San Diego"
+          },
+          "geonames_id": 5391811
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "California Sea Grant",
+          "type": "child",
+          "id": "https://ror.org/02yn1nr06"
+        },
+        {
+          "label": "California Space Grant Consortium",
+          "type": "child",
+          "id": "https://ror.org/05ffhwq07"
+        },
+        {
+          "label": "San Diego Supercomputer Center",
+          "type": "child",
+          "id": "https://ror.org/04mg3nk07"
+        },
+        {
+          "label": "Scripps Institution of Oceanography",
+          "type": "child",
+          "id": "https://ror.org/04v7hvq31"
+        },
+        {
+          "label": "UCSD-CNRS Joint Research Chemistry Laboratory",
+          "type": "child",
+          "id": "https://ror.org/00t7axd27"
+        },
+        {
+          "label": "Center for Wireless Communications",
+          "type": "child",
+          "id": "https://ror.org/04b57z061"
+        },
+        {
+          "label": "CloudBank",
+          "type": "child",
+          "id": "https://ror.org/02whst089"
+        },
+        {
+          "label": "Swartz Center for Computational Neuroscience",
+          "type": "child",
+          "id": "https://ror.org/01bt2qm76"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Rady Children's Hospital-San Diego",
+          "type": "related",
+          "id": "https://ror.org/00414dg76"
+        },
+        {
+          "label": "Salk Institute for Biological Studies",
+          "type": "related",
+          "id": "https://ror.org/03xez1567"
+        },
+        {
+          "label": "Scripps Mercy Hospital",
+          "type": "related",
+          "id": "https://ror.org/04k4h9k07"
+        },
+        {
+          "label": "University of California San Diego Medical Center",
+          "type": "related",
+          "id": "https://ror.org/03aw5sn18"
+        },
+        {
+          "label": "VA San Diego Healthcare System",
+          "type": "related",
+          "id": "https://ror.org/00znqwq11"
+        },
+        {
+          "label": "Open Data Commons for Spinal Cord Injury",
+          "type": "related",
+          "id": "https://ror.org/027790w81"
+        },
+        {
+          "label": "Moorea Coral Reef Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/017vyhs10"
+        },
+        {
+          "label": "Materials Science in Extreme Environments University Research Alliance",
+          "type": "related",
+          "id": "https://ror.org/04n07f274"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/01an7q238",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Cal Berkeley"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Berkeley"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCB"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Berkeley"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "University of California at Berkeley"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Berkeley"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Berkeley"
+        }
+      ],
+      "domains": [
+        "berkeley.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 37.87159,
+            "lng": -122.27275,
+            "name": "Berkeley"
+          },
+          "geonames_id": 5327684
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Center for Effective Global Action",
+          "type": "child",
+          "id": "https://ror.org/03djjyk45"
+        },
+        {
+          "label": "Gump South Pacific Research Station",
+          "type": "child",
+          "id": "https://ror.org/04sk0et52"
+        },
+        {
+          "label": "Innovative Genomics Institute",
+          "type": "child",
+          "id": "https://ror.org/01r4tcq81"
+        },
+        {
+          "label": "Plant Gene Expression Center",
+          "type": "child",
+          "id": "https://ror.org/03rafms67"
+        },
+        {
+          "label": "Tsinghua–Berkeley Shenzhen Institute",
+          "type": "child",
+          "id": "https://ror.org/02hhwwz98"
+        },
+        {
+          "label": "Chan Zuckerberg Biohub San Francisco",
+          "type": "child",
+          "id": "https://ror.org/00knt4f32"
+        },
+        {
+          "label": "QB3",
+          "type": "child",
+          "id": "https://ror.org/04n1n3n22"
+        },
+        {
+          "label": "Pacific Earthquake Engineering Research Center",
+          "type": "child",
+          "id": "https://ror.org/02cq2e244"
+        },
+        {
+          "label": "Space Sciences Laboratory",
+          "type": "child",
+          "id": "https://ror.org/048400679"
+        },
+        {
+          "label": "Institute of International Studies",
+          "type": "child",
+          "id": "https://ror.org/01rq3ht76"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Dominican School of Philosophy and Theology",
+          "type": "related",
+          "id": "https://ror.org/015yfqq31"
+        },
+        {
+          "label": "Graduate Theological Union",
+          "type": "related",
+          "id": "https://ror.org/00xs48965"
+        },
+        {
+          "label": "Kaiser Permanente Oakland Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05rfek682"
+        },
+        {
+          "label": "San Francisco Theological Seminary",
+          "type": "related",
+          "id": "https://ror.org/02wyv8x71"
+        },
+        {
+          "label": "Hubbard Brook Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/00mkh7345"
+        },
+        {
+          "label": "International Computer Science Institute",
+          "type": "related",
+          "id": "https://ror.org/01ewh7m12"
+        },
+        {
+          "label": "CloudBank",
+          "type": "child",
+          "id": "https://ror.org/02whst089"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/01esghr10",
+      "status": "active",
+      "names": [
+        {
+          "value": "CUIMC",
+          "types": [
+            "acronym"
+          ],
+          "lang": null
+        },
+        {
+          "value": "CUMC",
+          "types": [
+            "acronym"
+          ],
+          "lang": null
+        },
+        {
+          "value": "Centre médical de l'université columbia",
+          "types": [
+            "label"
+          ],
+          "lang": "fr"
+        },
+        {
+          "value": "Columbia University Irving Medical Center",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        },
+        {
+          "value": "Columbia University Medical Center",
+          "types": [
+            "alias"
+          ],
+          "lang": "en"
+        },
+        {
+          "value": "centro médico de la Universidad de Columbia",
+          "types": [
+            "label"
+          ],
+          "lang": "es"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 5128581,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "NY",
+            "country_subdivision_name": "New York",
+            "lat": 40.71427,
+            "lng": -74.00597,
+            "name": "New York"
+          }
+        }
+      ],
+      "types": [
+        "healthcare",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Columbia University",
+          "type": "related",
+          "id": "https://ror.org/00hj8s172"
+        },
+        {
+          "label": "Harlem Hospital Center",
+          "type": "related",
+          "id": "https://ror.org/00tz4k675"
+        },
+        {
+          "label": "New York State Psychiatric Institute",
+          "type": "related",
+          "id": "https://ror.org/04aqjf708"
+        },
+        {
+          "label": "Herbert Irving Comprehensive Cancer Center",
+          "type": "related",
+          "id": "https://ror.org/051kc1939"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/01f5ytq51",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "TAMU"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Texas A&M University"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "TX",
+            "country_subdivision_name": "Texas",
+            "lat": 30.62798,
+            "lng": -96.33441,
+            "name": "College Station"
+          },
+          "geonames_id": 4682464
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Texas A&M Health Science Center",
+          "type": "child",
+          "id": "https://ror.org/01tx6pn92"
+        },
+        {
+          "label": "Texas A&M University School of Law",
+          "type": "child",
+          "id": "https://ror.org/03cv6f983"
+        },
+        {
+          "label": "Texas A&M University at Qatar",
+          "type": "child",
+          "id": "https://ror.org/03vb4dm14"
+        },
+        {
+          "label": "Texas A&M Engineering Experiment Station",
+          "type": "child",
+          "id": "https://ror.org/03p8qrw52"
+        },
+        {
+          "label": "Texas A&M University System",
+          "type": "parent",
+          "id": "https://ror.org/0034eay46"
+        },
+        {
+          "label": "Baylor Scott & White Health",
+          "type": "related",
+          "id": "https://ror.org/05wevan27"
+        },
+        {
+          "label": "Baylor University Medical Center",
+          "type": "related",
+          "id": "https://ror.org/03nxfhe13"
+        },
+        {
+          "label": "Central Texas Veterans Health Care System",
+          "type": "related",
+          "id": "https://ror.org/02dcp1550"
+        },
+        {
+          "label": "Texas Medical Center",
+          "type": "related",
+          "id": "https://ror.org/00dqsbj20"
+        },
+        {
+          "label": "The University of Texas MD Anderson Cancer Center",
+          "type": "related",
+          "id": "https://ror.org/04twxam07"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/01kbfgm16",
+      "status": "active",
+      "names": [
+        {
+          "value": "UC San Diego Health",
+          "types": [
+            "alias"
+          ],
+          "lang": "en"
+        },
+        {
+          "value": "UC San Diego Health System",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 5391811,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 32.71571,
+            "lng": -117.16472,
+            "name": "San Diego"
+          }
+        }
+      ],
+      "types": [
+        "healthcare"
+      ],
+      "relationships": [
+        {
+          "label": "University of California San Diego Medical Center",
+          "type": "child",
+          "id": "https://ror.org/03aw5sn18"
+        },
+        {
+          "label": "Moores Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/01qkmtm61"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/0264fdx42",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "SDSU"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "San Diego State University"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad Estatal de San Diego"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université d'État de san diego"
+        }
+      ],
+      "domains": [
+        "sdsu.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 32.71571,
+            "lng": -117.16472,
+            "name": "San Diego"
+          },
+          "geonames_id": 5391811
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "California State University System",
+          "type": "parent",
+          "id": "https://ror.org/020qm1538"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/0294hxs80",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "CSULA"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Cal State LA"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "California State University Los Angeles"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad Estatal de California, Los Ángeles"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université d'État de californie à los angeles"
+        }
+      ],
+      "domains": [
+        "calstatela.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 34.05223,
+            "lng": -118.24368,
+            "name": "Los Angeles"
+          },
+          "geonames_id": 5368361
+        }
+      ],
+      "types": [
+        "education"
+      ],
+      "relationships": [
+        {
+          "label": "California State University System",
+          "type": "parent",
+          "id": "https://ror.org/020qm1538"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/02jbv0t02",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Berkeley Lab"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "LBL"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "LBNL"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Laboratoire national lawrence-berkeley"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Lawrence Berkeley National Laboratory"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "United States Department of Energy Office of Science Lawrence Berkeley National Laboratory"
+        }
+      ],
+      "domains": [
+        "lbl.gov"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 37.87159,
+            "lng": -122.27275,
+            "name": "Berkeley"
+          },
+          "geonames_id": 5327684
+        }
+      ],
+      "types": [
+        "facility",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Joint Center for Artificial Photosynthesis",
+          "type": "child",
+          "id": "https://ror.org/05jtgpc57"
+        },
+        {
+          "label": "Advanced Light Source",
+          "type": "child",
+          "id": "https://ror.org/00319zh75"
+        },
+        {
+          "label": "Joint Genome Institute",
+          "type": "child",
+          "id": "https://ror.org/04xm1d337"
+        },
+        {
+          "label": "Environmental System Science Data Infrastructure for a Virtual Ecosystem",
+          "type": "child",
+          "id": "https://ror.org/01t14bp54"
+        },
+        {
+          "label": "Molecular Foundry",
+          "type": "child",
+          "id": "https://ror.org/01fdhpk75"
+        },
+        {
+          "label": "National Energy Research Scientific Computing Center",
+          "type": "child",
+          "id": "https://ror.org/05v3mvq14"
+        },
+        {
+          "label": "Energy Sciences Network",
+          "type": "child",
+          "id": "https://ror.org/0382bxa43"
+        },
+        {
+          "label": "National Microbiome Data Collaborative",
+          "type": "child",
+          "id": "https://ror.org/05cwx3318"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Office of Science",
+          "type": "parent",
+          "id": "https://ror.org/00mmn6b08"
+        },
+        {
+          "label": "Atmospheric Radiation Measurement User Facility",
+          "type": "related",
+          "id": "https://ror.org/01dvj3d25"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/02jzgtq86",
+      "status": "active",
+      "names": [
+        {
+          "value": "Dana-Farber Cancer Institute",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 4930956,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "MA",
+            "country_subdivision_name": "Massachusetts",
+            "lat": 42.35843,
+            "lng": -71.05977,
+            "name": "Boston"
+          }
+        }
+      ],
+      "types": [
+        "facility",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Dana-Farber/Boston Children's Cancer and Blood Disorders Center",
+          "type": "child",
+          "id": "https://ror.org/05k11pb55"
+        },
+        {
+          "label": "Dana-Farber Brigham Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/05rgrbr06"
+        },
+        {
+          "label": "Dana-Farber/Harvard Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/03pvyf116"
+        },
+        {
+          "label": "Boston Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/00dvg7y05"
+        },
+        {
+          "label": "Harvard University",
+          "type": "related",
+          "id": "https://ror.org/03vek6s52"
+        },
+        {
+          "label": "Massachusetts General Hospital",
+          "type": "related",
+          "id": "https://ror.org/002pd6e78"
+        },
+        {
+          "label": "Wyss Institute for Biologically Inspired Engineering",
+          "type": "related",
+          "id": "https://ror.org/008cfmj78"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/02t274463",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Santa Barbara"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCSB"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Santa Bárbara"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Santa Barbara"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Santa Barbara"
+        }
+      ],
+      "domains": [
+        "ucsb.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 34.42083,
+            "lng": -119.69819,
+            "name": "Santa Barbara"
+          },
+          "geonames_id": 5392952
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "California NanoSystems Institute",
+          "type": "child",
+          "id": "https://ror.org/00q7fqf35"
+        },
+        {
+          "label": "National Center for Ecological Analysis and Synthesis",
+          "type": "child",
+          "id": "https://ror.org/0146z4r19"
+        },
+        {
+          "label": "Moorea Coral Reef Long Term Ecological Research",
+          "type": "child",
+          "id": "https://ror.org/017vyhs10"
+        },
+        {
+          "label": "Santa Barbara Coastal Long Term Ecological Research",
+          "type": "child",
+          "id": "https://ror.org/05hnkta08"
+        },
+        {
+          "label": "Institute for Collaborative Biotechnologies",
+          "type": "child",
+          "id": "https://ror.org/04kz4p343"
+        },
+        {
+          "label": "Kavli Institute for Theoretical Physics",
+          "type": "child",
+          "id": "https://ror.org/02yt0vw44"
+        },
+        {
+          "label": "La Kretz Research Center at Sedgwick Reserve",
+          "type": "child",
+          "id": "https://ror.org/03d5jvw89"
+        },
+        {
+          "label": "University of California Santa Barbara Microscopy and Microanalysis Facility",
+          "type": "child",
+          "id": "https://ror.org/03f1rr013"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Long Term Ecological Research Network",
+          "type": "related",
+          "id": "https://ror.org/039kwqk96"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/02vm5rt34",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Vanderbilt University"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Vandy"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "TN",
+            "country_subdivision_name": "Tennessee",
+            "lat": 36.16589,
+            "lng": -86.78444,
+            "name": "Nashville"
+          },
+          "geonames_id": 4644585
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Tennessee Space Grant Consortium",
+          "type": "child",
+          "id": "https://ror.org/03h2q9n18"
+        },
+        {
+          "label": "Monroe Carell Jr. Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/00y64dx33"
+        },
+        {
+          "label": "Vanderbilt University Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05dq2gs74"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/03nawhv43",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Riverside"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCR"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Riverside"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Riverside"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Riverside"
+        }
+      ],
+      "domains": [
+        "ucr.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 33.95335,
+            "lng": -117.39616,
+            "name": "Riverside"
+          },
+          "geonames_id": 5387877
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Materials Science in Extreme Environments University Research Alliance",
+          "type": "related",
+          "id": "https://ror.org/04n07f274"
+        },
+        {
+          "label": "U.S. Salinity Laboratory",
+          "type": "related",
+          "id": "https://ror.org/04pp5vm71"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/03s65by71",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Santa Cruz"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "acronym"
+          ],
+          "value": "UCSC"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Santa Cruz"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Santa Cruz"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Santa Cruz"
+        }
+      ],
+      "domains": [
+        "ucsc.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 36.97412,
+            "lng": -122.0308,
+            "name": "Santa Cruz"
+          },
+          "geonames_id": 5393052
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "QB3",
+          "type": "child",
+          "id": "https://ror.org/04n1n3n22"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Moorea Coral Reef Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/017vyhs10"
+        },
+        {
+          "label": "Northern Gulf of Alaska Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/01csn4944"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/03taz7m60",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "USC"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad del Sur de California"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of Southern California"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie du Sud"
+        }
+      ],
+      "domains": [
+        "usc.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 34.05223,
+            "lng": -118.24368,
+            "name": "Los Angeles"
+          },
+          "geonames_id": 5368361
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "METRANS Transportation Center",
+          "type": "child",
+          "id": "https://ror.org/0230s3k26"
+        },
+        {
+          "label": "University of Southern California Sea Grant",
+          "type": "child",
+          "id": "https://ror.org/0444fnd49"
+        },
+        {
+          "label": "USC Institute for Creative Technologies",
+          "type": "child",
+          "id": "https://ror.org/03hjhvn29"
+        },
+        {
+          "label": "NSF CI Compass",
+          "type": "child",
+          "id": "https://ror.org/001zwgm84"
+        },
+        {
+          "label": "Cedars-Sinai Medical Center",
+          "type": "related",
+          "id": "https://ror.org/02pammg90"
+        },
+        {
+          "label": "Children's Hospital of Los Angeles",
+          "type": "related",
+          "id": "https://ror.org/00412ts95"
+        },
+        {
+          "label": "Good Samaritan Hospital",
+          "type": "related",
+          "id": "https://ror.org/05hm6ny55"
+        },
+        {
+          "label": "Huntington Hospital",
+          "type": "related",
+          "id": "https://ror.org/02e271b61"
+        },
+        {
+          "label": "Keck Hospital of USC",
+          "type": "related",
+          "id": "https://ror.org/01rq8ck58"
+        },
+        {
+          "label": "LAC+USC Medical Center",
+          "type": "related",
+          "id": "https://ror.org/04xzj3x20"
+        },
+        {
+          "label": "Rancho Los Amigos National Rehabilitation Center",
+          "type": "related",
+          "id": "https://ror.org/03t3q6164"
+        },
+        {
+          "label": "Southern California Clinical and Translational Science Institute",
+          "type": "related",
+          "id": "https://ror.org/01ncqna34"
+        },
+        {
+          "label": "VA West Los Angeles Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01xfgtq85"
+        },
+        {
+          "label": "Graduate Fellowships for STEM Diversity",
+          "type": "related",
+          "id": "https://ror.org/030wr4654"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/03vek6s52",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Harvard University"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de Harvard"
+        }
+      ],
+      "domains": [
+        "harvard.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "MA",
+            "country_subdivision_name": "Massachusetts",
+            "lat": 42.3751,
+            "lng": -71.10561,
+            "name": "Cambridge"
+          },
+          "geonames_id": 4931972
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Athinoula A. Martinos Center for Biomedical Imaging",
+          "type": "child",
+          "id": "https://ror.org/032q5ym94"
+        },
+        {
+          "label": "Berenson Allen Center for Noninvasive Brain Stimulation",
+          "type": "child",
+          "id": "https://ror.org/03hj6c016"
+        },
+        {
+          "label": "Center for Astrophysics Harvard & Smithsonian",
+          "type": "child",
+          "id": "https://ror.org/03c3r2d17"
+        },
+        {
+          "label": "Center for Systems Biology",
+          "type": "child",
+          "id": "https://ror.org/05r3dyn47"
+        },
+        {
+          "label": "Center for Vascular Biology Research",
+          "type": "child",
+          "id": "https://ror.org/04wsv7966"
+        },
+        {
+          "label": "Gordon Center for Medical Imaging",
+          "type": "child",
+          "id": "https://ror.org/004y4rj95"
+        },
+        {
+          "label": "Harvard Stem Cell Institute",
+          "type": "child",
+          "id": "https://ror.org/04kj1hn59"
+        },
+        {
+          "label": "Harvard University Press",
+          "type": "child",
+          "id": "https://ror.org/006v7bf86"
+        },
+        {
+          "label": "MIT-Harvard Center for Ultracold Atoms",
+          "type": "child",
+          "id": "https://ror.org/053tmcn30"
+        },
+        {
+          "label": "Ragon Institute of MGH, MIT and Harvard",
+          "type": "child",
+          "id": "https://ror.org/053r20n13"
+        },
+        {
+          "label": "Sleep and Human Health Institute",
+          "type": "child",
+          "id": "https://ror.org/04r5ess67"
+        },
+        {
+          "label": "The NSF AI Institute for Artificial Intelligence and Fundamental Interactions",
+          "type": "child",
+          "id": "https://ror.org/04pvzz946"
+        },
+        {
+          "label": "Arnold Arboretum",
+          "type": "child",
+          "id": "https://ror.org/05xsxgs79"
+        },
+        {
+          "label": "Harvard Forest Long Term Ecological Research",
+          "type": "child",
+          "id": "https://ror.org/059cpzx98"
+        },
+        {
+          "label": "Wyss Institute for Biologically Inspired Engineering",
+          "type": "child",
+          "id": "https://ror.org/008cfmj78"
+        },
+        {
+          "label": "Dana-Farber/Harvard Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/03pvyf116"
+        },
+        {
+          "label": "Real Colegio Complutense",
+          "type": "child",
+          "id": "https://ror.org/05b0g2v72"
+        },
+        {
+          "label": "Beth Israel Deaconess Medical Center",
+          "type": "related",
+          "id": "https://ror.org/04drvxt59"
+        },
+        {
+          "label": "Boston Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/00dvg7y05"
+        },
+        {
+          "label": "Boston IVF",
+          "type": "related",
+          "id": "https://ror.org/05xckek43"
+        },
+        {
+          "label": "Botswana Harvard AIDS Institute Partnership",
+          "type": "related",
+          "id": "https://ror.org/04rkbns44"
+        },
+        {
+          "label": "Brigham and Women's Faulkner Hospital",
+          "type": "related",
+          "id": "https://ror.org/03w44ff23"
+        },
+        {
+          "label": "Brigham and Women's Hospital",
+          "type": "related",
+          "id": "https://ror.org/04b6nzv94"
+        },
+        {
+          "label": "Broad Institute",
+          "type": "related",
+          "id": "https://ror.org/05a0ya142"
+        },
+        {
+          "label": "Cambridge Health Alliance",
+          "type": "related",
+          "id": "https://ror.org/059c3mv67"
+        },
+        {
+          "label": "Dana-Farber Cancer Institute",
+          "type": "related",
+          "id": "https://ror.org/02jzgtq86"
+        },
+        {
+          "label": "Harvard Pilgrim Health Care",
+          "type": "related",
+          "id": "https://ror.org/01zxdeg39"
+        },
+        {
+          "label": "Harvard–MIT Division of Health Sciences and Technology",
+          "type": "related",
+          "id": "https://ror.org/00jjeh629"
+        },
+        {
+          "label": "Hebrew SeniorLife",
+          "type": "related",
+          "id": "https://ror.org/02vptss42"
+        },
+        {
+          "label": "IIT@Harvard",
+          "type": "related",
+          "id": "https://ror.org/044hpwe09"
+        },
+        {
+          "label": "Joslin Diabetes Center",
+          "type": "related",
+          "id": "https://ror.org/0280a3n32"
+        },
+        {
+          "label": "Judge Baker Children's Center",
+          "type": "related",
+          "id": "https://ror.org/05tby3y60"
+        },
+        {
+          "label": "Lahey Hospital and Medical Center",
+          "type": "related",
+          "id": "https://ror.org/03mbq3y29"
+        },
+        {
+          "label": "Massachusetts Eye and Ear Infirmary",
+          "type": "related",
+          "id": "https://ror.org/04g3dn724"
+        },
+        {
+          "label": "Massachusetts General Hospital",
+          "type": "related",
+          "id": "https://ror.org/002pd6e78"
+        },
+        {
+          "label": "Massachusetts Green High Performance Computing Center",
+          "type": "related",
+          "id": "https://ror.org/05par7p11"
+        },
+        {
+          "label": "McLean Hospital",
+          "type": "related",
+          "id": "https://ror.org/01kta7d96"
+        },
+        {
+          "label": "Newton Wellesley Hospital",
+          "type": "related",
+          "id": "https://ror.org/03hrxmf69"
+        },
+        {
+          "label": "Somerville Hospital",
+          "type": "related",
+          "id": "https://ror.org/023pf5e38"
+        },
+        {
+          "label": "Spaulding Rehabilitation Hospital",
+          "type": "related",
+          "id": "https://ror.org/011dvr318"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/03wevmz92",
+      "status": "withdrawn",
+      "names": [
+        {
+          "value": "HMS",
+          "types": [
+            "acronym"
+          ],
+          "lang": null
+        },
+        {
+          "value": "Harvard Medical School",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 4930956,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "MA",
+            "country_subdivision_name": "Massachusetts",
+            "lat": 42.35843,
+            "lng": -71.05977,
+            "name": "Boston"
+          }
+        }
+      ],
+      "types": [
+        "education"
+      ],
+      "relationships": [
+        {
+          "type": "related",
+          "label": "Boston IVF",
+          "id": "https://ror.org/05xckek43"
+        },
+        {
+          "type": "related",
+          "label": "Hebrew SeniorLife",
+          "id": "https://ror.org/02vptss42"
+        },
+        {
+          "type": "related",
+          "label": "Joslin Diabetes Center",
+          "id": "https://ror.org/0280a3n32"
+        },
+        {
+          "type": "related",
+          "label": "Judge Baker Children's Center",
+          "id": "https://ror.org/05tby3y60"
+        },
+        {
+          "label": "Harvard University",
+          "type": "successor",
+          "id": "https://ror.org/03vek6s52"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/042nb2s44",
+      "status": "active",
+      "names": [
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Instituto Tecnológico de Massachusetts"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "MIT"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Massachusetts Institute of Technology"
+        }
+      ],
+      "domains": [
+        "mit.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "MA",
+            "country_subdivision_name": "Massachusetts",
+            "lat": 42.3751,
+            "lng": -71.10561,
+            "name": "Cambridge"
+          },
+          "geonames_id": 4931972
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Athinoula A. Martinos Center for Biomedical Imaging",
+          "type": "child",
+          "id": "https://ror.org/032q5ym94"
+        },
+        {
+          "label": "Cambridge–MIT Institute",
+          "type": "child",
+          "id": "https://ror.org/00rj4dg52"
+        },
+        {
+          "label": "Institute for Soldier Nanotechnologies",
+          "type": "child",
+          "id": "https://ror.org/01t9bgr30"
+        },
+        {
+          "label": "MIT Lincoln Laboratory",
+          "type": "child",
+          "id": "https://ror.org/022z6jk58"
+        },
+        {
+          "label": "MIT Sea Grant",
+          "type": "child",
+          "id": "https://ror.org/03fg5ns40"
+        },
+        {
+          "label": "MIT-Harvard Center for Ultracold Atoms",
+          "type": "child",
+          "id": "https://ror.org/053tmcn30"
+        },
+        {
+          "label": "Massachusetts Space Grant Consortium",
+          "type": "child",
+          "id": "https://ror.org/0071sjj14"
+        },
+        {
+          "label": "McGovern Institute for Brain Research",
+          "type": "child",
+          "id": "https://ror.org/05ymca674"
+        },
+        {
+          "label": "Novartis-MIT Center for Continuous Manufacturing",
+          "type": "child",
+          "id": "https://ror.org/02dgwnb72"
+        },
+        {
+          "label": "Ragon Institute of MGH, MIT and Harvard",
+          "type": "child",
+          "id": "https://ror.org/053r20n13"
+        },
+        {
+          "label": "The NSF AI Institute for Artificial Intelligence and Fundamental Interactions",
+          "type": "child",
+          "id": "https://ror.org/04pvzz946"
+        },
+        {
+          "label": "Whitehead Institute for Biomedical Research",
+          "type": "child",
+          "id": "https://ror.org/04vqm6w82"
+        },
+        {
+          "label": "Institute for Collaborative Biotechnologies",
+          "type": "child",
+          "id": "https://ror.org/04kz4p343"
+        },
+        {
+          "label": "Koch Institute for Integrative Cancer Research At MIT",
+          "type": "child",
+          "id": "https://ror.org/01xd6q208"
+        },
+        {
+          "label": "Broad Institute",
+          "type": "related",
+          "id": "https://ror.org/05a0ya142"
+        },
+        {
+          "label": "Harvard–MIT Division of Health Sciences and Technology",
+          "type": "related",
+          "id": "https://ror.org/00jjeh629"
+        },
+        {
+          "label": "IIT@MIT",
+          "type": "related",
+          "id": "https://ror.org/01wp8zh54"
+        },
+        {
+          "label": "Massachusetts Green High Performance Computing Center",
+          "type": "related",
+          "id": "https://ror.org/05par7p11"
+        },
+        {
+          "label": "Northeast Radio Observatory Corporation",
+          "type": "related",
+          "id": "https://ror.org/03db3by08"
+        },
+        {
+          "label": "Singapore-MIT Alliance for Research and Technology",
+          "type": "related",
+          "id": "https://ror.org/05yb3w112"
+        },
+        {
+          "label": "Wyss Institute for Biologically Inspired Engineering",
+          "type": "related",
+          "id": "https://ror.org/008cfmj78"
+        },
+        {
+          "label": "Zaragoza Logistics Center",
+          "type": "related",
+          "id": "https://ror.org/02tpwnr26"
+        },
+        {
+          "label": "MIT Computer Science and Artificial Intelligence Laboratory",
+          "type": "child",
+          "id": "https://ror.org/01e85r662"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/043mz5j54",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC San Francisco"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCSF"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en San Francisco"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, San Francisco"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à San Francisco"
+        }
+      ],
+      "domains": [
+        "ucsf.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 37.77493,
+            "lng": -122.41942,
+            "name": "San Francisco"
+          },
+          "geonames_id": 5391959
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Innovative Genomics Institute",
+          "type": "child",
+          "id": "https://ror.org/01r4tcq81"
+        },
+        {
+          "label": "UCSF Helen Diller Family Comprehensive Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/05yndxy10"
+        },
+        {
+          "label": "Chan Zuckerberg Biohub San Francisco",
+          "type": "child",
+          "id": "https://ror.org/00knt4f32"
+        },
+        {
+          "label": "QB3",
+          "type": "child",
+          "id": "https://ror.org/04n1n3n22"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Alameda Hospital",
+          "type": "related",
+          "id": "https://ror.org/058sgvn64"
+        },
+        {
+          "label": "Gladstone Institutes",
+          "type": "related",
+          "id": "https://ror.org/038321296"
+        },
+        {
+          "label": "Langley Porter Psychiatric Hospital and Clinics",
+          "type": "related",
+          "id": "https://ror.org/014gzk937"
+        },
+        {
+          "label": "Natividad Medical Center",
+          "type": "related",
+          "id": "https://ror.org/038jxf238"
+        },
+        {
+          "label": "San Francisco General Hospital",
+          "type": "related",
+          "id": "https://ror.org/05j8x4n38"
+        },
+        {
+          "label": "San Francisco VA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/049peqw80"
+        },
+        {
+          "label": "UCSF Benioff Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/03hwe2705"
+        },
+        {
+          "label": "University of California San Francisco Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01t8svj65"
+        },
+        {
+          "label": "Open Data Commons for Spinal Cord Injury",
+          "type": "related",
+          "id": "https://ror.org/027790w81"
+        },
+        {
+          "label": "California Pacific Medical Center",
+          "type": "related",
+          "id": "https://ror.org/02bjh0167"
+        },
+        {
+          "label": "Philip R. Lee Institute for Health Policy Studies",
+          "type": "child",
+          "id": "https://ror.org/0570qwq18"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/046rm7j60",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "State Normal School at Los Angeles"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Los Angeles"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCLA"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Los Ángeles"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "University of California Southern Branch"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "University of California at Los Angeles"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Los Angeles"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Los Angeles"
+        }
+      ],
+      "domains": [
+        "ucla.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 34.05223,
+            "lng": -118.24368,
+            "name": "Los Angeles"
+          },
+          "geonames_id": 5368361
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "California NanoSystems Institute",
+          "type": "child",
+          "id": "https://ror.org/00q7fqf35"
+        },
+        {
+          "label": "UCLA Clinical and Translational Science Institute",
+          "type": "child",
+          "id": "https://ror.org/04kpwcf85"
+        },
+        {
+          "label": "NSF-Simons AI Institute for Cosmic Origins",
+          "type": "child",
+          "id": "https://ror.org/0424mzx13"
+        },
+        {
+          "label": "Higher Education Research Institute",
+          "type": "child",
+          "id": "https://ror.org/035jch041"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Cedars-Sinai Medical Center",
+          "type": "related",
+          "id": "https://ror.org/02pammg90"
+        },
+        {
+          "label": "Education and Research Institute",
+          "type": "related",
+          "id": "https://ror.org/03gkbdq83"
+        },
+        {
+          "label": "Good Samaritan Hospital",
+          "type": "related",
+          "id": "https://ror.org/05hm6ny55"
+        },
+        {
+          "label": "Harbor–UCLA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05h4zj272"
+        },
+        {
+          "label": "Kern Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01eyb5f38"
+        },
+        {
+          "label": "The Lundquist Institute",
+          "type": "related",
+          "id": "https://ror.org/025j2nd68"
+        },
+        {
+          "label": "Martin Luther King, Jr. Community Hospital",
+          "type": "related",
+          "id": "https://ror.org/0253es752"
+        },
+        {
+          "label": "Mattel Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/04p5baq95"
+        },
+        {
+          "label": "Olive View-UCLA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/03b66rp04"
+        },
+        {
+          "label": "Ronald Reagan UCLA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/04k3jt835"
+        },
+        {
+          "label": "St. Mary Medical Center",
+          "type": "related",
+          "id": "https://ror.org/0466fwq98"
+        },
+        {
+          "label": "UCLA Health",
+          "type": "related",
+          "id": "https://ror.org/01d88se56"
+        },
+        {
+          "label": "UCLA Medical Center",
+          "type": "related",
+          "id": "https://ror.org/04vq5kb54"
+        },
+        {
+          "label": "VA Long Beach Healthcare System",
+          "type": "related",
+          "id": "https://ror.org/058p1kn93"
+        },
+        {
+          "label": "VA West Los Angeles Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01xfgtq85"
+        },
+        {
+          "label": "Jornada Basin Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/05976ta47"
+        },
+        {
+          "label": "Santa Barbara Coastal Long Term Ecological Research",
+          "type": "related",
+          "id": "https://ror.org/05hnkta08"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/04gyf1771",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Irvine"
+        },
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "UCI"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Irvine"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Irvine"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Irvine"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 33.66946,
+            "lng": -117.82311,
+            "name": "Irvine"
+          },
+          "geonames_id": 5359777
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Center for Hydrometeorology and Remote Sensing",
+          "type": "child",
+          "id": "https://ror.org/009shwh61"
+        },
+        {
+          "label": "UC Irvine Chao Family Comprehensive Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/05gzqy922"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "Arrowhead Regional Medical Center",
+          "type": "related",
+          "id": "https://ror.org/00yvh2s32"
+        },
+        {
+          "label": "Beckman Laser Institute and Medical Clinic",
+          "type": "related",
+          "id": "https://ror.org/03bfp2076"
+        },
+        {
+          "label": "Children's Hospital of Orange County",
+          "type": "related",
+          "id": "https://ror.org/0282qcz50"
+        },
+        {
+          "label": "Kaweah Delta Health Care District",
+          "type": "related",
+          "id": "https://ror.org/0596qfc35"
+        },
+        {
+          "label": "University of California, Irvine Medical Center",
+          "type": "related",
+          "id": "https://ror.org/00cm8nm15"
+        },
+        {
+          "label": "VA Long Beach Healthcare System",
+          "type": "related",
+          "id": "https://ror.org/058p1kn93"
+        },
+        {
+          "label": "Center for Statistics and Applications in Forensic Evidence",
+          "type": "related",
+          "id": "https://ror.org/01txfgz53"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/04tj63d06",
+      "status": "active",
+      "names": [
+        {
+          "lang": null,
+          "types": [
+            "acronym"
+          ],
+          "value": "NCSU"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "North Carolina State University"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad Estatal de Carolina del Norte"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université d'État de caroline du nord"
+        }
+      ],
+      "domains": [
+        "ncsu.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "NC",
+            "country_subdivision_name": "North Carolina",
+            "lat": 35.7721,
+            "lng": -78.63861,
+            "name": "Raleigh"
+          },
+          "geonames_id": 4487042
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Center for Dielectrics & Piezoelectrics",
+          "type": "child",
+          "id": "https://ror.org/04nv7tt16"
+        },
+        {
+          "label": "North Carolina Sea Grant",
+          "type": "child",
+          "id": "https://ror.org/01kgxxx41"
+        },
+        {
+          "label": "North Carolina Space Grant Consortium",
+          "type": "child",
+          "id": "https://ror.org/058465397"
+        },
+        {
+          "label": "UNC/NCSU Joint Department of Biomedical Engineering",
+          "type": "child",
+          "id": "https://ror.org/03hakdk41"
+        },
+        {
+          "label": "Triangle Center for Evolutionary Medicine",
+          "type": "child",
+          "id": "https://ror.org/02yjqwr70"
+        },
+        {
+          "label": "Southeast Climate Adaptation Science Center",
+          "type": "child",
+          "id": "https://ror.org/009hmnr85"
+        },
+        {
+          "label": "Renaissance Computing Institute",
+          "type": "child",
+          "id": "https://ror.org/01s91ey96"
+        },
+        {
+          "label": "The Nonwovens Institute",
+          "type": "child",
+          "id": "https://ror.org/0568g2481"
+        },
+        {
+          "label": "North Carolina State Climate Office",
+          "type": "child",
+          "id": "https://ror.org/03mpd4h52"
+        },
+        {
+          "label": "Center for Marine Sciences and Technology",
+          "type": "child",
+          "id": "https://ror.org/03784zd57"
+        },
+        {
+          "label": "University of North Carolina System",
+          "type": "parent",
+          "id": "https://ror.org/0566a8c54"
+        },
+        {
+          "label": "North Carolina Institute for Climate Studies",
+          "type": "child",
+          "id": "https://ror.org/04k7cvz88"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/0556gk990",
+      "status": "active",
+      "names": [
+        {
+          "value": "TUC",
+          "types": [
+            "acronym"
+          ],
+          "lang": null
+        },
+        {
+          "value": "Touro University California",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 5405380,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 38.10409,
+            "lng": -122.25664,
+            "name": "Vallejo"
+          }
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Arrowhead Regional Medical Center",
+          "type": "related",
+          "id": "https://ror.org/00yvh2s32"
+        },
+        {
+          "label": "College Medical Center",
+          "type": "related",
+          "id": "https://ror.org/01g9vka88"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/05a0ya142",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "Broad Institute"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Broad Institute of MIT and Harvard"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "El Instituto Broad"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "Eli and Edythe L. Broad Institute of MIT and Harvard"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "MA",
+            "country_subdivision_name": "Massachusetts",
+            "lat": 42.3751,
+            "lng": -71.10561,
+            "name": "Cambridge"
+          },
+          "geonames_id": 4931972
+        }
+      ],
+      "types": [
+        "funder",
+        "nonprofit"
+      ],
+      "relationships": [
+        {
+          "label": "Stanley Center for Psychiatric Research",
+          "type": "child",
+          "id": "https://ror.org/01tm9b530"
+        },
+        {
+          "label": "Beth Israel Deaconess Medical Center",
+          "type": "related",
+          "id": "https://ror.org/04drvxt59"
+        },
+        {
+          "label": "Boston Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/00dvg7y05"
+        },
+        {
+          "label": "Brigham and Women's Hospital",
+          "type": "related",
+          "id": "https://ror.org/04b6nzv94"
+        },
+        {
+          "label": "Harvard University",
+          "type": "related",
+          "id": "https://ror.org/03vek6s52"
+        },
+        {
+          "label": "Massachusetts General Hospital",
+          "type": "related",
+          "id": "https://ror.org/002pd6e78"
+        },
+        {
+          "label": "Massachusetts Institute of Technology",
+          "type": "related",
+          "id": "https://ror.org/042nb2s44"
+        },
+        {
+          "label": "Klarman Cell Observatory",
+          "type": "child",
+          "id": "https://ror.org/02p827605"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/05dq2gs74",
+      "status": "active",
+      "names": [
+        {
+          "value": "VUMC",
+          "types": [
+            "acronym"
+          ],
+          "lang": null
+        },
+        {
+          "value": "Vanderbilt University Medical Center",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "lang": "en"
+        }
+      ],
+      "domains": [],
+      "locations": [
+        {
+          "geonames_id": 4644585,
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "TN",
+            "country_subdivision_name": "Tennessee",
+            "lat": 36.16589,
+            "lng": -86.78444,
+            "name": "Nashville"
+          }
+        }
+      ],
+      "types": [
+        "healthcare",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "Monroe Carell Jr. Children's Hospital",
+          "type": "child",
+          "id": "https://ror.org/00y64dx33"
+        },
+        {
+          "label": "Vanderbilt Psychiatric Hospital",
+          "type": "child",
+          "id": "https://ror.org/0118bqm57"
+        },
+        {
+          "label": "Vanderbilt-Ingram Cancer Center",
+          "type": "child",
+          "id": "https://ror.org/02rjj2m04"
+        },
+        {
+          "label": "Vanderbilt Health",
+          "type": "parent",
+          "id": "https://ror.org/05grhsk96"
+        },
+        {
+          "label": "Vanderbilt University",
+          "type": "related",
+          "id": "https://ror.org/02vm5rt34"
+        }
+      ]
+    },
+    {
+      "id": "https://ror.org/05rrcem69",
+      "status": "active",
+      "names": [
+        {
+          "lang": "en",
+          "types": [
+            "alias"
+          ],
+          "value": "UC Davis"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "acronym"
+          ],
+          "value": "UCD"
+        },
+        {
+          "lang": "es",
+          "types": [
+            "label"
+          ],
+          "value": "Universidad de California en Davis"
+        },
+        {
+          "lang": "en",
+          "types": [
+            "ror_display",
+            "label"
+          ],
+          "value": "University of California, Davis"
+        },
+        {
+          "lang": "fr",
+          "types": [
+            "label"
+          ],
+          "value": "Université de Californie à Davis"
+        }
+      ],
+      "domains": [
+        "ucdavis.edu"
+      ],
+      "locations": [
+        {
+          "geonames_details": {
+            "continent_code": "NA",
+            "continent_name": "North America",
+            "country_code": "US",
+            "country_name": "United States",
+            "country_subdivision_code": "CA",
+            "country_subdivision_name": "California",
+            "lat": 38.54491,
+            "lng": -121.74052,
+            "name": "Davis"
+          },
+          "geonames_id": 5341704
+        }
+      ],
+      "types": [
+        "education",
+        "funder"
+      ],
+      "relationships": [
+        {
+          "label": "NeuroMab",
+          "type": "child",
+          "id": "https://ror.org/00fyrp007"
+        },
+        {
+          "label": "Tahoe Environmental Research Center",
+          "type": "child",
+          "id": "https://ror.org/00xcmeq33"
+        },
+        {
+          "label": "University of California System",
+          "type": "parent",
+          "id": "https://ror.org/00pjdza24"
+        },
+        {
+          "label": "UC Davis Children's Hospital",
+          "type": "related",
+          "id": "https://ror.org/05ehe8t08"
+        },
+        {
+          "label": "UC Davis Health System",
+          "type": "related",
+          "id": "https://ror.org/05q8kyc69"
+        },
+        {
+          "label": "University of California Davis Medical Center",
+          "type": "related",
+          "id": "https://ror.org/05t6gpm70"
+        },
+        {
+          "label": "Veterinary Medical Teaching Hospital",
+          "type": "related",
+          "id": "https://ror.org/026t0fx73"
+        }
+      ]
+    }
+  ]
+}

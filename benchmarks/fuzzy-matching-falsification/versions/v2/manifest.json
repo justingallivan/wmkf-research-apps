@@ -1,0 +1,18 @@
+{
+  "schema_version": "falsification-suite-v2-manifest/v1",
+  "base_suite": "../../",
+  "base_files_sha256": {
+    "run.js": "169eb88f573cf314e3832b246f874075f4c686481fa994fd73feeaabc576c17b",
+    "cases/affiliation-current.jsonl": "f7eb8ede9cde2ef22b2e4d88f5001d13bb5bfbad78ab339b49d628319d887663",
+    "cases/contact-attribution.jsonl": "1dd764d1a3104a7a185b533bff28a2a4f6a6a712105baf4b53ae74464fc0f1b8",
+    "cases/institution-byline-normalization.jsonl": "a4acdcd7970cfd4b89718411ea5c967fdb06feae92d0782820f6f3f88b0b71cc",
+    "cases/institution-hierarchy.jsonl": "61dbf804c778f3aabab09aa64e337e9c916316c955e7750e635f7150d8772864",
+    "cases/institution-uc-matrix.jsonl": "b7d29bce6f23c8a24f9ceb2794ff7b0f07e9fb6608738974838db300cdbd26d8",
+    "cases/person-identity.jsonl": "6c24012f79ec56c31a19eae543e60c62e39d14d239ea56431d1e90d5358dcd79"
+  },
+  "ror_source": {
+    "release": "v2.11-2026-08-03",
+    "sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa",
+    "runtime_use": false
+  }
+}

@@ -4,7 +4,7 @@ description: The card's 15 banners are a symptom of a matching layer with ~25 sc
 type: project
 status: active
 scope: reviewer
-last_verified: 2026-08-06 via full CandidateCard source read, save-candidates COI gate, and owner decisions in S403
+last_verified: 2026-08-07 via current card/save gates, owner decisions, and institution candidate benchmark v2
 ---
 
 ## Recall Rule
@@ -33,7 +33,7 @@ renders a real scored verdict; skip it and the band is a hand-assembled preceden
 decision.** An earlier draft had the containment-first comparison fix first; the owner
 corrected the altitude — order by what most rapidly reduces complexity.
 
-## Decided (owner, 2026-08-06) — none of this is built
+## Decided (owner, 2026-08-06) — card redesign unbuilt; matching groundwork partial
 
 - **Sequence (step 1 DONE S404, 2026-08-06):** fuzzy-matching reconciliation — completed
   as a confirmed Claude×Codex consensus,
@@ -43,8 +43,13 @@ corrected the altitude — order by what most rapidly reduces complexity.
   and incumbent baseline FROZEN S405 (owner authorized) at
   `benchmarks/fuzzy-matching-falsification/` — incumbent "safe but blind"
   (0 wrong entities, 36/47 positives abstain), see
-  `baseline/incumbent-2026-08-06.md` → comparator runs → normalizer
-  consolidation + shared scorer in small independently shippable increments →
+  `baseline/incumbent-2026-08-06.md` → ROR v1 comparator DONE → canonical-ID
+  candidate benchmark v2 DONE (ROR API 128/141 vs incumbent 84/141; retrieval
+  still not decision authority), see
+  `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`
+  → organization-span
+  parsing + controlled query fallback + veto/scorer comparator → S2AFF profile →
+  normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.
 - **The two "COI"s are different in kind and must be split.** Institution COI is the
