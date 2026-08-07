@@ -485,8 +485,14 @@ Subsequent current state (2026-08-07): owner-authorized measurement work has
 started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
 pinned ROR v2.11 size experiment is complete and offline-only. The owner selected
 the ROR API for planned live candidate retrieval, with no production local
-index or initially planned cross-request database cache. No schema, production adapter,
-resolver/scorer authority, or identity/write gate changed.
+index or initially planned cross-request database cache. The deliberately
+versioned candidate benchmark is now complete: canonical ROR ids and
+relationships are pinned, ROR API v2 single-search passed 128/141 institution
+cases versus the incumbent bridge's 84/141, and 71/124 ROR resolve cases also
+contained a candidate forbidden as the final resolution. That validates ROR as
+a candidate source and separately validates the need for local vetoes; it does
+not validate a final resolver. No schema, production adapter, resolver/scorer
+authority, or identity/write gate changed.
 
 ## Primary sources
 

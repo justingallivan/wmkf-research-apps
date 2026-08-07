@@ -15,6 +15,7 @@ source_files:
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - outputs/institution-resolution-handoff-to-codex-2026-08-07.md
   - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
+  - benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -29,6 +30,7 @@ watch_paths:
   - docs/**/*ROADMAP*.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - benchmarks/compact-ror-index/**
+  - benchmarks/fuzzy-matching-falsification/versions/v2/**
 update_triggers:
   - roadmap or phasing changes
   - cross-capability architecture changes
@@ -87,9 +89,11 @@ document inventory, and individual implementation plans do not establish priorit
   VETO counts — the original "40" missed 6 UCSD resolutions to a comma-less name;
   three relationship cases (byline-013/014, hier-007) are excluded from the
   identity aggregate as predetermined by the same-ROR-id-only pair rule; the
-  naming-artifact set is unadjudicated pending canonical ROR ids (inst-uc-109 is
-  a distinct record — UCOP `00dmfq477` ≠ UC System `00pjdza24` — so the earlier
-  "uc-parent 3/3" and "53/88" figures are withdrawn). Evidence limit: the
+  naming-artifact set was unadjudicated at v1's exact-name boundary (inst-uc-109
+  is a distinct record — UCOP `00dmfq477` ≠ UC System `00pjdza24` — so the
+  earlier "uc-parent 3/3" and "53/88" figures remain withdrawn from that frozen
+  report). The separate v2 benchmark now adjudicates by canonical ROR id without
+  rewriting v1. Evidence limit: the
   institution slice is 15 real / 126 synthetic and ALL 64 unsafe resolutions are
   synthetic — the mechanism transfers to production (the S400 shape), the
   magnitude does not. **Comparator #2 (S2AFF) IS ON THE QUEUE — the earlier
@@ -124,6 +128,17 @@ document inventory, and individual implementation plans do not establish priorit
   affiliation needs one primary call and may need one selective query fallback;
   ROR's documented 2,000-request/five-minute limit therefore makes measured
   fallback and peak burst rates the operational metrics, not total cycle volume.
+  **CANDIDATE BENCHMARK v2 COMPLETE 2026-08-07:** the manifest preserves v1
+  runner/case bytes by hash; 141 institution cases now have canonical ROR ids
+  and pinned relationship labels; the verdict-free adapter contract includes
+  API/adapter/strategy/date/input-hash provenance plus actual attempts, retries,
+  cache, and same-cancellation-scope single-flight. Both systems were rerun: ROR
+  API v2 single-search passed 128/141 (116/124 resolve retrieval; 12/17 pair +
+  relationship) versus the incumbent bridge's 84/141, with zero errors. ROR
+  also returned a forbidden final-resolution candidate in 71/124 resolve cases,
+  validating the candidate-source choice and the separate need for local
+  vetoes—not a final resolver. Report:
+  `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`.
   Corrected facts: pinned ROR v2.11 has **135,710 total /
   132,706 active records** [VERIFIED via the checksum-pinned 2026-08-03 dump].
   Its 304.9 MB raw JSON exceeds Vercel's 250 MB standard path. Vercel offers a
@@ -141,11 +156,12 @@ document inventory, and individual implementation plans do not establish priorit
   `shadow` or `combined`**
   (measurement vehicle, not a performance claim) → **compact-index size
   experiment COMPLETE and retained offline-only**
-  (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → pinned v2.11
-  offline benchmark revision with canonical expected ROR ids,
-  relationship-aware pair evaluation, and a frozen candidate/veto input contract
-  → build the server-only ROR API candidate adapter → evaluate the API-backed
-  veto/scorer pipeline behind the legacy-default/shadow seam → run and
+  (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → **pinned v2.11
+  offline candidate benchmark COMPLETE** with canonical expected ROR ids,
+  relationship-aware pair evaluation, and a frozen verdict-free contract → add
+  organization-span parsing, controlled query fallback, and evaluate the
+  non-overridable veto/scorer → only then build the production request-scoped
+  ROR API adapter behind the legacy-default/shadow seam → run and
   resource-profile S2AFF as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
@@ -160,7 +176,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  pinned-v2.11 offline comparator contract → ROR API adapter/veto-scorer → S2AFF profile → normalizer
+  parser/query-fallback + veto/scorer comparator → production shadow adapter → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

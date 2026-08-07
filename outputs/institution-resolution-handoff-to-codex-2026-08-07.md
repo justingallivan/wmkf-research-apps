@@ -10,23 +10,30 @@ implemented and merged in PR #113; production resolver authority was live-verifi
 `combined`. The pinned ROR v2.11 compact-index experiment is complete and
 measurement-only. Owner decision 2026-08-07: the live candidate-retrieval plan
 uses ROR's official API, not a bundled local index; the claim-oriented
-resolver/scorer remains planned.
+resolver/scorer remains planned. The versioned candidate benchmark is also
+complete: canonical ROR-id and relationship labels are pinned without changing
+v1, and ROR API plus incumbent were both rerun under the new candidate-
+retrieval claim.
 **Changed surfaces:** the request-batch W2 resolver scope, cancellation-safe
-single-flight, aggregate runtime metrics, and an offline compact-index
-builder/measurement. No production index asset or resolver/scorer was wired.
+single-flight, aggregate runtime metrics, an offline compact-index
+builder/measurement, and benchmark-only candidate adapters/contracts. No
+production index asset or resolver/scorer was wired.
 **Verification:** 47 affected resolver/runtime tests and 159 broader
 reviewer-identity tests green; full suite 580/580 suites and 7,087/7,087 tests
 green; type check and all
 relevant source/Atlas/wiki/doc gates plus paired self-tests green. The compact
 index build is deterministic across two runs; its targeted tests and lint pass.
+The candidate overlay validates all 141 institution labels against seven frozen
+base hashes and 29 pinned ROR records; eight focused contract/adapter tests pass,
+and both 166-case v2 comparator runs completed with zero provider errors.
 **Next owner/action:** keep production authority on `legacy-default` unless the
-owner separately authorizes shadow observation. First version the benchmark,
-add canonical expected ROR ids, make pair evaluation relationship-aware, and
-freeze the candidate/veto input contract. Then build a server-only ROR API
-candidate adapter and evaluate the API-backed veto/scorer pipeline behind that
-seam; do not use ROR's chosen flag or rank as the verdict. Keep pinned ROR v2.11
-only as the offline label and relationship substrate. Claude remains off this
-surface.
+owner separately authorizes shadow observation. Build the next benchmark-only
+slice: organization-span parsing, controlled ordinary-query fallback, and
+non-overridable veto/scoring behavior over the frozen candidate contract. Do
+not use ROR's chosen flag or rank as the verdict. Only after that comparator
+passes should a production request-scoped adapter be wired behind the existing
+legacy/shadow seam. Keep pinned ROR v2.11 only as the offline label and
+relationship substrate. Claude remains off this surface.
 
 Owner decision, 2026-08-07: **Codex takes the lead on the institution-resolution
 model.** Claude's assessment
@@ -47,9 +54,9 @@ retrieval evidence, not decision authority.** Vetoes run *before* scoring.
 
 ## Owner decision: ROR API for live retrieval (2026-08-07)
 
-[PLANNED] The live app will query ROR from the server instead of packaging or
-loading the raw/compact dataset. The current compact-index artifacts remain
-offline-only and untracked.
+[BENCHMARK CONTRACT IMPLEMENTED; PRODUCTION ADAPTER PLANNED] The live app will
+query ROR from the server instead of packaging or loading the raw/compact
+dataset. The current compact-index artifacts remain offline-only and untracked.
 
 Minimum live contract:
 
@@ -148,21 +155,22 @@ the review.
    20/20 "safe"). The moment domain evidence is consumable it becomes a real
    scoreboard. Treat movement there as the signal that the domain veto works.
 
-4. **The versioned envelope needs explicit API provenance.** The API-backed
-   result needs input/evidence hash + adapter version + API v2 + explicit
+4. **The versioned envelope needs explicit API provenance. IMPLEMENTED for the
+   candidate benchmark.** The API-backed result records input/evidence hash +
+   adapter version + API v2 + explicit
    `single_search` + observation date.
    Because no cross-request persistent cache is planned initially,
    release-wide invalidation is not yet a live storage problem. If durable
    caching is later justified, specify which fields trigger lazy recomputation
    before adding the schema.
 
-5. **Two comparator-#1 review findings are now on the critical path**, not
+5. **Two comparator-#1 review findings are now complete in benchmark v2**, not
    deferred cleanup:
-   - **canonical expected ROR ids in the cases** — without them the naming-artifact
-     class stays unadjudicable in *both* frozen runs, and the granularity veto
-     cannot be scored at all;
-   - **a relationship-aware pair adapter** — the current same-ROR-id-only rule
-     cannot express hierarchy, so parent/child consistency is unmeasured.
+   - **canonical expected ROR ids in the cases** now adjudicate the old naming
+     artifacts without changing either frozen v1 run;
+   - **relationship-aware pair evaluation** now measures ROR `same`,
+     parent/child, `related`, successor, and distinct evidence independently of
+     the still-planned WMKF consistency policy.
 
 6. **Treat the first increment as a measurement vehicle, not a perf fix.**
    **BUILT in PR #113; production authority remains `legacy-default`:**
@@ -192,6 +200,10 @@ the review.
 - Comparator runs hit live providers. Per the incumbent baseline's hard-won
   lesson: **a uniformly abstaining resolver is a broken credential, not a
   result.**
+- The deliberate ROR-id reset lives under `versions/v2/`; its manifest pins the
+  v1 runner/cases, and both incumbent and ROR were rerun. v2 judges candidate
+  recall/relationship evidence, not v1 final outcomes, so their pass counts are
+  not interchangeable.
 
 ## Evidence trail
 
@@ -203,6 +215,7 @@ the review.
 | `docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md` | Comparator list; S2AFF architecture description |
 | `outputs/fuzzy-matching-owner-answers-2026-08-06.md` | The six owner answers this all serves (Q1: ambiguity must WIDEN checks) |
 | `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Pinned release, deterministic compact-index sizes, component costs, and fresh-process load/memory evidence |
+| `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md` | 128/141 ROR API vs 84/141 incumbent candidate/relationship run; 71/124 ROR resolve cases also contained a vetoed final-resolution candidate |
 | [ROR REST API documentation](https://ror.readme.io/docs/rest-api) | Official endpoints, per-IP rate limit, client-identification policy, heartbeat/status guidance |
 | [ROR affiliation documentation](https://ror.readme.io/docs/api-affiliation) | Affiliation matching contract and explicit warning that automatic matching can be wrong |
 

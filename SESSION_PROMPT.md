@@ -70,10 +70,11 @@ What review #1 corrected in my analysis:
 - Three relationship cases (byline-013/014, hier-007) are **predetermined** by
   the same-ROR-id-only pair rule and are out of the identity aggregate.
   Documenting circularity in prose did not make the aggregate like-for-like.
-- The naming-artifact set is **unadjudicated** pending canonical ROR ids;
-  inst-uc-109 is a *distinct record* (UCOP `00dmfq477` ≠ UC System `00pjdza24`).
-  "uc-parent 3/3" and "53/88" withdrawn. The incumbent baseline got a matching
-  addendum — its own 4 artifacts carry the same caveat (±2 on its "60 real").
+- At that run's v1 exact-name boundary, the naming-artifact set was
+  **unadjudicated**; inst-uc-109 is a *distinct record* (UCOP `00dmfq477` ≠ UC
+  System `00pjdza24`). "uc-parent 3/3" and "53/88" remain withdrawn from the
+  frozen v1 report. The deliberately versioned v2 benchmark now supplies the
+  canonical ROR-id adjudication without rewriting those historical artifacts.
 - "Viable as a signal inside a scorer" → **unvalidated candidate signal**, and
   the S2AFF skip recommendation **withdrawn**.
 
@@ -135,11 +136,18 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    retries, and request-local reuse. Peak five-minute traffic, not cycle total,
    is the operational limit to measure. Re-verify ROR's live rate/client-id
    policy before rollout and support its `Client-Id` header when required. No
-   cross-request database cache is planned initially. Next: **(d)** deliberately version the
-   offline benchmark against pinned v2.11, add **canonical expected ROR ids**
-   and a **relationship-aware pair adapter**, and freeze the candidate/veto
-   input contract; **(e)** build and evaluate the API-backed candidate union plus
-   veto/scorer behavior behind `legacy-default`/shadow. Only a locally resolved
+   cross-request database cache is planned initially. **Step (d) is complete:**
+   `versions/v2/` pins the v1 runner and case bytes by hash, adds canonical ROR ids and
+   pinned relationship labels, freezes a verdict-free candidate-set contract,
+   and reruns both prior systems under the new claim. ROR API v2 single-search
+   passed 128/141 institution cases (116/124 resolve retrieval; 12/17 pair +
+   relationship) versus the incumbent bridge's 84/141, with zero provider
+   errors. A forbidden final-resolution ROR id was nevertheless present in
+   71/124 ROR resolve candidate sets, proving that retrieval cannot be decision
+   authority. **Next (e):** add organization-span parsing, controlled ordinary-
+   query fallback, and the non-overridable veto/scorer comparator; only after it
+   passes should a production request-scoped adapter be built behind
+   `legacy-default`/shadow. Only a locally resolved
    ROR id may then be hydrated through OpenAlex to supply the OpenAlex institution
    id the works-first path requires; hydration may not select among ROR
    candidates, and failure returns review/no bind. **(f)** Run and
@@ -190,11 +198,12 @@ it now arrives via Codex's step (f) rather than as a standalone ask.
    Hazards: load env with `set -a; . .env.local; set +a` (quote-glued
    `OPENALEX_API_KEY` silently kills every call → **uniform abstention is a
    broken credential, not a result**); `run.js`/`judge()`/`cases/` are **frozen
-   for comparability** — changing the judge (e.g. to ROR-id comparison) resets
-   the comparison and requires re-running every prior system; `run-comparator.js`
-   **refuses to overwrite a frozen slug**; the suite must stay jest-invisible
-   (`npx jest --listTests`). Artifact counts are **unadjudicated** in both runs
-   (ROR 7, incumbent 4) — the old "4 known artifact fails" phrasing is stale.
+   for v1 comparability**. The ROR-id reset happened in the separate
+   `versions/v2/` overlay, whose manifest pins v1 and whose comparator reran
+   both ROR and incumbent. Both versioned drivers refuse to overwrite frozen
+   slugs; the benchmark directory must stay jest-invisible (`npx jest
+   --listTests`). Do not move v2's candidate-recall counts back into v1's
+   final-outcome claim.
 3. **Any matching/normalizer work** — `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`
    is authoritative (institution 9, NOT the memo's 11); read
    `feedback-latency-plan-scope-accretion-postmortem` before expanding scope;
@@ -247,6 +256,7 @@ it now arrives via Codex's step (f) rather than as a standalone ask.
 | `benchmarks/fuzzy-matching-falsification/README.md` | Suite contract, denominators, execution hazards, what remains queued |
 | `benchmarks/fuzzy-matching-falsification/run-comparator.js` | Generic comparator driver (refuses to overwrite a frozen slug) |
 | `benchmarks/compact-ror-index/results/v2.11-2026-08-03.md` | Completed v2.11 size/load measurement; offline evidence only after the owner selected ROR API lookup for live retrieval |
+| `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md` | Canonical-ID candidate/relationship comparator, both rerun systems, misses, and next veto/scorer gate |
 | `outputs/institution-resolution-runtime-architecture-2026-08-07.md` | **SUPERSEDED** — retained for the reasoning trail only |
 | `lib/services/reviewer-rollup.js` | Progress buckets incl. the new `released`; `deriveWorkRemaining` |
 | `shared/components/workbench/ReviewerStatusIndicator.js` | Sole consumer of `progress` (parity-gated) |
