@@ -49,6 +49,17 @@ function extractObjectStringValues(src, name) {
   return [...m[1].matchAll(/:\s*['"]([^'"]+)['"]/g)].map((x) => x[1]);
 }
 
+// Keys of the nested `progress: { ... }` literal inside `emptyCounts()` — the
+// rollup's exclusive dashboard buckets. `total` is dropped: it is the row count the
+// bar width encodes, not a bucket a row can land in.
+function extractProgressBucketKeys(src) {
+  const m = src.match(/progress:\s*\{([\s\S]*?)\}/);
+  if (!m) return null;
+  return [...m[1].matchAll(/([A-Za-z_][\w]*)\s*:/g)]
+    .map((x) => x[1])
+    .filter((k) => k !== 'total');
+}
+
 // String members of `const NAME = [ 'a', 'b' ]`.
 function extractArrayStrings(src, name) {
   const m = src.match(new RegExp(`(?:const|export const)\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\]`));
@@ -117,6 +128,26 @@ function registry() {
       consumer: 'WORK_REMAINING_LABEL keys (reviewer-rollup.js)',
       produced: extractReturnedStrings(rollup, 'deriveWorkRemaining'),
       consumed: extractObjectKeys(rollup, 'WORK_REMAINING_LABEL'),
+      rule: 'equal',
+    });
+  }
+
+  // 1c. rollup `progress` display buckets ⇔ ReviewerStatusIndicator STATUS_META
+  //     (equal: every exclusive bucket the rollup can fill MUST have a bar segment +
+  //     legend entry, and no orphan legend row). `total` is excluded — it is the bar
+  //     width, not a bucket. The pair that bit S406: `withdraw-sufficient` writes a
+  //     resolved responseType without archiving the row, so released reviewers were
+  //     silently absorbed into `pending`; adding the bucket without a STATUS_META
+  //     entry would have made them silently vanish from the card instead.
+  {
+    const rollup = read('lib/services/reviewer-rollup.js');
+    const indicator = read('shared/components/workbench/ReviewerStatusIndicator.js');
+    checks.push({
+      name: 'rollup progress buckets ⇔ ReviewerStatusIndicator STATUS_META',
+      producer: 'emptyCounts().progress keys (reviewer-rollup.js)',
+      consumer: 'STATUS_META keys (ReviewerStatusIndicator.js)',
+      produced: extractProgressBucketKeys(rollup),
+      consumed: extractArrayObjectPropertyStrings(indicator, 'STATUS_META', 'key'),
       rule: 'equal',
     });
   }

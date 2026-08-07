@@ -1,6 +1,7 @@
 const STATUS_META = [
   { key: 'accepted', label: 'accepted', color: 'bg-green-500', text: 'text-green-700' },
   { key: 'pending', label: 'pending', color: 'bg-amber-400', text: 'text-amber-700' },
+  { key: 'released', label: 'released', color: 'bg-gray-400', text: 'text-gray-600' },
   { key: 'declined', label: 'declined', color: 'bg-red-500', text: 'text-red-700' },
   { key: 'uninvited', label: 'not invited', color: 'bg-gray-300', text: 'text-gray-500' },
 ];

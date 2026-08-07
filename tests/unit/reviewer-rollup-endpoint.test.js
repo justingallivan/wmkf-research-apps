@@ -60,7 +60,9 @@ it('returns empty counts (not an error) when the request has no suggestion rows'
     declined: 0,
     held: 0,
     completed: 0,
-    progress: { total: 0, accepted: 0, pending: 0, declined: 0, uninvited: 0 },
+    progress: {
+      total: 0, accepted: 0, pending: 0, released: 0, declined: 0, uninvited: 0,
+    },
   });
   expect(r.body.workRemaining).toBe('find');
 });

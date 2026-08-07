@@ -10,6 +10,7 @@ import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { fetchReviewerRollup, emptyCounts } from '../../lib/services/reviewer-rollup.js';
 import { RESPONSE_TYPE_MAP } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
+import { TERMINAL_REVIEW_STATUS_VALUES } from '../../shared/config/reviewerStatus.js';
 
 const REQUEST_A = '11111111-1111-4111-8111-111111111111';
 const REQUEST_B = '22222222-2222-4222-8222-222222222222';
@@ -42,12 +43,16 @@ describe('fetchReviewerRollup (characterization)', () => {
       declined: 1,
       held: 0,
       completed: 1,
-      progress: { total: 2, accepted: 1, pending: 0, declined: 1, uninvited: 0 },
+      progress: {
+        total: 2, accepted: 1, pending: 0, released: 0, declined: 1, uninvited: 0,
+      },
     });
     expect(out[REQUEST_B]).toEqual({
       ...emptyCounts(),
       candidates: 1,
-      progress: { total: 1, accepted: 0, pending: 0, declined: 0, uninvited: 1 },
+      progress: {
+        total: 1, accepted: 0, pending: 0, released: 0, declined: 0, uninvited: 1,
+      },
     });
 
     // Byte-mirror guard: entity set, select list, and filter shape (OR-chain +
@@ -78,11 +83,66 @@ describe('fetchReviewerRollup (characterization)', () => {
       total: 4,
       accepted: 1,
       pending: 1,
+      released: 0,
       declined: 1,
       uninvited: 1,
     });
     expect(Object.values(out[REQUEST_A].progress).slice(1).reduce((sum, value) => sum + value, 0)).toBe(4);
     expect(out[REQUEST_A]).toMatchObject({ candidates: 3, invited: 2, accepted: 1, declined: 1 });
+  });
+
+  // S406 owner report (request 1002959): releasing a pending invitee left the
+  // dashboard card reading "2 pending" when only one invitee was still awaiting.
+  // Neither release path archives the row or sets wmkf_declined, so both used to
+  // fall through into `pending` (or, post-acceptance, stay in `accepted`).
+  test('ended engagements land in `released`, not `pending`/`accepted`', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        // Still genuinely awaiting a response.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true },
+        // PD released as no longer needed (withdraw-sufficient): responsetype only.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_responsetype: RESPONSE_TYPE_MAP.withdrawn_sufficient },
+        // Closed out as no-response.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_responsetype: RESPONSE_TYPE_MAP.no_response },
+        // Withdrawn AFTER accepting (terminal-transition): terminal reviewstatus
+        // on an accepted row, which used to keep inflating `accepted`.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.released },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.withdrew },
+        // A real acceptance still reads as accepted.
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted },
+      ],
+    });
+
+    const out = await fetchReviewerRollup([REQUEST_A]);
+
+    expect(out[REQUEST_A].progress).toEqual({
+      total: 6,
+      accepted: 1,
+      pending: 1,
+      released: 4,
+      declined: 0,
+      uninvited: 0,
+    });
+    // Still exclusive: every queried row lands in exactly one bucket.
+    expect(Object.values(out[REQUEST_A].progress).slice(1).reduce((sum, value) => sum + value, 0)).toBe(6);
+    // Active lifecycle counts are UNCHANGED — `deriveWorkRemaining` and the
+    // needs-reviewers behavior must not shift with a display-bucket fix.
+    expect(out[REQUEST_A]).toMatchObject({ candidates: 6, invited: 6, accepted: 3, declined: 0 });
+  });
+
+  // `held` is retired but still routes the reviewer to the accept form, so it must
+  // stay 'awaiting'/pending rather than joining the ended-engagement bucket.
+  test('a held row stays pending, not released', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_responsetype: RESPONSE_TYPE_MAP.held },
+      ],
+    });
+
+    const out = await fetchReviewerRollup([REQUEST_A]);
+
+    expect(out[REQUEST_A].progress).toMatchObject({ pending: 1, released: 0 });
+    expect(out[REQUEST_A].held).toBe(1);
   });
 
   test('chunks requestIds at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {
