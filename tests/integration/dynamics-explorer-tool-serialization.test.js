@@ -720,6 +720,46 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).not.toContain('SHOULD_NOT_REACH_CLAUDE');
   });
 
+  // A rejected tool must still be answered against its OWN tool_use id. It used
+  // to be answered with a literal 'unknown', which leaves the real tool_use
+  // unanswered and invents an id that was never issued — the Anthropic API
+  // rejects both on the next round, so any rejection here became an
+  // unexplainable top-level failure instead of a recoverable tool error.
+  test('answers a rejected tool call with its own tool_use id', async () => {
+    // A BigInt survives the serializer and makes truncateResult's
+    // JSON.stringify throw, which rejects the executeOne promise.
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockResolvedValue({
+      records: [{ akoya_requestnum: 1n }],
+      totalCount: 1,
+    });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    // The loop must continue — a rejected tool is recoverable, not fatal.
+    expect(mockStream).toHaveBeenCalledTimes(2);
+
+    const assistantMsg = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'assistant' && Array.isArray(m.content),
+    );
+    const issuedIds = assistantMsg.content
+      .filter(b => b.type === 'tool_use')
+      .map(b => b.id);
+    const toolResults = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content;
+
+    // Every issued tool_use is answered, and no answer names an unissued id.
+    expect(toolResults.map(r => r.tool_use_id).sort()).toEqual([...issuedIds].sort());
+    expect(toolResults.map(r => r.tool_use_id)).not.toContain('unknown');
+    expect(toolResults[0].content).toContain('error');
+  });
+
   // Top-level failure copy. A top-level throw used to emit the bare string
   // "Query failed", which named neither what broke nor what to do, and gave the
   // user nothing to quote when escalating. Owner-reported 2026-08-07.

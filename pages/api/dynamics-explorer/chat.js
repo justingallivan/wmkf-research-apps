@@ -253,14 +253,20 @@ export default async function handler(req, res) {
         return { type: 'tool_result', tool_use_id: id, content: wrapped.text };
       };
 
+      // `settled` is index-aligned with toolBlocks, so a rejected executeOne
+      // still knows which tool_use it belongs to. Answering with a literal
+      // 'unknown' id instead left the real tool_use unanswered AND added a
+      // tool_result for an id that was never issued — both of which the
+      // Anthropic API rejects on the next round, turning any rejection here
+      // into an unexplainable top-level failure.
       const settled = await Promise.allSettled(toolBlocks.map(executeOne));
-      for (const s of settled) {
+      settled.forEach((s, i) => {
         toolResults.push(s.status === 'fulfilled' ? s.value : {
           type: 'tool_result',
-          tool_use_id: 'unknown',
+          tool_use_id: toolBlocks[i].id,
           content: JSON.stringify({ error: s.reason?.message || 'Tool execution failed' }),
         });
-      }
+      });
 
       // Append assistant + tool results, then compact old rounds
       currentMessages.push({
