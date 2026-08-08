@@ -373,6 +373,61 @@ describe('reviewer identity runtime seam', () => {
     expect(first.candidateKey).not.toBe(second.candidateKey);
   });
 
+  test('request-local comparison observer receives names while durable telemetry stays pseudonymous', async () => {
+    const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+    const onComparisonObserved = jest.fn();
+
+    const results = await evaluateSuggestionsWithRuntimeSeam([suggestion], {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+      onComparisonObserved,
+    });
+
+    expect(results).toEqual([legacyResult]);
+    expect(onComparisonObserved).toHaveBeenCalledWith(expect.objectContaining({
+      runId: expect.any(String),
+      resolverMode: RESOLVER_MODE.SHADOW,
+      reviewerName: 'Will Harcombe',
+      claimedInstitution: 'University of Minnesota',
+      legacyDecision: 'bind',
+      worksDecision: 'bind',
+      combinedDecision: 'bind',
+    }));
+
+    const durableEntry = recordShadowComparison.mock.calls[0][0];
+    expect(durableEntry).not.toHaveProperty('reviewerName');
+    expect(durableEntry).not.toHaveProperty('claimedInstitution');
+    expect(JSON.stringify(durableEntry)).not.toContain('Harcombe');
+    expect(JSON.stringify(durableEntry)).not.toContain('Minnesota');
+    const runtimeLog = info.mock.calls.find(
+      ([message]) => message === '[reviewer-identity-runtime] shadow comparison',
+    );
+    expect(JSON.stringify(runtimeLog)).not.toContain('Harcombe');
+    expect(JSON.stringify(runtimeLog)).not.toContain('Minnesota');
+  });
+
+  test('request-local comparison observer failure cannot change the legacy result', async () => {
+    jest.spyOn(console, 'info').mockImplementation(() => {});
+    const results = await evaluateSuggestionsWithRuntimeSeam([suggestion], {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(async () => ({
+        decision: 'bind',
+        anchor: 'orcid:0000-0001-8445-2052',
+      })),
+      createAnchorsMatch: () => async () => true,
+      onComparisonObserved: () => { throw new Error('admin panel unavailable'); },
+    });
+
+    expect(results).toEqual([legacyResult]);
+    expect(recordShadowComparison).toHaveBeenCalledTimes(1);
+  });
+
   test('batch default W2 resolver reuses institutions and emits data-minimized metrics', async () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const candidates = [suggestion, { ...suggestion }];

@@ -257,6 +257,26 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     });
   });
 
+  test('spine verification forwards a request-local identity comparison observer', async () => {
+    const onIdentityComparison = jest.fn();
+
+    await runVerification(
+      { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
+      {},
+      {
+        searchPubmed: false,
+        proposalInfo: { primaryResearchArea: 'Physics' },
+        onIdentityComparison,
+      },
+    );
+
+    expect(ReviewerIdentityRuntime.evaluateSuggestions).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ name: 'Robert Sang' })]),
+      expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
+      expect.objectContaining({ onComparisonObserved: onIdentityComparison }),
+    );
+  });
+
   test('spine-verified candidate carries ORCID employment history as affiliationHistory (former-institution COI)', async () => {
     // Codex S236 post-impl CHECK 4: deduplication-service scans former-institution
     // COI only when affiliationHistory is an array. The spine path must supply it

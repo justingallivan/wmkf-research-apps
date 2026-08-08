@@ -134,6 +134,66 @@ test('an unverified suggestion card carries confirm-identity and exclude afforda
   expect(screen.queryByLabelText('Select Yamuna Krishnan')).not.toBeInTheDocument();
 });
 
+test('renders a named admin-only identity comparison from the discovery response', async () => {
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: { proposalInfo: { title: 'Proposal', primaryResearchArea: 'Physics' } },
+      });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: {
+          ranked: [],
+          unverified: [],
+          identityComparison: {
+            runId: '11111111-1111-4111-8111-111111111111',
+            resolverMode: 'shadow',
+            candidates: [{
+              candidateKey: 'abcd1234abcd1234',
+              reviewerName: 'Different Reviewer',
+              claimedInstitution: 'Example University',
+              legacyDecision: 'abstain',
+              worksDecision: 'bind',
+              combinedDecision: 'bind',
+              combinedReason: 'works_rescue',
+              anchorsAgree: false,
+            }],
+          },
+        },
+      });
+    });
+
+  const { rerender } = render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  expect(await screen.findByText('Identity resolver comparison (admin)')).toBeInTheDocument();
+  expect(screen.getByText('Different Reviewer')).toBeInTheDocument();
+  expect(screen.getByText('Example University')).toBeInTheDocument();
+  expect(screen.getByText(/Works-first corroborated an identity that Legacy missed/)).toBeInTheDocument();
+  expect(screen.getByText(/This search still used Legacy results/)).toBeInTheDocument();
+
+  rerender(
+    <ReviewerSearchSection
+      requestId="cccccccc-3333-3333-3333-333333333333"
+      blobUrl="blob-2"
+      proposalKey="proposal-2"
+    />,
+  );
+  await waitFor(() => {
+    expect(screen.queryByTestId('identity-comparison-panel')).not.toBeInTheDocument();
+  });
+});
+
 test('confirming an unverified suggestion records it on the roster BEFORE confirm_identity, then renders it as a confirmed active card', async () => {
   const calls = [];
   global.fetch = jest.fn((url, options = {}) => {

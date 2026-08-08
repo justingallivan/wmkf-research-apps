@@ -12,7 +12,7 @@
  * Uses streaming SSE for real-time progress updates.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
@@ -83,6 +83,13 @@ export default async function handler(req, res) {
 
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
+
+  // Named resolver comparisons are deliberately more restricted than the
+  // reviewer-finder app itself. Re-check the uncached server-owned role and
+  // fail closed on a lookup miss/error (`getUserRole` returns read_only).
+  const canViewIdentityComparison = access.session?.authBypassed === true
+    || await getUserRole(access.profileId) === 'superuser';
+  const identityComparisons = [];
 
   await loadModelOverrides();
 
@@ -224,6 +231,9 @@ export default async function handler(req, res) {
       searchChemrxiv,
       piInstitutions: piInsts,
       signal: deadlineController.signal,
+      onIdentityComparison: canViewIdentityComparison
+        ? (comparison) => { identityComparisons.push(comparison); }
+        : null,
       onProgress: (progress) => {
         sendEvent('progress', progress);
       }
@@ -643,13 +653,37 @@ export default async function handler(req, res) {
       console.error('[Discover API] S266 generation audit failed (non-fatal):', auditErr.message);
     }
 
+    const identityComparison = canViewIdentityComparison && identityComparisons.length > 0
+      ? {
+        runId: identityComparisons.every((row) => row.runId === identityComparisons[0].runId)
+          ? identityComparisons[0].runId
+          : null,
+        resolverMode: identityComparisons.every((row) => row.resolverMode === identityComparisons[0].resolverMode)
+          ? identityComparisons[0].resolverMode
+          : 'mixed',
+        // Explicit response allowlist: a future runtime observer field cannot
+        // silently expand this privileged SSE contract.
+        candidates: identityComparisons.map((row) => ({
+          candidateKey: row.candidateKey,
+          reviewerName: row.reviewerName,
+          claimedInstitution: row.claimedInstitution,
+          legacyDecision: row.legacyDecision,
+          worksDecision: row.worksDecision,
+          combinedDecision: row.combinedDecision,
+          combinedReason: row.combinedReason,
+          anchorsAgree: row.anchorsAgree === true,
+        })),
+      }
+      : null;
+
     sendEvent('result', {
       verified: verifiedWithCOI,
       unverified: unverifiedWithProvenance,
       discovered: enhancedDiscovered,
       ranked: rankedWithProvenance,
       blockedReferredSeeds,
-      stats: discoveryResults.stats
+      stats: discoveryResults.stats,
+      ...(identityComparison ? { identityComparison } : {}),
     });
 
     sendEvent('complete', {

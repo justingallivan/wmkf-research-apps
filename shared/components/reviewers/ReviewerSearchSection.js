@@ -95,6 +95,15 @@ const BLOCKED_REFERRAL_REASON = {
   institution_coi: 'PI institution conflict',
 };
 
+const IDENTITY_COMPARISON_REASON = {
+  spine_works_consensus: 'Both resolvers selected the same identity.',
+  spine_retained_without_works_contradiction: 'Legacy identity retained; Works-first found no contradiction.',
+  works_rescue: 'Works-first corroborated an identity that Legacy missed.',
+  claimed_institution_unresolved: 'The claimed institution could not be resolved confidently.',
+  no_institution_corroborated_byline: 'A publication byline was found, but its institution was not corroborated.',
+  resolver_anchor_disagreement: 'The resolvers selected different identity anchors.',
+};
+
 export function addressTrustFailureMessage(data, fallback) {
   const base = data?.message || data?.error || fallback;
   const actions = Array.isArray(data?.remediation) ? data.remediation : [];
@@ -130,6 +139,91 @@ function Pill({ children, tone = 'gray', onClick = null, title }) {
     <button type="button" onClick={onClick} title={title} className={`${base} underline underline-offset-2 hover:brightness-95 cursor-pointer`}>
       {children}
     </button>
+  );
+}
+
+function IdentityDecision({ value }) {
+  const tone = value === 'bind'
+    ? 'bg-green-100 text-green-800'
+    : value === 'review'
+      ? 'bg-amber-100 text-amber-800'
+      : 'bg-gray-100 text-gray-700';
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${tone}`}>
+      {value || 'unknown'}
+    </span>
+  );
+}
+
+function IdentityComparisonPanel({ comparison }) {
+  const rows = Array.isArray(comparison?.candidates) ? comparison.candidates : [];
+  if (rows.length === 0) return null;
+  const differences = rows.filter((row) => (
+    row.legacyDecision !== row.worksDecision
+      || row.legacyDecision !== row.combinedDecision
+      || row.combinedReason === 'resolver_anchor_disagreement'
+  ));
+  const changedOutcomes = rows.filter((row) => row.legacyDecision !== row.combinedDecision).length;
+  const mode = comparison.resolverMode || 'unknown';
+
+  return (
+    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-950" data-testid="identity-comparison-panel">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold">Identity resolver comparison (admin)</p>
+          <p className="mt-0.5 text-xs text-purple-800">
+            {mode === 'shadow'
+              ? 'This search still used Legacy results; Combined is shown for evaluation only.'
+              : mode === 'combined'
+                ? 'Combined supplied the live identity decisions for this search.'
+                : `Resolver mode: ${mode}.`}
+          </p>
+        </div>
+        <span className="text-xs text-purple-700">
+          {differences.length} difference{differences.length === 1 ? '' : 's'} of {rows.length}
+          {' '}· {changedOutcomes} combined outcome{changedOutcomes === 1 ? '' : 's'} changed
+        </span>
+      </div>
+
+      {differences.length === 0 ? (
+        <p className="mt-3 text-xs text-purple-800">Legacy, Works-first, and Combined agreed for every reviewer.</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
+            <thead>
+              <tr className="text-purple-800">
+                <th className="border-b border-purple-200 px-2 py-1.5 font-medium">Reviewer</th>
+                <th className="border-b border-purple-200 px-2 py-1.5 font-medium">Legacy</th>
+                <th className="border-b border-purple-200 px-2 py-1.5 font-medium">Works-first</th>
+                <th className="border-b border-purple-200 px-2 py-1.5 font-medium">Combined</th>
+                <th className="border-b border-purple-200 px-2 py-1.5 font-medium">Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              {differences.map((row) => (
+                <tr key={row.candidateKey || `${row.reviewerName}-${row.claimedInstitution}`} className="align-top">
+                  <td className="border-b border-purple-100 px-2 py-2">
+                    <span className="font-medium">{row.reviewerName || 'Unnamed reviewer'}</span>
+                    {row.claimedInstitution && <span className="block text-purple-700">{row.claimedInstitution}</span>}
+                  </td>
+                  <td className="border-b border-purple-100 px-2 py-2"><IdentityDecision value={row.legacyDecision} /></td>
+                  <td className="border-b border-purple-100 px-2 py-2"><IdentityDecision value={row.worksDecision} /></td>
+                  <td className="border-b border-purple-100 px-2 py-2"><IdentityDecision value={row.combinedDecision} /></td>
+                  <td className="border-b border-purple-100 px-2 py-2 text-purple-800">
+                    {IDENTITY_COMPARISON_REASON[row.combinedReason]
+                      || String(row.combinedReason || 'Unknown reason').replaceAll('_', ' ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-purple-700">
+        This named comparison exists only in the current browser response; durable telemetry remains pseudonymous.
+        {comparison.runId ? ` Run ${comparison.runId}.` : ''}
+      </p>
+    </div>
   );
 }
 
@@ -1002,6 +1096,7 @@ export default function ReviewerSearchSection({
   const [candidates, setCandidates] = useState([]);
   const [unverified, setUnverified] = useState([]); // Claude suggestions the searched databases couldn't verify (not selectable; rescuable via confirm-identity or excludable)
   const [analysis, setAnalysis] = useState(null);
+  const [identityComparison, setIdentityComparison] = useState(null);
   // `selected` is keyed by the stable per-candidate correlation key, not by a
   // normalized name or flat array index. Same-name people must remain separate
   // through enrichment, durable roster actions, and partial-save handling.
@@ -1087,7 +1182,7 @@ export default function ReviewerSearchSection({
   useEffect(() => {
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
-    setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null);
+    setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
     setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
@@ -1176,7 +1271,7 @@ export default function ReviewerSearchSection({
     ]));
     const referredSeeds = parseReferredSeeds(referredSeedsText, referredBy);
     setPhase('running');
-    setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setSelected(new Set());
+    setError(null); setErrorMeta(null); setProgress([]); setCandidates([]); setUnverified([]); setIdentityComparison(null); setSelected(new Set());
     setPromotionNotice(null); setEnrichNote(null); setAnalysis(null); setExcludedRemoved(0); setExportError(null); setBlockedReferredSeeds([]);
     try {
       // 1. Analyze the proposal (Claude). excludedNames soft-blocks Claude's own
@@ -1251,6 +1346,7 @@ export default function ReviewerSearchSection({
       let ranked = null;
       let unverifiedRaw = null;
       let blockedReferredRaw = [];
+      let identityComparisonRaw = null;
       streamError = null;
       let discoveryTransportError = null;
       try {
@@ -1261,6 +1357,7 @@ export default function ReviewerSearchSection({
           if (data?.ranked) ranked = data.ranked;
           if (data?.unverified) unverifiedRaw = data.unverified;
           if (Array.isArray(data?.blockedReferredSeeds)) blockedReferredRaw = data.blockedReferredSeeds;
+          if (data?.identityComparison) identityComparisonRaw = data.identityComparison;
         });
       } catch (transportError) {
         discoveryTransportError = transportError;
@@ -1272,6 +1369,7 @@ export default function ReviewerSearchSection({
       if (discoveryTransportError) pushProgress('Candidate results received; continuing after the connection closed.');
       if (!ranked) throw new Error('Discovery returned no candidates.');
       if (genRef.current !== myGen) return; // context changed — abort
+      setIdentityComparison(identityComparisonRaw);
 
       // 3. Hard-filter excluded names from the database results — /discover does
       //    NOT honor the soft-block, so without this the panel's "excluded names
@@ -2849,6 +2947,7 @@ export default function ReviewerSearchSection({
               set) shows on reload and even when no proposal is loaded. */}
           {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
             <div className="space-y-3 mt-3">
+              <IdentityComparisonPanel comparison={identityComparison} />
               {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
               {incompleteCoiCandidates.length > 0 && (
                 <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">

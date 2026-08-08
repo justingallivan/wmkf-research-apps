@@ -6,6 +6,7 @@
  */
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 5 })),
+  getUserRole: jest.fn(async () => 'read_only'),
 }));
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: jest.fn(() => jest.fn(async () => true)),
@@ -26,7 +27,7 @@ jest.mock('../../lib/services/proposal-pi-identity', () => ({
     contactName: 'Patricia Investigator',
   })),
   excludePiIdentity: jest.fn((candidates) => ({ kept: candidates, removed: [] })),
-  appendPiName: jest.fn((authors, pi) => [...authors, pi.canonicalName]),
+  appendPiName: jest.fn((authors, pi) => pi?.canonicalName ? [...authors, pi.canonicalName] : authors),
   piInstitutions: jest.fn(() => []),
 }));
 jest.mock('../../lib/dataverse/core/context', () => ({
@@ -63,6 +64,7 @@ jest.mock('../../lib/services/discovery-service', () => ({
 }));
 
 import handler from '../../pages/api/reviewer-finder/discover';
+import { getUserRole } from '../../lib/utils/auth';
 
 function response() {
   const chunks = [];
@@ -118,4 +120,64 @@ test('filters PI and co-investigator name variants before emitting unverified su
   const result = resultEvent(res);
   expect(result).not.toBeNull();
   expect(result.unverified.map((candidate) => candidate.name)).toEqual(['Morgan Reviewer']);
+});
+
+test('returns named resolver comparisons only to a freshly verified superuser', async () => {
+  getUserRole.mockResolvedValueOnce('superuser');
+  mockDiscover.mockImplementationOnce(async (_analysisResult, options) => {
+    await options.onIdentityComparison({
+      runId: '11111111-1111-4111-8111-111111111111',
+      resolverMode: 'shadow',
+      candidateKey: 'abcd1234abcd1234',
+      reviewerName: 'Named Admin Diagnostic',
+      claimedInstitution: 'Example University',
+      legacyDecision: 'abstain',
+      worksDecision: 'bind',
+      combinedDecision: 'bind',
+      combinedReason: 'works_rescue',
+      anchorsAgree: false,
+      providerPayload: { shouldNeverReachResponse: true },
+    });
+    return { verified: [], unverified: [], discovered: [], coiDropped: [], stats: {} };
+  });
+
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: {
+      analysisResult: { proposalInfo: { keywords: '' }, reviewerSuggestions: [] },
+      options: { generateReasoning: false },
+    },
+  }, res);
+
+  expect(resultEvent(res).identityComparison).toEqual({
+    runId: '11111111-1111-4111-8111-111111111111',
+    resolverMode: 'shadow',
+    candidates: [expect.objectContaining({
+      reviewerName: 'Named Admin Diagnostic',
+      legacyDecision: 'abstain',
+      combinedDecision: 'bind',
+    })],
+  });
+  expect(resultEvent(res).identityComparison.candidates[0]).not.toHaveProperty('providerPayload');
+});
+
+test('ordinary app users receive no named comparison field and no observer', async () => {
+  let receivedObserver = 'not-called';
+  mockDiscover.mockImplementationOnce(async (_analysisResult, options) => {
+    receivedObserver = options.onIdentityComparison;
+    return { verified: [], unverified: [], discovered: [], coiDropped: [], stats: {} };
+  });
+
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: {
+      analysisResult: { proposalInfo: { keywords: '' }, reviewerSuggestions: [] },
+      options: { generateReasoning: false },
+    },
+  }, res);
+
+  expect(receivedObserver).toBeNull();
+  expect(resultEvent(res)).not.toHaveProperty('identityComparison');
 });
