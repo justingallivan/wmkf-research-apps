@@ -21,8 +21,13 @@ related:
 
 ## Status
 
-**PROPOSED — no stage is authorized until the owner approves.** Drafted
-2026-08-08 (Session 409) from the owner's problem statement: staff spend
+**APPROVED WITH SCOPE, 2026-08-08 — Stage 1 is authorized.** The four owner
+decisions below were resolved in Session 409; see "Owner decisions —
+resolved." Stages proceed in order on a branch per the rollout section; every
+stage gate must be runnable headlessly by an agent (see "Agent-runnable
+evaluation harness") — no production UI searches are part of any gate.
+
+Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
 substantial effort resolving conflicts that should be automatic — "Harvard
 University" vs "Harvard Medical School," "University of Illinois" vs
 "University of Illinois Department of Chemistry" — including clicking
@@ -186,6 +191,36 @@ no COI behavior change (existing COI tests stay green). **No-go:** any gate
 failure stops the stage; no threshold tuning against the gate set without a
 new owner decision (the S395 scope-accretion postmortem applies).
 
+## Agent-runnable evaluation harness (owner requirement, 2026-08-08)
+
+Every stage gate must be executable from a local agent session (Claude/Codex
+CLI) with no production UI interaction and no paid Claude search. Precedents
+already in the repo: the S400 probes ran the real production modules against
+live keyless OpenAlex from a local Node process, and the falsification
+comparator harness (`benchmarks/fuzzy-matching-falsification/run-comparator.js`)
+replays frozen cases against adapters with new result slugs.
+
+Deliverables (Stage 1 builds the harness alongside the fix):
+
+1. **Offline jest suite** — deterministic fixture-based unit tests for the
+   normalizer and the pair-verdict logic (recorded provider responses for the
+   1002903-class strings, hierarchy pairs, and sibling pairs). Runs in the
+   ordinary test suite with no network; this is the red gate for regressions.
+2. **Live replay CLI** — a `benchmarks/`-style runner (jest-invisible, new
+   result slugs, refuses to overwrite existing results) that replays the gate
+   set — byline-normalization and hierarchy families, UC sibling pairs, the
+   five 1002903 captured strings — through the real checker in both incumbent
+   and staged configurations, and prints a per-family verdict table plus the
+   go/no-go gate results. Read-only provider calls (OpenAlex, and ROR from
+   Stage 2); no schema, no writes, no production deployment involved.
+3. **Consumer-scope assertion** — a focused test that the factory default is
+   unchanged and only the two in-scope call sites receive the new behavior,
+   so decision 3's boundary is machine-enforced rather than convention.
+
+The live replay CLI replaces production-UI observation as the per-stage
+acceptance evidence; the post-promotion signed-in smoke remains a one-time
+deployment sanity check, not a measurement instrument.
+
 ## Rollout
 
 - Tier classification per
@@ -196,27 +231,37 @@ new owner decision (the S395 scope-accretion postmortem applies).
   the gates); Stage 2 only after Stage 1 ships and its effect is observed on
   a real request batch; Stage 3 copy/policy rides with whichever stage its
   pieces depend on.
-- Verification per stage: focused unit tests for the checker and normalizer,
-  the benchmark gate runs above, relevant red gates for touched surfaces, and
-  a signed-in production smoke on a real request after promotion.
+- Verification per stage: the offline jest suite, the live replay CLI gate
+  run (agent-runnable, see harness section), relevant red gates for touched
+  surfaces, and a one-time signed-in production smoke after promotion.
 
-## Owner decisions required before Stage 1 starts
+## Owner decisions — resolved 2026-08-08 (Session 409)
 
-1. **Approve the pair-consistency contract as the product goal** for this
-   workstream (supersedes the resolver-promotion framing in the strategic
-   reset; the identity-arm promotion question is separately parked).
-2. **Relationship auto-clear policy:** which typed relationships count as
-   `related`-and-auto-clear — recommendation: parent/child (med school,
-   department, constituent college) and one-hop associated institutions yes;
-   sibling never; `successor` and cross-system links surfaced, not
-   auto-cleared, until observed.
-3. **Consumer scope:** apply verdicts to the mismatch alert and enrichment
-   review flags first (recommendation), or also to identity-evidence
-   corroboration in the same stage.
-4. **Whether the two parked measurement runs from
-   `outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md` still
-   run.** They price identity-arm promotion, which this plan does not need;
-   recommendation: drop unless identity promotion returns to the table.
+1. **Contract approved.** Pair consistency is the product goal for this
+   workstream, superseding the resolver-promotion framing in the strategic
+   reset; the identity-arm promotion question remains separately parked.
+2. **Relationship auto-clear policy approved as recommended.** Parent/child
+   (med school, department, constituent college) and one-hop associated
+   institutions auto-clear as `related`; sibling campuses never;
+   `successor` and cross-system links are surfaced, not auto-cleared, until
+   observed.
+3. **Consumer scope: mismatch alert and enrichment review flags only.**
+   Verdicts apply to the affiliation-mismatch alert and the enrichment
+   review-flag path now. Identity-evidence corroboration is **deferred**: it
+   changes identity-confirmation rates (which gate contact enrichment,
+   bibliometrics, and invite readiness), not just display. Extending to it
+   requires a new owner decision and, first, the parked frozen-40
+   person-identity benchmark run with the new checker wired in, gated on
+   zero false binds. Mechanically, scoping is implemented by injecting the
+   new behavior at the two in-scope call sites; the checker factory default
+   stays unchanged so `reviewer-identity-evidence.js` keeps today's behavior
+   bit-for-bit.
+4. **The two strategic-assessment measurement runs are PARKED, not
+   dropped** (`outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md`).
+   Named triggers to unpark: (a) the frozen-40 W2 rerun — required before
+   any consumer-3 extension of this plan or any identity-arm promotion;
+   (b) the C3 replay — if institution-resolver promotion returns to the
+   table.
 
 ## Relationship to the strategic reset
 
