@@ -760,6 +760,70 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResults[0].content).toContain('error');
   });
 
+  // The case the fix actually exists for: SEVERAL tools in one round, settling
+  // out of order, with only one of them rejecting. Index alignment between
+  // Promise.allSettled results and toolBlocks is what keeps each answer attached
+  // to its own id — the single-tool test above cannot detect a misalignment.
+  // (Gap identified in Codex review, 2026-08-07.)
+  test('keeps ids aligned when several tools settle out of order and one rejects', async () => {
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          // Middle one will reject; the others resolve on different timelines.
+          { type: 'tool_use', id: 'tu_a', name: 'count_records', input: { table_name: 'akoya_request', filter: 'statecode eq 0' } },
+          { type: 'tool_use', id: 'tu_b', name: 'query_records', input: { table_name: 'akoya_request', top: 1 } },
+          { type: 'tool_use', id: 'tu_c', name: 'count_records', input: { table_name: 'akoya_request', filter: 'statecode eq 1' } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Done.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    // tu_b rejects (BigInt breaks JSON.stringify inside truncateResult).
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockResolvedValue({ records: [{ akoya_requestnum: 1n }], totalCount: 1 });
+
+    // The two count_records calls settle in reverse order relative to issue
+    // order, so a naive positional assumption would cross the answers over.
+    mockCountRecords.mockReset();
+    mockCountRecords
+      .mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve(41), 20)))
+      .mockImplementationOnce(() => Promise.resolve(7));
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'three lookups' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(mockStream).toHaveBeenCalledTimes(2);
+
+    const toolResults = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content;
+
+    // Answered in issue order, one per issued id, none invented.
+    expect(toolResults.map(r => r.tool_use_id)).toEqual(['tu_a', 'tu_b', 'tu_c']);
+    // The rejection is attached to tu_b specifically, not to a sibling.
+    const byId = Object.fromEntries(toolResults.map(r => [r.tool_use_id, r.content]));
+    expect(byId.tu_b).toContain('error');
+    // The two successes carry their own distinct counts — proof the results
+    // didn't get swapped by completion order. Matched with the JSON key so a
+    // bare number can't fake-pass against the hex nonce in the wrapper.
+    expect(byId.tu_a).toContain('"count":41');
+    expect(byId.tu_c).toContain('"count":7');
+    expect(byId.tu_a).not.toContain('error');
+    expect(byId.tu_c).not.toContain('error');
+  });
+
   // Top-level failure copy. A top-level throw used to emit the bare string
   // "Query failed", which named neither what broke nor what to do, and gave the
   // user nothing to quote when escalating. Owner-reported 2026-08-07.

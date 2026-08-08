@@ -311,7 +311,8 @@ function DynamicsExplorer() {
                   role: 'assistant',
                   // The reference id matches the server log line for this
                   // request — it's what an administrator needs to find the
-                  // underlying error, which never reaches the browser.
+                  // underlying error, which is not sent to the browser in
+                  // production (development additionally returns `details`).
                   content: `**Error:** ${parsed.message}${parsed.requestId ? `\n\nReference: \`${parsed.requestId}\`` : ''}`,
                   timestamp: Date.now(),
                   isError: true,

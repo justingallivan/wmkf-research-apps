@@ -306,7 +306,9 @@ export default async function handler(req, res) {
 // restriction load, or the taxonomy build. A single "Query failed" string told
 // the user nothing about which, and left nothing to quote when escalating.
 //
-// The raw error stays server-side (logged above with the same requestId).
+// In production the raw error stays server-side (logged above with the same
+// requestId); in development it is ALSO returned as `details` for local
+// debugging — so "server-side only" holds for production, not for every mode.
 // Copy follows the house voice for transient failures: the system is the
 // subject, plain words, and a retry → administrator action ladder. It never
 // implies the user's own access is in doubt.

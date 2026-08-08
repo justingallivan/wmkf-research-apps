@@ -579,13 +579,41 @@ describe('LLMClient.stream', () => {
     const r = await client.stream({ messages: [] });
 
     const thinking = r.content.find(b => b.type === 'thinking');
-    // The API rejects an echoed thinking block whose text is empty.
+    // Both fields must survive so the block can be echoed back unmodified.
     expect(thinking.thinking).toBe('let me check');
     expect(thinking.signature).toBe('sig123');
     // Never the string "undefined" from appending to a missing field.
     expect(thinking.thinking).not.toMatch(/undefined/);
     // Thinking must not be mistaken for assistant text.
     expect(r.text).toBe('');
+  });
+
+  // The shape current models actually send: `display: "omitted"` is the default,
+  // so the block carries NO thinking text and only a signature. Restoring the
+  // text alone would not have fixed this case — the signature is the field that
+  // makes the echoed block verifiable. (Gap identified in Codex review,
+  // 2026-08-07: the original test only covered the summarized-display shape.)
+  test('preserves the signature when display is omitted and no thinking_delta arrives', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'EqQBCgIYAhoM' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tu_1', name: 'q' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', usage: { output_tokens: 2 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    const thinking = r.content.find(b => b.type === 'thinking');
+    expect(thinking.signature).toBe('EqQBCgIYAhoM');
+    // Empty thinking text is legitimate under omitted display — it must be
+    // passed through as-is, not synthesized into something non-empty.
+    expect(thinking.thinking).toBe('');
+    // The tool call alongside it still reassembles normally.
+    expect(r.content.find(b => b.type === 'tool_use').input).toEqual({});
   });
 
   test('accumulates thinking deltas when the start event omits the fields', async () => {
