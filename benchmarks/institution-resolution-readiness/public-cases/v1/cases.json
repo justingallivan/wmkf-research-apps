@@ -1,0 +1,164 @@
+[
+  {
+    "schema_version": 1,
+    "id": "public-umn-canonical",
+    "origin": "public_registry",
+    "profile": "production_shape",
+    "group": "canonical-name",
+    "first_split_assignment": {
+      "split": "public_regression",
+      "release": "readiness-public-v1"
+    },
+    "split": "public_regression",
+    "input": {
+      "affiliation_string": "University of Minnesota"
+    },
+    "expected": {
+      "outcome": "resolved",
+      "ror_ids": [
+        "https://ror.org/017zqws13"
+      ],
+      "must_not_ror_ids": []
+    },
+    "label": {
+      "status": "verified",
+      "adjudicator_role": "public-fixture-maintainer",
+      "evidence": [
+        "https://ror.org/017zqws13"
+      ],
+      "allowed_evidence_hosts": [],
+      "ror_release": "v2.11-2026-08-03",
+      "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "synthetic-harvard-mit-multiple",
+    "origin": "synthetic",
+    "profile": "production_shape",
+    "group": "multiple-organizations",
+    "first_split_assignment": {
+      "split": "public_regression",
+      "release": "readiness-public-v1"
+    },
+    "split": "public_regression",
+    "input": {
+      "affiliation_string": "Harvard University and Massachusetts Institute of Technology"
+    },
+    "expected": {
+      "outcome": "review",
+      "ror_ids": [],
+      "must_not_ror_ids": [
+        "https://ror.org/03vek6s52",
+        "https://ror.org/042nb2s44"
+      ]
+    },
+    "label": {
+      "status": "verified",
+      "adjudicator_role": "public-fixture-maintainer",
+      "evidence": [
+        "https://ror.org/03vek6s52",
+        "https://ror.org/042nb2s44"
+      ],
+      "allowed_evidence_hosts": [],
+      "ror_release": "v2.11-2026-08-03",
+      "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "synthetic-uc-sibling-contradiction",
+    "origin": "synthetic",
+    "profile": "production_shape",
+    "group": "sibling-contradiction",
+    "first_split_assignment": {
+      "split": "public_regression",
+      "release": "readiness-public-v1"
+    },
+    "split": "public_regression",
+    "input": {
+      "affiliation_string": "University of California, Berkeley (UCLA)"
+    },
+    "expected": {
+      "outcome": "review",
+      "ror_ids": [],
+      "must_not_ror_ids": [
+        "https://ror.org/01an7q238",
+        "https://ror.org/046rm7j60"
+      ]
+    },
+    "label": {
+      "status": "verified",
+      "adjudicator_role": "public-fixture-maintainer",
+      "evidence": [
+        "https://ror.org/01an7q238",
+        "https://ror.org/046rm7j60"
+      ],
+      "allowed_evidence_hosts": [],
+      "ror_release": "v2.11-2026-08-03",
+      "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "synthetic-unknown-organization",
+    "origin": "synthetic",
+    "profile": "production_shape",
+    "group": "unknown-organization",
+    "first_split_assignment": {
+      "split": "public_regression",
+      "release": "readiness-public-v1"
+    },
+    "split": "public_regression",
+    "input": {
+      "affiliation_string": "North Meridian Example Institute"
+    },
+    "expected": {
+      "outcome": "unresolved",
+      "ror_ids": [],
+      "must_not_ror_ids": []
+    },
+    "label": {
+      "status": "verified",
+      "adjudicator_role": "public-fixture-maintainer",
+      "evidence": [],
+      "allowed_evidence_hosts": [],
+      "ror_release": "v2.11-2026-08-03",
+      "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+    }
+  },
+  {
+    "schema_version": 1,
+    "id": "public-berkeley-capability",
+    "origin": "public_registry",
+    "profile": "capability_only",
+    "group": "country-domain-capability",
+    "first_split_assignment": {
+      "split": "public_regression",
+      "release": "readiness-public-v1"
+    },
+    "split": "public_regression",
+    "input": {
+      "affiliation_string": "University of California, Berkeley",
+      "country_code": "US",
+      "domain_evidence": "berkeley.edu"
+    },
+    "expected": {
+      "outcome": "resolved",
+      "ror_ids": [
+        "https://ror.org/01an7q238"
+      ],
+      "must_not_ror_ids": []
+    },
+    "label": {
+      "status": "verified",
+      "adjudicator_role": "public-fixture-maintainer",
+      "evidence": [
+        "https://ror.org/01an7q238"
+      ],
+      "allowed_evidence_hosts": [],
+      "ror_release": "v2.11-2026-08-03",
+      "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa"
+    }
+  }
+]

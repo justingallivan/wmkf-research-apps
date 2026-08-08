@@ -16,7 +16,8 @@ related:
 
 # Institution Resolution Offline Evaluation and Rollout Plan
 
-**Status:** Implementation in progress; Phase 0 runtime prerequisites are built on the current branch
+**Status:** Implementation in progress; Phase 0 runtime prerequisites and the safe
+public portion of Phase 1 are built on the current branch
 **Decision date:** 2026-08-07  
 **Reason for this plan:** Reviewer searching is complete for the current cycle, so
 organic production shadow traffic will not provide a useful sample for roughly six
@@ -27,15 +28,19 @@ rather than by waiting for the next campaign.
 
 ### Change surface
 
-[PLANNED] Build a production-readiness evaluation harness for the API-backed ROR
+[PARTIALLY IMPLEMENTED ON CURRENT BRANCH] Build a production-readiness evaluation
+harness for the API-backed ROR
 institution resolver. It will combine a private completed-cycle corpus,
 deterministic provider replay, an opt-in live-provider canary, and bounded workload
 tests. Public-repository automation will use only public-registry and synthetic
-fixtures; completed-cycle inputs and their per-case outputs remain outside Git.
+fixtures; completed-cycle inputs and their per-case outputs remain outside Git. The
+versioned public contracts, publication guard, tracked-file guard, public/synthetic
+case fixture, byte-pinned manifest, and network-free validator tests are built. The
+private corpus, replay runners, live canary, and load probe remain planned.
 
 ### Entry points
 
-[PLANNED]
+[PARTIALLY IMPLEMENTED ON CURRENT BRANCH]
 
 - a read-only extraction script for completed-cycle institution evidence;
 - an offline replay command used by developers against either the private corpus or
@@ -43,7 +48,8 @@ fixtures; completed-cycle inputs and their per-case outputs remain outside Git.
 - a network-free public-fixture replay command used by CI;
 - an opt-in live ROR/OpenAlex canary command;
 - a bounded workload command with an explicit call cap and dry-run estimate; and
-- Jest contract tests under `tests/unit/benchmarks/`.
+- Jest contract tests under `tests/unit/benchmarks/` (implemented for the public
+  contracts and privacy boundary; replay coverage remains planned).
 
 ### Persistence
 
@@ -51,10 +57,12 @@ fixtures; completed-cycle inputs and their per-case outputs remain outside Git.
   route, schema, or UI surface. See
   `lib/services/institution-resolution/ror-institution-identity-resolver.js` and
   `lib/services/reviewer-identity-runtime.js`.
-- [PLANNED] The public repository will contain only schemas, validators, synthetic
-  or public-registry fixtures, manifest hashes, and aggregate result summaries. It
-  will not contain completed-cycle cases, completed-cycle cassettes, frequency
-  weights, per-case cycle results, or reversible source mappings.
+- [IMPLEMENTED ON CURRENT BRANCH FOR PHASE 1] The public repository contains schemas,
+  validators, five synthetic/public-registry institution-only cases, and a
+  byte-pinned public manifest. Later phases may add public cassettes and approved
+  aggregate summaries. It will not contain completed-cycle cases, completed-cycle
+  cassettes, frequency weights, per-case cycle results, or reversible source
+  mappings.
 - [PLANNED] The private corpus and its cassettes/results remain in an
   access-controlled location selected before extraction. A gitignored local path is
   permitted only as temporary working storage with an approved private backup; it
@@ -516,7 +524,8 @@ All of the following are required:
    this requirement. The certified allocation includes the observer path: replay
    covers zero-delay and worst-case observer latency, and production logging is
    inside the allocation with a best-effort skip when no observer budget remains.
-7. Case/publication-boundary validators (including the [PLANNED] privacy validator),
+7. Case/publication-boundary validators (including the implemented Phase 1 privacy
+   validator),
    the private-path tracked-file guard, the existing secret scan, and relevant
    repository gates pass.
 8. Live ROR policy is reverified on the observation date. The report records the
@@ -610,17 +619,22 @@ that is an acceptable outcome.
 
 ### Phase 1 — schema, validators, and read-only inventory
 
-1. Create `benchmarks/institution-resolution-readiness/README.md`.
-2. Define the versioned case, cassette, and result schemas.
-3. Build validators first, including seeded tests proving forbidden PII and invalid
+1. **[IMPLEMENTED ON CURRENT BRANCH]** Create `benchmarks/institution-resolution-readiness/README.md`.
+2. **[IMPLEMENTED ON CURRENT BRANCH]** Define the versioned case, cassette,
+   manifest, and result schemas.
+3. **[IMPLEMENTED ON CURRENT BRANCH]** Build validators first, including seeded
+   tests proving forbidden PII and invalid
    labels are rejected.
-4. Select the private storage/access/backup/retention owners and name the primary and
+4. **[OWNER DECISION REQUIRED]** Select the private
+   storage/access/backup/retention owners and name the primary and
    tie-breaking adjudicators. No extraction occurs before these decisions.
-5. Add a fail-closed Git guard parameterized by the selected private working path and
-   private artifact patterns.
-6. Probe the completed-cycle source fields and counts without writing an extract,
+5. **[IMPLEMENTED ON CURRENT BRANCH; PRIVATE PATH UNSET]** Add a fail-closed Git
+   guard parameterized by the selected private working path and private artifact
+   patterns. The generic guard is built; no private path has been inferred.
+6. **[PENDING AFTER ITEM 4]** Probe the completed-cycle source fields and counts
+   without writing an extract,
    using the trusted DAL context and target-interlock policy described above.
-7. Publish only an approved aggregate stratum/count inventory, applying the same
+7. **[PENDING]** Publish only an approved aggregate stratum/count inventory, applying the same
    minimum-cell-size/suppression rule as public results, and confirm the sampling
    design.
 
@@ -731,10 +745,15 @@ corpus receipts or per-case public-fixture results only.
 | Offline replay | network-disabled run with provider and Postgres env variables unset, plus explicit no-write observers |
 | Live canary | explicit opt-in, OpenAlex key present, ROR client-ID status, 2-of-3 clean rule, pinned-release drift diff, versioned reports |
 | Workload | separate ROR/OpenAlex dry-run estimates and caps, bounded author loop, 15/25/50 batches for both entry points, independent per-batch adapters, staged concurrency, per-entry-point parent-budget margin |
-| Privacy | evidence-host allowlist, fixture/result allowlists, seeded forbidden data, existing secret scan, and [PLANNED] publication-boundary privacy validator |
+| Privacy | evidence-host allowlist, fixture/result allowlists, seeded forbidden data, existing secret scan, and implemented publication-boundary privacy validator |
 | Docs | docs catalog, symbol references, build-claim freshness, fact consistency |
 
 ## 10. Contract-reconciliation audit
+
+The implemented Phase 1 public path is [VERIFIED ON CURRENT BRANCH] as public case ->
+exact-field schema -> publication boundary -> byte-pinned manifest -> local CLI/Jest
+consumer. It has no application caller, persistence seam, provider call, or partial
+async state. The remaining end-to-end path is:
 
 1. **Whole-flow:** [PLANNED] trusted-DAL completed-cycle read -> private sanitizer ->
    resolver-blind adjudicated case -> private cassette/live provider -> production
@@ -749,17 +768,19 @@ corpus receipts or per-case public-fixture results only.
    deadline per case/batch. No UI state exists. Harness observers are explicit
    no-writes. Cancellation, observer delay, and post-timeout activity are tested;
    result artifacts are written only after the run settles.
-4. **Helper extraction:** [PLANNED] shared schemas/judges may normalize ROR IDs and
-   compare outcomes, but must not collapse `review` into `unresolved`, candidate
-   retrieval into resolution, or relationship compatibility into same-entity
-   identity.
-5. **Durable surface:** [PLANNED] tracked public benchmark assets require schema
-   validators, private-path guards, manifest hashes, cap/retention rules, tests, docs
-   catalog coverage, and immutable result slugs. Private corpus/cassettes/results
-   require access, backup, retention, and deletion owners. No migration, Atlas entity,
-   or API route change is expected.
-6. **Doc reconciliation:** [PLANNED] implementation completion requires `/sweep` over
-   this plan, the active handoffs, research memo, session prompt, and roadmap wiki.
+4. **Helper extraction:** [PARTIALLY IMPLEMENTED] Exact-field public schemas preserve
+   the three outcomes and require exactly one canonical ROR ID only for `resolved`.
+   Replay judges remain planned and must not collapse `review` into `unresolved`,
+   candidate retrieval into resolution, or relationship compatibility into
+   same-entity identity.
+5. **Durable surface:** [PARTIALLY IMPLEMENTED] Tracked public case assets now require
+   schema/publication validators, the parameterized private-path guard, a manifest
+   hash, and tests. Cap/retention rules and immutable result slugs remain later-phase
+   work. Private corpus/cassettes/results still require access, backup, retention,
+   and deletion owners. No migration, Atlas entity, or API route changed.
+6. **Doc reconciliation:** [VERIFIED FOR THIS SLICE] `/sweep` reconciled this plan,
+   the active handoff, session prompt, memory direction, and roadmap wiki. The
+   research memo has no implementation-status restatement for this Phase 1 slice.
 7. **Symbol fan-out:** N/A for this plan: it introduces no application enum, status,
    persisted column, or route. If implementation changes one, this audit must be
    reopened.

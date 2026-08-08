@@ -187,7 +187,8 @@ document inventory, and individual implementation plans do not establish priorit
   IMPLEMENTED ON `codex/ror-api-production-shadow`; not merged/deployed** →
   **offline readiness plan ACTIVE on
   `codex/institution-resolution-evaluation-plan`; Phase 0 runtime prerequisites
-  built, public schemas/replay and private-corpus governance next** → run and
+  plus the safe public Phase 1 schema/privacy/fixture slice built; private-corpus
+  governance and deterministic replay next** → run and
   resource-profile S2AFF later as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class

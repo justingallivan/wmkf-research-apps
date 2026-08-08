@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "manifest_id": "public-cases-v1",
+  "artifact_type": "public_cases",
+  "release": "readiness-public-v1",
+  "ror_release": "v2.11-2026-08-03",
+  "ror_release_sha256": "5984c0455f5af6dd9af69e8ad5df3220d28ee0804b67a4d987ef98f079ce1daa",
+  "artifacts": [
+    {
+      "path": "public-cases/v1/cases.json",
+      "sha256": "9b72d3f492ca9311a3e245a07e18957a1884c4d055665447a95e6db628bf3e76",
+      "records": 5
+    }
+  ]
+}

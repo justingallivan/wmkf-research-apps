@@ -110,10 +110,12 @@ from passing as misses.
 Complete the offline readiness harness in
 `docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md`; organic production
 traffic is unavailable for roughly six months. The current branch implements
-the Phase 0 runtime prerequisites but does not enable any deployed mode. Build
-public schemas/validators and deterministic production-path replay next, then
-collect the private representative corpus only after its storage, access,
-retention, and adjudication owners are selected. Migration 026 is already live;
+the Phase 0 runtime prerequisites plus the public Phase 1 schemas, privacy/Git
+guards, safe cases, pinned manifest, and network-free validator tests; it does
+not enable any deployed mode. Select private-corpus governance next; then probe,
+extract, and adjudicate the private representative corpus and build deterministic
+production-path replay. No collection begins until its storage, access, retention,
+and adjudication owners are selected. Migration 026 is already live;
 do not couple its applied state to a mode change. Each entry point must pass its
 own Gate S before comparison-only shadow observation and its own Gate C before
 combined. `w2`, `cutover`, typos, and unset values fail back to legacy. The

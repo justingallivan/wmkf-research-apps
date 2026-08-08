@@ -54,7 +54,8 @@ corrected the altitude — order by what most rapidly reduces complexity.
   IMPLEMENTED ON `codex/ror-api-production-shadow` (not merged/deployed;
   no deployed mode change) → offline readiness plan ACTIVE on
   `codex/institution-resolution-evaluation-plan` (Phase 0 runtime prerequisites
-  built; public schemas/replay and private corpus governance next) → S2AFF profile →
+  and the safe public Phase 1 schema/privacy/fixture slice built; private corpus
+  governance and deterministic replay next) → S2AFF profile →
   normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.

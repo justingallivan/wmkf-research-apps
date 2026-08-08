@@ -171,11 +171,18 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    redirects. Focused runtime/caller tests
    and type checking are green. The 2026-08-07 redacted Production probe covered
    only the former global mode and is not evidence for the new scoped variables.
-   **Next (g):** build Phase 1 public schemas, privacy validators, safe fixtures,
-   and deterministic production-path replay from
-   `docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md`. Do not extract
-   completed-cycle data until the owner selects private storage/access/
-   retention and adjudication owners. S2AFF remains a later challenger.
+   **Phase 1 public slice is implemented on the current branch:** versioned
+   case/cassette/manifest/result contracts, a fail-closed publication validator,
+   a private-path-parameterized tracked-file guard, five institution-only
+   synthetic/public-registry cases, a byte-pinned manifest, and network-free
+   adversarial Jest coverage now live under
+   `benchmarks/institution-resolution-readiness/` and
+   `tests/unit/benchmarks/`. No completed-cycle input, cassette, distribution,
+   or per-case result was added. **Next (g):** the owner must select private
+   storage/access/backup/retention and primary/tie-breaking adjudication owners;
+   only then probe completed-cycle source fields/counts without writing an
+   extract. Deterministic production-path replay follows in Phase 3. S2AFF
+   remains a later challenger.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
    Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes;
    158 characterization tests already green. Start with the two byte-identical
