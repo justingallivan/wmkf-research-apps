@@ -35,6 +35,7 @@ class FakeSseReadableStream {
 
   getReader() {
     return {
+      cancel: jest.fn(async () => {}),
       read: jest.fn(async () => {
         let next = this.reads.shift();
         if (next?.isDeferredRead) {
@@ -277,14 +278,14 @@ describe('Dynamics Explorer SSE terminal state', () => {
     expect(screen.queryByText('late-stale-export.xlsx')).not.toBeInTheDocument();
   });
 
-  test('a delayed prior-turn EOF cannot erase the current turn artifacts', async () => {
-    const priorTurnEof = deferredRead();
+  test('a prior turn stops reading at complete and cannot disturb the current turn', async () => {
+    const priorTurnLateRead = deferredRead();
     const currentTurnRemainder = deferredRead();
     fetch
       .mockResolvedValueOnce(streamResponse([
         sse('response', { content: 'First answer' }),
         sse('complete', { rounds: 1 }),
-        priorTurnEof,
+        priorTurnLateRead,
       ]))
       .mockResolvedValueOnce(streamResponse([
         sse('file_ready', {
@@ -300,13 +301,14 @@ describe('Dynamics Explorer SSE terminal state', () => {
     submitQuestion('First question');
     expect(await screen.findByText('First answer')).toBeInTheDocument();
     await expectComposerUnlocked();
-    await waitFor(() => expect(priorTurnEof.started).toBe(true));
+    expect(priorTurnLateRead.started).toBe(false);
 
     submitQuestion('Second question');
     await waitFor(() => expect(currentTurnRemainder.started).toBe(true));
 
-    priorTurnEof.resolve(EOF);
-    await waitFor(() => expect(priorTurnEof.consumed).toBe(true));
+    // This would reject the old reader if the client incorrectly consumed an
+    // event after `complete`. It must remain untouched while turn two finishes.
+    priorTurnLateRead.resolve(new Error('late prior-turn rejection'));
 
     currentTurnRemainder.resolve(
       sse('response', { content: 'Second answer' })
@@ -315,6 +317,9 @@ describe('Dynamics Explorer SSE terminal state', () => {
 
     expect(await screen.findByText('Second answer')).toBeInTheDocument();
     expect(await screen.findByText('fresh-export.xlsx')).toBeInTheDocument();
+    expect(screen.queryByText(/late prior-turn rejection/i)).not.toBeInTheDocument();
+    expect(priorTurnLateRead.started).toBe(false);
+    expect(priorTurnLateRead.consumed).toBe(false);
     await expectComposerUnlocked();
   });
 });

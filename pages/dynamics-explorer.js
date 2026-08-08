@@ -209,6 +209,14 @@ function DynamicsExplorer() {
 
       // Parse SSE stream
       const reader = resp.body.getReader();
+      const cancelReader = async () => {
+        try {
+          await reader.cancel?.();
+        } catch {
+          // The terminal event has already been handled; cancellation failure
+          // must not replace the answer/error the user is reading.
+        }
+      };
       const decoder = new TextDecoder();
       let buffer = '';
       let assistantContent = '';
@@ -321,7 +329,8 @@ function DynamicsExplorer() {
                 sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
-                break;
+                await cancelReader();
+                return;
               }
               case 'error':
                 clearPendingArtifacts();
@@ -350,7 +359,8 @@ function DynamicsExplorer() {
                 sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
-                break;
+                await cancelReader();
+                return;
             }
           } catch {
             // Skip malformed events
