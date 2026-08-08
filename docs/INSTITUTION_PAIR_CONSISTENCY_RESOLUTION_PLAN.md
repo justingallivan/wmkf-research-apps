@@ -27,6 +27,20 @@ resolved." Stages proceed in order on a branch per the rollout section; every
 stage gate must be runnable headlessly by an agent (see "Agent-runnable
 evaluation harness") — no production UI searches are part of any gate.
 
+**Amended 2026-08-08 after Codex adversarial review (GPT-5; verdict
+needs-attention).** All four findings were verified against source and
+accepted: (1) the enrichment consumer's checker verdict feeds
+`identityNeedsReview`, which gates durable researcher writes, ORCID
+back-propagation, and COI writes — not only display [VERIFIED via
+`lib/services/workbench/enrich-recommended-service.js` identity gate and
+`upsertByPotentialReviewer` branch]; (2) the production ROR resolver returns
+only the hydrated canonical identity, so successor canonicalization is
+invisible to a same-ID pair verdict; (3) ROR's `related` type does not
+distinguish constituent links from cross-system links; (4) the originally
+named gate evidence was partly untracked or mismatched. The decision-3
+rescope, Stage 2 operand contract, relationship-policy table, and fixture
+requirements below are the accepted remediations.
+
 Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
 substantial effort resolving conflicts that should be automatic — "Harvard
 University" vs "Harvard Medical School," "University of Illinois" vs
@@ -49,6 +63,8 @@ The strategic reset separated reviewer relevance, person identity, and
 institution normalization. The staff pain sits in a fourth contract:
 
 > `pairConsistency(left, right) → same | related | distinct | insufficient`
+> (with `related` policy-split into `related-autoclear` / `related-surface`
+> per the Stage 2 relationship-policy table)
 
 - **Input:** two institution strings from different evidence sources (listed
   institution, publication byline, enrichment result, prior record).
@@ -125,14 +141,36 @@ contract) rather than adding a new normalizer; consolidate, do not fork.
 Swap the checker's internal resolver from the incumbent
 `createInstitutionIdentityResolver` to the production
 `createRorInstitutionIdentityResolver` (dormant, veto-first, request-scoped),
-and adjudicate resolved pairs with typed evidence:
+with a **provenance-preserving operand contract** (Codex finding 2): the
+pair-adjudication layer must receive, for each side, the source-matched ROR
+id, the canonical/hydrated ROR id, and any canonicalization relationship the
+decision layer applied — the current resolver returns only the hydrated
+canonical identity, and its decision layer can select an active successor for
+a predecessor input via `successor_from_predecessor` [VERIFIED via
+`lib/services/ror-institution-decision.js:181,200` and
+`ror-institution-identity-resolver.js:63-114`], which would otherwise make a
+forbidden successor pair look same-ID.
 
-- same ROR id → `same`;
-- ROR parent/child or related link, or existing one-hop OpenAlex
-  associated-institution link → `related` (policy decides which relationship
-  kinds auto-clear; see owner decisions);
-- both resolve, no link → `distinct`;
-- either side unresolved/vetoed/provider-failed → `insufficient`.
+Pair adjudication order:
+
+1. predecessor/successor and any other canonicalization relationship is
+   adjudicated **before** same-ID equality; per decision 2, successor pairs
+   surface, never auto-clear;
+2. same source ROR id (no canonicalization) → `same`;
+3. relationship-policy table (below) maps typed links to
+   `related-autoclear` vs `related-surface`;
+4. both resolve, no link → `distinct`;
+5. either side unresolved/vetoed/provider-failed → `insufficient`.
+
+**Relationship-policy table (Codex finding 3):** ROR's `related` type does
+not distinguish a constituent hospital from a merely affiliated independent
+organization, so registry relation ≠ auto-clear eligibility. The table is a
+tracked artifact with a falsifiable classifier (e.g. parent/child → eligible;
+`related` eligible only with corroborating evidence such as shared domain or
+name-containment per the v3 name-compatibility policy; cross-system `related`
+without corroboration → surface). Required named regressions: Harvard↔HMS
+(successor/canonicalization: surface), VUMC↔Vanderbilt (`related` constituent:
+auto-clear), Dana-Farber↔Harvard (`related` cross-organization: surface).
 
 ROR rank/`chosen:true` remains retrieval evidence only; vetoes still run
 before any pair verdict. Callers of the incumbent resolver outside the
@@ -140,9 +178,10 @@ checker (e.g. save-candidates, evaluation harness) are untouched.
 
 ### Stage 3 — consumer policy and copy
 
-- `same`/`related` auto-clear with a stated reason ("Harvard Medical School
-  is a constituent of Harvard University — registry relationship"), removing
-  the manual verify-and-cite step for those classes.
+- `same` and `related-autoclear` verdicts clear with a stated reason (e.g.
+  "constituent organization — registry relationship"), removing the manual
+  verify-and-cite step for those classes; `related-surface` verdicts stay in
+  the human queue with the relationship shown.
 - `distinct` surfaces as a genuine conflict and keeps the existing human
   adjudication/attestation flow.
 - `insufficient` surfaces as "could not compare," never as "mismatch"
@@ -176,14 +215,22 @@ No new labeling effort and no Claude search. Score every stage on:
   (14 cases) and `institution-hierarchy.jsonl` (7 cases) [case counts
   VERIFIED via line counts this session] — the two families directly on
   point;
-- the five real request-1002903 captures
-  (`outputs/s400-verdict-trace-capture-2026-08-04.log`) — expected: rows 1–4
+- a **tracked, sanitized fixture of the five request-1002903 pairs**
+  (institution strings only, no reviewer names), created in Stage 1 — the
+  source capture log is untracked local state under gitignored `outputs/`
+  and cannot gate a clean checkout (Codex finding 4). Expected: rows 1–4
   become `same`, row 5 stays flagged;
-- sibling/parent adversarial pairs derived from
-  `institution-uc-matrix.jsonl` (120 cases) — expected: zero
-  `same`/`related` verdicts across sibling campuses;
-- the v2 relationship-aware pair-evaluation harness for typed-relationship
-  scoring (new result slugs; frozen artifacts untouched).
+- sibling/parent adversarial **pairs produced by a frozen, tracked pair
+  generator with explicit expected verdicts** — the 120
+  `institution-uc-matrix.jsonl` rows are single-operand resolve cases, so
+  the pair set and its oracle must be derived deterministically and frozen
+  as their own case file, not implied. Expected: zero `same` or
+  `related-autoclear` verdicts across sibling campuses;
+- the **v3** relationship/product-policy comparator harness (not v2 — v3
+  carries the name-compatibility pair policy) under new result slugs;
+  frozen artifacts untouched;
+- the three named relationship regressions from Stage 2 (Harvard↔HMS
+  surface, VUMC↔Vanderbilt auto-clear, Dana-Farber↔Harvard surface).
 
 **Go gates per stage:** zero sibling auto-clears; zero new wrong `same`
 verdicts on the frozen families; 1002903 rows 1–4 flip and row 5 holds;
@@ -208,11 +255,15 @@ Deliverables (Stage 1 builds the harness alongside the fix):
    ordinary test suite with no network; this is the red gate for regressions.
 2. **Live replay CLI** — a `benchmarks/`-style runner (jest-invisible, new
    result slugs, refuses to overwrite existing results) that replays the gate
-   set — byline-normalization and hierarchy families, UC sibling pairs, the
-   five 1002903 captured strings — through the real checker in both incumbent
-   and staged configurations, and prints a per-family verdict table plus the
-   go/no-go gate results. Read-only provider calls (OpenAlex, and ROR from
-   Stage 2); no schema, no writes, no production deployment involved.
+   set — byline-normalization and hierarchy families, the frozen sibling
+   pair set, the tracked 1002903 pair fixture, and the named relationship
+   regressions — through the real checker in both incumbent and staged
+   configurations, and prints a per-family verdict table plus the go/no-go
+   gate results. Read-only provider calls (OpenAlex, and ROR from Stage 2);
+   no schema, no writes, no production deployment involved. **The CLI must
+   exit nonzero on any missing case, skipped case, provider failure, or
+   forbidden verdict** — a partially executed run is a failed run, never a
+   green one (Codex finding 4).
 3. **Consumer-scope assertion** — a focused test that the factory default is
    unchanged and only the two in-scope call sites receive the new behavior,
    so decision 3's boundary is machine-enforced rather than convention.
@@ -245,23 +296,45 @@ deployment sanity check, not a measurement instrument.
    institutions auto-clear as `related`; sibling campuses never;
    `successor` and cross-system links are surfaced, not auto-cleared, until
    observed.
-3. **Consumer scope: mismatch alert and enrichment review flags only.**
-   Verdicts apply to the affiliation-mismatch alert and the enrichment
-   review-flag path now. Identity-evidence corroboration is **deferred**: it
-   changes identity-confirmation rates (which gate contact enrichment,
-   bibliometrics, and invite readiness), not just display. Extending to it
-   requires a new owner decision and, first, the parked frozen-40
-   person-identity benchmark run with the new checker wired in, gated on
-   zero false binds. Mechanically, scoping is implemented by injecting the
-   new behavior at the two in-scope call sites; the checker factory default
-   stays unchanged so `reviewer-identity-evidence.js` keeps today's behavior
-   bit-for-bit.
-4. **The two strategic-assessment measurement runs are PARKED, not
-   dropped** (`outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md`).
-   Named triggers to unpark: (a) the frozen-40 W2 rerun — required before
-   any consumer-3 extension of this plan or any identity-arm promotion;
-   (b) the C3 replay — if institution-resolver promotion returns to the
-   table.
+3. **Consumer scope — RESCOPED 2026-08-08 after Codex finding 1.** The
+   enrichment checker verdict is not display-only: `institutionContradicted`
+   feeds `identityNeedsReview`, whose false branch permits
+   `upsertByPotentialReviewer` (durable researcher write of email, ORCID,
+   metrics, affiliation), `writeIdentityDecision`, ORCID back-propagation to
+   the linked contact, and COI reason writes [VERIFIED via
+   `lib/services/workbench/enrich-recommended-service.js` identity-gate and
+   write branches, read S409]. Therefore:
+   - **Full pair-verdict injection now: the affiliation-mismatch alert
+     only** (`alert-reviewer-affiliation-mismatch.js`).
+   - **Enrichment now: copy and provenance only** — the banner names the
+     compared institutions and `insufficient` reads "could not compare";
+     the verdict-bearing checker in the `identityNeedsReview` computation
+     stays legacy, bit-for-bit.
+   - **Enrichment verdict injection is identity-authority work**: it is
+     unlocked only by the frozen-40 person-identity benchmark run with the
+     new checker wired in, gated on zero false binds, plus an owner sign-off
+     on that result. Identity-evidence corroboration
+     (`reviewer-identity-evidence.js`) remains deferred behind the same gate
+     and a further owner decision.
+   - The checker factory default stays unchanged; scope boundaries are
+     machine-enforced by the harness's consumer-scope assertion.
+   Note: the identity gate also requires the resolver to independently reach
+   ≥probable, so a pair verdict can only ever clear the second of two
+   vetoes; the rescope treats that as defense-in-depth to preserve, not as
+   license.
+4. **Measurement runs — run (a) UNPARKED 2026-08-08; run (b) still
+   parked** (`outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md`).
+   - **(a) Frozen-40 W2 rerun: authorized, two arms.** Arm 1 (baseline,
+     runnable immediately): the existing evaluator as-is — it wires the
+     incumbent institution resolver [VERIFIED via
+     `scripts/evaluate-reviewer-works-first.js:18,281-284`], and the
+     benchmark has never had a clean run. Arm 2 (the actual
+     enrichment-injection gate): the evaluator extended to wire the
+     ROR-backed checker path — built with the Stage 1 harness. New output
+     slugs; the failed 2026-08-08 network-outage artifact is preserved,
+     not overwritten.
+   - **(b) C3 replay: parked** — trigger unchanged (institution-resolver
+     promotion returning to the table).
 
 ## Relationship to the strategic reset
 
