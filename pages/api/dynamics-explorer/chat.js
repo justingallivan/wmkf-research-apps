@@ -1013,10 +1013,17 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
   };
 
   if (hasLookupAlias) {
+    // The bare logicalName is NOT the navigation property. Navigation property
+    // names come from relationship metadata (CSDL), are case-sensitive, and for
+    // multi-table Customer/Owner/regarding lookups bear no fixed relation to the
+    // column's logical name — this path has attribute metadata only, so it must
+    // not teach a guess.
     result.lookupFieldNote = 'Lookup/Customer/Owner columns carry a "queryAs" name. '
-      + 'Use queryAs (_<name>_value) in $select and $filter, compared to an UNQUOTED GUID. '
-      + 'The bare logicalName is the navigation property and is only valid in $expand. '
-      + '$orderby does not accept the computed alias.';
+      + 'Use queryAs (_<name>_value) in $select and $filter, compared to an UNQUOTED GUID or to null. '
+      + 'The bare logicalName is not a queryable property, and it is not necessarily the $expand navigation '
+      + 'property either: navigation property names come from relationship metadata, are case-sensitive, and '
+      + 'for multi-table lookups do not follow the column name — do not guess them. '
+      + 'Neither spelling is accepted in $orderby or as an aggregate field/group_by.';
   }
 
   if (full) {

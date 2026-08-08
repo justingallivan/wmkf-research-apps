@@ -769,8 +769,11 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
 
       expect(toolResult).toContain('_akoya_applicantid_value');
       expect(toolResult).toContain('_ownerid_value');
-      // The bare logical name still appears — it is the $expand spelling.
+      // The bare logical name still appears as the attribute's logicalName, but
+      // the note must not present it as the $expand navigation property.
       expect(toolResult).toContain('akoya_applicantid');
+      expect(toolResult).not.toMatch(/bare logicalName is the navigation property/i);
+      expect(toolResult).toMatch(/do not guess/i);
     });
 
     test('describe_table honors a restriction stored under the alias spelling', async () => {
@@ -813,6 +816,78 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       expect(mockQueryRecords).not.toHaveBeenCalled();
       expect(toolResult).toContain('DENIED');
       expect(toolResult).toContain('_akoya_applicantid_value');
+    });
+
+    // A restriction on the bare lookup used to be bypassed by filtering its
+    // NAVIGATION PATH: the general tokenizer drops any token containing "/", and
+    // chat.js's checkRestriction never inspects $filter at all, so the query
+    // reached Dataverse and returned the restricted column's value by name.
+    test('a navigation-path filter cannot bypass a restriction on the lookup', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: 'akoya_applicantid',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: "akoya_applicantid/name eq 'Secret Org'",
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      // The denial names the spelling the model typed, not the complement.
+      expect(toolResult).not.toContain('_akoya_applicantid_value');
+    });
+
+    // Nested $expand options name fields on the EXPANDED table, whose identity
+    // cannot be resolved from AttributeMetadata. With any field restriction
+    // configured they must fail closed rather than be forwarded unchecked.
+    test('nested $expand options fail closed while a field restriction exists', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'account',
+            field_name: 'wmkf_secret',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'akoya_applicantid($select=name,wmkf_secret)',
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      expect(toolResult).not.toContain('wmkf_secret');
+    });
+
+    test('invalid Edm.Guid literals never reach queryRecords', async () => {
+      for (const filter of [
+        `_akoya_applicantid_value eq '${GUID}'`,
+        "_akoya_applicantid_value eq 'Secret Org'",
+        '_akoya_applicantid_value eq 12345678',
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('UNQUOTED GUID');
+      }
     });
 
     test('classified unknown-field hints suggest the queryable alias, not the bare lookup', async () => {
