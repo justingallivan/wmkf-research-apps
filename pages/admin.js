@@ -1863,7 +1863,9 @@ function DynamicsFeedbackSection() {
   const [feedback, setFeedback] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ status: '', type: '' });
+  // Default to unreviewed feedback — that's the queue an admin opens this
+  // section to work through. "All statuses" buried new items under resolved ones.
+  const [filter, setFilter] = useState({ status: 'new', type: '' });
   const [expandedId, setExpandedId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
 

@@ -186,9 +186,11 @@ export default async function handler(req, res) {
       results.intakePrivateBlobs = { error: error.message };
     }
 
-    // 8. Dynamics feedback cleanup (resolved entries older than 180 days)
+    // 8. Dynamics feedback cleanup (resolved entries older than 20 days).
+    // Owner decision 2026-08-07: 180 -> 20 days. Resolved-only, so anything
+    // still `new` or `reviewed` is retained regardless of age.
     try {
-      results.feedback = await FeedbackService.cleanupOldFeedback(180);
+      results.feedback = await FeedbackService.cleanupOldFeedback(20);
       totalDeleted += results.feedback;
     } catch (error) {
       results.feedback = { error: error.message };

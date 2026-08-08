@@ -28,7 +28,8 @@ The Dynamics Explorer thumbs-up/down feedback flow is end-to-end shipped:
 - **Reader:** same file's GET + PATCH (superuser-only)
 - **Admin UI:** `pages/admin.js` `DynamicsFeedbackSection` (currently ~line 1645, unconditionally wired ~line 2282) with summary stats, status/type filters, expand-to-review, mark-reviewed/resolved actions
 - **Storage:** `dynamics_feedback` table with status / feedback_type / category / conversation_context / admin_note / reviewed_by / reviewed_at columns
-- **Retention:** `FeedbackService.cleanupOldFeedback(180)` runs in the daily maintenance cron (resolved-only after 180d)
+- **Retention:** `FeedbackService.cleanupOldFeedback(20)` runs in the daily maintenance cron (resolved-only after 20d). Owner decision 2026-08-07 reduced this from 180d; the resolved-only scope is unchanged, so a record left `new` or `reviewed` is retained indefinitely.
+- **Default admin view:** the section opens filtered to `status = 'new'` (owner decision 2026-08-07) rather than all statuses.
 
 **Why:** S186 readiness audit item #10 said "no admin page reads dynamics_feedback / dynamics_query_log; either build /admin/dynamics-feedback or remove the thumbs UI." Verified S187: the dynamics_feedback admin surface was already shipped (likely pre-audit) — the audit framing was stale. The dynamics_query_log half of the audit conflated two tables: query_log is operational telemetry written by chat.js (every query), not user-facing feedback, and not what the audit was actually asking for.
 
