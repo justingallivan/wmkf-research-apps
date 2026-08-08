@@ -43,6 +43,11 @@ const attrs = [
   { logicalName: 'wmkf_programareaserved_research', type: 'MultiSelectPicklist' },
   { logicalName: 'wmkf_secret', type: 'String' },
   { logicalName: 'wmkf_hiddenlink', type: 'Lookup' },
+  // A SECOND Guid-typed column of each shape, so a same-type comparison
+  // (Guid column vs Guid column) can be distinguished from a Guid column
+  // compared to a literal or to a column of another type.
+  { logicalName: 'wmkf_secondaryuniqueid', type: 'Uniqueidentifier' },
+  { logicalName: 'wmkf_secondlookup', type: 'Lookup' },
 ];
 
 const GUID = '3f2504e0-4f89-11d3-9a0c-0305e82c330c';
@@ -470,40 +475,68 @@ describe('Dynamics Explorer OData pre-flight validator', () => {
       }, ctx())).resolves.toEqual({ ok: true });
     });
 
-    test('rejects nested $expand options fail-closed whenever a field restriction exists', async () => {
+    // A PLAIN $expand returns the related entity's DEFAULT field set, so it
+    // leaks a restricted column on the expanded table exactly like
+    // `$expand=nav($select=<restricted>)` does. Nested $orderby/$top/$expand
+    // read that table too. Until relationship metadata resolves the target,
+    // every non-empty model-supplied $expand fails closed.
+    test('rejects EVERY $expand shape fail-closed whenever a field restriction exists', async () => {
+      const restrictions = [{ table_name: 'account', field_name: 'wmkf_secret' }];
       for (const expand of [
+        'akoya_applicantid',
         'akoya_applicantid($select=name)',
         "akoya_applicantid($filter=name eq 'Secret Org')",
+        'akoya_applicantid($orderby=name desc)',
+        'akoya_applicantid($top=5)',
+        'akoya_applicantid($expand=parentaccountid)',
+        'akoya_applicantid,ownerid',
       ]) {
         const result = await validateODataCall('query_records', {
           table_name: 'akoya_request',
           select: 'akoya_requestnum',
           expand,
-        }, ctx({ restrictions: [{ table_name: 'account', field_name: 'wmkf_secret' }] }));
+        }, ctx({ restrictions }));
         expect(result.reject).toContain('DENIED');
         // The expanded target table cannot be resolved here, so the message may
         // not name a restricted field or table.
         expect(result.reject).not.toContain('wmkf_secret');
         expect(result.reject).not.toContain('account');
+        // Nor may it prescribe a navigation property spelling.
+        expect(result.reject).not.toContain('akoya_applicantid');
       }
     });
 
-    test('a bare $expand navigation stays allowed when a field restriction exists elsewhere', async () => {
-      await expect(validateODataCall('query_records', {
-        table_name: 'akoya_request',
-        select: 'akoya_requestnum',
-        expand: 'akoya_applicantid',
-      }, ctx({ restrictions: [{ table_name: 'account', field_name: 'wmkf_secret' }] })))
-        .resolves.toEqual({ ok: true });
+    test('every $expand shape stays allowed when no field restriction exists', async () => {
+      // No restrictions at all, and a TABLE-level restriction (field_name null),
+      // which carries no field scope to fail closed over.
+      for (const restrictions of [[], [{ table_name: 'akoya_request', field_name: null }]]) {
+        for (const expand of [
+          'akoya_applicantid',
+          'akoya_applicantid($select=name)',
+          'akoya_applicantid($orderby=name desc)',
+          'akoya_applicantid,ownerid',
+        ]) {
+          await expect(validateODataCall('query_records', {
+            table_name: 'akoya_request',
+            select: 'akoya_requestnum',
+            expand,
+          }, ctx({ restrictions }))).resolves.toEqual({ ok: true });
+        }
+      }
     });
 
-    test('nested $expand options stay allowed when no field restriction exists', async () => {
-      await expect(validateODataCall('query_records', {
-        table_name: 'akoya_request',
-        select: 'akoya_requestnum',
-        expand: 'akoya_applicantid($select=name)',
-      }, ctx({ restrictions: [{ table_name: 'akoya_request', field_name: null }] })))
-        .resolves.toEqual({ ok: true });
+    // The blanket $expand denial is the FALLBACK for an unresolvable target. A
+    // restriction on the navigation token the model actually typed must still be
+    // answered by the restriction walk, which names that spelling back.
+    test('a restricted $expand token is still denied by name, not by the blanket rule', async () => {
+      for (const spelling of ['wmkf_hiddenlink', '_wmkf_hiddenlink_value']) {
+        const result = await validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          expand: spelling,
+        }, ctx({ restrictions: hidden }));
+        expect(result.reject).toContain('DENIED');
+        expect(result.reject).toContain(spelling);
+      }
     });
   });
 
@@ -566,6 +599,185 @@ describe('Dynamics Explorer OData pre-flight validator', () => {
         expect(result.reject).toContain('contains() cannot be used on lookup');
         expect(result.reject).toMatch(/UNQUOTED GUID/);
         expect(result.reject).not.toMatch(/eq '</);
+      }
+    });
+  });
+
+  // ─── Edm.Guid comparisons: OData grouping parentheses and operand symmetry.
+  // `(a) eq b` is valid OData (grouping is precedence-only), and comparison
+  // operands are symmetric for type checking, so a left-anchored regex reads
+  // both as untyped and lets the invalid form through.
+  describe('Edm.Guid comparisons across grouping parentheses and operand order', () => {
+    const rejects = async (filter) => (await validateODataCall('query_records', {
+      table_name: 'akoya_request',
+      filter,
+    }, ctx())).reject;
+
+    test('rejects an invalid literal written on the LEFT of a Guid column', async () => {
+      for (const filter of [
+        "'not-guid' eq akoya_requestid",
+        '12345678 ne akoya_requestid',
+        `'${GUID}' eq _akoya_applicantid_value`,
+        "'Secret Org' ne _customerid_value",
+      ]) {
+        const reject = await rejects(filter);
+        expect(reject).toMatch(/UNQUOTED GUID/);
+      }
+    });
+
+    test('rejects an invalid literal wrapped in OData grouping parentheses', async () => {
+      for (const filter of [
+        `(_akoya_applicantid_value) eq '${GUID}'`,
+        `_akoya_applicantid_value eq ('${GUID}')`,
+        "((akoya_requestid)) eq 'not-guid'",
+        '(_akoya_applicantid_value) ne (12345678)',
+        "('not-guid') eq (akoya_requestid)",
+      ]) {
+        const reject = await rejects(filter);
+        expect(reject).toMatch(/UNQUOTED GUID/);
+      }
+    });
+
+    test('accepts a valid Guid comparison in either orientation and through grouping', async () => {
+      for (const filter of [
+        `${GUID} eq _akoya_applicantid_value`,
+        `(_akoya_applicantid_value) eq ${GUID}`,
+        `_akoya_applicantid_value eq (${GUID})`,
+        `((_akoya_applicantid_value)) ne ((${GUID}))`,
+        'null eq _akoya_applicantid_value',
+        '(akoya_requestid) ne null',
+        `(_akoya_applicantid_value eq ${GUID}) and (akoya_requestid ne null)`,
+        `(${GUID} eq _akoya_applicantid_value) or (akoya_requestid eq ${GUID})`,
+      ]) {
+        await expect(validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          filter,
+        }, ctx())).resolves.toEqual({ ok: true });
+      }
+    });
+
+    test('keeps the specific request-number hint when the number is on the left', async () => {
+      const reject = await rejects(`'1002051' eq _akoya_applicantid_value`);
+      expect(reject).toContain('needs a GUID, not request number "1002051"');
+    });
+
+    test('a digit-leading canonical GUID is still accepted in either orientation', async () => {
+      for (const filter of [
+        '_akoya_applicantid_value eq 12345678-aaaa-bbbb-cccc-121212121212',
+        '12345678-aaaa-bbbb-cccc-121212121212 eq _akoya_applicantid_value',
+      ]) {
+        await expect(validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          filter,
+        }, ctx())).resolves.toEqual({ ok: true });
+      }
+    });
+
+    test('does not read a comparison out of a quoted string in either orientation', async () => {
+      for (const filter of [
+        "akoya_title eq '_akoya_applicantid_value eq nonsense'",
+        "akoya_title eq 'nonsense eq _akoya_applicantid_value'",
+        "akoya_title ne '(akoya_requestid) eq not-guid'",
+      ]) {
+        await expect(validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          filter,
+        }, ctx())).resolves.toEqual({ ok: true });
+      }
+    });
+  });
+
+  // ─── Same-type Guid column comparisons ───
+  describe('Guid column compared to another column', () => {
+    test('allows two Guid-typed columns, in either orientation and through grouping', async () => {
+      for (const filter of [
+        'akoya_requestid eq wmkf_secondaryuniqueid',
+        'wmkf_secondaryuniqueid ne akoya_requestid',
+        '_akoya_applicantid_value eq _wmkf_secondlookup_value',
+        '(_akoya_applicantid_value) eq (_wmkf_secondlookup_value)',
+        'akoya_requestid eq _akoya_applicantid_value',
+      ]) {
+        await expect(validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          filter,
+        }, ctx())).resolves.toEqual({ ok: true });
+      }
+    });
+
+    test('rejects a Guid column compared to a known non-Guid column', async () => {
+      for (const filter of [
+        'akoya_requestid eq akoya_title',
+        'akoya_requestnum ne _akoya_applicantid_value',
+        '(akoya_requestid) eq (createdon)',
+      ]) {
+        const result = await validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          filter,
+        }, ctx());
+        expect(result.reject).toMatch(/Edm\.Guid/);
+        expect(result.reject).toMatch(/cannot be compared/i);
+      }
+    });
+
+    test('a bare lookup operand keeps the alias hint instead of a type mismatch', async () => {
+      const result = await validateODataCall('query_records', {
+        table_name: 'akoya_request',
+        filter: '_wmkf_secondlookup_value eq akoya_applicantid',
+      }, ctx());
+      expect(result.reject).toContain('_akoya_applicantid_value');
+      expect(result.reject).not.toMatch(/cannot be compared/i);
+    });
+  });
+
+  // ─── $expand names that AttributeMetadata proves are not navigation
+  // properties. A scalar attribute and a navigation property cannot share a
+  // name on the same entity type, and `_<name>_value` is a computed value
+  // spelling that is never a navigation property.
+  describe('$expand rejects provably non-navigation names', () => {
+    const expandReject = async (expand) => (await validateODataCall('query_records', {
+      table_name: 'akoya_request',
+      select: 'akoya_requestnum',
+      expand,
+    }, ctx())).reject;
+
+    test('rejects PartyList, Uniqueidentifier and scalar attribute names', async () => {
+      for (const token of ['to', 'akoya_requestid', 'akoya_title', 'createdon', 'statecode']) {
+        const reject = await expandReject(token);
+        expect(reject).toContain(token);
+        expect(reject).toMatch(/relationship metadata/i);
+        expect(reject).toMatch(/do not guess/i);
+      }
+    });
+
+    test('rejects fabricated alias-shaped names derived from non-lookup attributes', async () => {
+      for (const token of ['_to_value', '_akoya_requestid_value', '_akoya_title_value']) {
+        const reject = await expandReject(token);
+        expect(reject).toContain(token);
+        expect(reject).toMatch(/relationship metadata/i);
+        expect(reject).toMatch(/do not guess/i);
+      }
+    });
+
+    test('still rejects the computed lookup alias generically', async () => {
+      for (const token of ['_akoya_applicantid_value', '_customerid_value', '_ownerid_value']) {
+        const reject = await expandReject(token);
+        expect(reject).toContain(token);
+        expect(reject).toMatch(/relationship metadata/i);
+      }
+    });
+
+    test('an unknown but plausible navigation name still passes through', async () => {
+      for (const expand of [
+        'akoya_applicantid',
+        'primarycontactid',
+        'akoya_Request_Emails',
+        'akoya_applicantid($select=name)',
+      ]) {
+        await expect(validateODataCall('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        }, ctx())).resolves.toEqual({ ok: true });
       }
     });
   });

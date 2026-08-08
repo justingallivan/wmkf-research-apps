@@ -872,6 +872,90 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       expect(toolResult).not.toContain('wmkf_secret');
     });
 
+    // A PLAIN $expand returns the related entity's default field set, and
+    // nested $orderby/$top/$expand read that table too — the same leak the
+    // nested-$select case has. None of them may reach Dynamics while a field
+    // restriction exists, because the expanded target cannot be resolved here.
+    test('every $expand shape fails closed while a field restriction exists', async () => {
+      for (const expand of [
+        'akoya_applicantid',
+        'akoya_applicantid($orderby=name desc)',
+        'akoya_applicantid($top=5)',
+        'akoya_applicantid($expand=parentaccountid)',
+      ]) {
+        setMockSqlResults({
+          dynamics_restrictions: {
+            rows: [{
+              table_name: 'account',
+              field_name: 'wmkf_secret',
+              restriction_type: 'field',
+              reason: 'sensitive',
+            }],
+          },
+        });
+        mockQueryRecords.mockClear();
+
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('DENIED');
+        expect(toolResult).not.toContain('wmkf_secret');
+      }
+    });
+
+    test('an $expand naming a scalar or fabricated alias never reaches queryRecords', async () => {
+      for (const expand of ['akoya_requestid', '_akoya_requestid_value', 'akoya_requestnum']) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('relationship metadata');
+      }
+    });
+
+    test('grouped and reversed invalid Guid comparisons never reach queryRecords', async () => {
+      for (const filter of [
+        "'not-guid' eq akoya_requestid",
+        '12345678 ne akoya_requestid',
+        `(_akoya_applicantid_value) eq '${GUID}'`,
+        `_akoya_applicantid_value eq ('${GUID}')`,
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('UNQUOTED GUID');
+      }
+    });
+
+    test('a valid Guid comparison written in reverse or grouped still reaches queryRecords', async () => {
+      for (const filter of [
+        `${GUID} eq _akoya_applicantid_value`,
+        `(_akoya_applicantid_value) eq ${GUID}`,
+      ]) {
+        mockQueryRecords.mockClear();
+        await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+        expect(mockQueryRecords.mock.calls[0][1].filter).toContain(filter);
+      }
+    });
+
     test('invalid Edm.Guid literals never reach queryRecords', async () => {
       for (const filter of [
         `_akoya_applicantid_value eq '${GUID}'`,
