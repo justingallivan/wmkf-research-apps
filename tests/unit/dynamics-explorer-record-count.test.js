@@ -104,7 +104,7 @@ describe('deriveRecordCount', () => {
     });
   });
 
-  test('a not-found is a zero-result answer, not an errored call', () => {
+  test('an explicitly classified name-based miss is a zero-result answer, not an errored call', () => {
     expect(deriveRecordCount('get_entity', {
       error: 'No account found matching "Nowhere University"',
       _notFound: true,

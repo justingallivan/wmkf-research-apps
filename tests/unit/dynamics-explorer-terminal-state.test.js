@@ -36,7 +36,13 @@ class FakeSseReadableStream {
   getReader() {
     return {
       read: jest.fn(async () => {
-        const next = this.reads.shift();
+        let next = this.reads.shift();
+        if (next?.isDeferredRead) {
+          next.started = true;
+          const deferred = next;
+          next = await deferred.promise;
+          deferred.consumed = true;
+        }
         if (next === EOF || next === undefined) {
           return { done: true, value: undefined };
         }
@@ -48,6 +54,14 @@ class FakeSseReadableStream {
       }),
     };
   }
+}
+
+function deferredRead() {
+  let resolve;
+  const promise = new Promise(resolvePromise => {
+    resolve = resolvePromise;
+  });
+  return { isDeferredRead: true, started: false, consumed: false, promise, resolve };
 }
 
 function sse(event, data) {
@@ -261,5 +275,46 @@ describe('Dynamics Explorer SSE terminal state', () => {
     await expectComposerUnlocked();
 
     expect(screen.queryByText('late-stale-export.xlsx')).not.toBeInTheDocument();
+  });
+
+  test('a delayed prior-turn EOF cannot erase the current turn artifacts', async () => {
+    const priorTurnEof = deferredRead();
+    const currentTurnRemainder = deferredRead();
+    fetch
+      .mockResolvedValueOnce(streamResponse([
+        sse('response', { content: 'First answer' }),
+        sse('complete', { rounds: 1 }),
+        priorTurnEof,
+      ]))
+      .mockResolvedValueOnce(streamResponse([
+        sse('file_ready', {
+          filename: 'fresh-export.xlsx',
+          base64: 'AA==',
+          recordCount: 1,
+          columns: ['name'],
+        }),
+        currentTurnRemainder,
+      ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion('First question');
+    expect(await screen.findByText('First answer')).toBeInTheDocument();
+    await expectComposerUnlocked();
+    await waitFor(() => expect(priorTurnEof.started).toBe(true));
+
+    submitQuestion('Second question');
+    await waitFor(() => expect(currentTurnRemainder.started).toBe(true));
+
+    priorTurnEof.resolve(EOF);
+    await waitFor(() => expect(priorTurnEof.consumed).toBe(true));
+
+    currentTurnRemainder.resolve(
+      sse('response', { content: 'Second answer' })
+        + sse('complete', { rounds: 1 }),
+    );
+
+    expect(await screen.findByText('Second answer')).toBeInTheDocument();
+    expect(await screen.findByText('fresh-export.xlsx')).toBeInTheDocument();
+    await expectComposerUnlocked();
   });
 });

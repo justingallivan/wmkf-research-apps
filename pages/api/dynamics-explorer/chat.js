@@ -713,9 +713,9 @@ const COUNT_FIELDS = [
  *
  * Semantics: the tool result's relevant cardinality. Search reports total
  * matches; collection queries, exports, and relationship tools report the
- * target rows returned; 0 means a genuine zero-result answer (including a
- * not-found lookup); -1 means the tool errored; a schema or single-entity
- * answer counts as 1.
+ * target rows returned; 0 means a genuine zero-result answer (including an
+ * explicitly classified name-based lookup miss); -1 means the tool errored;
+ * a schema or single-entity answer counts as 1.
  *
  * The original expression was a falsy-chain
  * (`records?.length || results?.length || count || searchCount || …`) which

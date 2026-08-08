@@ -132,8 +132,6 @@ function DynamicsExplorer() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const messageIdRef = useRef(0);
-  const pendingFileExportsRef = useRef([]);
-  const pendingDocumentLinksRef = useRef([]);
 
   // useContext returns null when no ProfileProvider is mounted (non-public
   // pages always have one — see pages/_app.js); unconditional hook call.
@@ -185,9 +183,13 @@ function DynamicsExplorer() {
     // rejects AFTER a terminal event was already handled must not append a
     // second, contradictory error message.
     let sawTerminalEvent = false;
+    // Request-local queues prevent a delayed EOF or late event from an older
+    // turn from clearing/contaminating a newer turn after the composer unlocks.
+    const pendingFileExports = [];
+    const pendingDocumentLinks = [];
     const clearPendingArtifacts = () => {
-      pendingFileExportsRef.current = [];
-      pendingDocumentLinksRef.current = [];
+      pendingFileExports.length = 0;
+      pendingDocumentLinks.length = 0;
     };
 
     try {
@@ -247,10 +249,10 @@ function DynamicsExplorer() {
                 setThinkingStatus(parsed.message || 'Processing...');
                 break;
               case 'file_ready':
-                pendingFileExportsRef.current.push(parsed);
+                pendingFileExports.push(parsed);
                 break;
               case 'document_links':
-                pendingDocumentLinksRef.current.push(parsed);
+                pendingDocumentLinks.push(parsed);
                 break;
               case 'export_progress':
                 setThinkingStatus(`Processing records ${parsed.processed} of ${parsed.total}...${parsed.failed ? ` (${parsed.failed} failed)` : ''}`);
@@ -282,11 +284,11 @@ function DynamicsExplorer() {
                 assistantContent = parsed.content || '';
                 break;
               case 'complete': {
-                const fileExports = pendingFileExportsRef.current.length > 0
-                  ? [...pendingFileExportsRef.current]
+                const fileExports = pendingFileExports.length > 0
+                  ? [...pendingFileExports]
                   : undefined;
-                const documentLinks = pendingDocumentLinksRef.current.length > 0
-                  ? [...pendingDocumentLinksRef.current]
+                const documentLinks = pendingDocumentLinks.length > 0
+                  ? [...pendingDocumentLinks]
                   : undefined;
                 clearPendingArtifacts();
 
