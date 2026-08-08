@@ -181,6 +181,11 @@ function DynamicsExplorer() {
       textareaRef.current.style.height = 'auto';
     }
 
+    // Declared OUTSIDE the try so the catch below can see it: a read that
+    // rejects AFTER a terminal event was already handled must not append a
+    // second, contradictory error message.
+    let sawTerminalEvent = false;
+
     try {
       const resp = await fetch('/api/dynamics-explorer/chat', {
         method: 'POST',
@@ -202,15 +207,13 @@ function DynamicsExplorer() {
       let buffer = '';
       let assistantContent = '';
       let streamingMsgId = null;
-      // Tracks whether the server sent a terminal event. A plain
-      // `if (isProcessing)` after the read loop can never work: isProcessing is
-      // captured from the render that created this callback, and the guard at
-      // the top of sendMessage already returned when it was true — so it is
-      // always false here, and a stream that drops without a terminal event
-      // (function timeout, network cut) left the spinner running forever with
-      // nothing rendered. A local flag is the only thing that survives the
-      // closure correctly.
-      let sawTerminalEvent = false;
+      // sawTerminalEvent (declared above the try) records whether the server
+      // sent a terminal event. A plain `if (isProcessing)` after the read loop
+      // can never work: isProcessing is captured from the render that created
+      // this callback, and the guard at the top of sendMessage already returned
+      // when it was true — so it is always false here, and a stream that drops
+      // without a terminal event (function timeout, network cut) left the
+      // spinner running forever with nothing rendered.
 
       while (true) {
         const { done, value } = await reader.read();
@@ -316,6 +319,17 @@ function DynamicsExplorer() {
                 break;
               }
               case 'error':
+                // If text had already begun streaming, that message still
+                // carries isStreaming — the error branch used to leave it set,
+                // so the partial answer pulsed forever above the error. Finalize
+                // it first, then append the error.
+                if (streamingMsgId) {
+                  setMessages(prev => prev.map(m =>
+                    m.id === streamingMsgId
+                      ? { ...m, content: assistantContent, isStreaming: false }
+                      : m
+                  ));
+                }
                 setMessages(prev => [...prev, {
                   id: ++messageIdRef.current,
                   role: 'assistant',
@@ -373,13 +387,19 @@ function DynamicsExplorer() {
         setThinkingStatus('');
       }
     } catch (err) {
-      setMessages(prev => [...prev, {
-        id: ++messageIdRef.current,
-        role: 'assistant',
-        content: `**Error:** ${err.message}`,
-        timestamp: Date.now(),
-        isError: true,
-      }]);
+      // The answer already landed if a terminal event was handled; a read that
+      // rejects afterwards (socket torn down after the final chunk) is not
+      // something to report — appending here would contradict the answer the
+      // user is already reading.
+      if (!sawTerminalEvent) {
+        setMessages(prev => [...prev, {
+          id: ++messageIdRef.current,
+          role: 'assistant',
+          content: `**Error:** ${err.message}`,
+          timestamp: Date.now(),
+          isError: true,
+        }]);
+      }
       setIsProcessing(false);
       setThinkingStatus('');
     }

@@ -677,37 +677,56 @@ function validatorReject(message) {
   return { error: message, _validatorReject: true };
 }
 
-// Tools whose success shape is a BARE record rather than a collection.
-const ENTITY_LOOKUP_TOOLS = new Set(['get_entity', 'get_record']);
+// `get_entity` resolves to a BARE record rather than a collection. `get_record`
+// is deliberately NOT here: no such branch exists in executeTool.
+const ENTITY_LOOKUP_TOOLS = new Set(['get_entity']);
 
-// Count fields, in the order we prefer them. `count` first so count_records
-// reports its own answer rather than an incidental total.
+// Tools that answer with SCHEMA rather than data. A successful describe_table
+// has no count field at all; reporting 0 would file a success under
+// "zero results", so it counts as the one schema it returned.
+const METADATA_TOOLS = new Set(['describe_table']);
+
+// Count fields in preference order, derived from the actual return shapes in
+// this file rather than guessed. Two rules make the order what it is:
+//
+//  1. `count` first — for count_records the count IS the answer.
+//  2. The TARGET of the call beats incidental context, and `totalCount` comes
+//     LAST. Several relationship handlers return both a specific count and a
+//     total: account→emails returns `emailCount` (emails found) alongside
+//     `requestCount` (requests scanned to find them), and most handlers return
+//     `totalCount` (total matching in Dataverse) next to the number of rows
+//     actually returned. record_count means "rows this call returned", matching
+//     query_records where we use records.length and not totalCount — so a
+//     specific count always wins, and `requestCount` sits after the other
+//     targets because it is context whenever one of them is present.
 const COUNT_FIELDS = [
-  'count', 'totalCount', 'emailCount', 'reportCount', 'paymentCount',
-  'documentCount', 'searchCount', 'exportedCount', 'estimatedCount',
+  'count',
+  'emailCount', 'paymentCount', 'reportCount', 'annotationCount', 'reviewerCount',
+  'documentCount', 'searchCount',
+  'exportedCount', 'estimatedCount',
   'requestCount',
+  'totalCount',
 ];
 
 /**
  * What to write to dynamics_query_log.record_count for one tool result.
  *
- * The previous expression was a falsy-chain
- * (`records?.length || results?.length || count || searchCount || …`) and was
- * wrong in three ways that made the failure telemetry untrustworthy:
+ * Semantics: the number of rows THIS call returned. 0 means a genuine
+ * zero-result answer (including a not-found lookup); -1 means the tool errored;
+ * a schema or single-entity answer counts as 1.
  *
- *  - `search` returns `results` as a preformatted STRING, so `.length` logged
- *    its CHARACTER COUNT as a record count (e.g. 4036 "records" for ~20 hits).
- *  - `get_entity`/`get_record` resolve to a bare record with no count field, so
- *    a SUCCESSFUL lookup logged 0 — indistinguishable from "no results", which
- *    is why the zero-result bucket was dominated by successes.
- *  - `exportedCount`/`estimatedCount` were absent from the chain, so export_csv
- *    logged 0 regardless of what it exported.
- *
- * A legitimate not-found now logs 0 (a real zero-result answer) while -1 stays
- * reserved for a tool that actually errored.
+ * The original expression was a falsy-chain
+ * (`records?.length || results?.length || count || searchCount || …`) which
+ * logged `search`'s formatted-string LENGTH as a count (212 for 3 hits), logged
+ * 0 for every successful get_entity, and ignored export counts entirely. A
+ * first correction fixed those but still preferred `totalCount` over the
+ * tool-specific field and omitted `annotationCount`/`reviewerCount`, so
+ * relationship calls reported total matches instead of returned rows and
+ * request→reviewers reported 0 on success. Both rounds of that are covered by
+ * tests built from the real return shapes.
  *
  * NOTE: rows written before this change carry the old semantics — any trend
- * analysis spanning it must treat the two eras separately.
+ * analysis spanning it must treat the eras separately.
  */
 export function deriveRecordCount(name, result) {
   if (!result || typeof result !== 'object') return 0;
@@ -724,6 +743,7 @@ export function deriveRecordCount(name, result) {
   }
 
   if (ENTITY_LOOKUP_TOOLS.has(name)) return 1;
+  if (METADATA_TOOLS.has(name)) return 1;
   return 0;
 }
 
@@ -1772,7 +1792,9 @@ async function listDocuments({ request_number, request_id }) {
   let requestNum = request_number;
   if (!requestId) {
     const result = await getEntity({ type: 'request', identifier: request_number });
-    if (result.error) return { error: result.error };
+    // Carry _notFound so an unresolvable request logs a zero-result rather
+    // than an errored call (see deriveRecordCount).
+    if (result.error) return { error: result.error, _notFound: result._notFound };
     requestId = result.akoya_requestid;
     requestNum = result.akoya_requestnum || request_number;
     if (!requestId) {
@@ -1897,7 +1919,8 @@ async function searchDocuments({ query, library, request_number }) {
 
   if (request_number) {
     const reqResult = await getEntity({ type: 'request', identifier: request_number });
-    if (reqResult.error) return { error: reqResult.error };
+    // Same as listDocuments — a not-found source is a zero-result, not an error.
+    if (reqResult.error) return { error: reqResult.error, _notFound: reqResult._notFound };
     requestId = reqResult.akoya_requestid;
     const requestNum = reqResult.akoya_requestnum || request_number;
     if (!requestId) {

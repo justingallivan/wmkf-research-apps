@@ -46,7 +46,61 @@ describe('deriveRecordCount', () => {
     // getEntity resolves to a BARE record — no records array, no count field.
     const record = { accountid: 'a1', name: 'Texas Tech University', akoya_countofrequests: 12 };
     expect(deriveRecordCount('get_entity', record)).toBe(1);
-    expect(deriveRecordCount('get_record', record)).toBe(1);
+  });
+
+  // Relationship handlers return the SPECIFIC count of what was asked for and
+  // usually a totalCount of everything matching in Dataverse. record_count means
+  // rows returned, so the specific field must win. These fixtures carry every
+  // field the real handler returns — an earlier version omitted totalCount and
+  // therefore could not detect the precedence bug at all.
+  describe('relationship handlers prefer the target count over totalCount', () => {
+    test('account -> emails counts emails, not the requests scanned to find them', () => {
+      // handleAccountEmails returns requestCount (context) AND emailCount (target).
+      expect(deriveRecordCount('get_related', {
+        account: 'Texas Tech University',
+        requestCount: 40,
+        emailCount: 12,
+        totalEmailCount: 300,
+        hasMore: true,
+        emails: 'formatted text',
+      })).toBe(12);
+    });
+
+    test('account -> requests counts requests when that IS the target', () => {
+      expect(deriveRecordCount('get_related', {
+        account: 'x', requestCount: 7, totalCount: 250, hasMore: true,
+        header: 'Request# | ...', requests: 'formatted text',
+      })).toBe(7);
+    });
+
+    test('account -> payments counts returned payments, not total matches', () => {
+      expect(deriveRecordCount('get_related', {
+        account: 'x', paymentCount: 5, totalCount: 99, payments: 'formatted text',
+      })).toBe(5);
+    });
+
+    test('request -> annotations uses annotationCount', () => {
+      // annotationCount was missing from the field list entirely.
+      // totalCount deliberately DIFFERS from annotationCount — equal values
+      // would pass under either precedence and prove nothing.
+      expect(deriveRecordCount('get_related', {
+        annotationCount: 3, totalCount: 12, annotations: 'formatted text',
+      })).toBe(3);
+    });
+
+    test('request -> reviewers uses reviewerCount and no longer reports zero', () => {
+      // handleRequestReviewers returns ONLY reviewerCount — no totalCount, no
+      // records array — so an omission here logged 0 on every success.
+      expect(deriveRecordCount('get_related', {
+        reviewerCount: 4, reviewers: 'formatted text',
+      })).toBe(4);
+    });
+
+    test('find_reports_due counts reports, not total matches', () => {
+      expect(deriveRecordCount('find_reports_due', {
+        reportCount: 6, totalCount: 41, reports: 'formatted text',
+      })).toBe(6);
+    });
   });
 
   test('a not-found is a zero-result answer, not an errored call', () => {
@@ -64,11 +118,30 @@ describe('deriveRecordCount', () => {
     expect(deriveRecordCount('count_records', { error: 'DENIED: ...', _validatorReject: true })).toBe(0);
   });
 
-  test('export counts are no longer dropped', () => {
-    expect(deriveRecordCount('export_csv', { exportedCount: 37, message: 'ok' })).toBe(37);
+  test('export counts are no longer dropped, and beat totalCount when capped', () => {
+    // A completed export returns BOTH exportedCount and totalCount; a capped or
+    // trimmed export makes them differ, and the exported figure is the truth.
+    expect(deriveRecordCount('export_csv', { exportedCount: 37, totalCount: 37, message: 'ok' })).toBe(37);
+    expect(deriveRecordCount('export_csv', { exportedCount: 5000, totalCount: 12000, message: 'capped' })).toBe(5000);
     expect(deriveRecordCount('export_csv', { estimatedCount: 5000, estimatedCostCents: 100 })).toBe(5000);
     // A zero export is still reported as zero rather than skipped.
     expect(deriveRecordCount('export_csv', { exportedCount: 0, message: 'No records matched.' })).toBe(0);
+  });
+
+  test('describe_table reports one schema on success in either mode', () => {
+    // List mode carries a real count of annotated tables.
+    expect(deriveRecordCount('describe_table', { tables: 'a\nb\nc', count: 3, note: '...' })).toBe(3);
+    // Detail mode has NO count field — additionalLiveFieldCount is a field
+    // tally, not a result count, and must not be mistaken for one. Reporting 0
+    // here filed a successful schema lookup under "zero results".
+    expect(deriveRecordCount('describe_table', {
+      table: 'akoya_request',
+      entitySet: 'akoya_requests',
+      description: 'Requests',
+      fields: 'akoya_requestnum: string',
+      rules: '',
+      additionalLiveFieldCount: 87,
+    })).toBe(1);
   });
 
   test('count_records reports its own count, including zero', () => {
@@ -81,17 +154,32 @@ describe('deriveRecordCount', () => {
     expect(deriveRecordCount('aggregate', { results: [{}, {}, {}], operation: 'sum' })).toBe(3);
   });
 
-  test('relationship tools report their own count fields', () => {
-    expect(deriveRecordCount('get_related', { account: 'x', emailCount: 12, emails: 'text' })).toBe(12);
-    expect(deriveRecordCount('find_reports_due', { reportCount: 4, reports: 'text' })).toBe(4);
-    expect(deriveRecordCount('list_documents', { documentCount: 9 })).toBe(9);
+  test('document tools report their own count fields', () => {
+    expect(deriveRecordCount('list_documents', { requestNumber: 'REQ-1', documentCount: 9 })).toBe(9);
     expect(deriveRecordCount('search_documents', { searchCount: 2 })).toBe(2);
+  });
+
+  test('a not-found source in a document tool is a zero-result, not an error', () => {
+    // listDocuments/searchDocuments resolve the request first; that resolution
+    // previously dropped the marker, so an unresolvable request logged -1.
+    expect(deriveRecordCount('list_documents', {
+      error: 'No request found matching "REQ-nope"', _notFound: true,
+    })).toBe(0);
+    expect(deriveRecordCount('search_documents', {
+      error: 'No request found matching "REQ-nope"', _notFound: true,
+    })).toBe(0);
+    // A genuine failure in the same tool still reports -1.
+    expect(deriveRecordCount('list_documents', {
+      error: 'Either request_number or request_id is required.',
+    })).toBe(-1);
   });
 
   test('non-object and empty results are zero, never NaN', () => {
     for (const value of [null, undefined, '', 'text', 0]) {
       expect(deriveRecordCount('search', value)).toBe(0);
     }
-    expect(deriveRecordCount('describe_table', { table: 'akoya_request', fields: 'a: b' })).toBe(0);
+    // An unrecognized tool with no count field is still zero, not NaN.
+    expect(Number.isFinite(deriveRecordCount('some_future_tool', { foo: 'bar' }))).toBe(true);
+    expect(deriveRecordCount('some_future_tool', { foo: 'bar' })).toBe(0);
   });
 });
