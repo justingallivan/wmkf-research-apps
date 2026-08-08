@@ -130,6 +130,7 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 | `ORCID_CLIENT_ID` | Researcher contact lookup **+ identity-spine verification (OpenAlex+ORCID Track-A)** | [ORCID Developer Tools](https://orcid.org/developer-tools) | Free |
 | `ORCID_CLIENT_SECRET` | ORCID authentication | Created with client ID | Free |
 | `OPENALEX_API_KEY` | OpenAlex author/institution/work lookup authentication and rate-limit budget | [OpenAlex API key](https://openalex.org/settings/api) | Free daily budget |
+| `ROR_CLIENT_ID` | Optional, non-secret client identifier sent as `Client-Id` by the request-scoped ROR institution candidate adapter. The adapter remains operational when unset; configure it when ROR registration is available/policy requires identified traffic. | [ROR Client ID](https://ror.readme.io/docs/client-id) | Free |
 | `SERP_API_KEY` | Reviewer contact lookup + PubPeer + news (integrity). NOT academic search — Scholar metrics/literature migrated to OpenAlex S251 | [SerpAPI](https://serpapi.com/) | ~$0.01/search |
 
 > **Load-bearing for the reviewer identity spine:** the OpenAlex+ORCID Track-A
@@ -142,6 +143,11 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 > server-side in each runtime environment. `OPENALEX_POLITE_MAILTO` remains only
 > as an optional monitored contact in the User-Agent; it does not authenticate or
 > increase the request budget. Never expose the API key to client code.
+
+`ROR_CLIENT_ID` is an identifier, not a secret, and therefore is intentionally
+absent from `lib/utils/tracked-secrets.js`. The production adapter sends only
+institution affiliation text to ROR; optional country/domain evidence remains
+local decision evidence and is not added to the provider request.
 
 ### Optional — Per-App Model Overrides
 

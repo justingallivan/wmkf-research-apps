@@ -28,6 +28,39 @@ const {
   reportInstitutionResolverMetrics,
 } = _internals;
 
+function rorAffiliationResponse({
+  id = 'https://ror.org/017zqws13',
+  name = 'University of Minnesota',
+} = {}) {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => ({
+      items: [{
+        chosen: true,
+        matching_type: 'SINGLE SEARCH',
+        score: 1,
+        organization: {
+          id,
+          status: 'active',
+          names: [{ value: name, types: ['ror_display'], lang: 'en' }],
+          domains: ['umn.edu'],
+          locations: [{
+            geonames_details: {
+              country_code: 'US',
+              country_subdivision_code: 'MN',
+              name: 'Minneapolis',
+            },
+          }],
+          types: ['education'],
+          relationships: [],
+        },
+      }],
+    }),
+  };
+}
+
 describe('reviewer identity runtime seam', () => {
   const suggestion = {
     name: 'Will Harcombe',
@@ -343,6 +376,7 @@ describe('reviewer identity runtime seam', () => {
   test('batch default W2 resolver reuses institutions and emits data-minimized metrics', async () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const candidates = [suggestion, { ...suggestion }];
+    jest.spyOn(global, 'fetch').mockResolvedValue(rorAffiliationResponse());
     jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
       totalCount: 1,
       records: [{
@@ -357,15 +391,11 @@ describe('reviewer identity runtime seam', () => {
         }],
       }],
     });
-    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-    }]);
     jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
       openAlexId: 'https://openalex.org/I1',
       displayName: 'University of Minnesota',
       country: 'US',
+      ror: 'https://ror.org/017zqws13',
       associatedInstitutions: [],
     });
     jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
@@ -384,7 +414,8 @@ describe('reviewer identity runtime seam', () => {
     });
 
     expect(results).toEqual([legacyResult, legacyResult]);
-    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][0]).toContain('&single_search');
     expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
     const metricsCall = info.mock.calls.find(
       ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
@@ -400,6 +431,7 @@ describe('reviewer identity runtime seam', () => {
       singleFlightHits: 0,
       providerSearches: 1,
       providerHydrations: 1,
+      providerRequests: 1,
       resolved: 1,
       definitiveMisses: 0,
       providerFailures: 0,
@@ -415,6 +447,7 @@ describe('reviewer identity runtime seam', () => {
   test('combined batches share the W2 resolver, adapt rescues, and isolate per-row fallback', async () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     const candidates = [suggestion, { ...suggestion }];
+    jest.spyOn(global, 'fetch').mockResolvedValue(rorAffiliationResponse());
     const firstLegacy = { status: 'abstain', reason: 'first-legacy-safe-result' };
     const secondLegacy = { status: 'abstain', reason: 'second-legacy-safe-result' };
     jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
@@ -432,12 +465,6 @@ describe('reviewer identity runtime seam', () => {
         }],
       })),
     });
-    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-      ror: 'https://ror.org/017zqws13',
-    }]);
     jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
       openAlexId: 'https://openalex.org/I1',
       displayName: 'University of Minnesota',
@@ -479,7 +506,7 @@ describe('reviewer identity runtime seam', () => {
       selectedRecord: { openAlexId: 'https://openalex.org/A1' },
     });
     expect(results[1]).toBe(secondLegacy);
-    expect(OpenAlexService.searchInstitutions).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(OpenAlexService.getInstitution).toHaveBeenCalledTimes(1);
     const metricsCall = info.mock.calls.find(
       ([message]) => message === '[reviewer-identity-runtime] institution resolver metrics',
@@ -738,6 +765,7 @@ describe('reviewer identity runtime seam', () => {
 
   test('runtime W2 adapter resolves mapped OpenAlex authorships', async () => {
     const signal = new AbortController().signal;
+    jest.spyOn(global, 'fetch').mockResolvedValue(rorAffiliationResponse());
     jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName').mockResolvedValue({
       totalCount: 1,
       records: [{
@@ -752,15 +780,11 @@ describe('reviewer identity runtime seam', () => {
         }],
       }],
     });
-    jest.spyOn(OpenAlexService, 'searchInstitutions').mockResolvedValue([{
-      openAlexId: 'https://openalex.org/I1',
-      displayName: 'University of Minnesota',
-      country: 'US',
-    }]);
     jest.spyOn(OpenAlexService, 'getInstitution').mockResolvedValue({
       openAlexId: 'https://openalex.org/I1',
       displayName: 'University of Minnesota',
       country: 'US',
+      ror: 'https://ror.org/017zqws13',
       associatedInstitutions: [],
     });
     jest.spyOn(OpenAlexService, 'getAuthorById').mockResolvedValue({
@@ -780,10 +804,10 @@ describe('reviewer identity runtime seam', () => {
     });
     expect(OpenAlexService.searchWorksByRawAuthorName)
       .toHaveBeenCalledWith('Will Harcombe', { signal, limit: 50 });
-    expect(OpenAlexService.searchInstitutions)
-      .toHaveBeenCalledWith('University of Minnesota', { signal, limit: 10 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0][0]).toContain('&single_search');
     expect(OpenAlexService.getInstitution)
-      .toHaveBeenCalledWith('https://openalex.org/I1', { signal });
+      .toHaveBeenCalledWith('https://ror.org/017zqws13', { signal });
     expect(OpenAlexService.getAuthorById)
       .toHaveBeenCalledWith('A1', { signal });
   });

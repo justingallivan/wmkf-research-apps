@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-07
+last_verified: 2026-08-08
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -17,6 +17,10 @@ source_files:
   - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
   - benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md
   - benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md
+  - lib/services/reviewer-identity-runtime.js
+  - lib/services/ror-institution-candidate-adapter.js
+  - lib/services/ror-institution-decision.js
+  - lib/services/ror-institution-identity-resolver.js
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -33,6 +37,8 @@ watch_paths:
   - benchmarks/compact-ror-index/**
   - benchmarks/fuzzy-matching-falsification/versions/v2/**
   - benchmarks/fuzzy-matching-falsification/versions/v3/**
+  - lib/services/reviewer-identity-runtime.js
+  - lib/services/ror-institution-*.js
 update_triggers:
   - roadmap or phasing changes
   - cross-capability architecture changes
@@ -116,15 +122,16 @@ document inventory, and individual implementation plans do not establish priorit
   decision 2026-08-07: the live app uses API lookup and does not bundle a local
   ROR index.** The API adapter must send institution evidence only, retain
   out-of-band domain/country/type/hierarchy evidence for local vetoes, and fall
-  back to no new resolution on provider failure or ambiguity. The current
-  resolver is a single-winner OpenAlex resolver and must not be reused as the
-  candidate-union interface; extract/reuse only its request-scoped cache,
-  single-flight, cancellation, and metrics pattern. The new interface returns
-  candidate ROR records with no verdict, explicitly requests API v2
-  `single_search`, bounds concurrency/time/retries, and supports the `Client-Id`
-  header when ROR policy requires it. Only after local resolution may a
-  ROR→OpenAlex hydration bridge supply the OpenAlex id works-first needs; failure
-  means review/no bind. No cross-request persistent cache is initially planned.
+  back to no new resolution on provider failure or ambiguity. The feature branch
+  `codex/ror-production-shadow-adapter` now implements a separate candidate-union
+  interface rather than reusing the single-winner OpenAlex resolver [VERIFIED
+  2026-08-08 via source and focused tests]. It returns candidate ROR records with
+  no verdict, explicitly requests API v2 `single_search`, bounds
+  concurrency/time/retries, and supports the optional `Client-Id` header. Only
+  after a unique local resolution does the exact-ROR OpenAlex hydration bridge
+  supply the OpenAlex id works-first needs; failure means review/no bind. Cache
+  and single-flight state are request-scoped; no cross-request persistent cache
+  was added.
   Owner volume is fewer than 1,000 review requests
   per cycle × about 15 default candidates plus user additions. Each unique
   affiliation needs one primary call and may need one selective query fallback;
@@ -172,10 +179,10 @@ document inventory, and individual implementation plans do not establish priorit
   (`benchmarks/compact-ror-index/results/v2.11-2026-08-03.md`) → **pinned v2.11
   offline candidate benchmark COMPLETE** with canonical expected ROR ids,
   relationship-aware pair evaluation, and a frozen verdict-free contract →
-  **claim-oriented API decision benchmark v3 COMPLETE** → next build the
-  production request-scoped ROR API adapter behind the legacy-default/shadow
-  seam, preserving the passing contracts and adding the post-resolution
-  ROR→OpenAlex identifier bridge → run and
+  **claim-oriented API decision benchmark v3 COMPLETE** → **production
+  request-scoped ROR API adapter + local decision + exact-ROR OpenAlex bridge
+  BUILT and VERIFIED on `codex/ror-production-shadow-adapter`; owner-approved
+  promotion remains, and production is still `legacy-default`** → run and
   resource-profile S2AFF as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
@@ -190,7 +197,7 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  production shadow adapter + ROR→OpenAlex bridge → S2AFF profile → normalizer
+  deliberately promote the production ROR shadow adapter → S2AFF profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

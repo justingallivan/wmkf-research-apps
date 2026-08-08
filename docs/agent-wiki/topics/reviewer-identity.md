@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-08
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -15,6 +15,12 @@ source_files:
   - lib/services/capture-self-reported-orcid.js
   - lib/services/reviewer-acceptance-drain.js
   - lib/services/reviewer-identity-binding-writer.js
+  - lib/services/reviewer-identity-runtime.js
+  - lib/services/ror-institution-candidate-contract.js
+  - lib/services/ror-institution-evidence.js
+  - lib/services/ror-institution-candidate-adapter.js
+  - lib/services/ror-institution-decision.js
+  - lib/services/ror-institution-identity-resolver.js
   - lib/services/reviewer-roster-store.js
   - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
@@ -45,6 +51,8 @@ watch_paths:
   - lib/services/capture-self-reported-orcid.js
   - lib/services/reviewer-acceptance-drain.js
   - lib/services/reviewer-identity-binding-writer.js
+  - lib/services/reviewer-identity-runtime.js
+  - lib/services/ror-institution-*.js
   - pages/api/workbench/reviewer-roster.js
   - pages/api/review-manager/send-emails.js
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
@@ -88,6 +96,7 @@ no drift). The 8 contracts:
 
 - Trace hidden write sinks. Start with the route named in the task, then include adapters and service helpers that can persist identity fields or suggestion state.
 - ORCID/contact propagation can cross from reviewer-finder into review-manager and honorarium flows. Search call sites before treating it as a local reviewer-finder change.
+- **ROR institution resolution integration (feature branch, not deployed 2026-08-08).** `reviewer-identity-runtime.js` now constructs one request-scoped ROR candidate/decision/OpenAlex-bridge resolver for W2 shadow/combined evaluation. The candidate adapter sends only affiliation text, returns no verdict, and treats provider rank/`chosen` as evidence; trusted country/domain evidence stays local and hard vetoes precede scoring. Only a unique local ROR decision may hydrate that exact ROR through OpenAlex. Provider/bridge failure abstains, aggregate metrics retain no raw affiliation/name, and legacy/default/unknown modes remain exact legacy with no ROR work. [VERIFIED via source and focused contract/runtime tests.] Production remains `legacy-default`; promotion is owner-gated.
 - **Wave 13 first binding-writer caller (production-live 2026-07-13, PR #57 / `00ffb09c`).** The owner-approved first caller is limited to acceptance-drain self-report with the durable job `accepted_at`. `capture-self-reported-orcid.js` sends clean/already-bound rows through `reviewer-identity-binding-writer.js`, truncates the self-report event identity (`boundAt`/`resolvedAt`) to Dataverse second precision so a job retry replays the stored binding as an exact no-op (Dataverse drops fractional seconds on DateTime round-trips — S362 fix), uses the transitional person writes only for typed `legacy_classification_required`, marks other deterministic typed binding failures non-retryable, and preserves retries for bounded optimistic-concurrency exhaustion or untyped transport failures. `reviewer-acceptance-drain.js` runs this before honorarium/back-propagation and marks the in-memory reviewer confirmed only after `{persisted:true}`. Its lease-guarded email-step claim, cancellation, completion, and failure-recording paths now fail closed on a stale token; drain telemetry carries per-outcome ids, and only a completion update that returned a row enters `completedJobIds`. Decline/no-stable-timestamp calls remain on the transitional path. Automated writers, backfill, merge/action policy, and the four suggestion COI fields are unchanged. Deployment `dpl_4YpnVVdRmDHyuzgPVSKXNcx22bKu` reached READY; three immediate scheduled drain runs had no error-level logs, and the immediate post-deploy Wave 13 population remained zero. The later S363 smoke found a fresh baseline of one person and zero suggestion rows; it did not adjudicate the origin of that pre-existing person row. The manual positive-control smoke is `scripts/smoke-reviewer-binding.js` (safety logic pinned by `tests/unit/smoke-reviewer-binding.test.js` via `scripts/lib/smoke-reviewer-binding-core.js`): it stages a synthetic repeat-accept/opted-out/no-contact job for the deployed cron to claim, asserts the exact first `self_reported` Wave 13 binding (a legacy-fallback-only result fails), persists an incremental recovery artifact before and after every setup write plus on errors/SIGINT/SIGTERM, stops the main flow behind one durable fatal-shutdown path, permits job-backed cleanup only after immutable `completed` status (failed/cancelled jobs can be requeued), and keeps the completed queue row unless `--delete-job`. Owner gating is mechanical (post-Codex hardening, same day): the resolved request GUID must equal `--approved-request-id` and be committed in `scripts/lib/smoke-reviewer-binding-fixtures.js`, `--expect-deployment` must attest the production deployment, deployed-cron attribution requires a `maintenance_runs` details payload whose `completedJobIds` contains the exact smoke job id and whose deployment fingerprint matches the expected SHA prefix or `dpl_` id, and there is no environment-variable confirm fallback. A claimed/retried/failed/lease-lost id cannot satisfy attribution. The owner-authorized S363 production run passed against PR #60 deployment `dpl_BqCBSFWoRto2noQdrovHG7fBsA6X`: maintenance run `15060` attributed completed job `25`, exact `self_reported` binding assertions passed, synthetic Dataverse rows were deleted and absence-verified, the baseline was restored, and job `25` remains retained as the audit row. Do not run `scripts/pr4-e2e.js` for this purpose (see the 2026-07-13 adversarial-review artifact).
 - **Reviewer ↔ CRM-contact boundary gap (historical S290 baseline; superseded on the S389 integration branch).** The shipped S290 path tolerated ambiguous ORCID matches, email/ORCID splits, and a concurrently appearing reviewer link. The S389 branch changes the acceptance boundary to fail closed: every existing or candidate Contact must be active and pass name plus email/ORCID validation; ambiguity and split identities remain unlinked for staff review. A genuine new Contact uses a canonical-ORCID-derived deterministic ID across duplicate reviewer rows (reviewer-ID fallback without ORCID), and Contact creation plus reviewer linking commit atomically under the reviewer ETag. Invitation send never promotes or back-propagates. The later acceptance corrections remain: reviewer-self-reported name/title/nickname sync after a validated link; differing email and affiliation remain alert-only. Origination-time confident reuse in candidate save/manual add is a separate pre-existing-Contact policy. Canonical current contract: `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md`; source: `lib/bill/honorarium-onboard-orchestrator.js`.
 - Tests that mock an injected resolver or enrichment seam should be paired with at least one unmocked path when the issue involves default credentials, provider routing, or persistence.

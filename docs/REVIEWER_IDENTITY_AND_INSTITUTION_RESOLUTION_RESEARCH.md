@@ -481,7 +481,7 @@ Historical boundary — as of 2026-08-04:
 - **Not authorized by this memo:** implementation, dependency adoption, schema
   work, production experimentation, or changes to live identity/write gates.
 
-Subsequent current state (2026-08-07): owner-authorized measurement work has
+Subsequent current state (2026-08-08): owner-authorized measurement work has
 started under the Codex handoff. PR #113 is merged behind `legacy-default`; the
 pinned ROR v2.11 size experiment is complete and offline-only. The owner selected
 the ROR API for eventual live candidate retrieval, with no production local
@@ -498,8 +498,13 @@ failures, 0 provider errors, and 0 wrong automatic resolutions. It used 151 ROR
 requests for 160 candidate sets after 44 benchmark-process cache hits; that
 does not predict production request-scoped reuse. This clears the
 frozen falsification bar, not representative production calibration or rollout
-capacity. No schema, production adapter, resolver/scorer authority, or
-identity/write gate changed; production remains `legacy-default`.
+capacity. The feature branch `codex/ror-production-shadow-adapter` now carries
+the request-scoped production ROR candidate adapter, local veto/scorer, and
+exact-ROR OpenAlex bridge behind the W2 runtime seam [VERIFIED via source and
+focused tests]. It imports no benchmark module and changes no schema,
+persistence, identity/write gate, or deployed resolver authority. The branch is
+not deployed; production remains `legacy-default` pending owner-approved
+promotion.
 
 ## Primary sources
 

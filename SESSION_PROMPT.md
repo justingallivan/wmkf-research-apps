@@ -77,16 +77,19 @@
    `_akoya_applicantid_value eq <unquoted-guid>` and confirm the preflight reaches
    Dataverse without the old bare-lookup retry storm. Do not perform writes.
 
-2. **Move the proven ROR claim-oriented contracts behind the production
-   institution-resolution runtime seam without changing legacy authority.**
-   Evidence: `benchmarks/fuzzy-matching-falsification/versions/v3/` remains
-   benchmark-only; CodeGraph on 2026-08-08 showed
-   `lib/services/reviewer-identity-runtime.js` still calls the existing
-   works-first/OpenAlex institution resolver and contains no production ROR
-   candidate adapter. Start with
-   `outputs/institution-resolution-handoff-to-codex-2026-08-07.md`. Keep
-   `legacy-default`; ROR rank/`chosen:true` are retrieval evidence only, vetoes
-   precede scoring, and provider failure must preserve legacy/review behavior.
+2. **Deliberately promote the verified ROR institution-resolution integration
+   branch without changing legacy authority.**
+   Evidence: branch `codex/ror-production-shadow-adapter` now contains a
+   request-scoped ROR API candidate adapter, local veto-before-scoring decision
+   layer, and exact-ROR OpenAlex bridge behind
+   `lib/services/reviewer-identity-runtime.js` [VERIFIED 2026-08-08 via source
+   and focused contract tests]. The frozen v3 benchmark remains unimported and
+   benchmark-only. Production remains `legacy-default`; the branch is not
+   deployed, ROR rank/`chosen:true` remain retrieval evidence only, and provider
+   failure preserves legacy/review behavior. Full Jest (589 suites / 7,280
+   tests), the production build, focused ESLint, TypeScript, and durable-doc
+   gates are green on the branch [VERIFIED 2026-08-08]. Obtain owner approval
+   before promotion.
 
 3. **Normalizer consolidation, seam by seam.**
    Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md`; 158 characterization
