@@ -882,6 +882,9 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
         'akoya_applicantid($orderby=name desc)',
         'akoya_applicantid($top=5)',
         'akoya_applicantid($expand=parentaccountid)',
+        // A provably-wrong path root still answers with the BLANKET denial while
+        // a restriction exists — the fail-closed rule runs first.
+        'akoya_requestid/child',
       ]) {
         setMockSqlResults({
           dynamics_restrictions: {
@@ -918,6 +921,44 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
         expect(mockQueryRecords).not.toHaveBeenCalled();
         expect(toolResult).toContain('relationship metadata');
       }
+    });
+
+    // Appending a path cannot turn a scalar, PartyList or computed-value
+    // property into a navigation property, so `$expand=<wrong root>/child` must
+    // be stopped here exactly like the bare spelling is.
+    test('a path-shaped $expand with a provably-wrong root never reaches queryRecords', async () => {
+      const baseAttrs = await mockGetEntityAttributes();
+      mockGetEntityAttributes.mockResolvedValue([
+        ...baseAttrs,
+        { logicalName: 'to', displayName: 'To', type: 'PartyList', description: '' },
+      ]);
+
+      for (const expand of [
+        'to/child',                          // PartyList root
+        'akoya_requestid/child',             // Uniqueidentifier (scalar) root
+        '_to_value/child',                   // fabricated alias root
+        '_akoya_applicantid_value/child',    // computed lookup value root
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('relationship metadata');
+      }
+    });
+
+    test('a path-shaped $expand with an unknown plausible root is forwarded unchanged', async () => {
+      mockQueryRecords.mockClear();
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'Unknown_Nav/child',
+      });
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].expand).toBe('Unknown_Nav/child');
     });
 
     test('grouped and reversed invalid Guid comparisons never reach queryRecords', async () => {

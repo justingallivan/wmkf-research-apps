@@ -377,6 +377,46 @@ describe('Dynamics Explorer OData pre-flight validator', () => {
     expect(result.reject).toMatch(/do not guess/i);
   });
 
+  // A path-shaped segment (`nav/child`) is still ROOTED in a navigation property
+  // on THIS table, and appending a path cannot turn a scalar, PartyList or
+  // computed-value property into a navigation property. Every root that is
+  // provably wrong as a bare segment stays wrong with a suffix attached.
+  test('rejects a path-shaped $expand whose ROOT is provably not a navigation property', async () => {
+    const cases = [
+      ['to/child', /not a navigation property/i],                          // PartyList root
+      ['akoya_requestid/child', /not a navigation property/i],             // Uniqueidentifier (scalar) root
+      ['_to_value/child', /computed lookup value property/i],              // fabricated alias root
+      ['_akoya_applicantid_value/child', /computed lookup value property/i], // computed lookup value root
+    ];
+    for (const [expand, messagePattern] of cases) {
+      const result = await validateODataCall('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand,
+      }, ctx());
+      expect(result.ok).toBeUndefined();
+      expect(result.reject).toMatch(messagePattern);
+      expect(result.reject).toMatch(/do not guess/i);
+    }
+  });
+
+  // The navigation property name comes from relationship metadata this module
+  // never fetches, so an unknown-but-plausible root — with or without a path —
+  // is not evidence of a mistake and must still pass through.
+  test('a path-shaped $expand with an unknown or lookup root still passes through', async () => {
+    for (const expand of [
+      'Unknown_Nav/child',
+      'Unknown_Nav/child($select=name)',
+      'akoya_applicantid/parentaccountid',
+    ]) {
+      await expect(validateODataCall('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand,
+      }, ctx())).resolves.toEqual({ ok: true });
+    }
+  });
+
   test('$expand denies a restricted lookup under either spelling', async () => {
     const restrictions = [{ table_name: 'akoya_request', field_name: 'wmkf_hiddenlink' }];
     const result = await validateODataCall('query_records', {
@@ -490,6 +530,9 @@ describe('Dynamics Explorer OData pre-flight validator', () => {
         'akoya_applicantid($top=5)',
         'akoya_applicantid($expand=parentaccountid)',
         'akoya_applicantid,ownerid',
+        // A provably-wrong path root must still answer with the BLANKET denial
+        // while a restriction exists — the fail-closed rule runs first.
+        'akoya_requestid/child',
       ]) {
         const result = await validateODataCall('query_records', {
           table_name: 'akoya_request',
