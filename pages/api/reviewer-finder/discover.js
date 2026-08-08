@@ -661,17 +661,25 @@ export default async function handler(req, res) {
         resolverMode: identityComparisons.every((row) => row.resolverMode === identityComparisons[0].resolverMode)
           ? identityComparisons[0].resolverMode
           : 'mixed',
+        ...(identityComparisons.every((row) => row.baselineKind === identityComparisons[0].baselineKind)
+          && identityComparisons[0].baselineKind
+          ? { baselineKind: identityComparisons[0].baselineKind }
+          : {}),
         // Explicit response allowlist: a future runtime observer field cannot
         // silently expand this privileged SSE contract.
         candidates: identityComparisons.map((row) => ({
           candidateKey: row.candidateKey,
           reviewerName: row.reviewerName,
           claimedInstitution: row.claimedInstitution,
+          baselineKind: row.baselineKind,
+          baselineDecision: row.baselineDecision,
           legacyDecision: row.legacyDecision,
           worksDecision: row.worksDecision,
           combinedDecision: row.combinedDecision,
           combinedReason: row.combinedReason,
           anchorsAgree: row.anchorsAgree === true,
+          comparisonStatus: row.comparisonStatus,
+          differenceReason: row.differenceReason,
         })),
       }
       : null;

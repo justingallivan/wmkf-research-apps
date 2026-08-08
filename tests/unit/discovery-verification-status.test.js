@@ -13,6 +13,7 @@ jest.mock('../../lib/services/reviewer-identity-runtime', () => {
   return {
     ReviewerIdentityRuntime: {
       evaluateSuggestion,
+      diagnosePubMedResults: jest.fn(async (_suggestions, pubMedResults) => pubMedResults),
       evaluateSuggestions: jest.fn(async (suggestions, options, hooks = {}) => {
         const results = [];
         for (let index = 0; index < suggestions.length; index += 1) {
@@ -275,6 +276,56 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
       expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
       expect.objectContaining({ onComparisonObserved: onIdentityComparison }),
     );
+  });
+
+  test('PubMed verification forwards its exact ordered results to the admin diagnostic seam', async () => {
+    const onIdentityComparison = jest.fn();
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      { name: 'Alain Laederach', expertiseAreas: [] },
+      { 'Alain Laederach[Author]': alainArticles },
+      {
+        proposalInfo: { primaryResearchArea: 'Cancer biology' },
+        onIdentityComparison,
+      },
+    );
+
+    expect(result.verified).toHaveLength(1);
+    expect(ReviewerIdentityRuntime.diagnosePubMedResults).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: 'Alain Laederach' })],
+      [result.verified[0]],
+      expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Cancer biology' } }),
+      { onComparisonObserved: onIdentityComparison },
+    );
+  });
+
+  test('a rejected PubMed diagnostic cannot fail or change authoritative verification', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    ReviewerIdentityRuntime.diagnosePubMedResults.mockRejectedValueOnce(new Error('diagnostic setup failed'));
+    const alainArticles = [
+      article('1', 'Alain Laederach'),
+      article('2', 'Alain Laederach'),
+      article('3', 'Alain Laederach'),
+    ];
+
+    const result = await runVerification(
+      { name: 'Alain Laederach', expertiseAreas: [] },
+      { 'Alain Laederach[Author]': alainArticles },
+      { onIdentityComparison: jest.fn() },
+    );
+
+    expect(result.verified).toHaveLength(1);
+    expect(result.unverified).toHaveLength(0);
+    expect(result.verified[0]).toMatchObject({
+      name: 'Alain Laederach',
+      verified: true,
+      verificationSource: 'pubmed',
+    });
   });
 
   test('spine-verified candidate carries ORCID employment history as affiliationHistory (former-institution COI)', async () => {

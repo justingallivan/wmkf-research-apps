@@ -162,6 +162,51 @@ test('returns named resolver comparisons only to a freshly verified superuser', 
   expect(resultEvent(res).identityComparison.candidates[0]).not.toHaveProperty('providerPayload');
 });
 
+test('allowlists a superuser-only PubMed diagnostic without Combined fields', async () => {
+  getUserRole.mockResolvedValueOnce('superuser');
+  mockDiscover.mockImplementationOnce(async (_analysisResult, options) => {
+    await options.onIdentityComparison({
+      runId: '22222222-2222-4222-8222-222222222222',
+      resolverMode: 'diagnostic',
+      baselineKind: 'pubmed',
+      candidateKey: 'dcba4321dcba4321',
+      reviewerName: 'PubMed Diagnostic Reviewer',
+      claimedInstitution: 'Example University',
+      baselineDecision: 'bind',
+      worksDecision: 'review',
+      comparisonStatus: 'available',
+      differenceReason: 'works_did_not_confirm',
+      providerPayload: { shouldNeverReachResponse: true },
+    });
+    return { verified: [], unverified: [], discovered: [], coiDropped: [], stats: {} };
+  });
+
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: {
+      analysisResult: { proposalInfo: { keywords: '' }, reviewerSuggestions: [] },
+      options: { generateReasoning: false },
+    },
+  }, res);
+
+  const diagnostic = resultEvent(res).identityComparison;
+  expect(diagnostic).toEqual({
+    runId: '22222222-2222-4222-8222-222222222222',
+    resolverMode: 'diagnostic',
+    baselineKind: 'pubmed',
+    candidates: [expect.objectContaining({
+      baselineKind: 'pubmed',
+      baselineDecision: 'bind',
+      worksDecision: 'review',
+      comparisonStatus: 'available',
+      differenceReason: 'works_did_not_confirm',
+    })],
+  });
+  expect(diagnostic.candidates[0]).not.toHaveProperty('combinedDecision');
+  expect(diagnostic.candidates[0]).not.toHaveProperty('providerPayload');
+});
+
 test('ordinary app users receive no named comparison field and no observer', async () => {
   let receivedObserver = 'not-called';
   mockDiscover.mockImplementationOnce(async (_analysisResult, options) => {

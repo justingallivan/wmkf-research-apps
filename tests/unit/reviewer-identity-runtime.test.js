@@ -19,6 +19,7 @@ const {
 
 const {
   configuredResolverMode,
+  diagnosePubMedResultsWithRuntimeSeam,
   evaluateCombinedAgainstLegacy,
   evaluateExistingResultWithRuntimeSeam,
   evaluateSuggestionsWithRuntimeSeam,
@@ -169,6 +170,108 @@ describe('reviewer identity runtime seam', () => {
     expect(result).toBe(legacyResult);
     expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
       message: 'provider unavailable',
+    }));
+  });
+
+  test('PubMed diagnostic compares an immutable baseline without writing W2 telemetry', async () => {
+    const pubMedResult = Object.freeze({
+      verified: true,
+      verificationStatus: 'verified',
+      verificationSource: 'pubmed',
+    });
+    const pubMedResults = Object.freeze([pubMedResult]);
+    const onComparisonObserved = jest.fn();
+
+    const result = await diagnosePubMedResultsWithRuntimeSeam(
+      [suggestion],
+      pubMedResults,
+      {},
+      {
+        evaluateWorksFirst: jest.fn(async () => ({ decision: 'review' })),
+        onComparisonObserved,
+      },
+    );
+
+    expect(result).toBe(pubMedResults);
+    expect(result[0]).toBe(pubMedResult);
+    expect(onComparisonObserved).toHaveBeenCalledWith(expect.objectContaining({
+      resolverMode: 'diagnostic',
+      baselineKind: 'pubmed',
+      baselineDecision: 'bind',
+      worksDecision: 'review',
+      comparisonStatus: 'available',
+      differenceReason: 'works_did_not_confirm',
+    }));
+    expect(recordShadowComparison).not.toHaveBeenCalled();
+    expect(recordShadowError).not.toHaveBeenCalled();
+  });
+
+  test('PubMed diagnostic timeout is visible but retains the exact baseline', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const pubMedResults = [{ verified: false, verificationStatus: 'unresolved' }];
+    const onComparisonObserved = jest.fn();
+
+    const result = await diagnosePubMedResultsWithRuntimeSeam(
+      [suggestion],
+      pubMedResults,
+      {},
+      {
+        evaluateWorksFirst: jest.fn(() => new Promise(() => {})),
+        diagnosticTimeoutMs: 1,
+        onComparisonObserved,
+      },
+    );
+
+    expect(result).toBe(pubMedResults);
+    expect(onComparisonObserved).toHaveBeenCalledWith(expect.objectContaining({
+      baselineDecision: 'abstain',
+      worksDecision: 'unavailable',
+      comparisonStatus: 'failed',
+      differenceReason: 'comparison_failed',
+    }));
+    expect(recordShadowComparison).not.toHaveBeenCalled();
+  });
+
+  test('PubMed diagnostic uses one batch-wide deadline and rejects malformed decisions', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const suggestions = [suggestion, { ...suggestion, name: 'Second Reviewer' }];
+    const pubMedResults = [
+      { verified: true, verificationStatus: 'verified' },
+      { verified: false, verificationStatus: 'unresolved' },
+    ];
+    let nowMs = 0;
+    const evaluateWorksFirst = jest.fn(async () => {
+      nowMs = 3;
+      throw new Error('provider unavailable');
+    });
+    const onComparisonObserved = jest.fn();
+
+    await diagnosePubMedResultsWithRuntimeSeam(suggestions, pubMedResults, {}, {
+      evaluateWorksFirst,
+      diagnosticTimeoutMs: 2,
+      onComparisonObserved,
+      now: () => nowMs,
+    });
+
+    expect(evaluateWorksFirst).toHaveBeenCalledTimes(1);
+    expect(onComparisonObserved).toHaveBeenCalledTimes(2);
+    expect(onComparisonObserved).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      comparisonStatus: 'failed',
+      worksDecision: 'unavailable',
+    }));
+    expect(onComparisonObserved).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      comparisonStatus: 'failed',
+      worksDecision: 'unavailable',
+    }));
+
+    onComparisonObserved.mockClear();
+    await diagnosePubMedResultsWithRuntimeSeam([suggestion], [pubMedResults[0]], {}, {
+      evaluateWorksFirst: jest.fn(async () => ({ decision: 'invented' })),
+      onComparisonObserved,
+    });
+    expect(onComparisonObserved).toHaveBeenCalledWith(expect.objectContaining({
+      comparisonStatus: 'failed',
+      worksDecision: 'unavailable',
     }));
   });
 

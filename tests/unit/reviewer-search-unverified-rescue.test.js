@@ -194,6 +194,127 @@ test('renders a named admin-only identity comparison from the discovery response
   });
 });
 
+test('renders PubMed diagnostics without implying Legacy or Combined ran', async () => {
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { proposalInfo: { title: 'Proposal', primaryResearchArea: 'Biology' } } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: {
+          ranked: [],
+          unverified: [],
+          identityComparison: {
+            runId: '22222222-2222-4222-8222-222222222222',
+            resolverMode: 'diagnostic',
+            baselineKind: 'pubmed',
+            candidates: [{
+              candidateKey: 'dcba4321dcba4321',
+              reviewerName: 'PubMed Diagnostic Reviewer',
+              claimedInstitution: 'Example University',
+              baselineDecision: 'bind',
+              worksDecision: 'review',
+              comparisonStatus: 'available',
+              differenceReason: 'works_did_not_confirm',
+            }],
+          },
+        },
+      });
+    });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  expect(await screen.findByText(/This search used PubMed results/)).toBeInTheDocument();
+  expect(screen.getByRole('columnheader', { name: 'PubMed' })).toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Legacy' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('columnheader', { name: 'Combined' })).not.toBeInTheDocument();
+  expect(screen.getByText(/not part of W2 shadow telemetry/)).toBeInTheDocument();
+});
+
+test('drops a late PubMed diagnostic after the request context changes', async () => {
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('dddddddd-4444-4444-4444-444444444444')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [{
+          name: 'Current Request Reviewer',
+          email: 'current@example.edu',
+          identityStatus: 'confirmed',
+          verificationStatus: 'verified',
+          verified: true,
+        }],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        handled: [],
+        savedKeys: [],
+        allNames: ['Current Request Reviewer'],
+      }));
+    }
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  let releaseOldDiscovery;
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { proposalInfo: { title: 'Proposal', primaryResearchArea: 'Biology' } } });
+    })
+    .mockImplementationOnce((_response, onEvent) => new Promise((resolve) => {
+      releaseOldDiscovery = () => {
+        onEvent({
+          event: 'result',
+          data: {
+            ranked: [],
+            unverified: [],
+            identityComparison: {
+              resolverMode: 'diagnostic',
+              baselineKind: 'pubmed',
+              candidates: [{
+                reviewerName: 'Stale Diagnostic Reviewer',
+                baselineDecision: 'bind',
+                worksDecision: 'review',
+                comparisonStatus: 'available',
+                differenceReason: 'works_did_not_confirm',
+              }],
+            },
+          },
+        });
+        resolve();
+      };
+    }));
+
+  const { rerender } = render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await waitFor(() => expect(releaseOldDiscovery).toEqual(expect.any(Function)));
+
+  rerender(
+    <ReviewerSearchSection
+      requestId="dddddddd-4444-4444-4444-444444444444"
+      blobUrl="blob-2"
+      proposalKey="proposal-2"
+    />,
+  );
+  releaseOldDiscovery();
+
+  await waitFor(() => {
+    expect(screen.getByText('Current Request Reviewer')).toBeInTheDocument();
+    expect(screen.queryByText('Stale Diagnostic Reviewer')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('identity-comparison-panel')).not.toBeInTheDocument();
+  });
+});
+
 test('confirming an unverified suggestion records it on the roster BEFORE confirm_identity, then renders it as a confirmed active card', async () => {
   const calls = [];
   global.fetch = jest.fn((url, options = {}) => {
