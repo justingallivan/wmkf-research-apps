@@ -202,6 +202,15 @@ function DynamicsExplorer() {
       let buffer = '';
       let assistantContent = '';
       let streamingMsgId = null;
+      // Tracks whether the server sent a terminal event. A plain
+      // `if (isProcessing)` after the read loop can never work: isProcessing is
+      // captured from the render that created this callback, and the guard at
+      // the top of sendMessage already returned when it was true — so it is
+      // always false here, and a stream that drops without a terminal event
+      // (function timeout, network cut) left the spinner running forever with
+      // nothing rendered. A local flag is the only thing that survives the
+      // closure correctly.
+      let sawTerminalEvent = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -301,6 +310,7 @@ function DynamicsExplorer() {
                 if (parsed.suggestFeedback) {
                   setSuggestFeedbackId(finalMsgId);
                 }
+                sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
                 break;
@@ -317,6 +327,7 @@ function DynamicsExplorer() {
                   timestamp: Date.now(),
                   isError: true,
                 }]);
+                sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
                 break;
@@ -327,8 +338,9 @@ function DynamicsExplorer() {
         }
       }
 
-      // If we fell through without a complete event, finalize
-      if (isProcessing) {
+      // The stream ended without a terminal event — finalize whatever arrived
+      // so the composer is usable again instead of stuck on a spinner.
+      if (!sawTerminalEvent) {
         if (assistantContent) {
           if (streamingMsgId) {
             setMessages(prev => prev.map(m =>
@@ -344,6 +356,18 @@ function DynamicsExplorer() {
               timestamp: Date.now(),
             }]);
           }
+        } else {
+          // Nothing arrived at all. Silently clearing the spinner would leave
+          // the user staring at their own question with no idea it failed.
+          setMessages(prev => [...prev, {
+            id: ++messageIdRef.current,
+            role: 'assistant',
+            content: '**Error:** The connection dropped before I could answer. '
+              + 'Long questions are the usual cause — narrowing yours often helps. '
+              + 'Please try asking again, and if the problem doesn\'t resolve, contact an administrator.',
+            timestamp: Date.now(),
+            isError: true,
+          }]);
         }
         setIsProcessing(false);
         setThinkingStatus('');

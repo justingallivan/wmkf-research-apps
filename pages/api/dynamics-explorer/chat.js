@@ -216,9 +216,7 @@ export default async function handler(req, res) {
         }
         const executionTime = Date.now() - startTime;
 
-        const recordCount = result?._validatorReject
-          ? 0
-          : result?.records?.length || result?.results?.length || result?.count || result?.searchCount || (result?.error ? -1 : 0);
+        const recordCount = deriveRecordCount(name, result);
         console.log(`[DynExp] Round ${round} ${name} → ${recordCount} records, ${executionTime}ms`);
 
         logQuery({
@@ -232,6 +230,12 @@ export default async function handler(req, res) {
           wasDenied: false,
           denialReason: result?._validatorReject ? `ODATA_VALIDATOR_REJECT: ${result.error}` : null,
         });
+
+        // `_notFound` is internal telemetry framing — strip it before the
+        // result reaches the model.
+        if (result && typeof result === 'object' && '_notFound' in result) {
+          delete result._notFound;
+        }
 
         const resultForModel = serializeDynamicsExplorerToolResult(
           result?._validatorReject ? { error: result.error } : result,
@@ -673,6 +677,56 @@ function validatorReject(message) {
   return { error: message, _validatorReject: true };
 }
 
+// Tools whose success shape is a BARE record rather than a collection.
+const ENTITY_LOOKUP_TOOLS = new Set(['get_entity', 'get_record']);
+
+// Count fields, in the order we prefer them. `count` first so count_records
+// reports its own answer rather than an incidental total.
+const COUNT_FIELDS = [
+  'count', 'totalCount', 'emailCount', 'reportCount', 'paymentCount',
+  'documentCount', 'searchCount', 'exportedCount', 'estimatedCount',
+  'requestCount',
+];
+
+/**
+ * What to write to dynamics_query_log.record_count for one tool result.
+ *
+ * The previous expression was a falsy-chain
+ * (`records?.length || results?.length || count || searchCount || …`) and was
+ * wrong in three ways that made the failure telemetry untrustworthy:
+ *
+ *  - `search` returns `results` as a preformatted STRING, so `.length` logged
+ *    its CHARACTER COUNT as a record count (e.g. 4036 "records" for ~20 hits).
+ *  - `get_entity`/`get_record` resolve to a bare record with no count field, so
+ *    a SUCCESSFUL lookup logged 0 — indistinguishable from "no results", which
+ *    is why the zero-result bucket was dominated by successes.
+ *  - `exportedCount`/`estimatedCount` were absent from the chain, so export_csv
+ *    logged 0 regardless of what it exported.
+ *
+ * A legitimate not-found now logs 0 (a real zero-result answer) while -1 stays
+ * reserved for a tool that actually errored.
+ *
+ * NOTE: rows written before this change carry the old semantics — any trend
+ * analysis spanning it must treat the two eras separately.
+ */
+export function deriveRecordCount(name, result) {
+  if (!result || typeof result !== 'object') return 0;
+  if (result._validatorReject) return 0;
+  if (result._notFound) return 0;
+  if (result.error) return -1;
+
+  // Arrays are genuine collections. Strings never are — that was the search bug.
+  if (Array.isArray(result.records)) return result.records.length;
+  if (Array.isArray(result.results)) return result.results.length;
+
+  for (const field of COUNT_FIELDS) {
+    if (Number.isFinite(result[field])) return result[field];
+  }
+
+  if (ENTITY_LOOKUP_TOOLS.has(name)) return 1;
+  return 0;
+}
+
 /**
  * Strip null, empty string, false, and 0 values from a record.
  * Also remove internal fields (starting with @ or containing "odata").
@@ -1060,7 +1114,8 @@ async function getEntity({ type, identifier }) {
   }
 
   if (!result.records.length) {
-    return { error: `No ${type} found matching "${identifier}"` };
+    // A real zero-result answer, not a tool failure — see deriveRecordCount.
+    return { error: `No ${type} found matching "${identifier}"`, _notFound: true };
   }
 
   // Prefer exact match — check both primary and alternate name fields
@@ -1139,7 +1194,9 @@ async function getEntity({ type, identifier }) {
  */
 async function resolveEntity(sourceType, sourceName) {
   const result = await getEntity({ type: sourceType, identifier: sourceName });
-  if (result.error) return { error: result.error };
+  // Carry the not-found marker through so get_related logs a zero-result rather
+  // than an error when the source simply doesn't exist.
+  if (result.error) return { error: result.error, _notFound: result._notFound };
 
   // Extract the GUID from the result
   const cfg = ENTITY_TYPE_CONFIGS[sourceType];
@@ -1209,7 +1266,7 @@ async function getRelated({ source_type, source_id, source_name, target_type, da
   let sourceRecord = null;
   if (!resolvedId) {
     const resolved = await resolveEntity(source_type, source_name);
-    if (resolved.error) return { error: resolved.error };
+    if (resolved.error) return { error: resolved.error, _notFound: resolved._notFound };
     resolvedId = resolved.id;
     sourceRecord = resolved.record;
   }
