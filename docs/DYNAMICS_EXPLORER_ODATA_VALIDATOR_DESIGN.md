@@ -1,21 +1,22 @@
 ---
-title: "Dynamics Explorer — OData Pre-flight Validator (design)"
+title: "Dynamics Explorer — OData Pre-flight Validator (historical design)"
 domain: dataverse
 kind: spec
-status: active
-summary: "Status: DRAFT, Codex-reviewed + folded (S200, 2026-05-29). Pre-implementation design, grounded in production failure data."
+status: historical
+summary: "Historical 2026-05-29 pre-implementation design. Current behavior lives in lib/services/dynamics-odata-validator.js and the service catalog."
 canonical: false
 cataloged: 2026-07-02
+last_verified: 2026-08-08
 owner: product-engineering
 related:
   - scripts/analyze-dynamics-explorer-failures.js
   - lib/services/dataverse-export/compiler.js
 ---
 
-# Dynamics Explorer — OData Pre-flight Validator (design)
+# Dynamics Explorer — OData Pre-flight Validator (historical design)
 
-**Status:** DRAFT, Codex-reviewed + folded (S200, 2026-05-29). Pre-implementation design, grounded in production failure data.
-**Relationship to Path A:** this is the data-driven re-prioritization of the Path A plan. A2 (live taxonomy) shipped. This validator is the highest-leverage *next* slice and **reuses A1's live schema** as its field-name oracle. It supersedes A3/A4/A5 as the next target.
+**Status:** Historical pre-implementation design, Codex-reviewed + folded (S200, 2026-05-29). It records the failure data and decisions that shaped the initial build; it is not the current runtime contract. Read `lib/services/dynamics-odata-validator.js`, its tests, and `docs/SERVICE_AND_UTILITY_CATALOG.md` for current behavior.
+**Relationship to Path A at the time:** this was the data-driven re-prioritization of the Path A plan. A2 (live taxonomy) had shipped, and this validator was selected as the next slice using A1's live schema as its field-name oracle.
 
 > **Codex review folded (S200).** Key corrections, each verified against the live code: (1) **`aggregate` was missing** from scope — it's a model-supplied-OData tool (`chat.js:498` → `aggregateRecords` builds `$apply=filter(...)`); added. (2) The live tool is **`get_entity`** (`chat.js:467`), not `get_record` (that name only appears in historical `dynamics_query_log` rows); it's an *identifier* validator, not an OData-expression one. (3) **GUID auto-quoting DROPPED** — server-built filters use *unquoted* GUIDs on lookup `_value` fields (`_akoya_applicantid_value eq ${accountId}`, `chat.js:935/1054/1092/1133/1208/1435`), proving unquoted is valid; quoting would be harmful. The real GUID bug is *request-number-where-GUID-expected*. (4) **Restriction checks do NOT cover `filter`/`orderby`** (`checkRestriction` only inspects select/field/group_by/expand, `chat.js:2225-2268`) — so the validator must actively *block* restricted fields it finds in filters, making it a security enhancement, not just suppress suggestions. (5) `$expand` subtrees, `ContainValues` namespace functions, escaped quotes, `orderby` suffixes, and lambda aliases are tokenizer false-reject traps. (6) Validate *effective* values (post-`sanitizeSelect`/`statecode` injection/`cleanSelect`), not raw model input. (7) In-flight schema-fetch coalescing + a distinct log marker. (8) fiscalyear via static prompt hint, not live sampling (taxonomy has no fiscalyear path).
 

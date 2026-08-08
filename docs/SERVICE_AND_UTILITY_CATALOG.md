@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-07
+last_verified: 2026-08-08
 owner: product-engineering
 related:
   - lib/services/
@@ -42,7 +42,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`dynamics-service.js`** — Dynamics 365 / Dataverse client (OAuth, OData, Dataverse Search, email activities, `updateIfEmpty`, `logAiRun`). Impersonation contract documented in `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`.
 - **`dynamics-context.js`** — AsyncLocalStorage restriction context. `withDynamicsContext` / `bypassDynamicsRestrictions` for route + library callers; `enterDynamicsBypassForScript` for top-level scripts. **`DynamicsService.checkRestriction()` fails closed** when no context is set — every caller must opt in explicitly.
 - **`dynamics-explorer-taxonomy.js`** — Dynamics Explorer A2 layer (S200): 6h-cached, **fail-loud** live resolution of program / grantprogram / type / `wmkf_request_type` / distinct `akoya_requeststatus` over a fixed whitelist, with table-restriction gate + GUID/int/label validation, into a server-resolved system-prompt block (replaces the old hardcoded program GUIDs). Wraps `dataverse-export/live-taxonomy.js`.
-- **`dynamics-odata-validator.js`** — Dynamics Explorer OData pre-flight validator (S200): tolerant tokenizer + checks (field/entity name vs live `getEntityAttributes`, restricted-field enforcement in filter/orderby, request-number-as-GUID, unsupported-construct rejects). Reject-with-hint only, **no auto-correct**; unknown shapes pass through (false-reject-averse). Design: `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`.
+- **`dynamics-odata-validator.js`** — Dynamics Explorer OData pre-flight validator (S200): tolerant tokenizer + live `getEntityAttributes` checks, synthesized Lookup/Customer/Owner `_value` aliases, restriction enforcement across navigation-path roots, invalid Edm.Guid comparison checks, and rejects for provably wrong lookup / `$expand` forms. Every `$expand` fails closed while any field-level restriction is configured because the related target cannot be resolved here; otherwise unknown shapes pass through. Reject-with-hint only, **no auto-correct**. Historical design: `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`.
 - **`dataverse-identity-map.js`** / **`dynamics-identity-service.js`** — `user_profiles` ↔ Dynamics `systemuser` bridge; reconciliation CLI at `scripts/reconcile-dynamics-identities.js`.
 - **`program-director-resolver.js`** — Email → Dynamics `systemuser` bridge for Reviewer Finder's PD-filtered picker.
 - **`grant-cycles-dataverse.js`** — Dataverse `wmkf_appgrantcycle` adapter (Migrates / Replaced `grant_cycles` at W3 cutover 2026-05-12 — drain-only thereafter). Consumed by Reviewer Finder + Review Manager (`render-emails`, `send-emails`) + `maintenance-service` blob cleanup.
