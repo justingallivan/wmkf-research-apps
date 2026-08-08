@@ -277,6 +277,23 @@ describe('Dynamics Explorer OData pre-flight validator', () => {
     }
   });
 
+  test('a digit-leading GUID is not mistaken for a request number', async () => {
+    // `\d{5,7}` would otherwise swallow the first 7 digits of
+    // 12345678-aaaa-... and reject a perfectly valid filter. The guard was dead
+    // in production before aliases entered attrNames, so this false positive
+    // only becomes reachable with this change.
+    await expect(validateODataCall('query_records', {
+      table_name: 'akoya_request',
+      filter: '_akoya_applicantid_value eq 12345678-aaaa-bbbb-cccc-121212121212',
+    }, ctx())).resolves.toEqual({ ok: true });
+
+    // An 8-digit integer is not a 7-digit request number either.
+    await expect(validateODataCall('query_records', {
+      table_name: 'akoya_request',
+      filter: '_akoya_applicantid_value eq 12345678',
+    }, ctx())).resolves.toEqual({ ok: true });
+  });
+
   test('classifies contains() on a bare lookup as contains-on-lookup in one round', async () => {
     for (const field of ['akoya_applicantid', '_akoya_applicantid_value', 'ownerid', 'customerid']) {
       const result = await validateODataCall('query_records', {
