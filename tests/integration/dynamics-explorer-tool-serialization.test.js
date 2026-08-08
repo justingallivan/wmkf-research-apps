@@ -128,8 +128,13 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       { logicalName: 'normal_field', displayName: 'Normal', type: 'String', description: '' },
       { logicalName: 'statecode', displayName: 'Status', type: 'State', description: '' },
       { logicalName: 'createdon', displayName: 'Created On', type: 'DateTime', description: '' },
-      { logicalName: '_regardingobjectid_value', displayName: 'Regarding', type: 'Lookup', description: '' },
-      { logicalName: '_wmkf_potentialreviewer1_value', displayName: 'Potential Reviewer 1', type: 'Lookup', description: '' },
+      // AttributeMetadata reports BARE lookup logical names; the `_<name>_value`
+      // computed alias is never an attribute row. See the fixture-shape note in
+      // tests/unit/dynamics-odata-validator.test.js ([ASSUMED], not live-captured).
+      { logicalName: 'regardingobjectid', displayName: 'Regarding', type: 'Lookup', description: '' },
+      { logicalName: 'wmkf_potentialreviewer1', displayName: 'Potential Reviewer 1', type: 'Lookup', description: '' },
+      { logicalName: 'akoya_applicantid', displayName: 'Applicant', type: 'Lookup', description: 'Applying organization' },
+      { logicalName: 'ownerid', displayName: 'Owner', type: 'Owner', description: '' },
       { logicalName: 'wmkf_secret', displayName: 'Secret', type: 'String', description: '' },
     ]);
     mockQueryRecords.mockResolvedValue({
@@ -661,6 +666,172 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('DENIED');
     expect(toolResult).toContain('wmkf_secret');
     expect(toolResult).toContain('restricted');
+  });
+
+  // ─── Lookup computed-alias handling (production request
+  // tq9j6-1786197256337-e64473f8bbd5 burned 15 rounds because the pre-flight
+  // validator accepted the WRONG lookup spelling and rejected the right one).
+  describe('lookup computed alias', () => {
+    const GUID = '3f2504e0-4f89-11d3-9a0c-0305e82c330c';
+
+    /** Drive one tool_use round through the handler and return its tool_result. */
+    const runTool = async (name, input) => {
+      mockStream
+        .mockReset()
+        .mockResolvedValueOnce({
+          content: [{ type: 'tool_use', id: 'tool-1', name, input }],
+          model: 'claude-test',
+          usage: {},
+          textStreamed: false,
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'Done.' }],
+          model: 'claude-test',
+          usage: {},
+          textStreamed: false,
+        });
+      const req = createMockReq({
+        method: 'POST',
+        body: { messages: [{ role: 'user', content: 'lookup query' }] },
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      return mockStream.mock.calls[1][0].messages.find(
+        m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+      ).content[0].content;
+    };
+
+    test('mocked live metadata carries no precomputed _value alias', async () => {
+      const mocked = await mockGetEntityAttributes();
+      const precomputed = mocked
+        .map(a => a.logicalName)
+        .filter(n => n.startsWith('_') && n.endsWith('_value'));
+      expect(mocked.length).toBeGreaterThan(0);
+      expect(precomputed).toEqual([]);
+    });
+
+    test('the correct alias filter validates and reaches queryRecords', async () => {
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: `_akoya_applicantid_value eq ${GUID}`,
+        top: 1,
+      });
+
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].filter).toContain(`_akoya_applicantid_value eq ${GUID}`);
+    });
+
+    test('the bare lookup spelling is rejected locally and never reaches queryRecords', async () => {
+      for (const filter of [`akoya_applicantid eq '${GUID}'`, `akoya_applicantid eq ${GUID}`]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('_akoya_applicantid_value');
+      }
+    });
+
+    test('the alias is rejected in $orderby and the bare alias hint stays out of $expand', async () => {
+      const ordered = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        orderby: '_akoya_applicantid_value desc',
+      });
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(ordered).toContain('orderby');
+
+      mockQueryRecords.mockClear();
+      const expanded = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: '_akoya_applicantid_value',
+      });
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(expanded).toContain('akoya_applicantid');
+
+      mockQueryRecords.mockClear();
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'akoya_applicantid($select=name)',
+      });
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].expand).toBe('akoya_applicantid($select=name)');
+    });
+
+    test('describe_table surfaces the queryable alias for lookup attributes', async () => {
+      const toolResult = await runTool('describe_table', { table_name: 'akoya_request', full: true });
+
+      expect(toolResult).toContain('_akoya_applicantid_value');
+      expect(toolResult).toContain('_ownerid_value');
+      // The bare logical name still appears — it is the $expand spelling.
+      expect(toolResult).toContain('akoya_applicantid');
+    });
+
+    test('describe_table honors a restriction stored under the alias spelling', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: '_akoya_applicantid_value',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('describe_table', { table_name: 'akoya_request', full: true });
+
+      expect(toolResult).not.toContain('akoya_applicantid');
+      expect(toolResult).not.toContain('Applying organization');
+      expect(toolResult).toContain('akoya_requestnum');
+    });
+
+    test('a bare-stored restriction denies the alias spelling before Dynamics is called', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: 'akoya_applicantid',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: `_akoya_applicantid_value eq ${GUID}`,
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      expect(toolResult).toContain('_akoya_applicantid_value');
+    });
+
+    test('classified unknown-field hints suggest the queryable alias, not the bare lookup', async () => {
+      mockQueryRecords.mockReset();
+      mockQueryRecords.mockRejectedValue(new Error(
+        "Query failed (400): Could not find a property named 'akoya_applicantid' on type 'Microsoft.Dynamics.CRM.akoya_request'."
+      ));
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_requests',
+        select: 'akoya_requestnum',
+        top: 1,
+      });
+
+      expect(toolResult).toContain('unknown_field');
+      const suggestions = toolResult.match(/"suggestions":\[(.*?)\]/)?.[1] || '';
+      expect(suggestions).toContain('"_akoya_applicantid_value"');
+      expect(suggestions).not.toContain('"akoya_applicantid"');
+    });
   });
 
   test('search strips operational AI run hits returned by Dataverse Search', async () => {

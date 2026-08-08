@@ -45,7 +45,12 @@ import {
   serializeDynamicsExplorerToolResult,
 } from '../../../lib/utils/dynamics-explorer-serializer';
 import { buildResolvedTaxonomyPromptBlock } from '../../../lib/services/dynamics-explorer-taxonomy';
-import { validateODataCall } from '../../../lib/services/dynamics-odata-validator';
+import {
+  expandRestrictedFieldNames,
+  isLookupAliasType,
+  lookupAliasFor,
+  validateODataCall,
+} from '../../../lib/services/dynamics-odata-validator';
 
 export const config = {
   api: {
@@ -886,9 +891,19 @@ async function classifyToolError(err, name, input, restrictions = []) {
       // filtering matches restrictions (keyed by logical name). Inside the try so
       // any failure falls back to the raw error — enrichment never masks it.
       const tableName = DynamicsService.resolveLogicalName(input.table_name);
-      const restricted = restrictedFieldsForTable(tableName, restrictions);
       const attrs = await DynamicsService.getEntityAttributes(tableName);
-      const validNames = attrs.map(a => a.logicalName).filter(f => !restricted.has(f));
+      // Expanded across both lookup spellings so a restriction stored under one
+      // can't be suggested back under the other.
+      const restricted = expandRestrictedFieldNames(
+        restrictedFieldsForTable(tableName, restrictions),
+        attrs,
+      );
+      // Suggest the spelling the model must actually type in $select/$filter.
+      // Offering the bare lookup name here contradicted this hint's own
+      // "_<name>_value" instruction and cost a round every time.
+      const validNames = attrs
+        .map(a => (isLookupAliasType(a.type) ? lookupAliasFor(a.logicalName) : a.logicalName))
+        .filter(f => !restricted.has(f));
       const suggestions = closestFieldNames(invalidField, validNames);
       return {
         error: raw.substring(0, 300),
@@ -943,22 +958,35 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
   // restricted attribute's name/metadata through this listing. Drop any field
   // restricted for this table from both the curated and live field sets, and
   // redact its name from all remaining free text (descriptions + rules).
-  const restrictedFieldNames = restrictedFieldsForTable(table_name, restrictions);
-
   const table = TABLE_ANNOTATIONS[table_name];
   const liveAttributes = await DynamicsService.getEntityAttributes(table_name);
+  // Live metadata is needed to expand a restriction across both lookup
+  // spellings, so the attribute fetch has to precede the restriction set.
+  const restrictedFieldNames = expandRestrictedFieldNames(
+    restrictedFieldsForTable(table_name, restrictions),
+    liveAttributes,
+  );
   const curatedFields = Object.fromEntries(
     Object.entries(table?.fields || {}).filter(([field]) => !restrictedFieldNames.has(field))
   );
   const curatedNames = new Set(Object.keys(curatedFields));
   const additionalLiveFields = liveAttributes
     .filter(attr => !curatedNames.has(attr.logicalName) && !restrictedFieldNames.has(attr.logicalName))
-    .map(attr => ({
-      logicalName: attr.logicalName,
-      displayName: redactRestrictedFieldNames(attr.displayName, restrictedFieldNames),
-      type: attr.type,
-      description: redactRestrictedFieldNames(attr.description, restrictedFieldNames),
-    }));
+    .map(attr => {
+      const field = {
+        logicalName: attr.logicalName,
+        displayName: redactRestrictedFieldNames(attr.displayName, restrictedFieldNames),
+        type: attr.type,
+        description: redactRestrictedFieldNames(attr.description, restrictedFieldNames),
+      };
+      // AttributeMetadata reports the BARE lookup column, which is exactly the
+      // spelling the model then wrote into $filter and Dataverse 400'd. Surface
+      // the queryable computed alias alongside it so this path teaches the right
+      // name instead of the wrong one.
+      if (isLookupAliasType(attr.type)) field.queryAs = lookupAliasFor(attr.logicalName);
+      return field;
+    });
+  const hasLookupAlias = additionalLiveFields.some(f => f.queryAs);
 
   // Apply the same inline-render sanitizers used by buildInlineSchemas so the
   // describe_table path can't leak stale hardcoded option-set codes (e.g.
@@ -983,6 +1011,13 @@ async function describeTable({ table_name, full = false }, restrictions = []) {
     rules: redactRestrictedFieldNames(rulesBlock, restrictedFieldNames),
     additionalLiveFieldCount: additionalLiveFields.length,
   };
+
+  if (hasLookupAlias) {
+    result.lookupFieldNote = 'Lookup/Customer/Owner columns carry a "queryAs" name. '
+      + 'Use queryAs (_<name>_value) in $select and $filter, compared to an UNQUOTED GUID. '
+      + 'The bare logicalName is the navigation property and is only valid in $expand. '
+      + '$orderby does not accept the computed alias.';
+  }
 
   if (full) {
     result.additionalLiveFields = additionalLiveFields;
