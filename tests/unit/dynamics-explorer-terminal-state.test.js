@@ -181,4 +181,85 @@ describe('Dynamics Explorer SSE terminal state', () => {
     expect(await screen.findByText(/Server error: 503/)).toBeInTheDocument();
     await expectComposerUnlocked();
   });
+
+  test.each([
+    [
+      'server error',
+      [sse('error', { message: 'First turn failed' }), EOF],
+      /First turn failed/,
+    ],
+    [
+      'clean EOF',
+      [EOF],
+      /connection dropped before I could answer/i,
+    ],
+    [
+      'reader rejection',
+      [new Error('first turn reader rejected')],
+      /first turn reader rejected/i,
+    ],
+  ])('%s discards pending artifacts before the next answer', async (_label, terminalReads, firstTurnMessage) => {
+    const pendingArtifacts = [
+      sse('file_ready', {
+        filename: 'stale-export.xlsx',
+        base64: 'AA==',
+        recordCount: 1,
+        columns: ['name'],
+      }),
+      sse('document_links', {
+        requestNumber: '1000001',
+        files: [{ name: 'stale-document.docx', webUrl: 'https://example.test/stale', size: 12 }],
+      }),
+    ];
+    fetch
+      .mockResolvedValueOnce(streamResponse([...pendingArtifacts, ...terminalReads]))
+      .mockResolvedValueOnce(streamResponse([
+        sse('response', { content: 'Second answer' }),
+        sse('complete', { rounds: 1 }),
+        EOF,
+      ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion('First question');
+    expect(await screen.findByText(firstTurnMessage)).toBeInTheDocument();
+    await expectComposerUnlocked();
+
+    submitQuestion('Second question');
+    expect(await screen.findByText('Second answer')).toBeInTheDocument();
+    await expectComposerUnlocked();
+
+    expect(screen.queryByText('stale-export.xlsx')).not.toBeInTheDocument();
+    expect(screen.queryByText('stale-document.docx')).not.toBeInTheDocument();
+  });
+
+  test('clean EOF discards an out-of-protocol artifact received after complete', async () => {
+    fetch
+      .mockResolvedValueOnce(streamResponse([
+        sse('response', { content: 'First answer' }),
+        sse('complete', { rounds: 1 }),
+        sse('file_ready', {
+          filename: 'late-stale-export.xlsx',
+          base64: 'AA==',
+          recordCount: 1,
+          columns: ['name'],
+        }),
+        EOF,
+      ]))
+      .mockResolvedValueOnce(streamResponse([
+        sse('response', { content: 'Second answer' }),
+        sse('complete', { rounds: 1 }),
+        EOF,
+      ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion('First question');
+    expect(await screen.findByText('First answer')).toBeInTheDocument();
+    await expectComposerUnlocked();
+
+    submitQuestion('Second question');
+    expect(await screen.findByText('Second answer')).toBeInTheDocument();
+    await expectComposerUnlocked();
+
+    expect(screen.queryByText('late-stale-export.xlsx')).not.toBeInTheDocument();
+  });
 });

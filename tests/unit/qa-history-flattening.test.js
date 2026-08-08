@@ -31,6 +31,13 @@ describe('flattenHistoryMessage', () => {
       .toEqual({ role: 'assistant', content: 'It is $1M.' });
   });
 
+  test.each(['', '   ', '\n\t'])('%j string content becomes a non-empty placeholder', (content) => {
+    expect(flattenHistoryMessage({ role: 'assistant', content })).toEqual({
+      role: 'assistant',
+      content: '[non-text content omitted]',
+    });
+  });
+
   test('strips thinking blocks from a client-supplied assistant turn', () => {
     const result = flattenHistoryMessage({
       role: 'assistant',

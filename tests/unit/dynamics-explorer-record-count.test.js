@@ -49,10 +49,11 @@ describe('deriveRecordCount', () => {
   });
 
   // Relationship handlers return the SPECIFIC count of what was asked for and
-  // usually a totalCount of everything matching in Dataverse. record_count means
-  // rows returned, so the specific field must win. These fixtures carry every
-  // field the real handler returns — an earlier version omitted totalCount and
-  // therefore could not detect the precedence bug at all.
+  // usually a totalCount of everything matching in Dataverse. For these tools,
+  // record_count means target rows returned, so the specific field must win.
+  // These fixtures carry every field the real handler returns — an earlier
+  // version omitted totalCount and therefore could not detect the precedence
+  // bug at all.
   describe('relationship handlers prefer the target count over totalCount', () => {
     test('account -> emails counts emails, not the requests scanned to find them', () => {
       // handleAccountEmails returns requestCount (context) AND emailCount (target).

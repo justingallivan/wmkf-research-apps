@@ -694,11 +694,11 @@ const METADATA_TOOLS = new Set(['describe_table']);
 //     LAST. Several relationship handlers return both a specific count and a
 //     total: account→emails returns `emailCount` (emails found) alongside
 //     `requestCount` (requests scanned to find them), and most handlers return
-//     `totalCount` (total matching in Dataverse) next to the number of rows
-//     actually returned. record_count means "rows this call returned", matching
-//     query_records where we use records.length and not totalCount — so a
-//     specific count always wins, and `requestCount` sits after the other
-//     targets because it is context whenever one of them is present.
+//     `totalCount` (total matching in Dataverse) next to the number of target
+//     rows actually returned. Those tool-specific counts win. Search is the
+//     deliberate exception: its formatted `results` value is a string, so
+//     `totalCount` is the relevant search cardinality. `requestCount` sits after
+//     the other targets because it is context whenever one of them is present.
 const COUNT_FIELDS = [
   'count',
   'emailCount', 'paymentCount', 'reportCount', 'annotationCount', 'reviewerCount',
@@ -711,9 +711,11 @@ const COUNT_FIELDS = [
 /**
  * What to write to dynamics_query_log.record_count for one tool result.
  *
- * Semantics: the number of rows THIS call returned. 0 means a genuine
- * zero-result answer (including a not-found lookup); -1 means the tool errored;
- * a schema or single-entity answer counts as 1.
+ * Semantics: the tool result's relevant cardinality. Search reports total
+ * matches; collection queries, exports, and relationship tools report the
+ * target rows returned; 0 means a genuine zero-result answer (including a
+ * not-found lookup); -1 means the tool errored; a schema or single-entity
+ * answer counts as 1.
  *
  * The original expression was a falsy-chain
  * (`records?.length || results?.length || count || searchCount || …`) which

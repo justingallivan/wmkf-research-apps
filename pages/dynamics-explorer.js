@@ -185,6 +185,10 @@ function DynamicsExplorer() {
     // rejects AFTER a terminal event was already handled must not append a
     // second, contradictory error message.
     let sawTerminalEvent = false;
+    const clearPendingArtifacts = () => {
+      pendingFileExportsRef.current = [];
+      pendingDocumentLinksRef.current = [];
+    };
 
     try {
       const resp = await fetch('/api/dynamics-explorer/chat', {
@@ -281,11 +285,10 @@ function DynamicsExplorer() {
                 const fileExports = pendingFileExportsRef.current.length > 0
                   ? [...pendingFileExportsRef.current]
                   : undefined;
-                pendingFileExportsRef.current = [];
                 const documentLinks = pendingDocumentLinksRef.current.length > 0
                   ? [...pendingDocumentLinksRef.current]
                   : undefined;
-                pendingDocumentLinksRef.current = [];
+                clearPendingArtifacts();
 
                 let finalMsgId;
                 if (streamingMsgId) {
@@ -319,6 +322,7 @@ function DynamicsExplorer() {
                 break;
               }
               case 'error':
+                clearPendingArtifacts();
                 // If text had already begun streaming, that message still
                 // carries isStreaming — the error branch used to leave it set,
                 // so the partial answer pulsed forever above the error. Finalize
@@ -351,6 +355,10 @@ function DynamicsExplorer() {
           }
         }
       }
+
+      // EOF is a hard boundary even if an out-of-protocol event arrived after
+      // `complete`/`error`; nothing pending may cross into the next turn.
+      clearPendingArtifacts();
 
       // The stream ended without a terminal event — finalize whatever arrived
       // so the composer is usable again instead of stuck on a spinner.
@@ -391,6 +399,7 @@ function DynamicsExplorer() {
       // rejects afterwards (socket torn down after the final chunk) is not
       // something to report — appending here would contradict the answer the
       // user is already reading.
+      clearPendingArtifacts();
       if (!sawTerminalEvent) {
         setMessages(prev => [...prev, {
           id: ++messageIdRef.current,

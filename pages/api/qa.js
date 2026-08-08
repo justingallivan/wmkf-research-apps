@@ -54,7 +54,9 @@ export function flattenHistoryMessage(message) {
   }
   const { content } = message || {};
 
-  if (typeof content === 'string') return { role, content };
+  if (typeof content === 'string') {
+    return { role, content: content.trim() ? content : '[non-text content omitted]' };
+  }
   if (Array.isArray(content)) {
     const text = content
       .filter(block => block?.type === 'text' && typeof block.text === 'string')
