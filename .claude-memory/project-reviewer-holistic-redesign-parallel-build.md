@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-22 via reviewer identity runtime/callers, binding-writer imports, evaluation-only pipeline location, Track B constant, and controlling plans
+  last_verified: 2026-08-07 via reviewer identity runtime/callers, scoped-mode and deadline tests, binding-writer imports, evaluation-only pipeline location, Track B constant, and controlling plans
 ---
 
 ## Recall Rule
@@ -24,12 +24,14 @@ memory. Re-probe environment state before claiming which resolver mode is live.
 
 ## Current operating contract
 
-1. **Legacy-authoritative by default.** `[VERIFIED via
-   lib/services/reviewer-identity-runtime.js, 2026-07-22]`
-   `REVIEWER_IDENTITY_RESOLVER_MODE` accepts `legacy`, `shadow`, and `combined`.
-   Unset or unknown values select legacy. Shadow runs bounded W2 comparisons and
-   returns the exact legacy result; only explicit `combined` may adapt W2 into
-   the authoritative result, and that cutover remains owner-gated.
+1. **Legacy-authoritative by default, independently per caller.** `[VERIFIED via
+   lib/services/reviewer-identity-runtime.js, 2026-08-07]` Reviewer discovery,
+   Workbench applicant-recommended verification, and contact enrichment have
+   separate server mode variables accepting `legacy`, `shadow`, and `combined`.
+   Unset or unknown values select legacy, and the former generic variable cannot
+   promote a tagged live caller. Shadow runs bounded W2 comparisons and returns
+   the exact legacy result; only that caller's explicit `combined` may adapt W2,
+   and each cutover remains separately owner-gated.
 2. **Two production W2 seams exist.** `[VERIFIED via
    lib/services/discovery/verification.js and
    lib/services/contact-enrichment/tiers.js, 2026-07-22]` Non-biomedical/PubMed-
@@ -62,9 +64,11 @@ memory. Re-probe environment state before claiming which resolver mode is live.
    expand binding writers/readers; build and shadow a pure action-policy
    projection; then separately gate render/send enforcement. Null legacy rows
    never become eligible by default.
-2. **W2 production cutover:** review durable shadow observations before any
-   owner-approved `combined` environment change. Shadow logging and migration
-   state do not themselves authorize cutover.
+2. **W2 production cutover:** because organic searches are finished for this
+   cycle, complete the offline readiness harness and pass the applicable
+   entry-point Gate S before any scoped `shadow` change. A scoped `combined`
+   change separately requires that caller's Gate C. Shadow logging and migration
+   state do not themselves authorize either change.
 3. **Identity follow-ons:** anchor reuse/re-resolution, union-of-anchors dedup,
    and name-comparator consolidation remain planned and require their named
    evaluation/contract gates.

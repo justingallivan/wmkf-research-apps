@@ -498,14 +498,18 @@ failures, 0 provider errors, and 0 wrong automatic resolutions. It used 151 ROR
 requests for 160 candidate sets after 44 benchmark-process cache hits; that
 does not predict production request-scoped reuse. This clears the
 frozen falsification bar, not representative production calibration or rollout
-capacity. On branch `codex/ror-api-production-shadow`, that same decision core
-is shared with a request-scoped production adapter behind the existing seam.
+capacity. On branch `codex/institution-resolution-evaluation-plan`, stacked on
+the ROR production-shadow slice, that same decision core is shared with a
+request-scoped production adapter behind the existing seam.
 Only one locally selected ROR id can be hydrated through OpenAlex, and the
 hydrated record must echo the same ROR; failures and ambiguity return no new
-identity. The branch adds no schema or write path and has not been merged or
-deployed. A value-redacted Production env pull on 2026-08-07 confirmed
-`REVIEWER_IDENTITY_RESOLVER_MODE` is present and non-empty but normalizes to
-`legacy`, so authority remains legacy-only.
+identity. Phase 0 of the offline-evaluation plan additionally separates the
+three live caller modes, forwards parent deadlines, bounds observation inside
+the shadow allocation, and caps all OpenAlex subrequests per resolution. The
+branch adds no schema or write path and has not been merged or deployed. A
+value-redacted Production env pull on 2026-08-07 established only that the
+former global `REVIEWER_IDENTITY_RESOLVER_MODE` normalized to `legacy`; the new
+scoped variables must be probed independently before any live observation.
 
 ## Primary sources
 

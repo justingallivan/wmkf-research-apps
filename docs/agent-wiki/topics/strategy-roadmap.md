@@ -17,6 +17,7 @@ source_files:
   - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
   - benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md
   - benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md
+  - docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md
 canonical_docs:
   - docs/CURRENT_WORK_QUEUE.md
   - docs/SYSTEM_MODEL.md
@@ -33,6 +34,7 @@ watch_paths:
   - benchmarks/compact-ror-index/**
   - benchmarks/fuzzy-matching-falsification/versions/v2/**
   - benchmarks/fuzzy-matching-falsification/versions/v3/**
+  - docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md
 update_triggers:
   - roadmap or phasing changes
   - cross-capability architecture changes
@@ -98,11 +100,12 @@ document inventory, and individual implementation plans do not establish priorit
   rewriting v1. Evidence limit: the
   institution slice is 15 real / 126 synthetic and ALL 64 unsafe resolutions are
   synthetic — the mechanism transfers to production (the S400 shape), the
-  magnitude does not. **Comparator #2 (S2AFF) IS ON THE QUEUE — the earlier
+  magnitude does not. **Comparator #2 (S2AFF) REMAINS A LATER CHALLENGER — the earlier
   "skip it" recommendation was WITHDRAWN in review.** S2AFF is parse →
   high-recall ROR retrieval → LightGBM rerank → margin-based abstention, the
   closest existing analogue to the scorer we intend to build, so it is the most
-  informative remaining comparator, not the least. Needs a pinned Python
+  informative remaining comparator, not the least. The owner-approved offline
+  production-path harness now comes first. S2AFF then needs a pinned Python
   3.10/3.11 venv (local is 3.14, no uv/pyenv) and its own session.
   **CODEX OWNS THE INSTITUTION-RESOLUTION MODEL from 2026-08-07 (owner
   decision).** Claude's runtime/deployment assessment was superseded by
@@ -181,8 +184,11 @@ document inventory, and individual implementation plans do not establish priorit
   relationship-aware pair evaluation, and a frozen verdict-free contract →
   **claim-oriented API decision benchmark v3 COMPLETE** → **production
   request-scoped ROR API adapter + post-resolution ROR→OpenAlex bridge
-  IMPLEMENTED ON `codex/ror-api-production-shadow`; review/promotion remains**
-  → run and resource-profile S2AFF as a challenger. Both
+  IMPLEMENTED ON `codex/ror-api-production-shadow`; not merged/deployed** →
+  **offline readiness plan ACTIVE on
+  `codex/institution-resolution-evaluation-plan`; Phase 0 runtime prerequisites
+  built, public schemas/replay and private-corpus governance next** → run and
+  resource-profile S2AFF later as a challenger. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -196,7 +202,8 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  review/promote production shadow adapter → S2AFF profile → normalizer
+  finish the offline readiness harness and entry-point Gate S evidence → S2AFF
+  profile → normalizer
   consolidation + shared scorer (small independently shippable increments; decision-specific
   models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
   card redesign → coauthor verdict → institution-COI sort + audited override. Decisions

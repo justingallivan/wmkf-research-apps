@@ -41,13 +41,16 @@ This is the continuation entry point for the
   bind, and three remaining misses. Same-ORCID fragments collapse; distinct
   ORCIDs always go to review. The scoring overlay cannot affect resolver
   consensus.
-- `ReviewerIdentityRuntime` now owns the production Track-A spine call. Unset,
-  `legacy`, and unknown `REVIEWER_IDENTITY_RESOLVER_MODE` values execute legacy
-  only. `shadow` settles every legacy candidate in the batch first, then runs
-  each W2 comparison under an independent hard 15-second deadline, but returns
-  the exact legacy objects. Observer failures are contained. Explicit
-  `combined` mode adapts safe W2 rescues into the established result contract
-  with a `probable` ceiling; no tracked production setting enables it.
+- `ReviewerIdentityRuntime` now owns the production Track-A spine call. Reviewer
+  discovery, Workbench applicant-recommended verification, and contact
+  enrichment have independent server mode variables; each unset, `legacy`, or
+  unknown value executes legacy only. `shadow` settles every legacy candidate
+  first, then runs bounded W2 work while returning the exact legacy objects.
+  Workbench and discovery forward their parent deadline; W2 skips when its full
+  allocation plus reserve does not fit. Observer work shares that allocation,
+  and one 16-request OpenAlex budget spans works, ROR hydration, author/anchor, and
+  combined ORCID-profile requests. Explicit `combined` affects only the selected
+  entry point and retains a `probable` ceiling; no mode change is made here.
 - The W2 batch implementation in PR #113 owns one request-bounded institution
   resolver. Production resolver authority was live-verified as `legacy-default`
   on 2026-08-07; promotion does not enable `shadow` or `combined`.
@@ -104,16 +107,18 @@ from passing as misses.
 
 ## Next product choice
 
-First merge and deploy the independently safe ROR shadow-adapter slice; that
-does not change live decisions while production remains `legacy-default`. The
-remaining runtime product gate is an owner-approved
-`REVIEWER_IDENTITY_RESOLVER_MODE=combined` cutover after reviewing durable
-shadow observations. Migration 026 is already live; do not couple its applied
-state to a mode change. `shadow` remains available for comparison-only
-observation; `w2`, `cutover`, typos, and unset values fail back to legacy. The
-next model experiment after this slice is the separately scoped S2AFF challenger
-profile; the representative 1–2k benchmark remains parked, so high-risk
-automation remains review-only. The
+Complete the offline readiness harness in
+`docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md`; organic production
+traffic is unavailable for roughly six months. The current branch implements
+the Phase 0 runtime prerequisites but does not enable any deployed mode. Build
+public schemas/validators and deterministic production-path replay next, then
+collect the private representative corpus only after its storage, access,
+retention, and adjudication owners are selected. Migration 026 is already live;
+do not couple its applied state to a mode change. Each entry point must pass its
+own Gate S before comparison-only shadow observation and its own Gate C before
+combined. `w2`, `cutover`, typos, and unset values fail back to legacy. The
+separately scoped S2AFF challenger remains later evidence, not a prerequisite
+for the harness. The
 separate open policy questions are whether to add any umbrella
 organization beyond HHMI/Broad and whether the benchmark should credit a
 correct-but-flagged bind for fragmented famous names. The buy-vs-build question

@@ -224,6 +224,7 @@ export default async function handler(req, res) {
       searchChemrxiv,
       piInstitutions: piInsts,
       signal: deadlineController.signal,
+      deadlineAt,
       onProgress: (progress) => {
         sendEvent('progress', progress);
       }

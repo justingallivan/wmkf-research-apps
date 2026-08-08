@@ -13,19 +13,30 @@ const {
   recordShadowError,
 } = require('../../lib/services/reviewer-identity-shadow-log');
 const {
+  OPENALEX_REQUESTS_PER_RESOLUTION,
+  RESOLVER_ENTRY_POINT,
   RESOLVER_MODE,
+  REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE,
+  REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE,
+  REVIEWER_IDENTITY_WORKBENCH_RESOLVER_MODE,
+  SHADOW_PARENT_DEADLINE_RESERVE_MS,
+  ReviewerIdentityRuntime,
   _internals,
 } = require('../../lib/services/reviewer-identity-runtime');
 
 const {
   configuredResolverMode,
+  configuredResolverModeForEntryPoint,
+  createOpenAlexRequestBudget,
   evaluateCombinedAgainstLegacy,
   evaluateExistingResultWithRuntimeSeam,
   evaluateSuggestionsWithRuntimeSeam,
   evaluateWithRuntimeSeam,
   evaluateWorksFirstSuggestion,
+  hasShadowAllocation,
   normalizeResolverMode,
   reportInstitutionResolverMetrics,
+  shadowPhaseBudgets,
 } = _internals;
 
 describe('reviewer identity runtime seam', () => {
@@ -204,7 +215,10 @@ describe('reviewer identity runtime seam', () => {
     expect(result.selectedRecord.openAlexId).toBe('https://openalex.org/A1');
     expect(OpenAlexService.getAuthorById).toHaveBeenCalledWith(
       'A1',
-      { signal: expect.any(AbortSignal) },
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        requestScope: expect.any(Object),
+      }),
     );
   });
 
@@ -417,7 +431,10 @@ describe('reviewer identity runtime seam', () => {
     expect(institutionResolver.resolve).toHaveBeenNthCalledWith(
       1,
       'University of Minnesota',
-      { signal: expect.any(AbortSignal) },
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        openAlexRequestBudget: expect.objectContaining({ maxRequests: 16 }),
+      }),
     );
     expect(JSON.stringify(institutionResolver.resolve.mock.calls)).not.toContain('Harcombe');
     const metricsCall = info.mock.calls.find(
@@ -736,6 +753,40 @@ describe('reviewer identity runtime seam', () => {
     }));
   });
 
+  test('combined profile hydration and its error observer share one bounded allocation', async () => {
+    const legacy = { status: 'abstain', reason: 'legacy-safe-result' };
+    const onShadowError = jest.fn(() => new Promise(() => {}));
+    const startedAt = Date.now();
+    const result = await evaluateCombinedAgainstLegacy(
+      { name: 'Taekjip Ha', suggestedInstitution: 'Johns Hopkins University' },
+      {},
+      legacy,
+      {
+        shadowTimeoutMs: 18,
+        evaluateWorksFirst: jest.fn(async () => ({
+          decision: 'bind',
+          anchor: 'orcid:0000-0003-2195-6258',
+          evidenceBundle: {
+            orcids: ['0000-0003-2195-6258'],
+            anchorDois: ['10.1000/one'],
+            rors: [],
+            openAlexAuthorIds: ['A100'],
+          },
+        })),
+        createAnchorsMatch: () => async () => false,
+        onShadowComparison: jest.fn(),
+        onShadowError,
+        getAuthorByOrcid: jest.fn(() => new Promise(() => {})),
+      },
+    );
+
+    expect(result).toBe(legacy);
+    expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'reviewer_identity_shadow_timeout',
+    }));
+    expect(Date.now() - startedAt).toBeLessThan(100);
+  });
+
   test('default combined hydration errors retain candidate attribution', async () => {
     jest.spyOn(console, 'info').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -783,6 +834,250 @@ describe('reviewer identity runtime seam', () => {
       { mode: RESOLVER_MODE.SHADOW, evaluateWorksFirst },
     )).resolves.toBe(legacy);
     expect(evaluateWorksFirst).not.toHaveBeenCalled();
+  });
+
+  test('entry-point configuration is independent and unknown entry points fail closed', () => {
+    const env = {
+      REVIEWER_IDENTITY_RESOLVER_MODE: 'combined',
+      [REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE]: 'shadow',
+      [REVIEWER_IDENTITY_WORKBENCH_RESOLVER_MODE]: 'combined',
+      [REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE]: 'cutover',
+    };
+
+    expect(configuredResolverModeForEntryPoint(RESOLVER_ENTRY_POINT.DISCOVERY, env))
+      .toBe(RESOLVER_MODE.SHADOW);
+    expect(configuredResolverModeForEntryPoint(RESOLVER_ENTRY_POINT.WORKBENCH_RECOMMENDED, env))
+      .toBe(RESOLVER_MODE.COMBINED);
+    expect(configuredResolverModeForEntryPoint(RESOLVER_ENTRY_POINT.CONTACT_ENRICHMENT, env))
+      .toBe(RESOLVER_MODE.LEGACY);
+    expect(configuredResolverModeForEntryPoint('unknown-entry-point', env))
+      .toBe(RESOLVER_MODE.LEGACY);
+    expect(configuredResolverModeForEntryPoint(RESOLVER_ENTRY_POINT.DISCOVERY, {}))
+      .toBe(RESOLVER_MODE.LEGACY);
+  });
+
+  test('contact enrichment ignores the global and discovery modes unless independently enabled', async () => {
+    const previousGlobal = process.env.REVIEWER_IDENTITY_RESOLVER_MODE;
+    const previousDiscovery = process.env[REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE];
+    const previousContact = process.env[REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE];
+    process.env.REVIEWER_IDENTITY_RESOLVER_MODE = 'combined';
+    process.env[REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE] = 'combined';
+    delete process.env[REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE];
+    const searchWorks = jest.spyOn(OpenAlexService, 'searchWorksByRawAuthorName');
+    try {
+      const legacy = { status: 'unresolved', identity: { status: 'unresolved' } };
+      await expect(ReviewerIdentityRuntime.evaluateExistingResult(
+        suggestion,
+        legacy,
+        {},
+      )).resolves.toBe(legacy);
+      expect(searchWorks).not.toHaveBeenCalled();
+    } finally {
+      if (previousGlobal === undefined) delete process.env.REVIEWER_IDENTITY_RESOLVER_MODE;
+      else process.env.REVIEWER_IDENTITY_RESOLVER_MODE = previousGlobal;
+      if (previousDiscovery === undefined) {
+        delete process.env[REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE];
+      } else {
+        process.env[REVIEWER_IDENTITY_DISCOVERY_RESOLVER_MODE] = previousDiscovery;
+      }
+      if (previousContact === undefined) {
+        delete process.env[REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE];
+      } else {
+        process.env[REVIEWER_IDENTITY_CONTACT_ENRICHMENT_RESOLVER_MODE] = previousContact;
+      }
+    }
+  });
+
+  test('OpenAlex budgets fail closed at their configured request ceiling', () => {
+    const budget = createOpenAlexRequestBudget(2);
+    expect(budget.maxRequests).toBe(2);
+    expect(budget.consume('works_search')).toBe(1);
+    expect(budget.consume('institution_hydration')).toBe(2);
+    let exhaustion;
+    try {
+      budget.consume('author_profile');
+    } catch (error) {
+      exhaustion = error;
+    }
+    expect(exhaustion).toMatchObject({
+      code: 'reviewer_identity_openalex_budget_exhausted',
+      operation: 'author_profile',
+    });
+    expect(budget.used).toBe(2);
+    expect(budget.remaining).toBe(0);
+    expect(OPENALEX_REQUESTS_PER_RESOLUTION).toBe(16);
+
+    const retryBudget = createOpenAlexRequestBudget(2);
+    const requestScope = retryBudget.begin('works_search');
+    expect(retryBudget.used).toBe(1);
+    expect(requestScope.consumeRequest()).toBe(1);
+    expect(requestScope.consumeRequest()).toBe(2);
+    let retryExhaustion;
+    try {
+      requestScope.consumeRequest();
+    } catch (error) {
+      retryExhaustion = error;
+    }
+    expect(retryExhaustion).toMatchObject({
+      code: 'reviewer_identity_openalex_budget_exhausted',
+      operation: 'works_search',
+    });
+  });
+
+  test('injected OpenAlex services still traverse the institution resolver bridge', async () => {
+    const institutionResolver = {
+      resolve: jest.fn(async () => ({
+        openAlexId: 'https://openalex.org/I1',
+        ror: 'https://ror.org/017zqws13',
+      })),
+      metrics: {},
+    };
+    const openAlexService = {
+      searchWorksByRawAuthorName: jest.fn(async () => ({
+        records: [{
+          authorships: [{
+            openAlexAuthorId: 'https://openalex.org/A1',
+            displayName: 'William Harcombe',
+            orcid: '0000-0001-8445-2052',
+            raw: {
+              raw_author_name: 'Will Harcombe',
+              institutions: [{ id: 'https://openalex.org/I1' }],
+            },
+          }],
+        }],
+      })),
+      getAuthorById: jest.fn(async () => ({
+        displayName: 'William Harcombe',
+        orcid: '0000-0001-8445-2052',
+        lastKnownInstitutionId: 'https://openalex.org/I1',
+        worksCount: 10,
+      })),
+    };
+    const createInstitutionResolver = jest.fn(() => institutionResolver);
+
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      openAlexService,
+      createInstitutionResolver,
+      onShadowComparison: jest.fn(),
+    });
+
+    expect(result).toBe(legacyResult);
+    expect(createInstitutionResolver).toHaveBeenCalledWith({ openAlexService });
+    expect(institutionResolver.resolve).toHaveBeenCalledWith(
+      'University of Minnesota',
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        openAlexRequestBudget: expect.any(Object),
+      }),
+    );
+    expect(openAlexService.searchWorksByRawAuthorName).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ requestScope: expect.any(Object) }),
+    );
+    expect(openAlexService.getAuthorById).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ requestScope: expect.any(Object) }),
+    );
+  });
+
+  test('the OpenAlex request budget bounds the author-profile loop', async () => {
+    const budget = createOpenAlexRequestBudget(4);
+    const openAlexService = {
+      searchWorksByRawAuthorName: jest.fn(async () => ({
+        records: [{
+          authorships: ['A1', 'A2'].map((authorId) => ({
+            openAlexAuthorId: `https://openalex.org/${authorId}`,
+            displayName: 'William Harcombe',
+            orcid: '0000-0001-8445-2052',
+            raw: {
+              raw_author_name: 'Will Harcombe',
+              institutions: [{ id: 'https://openalex.org/I1' }],
+            },
+          })),
+        }],
+      })),
+      getAuthorById: jest.fn(async (authorId) => ({
+        openAlexId: `https://openalex.org/${authorId}`,
+        displayName: 'William Harcombe',
+        orcid: '0000-0001-8445-2052',
+        lastKnownInstitutionId: 'https://openalex.org/I1',
+        worksCount: 10,
+      })),
+    };
+    const institutionResolver = {
+      resolve: jest.fn(async () => ({ openAlexId: 'https://openalex.org/I1' })),
+    };
+
+    const result = await evaluateWorksFirstSuggestion(suggestion, {
+      openAlexService,
+      institutionResolver,
+      openAlexRequestBudget: budget,
+    });
+
+    expect(result).toMatchObject({
+      decision: 'review',
+      reason: 'author_profile_fetch_failed',
+      providerFailure: 'openalex_author_profile',
+    });
+    expect(openAlexService.searchWorksByRawAuthorName).toHaveBeenCalledTimes(3);
+    expect(openAlexService.getAuthorById).toHaveBeenCalledTimes(1);
+    expect(budget.remaining).toBe(0);
+  });
+
+  test('resolver and observer work share one bounded shadow allocation', async () => {
+    const startedAt = Date.now();
+    const onShadowError = jest.fn(() => new Promise(() => {}));
+    const result = await evaluateWithRuntimeSeam(suggestion, {}, {
+      mode: RESOLVER_MODE.SHADOW,
+      shadowTimeoutMs: 18,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst: jest.fn(() => new Promise(() => {})),
+      onShadowError,
+    });
+
+    expect(result).toBe(legacyResult);
+    expect(onShadowError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'reviewer_identity_shadow_timeout',
+    }));
+    expect(Date.now() - startedAt).toBeLessThan(100);
+  });
+
+  test('shadow is skipped when the parent deadline cannot fund its full allocation', async () => {
+    const controller = new AbortController();
+    const evaluateWorksFirst = jest.fn();
+    const onShadowComparison = jest.fn();
+    const result = await evaluateWithRuntimeSeam(suggestion, {
+      signal: controller.signal,
+      deadlineAt: Date.now() + 50,
+    }, {
+      mode: RESOLVER_MODE.SHADOW,
+      shadowTimeoutMs: 18,
+      evaluateLegacy: jest.fn(async () => legacyResult),
+      evaluateWorksFirst,
+      onShadowComparison,
+    });
+
+    expect(result).toBe(legacyResult);
+    expect(evaluateWorksFirst).not.toHaveBeenCalled();
+    expect(onShadowComparison).not.toHaveBeenCalled();
+    expect(controller.signal.aborted).toBe(false);
+    expect(hasShadowAllocation(
+      { deadlineAt: 1_018 },
+      18,
+      () => 0,
+    )).toBe(true);
+    expect(SHADOW_PARENT_DEADLINE_RESERVE_MS).toBe(1_000);
+    expect(hasShadowAllocation(
+      { deadlineAt: 18 + SHADOW_PARENT_DEADLINE_RESERVE_MS - 1 },
+      18,
+      () => 0,
+    )).toBe(false);
+  });
+
+  test('a one-millisecond shadow allocation never over-allocates observer time', () => {
+    expect(shadowPhaseBudgets(1)).toEqual({ evaluationMs: 1, observerMs: 0 });
   });
 
   test('only explicit supported modes are opt-in; unset and unknown configuration are legacy', () => {
@@ -840,12 +1135,19 @@ describe('reviewer identity runtime seam', () => {
       reason: 'unique_orcid_institution_cluster',
     });
     expect(OpenAlexService.searchWorksByRawAuthorName)
-      .toHaveBeenCalledWith('Will Harcombe', { signal, limit: 50 });
+      .toHaveBeenCalledWith('Will Harcombe', expect.objectContaining({
+        signal,
+        limit: 50,
+        requestScope: expect.any(Object),
+      }));
     expect(OpenAlexService.searchInstitutions)
       .toHaveBeenCalledWith('University of Minnesota', { signal, limit: 10 });
     expect(OpenAlexService.getInstitution)
       .toHaveBeenCalledWith('https://openalex.org/I1', { signal });
     expect(OpenAlexService.getAuthorById)
-      .toHaveBeenCalledWith('A1', { signal });
+      .toHaveBeenCalledWith('A1', expect.objectContaining({
+        signal,
+        requestScope: expect.any(Object),
+      }));
   });
 });

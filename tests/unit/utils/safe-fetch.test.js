@@ -102,6 +102,26 @@ describe('safeFetch', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('invokes onRequest for every outbound redirect hop without forwarding it', async () => {
+    const onRequest = jest.fn();
+    fetch
+      .mockResolvedValueOnce(mockRedirect(302, 'https://graph.microsoft.com/v2.0/me'))
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await safeFetch('https://graph.microsoft.com/v1.0/me', { onRequest });
+
+    expect(onRequest).toHaveBeenCalledTimes(2);
+    expect(onRequest).toHaveBeenNthCalledWith(1, {
+      url: 'https://graph.microsoft.com/v1.0/me',
+      redirectIndex: 0,
+    });
+    expect(onRequest).toHaveBeenNthCalledWith(2, {
+      url: 'https://graph.microsoft.com/v2.0/me',
+      redirectIndex: 1,
+    });
+    expect(fetch.mock.calls.every(([, options]) => !('onRequest' in options))).toBe(true);
+  });
+
   it('blocks redirects to non-allowed hosts', async () => {
     fetch.mockResolvedValueOnce(mockRedirect(302, 'https://evil.com/steal'));
 

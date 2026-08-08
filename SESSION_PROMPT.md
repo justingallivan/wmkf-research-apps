@@ -160,18 +160,22 @@ offline for reproducible benchmark labels, relationship checks, and experiments.
    thresholds, peak-burst capacity, or deployment readiness. **Step (f) is
    implemented on `codex/ror-api-production-shadow`, not yet merged or
    deployed:** the v3 contracts are shared with a production request-scoped ROR
-   adapter behind `legacy-default`/shadow. Only one locally resolved ROR id is
-   hydrated through OpenAlex to supply the institution id works-first requires;
-   hydration cannot select among candidates and must echo the same ROR. Failure,
-   ambiguity, and multi-organization results return review/no bind. Existing W1
-   callers remain on the incumbent OpenAlex resolver. Focused resolver/runtime/
-   benchmark coverage is green, the broader affected caller suite is green, and
-   type checking passes. A value-redacted Production env pull on 2026-08-07
-   confirmed `REVIEWER_IDENTITY_RESOLVER_MODE` is present and non-empty but
-   normalizes to `legacy`, so this branch does not change current outputs.
-   **Next (g):** finish review/promotion of this slice, then run and
-   resource-profile S2AFF as a challenger before deciding whether any learned or
-   warm-service component is warranted.
+   adapter. The current `codex/institution-resolution-evaluation-plan` branch is
+   stacked on that slice and has begun the owner-approved offline harness plan.
+   Phase 0 runtime prerequisites are implemented: discovery, Workbench
+   applicant-recommended verification, and contact enrichment have independent
+   legacy-default modes; discovery and Workbench forward parent signals and
+   deadline timestamps; W2 skips when its full allocation plus reserve does not
+   fit; observer work shares that allocation; and all works/ROR/author OpenAlex
+   calls consume one 16-request per-resolution budget, including retries and
+   redirects. Focused runtime/caller tests
+   and type checking are green. The 2026-08-07 redacted Production probe covered
+   only the former global mode and is not evidence for the new scoped variables.
+   **Next (g):** build Phase 1 public schemas, privacy validators, safe fixtures,
+   and deterministic production-path replay from
+   `docs/INSTITUTION_RESOLUTION_OFFLINE_EVALUATION_PLAN.md`. Do not extract
+   completed-cycle data until the owner selects private storage/access/
+   retention and adjudication owners. S2AFF remains a later challenger.
 2. **Normalizer consolidation, seam by seam** (consensus step 1 proper).
    Evidence: `docs/NORMALIZER_CONSOLIDATION_INVENTORY.md` equivalence classes;
    158 characterization tests already green. Start with the two byte-identical

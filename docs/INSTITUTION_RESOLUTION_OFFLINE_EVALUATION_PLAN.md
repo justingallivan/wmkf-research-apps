@@ -2,7 +2,7 @@
 title: Institution Resolution Offline Evaluation and Rollout Plan
 domain: reviewer-identity
 kind: plan
-status: draft
+status: active
 summary: "Offline institution-resolution readiness plan using private cycle evidence, deterministic replay, live canaries, and bounded workload tests."
 canonical: false
 cataloged: 2026-08-07
@@ -16,7 +16,7 @@ related:
 
 # Institution Resolution Offline Evaluation and Rollout Plan
 
-**Status:** Proposed for adversarial review  
+**Status:** Implementation in progress; Phase 0 runtime prerequisites are built on the current branch
 **Decision date:** 2026-08-07  
 **Reason for this plan:** Reviewer searching is complete for the current cycle, so
 organic production shadow traffic will not provide a useful sample for roughly six
@@ -102,10 +102,12 @@ be enabled. It will not be called by the live request path.
    clearly non-biomedical proposal). It has two production entry points: reviewer
    discovery and Workbench applicant-recommended enrichment. Default PubMed-routed
    suggestions do not exercise this resolver.
-8. [VERIFIED via `lib/services/reviewer-identity-runtime.js`] The current shadow
-   batch is sequential, permits up to 15 seconds per candidate, and inherits the
-   parent discovery abort signal. Shadow therefore preserves legacy objects but is
-   not yet proven request-neutral for the shared discovery deadline.
+8. [VERIFIED FIXED ON CURRENT BRANCH via runtime and caller tests] The shadow
+   batch remains sequential, but comparison/error observation now shares each
+   candidate's total allocation, Workbench and reviewer discovery forward both
+   their abort signal and deadline timestamp, and W2 skips when its full
+   allocation plus reserve no longer fits. The representative 15/25-candidate
+   latency margin still requires Phase 4 measurement and owner approval.
 9. [VERIFIED via `evaluateWorksFirstSuggestion`] The production institution call
    passes only `suggestion.suggestedInstitution`; country and domain evidence are
    not transported to this seam.
@@ -376,10 +378,10 @@ The dry-run bounds are derived before network access as:
 - `ROR per-resolution-scope cap x candidate count x concurrent batch count`; and
 - `OpenAlex per-resolution-scope cap x candidate count x concurrent batch count`.
 
-Phase 0 adds and tests a unified per-resolution OpenAlex budget covering works
-searches, ROR hydration, every author-profile/anchor-matcher lookup, and combined-mode
-OpenAlex author-by-ORCID hydration; the currently uncapped author loop must consume
-that budget and stop safely. Retries and subrequests are inside their provider's
+Phase 0 now adds and tests a 16-request per-resolution OpenAlex budget covering
+works searches, ROR hydration, every author-profile/anchor-matcher lookup, and
+combined-mode OpenAlex author-by-ORCID hydration; the author loop consumes that
+budget and stops safely. Retries and subrequests are inside their provider's
 scope cap and are never silently omitted. The runner refuses a scenario whose
 arithmetic bound exceeds its explicit provider cap, the dated ROR ceiling, or the
 available OpenAlex quota; observation is not used as the first line of rate-limit
@@ -541,10 +543,10 @@ All Gate S requirements remain in force, plus:
 
 Gate C authorizes combined mode separately for the two spine-routed Track-A batch
 entry points: reviewer discovery and Workbench applicant-recommended enrichment.
-Because the current environment variable is global, Phase 0 must first add
-entry-point-scoped modes and keep contact-enrichment `evaluateExistingResult` in
-`legacy`. Contract tests prove enabling one batch caller cannot change either the
-other caller or contact enrichment. Contact-enrichment combined rollout requires its
+Phase 0 adds entry-point-scoped modes and keeps contact-enrichment
+`evaluateExistingResult` independently defaulted to `legacy`. Contract tests
+prove enabling one batch caller cannot change either the other caller or contact
+enrichment. Contact-enrichment combined rollout requires its
 own representative corpus, sealed holdout, transition ledger, and owner gate; it is
 not authorized by this plan.
 
@@ -586,21 +588,21 @@ that is an acceptable outcome.
 2. Treat runtime replay and any production-mode observation as dependent on the
    reviewed runtime slice landing; do not couple the evaluation plan's merge to that
    PR.
-3. Before Gate S, implement and characterize the shadow-budget isolation/skip seam so
+3. **[IMPLEMENTED ON CURRENT BRANCH]** Before Gate S, implement and characterize the shadow-budget isolation/skip seam so
    shadow cannot consume either parent deadline. Forward
    `deadlineController.signal` from Workbench applicant-recommended enrichment into
    `verifyClaudeSuggestions`; add a regression proving timeout/cancellation reaches
    that runtime batch.
-4. Put shadow comparison/error observation inside the same total budget and skip the
+4. **[IMPLEMENTED ON CURRENT BRANCH]** Put shadow comparison/error observation inside the same total budget and skip the
    best-effort write when no observer allocation remains; characterize zero-delay and
    worst-case observer behavior.
-5. Add explicit dependency injection for OpenAlex works search and author lookup so
+5. **[IMPLEMENTED ON CURRENT BRANCH]** Add explicit dependency injection for OpenAlex works search and author lookup so
    runtime replay can use cassettes without replacing works-first or skipping the ROR
    bridge. Preserve production defaults when hooks are omitted.
-6. Add a unified per-resolution OpenAlex provider budget covering works, institution,
+6. **[IMPLEMENTED ON CURRENT BRANCH]** Add a unified per-resolution OpenAlex provider budget covering works, institution,
    author/anchor, and OpenAlex author-by-ORCID calls; the author loop must fail safe
    when its budget is exhausted.
-7. Before any mode change, add entry-point-scoped controls for reviewer discovery,
+7. **[IMPLEMENTED ON CURRENT BRANCH]** Before any mode change, add entry-point-scoped controls for reviewer discovery,
    Workbench applicant-recommended verification, and contact enrichment. Each
    defaults independently to legacy; Gate S/C can promote only the caller whose
    evidence passed.

@@ -74,8 +74,9 @@ Files:
 - Logging is non-authoritative and best-effort; no application read path.
 - Logger failure/timeout/storage outage never alters the reviewer decision.
   Normal inserts are awaited so a Vercel function cannot finish before the
-  insert settles; the writer's 2-second deadline bounds that database latency
-  in shadow or combined mode.
+  insert settles. The writer retains its 2-second internal cap, and the runtime
+  additionally runs comparison/error observation inside the candidate's total
+  shadow allocation; observation is skipped when no allocation remains.
 - No proposal content, names, email addresses, provider payloads, anchors, or
   secrets are stored — `candidate_key` is the runtime's existing 16-hex
   truncated SHA-256; error rows store `error_code` only, never messages. The
@@ -106,8 +107,10 @@ is pseudonymous, not anonymous.
 
 ## Remaining production gate
 
-- No environment variables were changed; unknown values still collapse to
-  legacy. Code now recognizes explicit `combined`, but no deployed environment
-  enables it.
-- No W2 production cutover. Gather shadow observations before any separate
-  owner-approved `REVIEWER_IDENTITY_RESOLVER_MODE=combined` change.
+- No environment variables were changed by the current harness branch; unknown
+  values still collapse to legacy. Reviewer discovery, Workbench recommended
+  verification, and contact enrichment now have independent server mode
+  controls, so one caller's gate cannot promote another.
+- No W2 production cutover. Complete the applicable offline Gate S before an
+  owner-approved scoped `shadow` change; `combined` requires that caller's
+  separate Gate C.

@@ -97,6 +97,24 @@ describe('OpenAlexService.searchAuthors', () => {
     expect(safeFetch).toHaveBeenCalledTimes(3);
   });
 
+  test('each retry delegates actual-request accounting to the shared request scope', async () => {
+    const requestScope = { consumeRequest: jest.fn() };
+    safeFetch
+      .mockImplementationOnce(async (_url, options) => {
+        options.onRequest();
+        return jsonResponse({ error: 'busy' }, 503);
+      })
+      .mockImplementationOnce(async (_url, options) => {
+        options.onRequest();
+        return jsonResponse({ meta: { count: 0 }, results: [] });
+      });
+
+    await OpenAlexService.searchWorksByRawAuthorName('Test Author', { requestScope });
+
+    expect(requestScope.consumeRequest).toHaveBeenCalledTimes(2);
+    expect(safeFetch).toHaveBeenCalledTimes(2);
+  });
+
   test('caller abort interrupts retry backoff without another provider call', async () => {
     const controller = new AbortController();
     safeFetch.mockResolvedValue(jsonResponse(

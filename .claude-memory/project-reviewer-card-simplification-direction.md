@@ -52,8 +52,9 @@ corrected the altitude — order by what most rapidly reduces complexity.
   see `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`
   → production request-scoped shadow adapter + post-resolution ROR→OpenAlex bridge
   IMPLEMENTED ON `codex/ror-api-production-shadow` (not merged/deployed;
-  Production remains legacy-default)
-  → S2AFF profile →
+  no deployed mode change) → offline readiness plan ACTIVE on
+  `codex/institution-resolution-evaluation-plan` (Phase 0 runtime prerequisites
+  built; public schemas/replay and private corpus governance next) → S2AFF profile →
   normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.

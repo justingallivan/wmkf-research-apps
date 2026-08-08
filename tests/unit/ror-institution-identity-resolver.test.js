@@ -68,7 +68,10 @@ describe('ROR institution identity resolver', () => {
       domain_evidence: 'umn.edu',
       signal,
     });
-    expect(openAlexService.getInstitution).toHaveBeenCalledWith(ROR, { signal });
+    expect(openAlexService.getInstitution).toHaveBeenCalledWith(ROR, {
+      signal,
+      requestScope: undefined,
+    });
     expect(identity).toMatchObject({
       openAlexId: 'https://openalex.org/I130238516',
       ror: ROR,
@@ -168,6 +171,35 @@ describe('ROR institution identity resolver', () => {
       providerHydrations: 2,
       providerFailures: 1,
       definitiveMisses: 1,
+    });
+  });
+
+  test('OpenAlex budget exhaustion skips hydration and remains a retryable provider failure', async () => {
+    const decisionResolver = { resolve: jest.fn(async () => resolvedDecision()) };
+    const openAlexService = { getInstitution: jest.fn() };
+    const exhaustedBudget = {
+      begin: jest.fn(() => {
+        const error = new Error('reviewer_identity_openalex_budget_exhausted');
+        error.code = 'reviewer_identity_openalex_budget_exhausted';
+        throw error;
+      }),
+    };
+    const resolver = createResolver({ decisionResolver, openAlexService });
+
+    await expect(resolver.resolve('University of Minnesota', {
+      openAlexRequestBudget: exhaustedBudget,
+    })).resolves.toBeNull();
+    await expect(resolver.resolve('University of Minnesota', {
+      openAlexRequestBudget: exhaustedBudget,
+    })).resolves.toBeNull();
+
+    expect(exhaustedBudget.begin).toHaveBeenCalledTimes(2);
+    expect(openAlexService.getInstitution).not.toHaveBeenCalled();
+    expect(decisionResolver.resolve).toHaveBeenCalledTimes(2);
+    expect(resolver.metrics).toMatchObject({
+      providerHydrations: 0,
+      providerFailures: 2,
+      cacheSize: 0,
     });
   });
 

@@ -33,10 +33,11 @@ narrow current-affiliation alternate tie-break are live. The W3.1 full-text
 fallback and W3.4 page-first cascade completed evaluation and were not promoted.
 W0's additive institution-identity substrate and W1's affiliation/COI correction
 are implemented. W2's works-first resolver passed its frozen 40-case gate and
-now sits behind a server-owned runtime seam. The seam defaults to legacy,
-supports comparison-only shadow execution, and contains an explicit
-owner-gated `combined` mode; no tracked environment enables it, so production
-behavior is unchanged. W4.1's additive evidence-bundle generation and
+now sits behind a server-owned runtime seam. Reviewer discovery, Workbench
+applicant-recommended verification, and contact enrichment default
+independently to legacy, support comparison-only shadow execution, and contain
+an explicit owner-gated `combined` mode scoped to that caller. The current
+evaluation branch changes no deployed mode. W4.1's additive evidence-bundle generation and
 persistence path are built on the existing Wave 13 verified-anchors memo;
 re-resolution on later reuse and W4.2 dedup remain `[PLANNED]`. Broader
 email-alternate handling also remains `[PLANNED]`.
@@ -218,11 +219,13 @@ shadow arm. `ReviewerIdentityRuntime` is the sole production call seam for
 non-biomedical/PubMed-off Track-A verification. Unset, `legacy`, and every
 unknown value return `ReviewerIdentityEvidence` exactly as before. `shadow`
 settles every authoritative legacy result in the candidate batch first, then
-runs each W2 comparison under an independent hard 15-second deadline, emits a
-redacted decision-only comparison, and still returns the exact legacy objects.
-Shadow observers are non-throwing. The default observers await a best-effort
-Postgres insert so the function cannot finish before a normal insert settles;
-storage failures still cannot alter the reviewer result. The explicit
+runs bounded W2 comparison work, emits a redacted decision-only comparison,
+and still returns the exact legacy objects. Discovery and Workbench pass the
+parent signal and deadline timestamp; W2 skips if its complete allocation plus
+a reserve no longer fits. Comparison/error observation shares the allocation.
+One 16-request OpenAlex budget per resolution covers works searches, ROR hydration,
+author/anchor profiles, and combined ORCID-profile hydration; exhaustion fails
+safe. Storage failures still cannot alter the reviewer result. The explicit
 `combined` mode adapts W2 rescues into the established result contract with an
 automated `probable` ceiling, uses the current OpenAlex profile rather than
 overwriting it with the claimed affiliation, and fails back to the legacy
@@ -260,10 +263,12 @@ OpenAlex rank one, and a structured author-profile provider failure also fails
 the zero-provider-failure gate. Its W0 and anchor-canonicalization adapters
 propagate otherwise hidden provider failures, invalidating the run rather than
 scoring them. No new rule without a first failing benchmark case (invariant 6).
-**Runtime seam invariant.** `REVIEWER_IDENTITY_RESOLVER_MODE` accepts explicit
-`shadow` and `combined`; unset/`legacy`/unknown/authoritative-looking values such
-as `w2` and `cutover` execute legacy only. Shadow failures never change or
-replace legacy results; combined-mode W2 provider failure retains legacy.
+**Runtime seam invariant.** The discovery, Workbench-recommended, and
+contact-enrichment mode variables independently accept explicit `shadow` and
+`combined`; unset/`legacy`/unknown/authoritative-looking values such as `w2` and
+`cutover` execute legacy only. The former generic variable cannot promote these
+tagged live callers. Shadow failures never change or replace legacy results;
+combined-mode W2 provider failure retains legacy.
 The production batch completes all legacy provider work before W2 can consume
 provider quota. OpenAlex retry backoff observes the overall shadow abort but is
 not incorrectly governed by an expired per-request timeout. No client-provided

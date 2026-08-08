@@ -215,6 +215,8 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
   });
 
   test('PubMed-off verification runs OpenAlex/ORCID spine and can verify', async () => {
+    const signal = new AbortController().signal;
+    const deadlineAt = Date.now() + 30_000;
     ReviewerIdentityRuntime.evaluateSuggestion.mockResolvedValueOnce({
       status: 'confirmed',
       resolverStatus: 'confirmed',
@@ -232,13 +234,32 @@ describe('DiscoveryService.verifyClaudeSuggestions identity states', () => {
     const result = await runVerification(
       { name: 'Robert Sang', expertiseAreas: ['attosecond physics'] },
       { 'Robert Sang[Author]': [article('1', 'Robert Sang'), article('2', 'Robert Sang'), article('3', 'Robert Sang')] },
-      { searchPubmed: false, proposalInfo: { primaryResearchArea: 'Physics' } },
+      {
+        searchPubmed: false,
+        proposalInfo: { primaryResearchArea: 'Physics' },
+        resolverEntryPoint: 'reviewer_discovery',
+        signal,
+        deadlineAt,
+      },
     );
 
     expect(PubMedService.search).not.toHaveBeenCalled();
     expect(ReviewerIdentityRuntime.evaluateSuggestion).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Robert Sang' }),
-      expect.objectContaining({ proposalInfo: { primaryResearchArea: 'Physics' } }),
+      expect.objectContaining({
+        proposalInfo: { primaryResearchArea: 'Physics' },
+        signal,
+        deadlineAt,
+      }),
+    );
+    expect(ReviewerIdentityRuntime.evaluateSuggestions).toHaveBeenCalledWith(
+      [expect.objectContaining({ name: 'Robert Sang' })],
+      expect.objectContaining({
+        proposalInfo: { primaryResearchArea: 'Physics' },
+        signal,
+        deadlineAt,
+      }),
+      expect.objectContaining({ entryPoint: 'reviewer_discovery' }),
     );
     expect(result.verified).toHaveLength(1);
     expect(result.unverified).toHaveLength(0);

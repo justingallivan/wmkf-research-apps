@@ -208,6 +208,21 @@ test('happy path: progress frames strictly precede one terminal complete; never 
   );
 });
 
+test('verification receives the Workbench entry point and the live parent deadline signal', async () => {
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(verifyClaudeSuggestions).toHaveBeenCalledWith(
+    expect.any(Array),
+    expect.any(Function),
+    expect.objectContaining({
+      signal: expect.any(AbortSignal),
+      deadlineAt: expect.any(Number),
+      resolverEntryPoint: 'workbench_recommended',
+    }),
+  );
+});
+
 test.each([
   ['declined recommendation', { wmkf_selected: false, wmkf_declined: true }, 'declined'],
   ['invited selected recommendation', { wmkf_selected: true, wmkf_invited: true }, 'invited'],
