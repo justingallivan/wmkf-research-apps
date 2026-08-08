@@ -207,6 +207,82 @@ describe('LLMClient.complete', () => {
     expect(secondBody.model).toBe('fallback');
   });
 
+  test('strips model-bound thinking blocks only from a cross-model 529 fallback', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'fallback' }],
+        model: 'fallback', usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test', model: 'primary', fallbackModel: 'fallback',
+      initialRetryDelayMs: 1,
+    });
+    const messages = [
+      { role: 'user', content: 'Find the request' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'sig-primary' },
+          { type: 'tool_use', id: 'tool-1', name: 'get_entity', input: { id: 'request-1' } },
+          { type: 'redacted_thinking', data: 'encrypted-primary' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '{"found":true}' }],
+      },
+    ];
+    const originalMessages = JSON.parse(JSON.stringify(messages));
+
+    await client.complete({ messages });
+
+    const primaryBody = JSON.parse(safeFetch.mock.calls[0][1].body);
+    const fallbackBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(primaryBody.messages).toEqual(originalMessages);
+    expect(messages).toEqual(originalMessages);
+    expect(fallbackBody.messages).toEqual([
+      originalMessages[0],
+      {
+        role: 'assistant',
+        content: [originalMessages[1].content[1]],
+      },
+      originalMessages[2],
+    ]);
+    expect(fallbackBody.messages[1].content[0]).toEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'tool-1',
+    }));
+    expect(fallbackBody.messages[2].content[0]).toEqual(expect.objectContaining({
+      type: 'tool_result',
+      tool_use_id: 'tool-1',
+    }));
+  });
+
+  test('preserves thinking blocks when primary and fallback aliases resolve to the same model', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'retry' }],
+        model: 'claude-sonnet-4-6', usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'sonnet',
+      fallbackModel: 'sonnet',
+      initialRetryDelayMs: 1,
+      maxRetries: 1,
+    });
+    const messages = [{
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: '', signature: 'same-model-signature' }],
+    }];
+
+    await client.complete({ messages });
+
+    expect(JSON.parse(safeFetch.mock.calls[1][1].body).messages).toEqual(messages);
+  });
+
   test('rebuilds Opus primary to Sonnet fallback body with temperature and existing fields on 529', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
@@ -221,7 +297,26 @@ describe('LLMClient.complete', () => {
       fallbackModel: 'claude-sonnet-4-6',
       initialRetryDelayMs: 1,
     });
-    const messages = [{ role: 'user', content: 'hi' }];
+    const messages = [
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'primary-signature' },
+          { type: 'tool_use', id: 'fallback-tool-1', name: 'lookup', input: {} },
+          { type: 'redacted_thinking', data: 'primary-redacted' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'fallback-tool-1', content: 'result' }],
+      },
+    ];
+    const fallbackMessages = [
+      messages[0],
+      { role: 'assistant', content: [messages[1].content[1]] },
+      messages[2],
+    ];
     const system = 'system prompt';
     const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
 
@@ -233,7 +328,7 @@ describe('LLMClient.complete', () => {
     expect(firstBody).not.toHaveProperty('temperature');
     expect(retryBody).toEqual(expect.objectContaining({
       model: 'claude-sonnet-4-6',
-      messages,
+      messages: fallbackMessages,
       system,
       tools,
       max_tokens: 1234,
@@ -646,7 +741,26 @@ describe('LLMClient.stream', () => {
       fallbackModel: 'claude-sonnet-4-6',
       initialRetryDelayMs: 1,
     });
-    const messages = [{ role: 'user', content: 'hi' }];
+    const messages = [
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'stream-primary-signature' },
+          { type: 'tool_use', id: 'stream-tool-1', name: 'lookup', input: {} },
+          { type: 'redacted_thinking', data: 'stream-primary-redacted' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'stream-tool-1', content: 'result' }],
+      },
+    ];
+    const fallbackMessages = [
+      messages[0],
+      { role: 'assistant', content: [messages[1].content[1]] },
+      messages[2],
+    ];
     const system = 'system prompt';
     const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
 
@@ -656,7 +770,7 @@ describe('LLMClient.stream', () => {
     expect(result.text).toBe('ok');
     expect(retryBody).toEqual(expect.objectContaining({
       model: 'claude-sonnet-4-6',
-      messages,
+      messages: fallbackMessages,
       system,
       tools,
       max_tokens: 1234,
