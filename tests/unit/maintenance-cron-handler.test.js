@@ -54,6 +54,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
 
 import handler from '../../pages/api/cron/maintenance';
 import MaintenanceService from '../../lib/services/maintenance-service';
+import FeedbackService from '../../lib/services/feedback-service';
 
 function makeRes() {
   return {
@@ -67,6 +68,30 @@ function makeRes() {
 beforeEach(() => { jest.clearAllMocks(); });
 
 describe('maintenance cron — maintenance_runs retention step wiring', () => {
+  it('runs Dynamics feedback cleanup with the fixed 20-day ACK retention', async () => {
+    FeedbackService.cleanupOldFeedback.mockResolvedValueOnce(5);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(FeedbackService.cleanupOldFeedback).toHaveBeenCalledWith(20);
+    expect(res.body.results.feedback).toBe(5);
+    expect(res.body.totalDeleted).toBe(5);
+  });
+
+  it('reports Dynamics feedback cleanup failure instead of false zero-deletion success', async () => {
+    FeedbackService.cleanupOldFeedback.mockRejectedValueOnce(new Error('feedback delete failed'));
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.feedback).toEqual({ error: 'feedback delete failed' });
+    expect(res.body.failedSubtasks).toContain('feedback');
+    expect(MaintenanceService.completeRun).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ status: 'failed' }),
+    );
+  });
+
   it('runs reviewer identity shadow retention and folds its count into totalDeleted', async () => {
     MaintenanceService.cleanupReviewerIdentityShadowLog.mockResolvedValueOnce(6);
     const res = makeRes();

@@ -186,9 +186,11 @@ export default async function handler(req, res) {
       results.intakePrivateBlobs = { error: error.message };
     }
 
-    // 8. Dynamics feedback cleanup (resolved entries older than 180 days)
+    // 8. Dynamics feedback cleanup (20 days after first admin ACK).
+    // Owner decision 2026-08-08: reviewed_at is the retention clock; rows
+    // without an ACK remain ineligible regardless of status or creation age.
     try {
-      results.feedback = await FeedbackService.cleanupOldFeedback(180);
+      results.feedback = await FeedbackService.cleanupOldFeedback(20);
       totalDeleted += results.feedback;
     } catch (error) {
       results.feedback = { error: error.message };

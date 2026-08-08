@@ -719,4 +719,182 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).not.toContain('wmkf_ai_run');
     expect(toolResult).not.toContain('SHOULD_NOT_REACH_CLAUDE');
   });
+
+  // A rejected tool must still be answered against its OWN tool_use id. It used
+  // to be answered with a literal 'unknown', which leaves the real tool_use
+  // unanswered and invents an id that was never issued — the Anthropic API
+  // rejects both on the next round, so any rejection here became an
+  // unexplainable top-level failure instead of a recoverable tool error.
+  test('answers a rejected tool call with its own tool_use id', async () => {
+    // A BigInt survives the serializer and makes truncateResult's
+    // JSON.stringify throw, which rejects the executeOne promise.
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockResolvedValue({
+      records: [{ akoya_requestnum: 1n }],
+      totalCount: 1,
+    });
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    // The loop must continue — a rejected tool is recoverable, not fatal.
+    expect(mockStream).toHaveBeenCalledTimes(2);
+
+    const assistantMsg = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'assistant' && Array.isArray(m.content),
+    );
+    const issuedIds = assistantMsg.content
+      .filter(b => b.type === 'tool_use')
+      .map(b => b.id);
+    const toolResults = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content;
+
+    // Every issued tool_use is answered, and no answer names an unissued id.
+    expect(toolResults.map(r => r.tool_use_id).sort()).toEqual([...issuedIds].sort());
+    expect(toolResults.map(r => r.tool_use_id)).not.toContain('unknown');
+    expect(toolResults[0].content).toContain('error');
+  });
+
+  // The case the fix actually exists for: SEVERAL tools in one round, settling
+  // out of order, with only one of them rejecting. Index alignment between
+  // Promise.allSettled results and toolBlocks is what keeps each answer attached
+  // to its own id — the single-tool test above cannot detect a misalignment.
+  // (Gap identified in Codex review, 2026-08-07.)
+  test('keeps ids aligned when several tools settle out of order and one rejects', async () => {
+    mockStream
+      .mockReset()
+      .mockResolvedValueOnce({
+        content: [
+          // Middle one will reject; the others resolve on different timelines.
+          { type: 'tool_use', id: 'tu_a', name: 'count_records', input: { table_name: 'akoya_request', filter: 'statecode eq 0' } },
+          { type: 'tool_use', id: 'tu_b', name: 'query_records', input: { table_name: 'akoya_request', top: 1 } },
+          { type: 'tool_use', id: 'tu_c', name: 'count_records', input: { table_name: 'akoya_request', filter: 'statecode eq 1' } },
+        ],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      })
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Done.' }],
+        model: 'claude-test',
+        usage: {},
+        textStreamed: false,
+      });
+
+    // tu_b rejects (BigInt breaks JSON.stringify inside truncateResult).
+    mockQueryRecords.mockReset();
+    mockQueryRecords.mockResolvedValue({ records: [{ akoya_requestnum: 1n }], totalCount: 1 });
+
+    // The two count_records calls settle in reverse order relative to issue
+    // order, so a naive positional assumption would cross the answers over.
+    mockCountRecords.mockReset();
+    mockCountRecords
+      .mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve(41), 20)))
+      .mockImplementationOnce(() => Promise.resolve(7));
+
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'three lookups' }] },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(mockStream).toHaveBeenCalledTimes(2);
+
+    const toolResults = mockStream.mock.calls[1][0].messages.find(
+      m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+    ).content;
+
+    // Answered in issue order, one per issued id, none invented.
+    expect(toolResults.map(r => r.tool_use_id)).toEqual(['tu_a', 'tu_b', 'tu_c']);
+    // The rejection is attached to tu_b specifically, not to a sibling.
+    const byId = Object.fromEntries(toolResults.map(r => [r.tool_use_id, r.content]));
+    expect(byId.tu_b).toContain('error');
+    // The two successes carry their own distinct counts — proof the results
+    // didn't get swapped by completion order. Matched with the JSON key so a
+    // bare number can't fake-pass against the hex nonce in the wrapper.
+    expect(byId.tu_a).toContain('"count":41');
+    expect(byId.tu_c).toContain('"count":7');
+    expect(byId.tu_a).not.toContain('error');
+    expect(byId.tu_c).not.toContain('error');
+  });
+
+  // Top-level failure copy. A top-level throw used to emit the bare string
+  // "Query failed", which named neither what broke nor what to do, and gave the
+  // user nothing to quote when escalating. Owner-reported 2026-08-07.
+  describe('top-level failure reporting', () => {
+    /** Reassemble the SSE `error` event payload from res.write calls. */
+    const errorEvent = (res) => {
+      const stream = res.write.mock.calls.map(c => c[0]).join('');
+      const blocks = stream.split('\n\n').filter(Boolean);
+      const errBlock = blocks.find(b => b.startsWith('event: error'));
+      if (!errBlock) return null;
+      const dataLine = errBlock.split('\n').find(l => l.startsWith('data: '));
+      return JSON.parse(dataLine.slice(6));
+    };
+
+    const runWithStreamError = async (err) => {
+      mockStream.mockReset().mockRejectedValue(err);
+      const req = createMockReq({
+        method: 'POST',
+        body: { messages: [{ role: 'user', content: 'find all interactions with Texas Tech' }] },
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      return errorEvent(res);
+    };
+
+    test('does not emit the bare "Query failed" string, and carries a reference id', async () => {
+      const payload = await runWithStreamError(new Error('boom'));
+
+      expect(payload).not.toBeNull();
+      expect(payload.message).not.toBe('Query failed');
+      // Plain-language, system-as-subject, with the retry → administrator ladder.
+      expect(payload.message).toMatch(/temporary blip/i);
+      expect(payload.message).toMatch(/contact an administrator/i);
+      // Never implies the user's own access is at fault.
+      expect(payload.message).not.toMatch(/your (access|permission)/i);
+      // The Explorer has no retry button — an error is a plain chat bubble — so
+      // the copy must not tell the user to press one.
+      expect(payload.message).not.toMatch(/press retry|retry button/i);
+      // Correlates with the server log line.
+      expect(payload.requestId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    test('keeps the raw provider error server-side', async () => {
+      const payload = await runWithStreamError(
+        Object.assign(new Error('Claude API error 500: internal-detail-leak'), { status: 500 }),
+      );
+
+      expect(JSON.stringify(payload)).not.toContain('internal-detail-leak');
+    });
+
+    test('distinguishes an overloaded provider from a timeout', async () => {
+      const overloaded = await runWithStreamError(
+        Object.assign(new Error('Claude API error 529 after 3 attempts: overloaded'), { status: 529 }),
+      );
+      expect(overloaded.message).toMatch(/overloaded/i);
+
+      const timedOut = await runWithStreamError(new Error('Claude API timeout after 60000ms'));
+      expect(timedOut.message).toMatch(/took too long/i);
+      // A timeout is the one case with a useful self-service next step.
+      expect(timedOut.message).toMatch(/date range|single organization/i);
+      expect(timedOut.message).not.toMatch(/overloaded/i);
+    });
+
+    test('reports a rate-limited provider as capacity, not as user fault', async () => {
+      const payload = await runWithStreamError(
+        Object.assign(new Error('Claude API error 429 after 3 attempts: rate limit'), { status: 429 }),
+      );
+      expect(payload.message).toMatch(/too many requests/i);
+      expect(payload.message).not.toMatch(/your /i);
+    });
+  });
 });

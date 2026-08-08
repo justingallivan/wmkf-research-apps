@@ -37,7 +37,6 @@ import {
 } from '../../../lib/utils/ai-payload-boundary';
 import { getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { estimateCostCents } from '../../../lib/utils/usage-logger';
 import { LLMClient } from '../../../lib/services/llm-client';
 import {
@@ -100,6 +99,10 @@ export default async function handler(req, res) {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Minted before the try so the failure handler can quote the same id the
+  // server-side log carries — the user's "reference" for an escalation.
+  const requestId = crypto.randomUUID();
+
   try {
     const { messages, sessionId } = req.body;
     const claudeApiKey = process.env.CLAUDE_API_KEY;
@@ -120,7 +123,6 @@ export default async function handler(req, res) {
       getUserRole(userProfileId),
       getActiveRestrictions(),
     ]);
-    const requestId = crypto.randomUUID();
     return await withDynamicsContext({ restrictions, requestId }, async () => {
     // A7 Part 3: CRM records returned as tool_result are untrusted — applicant-
     // and staff-authored free-text fields can carry injection payloads that get
@@ -214,9 +216,7 @@ export default async function handler(req, res) {
         }
         const executionTime = Date.now() - startTime;
 
-        const recordCount = result?._validatorReject
-          ? 0
-          : result?.records?.length || result?.results?.length || result?.count || result?.searchCount || (result?.error ? -1 : 0);
+        const recordCount = deriveRecordCount(name, result);
         console.log(`[DynExp] Round ${round} ${name} → ${recordCount} records, ${executionTime}ms`);
 
         logQuery({
@@ -230,6 +230,12 @@ export default async function handler(req, res) {
           wasDenied: false,
           denialReason: result?._validatorReject ? `ODATA_VALIDATOR_REJECT: ${result.error}` : null,
         });
+
+        // `_notFound` is internal telemetry framing — strip it before the
+        // result reaches the model.
+        if (result && typeof result === 'object' && '_notFound' in result) {
+          delete result._notFound;
+        }
 
         const resultForModel = serializeDynamicsExplorerToolResult(
           result?._validatorReject ? { error: result.error } : result,
@@ -251,14 +257,20 @@ export default async function handler(req, res) {
         return { type: 'tool_result', tool_use_id: id, content: wrapped.text };
       };
 
+      // `settled` is index-aligned with toolBlocks, so a rejected executeOne
+      // still knows which tool_use it belongs to. Answering with a literal
+      // 'unknown' id instead left the real tool_use unanswered AND added a
+      // tool_result for an id that was never issued — both of which the
+      // Anthropic API rejects on the next round, turning any rejection here
+      // into an unexplainable top-level failure.
       const settled = await Promise.allSettled(toolBlocks.map(executeOne));
-      for (const s of settled) {
+      settled.forEach((s, i) => {
         toolResults.push(s.status === 'fulfilled' ? s.value : {
           type: 'tool_result',
-          tool_use_id: 'unknown',
+          tool_use_id: toolBlocks[i].id,
           content: JSON.stringify({ error: s.reason?.message || 'Tool execution failed' }),
         });
-      }
+      });
 
       // Append assistant + tool results, then compact old rounds
       currentMessages.push({
@@ -279,14 +291,70 @@ export default async function handler(req, res) {
     sendEvent('complete', { rounds: round, maxRoundsReached: true, suggestFeedback: true });
     });
   } catch (error) {
-    console.error('Dynamics Explorer chat error:', error);
+    console.error(`Dynamics Explorer chat error [requestId=${requestId}]:`, error);
     sendEvent('error', {
-      message: BASE_CONFIG.ERROR_MESSAGES.QUERY_FAILED,
+      message: describeChatFailure(error),
+      requestId,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   } finally {
     res.end();
   }
+}
+
+// ─── Top-level failure copy ───
+//
+// Tool failures never reach this path — they are classified by
+// classifyToolError and fed back into the agent loop. Everything that DOES
+// reach the outer catch is infrastructure: the Claude call, the role/
+// restriction load, or the taxonomy build. A single "Query failed" string told
+// the user nothing about which, and left nothing to quote when escalating.
+//
+// In production the raw error stays server-side (logged above with the same
+// requestId); in development it is ALSO returned as `details` for local
+// debugging — so "server-side only" holds for production, not for every mode.
+// Copy follows the house voice for transient failures: the system is the
+// subject, plain words, and a retry → administrator action ladder. It never
+// implies the user's own access is in doubt.
+
+// "press retry" would name a button the Explorer does not have — an error
+// message is a plain chat bubble, and the only recovery is asking again.
+const RETRY_LADDER = 'Please try asking again, and if the problem doesn\'t resolve, contact an administrator.';
+
+/**
+ * Map a top-level chat failure to user-facing copy.
+ * @param {Error & { status?: number }} error
+ * @returns {string}
+ */
+function describeChatFailure(error) {
+  const status = typeof error?.status === 'number' ? error.status : null;
+  const raw = String(error?.message || '');
+  const isAbort = error?.name === 'AbortError' || /\baborted\b/i.test(raw);
+  const isTimeout = /\btimeout\b/i.test(raw);
+
+  if (isTimeout || isAbort) {
+    return 'That question took too long to answer, so I stopped it. Narrowing it usually '
+      + 'helps — name a single organization, or add a date range. '
+      + 'No data was changed. ' + RETRY_LADDER;
+  }
+
+  if (status === 429) {
+    return 'The AI service is handling too many requests at the moment, so it turned '
+      + 'mine away. This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  if (status === 529 || status === 503) {
+    return 'The AI service is temporarily overloaded and couldn\'t take my request. '
+      + 'This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  if (status !== null) {
+    return 'I\'m having trouble reaching the AI service, so I couldn\'t work through '
+      + 'your question. This is usually a temporary blip. ' + RETRY_LADDER;
+  }
+
+  return 'Something went wrong on my side before I could finish your question. '
+    + 'This is usually a temporary blip. ' + RETRY_LADDER;
 }
 
 // ─── Auto-detection ───
@@ -607,6 +675,78 @@ async function validateEffectiveODataCall(name, input, restrictions) {
 
 function validatorReject(message) {
   return { error: message, _validatorReject: true };
+}
+
+// `get_entity` resolves to a BARE record rather than a collection. `get_record`
+// is deliberately NOT here: no such branch exists in executeTool.
+const ENTITY_LOOKUP_TOOLS = new Set(['get_entity']);
+
+// Tools that answer with SCHEMA rather than data. A successful describe_table
+// has no count field at all; reporting 0 would file a success under
+// "zero results", so it counts as the one schema it returned.
+const METADATA_TOOLS = new Set(['describe_table']);
+
+// Count fields in preference order, derived from the actual return shapes in
+// this file rather than guessed. Two rules make the order what it is:
+//
+//  1. `count` first — for count_records the count IS the answer.
+//  2. The TARGET of the call beats incidental context, and `totalCount` comes
+//     LAST. Several relationship handlers return both a specific count and a
+//     total: account→emails returns `emailCount` (emails found) alongside
+//     `requestCount` (requests scanned to find them), and most handlers return
+//     `totalCount` (total matching in Dataverse) next to the number of target
+//     rows actually returned. Those tool-specific counts win. Search is the
+//     deliberate exception: its formatted `results` value is a string, so
+//     `totalCount` is the relevant search cardinality. `requestCount` sits after
+//     the other targets because it is context whenever one of them is present.
+const COUNT_FIELDS = [
+  'count',
+  'emailCount', 'paymentCount', 'reportCount', 'annotationCount', 'reviewerCount',
+  'documentCount', 'searchCount',
+  'exportedCount', 'estimatedCount',
+  'requestCount',
+  'totalCount',
+];
+
+/**
+ * What to write to dynamics_query_log.record_count for one tool result.
+ *
+ * Semantics: the tool result's relevant cardinality. Search reports total
+ * matches; collection queries, exports, and relationship tools report the
+ * target rows returned; 0 means a genuine zero-result answer (including an
+ * explicitly classified name-based lookup miss); -1 means the tool errored;
+ * a schema or single-entity answer counts as 1.
+ *
+ * The original expression was a falsy-chain
+ * (`records?.length || results?.length || count || searchCount || …`) which
+ * logged `search`'s formatted-string LENGTH as a count (212 for 3 hits), logged
+ * 0 for every successful get_entity, and ignored export counts entirely. A
+ * first correction fixed those but still preferred `totalCount` over the
+ * tool-specific field and omitted `annotationCount`/`reviewerCount`, so
+ * relationship calls reported total matches instead of returned rows and
+ * request→reviewers reported 0 on success. Both rounds of that are covered by
+ * tests built from the real return shapes.
+ *
+ * NOTE: rows written before this change carry the old semantics — any trend
+ * analysis spanning it must treat the eras separately.
+ */
+export function deriveRecordCount(name, result) {
+  if (!result || typeof result !== 'object') return 0;
+  if (result._validatorReject) return 0;
+  if (result._notFound) return 0;
+  if (result.error) return -1;
+
+  // Arrays are genuine collections. Strings never are — that was the search bug.
+  if (Array.isArray(result.records)) return result.records.length;
+  if (Array.isArray(result.results)) return result.results.length;
+
+  for (const field of COUNT_FIELDS) {
+    if (Number.isFinite(result[field])) return result[field];
+  }
+
+  if (ENTITY_LOOKUP_TOOLS.has(name)) return 1;
+  if (METADATA_TOOLS.has(name)) return 1;
+  return 0;
 }
 
 /**
@@ -996,7 +1136,8 @@ async function getEntity({ type, identifier }) {
   }
 
   if (!result.records.length) {
-    return { error: `No ${type} found matching "${identifier}"` };
+    // A real zero-result answer, not a tool failure — see deriveRecordCount.
+    return { error: `No ${type} found matching "${identifier}"`, _notFound: true };
   }
 
   // Prefer exact match — check both primary and alternate name fields
@@ -1075,7 +1216,9 @@ async function getEntity({ type, identifier }) {
  */
 async function resolveEntity(sourceType, sourceName) {
   const result = await getEntity({ type: sourceType, identifier: sourceName });
-  if (result.error) return { error: result.error };
+  // Carry the not-found marker through so get_related logs a zero-result rather
+  // than an error when the source simply doesn't exist.
+  if (result.error) return { error: result.error, _notFound: result._notFound };
 
   // Extract the GUID from the result
   const cfg = ENTITY_TYPE_CONFIGS[sourceType];
@@ -1145,7 +1288,7 @@ async function getRelated({ source_type, source_id, source_name, target_type, da
   let sourceRecord = null;
   if (!resolvedId) {
     const resolved = await resolveEntity(source_type, source_name);
-    if (resolved.error) return { error: resolved.error };
+    if (resolved.error) return { error: resolved.error, _notFound: resolved._notFound };
     resolvedId = resolved.id;
     sourceRecord = resolved.record;
   }
@@ -1651,7 +1794,9 @@ async function listDocuments({ request_number, request_id }) {
   let requestNum = request_number;
   if (!requestId) {
     const result = await getEntity({ type: 'request', identifier: request_number });
-    if (result.error) return { error: result.error };
+    // Carry _notFound so an unresolvable request logs a zero-result rather
+    // than an errored call (see deriveRecordCount).
+    if (result.error) return { error: result.error, _notFound: result._notFound };
     requestId = result.akoya_requestid;
     requestNum = result.akoya_requestnum || request_number;
     if (!requestId) {
@@ -1776,7 +1921,8 @@ async function searchDocuments({ query, library, request_number }) {
 
   if (request_number) {
     const reqResult = await getEntity({ type: 'request', identifier: request_number });
-    if (reqResult.error) return { error: reqResult.error };
+    // Same as listDocuments — a not-found source is a zero-result, not an error.
+    if (reqResult.error) return { error: reqResult.error, _notFound: reqResult._notFound };
     requestId = reqResult.akoya_requestid;
     const requestNum = reqResult.akoya_requestnum || request_number;
     if (!requestId) {

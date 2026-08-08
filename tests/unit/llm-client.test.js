@@ -207,6 +207,82 @@ describe('LLMClient.complete', () => {
     expect(secondBody.model).toBe('fallback');
   });
 
+  test('strips model-bound thinking blocks only from a cross-model 529 fallback', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'fallback' }],
+        model: 'fallback', usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test', model: 'primary', fallbackModel: 'fallback',
+      initialRetryDelayMs: 1,
+    });
+    const messages = [
+      { role: 'user', content: 'Find the request' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'sig-primary' },
+          { type: 'tool_use', id: 'tool-1', name: 'get_entity', input: { id: 'request-1' } },
+          { type: 'redacted_thinking', data: 'encrypted-primary' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'tool-1', content: '{"found":true}' }],
+      },
+    ];
+    const originalMessages = JSON.parse(JSON.stringify(messages));
+
+    await client.complete({ messages });
+
+    const primaryBody = JSON.parse(safeFetch.mock.calls[0][1].body);
+    const fallbackBody = JSON.parse(safeFetch.mock.calls[1][1].body);
+    expect(primaryBody.messages).toEqual(originalMessages);
+    expect(messages).toEqual(originalMessages);
+    expect(fallbackBody.messages).toEqual([
+      originalMessages[0],
+      {
+        role: 'assistant',
+        content: [originalMessages[1].content[1]],
+      },
+      originalMessages[2],
+    ]);
+    expect(fallbackBody.messages[1].content[0]).toEqual(expect.objectContaining({
+      type: 'tool_use',
+      id: 'tool-1',
+    }));
+    expect(fallbackBody.messages[2].content[0]).toEqual(expect.objectContaining({
+      type: 'tool_result',
+      tool_use_id: 'tool-1',
+    }));
+  });
+
+  test('preserves thinking blocks when primary and fallback aliases resolve to the same model', async () => {
+    safeFetch
+      .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
+      .mockResolvedValueOnce(jsonResponse({
+        content: [{ type: 'text', text: 'retry' }],
+        model: 'claude-sonnet-4-6', usage: { input_tokens: 1, output_tokens: 1 },
+      }));
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test',
+      model: 'sonnet',
+      fallbackModel: 'sonnet',
+      initialRetryDelayMs: 1,
+      maxRetries: 1,
+    });
+    const messages = [{
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: '', signature: 'same-model-signature' }],
+    }];
+
+    await client.complete({ messages });
+
+    expect(JSON.parse(safeFetch.mock.calls[1][1].body).messages).toEqual(messages);
+  });
+
   test('rebuilds Opus primary to Sonnet fallback body with temperature and existing fields on 529', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
@@ -221,7 +297,26 @@ describe('LLMClient.complete', () => {
       fallbackModel: 'claude-sonnet-4-6',
       initialRetryDelayMs: 1,
     });
-    const messages = [{ role: 'user', content: 'hi' }];
+    const messages = [
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'primary-signature' },
+          { type: 'tool_use', id: 'fallback-tool-1', name: 'lookup', input: {} },
+          { type: 'redacted_thinking', data: 'primary-redacted' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'fallback-tool-1', content: 'result' }],
+      },
+    ];
+    const fallbackMessages = [
+      messages[0],
+      { role: 'assistant', content: [messages[1].content[1]] },
+      messages[2],
+    ];
     const system = 'system prompt';
     const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
 
@@ -233,7 +328,7 @@ describe('LLMClient.complete', () => {
     expect(firstBody).not.toHaveProperty('temperature');
     expect(retryBody).toEqual(expect.objectContaining({
       model: 'claude-sonnet-4-6',
-      messages,
+      messages: fallbackMessages,
       system,
       tools,
       max_tokens: 1234,
@@ -556,6 +651,80 @@ describe('LLMClient.stream', () => {
     ]);
   });
 
+  // Thinking blocks arrive empty from content_block_start and are filled by
+  // thinking_delta / signature_delta. Dropping those deltas left the block
+  // empty, and a caller that echoes the assistant turn back (the Dynamics
+  // Explorer agent loop) got a 400 from the API — "each thinking block must
+  // contain thinking" — which broke every multi-round query. Owner-reported
+  // 2026-08-07; confirmed in production logs.
+  test('accumulates thinking and signature deltas so the block can be echoed back', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'let me ' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'check' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig123' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tu_1', name: 'q' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', usage: { output_tokens: 2 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    const thinking = r.content.find(b => b.type === 'thinking');
+    // Both fields must survive so the block can be echoed back unmodified.
+    expect(thinking.thinking).toBe('let me check');
+    expect(thinking.signature).toBe('sig123');
+    // Never the string "undefined" from appending to a missing field.
+    expect(thinking.thinking).not.toMatch(/undefined/);
+    // Thinking must not be mistaken for assistant text.
+    expect(r.text).toBe('');
+  });
+
+  // The shape current models actually send: `display: "omitted"` is the default,
+  // so the block carries NO thinking text and only a signature. Restoring the
+  // text alone would not have fixed this case — the signature is the field that
+  // makes the echoed block verifiable. (Gap identified in Codex review,
+  // 2026-08-07: the original test only covered the summarized-display shape.)
+  test('preserves the signature when display is omitted and no thinking_delta arrives', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'EqQBCgIYAhoM' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tu_1', name: 'q' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', usage: { output_tokens: 2 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    const thinking = r.content.find(b => b.type === 'thinking');
+    expect(thinking.signature).toBe('EqQBCgIYAhoM');
+    // Empty thinking text is legitimate under omitted display — it must be
+    // passed through as-is, not synthesized into something non-empty.
+    expect(thinking.thinking).toBe('');
+    // The tool call alongside it still reassembles normally.
+    expect(r.content.find(b => b.type === 'tool_use').input).toEqual({});
+  });
+
+  test('accumulates thinking deltas when the start event omits the fields', async () => {
+    safeFetch.mockResolvedValueOnce(streamResponse([
+      { type: 'message_start', message: { model: 'm', usage: { input_tokens: 4 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'abc' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', usage: { output_tokens: 1 } },
+    ]));
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const r = await client.stream({ messages: [] });
+
+    expect(r.content.find(b => b.type === 'thinking').thinking).toBe('abc');
+  });
+
   test('rebuilds fallback body with stream flag and fallback temperature on 529', async () => {
     safeFetch
       .mockResolvedValueOnce(jsonResponse({ error: 'overloaded' }, { status: 529 }))
@@ -572,7 +741,26 @@ describe('LLMClient.stream', () => {
       fallbackModel: 'claude-sonnet-4-6',
       initialRetryDelayMs: 1,
     });
-    const messages = [{ role: 'user', content: 'hi' }];
+    const messages = [
+      { role: 'user', content: 'hi' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'stream-primary-signature' },
+          { type: 'tool_use', id: 'stream-tool-1', name: 'lookup', input: {} },
+          { type: 'redacted_thinking', data: 'stream-primary-redacted' },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'stream-tool-1', content: 'result' }],
+      },
+    ];
+    const fallbackMessages = [
+      messages[0],
+      { role: 'assistant', content: [messages[1].content[1]] },
+      messages[2],
+    ];
     const system = 'system prompt';
     const tools = [{ name: 'lookup', input_schema: { type: 'object', properties: {} } }];
 
@@ -582,7 +770,7 @@ describe('LLMClient.stream', () => {
     expect(result.text).toBe('ok');
     expect(retryBody).toEqual(expect.objectContaining({
       model: 'claude-sonnet-4-6',
-      messages,
+      messages: fallbackMessages,
       system,
       tools,
       max_tokens: 1234,

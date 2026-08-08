@@ -132,8 +132,6 @@ function DynamicsExplorer() {
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const messageIdRef = useRef(0);
-  const pendingFileExportsRef = useRef([]);
-  const pendingDocumentLinksRef = useRef([]);
 
   // useContext returns null when no ProfileProvider is mounted (non-public
   // pages always have one — see pages/_app.js); unconditional hook call.
@@ -181,6 +179,19 @@ function DynamicsExplorer() {
       textareaRef.current.style.height = 'auto';
     }
 
+    // Declared OUTSIDE the try so the catch below can see it: a read that
+    // rejects AFTER a terminal event was already handled must not append a
+    // second, contradictory error message.
+    let sawTerminalEvent = false;
+    // Request-local queues prevent a delayed EOF or late event from an older
+    // turn from clearing/contaminating a newer turn after the composer unlocks.
+    const pendingFileExports = [];
+    const pendingDocumentLinks = [];
+    const clearPendingArtifacts = () => {
+      pendingFileExports.length = 0;
+      pendingDocumentLinks.length = 0;
+    };
+
     try {
       const resp = await fetch('/api/dynamics-explorer/chat', {
         method: 'POST',
@@ -198,10 +209,25 @@ function DynamicsExplorer() {
 
       // Parse SSE stream
       const reader = resp.body.getReader();
+      const cancelReader = async () => {
+        try {
+          await reader.cancel?.();
+        } catch {
+          // The terminal event has already been handled; cancellation failure
+          // must not replace the answer/error the user is reading.
+        }
+      };
       const decoder = new TextDecoder();
       let buffer = '';
       let assistantContent = '';
       let streamingMsgId = null;
+      // sawTerminalEvent (declared above the try) records whether the server
+      // sent a terminal event. A plain `if (isProcessing)` after the read loop
+      // can never work: isProcessing is captured from the render that created
+      // this callback, and the guard at the top of sendMessage already returned
+      // when it was true — so it is always false here, and a stream that drops
+      // without a terminal event (function timeout, network cut) left the
+      // spinner running forever with nothing rendered.
 
       while (true) {
         const { done, value } = await reader.read();
@@ -231,10 +257,10 @@ function DynamicsExplorer() {
                 setThinkingStatus(parsed.message || 'Processing...');
                 break;
               case 'file_ready':
-                pendingFileExportsRef.current.push(parsed);
+                pendingFileExports.push(parsed);
                 break;
               case 'document_links':
-                pendingDocumentLinksRef.current.push(parsed);
+                pendingDocumentLinks.push(parsed);
                 break;
               case 'export_progress':
                 setThinkingStatus(`Processing records ${parsed.processed} of ${parsed.total}...${parsed.failed ? ` (${parsed.failed} failed)` : ''}`);
@@ -266,14 +292,13 @@ function DynamicsExplorer() {
                 assistantContent = parsed.content || '';
                 break;
               case 'complete': {
-                const fileExports = pendingFileExportsRef.current.length > 0
-                  ? [...pendingFileExportsRef.current]
+                const fileExports = pendingFileExports.length > 0
+                  ? [...pendingFileExports]
                   : undefined;
-                pendingFileExportsRef.current = [];
-                const documentLinks = pendingDocumentLinksRef.current.length > 0
-                  ? [...pendingDocumentLinksRef.current]
+                const documentLinks = pendingDocumentLinks.length > 0
+                  ? [...pendingDocumentLinks]
                   : undefined;
-                pendingDocumentLinksRef.current = [];
+                clearPendingArtifacts();
 
                 let finalMsgId;
                 if (streamingMsgId) {
@@ -301,21 +326,41 @@ function DynamicsExplorer() {
                 if (parsed.suggestFeedback) {
                   setSuggestFeedbackId(finalMsgId);
                 }
+                sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
-                break;
+                await cancelReader();
+                return;
               }
               case 'error':
+                clearPendingArtifacts();
+                // If text had already begun streaming, that message still
+                // carries isStreaming — the error branch used to leave it set,
+                // so the partial answer pulsed forever above the error. Finalize
+                // it first, then append the error.
+                if (streamingMsgId) {
+                  setMessages(prev => prev.map(m =>
+                    m.id === streamingMsgId
+                      ? { ...m, content: assistantContent, isStreaming: false }
+                      : m
+                  ));
+                }
                 setMessages(prev => [...prev, {
                   id: ++messageIdRef.current,
                   role: 'assistant',
-                  content: `**Error:** ${parsed.message}`,
+                  // The reference id matches the server log line for this
+                  // request — it's what an administrator needs to find the
+                  // underlying error, which is not sent to the browser in
+                  // production (development additionally returns `details`).
+                  content: `**Error:** ${parsed.message}${parsed.requestId ? `\n\nReference: \`${parsed.requestId}\`` : ''}`,
                   timestamp: Date.now(),
                   isError: true,
                 }]);
+                sawTerminalEvent = true;
                 setIsProcessing(false);
                 setThinkingStatus('');
-                break;
+                await cancelReader();
+                return;
             }
           } catch {
             // Skip malformed events
@@ -323,8 +368,13 @@ function DynamicsExplorer() {
         }
       }
 
-      // If we fell through without a complete event, finalize
-      if (isProcessing) {
+      // EOF is a hard boundary even if an out-of-protocol event arrived after
+      // `complete`/`error`; nothing pending may cross into the next turn.
+      clearPendingArtifacts();
+
+      // The stream ended without a terminal event — finalize whatever arrived
+      // so the composer is usable again instead of stuck on a spinner.
+      if (!sawTerminalEvent) {
         if (assistantContent) {
           if (streamingMsgId) {
             setMessages(prev => prev.map(m =>
@@ -340,18 +390,37 @@ function DynamicsExplorer() {
               timestamp: Date.now(),
             }]);
           }
+        } else {
+          // Nothing arrived at all. Silently clearing the spinner would leave
+          // the user staring at their own question with no idea it failed.
+          setMessages(prev => [...prev, {
+            id: ++messageIdRef.current,
+            role: 'assistant',
+            content: '**Error:** The connection dropped before I could answer. '
+              + 'Long questions are the usual cause — narrowing yours often helps. '
+              + 'Please try asking again, and if the problem doesn\'t resolve, contact an administrator.',
+            timestamp: Date.now(),
+            isError: true,
+          }]);
         }
         setIsProcessing(false);
         setThinkingStatus('');
       }
     } catch (err) {
-      setMessages(prev => [...prev, {
-        id: ++messageIdRef.current,
-        role: 'assistant',
-        content: `**Error:** ${err.message}`,
-        timestamp: Date.now(),
-        isError: true,
-      }]);
+      // The answer already landed if a terminal event was handled; a read that
+      // rejects afterwards (socket torn down after the final chunk) is not
+      // something to report — appending here would contradict the answer the
+      // user is already reading.
+      clearPendingArtifacts();
+      if (!sawTerminalEvent) {
+        setMessages(prev => [...prev, {
+          id: ++messageIdRef.current,
+          role: 'assistant',
+          content: `**Error:** ${err.message}`,
+          timestamp: Date.now(),
+          isError: true,
+        }]);
+      }
       setIsProcessing(false);
       setThinkingStatus('');
     }

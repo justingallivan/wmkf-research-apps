@@ -1859,19 +1859,28 @@ export function AppAccessSection() {
 }
 
 // --- Section D2: Dynamics Explorer Feedback ---
-function DynamicsFeedbackSection() {
+export function DynamicsFeedbackSection() {
   const [feedback, setFeedback] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ status: '', type: '' });
+  // Default to unreviewed feedback — that's the queue an admin opens this
+  // section to work through. "All statuses" buried new items under resolved ones.
+  const [filter, setFilter] = useState({ status: 'new', type: '' });
   const [expandedId, setExpandedId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
 
   const fetchFeedback = (params = {}) => {
     const qs = new URLSearchParams();
-    if (params.status || filter.status) qs.set('status', params.status || filter.status);
-    if (params.type || filter.type) qs.set('type', params.type || filter.type);
-    fetch(`/api/dynamics-explorer/feedback?${qs}`)
+    const status = Object.prototype.hasOwnProperty.call(params, 'status')
+      ? params.status
+      : filter.status;
+    const type = Object.prototype.hasOwnProperty.call(params, 'type')
+      ? params.type
+      : filter.type;
+    if (status) qs.set('status', status);
+    if (type) qs.set('type', type);
+    const query = qs.toString();
+    fetch(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         setFeedback(data?.feedback || []);

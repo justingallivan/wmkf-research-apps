@@ -29,6 +29,47 @@ export const config = {
 
 const limiter = nextRateLimiter({ max: 30 });
 
+/**
+ * Flatten one client-supplied history message to plain text.
+ *
+ * The Q&A UI sends history as `{role, content: <string>}`, so in practice this
+ * is a no-op. It exists because that was a CONVENTION, not an invariant: the
+ * route copied `req.body.messages` through unchanged, so a client could put
+ * arbitrary provider content blocks in an assistant turn and have them replayed
+ * to the model. `thinking` blocks are the case that matters — a malformed or
+ * foreign one is rejected by the API, which is exactly the failure mode that
+ * broke the Dynamics Explorer (see lib/services/llm-client.js). Reducing
+ * history to text makes the safe shape enforced here rather than assumed.
+ * When content is an array, only top-level `text` blocks survive that
+ * reduction. Multimodal `image` blocks and `document` blocks are intentionally
+ * dropped, along with thinking, tool-use, and every other provider-specific
+ * block type.
+ */
+export function flattenHistoryMessage(message) {
+  const suppliedRole = message?.role;
+  const roleIsRecognized = suppliedRole === 'user' || suppliedRole === 'assistant';
+  const role = suppliedRole === 'assistant' ? 'assistant' : 'user';
+  if (suppliedRole != null && !roleIsRecognized) {
+    console.warn('[QA] Unrecognized history role coerced to "user"', { role: suppliedRole });
+  }
+  const { content } = message || {};
+
+  if (typeof content === 'string') {
+    return { role, content: content.trim() ? content : '[non-text content omitted]' };
+  }
+  if (Array.isArray(content)) {
+    const text = content
+      .filter(block => block?.type === 'text' && typeof block.text === 'string')
+      .map(block => block.text)
+      .join('\n')
+      .trim();
+    // An assistant turn must be non-empty; fall back to a neutral placeholder
+    // rather than sending a block the API will reject.
+    return { role, content: text || '[non-text content omitted]' };
+  }
+  return { role, content: '[non-text content omitted]' };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -119,9 +160,9 @@ export default async function handler(req, res) {
         role: 'assistant',
         content: 'Understood. I have the full proposal and summary available. How can I help?'
       });
-      conversationMessages = conversationMessages.concat(messages.slice(-6));
+      conversationMessages = conversationMessages.concat(messages.slice(-6).map(flattenHistoryMessage));
     } else {
-      conversationMessages = [...messages];
+      conversationMessages = messages.map(flattenHistoryMessage);
     }
 
     // Add the new question
