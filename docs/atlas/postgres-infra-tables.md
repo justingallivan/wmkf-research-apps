@@ -48,9 +48,15 @@ loud at module load.
 **Source of truth:** Postgres-only.
 Per-query log (NL → tool plan → result). Used by feedback flow.
 
-### `dynamics_feedback` (2 rows)
+### `dynamics_feedback` (5 rows; targeted re-probe 2026-08-08)
 **Source of truth:** Postgres-only.
-Thumbs up/down + auto-detected failures.
+Thumbs up/down + auto-detected failures. The first successful admin Review or
+Resolve action stamps `reviewed_at` as the canonical acknowledgement time
+without restarting it on later status changes. Daily maintenance deletes acknowledged
+rows 20 days after that timestamp; rows with no acknowledgement are ineligible
+regardless of status or creation age. The 2026-08-08 aggregate-only production
+probe found five rows, all resolved, acknowledged, and older than 20 days from
+acknowledgement, so all five are eligible on the next cron run.
 
 ### `dynamics_user_roles` (6 rows), `dynamics_restrictions` (0 rows)
 **Source of truth:** Postgres-only.
