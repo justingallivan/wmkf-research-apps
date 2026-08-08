@@ -328,11 +328,27 @@ deployment sanity check, not a measurement instrument.
      runnable immediately): the existing evaluator as-is — it wires the
      incumbent institution resolver [VERIFIED via
      `scripts/evaluate-reviewer-works-first.js:18,281-284`], and the
-     benchmark has never had a clean run. Arm 2 (the actual
+     benchmark had never had a clean run. Arm 2 (the actual
      enrichment-injection gate): the evaluator extended to wire the
      ROR-backed checker path — built with the Stage 1 harness. New output
      slugs; the failed 2026-08-08 network-outage artifact is preserved,
      not overwritten.
+     **Arm 1 COMPLETED 2026-08-08** (local artifact
+     `outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-baseline-2026-08-08.json`,
+     untracked per run-artifact precedent): 40/40 cases, zero provider
+     failures — the first clean run of this benchmark. All five
+     `evaluatePromotion` gates pass for the combined arm: correct-bind gain
+     +8 (spine 13 → combined 21, required ≥3), false binds 3 → 0 (all three
+     spine false binds were demoted to review by the combine policy — two
+     via `initial_only_not_works_corroborated`, one via
+     `resolver_anchor_disagreement`, the latter becoming a miss [VERIFIED
+     via the run artifact's rows]),
+     right-person-policy binds 1 (≤ spine's 1), misses 11 → 4 (≤8). Works
+     arm detail: 7 of 40 cases returned `claimed_institution_unresolved`
+     under the incumbent institution resolver — the headroom arm 2's
+     ROR-backed stage targets. This result is measurement evidence only; it
+     does not authorize combined-mode promotion or enrichment injection,
+     which still require arm 2 plus owner sign-off.
    - **(b) C3 replay: parked** — trigger unchanged (institution-resolver
      promotion returning to the table).
 
