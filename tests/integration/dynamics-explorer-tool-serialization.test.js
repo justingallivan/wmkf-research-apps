@@ -128,8 +128,13 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       { logicalName: 'normal_field', displayName: 'Normal', type: 'String', description: '' },
       { logicalName: 'statecode', displayName: 'Status', type: 'State', description: '' },
       { logicalName: 'createdon', displayName: 'Created On', type: 'DateTime', description: '' },
-      { logicalName: '_regardingobjectid_value', displayName: 'Regarding', type: 'Lookup', description: '' },
-      { logicalName: '_wmkf_potentialreviewer1_value', displayName: 'Potential Reviewer 1', type: 'Lookup', description: '' },
+      // AttributeMetadata reports BARE lookup logical names; the `_<name>_value`
+      // computed alias is never an attribute row. See the fixture-shape note in
+      // tests/unit/dynamics-odata-validator.test.js ([ASSUMED], not live-captured).
+      { logicalName: 'regardingobjectid', displayName: 'Regarding', type: 'Lookup', description: '' },
+      { logicalName: 'wmkf_potentialreviewer1', displayName: 'Potential Reviewer 1', type: 'Lookup', description: '' },
+      { logicalName: 'akoya_applicantid', displayName: 'Applicant', type: 'Lookup', description: 'Applying organization' },
+      { logicalName: 'ownerid', displayName: 'Owner', type: 'Owner', description: '' },
       { logicalName: 'wmkf_secret', displayName: 'Secret', type: 'String', description: '' },
     ]);
     mockQueryRecords.mockResolvedValue({
@@ -661,6 +666,372 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('DENIED');
     expect(toolResult).toContain('wmkf_secret');
     expect(toolResult).toContain('restricted');
+  });
+
+  // ─── Lookup computed-alias handling (production request
+  // tq9j6-1786197256337-e64473f8bbd5 burned 15 rounds because the pre-flight
+  // validator accepted the WRONG lookup spelling and rejected the right one).
+  describe('lookup computed alias', () => {
+    const GUID = '3f2504e0-4f89-11d3-9a0c-0305e82c330c';
+
+    /** Drive one tool_use round through the handler and return its tool_result. */
+    const runTool = async (name, input) => {
+      mockStream
+        .mockReset()
+        .mockResolvedValueOnce({
+          content: [{ type: 'tool_use', id: 'tool-1', name, input }],
+          model: 'claude-test',
+          usage: {},
+          textStreamed: false,
+        })
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'Done.' }],
+          model: 'claude-test',
+          usage: {},
+          textStreamed: false,
+        });
+      const req = createMockReq({
+        method: 'POST',
+        body: { messages: [{ role: 'user', content: 'lookup query' }] },
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      return mockStream.mock.calls[1][0].messages.find(
+        m => m.role === 'user' && Array.isArray(m.content) && m.content[0]?.type === 'tool_result',
+      ).content[0].content;
+    };
+
+    test('mocked live metadata carries no precomputed _value alias', async () => {
+      const mocked = await mockGetEntityAttributes();
+      const precomputed = mocked
+        .map(a => a.logicalName)
+        .filter(n => n.startsWith('_') && n.endsWith('_value'));
+      expect(mocked.length).toBeGreaterThan(0);
+      expect(precomputed).toEqual([]);
+    });
+
+    test('the correct alias filter validates and reaches queryRecords', async () => {
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: `_akoya_applicantid_value eq ${GUID}`,
+        top: 1,
+      });
+
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].filter).toContain(`_akoya_applicantid_value eq ${GUID}`);
+    });
+
+    test('the bare lookup spelling is rejected locally and never reaches queryRecords', async () => {
+      for (const filter of [`akoya_applicantid eq '${GUID}'`, `akoya_applicantid eq ${GUID}`]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('_akoya_applicantid_value');
+      }
+    });
+
+    test('the alias is rejected in $orderby and the bare alias hint stays out of $expand', async () => {
+      const ordered = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        orderby: '_akoya_applicantid_value desc',
+      });
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(ordered).toContain('orderby');
+
+      mockQueryRecords.mockClear();
+      const expanded = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: '_akoya_applicantid_value',
+      });
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(expanded).toContain('akoya_applicantid');
+
+      mockQueryRecords.mockClear();
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'akoya_applicantid($select=name)',
+      });
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].expand).toBe('akoya_applicantid($select=name)');
+    });
+
+    test('describe_table surfaces the queryable alias for lookup attributes', async () => {
+      const toolResult = await runTool('describe_table', { table_name: 'akoya_request', full: true });
+
+      expect(toolResult).toContain('_akoya_applicantid_value');
+      expect(toolResult).toContain('_ownerid_value');
+      // The bare logical name still appears as the attribute's logicalName, but
+      // the note must not present it as the $expand navigation property.
+      expect(toolResult).toContain('akoya_applicantid');
+      expect(toolResult).not.toMatch(/bare logicalName is the navigation property/i);
+      expect(toolResult).toMatch(/do not guess/i);
+    });
+
+    test('describe_table honors a restriction stored under the alias spelling', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: '_akoya_applicantid_value',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('describe_table', { table_name: 'akoya_request', full: true });
+
+      expect(toolResult).not.toContain('akoya_applicantid');
+      expect(toolResult).not.toContain('Applying organization');
+      expect(toolResult).toContain('akoya_requestnum');
+    });
+
+    test('a bare-stored restriction denies the alias spelling before Dynamics is called', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: 'akoya_applicantid',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: `_akoya_applicantid_value eq ${GUID}`,
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      expect(toolResult).toContain('_akoya_applicantid_value');
+    });
+
+    // A restriction on the bare lookup used to be bypassed by filtering its
+    // NAVIGATION PATH: the general tokenizer drops any token containing "/", and
+    // chat.js's checkRestriction never inspects $filter at all, so the query
+    // reached Dataverse and returned the restricted column's value by name.
+    test('a navigation-path filter cannot bypass a restriction on the lookup', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'akoya_request',
+            field_name: 'akoya_applicantid',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        filter: "akoya_applicantid/name eq 'Secret Org'",
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      // The denial names the spelling the model typed, not the complement.
+      expect(toolResult).not.toContain('_akoya_applicantid_value');
+    });
+
+    // Nested $expand options name fields on the EXPANDED table, whose identity
+    // cannot be resolved from AttributeMetadata. With any field restriction
+    // configured they must fail closed rather than be forwarded unchecked.
+    test('nested $expand options fail closed while a field restriction exists', async () => {
+      setMockSqlResults({
+        dynamics_restrictions: {
+          rows: [{
+            table_name: 'account',
+            field_name: 'wmkf_secret',
+            restriction_type: 'field',
+            reason: 'sensitive',
+          }],
+        },
+      });
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'akoya_applicantid($select=name,wmkf_secret)',
+      });
+
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('DENIED');
+      expect(toolResult).not.toContain('wmkf_secret');
+    });
+
+    // A PLAIN $expand returns the related entity's default field set, and
+    // nested $orderby/$top/$expand read that table too — the same leak the
+    // nested-$select case has. None of them may reach Dynamics while a field
+    // restriction exists, because the expanded target cannot be resolved here.
+    test('every $expand shape fails closed while a field restriction exists', async () => {
+      for (const expand of [
+        'akoya_applicantid',
+        'akoya_applicantid($orderby=name desc)',
+        'akoya_applicantid($top=5)',
+        'akoya_applicantid($expand=parentaccountid)',
+        // A provably-wrong path root still answers with the BLANKET denial while
+        // a restriction exists — the fail-closed rule runs first.
+        'akoya_requestid/child',
+      ]) {
+        setMockSqlResults({
+          dynamics_restrictions: {
+            rows: [{
+              table_name: 'account',
+              field_name: 'wmkf_secret',
+              restriction_type: 'field',
+              reason: 'sensitive',
+            }],
+          },
+        });
+        mockQueryRecords.mockClear();
+
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('DENIED');
+        expect(toolResult).not.toContain('wmkf_secret');
+      }
+    });
+
+    test('an $expand naming a scalar or fabricated alias never reaches queryRecords', async () => {
+      for (const expand of ['akoya_requestid', '_akoya_requestid_value', 'akoya_requestnum']) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('relationship metadata');
+      }
+    });
+
+    // Appending a path cannot turn a scalar, PartyList or computed-value
+    // property into a navigation property, so `$expand=<wrong root>/child` must
+    // be stopped here exactly like the bare spelling is.
+    test('a path-shaped $expand with a provably-wrong root never reaches queryRecords', async () => {
+      const baseAttrs = await mockGetEntityAttributes();
+      mockGetEntityAttributes.mockResolvedValue([
+        ...baseAttrs,
+        { logicalName: 'to', displayName: 'To', type: 'PartyList', description: '' },
+      ]);
+
+      for (const expand of [
+        'to/child',                          // PartyList root
+        'akoya_requestid/child',             // Uniqueidentifier (scalar) root
+        '_to_value/child',                   // fabricated alias root
+        '_akoya_applicantid_value/child',    // computed lookup value root
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          expand,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('relationship metadata');
+      }
+    });
+
+    test('a path-shaped $expand with an unknown plausible root is forwarded unchanged', async () => {
+      mockQueryRecords.mockClear();
+      await runTool('query_records', {
+        table_name: 'akoya_request',
+        select: 'akoya_requestnum',
+        expand: 'Unknown_Nav/child',
+      });
+      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+      expect(mockQueryRecords.mock.calls[0][1].expand).toBe('Unknown_Nav/child');
+    });
+
+    test('grouped and reversed invalid Guid comparisons never reach queryRecords', async () => {
+      for (const filter of [
+        "'not-guid' eq akoya_requestid",
+        '12345678 ne akoya_requestid',
+        `(_akoya_applicantid_value) eq '${GUID}'`,
+        `_akoya_applicantid_value eq ('${GUID}')`,
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('UNQUOTED GUID');
+      }
+    });
+
+    test('a valid Guid comparison written in reverse or grouped still reaches queryRecords', async () => {
+      for (const filter of [
+        `${GUID} eq _akoya_applicantid_value`,
+        `(_akoya_applicantid_value) eq ${GUID}`,
+      ]) {
+        mockQueryRecords.mockClear();
+        await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).toHaveBeenCalledTimes(1);
+        expect(mockQueryRecords.mock.calls[0][1].filter).toContain(filter);
+      }
+    });
+
+    test('invalid Edm.Guid literals never reach queryRecords', async () => {
+      for (const filter of [
+        `_akoya_applicantid_value eq '${GUID}'`,
+        "_akoya_applicantid_value eq 'Secret Org'",
+        '_akoya_applicantid_value eq 12345678',
+      ]) {
+        mockQueryRecords.mockClear();
+        const toolResult = await runTool('query_records', {
+          table_name: 'akoya_request',
+          select: 'akoya_requestnum',
+          filter,
+          top: 1,
+        });
+        expect(mockQueryRecords).not.toHaveBeenCalled();
+        expect(toolResult).toContain('UNQUOTED GUID');
+      }
+    });
+
+    test('classified unknown-field hints suggest the queryable alias, not the bare lookup', async () => {
+      mockQueryRecords.mockReset();
+      mockQueryRecords.mockRejectedValue(new Error(
+        "Query failed (400): Could not find a property named 'akoya_applicantid' on type 'Microsoft.Dynamics.CRM.akoya_request'."
+      ));
+
+      const toolResult = await runTool('query_records', {
+        table_name: 'akoya_requests',
+        select: 'akoya_requestnum',
+        top: 1,
+      });
+
+      expect(toolResult).toContain('unknown_field');
+      const suggestions = toolResult.match(/"suggestions":\[(.*?)\]/)?.[1] || '';
+      expect(suggestions).toContain('"_akoya_applicantid_value"');
+      expect(suggestions).not.toContain('"akoya_applicantid"');
+    });
   });
 
   test('search strips operational AI run hits returned by Dataverse Search', async () => {
