@@ -40,9 +40,18 @@ const limiter = nextRateLimiter({ max: 30 });
  * foreign one is rejected by the API, which is exactly the failure mode that
  * broke the Dynamics Explorer (see lib/services/llm-client.js). Reducing
  * history to text makes the safe shape enforced here rather than assumed.
+ * When content is an array, only top-level `text` blocks survive that
+ * reduction. Multimodal `image` blocks and `document` blocks are intentionally
+ * dropped, along with thinking, tool-use, and every other provider-specific
+ * block type.
  */
 export function flattenHistoryMessage(message) {
-  const role = message?.role === 'assistant' ? 'assistant' : 'user';
+  const suppliedRole = message?.role;
+  const roleIsRecognized = suppliedRole === 'user' || suppliedRole === 'assistant';
+  const role = suppliedRole === 'assistant' ? 'assistant' : 'user';
+  if (suppliedRole != null && !roleIsRecognized) {
+    console.warn('[QA] Unrecognized history role coerced to "user"', { role: suppliedRole });
+  }
   const { content } = message || {};
 
   if (typeof content === 'string') return { role, content };
