@@ -3,13 +3,14 @@ title: Reviewer Identity and Institution Resolution Research
 domain: reviewer-identity
 kind: decision
 status: active
-summary: "Research foundation for reviewer identity and institution resolution; current build authority lives in the Codex handoff."
+summary: "Research foundation for reviewer identity and institution resolution; current sequencing is governed by the strategic-reset brief."
 canonical: false
 cataloged: 2026-08-04
 owner: product-engineering
 related:
   - docs/REVIEWER_IDENTITY_STRATEGY_EVALUATION.md
   - docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md
+  - docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md
   - docs/agent-wiki/topics/reviewer-identity.md
   - .claude-memory/project-reviewer-affiliation-institution-linking.md
   - .claude-memory/project-reviewer-contact-enrichment-anchoring.md
@@ -24,9 +25,10 @@ Date: 2026-08-04
 This document records the external research and original evaluation strategy.
 It no longer governs implementation authorization: subsequent owner decisions
 authorized the frozen falsification suite, comparator runs, PR #113's reversible
-measurement plumbing, and the offline compact-ROR-index size experiment. Current
-authority and sequencing live in
-`outputs/institution-resolution-handoff-to-codex-2026-08-07.md`.
+measurement plumbing, and the offline compact-ROR-index size experiment. The
+implementation handoff records the subsequent build history. Current authority
+and sequencing live in
+`docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`.
 
 Owner decision 2026-08-07: production candidate retrieval will use ROR's
 server-side API. The pinned dump remains an offline benchmark/relationship
@@ -498,13 +500,17 @@ failures, 0 provider errors, and 0 wrong automatic resolutions. It used 151 ROR
 requests for 160 candidate sets after 44 benchmark-process cache hits; that
 does not predict production request-scoped reuse. This clears the
 frozen falsification bar, not representative production calibration or rollout
-capacity. The feature branch `codex/ror-production-shadow-adapter` now carries
+capacity. Production now carries
 the request-scoped production ROR candidate adapter, local veto/scorer, and
 exact-ROR OpenAlex bridge behind the W2 runtime seam [VERIFIED via source and
 focused tests]. It imports no benchmark module and changes no schema,
-persistence, identity/write gate, or deployed resolver authority. The branch is
-not deployed; production remains `legacy-default` pending owner-approved
-promotion.
+persistence, identity/write gate, or deployed resolver authority. Production
+remains `legacy-default`. A request-local PubMed-versus-Works-first diagnostic
+then exposed that the experiment was combining reviewer relevance, person
+identity, and institution normalization into one outcome vocabulary. Further
+promotion and resolver tuning are paused pending the strategic contract and
+benchmark separation in
+`docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`.
 
 ## Primary sources
 

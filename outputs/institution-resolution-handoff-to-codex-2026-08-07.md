@@ -1,5 +1,10 @@
 # Handoff — institution resolution architecture → Codex lead (S406, 2026-08-07)
 
+> **Superseded for current sequencing on 2026-08-08 by
+> `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`.** Retained as the
+> historical implementation and benchmark trail. Its “Next owner/action” and
+> build sequence are not current authorization.
+
 **Owner:** Codex (design lead, from this point)
 **Branch:** PR #113 merged; compact-index measurement continued on
 `codex/compact-ror-index-experiment`

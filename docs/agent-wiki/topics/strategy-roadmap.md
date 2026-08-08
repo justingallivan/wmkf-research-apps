@@ -13,6 +13,7 @@ source_files:
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
+  - docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md
   - outputs/institution-resolution-handoff-to-codex-2026-08-07.md
   - benchmarks/compact-ror-index/results/v2.11-2026-08-03.md
   - benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md
@@ -122,10 +123,10 @@ document inventory, and individual implementation plans do not establish priorit
   decision 2026-08-07: the live app uses API lookup and does not bundle a local
   ROR index.** The API adapter must send institution evidence only, retain
   out-of-band domain/country/type/hierarchy evidence for local vetoes, and fall
-  back to no new resolution on provider failure or ambiguity. The feature branch
-  `codex/ror-production-shadow-adapter` now implements a separate candidate-union
-  interface rather than reusing the single-winner OpenAlex resolver [VERIFIED
-  2026-08-08 via source and focused tests]. It returns candidate ROR records with
+  back to no new resolution on provider failure or ambiguity. Production now
+  carries a separate candidate-union interface rather than reusing the
+  single-winner OpenAlex resolver [VERIFIED 2026-08-08 via source, focused tests,
+  and deployment `dpl_8J167uKtsFi5ej5uS9pgmXTxLjKu`]. It returns candidate ROR records with
   no verdict, explicitly requests API v2 `single_search`, bounds
   concurrency/time/retries, and supports the optional `Client-Id` header. Only
   after a unique local resolution does the exact-ROR OpenAlex hydration bridge
@@ -181,9 +182,13 @@ document inventory, and individual implementation plans do not establish priorit
   relationship-aware pair evaluation, and a frozen verdict-free contract →
   **claim-oriented API decision benchmark v3 COMPLETE** → **production
   request-scoped ROR API adapter + local decision + exact-ROR OpenAlex bridge
-  BUILT and VERIFIED on `codex/ror-production-shadow-adapter`; owner-approved
-  promotion remains, and production is still `legacy-default`** → run and
-  resource-profile S2AFF as a challenger. Both
+  BUILT, VERIFIED, and DEPLOYED; production authority remains
+  `legacy-default`**. The subsequent PubMed-versus-Works-first diagnostic
+  combined reviewer relevance, person identity, and institution normalization
+  into one outcome vocabulary, so it does not establish a ROR promotion case.
+  Current sequencing is the read-only Fable strategic reset in
+  `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`; S2AFF profiling and any
+  further resolver implementation require a new owner decision. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never
@@ -197,10 +202,11 @@ document inventory, and individual implementation plans do not establish priorit
   pinning per-seam behavior, incl. the live UC-containment false-positive
   divergence across institutionsMatch implementations. Jest excludes
   `.claude/worktrees/` (agent-worktree haste-map collisions). Remaining order:
-  deliberately promote the production ROR shadow adapter → S2AFF profile → normalizer
-  consolidation + shared scorer (small independently shippable increments; decision-specific
-  models on shared Fellegi–Sunter primitives, fail-closed vetoes, institution-first) →
-  card redesign → coauthor verdict → institution-COI sort + audited override. Decisions
+  Fable separates the three product contracts and proposes fixed reusable
+  benchmarks plus go/no-go criteria → owner decides which capability, if any,
+  advances → only then select an implementation increment. Normalizer
+  consolidation, shared scoring, card redesign, coauthor verdict, and
+  institution-COI sort/override remain parked behind that decision. Decisions
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.

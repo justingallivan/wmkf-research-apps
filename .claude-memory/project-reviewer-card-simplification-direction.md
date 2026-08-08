@@ -4,7 +4,7 @@ description: The card's 15 banners are a symptom of a matching layer with ~25 sc
 type: project
 status: active
 scope: reviewer
-last_verified: 2026-08-08 via current card/save gates, owner decisions, institution decision benchmark v3, and the production ROR integration branch
+last_verified: 2026-08-08 via current card/save gates, owner decisions, institution decision benchmark v3, and the deployed production ROR integration
 ---
 
 ## Recall Rule
@@ -51,9 +51,13 @@ corrected the altitude — order by what most rapidly reduces complexity.
   comparator DONE (v3 141/141 institution labels, 0 wrong automatic resolutions),
   see `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`
   → production request-scoped shadow adapter + post-resolution ROR→OpenAlex bridge
-  BUILT and VERIFIED on `codex/ror-production-shadow-adapter` (not deployed;
-  owner-approved promotion remains)
-  → S2AFF profile →
+  BUILT, VERIFIED, and DEPLOYED with production authority still
+  `legacy-default`
+  → STRATEGIC RESET before further promotion or tuning: the first diagnostic
+  conflated reviewer relevance, person identity, and institution normalization;
+  current authority is `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`
+  → only after owner review, decide whether S2AFF profiling or any resolver work
+  remains warranted →
   normalizer consolidation + shared scorer in small independently shippable increments →
   card status band + Details disclosure + footer split → coauthor verdict →
   institution-COI sort-to-bottom + audited override.
