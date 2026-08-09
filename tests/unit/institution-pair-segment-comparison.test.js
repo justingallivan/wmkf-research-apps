@@ -217,22 +217,23 @@ describe('segment-wise comparison (opt-in) — sibling-campus safety', () => {
 });
 
 describe('segment-wise comparison (opt-in) — resolved-pair (step 2) fallback', () => {
-  test('Wave 3c re-pin (owner-accepted 2026-08-08): an admitted-unproven fragment no longer earns associated-link credit', async () => {
+  test('Wave 3c re-pin (superseded by Wave 3e, still FALSE): an admitted fragment does not earn associated-link credit', async () => {
     // Pre-Wave-3c this test asserted TRUE: "Broad Institute" (a fragment with
-    // an abstaining ", Cambridge"/", Cambridge, MA" extension — admitted to
-    // the pool unproven) crossed the resolved MIT whole via Broad Institute's
-    // associatedInstitutions link. Wave 3c's symmetric crossing restriction
-    // deliberately narrows this: an admittedUnproven entry (on EITHER side)
-    // may only contribute identity-EQUALITY evidence
-    // (institutionDirectMatch), never associated-link evidence — the same
-    // restriction that closes the sibling-campus leak (an admitted-unproven
-    // bare fragment must not spend its one-hop associated link on the other
-    // operand's behalf, since the fragment itself was never disproven to be
-    // a bare parent). Broad Institute's identity does not directly match
-    // MIT's, so this pairing now correctly returns FALSE — the surviving
-    // associated-link path is corroboration between two PROVEN (whole or
-    // proven-decoration) operands; see the Harvard Medical School vs Harvard
-    // University test below, which still asserts TRUE as whole-vs-whole.
+    // an abstaining ", Cambridge"/", Cambridge, MA" extension) crossed the
+    // resolved MIT whole via Broad Institute's associatedInstitutions link.
+    // Wave 3c narrowed this via a per-entry `admittedUnproven` tag; Wave 3e
+    // (owner-directed, 2026-08-08) went further and REMOVED associated-link
+    // evidence from the staged path (`segmentComparison: true`) entirely —
+    // every step-2 crossing and the post-segment fallback now use
+    // `institutionDirectMatch` (identity equality) ONLY, unconditionally, for
+    // every pairing shape. Broad Institute's identity does not directly match
+    // MIT's, so this pairing stays FALSE under Wave 3e too, but for the
+    // simpler reason that NO staged pairing may draw on an associated link —
+    // not even a whole-vs-whole one. See the Harvard Medical School vs
+    // Harvard University test below, which — post-Wave-3e — now ALSO surfaces
+    // (FALSE) at the staged path per the plan's Stage 2 relationship-policy
+    // table (Harvard <-> HMS: surface), even though it still clears via
+    // associated link on the DEFAULT/unstaged path.
     const LEFT = 'Dept of Genomics, Broad Institute, Cambridge, MA';
     const RIGHT = 'Massachusetts Institute of Technology';
 
@@ -255,9 +256,9 @@ describe('segment-wise comparison (opt-in) — resolved-pair (step 2) fallback',
       [RIGHT, MIT_IDENTITY],
       // ", Cambridge" / ", Cambridge, MA" extensions deliberately NOT stubbed
       // (abstain): step 2's 'admit' policy still admits "Broad Institute" to
-      // the pool (its own identity resolved cleanly) but tags it
-      // admittedUnproven, which is exactly what now blocks the associated
-      // link below from clearing this pair.
+      // the pool (its own identity resolved cleanly), but under Wave 3e pool
+      // membership no longer matters for evidence type — no staged crossing
+      // may use the associated link below regardless of admission reason.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
@@ -473,21 +474,24 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
     //      pair correctly stays false).
     // When both hold, step 1's 'demote' policy still correctly refuses the
     // string-only match (see "campus vs bare parent surfaces" above), but
-    // step 2 admits the bare-parent fragment (its own identity resolved,
-    // tagged admittedUnproven) and the resulting crossing compares SYSTEM
-    // against SYSTEM (both sides resolved the identical bare string) — a
-    // genuine DIRECT identity-EQUALITY match, not associated-link evidence.
-    //
-    // Wave 3c narrowed this residual to PRECISELY identity-equality: the
-    // sibling-campus consequence of this same admitted-unproven bare
-    // fragment — crossing a genuinely DIFFERENT sibling campus via that
-    // campus's associatedInstitutions link back to SYSTEM — is now CLOSED
-    // (see "Wave 3c: sibling campuses never clear via an admitted-unproven
-    // bare-parent fragment's associated link" below). What remains here is
-    // strictly narrower and lower-risk: the bare string resolving to the
-    // SAME identity object on both sides is not new information the
-    // resolver invented — it's the literal identity equality of "University
-    // of California" with itself.
+    // step 2 admits the bare-parent fragment (its own identity resolved) and
+    // the resulting crossing compares SYSTEM against SYSTEM (both sides
+    // resolved the identical bare string) via
+    // `DeduplicationService.institutionDirectMatch` — a genuine DIRECT
+    // identity-EQUALITY match, not associated-link evidence. As of Wave 3e
+    // (owner-directed, 2026-08-08), this is not a special restriction on this
+    // one fragment shape — EVERY staged crossing is identity-equality-only,
+    // unconditionally, so this residual is simply what's left once
+    // associated-link evidence is removed from the staged path entirely: the
+    // bare string resolving to the SAME identity object on both sides is not
+    // new information the resolver invented — it's the literal identity
+    // equality of "University of California" with itself. The sibling-campus
+    // consequence of this same bare-parent fragment — crossing a genuinely
+    // DIFFERENT sibling campus via that campus's associatedInstitutions link
+    // back to SYSTEM — stays CLOSED, now for the simplest possible reason:
+    // there is no associated-link evidence left to spend on the staged path
+    // at all (see the sibling probe below, and the Wave 3e describe block for
+    // the Harvard/HMS case that made the removal necessary).
     //
     // The obvious "fix" — rejecting a pairing whenever the matched candidate
     // strings are textually identical — was evaluated and REJECTED: it also
@@ -540,14 +544,17 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
     // spending SYSTEM's one-hop associated link on UCSD's behalf is exactly
     // the auto-clear safety invariant 1 forbids.
     //
-    // Wave 3c's symmetric admittedUnproven restriction closes this: the left
-    // pool's only surviving entry ("University of California" -> SYSTEM) is
-    // tagged admittedUnproven (its extension abstained), so this crossing may
-    // only use institutionDirectMatch(SYSTEM, UCSD) — which fails (different
-    // identities) — never associatedIdentityMatches. Contrast with the
-    // accepted-residual test above, where BOTH sides resolve to the literal
-    // SAME identity object (SYSTEM vs SYSTEM) and a direct match legitimately
-    // succeeds; here the right side is a genuinely different campus (UCSD),
+    // Wave 3c closed this with a per-entry `admittedUnproven` restriction;
+    // Wave 3e (owner-directed, 2026-08-08) superseded that with the simpler,
+    // strictly stronger rule that no staged crossing may use associated-link
+    // evidence at all: the left pool's only surviving entry ("University of
+    // California" -> SYSTEM) crosses UCSD via
+    // `institutionDirectMatch(SYSTEM, UCSD)` only — which fails (different
+    // identities) — never `associatedIdentityMatches`, regardless of any
+    // admitted/proven distinction. Contrast with the accepted-residual test
+    // above, where BOTH sides resolve to the literal SAME identity object
+    // (SYSTEM vs SYSTEM) and a direct match legitimately succeeds; here the
+    // right side is a genuinely different campus (UCSD),
     // so no direct match exists and the pair correctly stays false.
     const system = {
       openAlexId: 'I-system',
@@ -573,40 +580,32 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
     )).resolves.toBe(false);
   });
 
-  test('Wave 3d: extension-cap overflow never certifies proven decoration', async () => {
-    // Codex HIGH, reproduced against production code (2026-08-08):
-    // `fragmentExtensions` caps its resolver-call check to the 3 SHORTEST
-    // contiguous extensions. When a fragment has 4+ extensions and the
-    // contradictory one is the LONGEST (and therefore excluded from the
-    // capped check), the fragment could be wrongly classified 'decoration'
-    // (proven) on the strength of the 3 short ones alone.
+  test('Wave 3d scenario, now closed structurally by Wave 3e: extension-cap overflow cannot spend associated-link evidence', async () => {
+    // Originally a Codex HIGH (2026-08-08): `fragmentExtensions` caps its
+    // resolver-call check to the 3 SHORTEST contiguous extensions. When a
+    // fragment has 4+ extensions and the contradictory one is the LONGEST
+    // (excluded from the capped check), Wave 3d's fix was to force such a
+    // fragment `admittedUnproven: true` so it could only cross via identity
+    // equality, not the associated link. Wave 3e (owner-directed) makes that
+    // per-fragment fix moot for THIS failure mode: no staged crossing may use
+    // an associated link AT ALL anymore, regardless of overflow, so this
+    // scenario is now closed by the same unconditional rule that closes every
+    // other associated-link leak on the staged path. The `overflow` tracking
+    // in `fragmentExtensions`/`classifyFragment` is still live code — it
+    // still governs step 1's STRING-ONLY match (which still needs "prove
+    // every extension" semantics, since string identity alone is otherwise
+    // enough to auto-clear) — but it no longer needs to do double duty
+    // gating step-2 evidence type. This test is kept to pin the outcome.
     //
-    // This LEFT operand comma-splits into "University of California" plus
-    // three short filler segments ("A", "Ab", "Abc") before "Los Angeles" —
-    // so the bare-parent fragment's contiguous extensions are: ", A"
-    // (checked), ", A, Ab" (checked), ", A, Ab, Abc" (checked), and the FULL
-    // operand string itself, "..., A, Ab, Abc, Los Angeles" (UNCHECKED —
-    // it's the 4th/longest match and the extension-count cap excludes it).
-    // The stub resolves the 3 checked short extensions to SYSTEM (same
-    // identity as the bare fragment — proving nothing wrong on their own)
-    // and the full/unchecked extension to UCLA (a genuinely different
-    // identity — the contradictory evidence the cap hid). RIGHT is UCSD, a
-    // sibling campus whose associatedInstitutions links back to SYSTEM.
-    //
-    // Pre-Wave-3d: the 3 checked extensions all matched the fragment's own
-    // SYSTEM identity, so classifyFragment certified 'decoration' (proven,
-    // admittedUnproven: false) — wrongly, since the unchecked 4th extension
-    // was the one that actually disproves it. That false "proof" let the
-    // SYSTEM fragment spend full associated-link evidence and cross UCSD's
-    // WHOLE operand via UCSD's associatedInstitutions -> SYSTEM link: a
-    // forbidden sibling-campus auto-clear.
-    //
-    // Wave 3d: `fragmentExtensions` reports `overflow: true` whenever more
-    // than 3 extensions exist; classifyFragment then refuses to certify
-    // 'decoration' regardless of what the checked 3 show — the fragment is
-    // still admitted to the pool (its own identity resolved), but forced
-    // `admittedUnproven: true`, so the crossing is restricted to
-    // institutionDirectMatch(SYSTEM, UCSD), which fails.
+    // Setup unchanged: LEFT comma-splits into "University of California" plus
+    // three short filler segments ("A", "Ab", "Abc") before "Los Angeles", so
+    // the bare-parent fragment's contiguous extensions are: ", A" (checked),
+    // ", A, Ab" (checked), ", A, Ab, Abc" (checked), and the FULL operand
+    // string itself (unchecked, 4th/longest match, excluded by the cap). The
+    // stub resolves the 3 checked short extensions to SYSTEM (same identity
+    // as the fragment) and the unchecked extension to UCLA (different
+    // identity). RIGHT is UCSD, a sibling campus whose associatedInstitutions
+    // links back to SYSTEM.
     const system = {
       openAlexId: 'I-system',
       displayName: 'University of California',
@@ -698,7 +697,11 @@ describe('Wave 3 CHANGE 1 + CHANGE 2 — adversarial-review probes A/B/C (live-g
     // contains an unresolved-looking entry named exactly "University of
     // California". Pre-Wave-3, the areConsistent default fallback substituted
     // the raw right-hand string on resolve failure and matched it against
-    // UCLA's associated institution BY NAME alone. CHANGE 2 must block that.
+    // UCLA's associated institution BY NAME alone. As of Wave 3e, the staged
+    // fallback is unconditionally `institutionDirectMatch` only (no
+    // associated-link evidence at all), which blocks this by construction —
+    // stronger than the original shape-conditional CHANGE 2 guard this test
+    // was written against.
     const ucla = {
       openAlexId: 'I-ucla',
       displayName: 'University of California, Los Angeles',
@@ -739,11 +742,27 @@ describe('Wave 3 CHANGE 1 + CHANGE 2 — adversarial-review probes A/B/C (live-g
   });
 });
 
-describe('Wave 3 — associated-link evidence still admissible for non-parent-fragment shapes', () => {
-  test('vector 6: Harvard Medical School vs Harvard University clears via associated link (no comma-fragment relation)', async () => {
-    // Neither operand contains the other as a contiguous comma-fragment, so
-    // the CHANGE 1/2 parent-shape restriction never engages and associated
-    // link evidence remains admissible, exactly as before Wave 3.
+describe('Wave 3e — associated-link evidence is consulted NOWHERE on the staged path', () => {
+  test('vector 6, FLIPPED (Wave 3e, owner-directed 2026-08-08): Harvard Medical School vs Harvard University now SURFACES at the staged path', async () => {
+    // Pre-Wave-3e this test asserted TRUE: neither operand contains the other
+    // as a contiguous comma-fragment, so the old CHANGE 1/2 parent-shape
+    // restriction never engaged and this whole-vs-whole pairing cleared via
+    // Harvard Medical School's associatedInstitutions link back to Harvard
+    // University. That is exactly the auto-clear the plan's Stage 2
+    // relationship-policy table forbids without a typed relationship:
+    // Harvard <-> Harvard Medical School is a SURFACE pair, not an
+    // auto-clear (same table entry that also requires Dana-Farber <-> Harvard
+    // to surface). Root cause (live-verified 2026-08-08): resolvable
+    // "container" identities like this one — and "University of California
+    // System", OpenAlex I2803209242, 15 associated institutions — make
+    // associated-link evidence far too permissive to spend as WHOLE-OPERAND
+    // corroboration on the staged path. Wave 3e removes the mechanism
+    // entirely for `segmentComparison: true`: this pair now correctly
+    // SURFACES (false) for human review. The associated link is not lost
+    // information — it remains valid identity-corroboration evidence on the
+    // DEFAULT/unstaged path (owner decision 3; see the default-path pin
+    // below) and is exactly the kind of typed-relationship signal Stage 2 is
+    // scoped to formalize for the staged path.
     const harvard = {
       openAlexId: 'I-harvard',
       displayName: 'Harvard University',
@@ -758,9 +777,16 @@ describe('Wave 3 — associated-link evidence still admissible for non-parent-fr
       ['Harvard Medical School', hms],
       ['Harvard University', harvard],
     ]));
-    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+    const stagedChecker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
-    await expect(checker.areConsistent('Harvard Medical School', 'Harvard University')).resolves.toBe(true);
+    await expect(stagedChecker.areConsistent('Harvard Medical School', 'Harvard University')).resolves.toBe(false);
+
+    // Default/unstaged path pin: the SAME associated link remains valid
+    // identity-corroboration evidence for enrichment/identity-evidence
+    // consumers (owner decision 3) — this must stay byte-identical to
+    // pre-Wave-3 behavior.
+    const defaultChecker = createInstitutionConsistencyChecker({ resolver });
+    await expect(defaultChecker.areConsistent('Harvard Medical School', 'Harvard University')).resolves.toBe(true);
   });
 
   test('vector 7: short whole operand ("MIT") still participates and matches a decorated MIT byline', async () => {
@@ -782,6 +808,87 @@ describe('Wave 3 — associated-link evidence still admissible for non-parent-fr
     await expect(checker.areConsistent(
       'MIT',
       'Department of Physics, Massachusetts Institute of Technology, Cambridge, MA',
+    )).resolves.toBe(true);
+  });
+});
+
+describe('Wave 3e — owner-directed live probes (2026-08-08): "University of California System" resolves live', () => {
+  // Live-verified root cause: "University of California System" resolves on
+  // the real resolver (OpenAlex I2803209242, 15 associated institutions), so
+  // any WHOLE-OPERAND pairing with a sibling campus that carries SYSTEM in
+  // its associatedInstitutions cleared via associated-link evidence — on both
+  // the staged path (step 2 whole-vs-whole crossing or the fallback) AND the
+  // pre-existing default path. These three tests are stub encodings of that
+  // live finding: SYSTEM {I-system, "University of California System"},
+  // UCSD carrying SYSTEM in its associatedInstitutions.
+  const system = {
+    openAlexId: 'I-system',
+    displayName: 'University of California System',
+    associatedInstitutions: [],
+  };
+  const ucsd = {
+    openAlexId: 'I-ucsd',
+    displayName: 'University of California San Diego',
+    associatedInstitutions: [{ openAlexId: 'I-system', displayName: 'University of California System' }],
+  };
+  const resolver = () => identityResolver(new Map([
+    ['University of California System', system],
+    ['University of California San Diego', ucsd],
+  ]));
+
+  test('(a) "Los Angeles, University of California System" vs "University of California San Diego" — staged — FALSE', async () => {
+    // LEFT decorates SYSTEM with a leading "Los Angeles" segment (mirroring a
+    // byline where the system name appears after a campus-city fragment).
+    // "University of California System" has no contiguous extension within
+    // this LEFT operand (nothing follows it), so it's a 'standalone' pool
+    // candidate — admitted, but on the staged path that only earns it a
+    // chance at `institutionDirectMatch`, never an associated link. SYSTEM's
+    // display name does not directly match UCSD's, so this stays FALSE.
+    const checker = createInstitutionConsistencyChecker({ resolver: resolver(), segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'Los Angeles, University of California System',
+      'University of California San Diego',
+    )).resolves.toBe(false);
+  });
+
+  test('(b) plain "University of California System" vs "University of California San Diego" — staged — FALSE', async () => {
+    // The CRITICAL TRAP this test exists to pin: LEFT here is the bare WHOLE
+    // operand string, with no comma-fragment relationship to RIGHT at all —
+    // "University of California System" is not a segment of the UCSD
+    // operand, and UCSD's own name is not a segment of the SYSTEM operand.
+    // The prior wave's shape-conditional fallback guard (`wholeIsParentWithin`)
+    // would NEVER have fired for this pairing, because there is no
+    // parent/child STRING shape between the two operands to detect — the
+    // leak here is purely that SYSTEM resolves as a WHOLE and carries a
+    // one-hop associated link to UCSD's family, with no fragment/parent
+    // shape involved at all. Only Wave 3e's unconditional
+    // (`segmentComparison: true` => `institutionDirectMatch` ONLY, always)
+    // rule closes this — a shape-conditional guard structurally cannot.
+    const checker = createInstitutionConsistencyChecker({ resolver: resolver(), segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California System',
+      'University of California San Diego',
+    )).resolves.toBe(false);
+  });
+
+  test('(c) same pair as (b) with segmentComparison FALSE — TRUE — pins pre-existing main/default corroboration behavior (Stage 2 scope)', async () => {
+    // The default/off path is untouched by Wave 3e (owner decision 3): it
+    // still uses `institutionsConsistent`, so this same pair clears via
+    // UCSD's associatedInstitutions -> SYSTEM link exactly as it did before
+    // any Stage 1 work started. This is the live behavior the owner
+    // identified as the actual production root cause (system/campus pairs
+    // auto-clearing on main) — fixing IT is explicitly Stage 2 scope
+    // (typed-relationship classification), not this wave's job. This test
+    // exists so that scope boundary is visible and enforced in CI: if this
+    // flips to false without a corresponding Stage 2 change, something
+    // touched default-path behavior that shouldn't have.
+    const checker = createInstitutionConsistencyChecker({ resolver: resolver() });
+
+    await expect(checker.areConsistent(
+      'University of California System',
+      'University of California San Diego',
     )).resolves.toBe(true);
   });
 });

@@ -138,13 +138,16 @@ out of string decoration, not genuine disagreements.
 > `normalizeAffiliationForComparison` untouched at :117; additive
 > `institutionSegments` at :152.]
 > [RECHECKED after lib/services/institution-affiliation-consistency.js change:
-> opt-in `segmentComparison` default-off at :180; segment-wise comparison at
-> :202 with shared-fragment self-pair exclusion, Wave 3 parent-fragment pool
-> policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`),
-> Wave 3c `admittedUnproven` crossing tags, and Wave 3d extension-cap
-> overflow handling (overflow never certifies proven decoration); default
-> path in `areConsistent` (:389; fallback guard gated strictly on
-> `segmentComparison`) unchanged when the flag is off.]
+> opt-in `segmentComparison` default-off at :165; segment-wise comparison at
+> :187 with shared-fragment self-pair exclusion, parent-fragment pool
+> policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`
+> and extension-cap overflow handling), and Wave 4 direct-identity-only
+> crossings/fallback (associated-link evidence consulted nowhere on the
+> staged path; the Wave 3c/3d crossing tags and whole-parent restrictions
+> are removed as subsumed); default path in `areConsistent` (:335)
+> behavior-identical when the flag is off — verified via the live
+> default-path probe, the vector-4 pin, and the resolve call-count
+> assertions.]
 > [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
 > sole opt-in call site, `segmentComparison: true` at :66.]
 > [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
@@ -241,7 +244,47 @@ out of string decoration, not genuine disagreements.
 >    provider outage still surfaces (unresolved fragments never enter
 >    pools — invariant 3 holds).
 >
->    **Wave 3d (final fix round) and the STOP-RULE.** A third re-review
+>    **Wave 4 (owner-directed, 2026-08-08): staged path drops
+>    associated-link credit entirely.** A fourth review round found prefix-
+>    ordered qualifiers bypass the suffix-only extension model; session
+>    probes then established the deeper fact: **"University of California
+>    System" resolves live** (OpenAlex I2803209242, 15 associated
+>    institutions), so system↔campus pairs auto-cleared via associated-link
+>    credit as plain whole operands — on the staged path AND on `main`'s
+>    default path (the checker's original one-hop corroboration design)
+>    [VERIFIED via live probes, S409: staged and default both returned true
+>    for "University of California System" vs "University of California San
+>    Diego"]. Owner decision 2 was therefore never enforced against the
+>    resolvable system name anywhere; the prior gate never caught it because
+>    its campus-vs-parent rows used the bare form, which abstains live. The
+>    owner overrode the stop-rule for this one fix ("fix it and let's move
+>    on"); the stop-rule is back in force after Wave 4.
+>    **The Wave 4 invariant (replaces the suffix-contiguous closure claim):
+>    with `segmentComparison: true`, associated-link evidence is consulted
+>    nowhere — step 1 clears on string match with decoration proof; step 2
+>    crossings and the fallback clear on resolved-identity direct match
+>    only.** This removes the subsumed Wave 3c/3d crossing machinery
+>    (`admittedUnproven` tags, whole-parent direct-only restriction,
+>    fallback parent-shape guard) rather than adding a fifth guard; the
+>    step-1 decoration proof, parent-fragment pool exclusion, and
+>    shared-fragment self-pair exclusion remain (each still blocks a named
+>    probe). Consequences, per the Stage 2 relationship-policy table
+>    (verified from this doc): Harvard↔HMS and Dana-Farber↔Harvard now
+>    SURFACE at the alert (the table's stated policy — note Harvard↔HMS was
+>    the owner's motivating example, so related-institution pairs will
+>    alert until Stage 2 typed relationships enable `related-autoclear`);
+>    VUMC↔Vanderbilt-class auto-clears are explicitly Stage 2 scope. The
+>    default path is behavior-identical (enrichment/identity-evidence
+>    corroboration unchanged, decision 3 — verified via live probe and the
+>    default-path pins); the earlier "branch widens the
+>    hazard" note inverts — post-Wave-4 the branch STRICTLY NARROWS alert
+>    auto-clearing relative to `main`. Remaining accepted residual:
+>    same-resolved-identity clears (the SYSTEM==SYSTEM class) are inherent
+>    to identity-equality evidence. The gate gains a system-name family
+>    ("University of California System" vs each campus → related-surface)
+>    so the resolvable form is exercised live.
+>
+>    **Wave 3d (superseded by Wave 4 above) and the STOP-RULE.** A third re-review
 >    round falsified the closure claim as then written: `fragmentExtensions`
 >    capped classification at the 3 shortest extensions, so a crafted
 >    byline whose contradictory extension is longest could be wrongly

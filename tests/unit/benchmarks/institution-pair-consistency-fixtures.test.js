@@ -65,6 +65,41 @@ describe('institution-pair-consistency fixtures', () => {
       const ids = rows.map((row) => row.caseId);
       expect(new Set(ids).size).toBe(ids.length);
     });
+
+    it('produces 148 rows total (140 pre-existing + 8 for the resolvable-system-name family)', () => {
+      const rows = buildRows();
+      expect(rows.length).toBe(148);
+    });
+
+    // Resolvable-system-name family (uc-system-*): the bare "University of
+    // California" parent string used by the uc-parent-* family abstains on
+    // the live OpenAlex resolver (no unique match), so a checker bug that
+    // grants system<->campus auto-clear credit through associated-
+    // institution links never fires against it in a live gate run. This
+    // family uses the OpenAlex-resolvable "University of California System"
+    // name (I2803209242, live-verified 2026-08-08 to resolve with 15
+    // associated institutions) so the gate actually exercises that hazard.
+    // Added after a live-verified miss survived four review rounds because
+    // no fixture row used a resolvable system name.
+    it('uc-system-* family: 7 campus-vs-resolvable-system rows (related-surface) + 1 self-identity row (same)', () => {
+      const rows = buildRows();
+      const systemRows = rows.filter((row) => row.caseId.startsWith('uc-system-'));
+      expect(systemRows.length).toBe(8);
+
+      const selfRow = systemRows.find((row) => row.caseId === 'uc-system-self');
+      expect(selfRow).toBeDefined();
+      expect(selfRow.expected).toBe('same');
+      expect(selfRow.left).toBe('University of California System');
+      expect(selfRow.right).toBe('University of California System');
+
+      const campusRows = systemRows.filter((row) => row.caseId !== 'uc-system-self');
+      expect(campusRows.length).toBe(7);
+      for (const row of campusRows) {
+        expect(row.expected).toBe('related-surface');
+        expect(row.right).toBe('University of California System');
+        expect(row.left).not.toBe('University of California System');
+      }
+    });
   });
 
   describe('request-1002903-pairs.jsonl (tracked sanitized fixture)', () => {

@@ -19,11 +19,25 @@ separate, independently frozen directory from that suite.
   auto-clear). No `Date.now()`/`Math.random()`; running it regenerates its
   output byte-identically every time.
 - `cases/uc-sibling-pairs.jsonl` — generated output of the script above.
-  140 rows: every ordered distinct pair of the 7 UC campuses in three
-  operand forms (full/full, acronym/full, decorated-full/full) — all
-  expected `distinct` — plus one same-campus identity pair (acronym vs full
-  name) expected `same`, and one full-campus-vs-"University of California"
-  system pair expected `related-surface` for each of the 7 campuses.
+  148 rows:
+  - 126 cross-campus rows (`uc-cross-*`): every ordered distinct pair of the
+    7 UC campuses in three operand forms (full/full, acronym/full,
+    decorated-full/full) — all expected `distinct`.
+  - 7 same-campus identity rows (`uc-identity-*`, acronym vs full name),
+    expected `same`.
+  - 7 parent-system rows (`uc-parent-*`): full campus name vs the bare
+    `"University of California"` system string, expected `related-surface`.
+  - 8 resolvable-system-name rows (`uc-system-*`), added after a
+    live-verified miss survived four review rounds: 7 rows of full campus
+    name vs the OpenAlex-resolvable `"University of California System"`
+    string (OpenAlex I2803209242, live-verified 2026-08-08: resolves with 15
+    associated institutions), expected `related-surface`, plus 1
+    system-name-vs-itself identity row, expected `same`. The bare parent
+    string used by `uc-parent-*` abstains on the live resolver (no unique
+    match), so a checker bug that grants system↔campus auto-clear credit
+    through associated-institution links never fires against it in a live
+    gate run — only a resolvable system name exercises that hazard, which is
+    why this is a separate family rather than a change to `uc-parent-*`.
 
 ## Row schema
 

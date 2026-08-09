@@ -34,6 +34,17 @@ const CAMPUSES = [
 
 const UC_SYSTEM = 'University of California';
 
+// The bare parent string above abstains on the live OpenAlex resolver (no
+// unique match), so a checker bug that grants system-vs-campus auto-clear
+// credit through associated-institution links never fires against it in a
+// live gate run. "University of California System" is the resolvable form
+// (OpenAlex I2803209242, live-verified 2026-08-08: resolves with 15
+// associated institutions) — only this literal string actually exercises
+// the associated-link hazard end to end. Added after a live-verified miss
+// (system<->campus auto-clearing via associated-link credit) survived four
+// review rounds because no fixture row used a resolvable system name.
+const UC_SYSTEM_RESOLVABLE = 'University of California System';
+
 const SOURCE =
   'generated: benchmarks/institution-pair-consistency/generate-sibling-pairs.js (deterministic UC campus matrix)';
 
@@ -111,6 +122,36 @@ function buildRows() {
     });
   }
 
+  // Resolvable-system-name pairs: full campus name vs "University of
+  // California System" — the OpenAlex-resolvable form of the parent, unlike
+  // the bare UC_SYSTEM string above which abstains on the live resolver.
+  // Expected related-surface for the same reason as the parent-system
+  // pairs (safety invariant 1, owner decision 2): this family is what
+  // actually exercises a checker's associated-institution-link path against
+  // a resolved system identity, since the bare-parent family never reaches
+  // a resolved identity to test against.
+  for (const campus of CAMPUSES) {
+    rows.push({
+      caseId: `uc-system-${campus.acronym}`,
+      source: SOURCE,
+      left: campus.full,
+      right: UC_SYSTEM_RESOLVABLE,
+      expected: 'related-surface',
+      notes: `Resolvable-system pair: ${campus.acronym} vs the OpenAlex-resolvable "University of California System" name (I2803209242). Parent/system evidence must be surfaced, never auto-cleared, even when the system name resolves to an identity with associated-institution links (safety invariant 1, owner decision 2).`,
+    });
+  }
+
+  // Resolvable-system identity pair: the system name vs itself. Expected
+  // same — this is the same organization, not a campus/parent pair.
+  rows.push({
+    caseId: 'uc-system-self',
+    source: SOURCE,
+    left: UC_SYSTEM_RESOLVABLE,
+    right: UC_SYSTEM_RESOLVABLE,
+    expected: 'same',
+    notes: 'Identity pair: the OpenAlex-resolvable "University of California System" name vs itself — the same organization.',
+  });
+
   return rows;
 }
 
@@ -134,4 +175,6 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { buildRows, buildJsonl, toJsonl, CAMPUSES, UC_SYSTEM, OUTPUT_PATH };
+module.exports = {
+  buildRows, buildJsonl, toJsonl, CAMPUSES, UC_SYSTEM, UC_SYSTEM_RESOLVABLE, OUTPUT_PATH,
+};
