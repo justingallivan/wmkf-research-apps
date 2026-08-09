@@ -2,12 +2,15 @@
  * Consumer-scope assertion (docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
  * owner decision 3, "Agent-runnable evaluation harness" deliverable 3).
  *
- * The Stage 1 segment-comparison opt-in must stay confined to the
- * affiliation-mismatch alert; the enrichment and identity-evidence consumers
- * must keep constructing the checker with its legacy (segmentComparison:
- * false) default. This test re-derives the call-site set by scanning the
+ * Wave 6 (2026-08-09): the segment-comparison opt-in now covers TWO
+ * consumers — the affiliation-mismatch alert (unchanged) and the enrichment
+ * institution seam (`enrich-recommended-service.js`, deliberately widened
+ * per the owner-approved S400 fix landing). reviewer-identity-evidence.js is
+ * the sole remaining consumer that must keep constructing the checker with
+ * its legacy default. This test re-derives the call-site set by scanning the
  * live repo tree rather than trusting a fixed list, so a NEW call site or a
- * scope leak fails the test instead of silently expanding scope.
+ * scope leak beyond these two fails the test instead of silently expanding
+ * scope further.
  */
 
 const fs = require('fs');
@@ -154,9 +157,10 @@ describe('institution consistency checker: consumer scope', () => {
     expect(callSitesByFile).toEqual(expected);
   });
 
-  test('segmentComparison: true appears exactly once, only in the affiliation-mismatch alert', () => {
+  test('segmentComparison: true appears exactly once each, only in the affiliation-mismatch alert and the enrichment seam', () => {
     expect(segmentComparisonTrueByFile).toEqual(new Map([
       ['lib/services/alert-reviewer-affiliation-mismatch.js', 1],
+      ['lib/services/workbench/enrich-recommended-service.js', 1],
     ]));
   });
 
@@ -168,17 +172,17 @@ describe('institution consistency checker: consumer scope', () => {
     expect(source).toMatch(/segmentComparison\s*=\s*false/);
   });
 
-  test('enrich-recommended-service.js constructs the checker with no options (bare call)', () => {
+  test('enrich-recommended-service.js constructs the checker with the segment-comparison option', () => {
     const source = fs.readFileSync(
       path.join(REPO_ROOT, 'lib/services/workbench/enrich-recommended-service.js'),
       'utf8',
     );
-    expect(source).toMatch(/createInstitutionConsistencyChecker\(\s*\)/);
-    // Guard against a bare-looking call that secretly passes an options
-    // object across a line break (e.g. "createInstitutionConsistencyChecker(\n  {").
+    // Guard against a call whose options object is something other than the
+    // exact expected literal (e.g. a stray extra key, or a computed value
+    // across a line break).
     const callMatch = source.match(/createInstitutionConsistencyChecker\(([^)]*)\)/);
     expect(callMatch).not.toBeNull();
-    expect(callMatch[1].trim()).toBe('');
+    expect(callMatch[1].trim()).toBe('{ segmentComparison: true }');
   });
 });
 
@@ -211,11 +215,15 @@ describe('institution consistency checker: consumer scope', () => {
  *     with minimal stubs for its many collaborators; the outer function
  *     catches any downstream error and resolves via an `error` SSE event, so
  *     the capture only depends on the mocks being sufficient to reach that
- *     point, not on the rest of the pipeline succeeding.
+ *     point, not on the rest of the pipeline succeeding. Wave 6 (2026-08-09):
+ *     this call site now passes the same options object as the alert
+ *     (`{ segmentComparison: true }`), so the captured value assertion below
+ *     changed from an empty-args expectation to that object.
  *   - reviewer-identity-evidence.js: constructs the checker at a fixed point
  *     inside the static `evaluateSuggestion` method, right after the
  *     OpenAlex author search resolves. Reaching it only requires stubbing
- *     OpenAlexService.searchAuthors to resolve.
+ *     OpenAlexService.searchAuthors to resolve. Remains the sole consumer
+ *     still constructing the checker with no arguments (legacy default).
  */
 describe('institution consistency checker: consumer scope (behavioral, value-based)', () => {
   function mockCheckerFactory() {
@@ -252,7 +260,7 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
     expect(factory.mock.calls[0]).toEqual([{ segmentComparison: true }]);
   });
 
-  test('enrich-recommended-service: factory called with no arguments', async () => {
+  test('enrich-recommended-service: factory called with exactly { segmentComparison: true }', async () => {
     const factory = mockCheckerFactory();
     let enrichRecommended;
     jest.isolateModules(() => {
@@ -340,7 +348,7 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
     }, onEvent);
 
     expect(factory).toHaveBeenCalledTimes(1);
-    expect(factory.mock.calls[0]).toEqual([]);
+    expect(factory.mock.calls[0]).toEqual([{ segmentComparison: true }]);
   });
 
   test('reviewer-identity-evidence: factory called with no arguments', async () => {
