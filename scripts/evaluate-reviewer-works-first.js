@@ -18,9 +18,14 @@ const {
   createInstitutionIdentityResolver,
 } = require('../lib/services/institution-identity-resolver');
 const {
+  createRorInstitutionIdentityResolver,
+} = require('../lib/services/ror-institution-identity-resolver');
+const {
   ReviewerIdentityEvidence,
 } = require('../lib/services/reviewer-identity-evidence');
 const { OpenAlexService } = require('../lib/services/openalex-service');
+
+const INSTITUTION_RESOLVER_ARMS = ['incumbent', 'ror'];
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const OPENALEX_API = 'https://api.openalex.org';
@@ -61,6 +66,7 @@ function parseCli(argv) {
     benchmarkPath: DEFAULT_BENCHMARK,
     outputPath: DEFAULT_OUTPUT,
     caseIds: [],
+    institutionResolverArm: 'incumbent',
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -70,12 +76,19 @@ function parseCli(argv) {
       options.outputPath = path.resolve(argv[++index] || '');
     } else if (argument === '--case') {
       options.caseIds.push(argv[++index] || '');
+    } else if (argument === '--institution-resolver') {
+      options.institutionResolverArm = argv[++index] || '';
     } else {
       throw new Error(`Unknown argument: ${argument}`);
     }
   }
   if (!options.benchmarkPath || !options.outputPath || options.caseIds.includes('')) {
     throw new Error('--benchmark, --output, and --case require non-empty values');
+  }
+  if (!INSTITUTION_RESOLVER_ARMS.includes(options.institutionResolverArm)) {
+    throw new Error(
+      `--institution-resolver must be one of: ${INSTITUTION_RESOLVER_ARMS.join(', ')}`,
+    );
   }
   return options;
 }
@@ -287,6 +300,13 @@ function createEvaluationInstitutionResolver(openAlex) {
   });
 }
 
+function createSearchInstitutionAdapter(institutionResolver) {
+  return async (query, { signal } = {}) => {
+    const identity = await institutionResolver.resolve(query, { signal });
+    return identity ? [identity] : [];
+  };
+}
+
 function suggestionFor(candidate) {
   return {
     name: candidate.name,
@@ -341,9 +361,23 @@ async function main() {
   if (selectedCases.length !== (options.caseIds.length || benchmark.cases.length)) {
     throw new Error('One or more requested --case values are absent from the benchmark');
   }
+  if (fs.existsSync(options.outputPath)) {
+    throw new Error(
+      `Refusing to overwrite existing output file: ${options.outputPath}`,
+    );
+  }
 
   const openAlex = createOpenAlexClient();
   const institutionResolver = createEvaluationInstitutionResolver(openAlex);
+  const rorInstitutionResolver = options.institutionResolverArm === 'ror'
+    ? createRorInstitutionIdentityResolver()
+    : null;
+  const worksSearchInstitution = rorInstitutionResolver
+    ? createSearchInstitutionAdapter(rorInstitutionResolver)
+    : async (query) => {
+      const identity = await institutionResolver.resolve(query);
+      return identity ? [identity] : [];
+    };
   const resolverAnchorsMatch = createAnchorMatcher({
     getAuthorById: openAlex.getAuthor,
     propagateProviderErrors: true,
@@ -371,10 +405,7 @@ async function main() {
     try {
       works = await resolveWorksFirst(candidate, {
         searchWorks: openAlex.searchWorks,
-        searchInstitution: async (query) => {
-          const identity = await institutionResolver.resolve(query);
-          return identity ? [identity] : [];
-        },
+        searchInstitution: worksSearchInstitution,
         getAuthor: openAlex.getAuthor,
       });
     } catch (error) {
@@ -429,6 +460,10 @@ async function main() {
     evaluationOnly: true,
     productionBehaviorChanged: false,
     persistenceWrites: false,
+    institutionResolverArm: options.institutionResolverArm,
+    ...(rorInstitutionResolver
+      ? { institutionResolverMetrics: rorInstitutionResolver.metrics }
+      : {}),
     selectedCaseCount: selectedCases.length,
     w2AndScoringOpenAlex: {
       ...openAlex.metrics(),

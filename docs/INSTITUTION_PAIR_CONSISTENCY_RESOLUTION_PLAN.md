@@ -19,6 +19,8 @@ related:
 
 # Institution Pair Consistency Resolution Plan
 
+<!-- [RECHECKED after lib/services/workbench/enrich-recommended-service.js change: Wave 2 branch diff is one display string in institutionVerdictReason (+1/−1); identity gate, checker construction, and write branches untouched; consumer set machine-enforced by tests/unit/institution-checker-consumer-scope.test.js] -->
+
 ## Status
 
 **APPROVED WITH SCOPE, 2026-08-08 — Stage 1 is authorized.** The four owner
@@ -39,7 +41,11 @@ invisible to a same-ID pair verdict; (3) ROR's `related` type does not
 distinguish constituent links from cross-system links; (4) the originally
 named gate evidence was partly untracked or mismatched. The decision-3
 rescope, Stage 2 operand contract, relationship-policy table, and fixture
-requirements below are the accepted remediations.
+requirements below are the accepted remediations. [RECHECKED after
+lib/services/workbench/enrich-recommended-service.js change: finding 1's
+identity-gate/write-branch claims are unaffected by the Wave 2 branch diff,
+which is a single display string in `institutionVerdictReason` (+1/−1);
+see the decision-3 recheck marker for detail.]
 
 Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
 substantial effort resolving conflicts that should be automatic — "Harvard
@@ -85,8 +91,11 @@ table]. Its consumers are the identity-evidence path, enrichment, and the
 affiliation-mismatch alert [VERIFIED via CodeGraph callers of
 `createInstitutionConsistencyChecker`: `reviewer-identity-evidence.js`,
 `workbench/enrich-recommended-service.js`,
-`alert-reviewer-affiliation-mismatch.js`]. It fails on the owner's two example
-classes for mechanical reasons proven live in
+`alert-reviewer-affiliation-mismatch.js`]. [RECHECKED after
+lib/services/workbench/enrich-recommended-service.js change: the consumer set
+is unchanged on the Stage 1 branch and is now machine-enforced by
+`tests/unit/institution-checker-consumer-scope.test.js`.] It fails on the
+owner's two example classes for mechanical reasons proven live in
 `outputs/s400-institution-checker-probe-findings.md`:
 
 1. **Subset/decorated strings never resolve.** "Department of X,
@@ -125,10 +134,241 @@ out of string decoration, not genuine disagreements.
 
 ### Stage 1 — institution-core extraction before comparison (no ROR)
 
-Normalize both sides of `areConsistent` by extracting the institution core
-from decorated bylines before resolution and comparison. Strengthen the
-existing extractor (or adopt the parsing built for the ROR candidate
-contract) rather than adding a new normalizer; consolidate, do not fork.
+> [RECHECKED after lib/services/discovery/affiliation.js change:
+> `normalizeAffiliationForComparison` untouched at :117; additive
+> `institutionSegments` at :152.]
+> [RECHECKED after lib/services/institution-affiliation-consistency.js change:
+> opt-in `segmentComparison` default-off at :165; segment-wise comparison at
+> :187 with shared-fragment self-pair exclusion, parent-fragment pool
+> policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`
+> and extension-cap overflow handling), and Wave 4 direct-identity-only
+> crossings/fallback (associated-link evidence consulted nowhere on the
+> staged path; the Wave 3c/3d crossing tags and whole-parent restrictions
+> are removed as subsumed); default path in `areConsistent` (:335)
+> behavior-identical when the flag is off — verified via the live
+> default-path probe, the vector-4 pin, and the resolve call-count
+> assertions.]
+> [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
+> sole opt-in call site, `segmentComparison: true` at :66.]
+> [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
+> `--institution-resolver` opt-in at :79; incumbent default construction at
+> :18,294; decision 4(a)'s earlier `:281-284` citation shifted to `:294`.]
+> [RECHECKED after lib/services/workbench/enrich-recommended-service.js Wave 2
+> change: copy-only edit to the `prior_flag` branch of `institutionVerdictReason`
+> (display text now says the institution "could not be compared this run"
+> instead of asserting a mismatch was flagged). `identityNeedsReview`, the
+> checker construction (bare `createInstitutionConsistencyChecker()`), and
+> every write-path condition described in owner decision 3 are byte-identical;
+> this file's verdict-bearing role in that decision is unchanged.]
+>
+> Wave 1 built 2026-08-08 (fixtures + generator, segment-comparison opt-in,
+> arm-2 evaluator flag); 55 focused tests green including a falsification
+> test for the shared-parent-fragment sibling hazard flagged during build.
+>
+> **Stage 1 live gate history.** Wave 2c PASS (145/145,
+> `results/stage1-wave2c-2026-08-08.json`) is HISTORICAL: it predates the
+> hardened runner, so it carries no provider-failure proof or provenance
+> (Codex finding 2). Wave 3 FAIL (141/145,
+> `results/stage1-wave3-2026-08-08.json`) is the falsification record for
+> the strict-everywhere pool rule. **Current gate: Wave 5 PASS, 2026-08-09
+> — 156/156 (named-relationship family added; required-families enforcement
+> active) with providerFailures 0 and clean-tree provenance (git sha
+> d9c8af0, dirty false)** (`results/stage1-wave5-2026-08-09.json`). All
+> three named-relationship rows surface on the staged arm as expected;
+> observationally, the incumbent (main-behavior) arm auto-clears
+> VUMC↔Vanderbilt AND Dana-Farber↔Harvard via associated links — live
+> confirmation that main's default path violates the policy table's
+> Dana-Farber surface expectation today, Stage 2 scope. Prior record:
+> Wave 4 PASS, 2026-08-08 — 153/153 (uc-system-* family added), git sha
+> df819f9 (`results/stage1-wave4-2026-08-08.json`). The seven new
+> campus-vs-system rows demonstrate the fix in-band: the incumbent
+> (main-behavior) arm auto-clears campus vs "University of California
+> System" (`same-or-related`, 7/7), the staged arm surfaces it
+> (`not-cleared`, 7/7); the eighth row (system self-pair) clears on both
+> arms, as expected for `same`.
+> Earlier PASS artifacts (wave3b/3c/3d/3e, 145-row set) record prior
+> checker revisions and are retained. The original wave2c narrative below
+> is retained for the family-level detail, which every subsequent passing
+> run reproduced:
+>
+> **Wave 2c detail (historical)** — 145/145 pairs:
+> all five 1002903 pairs behave to spec (four clear, the genuine mismatch
+> stays flagged), zero sibling auto-clears across 126 cross-campus pairs,
+> and all seven campus-vs-parent pairs surface. Two prior failed runs are
+> retained as the falsification record (`stage1-wave2-…`: campus-vs-parent
+> auto-cleared via a fail-open fragment guard, since made fail-closed;
+> `stage1-wave2b-…`: keyless-pool rate-limit mass timeouts, since fixed by
+> loading `.env.local` in the CLI). A direct segment match now requires its
+> contiguous extensions to be PROVEN decoration; unproven extensions demote
+> to step 2's positive-evidence path, so total provider failure surfaces
+> instead of auto-clearing.
+>
+> Wave 2 built 2026-08-08 (live replay CLI + offline tests, consumer-scope
+> assertion test, enrichment copy/provenance fix for the `prior_flag` verdict
+> reason).
+>
+> **Wave 3 remediation (2026-08-08, after Codex adversarial re-review of the
+> branch: needs-attention, 2 high + 2 medium).** An earlier revision of this
+> paragraph claimed the residual exposure was campus-vs-parent only and
+> Stage-1-only; offline probes falsified both halves, and Wave 3 closed the
+> in-scope paths:
+> 1. *Step-2 parent-fragment fail-open (was documented too narrowly).* With a
+>    resolver that resolves a bare parent string, step 2 auto-cleared BOTH
+>    campus-vs-parent (via the shared-fragment whole-operand exception) AND
+>    sibling campuses (parent fragment × associated-link) [VERIFIED via stub
+>    probes, S409]. Wave 3 fix, two revisions: the first cut excluded any
+>    fragment with an unresolvable extension from step-2 pools (strict fail
+>    closed everywhere) — empirically REJECTED: the live gate failed 141/145
+>    with all four 1002903 clears regressed, because real decoration
+>    extensions ("…, La Jolla", "…, Nashville") definitively abstain
+>    (`results/stage1-wave3-2026-08-08.json`, retained as the falsification
+>    record; providerFailures 0, so the misses are definitive, not outage).
+>    Final rule — a principled evidence split: step 1 (which clears on string
+>    match alone) and the whole-operand parent check stay strict (unproven
+>    extension demotes); step-2 pools, where clearing requires resolved
+>    identity evidence on BOTH sides, admit a fragment whose own identity
+>    resolved when its extensions merely abstain, and demote only on an
+>    extension resolving to a DIFFERENT identity. A whole operand that is
+>    itself a bare parent shape of the other operand earns direct-identity
+>    credit only in step-2 pairings (associated-link evidence withheld).
+>    The Codex re-review then falsified the first residual enumeration: an
+>    admitted-unproven bare-parent fragment could ALSO cross to a SIBLING
+>    campus whole via associated-link credit (bare parent resolves + one
+>    campus definitively misses) [VERIFIED via reproduced probe, S409] —
+>    an invariant-1 violation, not acceptable-residual class. Wave 3c fix
+>    (HISTORICAL — the tagging mechanism described here was removed by
+>    Wave 4, which drops associated-link evidence from the staged path
+>    entirely): pool entries admitted despite an abstaining extension were
+>    TAGGED, and any crossing involving a tagged entry cleared via direct
+>    identity match only. Deliberate narrowing accepted with that fix: the
+>    offline Broad-Institute-vs-MIT decorated-fragment case was re-pinned
+>    false. (Its "whole-operand corroboration is unaffected" carve-out was
+>    itself superseded by Wave 4, which flipped Harvard↔HMS to surface per
+>    the relationship-policy table.)
+>    ACCEPTED RESIDUAL, now precisely IDENTITY-EQUALITY ONLY (pinned in a
+>    labeled offline test): if a bare parent ever RESOLVES (it abstains
+>    today, S400) AND the campus extension string definitively misses, a
+>    campus-vs-parent pair auto-clears via step-2 directMatch of the same
+>    identity — unfixable without breaking the row-4 VUMC clear, which has
+>    the identical structural shape. Two independently unlikely live
+>    conditions. Tripwire: the deterministic offline pins — the live gate's
+>    campus-vs-parent rows CANNOT exercise this class (they require a
+>    one-sided definitive miss, and the real campuses resolve). Total
+>    provider outage still surfaces (unresolved fragments never enter
+>    pools — invariant 3 holds).
+>
+>    **Wave 4 (owner-directed, 2026-08-08): staged path drops
+>    associated-link credit entirely.** A fourth review round found prefix-
+>    ordered qualifiers bypass the suffix-only extension model; session
+>    probes then established the deeper fact: **"University of California
+>    System" resolves live** (OpenAlex I2803209242, 15 associated
+>    institutions), so system↔campus pairs auto-cleared via associated-link
+>    credit as plain whole operands — on the staged path AND on `main`'s
+>    default path (the checker's original one-hop corroboration design)
+>    [VERIFIED via live probes, S409: staged and default both returned true
+>    for "University of California System" vs "University of California San
+>    Diego"]. Owner decision 2 was therefore never enforced against the
+>    resolvable system name anywhere; the prior gate never caught it because
+>    its campus-vs-parent rows used the bare form, which abstains live. The
+>    owner overrode the stop-rule for this one fix ("fix it and let's move
+>    on"); the stop-rule is back in force after Wave 4.
+>    **The Wave 4 invariant (replaces the suffix-contiguous closure claim):
+>    with `segmentComparison: true`, associated-link evidence is consulted
+>    nowhere — step 1 clears on string match with decoration proof; step 2
+>    crossings and the fallback clear on resolved-identity direct match
+>    only.** This removes the subsumed Wave 3c/3d crossing machinery
+>    (`admittedUnproven` tags, whole-parent direct-only restriction,
+>    fallback parent-shape guard) rather than adding a fifth guard; the
+>    step-1 decoration proof, parent-fragment pool exclusion, and
+>    shared-fragment self-pair exclusion remain (each still blocks a named
+>    probe). Consequences, per the Stage 2 relationship-policy table
+>    (verified from this doc): Harvard↔HMS and Dana-Farber↔Harvard now
+>    SURFACE at the alert (the table's stated policy — note Harvard↔HMS was
+>    the owner's motivating example, so related-institution pairs will
+>    alert until Stage 2 typed relationships enable `related-autoclear`);
+>    VUMC↔Vanderbilt-class auto-clears are explicitly Stage 2 scope. The
+>    default path is behavior-identical (enrichment/identity-evidence
+>    corroboration unchanged, decision 3 — verified via live probe and the
+>    default-path pins); the earlier "branch widens the
+>    hazard" note inverts — post-Wave-4 the branch STRICTLY NARROWS alert
+>    auto-clearing relative to `main`. Remaining accepted residual:
+>    same-resolved-identity clears (the SYSTEM==SYSTEM class) are inherent
+>    to identity-equality evidence. The gate gains a system-name family
+>    ("University of California System" vs each campus → related-surface)
+>    so the resolvable form is exercised live.
+>
+>    **Wave 3d (superseded by Wave 4 above) and the STOP-RULE.** A third re-review
+>    round falsified the closure claim as then written: `fragmentExtensions`
+>    capped classification at the 3 shortest extensions, so a crafted
+>    byline whose contradictory extension is longest could be wrongly
+>    certified proven-decoration and earn associated-link credit
+>    [VERIFIED via reproduced probe, S409 — requires a bare parent that
+>    resolves, so live exposure is nil today]. Wave 3d makes the claim
+>    true: extension overflow forbids the 'decoration' classification
+>    (demote under strict policy, `admittedUnproven` under admit policy);
+>    the consumer-scope inventory widens to all runnable extensions and
+>    static dynamic-import specifiers. **Stop-rule (owner-directed,
+>    2026-08-08): this is the last Stage 1 checker iteration. If a
+>    subsequent adversarial review finds any further step-2 path, Stage 1
+>    freezes as-is — the finding is recorded, the closure claim is narrowed
+>    to what is proven, and the remainder routes to Stage 2's typed
+>    parent/child relationships. No fifth guard mechanism gets added to
+>    the string-side checker.** Rationale: three rounds produced
+>    progressively more contrived counterexamples, none live-reachable
+>    today — the step-2 crossing paths (rounds 2–3) all require a bare
+>    parent that resolves (live: abstains, S400), and round 1's fallback
+>    path required an associated-institution NAME collision (live: OpenAlex
+>    names the UC parent "University of California System", which does not
+>    collide); the composition of four interacting guards is a hand-rolled
+>    approximation of Stage 2's typed relationships, and further patching
+>    adds complexity faster than safety.
+> 2. *Unguarded fallback under `segmentComparison: true`.* When the segment
+>    path abstained, the pre-existing default path could still auto-clear
+>    campus-vs-parent via an associated-institution NAME collision (resolver
+>    abstains on the bare parent → raw-string substitution at the fallback →
+>    name match against the campus's associated institution) [VERIFIED via
+>    stub probe, S409]. Wave 3 fix: with `segmentComparison: true`, when one
+>    whole operand equals a proper parent fragment of the other, the fallback
+>    accepts only direct identity matches — associated-link evidence is
+>    rejected for that pair shape.
+> 3. *Pre-existing main-branch hazard, DOCUMENTED NOT FIXED (owner risk
+>    acceptance).* The same name-collision fallback path exists on `main`
+>    with `segmentComparison: false` — the mode enrichment and
+>    identity-evidence use. It does not fire live today only because OpenAlex
+>    names the UC parent "University of California System" (string ≠
+>    "University of California") [VERIFIED: live gate campus-vs-parent rows
+>    surface; stub probe with colliding name auto-clears]. Per owner
+>    decision 3 (enrichment copy-only in Stage 1), Wave 3 leaves default-path
+>    behavior byte-identical and pins the current behavior in a labeled test;
+>    the structural fix (typed parent/child relationships) is Stage 2 scope.
+> 4. *Gate runner could PASS vacuously during provider failure* (default
+>    error suppression turned provider exceptions into abstains, which
+>    satisfy `distinct`/`related-surface` expectations). Wave 3 fix: the
+>    runner propagates provider errors, records resolver metrics, and fails
+>    on any recorded provider failure; artifacts now embed git HEAD, dirty
+>    state, runner/fixture sha256, node version, and a key-present boolean.
+>    `gate: PASS` now means "all expectations met AND zero provider
+>    failures".
+> 5. *Falsification-record classification.* The two failed wave-2 artifacts
+>    are historical, non-revision-reproducible observations (runner, failure,
+>    and fix landed in one commit); the durable falsification record is the
+>    offline jest regressions that pin those fail-open scenarios with stub
+>    resolvers — stronger evidence than replaying an old commit, because the
+>    scenarios are deterministic.
+
+Normalize both sides of `areConsistent` by comparing institution segments of
+decorated bylines before resolution and comparison. Implementation note
+(Stage 1 build, 2026-08-08): this ships as a new function in
+`lib/services/discovery/affiliation.js` rather than a change to
+`normalizeAffiliationForComparison` — that function keys
+`_affiliationWeightsMap` grouping, so "strengthening" it would silently
+change discovery affiliation-history behavior; the new function lives in the
+same module to keep one home for affiliation parsing. The comparison is
+segment-wise (split on comma/semicolon boundaries, test each segment and
+progressive joins against the other operand) so a verdict of `same` can only
+arise from matching the other operand, never from free extraction. The
+behavior is opt-in at the checker factory and enabled only at the
+mismatch-alert call site per decision 3.
 
 - Expected effect: flips the four documented 1002903 byline-class false
   mismatches; leaves the possibly-substantive fifth flagged — the correct
@@ -171,6 +411,25 @@ name-containment per the v3 name-compatibility policy; cross-system `related`
 without corroboration → surface). Required named regressions: Harvard↔HMS
 (successor/canonicalization: surface), VUMC↔Vanderbilt (`related` constituent:
 auto-clear), Dana-Farber↔Harvard (`related` cross-organization: surface).
+
+**Gate-contract split (S409, closes the final Codex re-review finding):**
+the named regressions above carry TWO different expectations by stage. The
+**Stage 1 live gate** pins all three pairs as `related-surface` — the
+expected Wave 4 staged verdict given the live resolutions verified
+2026-08-09 (HMS definitively abstains; VUMC/Vanderbilt/Dana-Farber resolve
+to distinct identities) and the hostile-verified no-associated-link
+invariant; the expanded gate run recorded below is the end-to-end
+evidence — via the tracked `named-relationship-pairs.jsonl` family, and
+the runner fails fast if any required family (1002903, uc-sibling,
+named-relationship) is absent. The **Stage 2 contract** is where
+VUMC↔Vanderbilt's `related-autoclear` expectation lives (typed
+relationships); per the owner's 2026-08-09 cost calibration (institution
+errors at the alert tier are reviewer-self-corrected, so surfaced pairs —
+not false clears — are the expensive direction there), the Stage 2
+`related-autoclear` classification should lean broad. Byline-normalization
+coverage at the Stage 1 gate is the 1002903 family; the frozen
+fuzzy-matching hierarchy suites remain offline Stage 2 evidence, not Stage 1
+live-gate families.
 
 ROR rank/`chosen:true` remains retrieval evidence only; vetoes still run
 before any pair verdict. Callers of the incumbent resolver outside the
@@ -303,7 +562,13 @@ deployment sanity check, not a measurement instrument.
    metrics, affiliation), `writeIdentityDecision`, ORCID back-propagation to
    the linked contact, and COI reason writes [VERIFIED via
    `lib/services/workbench/enrich-recommended-service.js` identity-gate and
-   write branches, read S409]. Therefore:
+   write branches, read S409]. [RECHECKED after
+   lib/services/workbench/enrich-recommended-service.js change: the Wave 2
+   branch diff is one display string in `institutionVerdictReason` (+1/−1);
+   the identity gate, checker construction, and every write branch cited
+   above are untouched, and
+   `tests/unit/institution-checker-consumer-scope.test.js` machine-enforces
+   the bare checker construction.] Therefore:
    - **Full pair-verdict injection now: the affiliation-mismatch alert
      only** (`alert-reviewer-affiliation-mismatch.js`).
    - **Enrichment now: copy and provenance only** — the banner names the
