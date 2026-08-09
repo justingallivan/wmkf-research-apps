@@ -405,6 +405,25 @@ without corroboration → surface). Required named regressions: Harvard↔HMS
 (successor/canonicalization: surface), VUMC↔Vanderbilt (`related` constituent:
 auto-clear), Dana-Farber↔Harvard (`related` cross-organization: surface).
 
+**Gate-contract split (S409, closes the final Codex re-review finding):**
+the named regressions above carry TWO different expectations by stage. The
+**Stage 1 live gate** pins all three pairs as `related-surface` — the
+expected Wave 4 staged verdict given the live resolutions verified
+2026-08-09 (HMS definitively abstains; VUMC/Vanderbilt/Dana-Farber resolve
+to distinct identities) and the hostile-verified no-associated-link
+invariant; the expanded gate run recorded below is the end-to-end
+evidence — via the tracked `named-relationship-pairs.jsonl` family, and
+the runner fails fast if any required family (1002903, uc-sibling,
+named-relationship) is absent. The **Stage 2 contract** is where
+VUMC↔Vanderbilt's `related-autoclear` expectation lives (typed
+relationships); per the owner's 2026-08-09 cost calibration (institution
+errors at the alert tier are reviewer-self-corrected, so surfaced pairs —
+not false clears — are the expensive direction there), the Stage 2
+`related-autoclear` classification should lean broad. Byline-normalization
+coverage at the Stage 1 gate is the 1002903 family; the frozen
+fuzzy-matching hierarchy suites remain offline Stage 2 evidence, not Stage 1
+live-gate families.
+
 ROR rank/`chosen:true` remains retrieval evidence only; vetoes still run
 before any pair verdict. Callers of the incumbent resolver outside the
 checker (e.g. save-candidates, evaluation harness) are untouched.

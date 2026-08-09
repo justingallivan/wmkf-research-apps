@@ -38,6 +38,33 @@ separate, independently frozen directory from that suite.
     through associated-institution links never fires against it in a live
     gate run — only a resolvable system name exercises that hazard, which is
     why this is a separate family rather than a change to `uc-parent-*`.
+- `cases/named-relationship-pairs.jsonl` — 3 rows, hand-authored (not
+  generated), added S409 after Codex's final review found the plan's named
+  relationship regressions were never actually live-gated: the runner passes
+  whatever case files it's given, and none of the tracked files before this
+  one exercised these specific pairs. Live OpenAlex resolutions verified
+  2026-08-09. All three rows are expected `related-surface` at Stage 1
+  (nothing auto-clears), but the mechanism and the Stage-2 outlook differ per
+  row:
+  - `named-rel-harvard-hms` — "Harvard Medical School" vs "Harvard
+    University". Live mechanism is one-sided abstention: OpenAlex has no
+    separate HMS institution entity (folded into Harvard University,
+    I136199984), so there's no shared identity to match on either side.
+  - `named-rel-vumc-vanderbilt` — "Vanderbilt University Medical Center" vs
+    "Vanderbilt University". Distinct OpenAlex identities (I901861585 vs
+    I200719446). The relationship-policy table's related-autoclear
+    expectation for this pair is **Stage 2 scope** (typed relationships) —
+    at Stage 1 it surfaces, and per the owner's 2026-08-09 cost calibration
+    the Stage 2 related-autoclear classification should lean broad.
+  - `named-rel-danafarber-harvard` — "Dana-Farber Cancer Institute" vs
+    "Harvard University". Distinct identities; the policy table says
+    surface, with no Stage 2 auto-clear expectation noted for this pair.
+
+The runner's `REQUIRED_CASE_FILES` (`run-pair-gates.js`) now names all three
+tracked case files above by basename and fails fast — before any live
+provider call — if a run's loaded case set is missing one of them or a
+required file contributed zero rows, closing the "runner passes whatever
+it's given" gap this family exists to fix.
 
 ## Row schema
 

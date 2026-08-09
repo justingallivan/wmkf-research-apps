@@ -50,7 +50,17 @@ const RESULTS_DIR = path.join(__dirname, 'results');
 const DEFAULT_CASE_FILES = [
   path.join(__dirname, 'cases', 'request-1002903-pairs.jsonl'),
   path.join(__dirname, 'cases', 'uc-sibling-pairs.jsonl'),
+  path.join(__dirname, 'cases', 'named-relationship-pairs.jsonl'),
 ];
+
+// The three tracked case files the gate always requires by default,
+// identified by basename (matches the `family` field loadCaseFile attaches).
+// A prior Codex finding: the runner silently passes whatever case files it's
+// given, so a future refactor that drops one of the defaults (or a run
+// invoked with a truncated --cases override that doesn't replace all three)
+// would gate on a smaller, non-representative case set without any signal.
+// `assertRequiredCaseFiles` below fails fast on that before any live call.
+const REQUIRED_CASE_FILES = new Set(DEFAULT_CASE_FILES.map((filePath) => path.basename(filePath)));
 
 const REQUIRED_FIELDS = ['caseId', 'left', 'right', 'expected'];
 const KNOWN_EXPECTED = new Set(['same', 'distinct', 'related-surface', 'insufficient']);
@@ -87,6 +97,27 @@ function loadAllCases(extraPaths) {
     rows.push(...loadCaseFile(file));
   }
   return rows;
+}
+
+/**
+ * Fails fast (throws, before any live provider call) unless every required
+ * case-file family (by basename, matching `loadCaseFile`'s `family` tag)
+ * contributed at least one row to the loaded case set. Catches both a
+ * required file being absent from the loaded set entirely and a required
+ * file that loaded but was empty (zero rows) — either way, a run that
+ * silently drops a required family from the gate is not a real replay of
+ * the full case set and must not proceed.
+ */
+function assertRequiredCaseFiles(cases, requiredBasenames = REQUIRED_CASE_FILES) {
+  const rowCountByFamily = new Map();
+  for (const row of Array.isArray(cases) ? cases : []) {
+    const family = row?.family || 'unknown';
+    rowCountByFamily.set(family, (rowCountByFamily.get(family) || 0) + 1);
+  }
+  const missing = [...requiredBasenames].filter((name) => !(rowCountByFamily.get(name) > 0));
+  if (missing.length > 0) {
+    throw new Error(`required case file(s) missing or contributed zero rows: ${missing.join(', ')}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -466,6 +497,7 @@ async function main() {
   let cases;
   try {
     cases = loadAllCases(args.extraCases);
+    assertRequiredCaseFiles(cases);
   } catch (err) {
     console.error(`Error loading case files: ${err.message}`);
     process.exit(1);
@@ -559,6 +591,9 @@ module.exports = {
   runOnePair,
   loadCaseFile,
   loadAllCases,
+  assertRequiredCaseFiles,
+  REQUIRED_CASE_FILES,
+  DEFAULT_CASE_FILES,
   verdictLabel,
   gatePasses,
   isForbiddenVerdict,

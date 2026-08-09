@@ -22,6 +22,8 @@ const {
   gateOk,
   sha256File,
   buildProvenance,
+  assertRequiredCaseFiles,
+  REQUIRED_CASE_FILES,
 } = require(path.join('..', '..', '..', 'benchmarks', 'institution-pair-consistency', 'run-pair-gates.js'));
 const { createInstitutionConsistencyChecker } = require(path.join('..', '..', '..', 'lib', 'services', 'institution-affiliation-consistency.js'));
 const { createInstitutionIdentityResolver } = require(path.join('..', '..', '..', 'lib', 'services', 'institution-identity-resolver.js'));
@@ -193,15 +195,73 @@ describe('run-pair-gates core: case-file loading (pure fs, no network)', () => {
     }]);
   });
 
-  test('loadAllCases loads the two real Stage 1 fixtures (5 + 148 = 153 rows) plus any extras', () => {
+  test('loadAllCases loads the three real Stage 1 fixtures (5 + 148 + 3 = 156 rows) plus any extras', () => {
     const rows = loadAllCases([]);
-    expect(rows.length).toBe(153);
+    expect(rows.length).toBe(156);
     const families = new Set(rows.map((r) => r.family));
-    expect(families).toEqual(new Set(['request-1002903-pairs.jsonl', 'uc-sibling-pairs.jsonl']));
+    expect(families).toEqual(new Set([
+      'request-1002903-pairs.jsonl', 'uc-sibling-pairs.jsonl', 'named-relationship-pairs.jsonl',
+    ]));
   });
 
   test('loadAllCases throws (propagates) when a missing extra case file is requested — the CLI turns this into a nonzero exit', () => {
     expect(() => loadAllCases([path.join(tmpDir, 'missing-extra.jsonl')])).toThrow(/not found or unreadable/);
+  });
+});
+
+// -----------------------------------------------------------------------
+// Wave 5: required-case-file enforcement (final Codex finding — the runner
+// silently passes whatever case files it's given, so the named-relationship
+// regressions (Harvard<->HMS, VUMC<->Vanderbilt, Dana-Farber<->Harvard) were
+// never actually live-gated). assertRequiredCaseFiles fails a run BEFORE any
+// provider work — pure function over an already-loaded case array, no
+// network involved in exercising it.
+// -----------------------------------------------------------------------
+describe('run-pair-gates core: assertRequiredCaseFiles (required-family enforcement, fails before any live call)', () => {
+  test('REQUIRED_CASE_FILES names all three tracked case files by basename', () => {
+    expect(REQUIRED_CASE_FILES).toEqual(new Set([
+      'request-1002903-pairs.jsonl', 'uc-sibling-pairs.jsonl', 'named-relationship-pairs.jsonl',
+    ]));
+  });
+
+  test('a case set missing a required family throws, naming the missing file', () => {
+    const cases = [
+      { caseId: 'a', family: 'request-1002903-pairs.jsonl' },
+      { caseId: 'b', family: 'uc-sibling-pairs.jsonl' },
+      // named-relationship-pairs.jsonl absent entirely.
+    ];
+    expect(() => assertRequiredCaseFiles(cases)).toThrow(/named-relationship-pairs\.jsonl/);
+  });
+
+  test('a required family present but contributing zero rows still throws (same as absent)', () => {
+    // Simulates a required file that loaded successfully but was empty —
+    // the family never appears in the row set either way.
+    const cases = [
+      { caseId: 'a', family: 'request-1002903-pairs.jsonl' },
+      { caseId: 'b', family: 'uc-sibling-pairs.jsonl' },
+      { caseId: 'c', family: 'named-relationship-pairs.jsonl' },
+    ].filter((row) => row.family !== 'named-relationship-pairs.jsonl');
+    expect(() => assertRequiredCaseFiles(cases)).toThrow(/named-relationship-pairs\.jsonl/);
+  });
+
+  test('all three required families present with at least one row each passes silently', () => {
+    const cases = [
+      { caseId: 'a', family: 'request-1002903-pairs.jsonl' },
+      { caseId: 'b', family: 'uc-sibling-pairs.jsonl' },
+      { caseId: 'c', family: 'named-relationship-pairs.jsonl' },
+    ];
+    expect(() => assertRequiredCaseFiles(cases)).not.toThrow();
+  });
+
+  test('the real loaded default case set (all three tracked files) satisfies the required-family check', () => {
+    const cases = loadAllCases([]);
+    expect(() => assertRequiredCaseFiles(cases)).not.toThrow();
+  });
+
+  test('a custom requiredBasenames set can be passed explicitly (used by main() with the module default)', () => {
+    const cases = [{ caseId: 'a', family: 'some-other-file.jsonl' }];
+    expect(() => assertRequiredCaseFiles(cases, new Set(['some-other-file.jsonl']))).not.toThrow();
+    expect(() => assertRequiredCaseFiles(cases, new Set(['missing-file.jsonl']))).toThrow(/missing-file\.jsonl/);
   });
 });
 
