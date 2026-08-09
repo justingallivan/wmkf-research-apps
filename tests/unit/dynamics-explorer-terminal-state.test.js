@@ -116,6 +116,17 @@ afterEach(() => {
 });
 
 describe('Dynamics Explorer SSE terminal state', () => {
+  test('renders submitted user text in white on the lighter blue message bubble', async () => {
+    fetch.mockResolvedValueOnce(streamResponse([EOF]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion('Can you tell me about Texas Tech?');
+
+    const userText = await screen.findByText('Can you tell me about Texas Tech?');
+    expect(userText).toHaveClass('text-white', 'prose-invert');
+    expect(userText.parentElement).toHaveClass('bg-blue-500');
+  });
+
   test('clean EOF without a terminal event clears the spinner and explains the failure', async () => {
     fetch.mockResolvedValueOnce(streamResponse([EOF]));
     render(<DynamicsExplorerPage />);

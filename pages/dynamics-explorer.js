@@ -692,7 +692,7 @@ const MessageBubble = React.memo(function MessageBubble({ message, onCopy, onFee
       <div className={`max-w-[80%] ${isUser ? 'text-right' : ''}`}>
         <div className={`rounded-lg px-4 py-3 inline-block text-left ${
           isUser
-            ? 'bg-blue-600 text-white'
+            ? 'bg-blue-500 text-white'
             : message.isError
               ? 'bg-red-50 border border-red-200 text-gray-900'
               : 'bg-gray-100 text-gray-900'
@@ -703,7 +703,9 @@ const MessageBubble = React.memo(function MessageBubble({ message, onCopy, onFee
             ) : (
               <div
                 key={i}
-                className="text-sm leading-relaxed prose prose-sm max-w-none"
+                className={`text-sm leading-relaxed prose prose-sm max-w-none ${
+                  isUser ? 'text-white prose-invert' : ''
+                }`}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdownText(seg.content)) }}
               />
             )
