@@ -183,9 +183,11 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
     expect(reason).not.toContain('contradict');
   });
 
-  test('verdict reason: a carried prior flag says so', () => {
-    expect(institutionVerdictReason({ contradictionSource: 'prior_flag' }))
-      .toContain('earlier verification pass');
+  test('verdict reason: a carried prior flag says the comparison did not happen this run, not that a mismatch was confirmed', () => {
+    const reason = institutionVerdictReason({ contradictionSource: 'prior_flag' });
+    expect(reason).toContain('earlier verification pass');
+    expect(reason).toContain('could not be compared');
+    expect(reason).not.toMatch(/flagged an institution mismatch/);
   });
 
   test('verdict reason: long bylines are clipped for copy, not dumped verbatim', () => {

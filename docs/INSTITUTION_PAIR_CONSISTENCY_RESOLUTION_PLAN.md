@@ -19,6 +19,8 @@ related:
 
 # Institution Pair Consistency Resolution Plan
 
+<!-- [RECHECKED after lib/services/workbench/enrich-recommended-service.js change: Wave 2 branch diff is one display string in institutionVerdictReason (+1/−1); identity gate, checker construction, and write branches untouched; consumer set machine-enforced by tests/unit/institution-checker-consumer-scope.test.js] -->
+
 ## Status
 
 **APPROVED WITH SCOPE, 2026-08-08 — Stage 1 is authorized.** The four owner
@@ -39,7 +41,11 @@ invisible to a same-ID pair verdict; (3) ROR's `related` type does not
 distinguish constituent links from cross-system links; (4) the originally
 named gate evidence was partly untracked or mismatched. The decision-3
 rescope, Stage 2 operand contract, relationship-policy table, and fixture
-requirements below are the accepted remediations.
+requirements below are the accepted remediations. [RECHECKED after
+lib/services/workbench/enrich-recommended-service.js change: finding 1's
+identity-gate/write-branch claims are unaffected by the Wave 2 branch diff,
+which is a single display string in `institutionVerdictReason` (+1/−1);
+see the decision-3 recheck marker for detail.]
 
 Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
 substantial effort resolving conflicts that should be automatic — "Harvard
@@ -85,8 +91,11 @@ table]. Its consumers are the identity-evidence path, enrichment, and the
 affiliation-mismatch alert [VERIFIED via CodeGraph callers of
 `createInstitutionConsistencyChecker`: `reviewer-identity-evidence.js`,
 `workbench/enrich-recommended-service.js`,
-`alert-reviewer-affiliation-mismatch.js`]. It fails on the owner's two example
-classes for mechanical reasons proven live in
+`alert-reviewer-affiliation-mismatch.js`]. [RECHECKED after
+lib/services/workbench/enrich-recommended-service.js change: the consumer set
+is unchanged on the Stage 1 branch and is now machine-enforced by
+`tests/unit/institution-checker-consumer-scope.test.js`.] It fails on the
+owner's two example classes for mechanical reasons proven live in
 `outputs/s400-institution-checker-probe-findings.md`:
 
 1. **Subset/decorated strings never resolve.** "Department of X,
@@ -137,10 +146,34 @@ out of string decoration, not genuine disagreements.
 > [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
 > `--institution-resolver` opt-in at :79; incumbent default construction at
 > :18,294; decision 4(a)'s earlier `:281-284` citation shifted to `:294`.]
+> [RECHECKED after lib/services/workbench/enrich-recommended-service.js Wave 2
+> change: copy-only edit to the `prior_flag` branch of `institutionVerdictReason`
+> (display text now says the institution "could not be compared this run"
+> instead of asserting a mismatch was flagged). `identityNeedsReview`, the
+> checker construction (bare `createInstitutionConsistencyChecker()`), and
+> every write-path condition described in owner decision 3 are byte-identical;
+> this file's verdict-bearing role in that decision is unchanged.]
 >
 > Wave 1 built 2026-08-08 (fixtures + generator, segment-comparison opt-in,
 > arm-2 evaluator flag); 55 focused tests green including a falsification
 > test for the shared-parent-fragment sibling hazard flagged during build.
+>
+> **Stage 1 live gate: PASS, 2026-08-08** — 145/145 pairs
+> (`benchmarks/institution-pair-consistency/results/stage1-wave2c-2026-08-08.json`):
+> all five 1002903 pairs behave to spec (four clear, the genuine mismatch
+> stays flagged), zero sibling auto-clears across 126 cross-campus pairs,
+> and all seven campus-vs-parent pairs surface. Two prior failed runs are
+> retained as the falsification record (`stage1-wave2-…`: campus-vs-parent
+> auto-cleared via a fail-open fragment guard, since made fail-closed;
+> `stage1-wave2b-…`: keyless-pool rate-limit mass timeouts, since fixed by
+> loading `.env.local` in the CLI). A direct segment match now requires its
+> contiguous extensions to be PROVEN decoration; unproven extensions demote
+> to step 2's positive-evidence path, so total provider failure surfaces
+> instead of auto-clearing.
+>
+> Wave 2 built 2026-08-08 (live replay CLI + offline tests, consumer-scope
+> assertion test, enrichment copy/provenance fix for the `prior_flag` verdict
+> reason).
 
 Normalize both sides of `areConsistent` by comparing institution segments of
 decorated bylines before resolution and comparison. Implementation note
@@ -329,7 +362,13 @@ deployment sanity check, not a measurement instrument.
    metrics, affiliation), `writeIdentityDecision`, ORCID back-propagation to
    the linked contact, and COI reason writes [VERIFIED via
    `lib/services/workbench/enrich-recommended-service.js` identity-gate and
-   write branches, read S409]. Therefore:
+   write branches, read S409]. [RECHECKED after
+   lib/services/workbench/enrich-recommended-service.js change: the Wave 2
+   branch diff is one display string in `institutionVerdictReason` (+1/−1);
+   the identity gate, checker construction, and every write branch cited
+   above are untouched, and
+   `tests/unit/institution-checker-consumer-scope.test.js` machine-enforces
+   the bare checker construction.] Therefore:
    - **Full pair-verdict injection now: the affiliation-mismatch alert
      only** (`alert-reviewer-affiliation-mismatch.js`).
    - **Enrichment now: copy and provenance only** — the banner names the

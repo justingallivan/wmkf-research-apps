@@ -44,16 +44,40 @@ describe('segment-wise comparison (opt-in) — request-1002903 same-pairs', () =
   const ROW4_LEFT = 'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.';
   const ROW4_RIGHT = 'Vanderbilt University Medical Center';
 
+  // Fail-closed guard (post-live-gate hardening): a direct segment match with
+  // unproven contiguous extensions no longer auto-clears on string identity
+  // alone — the pair needs POSITIVE resolution evidence (the clean org segment
+  // resolving to the same identity on both sides). This mirrors live reality:
+  // S400 showed clean canonical names resolve while decorated strings return
+  // zero results.
+  const cleanOrgResolver = () => {
+    const identity = (id, name) => ({ openAlexId: id, displayName: name, associatedInstitutions: [] });
+    return identityResolver(new Map([
+      ['University of California San Diego', identity('I-UCSD', 'University of California San Diego')],
+      ['Columbia University', identity('I-COLUMBIA', 'Columbia University')],
+      ['North Carolina State University', identity('I-NCSU', 'North Carolina State University')],
+      ['Vanderbilt University Medical Center', identity('I-VUMC', 'Vanderbilt University Medical Center')],
+    ]));
+  };
+
   test.each([
     ['row1 (UCSD decorated byline)', ROW1_LEFT, ROW1_RIGHT],
     ['row2 (Columbia semicolon double-department)', ROW2_LEFT, ROW2_RIGHT],
     ['row3 (NC State decorated byline)', ROW3_LEFT, ROW3_RIGHT],
     ['row4 (VUMC — listed institution is NOT the first org mentioned)', ROW4_LEFT, ROW4_RIGHT],
-  ])('%s → consistent true via direct segment match, no resolver hit needed', async (_label, left, right) => {
+  ])('%s → consistent true when the clean org segment resolves (S400-real stub)', async (_label, left, right) => {
+    const checker = createInstitutionConsistencyChecker({ resolver: cleanOrgResolver(), segmentComparison: true });
+
+    await expect(checker.areConsistent(left, right)).resolves.toBe(true);
+  });
+
+  test('fail-closed: with a resolver that abstains on EVERYTHING, decorated rows surface instead of auto-clearing', async () => {
+    // Total provider failure (or total ambiguity) must degrade to surfaced
+    // review, never to a string-identity auto-clear — plan safety invariant 3.
     const resolver = nullResolver();
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
-    await expect(checker.areConsistent(left, right)).resolves.toBe(true);
+    await expect(checker.areConsistent(ROW1_LEFT, ROW1_RIGHT)).resolves.toBe(false);
   });
 
   test('row4: proves segment matching hits the LISTED institution (VUMC), not a first-org extraction', async () => {
@@ -63,8 +87,7 @@ describe('segment-wise comparison (opt-in) — request-1002903 same-pairs', () =
     // to match the right operand. Segment-wise comparison must instead test
     // EVERY segment against the other operand, so the VUMC segment (which
     // appears later) is what actually produces the match.
-    const resolver = nullResolver();
-    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+    const checker = createInstitutionConsistencyChecker({ resolver: cleanOrgResolver(), segmentComparison: true });
 
     await expect(checker.areConsistent(ROW4_LEFT, ROW4_RIGHT)).resolves.toBe(true);
     // A first-org extractor would have matched "Vanderbilt University
@@ -302,6 +325,73 @@ describe('shared-fragment self-pair hardening (safety invariant 1)', () => {
     await expect(checker.areConsistent(
       'Laboratory of Molecular Biology, Harvard University, Cambridge, MA',
       'Harvard University',
+    )).resolves.toBe(true);
+  });
+});
+
+describe('parent-fragment guard on direct segment matches (owner decision 2)', () => {
+  test('campus vs bare parent surfaces (false) when the contiguous extension resolves to a different identity', async () => {
+    // Live-gate falsification 2026-08-08: "University of California, Los
+    // Angeles" vs "University of California" auto-cleared via a step-1 direct
+    // fragment match. The matched fragment's contiguous extension (the full
+    // campus name) resolves to UCLA — a different identity than the fragment —
+    // so the fragment is a parent of something more specific and must not
+    // auto-clear.
+    const ucla = {
+      openAlexId: 'I-UCLA',
+      displayName: 'University of California, Los Angeles',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['University of California, Los Angeles', ucla],
+      // bare "University of California" abstains (ambiguous), per S400 evidence
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California, Los Angeles',
+      'University of California',
+    )).resolves.toBe(false);
+    expect(resolver.resolve).toHaveBeenCalledWith('University of California, Los Angeles', expect.anything());
+  });
+
+  test('decoration extensions (city/country) do not block a genuine byline match', async () => {
+    // VUMC has the identical string structure — matched segment plus a
+    // contiguous ", Nashville" extension. Under the fail-closed guard the
+    // unresolvable extension demotes the step-1 string match, and the pair
+    // clears through step 2 instead: the clean VUMC segment resolves to the
+    // same identity as the listed institution.
+    const vumc = {
+      openAlexId: 'I-VUMC',
+      displayName: 'Vanderbilt University Medical Center',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['Vanderbilt University Medical Center', vumc],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.',
+      'Vanderbilt University Medical Center',
+    )).resolves.toBe(true);
+  });
+
+  test('extension resolving to the SAME identity as the segment still clears', async () => {
+    const ncsu = {
+      openAlexId: 'I-NCSU',
+      displayName: 'North Carolina State University',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['North Carolina State University', ncsu],
+      ['North Carolina State University, Raleigh', ncsu],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'Department of Chemistry, North Carolina State University, Raleigh, NC, USA',
+      'North Carolina State University',
     )).resolves.toBe(true);
   });
 });

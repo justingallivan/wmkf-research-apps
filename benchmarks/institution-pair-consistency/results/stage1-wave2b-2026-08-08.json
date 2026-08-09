@@ -1,0 +1,1009 @@
+{
+  "ranAt": "2026-08-09T00:26:11.111Z",
+  "slug": "stage1-wave2b-2026-08-08",
+  "caseFiles": [
+    "benchmarks/institution-pair-consistency/cases/request-1002903-pairs.jsonl",
+    "benchmarks/institution-pair-consistency/cases/uc-sibling-pairs.jsonl"
+  ],
+  "timeoutMs": 15000,
+  "concurrency": 4,
+  "ok": false,
+  "summary": {
+    "total": 145,
+    "passed": 21,
+    "failed": 4,
+    "skipped": 0,
+    "errors": 120,
+    "forbidden": 4
+  },
+  "families": {
+    "request-1002903-pairs.jsonl": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "forbidden": 0
+    },
+    "uc-sibling-pairs.jsonl": {
+      "total": 140,
+      "passed": 16,
+      "failed": 4,
+      "skipped": 0,
+      "errors": 120,
+      "forbidden": 4
+    }
+  },
+  "rows": [
+    {
+      "caseId": "r1002903-row1",
+      "family": "request-1002903-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "r1002903-row2",
+      "family": "request-1002903-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "r1002903-row3",
+      "family": "request-1002903-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "r1002903-row4",
+      "family": "request-1002903-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "r1002903-row5",
+      "family": "request-1002903-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCI-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCLA-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCR-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSB-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSC-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "distinct",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSF-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSF-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSD-UCSF-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCI-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCI-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCI-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCLA-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCLA-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCLA-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCR-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCR-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCR-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSB-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSB-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSB-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSC-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSC-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSC-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSD-f1",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSD-f2",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-cross-UCSF-UCSD-f3",
+      "family": "uc-sibling-pairs.jsonl",
+      "status": "error",
+      "error": "timed out after 15000ms"
+    },
+    {
+      "caseId": "uc-identity-UCI",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCLA",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCR",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCSB",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCSC",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCSD",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-identity-UCSF",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "same",
+      "incumbentVerdict": "same-or-related",
+      "stagedVerdict": "same-or-related",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCI",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCLA",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCR",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": false,
+      "forbidden": true,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCSB",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": false,
+      "forbidden": true,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCSC",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": false,
+      "forbidden": true,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCSD",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "not-cleared",
+      "passed": true,
+      "forbidden": false,
+      "status": "ok"
+    },
+    {
+      "caseId": "uc-parent-UCSF",
+      "family": "uc-sibling-pairs.jsonl",
+      "expected": "related-surface",
+      "incumbentVerdict": "not-cleared",
+      "stagedVerdict": "same-or-related",
+      "passed": false,
+      "forbidden": true,
+      "status": "ok"
+    }
+  ]
+}
