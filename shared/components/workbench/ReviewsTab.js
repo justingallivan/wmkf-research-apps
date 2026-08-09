@@ -102,15 +102,17 @@ function ReviewCard({ reviewer }) {
   );
 }
 
-// The narrative (rich-text) answers from the answer snapshot. Ratings already
-// render as cells above, so only the rich-text questions show here, in question
-// order. HTML is rendered as-is because the API re-sanitizes on read (the stored
-// value was sanitized on write, and the route is the trusted server boundary
-// immediately before this render).
+// Every answered question from the answer snapshot, in question order —
+// including the rating picklists (owner decision 2026-08-09: no question is
+// skipped in the numbered flow; the RISK/OVERALL cells above remain as a
+// quick-scan summary). HTML is rendered as-is because the API re-sanitizes on
+// read (the stored value was sanitized on write, and the route is the trusted
+// server boundary immediately before this render).
 function AnswerDetails({ answers }) {
   const details = (answers || []).filter(
     (a) => (a.questionType === 'richtext' && a.answerHtml && a.answerHtml.trim().length > 0)
-      || a.questionType === 'multiselect',
+      || a.questionType === 'multiselect'
+      || a.questionType === 'picklist',
   );
   if (details.length === 0) return null;
   return (
@@ -123,6 +125,10 @@ function AnswerDetails({ answers }) {
               className="prose prose-sm max-w-none text-gray-800 mt-1"
               dangerouslySetInnerHTML={{ __html: a.answerHtml }}
             />
+          ) : a.questionType === 'picklist' ? (
+            <div className="text-sm text-gray-800 mt-1">
+              {a.answerText || 'Not provided'}
+            </div>
           ) : a.answerValuesUnreadable ? (
             <div className="text-sm text-amber-700 mt-1">Unreadable answer</div>
           ) : (

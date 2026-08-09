@@ -85,7 +85,7 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   expect(screen.getByText('No file on record')).toBeInTheDocument();
 });
 
-test('renders the narrative rich-text answers (Phase 4), not the picklist rows', async () => {
+test('renders every answered question in order, including picklist rows inline', async () => {
   const reviewer = {
     suggestionId: 'g1',
     name: 'Dr. Narrative',
@@ -93,8 +93,9 @@ test('renders the narrative rich-text answers (Phase 4), not the picklist rows',
     reviewerRiskLevel: 2,
     reviewerOverallAssessment: 4,
     answers: [
-      // Picklist rows render in the fixed rating cells, not the answer details.
-      { questionKey: 'riskLevel', questionOrder: 4, questionType: 'picklist', answerHtml: '', answerText: 'Medium risk (parts may succeed, others may fail)', answerValue: 2 },
+      // Picklist rows render BOTH in the fixed rating cells and inline in the
+      // answer details (owner decision 2026-08-09: no question skipped in the flow).
+      { questionKey: 'riskLevel', questionOrder: 4, questionType: 'picklist', questionText: 'Q4 — How risky is the project overall?', answerHtml: '', answerText: 'Medium risk (parts may succeed, others may fail)', answerValue: 2 },
       { questionKey: 'impactAreas', questionOrder: 3, questionType: 'multiselect', questionText: 'Q3 — Impact areas', answerHtml: '', answerText: 'Tools; Broad interest', answerValue: null, answerValues: [{ value: 1, label: 'Tools' }, { value: 3, label: 'Broad interest' }] },
       { questionKey: 'foreseenImpacts', questionOrder: 2, questionType: 'richtext', questionText: 'Q2 — What specific significant impacts do you foresee?', answerHtml: '<p>This could <strong>reshape</strong> the field.</p>', answerText: '...', answerValue: null },
       // Empty optional richtext: skipped.
@@ -113,7 +114,9 @@ test('renders the narrative rich-text answers (Phase 4), not the picklist rows',
   expect(screen.getByText('reshape')).toBeInTheDocument(); // <strong> rendered
   // The empty optional question is not rendered.
   expect(screen.queryByText('Q11 — Anything else?')).not.toBeInTheDocument();
-  expect(screen.getAllByText('Medium risk (parts may succeed, others may fail)')).toHaveLength(1);
+  // Once in the fixed RISK rating cell, once inline as the Q4 answer.
+  expect(screen.getAllByText('Medium risk (parts may succeed, others may fail)')).toHaveLength(2);
+  expect(screen.getByText('Q4 — How risky is the project overall?')).toBeInTheDocument();
   expect(screen.getByText('Q3 — Impact areas')).toBeInTheDocument();
   expect(screen.getByText('Tools')).toBeInTheDocument();
   expect(screen.getByText('Broad interest')).toBeInTheDocument();
