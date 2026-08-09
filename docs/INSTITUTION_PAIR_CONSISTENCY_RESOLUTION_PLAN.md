@@ -138,12 +138,12 @@ out of string decoration, not genuine disagreements.
 > `normalizeAffiliationForComparison` untouched at :117; additive
 > `institutionSegments` at :152.]
 > [RECHECKED after lib/services/institution-affiliation-consistency.js change:
-> opt-in `segmentComparison` default-off at :138; segment-wise comparison at
-> :160 with shared-fragment self-pair exclusion and Wave 3 parent-fragment
-> pool policy (`classifyFragment` with per-call-site
-> `unprovenExtensionPolicy`); default path in `areConsistent` (:308; Wave 3
-> fallback guard gated strictly on `segmentComparison`) unchanged when the
-> flag is off.]
+> opt-in `segmentComparison` default-off at :149; segment-wise comparison at
+> :171 with shared-fragment self-pair exclusion, Wave 3 parent-fragment pool
+> policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`),
+> and Wave 3c `admittedUnproven` crossing tags; default path in
+> `areConsistent` (:351; fallback guard gated strictly on
+> `segmentComparison`) unchanged when the flag is off.]
 > [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
 > sole opt-in call site, `segmentComparison: true` at :66.]
 > [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
@@ -213,14 +213,31 @@ out of string decoration, not genuine disagreements.
 >    extension resolving to a DIFFERENT identity. A whole operand that is
 >    itself a bare parent shape of the other operand earns direct-identity
 >    credit only in step-2 pairings (associated-link evidence withheld).
->    ACCEPTED RESIDUAL (pinned in a labeled offline test): if a bare parent
->    ever RESOLVES (it abstains today, S400) AND the campus extension string
->    definitively misses, a campus-vs-parent pair auto-clears via step-2
->    identity equality — the direct-only restriction cannot block identity
->    equality without also breaking the row-4 VUMC clear. Two independently
->    unlikely live conditions; the seven campus-vs-parent live gate rows are
->    the tripwire. Total provider outage still surfaces (unresolved fragments
->    never enter pools — invariant 3 holds).
+>    The Codex re-review then falsified the first residual enumeration: an
+>    admitted-unproven bare-parent fragment could ALSO cross to a SIBLING
+>    campus whole via associated-link credit (bare parent resolves + one
+>    campus definitively misses) [VERIFIED via reproduced probe, S409] —
+>    an invariant-1 violation, not acceptable-residual class. Wave 3c fix:
+>    pool entries admitted despite an abstaining extension are TAGGED, and
+>    any crossing involving a tagged entry clears via direct identity match
+>    only — step-2 associated-link credit now requires both crossing
+>    entries proven (a whole operand, or a fragment whose every extension
+>    resolved to its own identity). Deliberate narrowing accepted with this
+>    fix: admitted-unproven fragments lose legitimate associated-link
+>    clears too (the offline Broad-Institute-vs-MIT decorated-fragment case
+>    is re-pinned false); whole-operand corroboration (Harvard vs Harvard
+>    Medical School) is unaffected.
+>    ACCEPTED RESIDUAL, now precisely IDENTITY-EQUALITY ONLY (pinned in a
+>    labeled offline test): if a bare parent ever RESOLVES (it abstains
+>    today, S400) AND the campus extension string definitively misses, a
+>    campus-vs-parent pair auto-clears via step-2 directMatch of the same
+>    identity — unfixable without breaking the row-4 VUMC clear, which has
+>    the identical structural shape. Two independently unlikely live
+>    conditions. Tripwire: the deterministic offline pins — the live gate's
+>    campus-vs-parent rows CANNOT exercise this class (they require a
+>    one-sided definitive miss, and the real campuses resolve). Total
+>    provider outage still surfaces (unresolved fragments never enter
+>    pools — invariant 3 holds).
 > 2. *Unguarded fallback under `segmentComparison: true`.* When the segment
 >    path abstained, the pre-existing default path could still auto-clear
 >    campus-vs-parent via an associated-institution NAME collision (resolver

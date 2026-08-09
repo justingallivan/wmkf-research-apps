@@ -11,6 +11,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
@@ -44,6 +45,65 @@ function allSourceFiles() {
 
 function relPath(absPath) {
   return path.relative(REPO_ROOT, absPath).split(path.sep).join('/');
+}
+
+// --- Repo-wide IMPORT INVENTORY (Wave 3c hardening, Codex re-review) -------
+//
+// The lexical call-site scan above only recognizes a literal
+// `createInstitutionConsistencyChecker(...)` token and a literal
+// `segmentComparison: true` token. A NEW consumer that imports the factory
+// under an alias (`const { createInstitutionConsistencyChecker: makeChecker
+// } = require(...)`) and calls it with a COMPUTED options object
+// (`makeChecker({ segmentComparison: someFlag })`) would read as "no call
+// site" to that scan even though it is a real, scope-relevant consumer.
+//
+// An alias renames the local BINDING, never the module PATH: `require(...)`
+// and `import ... from '...'` must still name
+// `lib/services/institution-affiliation-consistency` (or a relative path
+// that resolves to it) for the alias to work at all. So this inventory scans
+// for the module PATH rather than the factory NAME — any new consumer,
+// aliased or not, MUST appear in this set, which forces a deliberate edit to
+// this test's allowlist (reviewed against owner decision 3) instead of
+// silently evading detection.
+const INVENTORY_SCAN_ROOTS = ['lib', 'pages', 'shared', 'scripts'];
+const TARGET_MODULE_NO_EXT = path.join(REPO_ROOT, 'lib/services/institution-affiliation-consistency');
+// Matches `require('spec')` and the specifier of any `from 'spec'` clause
+// (covers `import x from`, `import { x } from`, and `export ... from`).
+const IMPORT_SPECIFIER_REGEX = /(?:require\(\s*['"]([^'"]+)['"]\s*\)|from\s+['"]([^'"]+)['"])/g;
+
+function specifierResolvesToTargetModule(specifier, fromFile) {
+  // Only relative specifiers can resolve to a same-repo path at all; a
+  // bare/absolute specifier cannot be this module under any resolution rule.
+  if (!specifier.startsWith('.')) return false;
+  const resolved = path.resolve(path.dirname(fromFile), specifier).replace(/\.(js|jsx|ts|tsx)$/, '');
+  return resolved === TARGET_MODULE_NO_EXT;
+}
+
+// Returns the sorted relative-path list of files (from `files`, absolute
+// paths) that import the checker module by PATH, regardless of the local
+// binding name or how the import is later called.
+function findImportersOfCheckerModule(files) {
+  const importers = [];
+  for (const file of files) {
+    if (path.resolve(file) === `${TARGET_MODULE_NO_EXT}.js`) continue; // module doesn't import itself
+    const content = fs.readFileSync(file, 'utf8');
+    let match;
+    let hit = false;
+    IMPORT_SPECIFIER_REGEX.lastIndex = 0;
+    while ((match = IMPORT_SPECIFIER_REGEX.exec(content))) {
+      const specifier = match[1] || match[2];
+      if (specifierResolvesToTargetModule(specifier, file)) {
+        hit = true;
+        break;
+      }
+    }
+    if (hit) importers.push(relPath(file));
+  }
+  return importers.sort();
+}
+
+function allInventorySourceFiles() {
+  return INVENTORY_SCAN_ROOTS.flatMap((root) => listJsFiles(path.join(REPO_ROOT, root)));
 }
 
 describe('institution consistency checker: consumer scope', () => {
@@ -300,5 +360,75 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
     expect(result.status).toBe('abstain');
     expect(factory).toHaveBeenCalledTimes(1);
     expect(factory.mock.calls[0]).toEqual([]);
+  });
+});
+
+describe('institution consistency checker: repo-wide import inventory (discovery-gap hardening)', () => {
+  test('every production importer of the checker module, found by PATH resolution, is exactly the known allowlist', () => {
+    const files = allInventorySourceFiles();
+    expect(files.length).toBeGreaterThan(0);
+
+    const importers = findImportersOfCheckerModule(files);
+
+    // Derived from an actual scan (not assumed): matches the three known
+    // Stage 1 consumers and nothing else, across lib/, pages/, shared/, and
+    // scripts/. If this ever fails, a NEW file imports the checker module —
+    // list it and route it through owner decision 3 before editing this
+    // allowlist.
+    expect(importers).toEqual([
+      'lib/services/alert-reviewer-affiliation-mismatch.js',
+      'lib/services/reviewer-identity-evidence.js',
+      'lib/services/workbench/enrich-recommended-service.js',
+    ]);
+  });
+
+  describe('aliased-bypass fixture (proves the inventory is alias-proof and computed-option-proof)', () => {
+    let tempDir;
+
+    afterEach(() => {
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        tempDir = undefined;
+      }
+    });
+
+    test('a synthetic consumer that imports the factory under an alias, with a computed option, is still caught', () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'institution-checker-alias-fixture-'));
+      const targetSpecifier = path
+        .relative(tempDir, TARGET_MODULE_NO_EXT)
+        .split(path.sep)
+        .join('/');
+      const normalizedSpecifier = targetSpecifier.startsWith('.') ? targetSpecifier : `./${targetSpecifier}`;
+
+      const syntheticFile = path.join(tempDir, 'synthetic-aliased-consumer.js');
+      fs.writeFileSync(
+        syntheticFile,
+        [
+          "'use strict';",
+          '// Synthetic bypass fixture: renamed binding + computed option.',
+          `const { createInstitutionConsistencyChecker: makeChecker } = require('${normalizedSpecifier}');`,
+          'function build(flag) {',
+          '  return makeChecker({ segmentComparison: flag });',
+          '}',
+          'module.exports = { build };',
+          '',
+        ].join('\n'),
+      );
+
+      // Sanity: the regex/name-based lexical scan (describe block above)
+      // would NOT recognize this file at all — it never spells
+      // `createInstitutionConsistencyChecker(` as a call, and its
+      // `segmentComparison: flag` is computed, not the literal `: true`.
+      const syntheticContent = fs.readFileSync(syntheticFile, 'utf8');
+      expect(syntheticContent).not.toMatch(/createInstitutionConsistencyChecker\s*\(/);
+      expect(syntheticContent).not.toMatch(/segmentComparison\s*:\s*true/);
+
+      // The PATH-based inventory catches it anyway, mixed in with the real
+      // production file set.
+      const files = [...allInventorySourceFiles(), syntheticFile];
+      const importers = findImportersOfCheckerModule(files);
+
+      expect(importers).toContain(relPath(syntheticFile));
+    });
   });
 });
