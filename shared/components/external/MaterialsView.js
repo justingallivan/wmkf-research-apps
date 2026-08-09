@@ -45,15 +45,7 @@ function ProposalCard({ data }) {
         </div>
         <div>
           <p className="text-xs text-gray-500">Submission deadline</p>
-          <p className="text-gray-900">
-            {data.tokenExpiresAt
-              ? new Date(data.tokenExpiresAt).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-              : '—'}
-          </p>
+          <p className="text-gray-900">{formatDeadline(data.reviewDeadline)}</p>
         </div>
       </div>
     </div>
@@ -117,6 +109,22 @@ function SubmittedNotice({ data }) {
       </p>
     </div>
   );
+}
+
+// The review deadline is a plain YYYY-MM-DD calendar date. Parse it in local
+// time (matching the email's formatReviewDeadline) so "2026-09-09" never
+// renders as September 8 for reviewers west of UTC.
+function formatDeadline(ymd) {
+  const match = typeof ymd === 'string' ? /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd) : null;
+  if (!match) return '—';
+  const [, y, m, d] = match.map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 }
 
 function formatBytes(n) {

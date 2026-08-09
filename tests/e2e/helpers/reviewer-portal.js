@@ -73,6 +73,7 @@ function buildContext({ address, honorariumOptOut = false, longBody = false, vie
       coPIs: ['Dr. Sam Co'],
     },
     reviewer: { name: 'Dr. Jane Reviewer', email: 'jane@uni.edu', organization: 'Example University' },
+    reviewDeadline: '2026-07-15',
     tokenExpiresAt: '2026-08-01T00:00:00Z',
     submission: { receivedAt: null, filename: null },
     prefill: {

@@ -21,7 +21,7 @@ function baseData(overrides = {}) {
   return {
     proposal: { title: 'To Explore the Universe' },
     reviewer: { name: 'Test Case' },
-    tokenExpiresAt: '2026-10-14T23:59:59Z',
+    reviewDeadline: '2026-09-09',
     files: [],
     submission: null,
     ...overrides,
@@ -35,6 +35,18 @@ describe('MaterialsView FilesCard', () => {
     render(<MaterialsView data={baseData()} token={TOKEN} />);
     expect(screen.getByText(/hasn't shared materials for this review yet/i)).toBeInTheDocument();
     expect(screen.getByTestId('authoring-form')).toBeInTheDocument();
+  });
+
+  test('submission deadline shows the review due date as a local calendar date', () => {
+    render(<MaterialsView data={baseData()} token={TOKEN} />);
+    // 2026-09-09 must render as September 9 in EVERY timezone — a UTC parse
+    // would show September 8 west of UTC.
+    expect(screen.getByText('September 9, 2026')).toBeInTheDocument();
+  });
+
+  test('submission deadline falls back to a dash without a review due date', () => {
+    render(<MaterialsView data={baseData({ reviewDeadline: null })} token={TOKEN} />);
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   test('submitted view with no files hides the materials card entirely', () => {

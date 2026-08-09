@@ -154,6 +154,18 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
+- **The portal's "Submission deadline" is the request's review due date, not the token expiry (2026-08-09).**
+  `/context` exposes `reviewDeadline` (`wmkf_reviewduedate`, the same field the
+  email templates fall back to) and `MaterialsView` renders it YMD-local (a UTC
+  parse would show the prior day west of UTC). `tokenExpiresAt` (magic-link
+  expiry — review due + grace per `lib/external/reviewer-token-ttl.js`, 90 days
+  for accepted reviewers) stays in the payload but is no longer shown as a
+  deadline; before this fix the page displayed it under that label, and for an
+  accepted reviewer with a future due date it sits 90 days past the emailed
+  deadline. Residual divergence: a per-send composer
+  deadline override is persisted to the request only when `wmkf_reviewduedate`
+  was unset, so an override on a dated request still emails a date the portal
+  can't see.
 - **Post-accept and post-submit notices name the assigned Program Director (2026-08-09).**
   `/context` looks up the request's `_wmkf_programdirector_value` system user
   (best-effort; requires active + name + email) for the `accepted-pre-materials`,
