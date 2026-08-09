@@ -125,10 +125,36 @@ out of string decoration, not genuine disagreements.
 
 ### Stage 1 — institution-core extraction before comparison (no ROR)
 
-Normalize both sides of `areConsistent` by extracting the institution core
-from decorated bylines before resolution and comparison. Strengthen the
-existing extractor (or adopt the parsing built for the ROR candidate
-contract) rather than adding a new normalizer; consolidate, do not fork.
+> [RECHECKED after lib/services/discovery/affiliation.js change:
+> `normalizeAffiliationForComparison` untouched at :117; additive
+> `institutionSegments` at :152.]
+> [RECHECKED after lib/services/institution-affiliation-consistency.js change:
+> opt-in `segmentComparison` default-off at :45; segment-wise comparison at
+> :67 with shared-fragment self-pair exclusion; default path in
+> `areConsistent` (:133) unchanged.]
+> [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
+> sole opt-in call site, `segmentComparison: true` at :66.]
+> [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
+> `--institution-resolver` opt-in at :79; incumbent default construction at
+> :18,294; decision 4(a)'s earlier `:281-284` citation shifted to `:294`.]
+>
+> Wave 1 built 2026-08-08 (fixtures + generator, segment-comparison opt-in,
+> arm-2 evaluator flag); 55 focused tests green including a falsification
+> test for the shared-parent-fragment sibling hazard flagged during build.
+
+Normalize both sides of `areConsistent` by comparing institution segments of
+decorated bylines before resolution and comparison. Implementation note
+(Stage 1 build, 2026-08-08): this ships as a new function in
+`lib/services/discovery/affiliation.js` rather than a change to
+`normalizeAffiliationForComparison` — that function keys
+`_affiliationWeightsMap` grouping, so "strengthening" it would silently
+change discovery affiliation-history behavior; the new function lives in the
+same module to keep one home for affiliation parsing. The comparison is
+segment-wise (split on comma/semicolon boundaries, test each segment and
+progressive joins against the other operand) so a verdict of `same` can only
+arise from matching the other operand, never from free extraction. The
+behavior is opt-in at the checker factory and enabled only at the
+mismatch-alert call site per decision 3.
 
 - Expected effect: flips the four documented 1002903 byline-class false
   mismatches; leaves the possibly-substantive fifth flagged — the correct
