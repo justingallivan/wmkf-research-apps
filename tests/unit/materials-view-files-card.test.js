@@ -1,20 +1,24 @@
 /**
- * MaterialsView FilesCard visibility (S328).
+ * MaterialsView FilesCard visibility.
  *
- * The empty-files "hasn't shared materials yet — contact us" prompt exists
- * for the stage2b authoring view. After submission it reads as an error next
- * to the Review-received notice, so the card is hidden when submitted AND
- * empty; files that do exist stay downloadable in both states.
+ * The proposal-materials card exists for the stage2b authoring view only.
+ * After submission the reviewer no longer needs the proposal, so the whole
+ * card — downloads included — is hidden (owner decision 2026-08-09,
+ * superseding the S328 behavior that kept existing files downloadable).
+ * That covers both the server-known submitted state (return visit) and the
+ * just-submitted state signalled by the form's onSubmitted callback.
  *
  * @jest-environment jsdom
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import MaterialsView from '../../shared/components/external/MaterialsView';
 
 jest.mock('../../shared/components/external/ReviewAuthoringForm', () => ({
   __esModule: true,
-  default: () => <div data-testid="authoring-form" />,
+  default: ({ onSubmitted }) => (
+    <button data-testid="authoring-form" onClick={onSubmitted}>submit</button>
+  ),
 }));
 
 function baseData(overrides = {}) {
@@ -89,7 +93,7 @@ describe('MaterialsView FilesCard', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
-  test('submitted view with files keeps the download list', () => {
+  test('submitted view hides the materials card even when files exist', () => {
     render(
       <MaterialsView
         data={baseData({
@@ -99,7 +103,23 @@ describe('MaterialsView FilesCard', () => {
         token={TOKEN}
       />,
     );
-    expect(screen.getByText(/proposal materials/i)).toBeInTheDocument();
+    expect(screen.queryByText(/proposal materials/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/proposal\.pdf/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/review received/i)).toBeInTheDocument();
+  });
+
+  test('submitting in-page hides the materials card without a refetch', () => {
+    render(
+      <MaterialsView
+        data={baseData({ files: [{ id: 'f1', library: 'lib1', name: 'proposal.pdf' }] })}
+        token={TOKEN}
+      />,
+    );
     expect(screen.getByText(/proposal\.pdf/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('authoring-form')); // form signals onSubmitted
+    expect(screen.queryByText(/proposal\.pdf/i)).not.toBeInTheDocument();
+    // The form (showing its own success banner) stays mounted — the server
+    // hasn't been refetched, so SubmittedNotice must NOT replace it.
+    expect(screen.getByTestId('authoring-form')).toBeInTheDocument();
   });
 });

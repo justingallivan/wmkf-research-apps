@@ -105,7 +105,7 @@ export function isComplete(fields, values) {
   return true;
 }
 
-export default function ReviewAuthoringForm({ data, token }) {
+export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
   // The staff-editable question set + its version tag, delivered with /context.
   // Fail-closed: context 500s if the set can't load, so a stage2b render always
   // carries a non-empty set. We still guard below rather than render a partial
@@ -209,6 +209,9 @@ export default function ReviewAuthoringForm({ data, token }) {
       if (resp.ok && json.ok) {
         setSubmittedAt(json.receivedAt || new Date().toISOString());
         setSubmitState('submitted');
+        // Let the parent react to the finalized submit (MaterialsView hides
+        // the proposal-materials card) without a context refetch.
+        if (typeof onSubmitted === 'function') onSubmitted();
         return;
       }
       if (resp.status === 409) {
@@ -242,7 +245,7 @@ export default function ReviewAuthoringForm({ data, token }) {
       setSubmitErrors(['Network error — your review was not submitted. Please try again.']);
       setSubmitState('error');
     }
-  }, [token, values, setVersion, persist]);
+  }, [token, values, setVersion, persist, onSubmitted]);
 
   // Fail-closed: never render a partial or empty form. /context is fail-closed
   // and 500s when the question set can't load, so this is a defensive backstop

@@ -7,12 +7,17 @@
  * A submitted review is final and read-only — no re-upload/replace affordance.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReviewAuthoringForm from './ReviewAuthoringForm';
 import ProgramDirectorContact from './ProgramDirectorContact';
 
 export default function MaterialsView({ data, token }) {
-  const submitted = !!data.submission?.receivedAt;
+  // Server-known submission (return visit) vs a submit that just succeeded in
+  // this page instance (the form's own success banner is showing; /context was
+  // not refetched). Either way the materials card is no longer needed.
+  const serverSubmitted = !!data.submission?.receivedAt;
+  const [justSubmitted, setJustSubmitted] = useState(false);
+  const submitted = serverSubmitted || justSubmitted;
   const headingRef = useRef(null);
   useEffect(() => {
     if (headingRef.current) headingRef.current.focus();
@@ -28,7 +33,15 @@ export default function MaterialsView({ data, token }) {
       </h2>
       <ProposalCard data={data} />
       <FilesCard data={data} token={token} submitted={submitted} />
-      {submitted ? <SubmittedNotice data={data} /> : <ReviewAuthoringForm data={data} token={token} />}
+      {serverSubmitted
+        ? <SubmittedNotice data={data} />
+        : (
+          <ReviewAuthoringForm
+            data={data}
+            token={token}
+            onSubmitted={() => setJustSubmitted(true)}
+          />
+        )}
     </div>
   );
 }
@@ -53,11 +66,12 @@ function ProposalCard({ data }) {
 }
 
 function FilesCard({ data, token, submitted }) {
+  // After submission the reviewer no longer needs the proposal — the whole
+  // materials card (downloads included) goes away, leaving the Review-received
+  // notice. (Supersedes the S328 behavior that kept existing files
+  // downloadable post-submit; owner decision 2026-08-09.)
+  if (submitted) return null;
   if (!data.files || data.files.length === 0) {
-    // After submission the "hasn't shared materials yet — contact us" prompt
-    // is stale noise next to the Review-received notice; the reviewer no
-    // longer needs materials. Files that DO exist stay downloadable below.
-    if (submitted) return null;
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <h3 className="text-base font-semibold text-gray-900">Proposal materials</h3>
