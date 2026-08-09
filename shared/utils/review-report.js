@@ -13,10 +13,10 @@
  * Two responsibilities:
  *  1. `composeReviewReport(...)` — turn a `deriveReviewMatrix` result plus
  *     proposal identity into a report object: header, summary (counts +
- *     per-rating-question average/spread), ratings table (same rows/columns
- *     as the Compare grid), and per-question answer sections (multiselect +
- *     richtext together, IN QUESTION ORDER; all reviewers' answers, "Prior
- *     cycle" flag carried through).
+ *     per-rating-question average/spread) and per-question answer sections
+ *     (picklist + multiselect + richtext together, IN QUESTION ORDER; all
+ *     reviewers' answers, "Prior cycle" flag carried through). There is no
+ *     separate ratings table — ratings render inline in the question flow.
  *  2. `htmlToBlocks(html)` — a pure tokenizer for the sanitizer's ALLOWLISTED
  *     GRAMMAR ONLY (lib/external/sanitize-review-html.js `ALLOWED_TAGS`:
  *     p, br, strong, b, em, i, ul, ol, li, h2, h3, blockquote, a — no
@@ -261,15 +261,12 @@ function roundOrNull(n) {
  *   summary: {reviewsSubmitted:number, ratingQuestions:Array<{key:string,
  *     text:string, retired:boolean, average:(number|null), min:(number|null),
  *     max:(number|null), answeredCount:number, totalReviewers:number}>},
- *   ratingsTable: {reviewers:Array<{suggestionId:string,name:(string|null)}>,
- *     rows:Array<{key:string, text:string, retired:boolean,
- *       cells:Array<{suggestionId:string, label:(string|null)}>,
- *       average:(number|null), min:(number|null), max:(number|null)}>},
- *   answerSections: Array<{type:('multiselect'|'richtext'), key:string,
- *     text:string, retired:boolean,
+ *   answerSections: Array<{type:('picklist'|'multiselect'|'richtext'),
+ *     key:string, text:string, retired:boolean,
  *     tallies?:Array, answers:Array<{suggestionId:string,
  *       reviewerName:(string|null), state:('answered'|'empty'|'not-asked'),
- *       unreadable?:boolean, labels?:Array<string>, blocks?:Array}>}>,
+ *       label?:(string|null), unreadable?:boolean, labels?:Array<string>,
+ *       blocks?:Array}>}>,
  * }}
  */
 export function composeReviewReport({
@@ -310,33 +307,30 @@ export function composeReviewReport({
     })),
   };
 
-  const ratingsTable = {
-    reviewers: safeMatrix.reviewers,
-    rows: ratingQuestions.map((q) => ({
-      key: q.key,
-      text: q.text,
-      retired: !!q.retired,
-      cells: q.cells.map((c) => ({
-        suggestionId: c.suggestionId,
-        label: c.state === 'answered'
-          ? (c.answerText || (Number.isFinite(c.answerValue) ? String(c.answerValue) : null))
-          : c.state === 'not-asked' ? 'Not asked' : null,
-      })),
-      average: roundOrNull(q.average),
-      min: roundOrNull(q.min),
-      max: roundOrNull(q.max),
-    })),
-  };
-
   const reviewerName = new Map(safeMatrix.reviewers.map((r) => [r.suggestionId, r.name || null]));
 
-  // Per-question answer sections IN MATRIX (question) ORDER, one array for
-  // both section shapes. The former split into categoricalSections +
-  // narrativeSections made renderers print every multiselect before every
-  // narrative, so e.g. Q3 landed ahead of Q1/Q2 in the export.
+  // Per-question answer sections IN MATRIX (question) ORDER — every answered
+  // question type in one flow. Ratings (picklist) render inline like the
+  // other questions (owner decision 2026-08-09: no separate Ratings section);
+  // their average/spread stats remain in the Summary above.
   const answerSections = safeMatrix.questions
-    .filter((q) => q.type === 'multiselect' || q.type === 'richtext')
-    .map((q) => (q.type === 'multiselect'
+    .filter((q) => q.type === 'picklist' || q.type === 'multiselect' || q.type === 'richtext')
+    .map((q) => (q.type === 'picklist'
+      ? {
+        type: 'picklist',
+        key: q.key,
+        text: q.text,
+        retired: !!q.retired,
+        answers: q.cells.map((c) => ({
+          suggestionId: c.suggestionId,
+          reviewerName: reviewerName.get(c.suggestionId) ?? null,
+          state: c.state,
+          label: c.state === 'answered'
+            ? (c.answerText || (Number.isFinite(c.answerValue) ? String(c.answerValue) : null))
+            : null,
+        })),
+      }
+      : q.type === 'multiselect'
       ? {
         type: 'multiselect',
         key: q.key,
@@ -380,7 +374,6 @@ export function composeReviewReport({
   return {
     header,
     summary,
-    ratingsTable,
     answerSections,
     synthesisSection,
   };

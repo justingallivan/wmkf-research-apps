@@ -6,7 +6,7 @@
  * allowlist (lib/external/sanitize-review-html.js ALLOWED_TAGS — p, br,
  * strong/b, em/i, ul/ol/li, h2/h3, blockquote, a), nesting, unknown-tag
  * degradation, empty/null input, malformed fragments, and the report
- * composition itself (header/summary/ratingsTable/answerSections) built
+ * composition itself (header/summary/answerSections) built
  * on top of `deriveReviewMatrix`.
  */
 import { composeReviewReport, htmlToBlocks } from '../../shared/utils/review-report';
@@ -128,7 +128,7 @@ describe('composeReviewReport', () => {
     return { questionKey, questionOrder, questionType, questionText, answerText: null, answerHtml: null, answerValue: null, ...opts };
   }
 
-  test('composes header, summary, ratingsTable, and answerSections from a derived matrix', () => {
+  test('composes header, summary, and answerSections from a derived matrix', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [
         row('impact', 1, 'picklist', 'Impact?', { answerText: 'High', answerValue: 4 }),
@@ -165,13 +165,13 @@ describe('composeReviewReport', () => {
       key: 'impact', average: 3, min: 2, max: 4, answeredCount: 2, totalReviewers: 2,
     });
 
-    expect(report.ratingsTable.rows).toHaveLength(1);
-    const impactRow = report.ratingsTable.rows[0];
-    expect(impactRow.cells.find((c) => c.suggestionId === 'r1').label).toBe('High');
-    expect(impactRow.cells.find((c) => c.suggestionId === 'r2').label).toBe('Medium');
+    expect(report.answerSections).toHaveLength(2);
+    const impactSection = report.answerSections[0];
+    expect(impactSection.type).toBe('picklist');
+    expect(impactSection.answers.find((a) => a.suggestionId === 'r1').label).toBe('High');
+    expect(impactSection.answers.find((a) => a.suggestionId === 'r2').label).toBe('Medium');
 
-    expect(report.answerSections).toHaveLength(1);
-    const section = report.answerSections[0];
+    const section = report.answerSections[1];
     expect(section.key).toBe('comments');
     expect(section.type).toBe('richtext');
     const r1Answer = section.answers.find((a) => a.suggestionId === 'r1');
@@ -182,7 +182,7 @@ describe('composeReviewReport', () => {
     expect(r2Answer.blocks).toEqual([]);
   });
 
-  test('carries the "Prior cycle" (retired) flag through to both ratingsTable rows and answerSections', () => {
+  test('carries the "Prior cycle" (retired) flag through to summary rows and answerSections', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [
         row('oldRating', 5, 'picklist', 'Old rating?', { answerText: 'High', answerValue: 3 }),
@@ -193,9 +193,8 @@ describe('composeReviewReport', () => {
     const matrix = deriveReviewMatrix(reviewers, [{ key: 'somethingElse', order: 1, text: 'Live Q', type: 'picklist' }]);
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' });
 
-    expect(report.ratingsTable.rows[0].retired).toBe(true);
     expect(report.summary.ratingQuestions[0].retired).toBe(true);
-    expect(report.answerSections[0].retired).toBe(true);
+    expect(report.answerSections.map((s2) => s2.retired)).toEqual([true, true]);
   });
 
   test('zero submitted reviewers composes an empty-but-valid report, never throws', () => {
@@ -205,7 +204,6 @@ describe('composeReviewReport', () => {
     expect(report.header.reviewerCount).toBe(0);
     expect(report.summary.reviewsSubmitted).toBe(0);
     expect(report.summary.ratingQuestions).toEqual([]);
-    expect(report.ratingsTable.rows).toEqual([]);
     expect(report.answerSections).toEqual([]);
   });
 
@@ -261,7 +259,7 @@ describe('composeReviewReport', () => {
     ]);
   });
 
-  test('answerSections interleave multiselect and richtext in question order', () => {
+  test('answerSections put every question type in question order', () => {
     // Regression: the former categoricalSections/narrativeSections split made
     // renderers print every multiselect before every narrative, so a Q3
     // multiselect landed ahead of Q1/Q2 narratives in the export.
@@ -284,6 +282,7 @@ describe('composeReviewReport', () => {
       ['priorArt', 'richtext'],
       ['impacts', 'richtext'],
       ['impactAreas', 'multiselect'],
+      ['risk', 'picklist'],
     ]);
   });
 

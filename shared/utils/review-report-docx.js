@@ -169,42 +169,7 @@ export async function generateReviewReportDocx(report) {
     }
   }
 
-  // --- Ratings table (same rows/columns as the Compare grid) ---
-  const ratingsChildren = [];
-  if (report.ratingsTable.rows.length > 0) {
-    ratingsChildren.push(new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 300, after: 120 },
-      children: [new TextRun({ text: 'Ratings', size: 26, font: FONT, bold: true })],
-    }));
-
-    const reviewerCols = report.ratingsTable.reviewers;
-    const questionColWidth = 30;
-    const perReviewerWidth = reviewerCols.length > 0
-      ? Math.floor((100 - questionColWidth) / reviewerCols.length)
-      : 0;
-
-    const headRow = new TableRow({
-      children: [
-        headerCell('Question', questionColWidth),
-        ...reviewerCols.map((r) => headerCell(r.name || 'Unnamed reviewer', perReviewerWidth)),
-      ],
-    });
-
-    const bodyRows = report.ratingsTable.rows.map((row) => new TableRow({
-      children: [
-        bodyCell(row.retired ? `${row.text} (prior cycle)` : row.text, questionColWidth, { bold: true }),
-        ...reviewerCols.map((r) => {
-          const cell = row.cells.find((c) => c.suggestionId === r.suggestionId);
-          return bodyCell(cell ? cell.label : null, perReviewerWidth);
-        }),
-      ],
-    }));
-
-    ratingsChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headRow, ...bodyRows] }));
-  }
-
-  // --- Per-question answer sections (multiselect + richtext, question order) ---
+  // --- Per-question answer sections (picklist + multiselect + richtext, question order) ---
   function runsToTextRuns(runs) {
     // A run's text may contain an embedded "\n" from a <br>; docx needs an
     // explicit line Break between segments rather than a literal newline
@@ -264,6 +229,22 @@ export async function generateReviewReportDocx(report) {
       ],
     }));
 
+    if (section.type === 'picklist') {
+      for (const answer of section.answers) {
+        const value = answer.state === 'not-asked'
+          ? 'Not asked'
+          : answer.label != null ? answer.label : 'No answer provided';
+        answerChildren.push(new Paragraph({
+          spacing: { after: 80 },
+          children: [
+            bodyRun(`${answer.reviewerName || 'Unnamed reviewer'}: `, { bold: true }),
+            bodyRun(value),
+          ],
+        }));
+      }
+      continue;
+    }
+
     if (section.type === 'multiselect') {
       for (const answer of section.answers) {
         const value = answer.unreadable
@@ -317,7 +298,6 @@ export async function generateReviewReportDocx(report) {
         ...headerChildren,
         ...summaryChildren,
         ...synthesisChildren,
-        ...ratingsChildren,
         ...answerChildren,
       ],
     }],

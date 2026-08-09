@@ -98,25 +98,19 @@ export async function generateReviewReportPdf(report) {
     }
   }
 
-  // --- Ratings table (rendered as key/value rows per reviewer — pdf-lib has
-  // no built-in table primitive; PDFReportBuilder doesn't provide one either,
-  // so this mirrors the addKeyValue pattern used elsewhere in the builder). ---
-  if (report.ratingsTable.rows.length > 0) {
-    builder.addSection('Ratings');
-    for (const row of report.ratingsTable.rows) {
-      const label = row.retired ? `${row.text} (prior cycle)` : row.text;
-      builder.addSection(label, 2);
-      for (const reviewer of report.ratingsTable.reviewers) {
-        const cell = row.cells.find((c) => c.suggestionId === reviewer.suggestionId);
-        builder.addKeyValue(reviewer.name || 'Unnamed reviewer', cell && cell.label != null ? cell.label : 'Not provided');
-      }
-    }
-  }
-
-  // --- Per-question answer sections (multiselect + richtext, question order) ---
+  // --- Per-question answer sections (picklist + multiselect + richtext, question order) ---
   for (const section of report.answerSections || []) {
     const label = section.retired ? `${section.text} (prior cycle)` : section.text;
     builder.addSection(label);
+    if (section.type === 'picklist') {
+      for (const answer of section.answers) {
+        const value = answer.state === 'not-asked'
+          ? 'Not asked'
+          : answer.label != null ? answer.label : 'No answer provided';
+        builder.addKeyValue(answer.reviewerName || 'Unnamed reviewer', value);
+      }
+      continue;
+    }
     if (section.type === 'multiselect') {
       for (const answer of section.answers) {
         const value = answer.unreadable
