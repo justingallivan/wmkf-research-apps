@@ -22,6 +22,7 @@ source_files:
   - lib/admin/review-question-save.js
   - shared/components/admin/ReviewQuestionsSection.js
   - shared/components/external/ReviewAuthoringForm.js
+  - shared/components/external/ProgramDirectorContact.js
   - shared/components/external/RichReviewEditor.js
   - shared/components/external/MaterialsView.js
   - shared/components/external/DeclineFormView.js
@@ -153,6 +154,14 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
+- **Post-accept and post-submit notices name the assigned Program Director (2026-08-09).**
+  `/context` looks up the request's `_wmkf_programdirector_value` system user
+  (best-effort; requires active + name + email) for the `accepted-pre-materials`,
+  `stage2b`, and `submitted` views — stage2b is load-bearing because the immediate
+  post-submit banner renders from client state without refetching context. The shared
+  `ProgramDirectorContact` fragment renders the "(Name, mailto)" parenthetical in
+  `AcceptedConfirmationView`, `MaterialsView`'s Review-received notice, and
+  `ReviewAuthoringForm`'s post-submit banner.
 - **Staff-side upload + "mark received" surfaces removed from the Track Reviewers panel (S347); structured manual entry now lives on the Reviews tab.**
   `ReviewerManagePanel`'s ⋮ menu no longer offers **"Staff upload (override)"** (file upload →
   `/api/review-manager/upload-review`, was `UploadReviewModal` + `ReviewFormFields`) or **"Mark

@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import ProgramDirectorContact from './ProgramDirectorContact';
 
 export default function AcceptedConfirmationView({
   programDirector = null,
@@ -12,9 +13,6 @@ export default function AcceptedConfirmationView({
   showWithdrawalOption = true,
 }) {
   const headingRef = useRef(null);
-  const hasProgramDirectorContact = Boolean(
-    programDirector?.name && programDirector?.email,
-  );
 
   useEffect(() => {
     if (headingRef.current) headingRef.current.focus();
@@ -44,17 +42,7 @@ export default function AcceptedConfirmationView({
           {showWithdrawalOption
             ? ' You can change your response below, or reach out to your Program Director'
             : ' Use the secure link in your confirmation email, or reach out to your Program Director'}
-          {hasProgramDirectorContact && (
-            <>
-              {' '}({programDirector.name},{' '}
-              <a
-                href={`mailto:${programDirector.email}`}
-                className="text-blue-700 underline hover:text-blue-900"
-              >
-                {programDirector.email}
-              </a>)
-            </>
-          )}{' '}
+          <ProgramDirectorContact programDirector={programDirector} />{' '}
           rather than waiting until materials are released.
         </p>
       </div>

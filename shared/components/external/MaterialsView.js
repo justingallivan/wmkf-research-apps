@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 import ReviewAuthoringForm from './ReviewAuthoringForm';
+import ProgramDirectorContact from './ProgramDirectorContact';
 
 export default function MaterialsView({ data, token }) {
   const submitted = !!data.submission?.receivedAt;
@@ -111,7 +112,8 @@ function SubmittedNotice({ data }) {
           timeStyle: 'short',
         })}
         {data.submission.filename ? ` (${data.submission.filename})` : ''}.
-        Your review is final. If you need to make a change, please contact your Program Director.
+        Your review is final. If you need to make a change, please contact your Program Director
+        <ProgramDirectorContact programDirector={data.programDirector} />.
       </p>
     </div>
   );

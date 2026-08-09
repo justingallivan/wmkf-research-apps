@@ -49,6 +49,34 @@ describe('MaterialsView FilesCard', () => {
     expect(screen.getByText(/review received/i)).toBeInTheDocument();
   });
 
+  test('submitted notice names the Program Director with a mailto link when provided', () => {
+    render(
+      <MaterialsView
+        data={baseData({
+          submission: { receivedAt: '2026-07-04T17:26:56Z' },
+          programDirector: { name: 'Jane Director', email: 'jane.director@wmkeck.org' },
+        })}
+        token={TOKEN}
+      />,
+    );
+    expect(screen.getByText(/please contact your Program Director/i))
+      .toHaveTextContent('Program Director (Jane Director, jane.director@wmkeck.org)');
+    expect(screen.getByRole('link', { name: 'jane.director@wmkeck.org' }))
+      .toHaveAttribute('href', 'mailto:jane.director@wmkeck.org');
+  });
+
+  test('submitted notice keeps the generic guidance without Program Director contact', () => {
+    render(
+      <MaterialsView
+        data={baseData({ submission: { receivedAt: '2026-07-04T17:26:56Z' } })}
+        token={TOKEN}
+      />,
+    );
+    expect(screen.getByText(/please contact your Program Director/i))
+      .not.toHaveTextContent('(');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   test('submitted view with files keeps the download list', () => {
     render(
       <MaterialsView

@@ -30,6 +30,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import RichReviewEditor from './RichReviewEditor';
+import ProgramDirectorContact from './ProgramDirectorContact';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
@@ -283,7 +284,8 @@ export default function ReviewAuthoringForm({ data, token }) {
         <p className="text-sm text-green-800 mt-1">
           Thank you — we received your review
           {submittedAt ? ` on ${new Date(submittedAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}` : ''}.
-          Your review is final. If you need to make a change, please contact your Program Director.
+          Your review is final. If you need to make a change, please contact your Program Director
+          <ProgramDirectorContact programDirector={data.programDirector} />.
         </p>
       </div>
     );
