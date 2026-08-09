@@ -170,10 +170,17 @@ out of string decoration, not genuine disagreements.
 > hardened runner, so it carries no provider-failure proof or provenance
 > (Codex finding 2). Wave 3 FAIL (141/145,
 > `results/stage1-wave3-2026-08-08.json`) is the falsification record for
-> the strict-everywhere pool rule. **Current gate: Wave 4 PASS, 2026-08-08
-> — 153/153 (fixture set expanded with the uc-system-* family) with
-> providerFailures 0 and clean-tree provenance (git sha df819f9, dirty
-> false)** (`results/stage1-wave4-2026-08-08.json`). The seven new
+> the strict-everywhere pool rule. **Current gate: Wave 5 PASS, 2026-08-09
+> — 156/156 (named-relationship family added; required-families enforcement
+> active) with providerFailures 0 and clean-tree provenance (git sha
+> d9c8af0, dirty false)** (`results/stage1-wave5-2026-08-09.json`). All
+> three named-relationship rows surface on the staged arm as expected;
+> observationally, the incumbent (main-behavior) arm auto-clears
+> VUMC↔Vanderbilt AND Dana-Farber↔Harvard via associated links — live
+> confirmation that main's default path violates the policy table's
+> Dana-Farber surface expectation today, Stage 2 scope. Prior record:
+> Wave 4 PASS, 2026-08-08 — 153/153 (uc-system-* family added), git sha
+> df819f9 (`results/stage1-wave4-2026-08-08.json`). The seven new
 > campus-vs-system rows demonstrate the fix in-band: the incumbent
 > (main-behavior) arm auto-clears campus vs "University of California
 > System" (`same-or-related`, 7/7), the staged arm surfaces it
