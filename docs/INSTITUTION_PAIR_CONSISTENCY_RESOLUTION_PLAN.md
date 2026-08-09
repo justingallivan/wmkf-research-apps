@@ -166,12 +166,12 @@ out of string decoration, not genuine disagreements.
 > hardened runner, so it carries no provider-failure proof or provenance
 > (Codex finding 2). Wave 3 FAIL (141/145,
 > `results/stage1-wave3-2026-08-08.json`) is the falsification record for
-> the strict-everywhere pool rule. **Current gate: Wave 3b PASS, 2026-08-08
-> — 145/145 with providerFailures 0 and a provenance block**
-> (`results/stage1-wave3b-2026-08-08.json`; provenance records a dirty
-> pre-commit tree — a clean-tree rerun follows the Wave 3 commit). The
-> original wave2c narrative below is retained for the family-level detail,
-> which the Wave 3b run reproduced:
+> the strict-everywhere pool rule. **Current gate: Wave 3c PASS, 2026-08-08
+> — 145/145 with providerFailures 0 and clean-tree provenance (git sha
+> cad6d2d, dirty false)** (`results/stage1-wave3c-2026-08-08.json`; the
+> wave3b PASS artifact is the same result on the dirty pre-commit tree,
+> retained as a record). The original wave2c narrative below is retained
+> for the family-level detail, which the wave3b/3c runs reproduced:
 >
 > **Wave 2c detail (historical)** — 145/145 pairs:
 > all five 1002903 pairs behave to spec (four clear, the genuine mismatch
