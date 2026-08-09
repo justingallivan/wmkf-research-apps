@@ -79,16 +79,24 @@ const { createInstitutionConsistencyChecker } = require('../../lib/services/inst
 
 // Abstaining resolver: mirrors captured production behavior for decorated
 // bylines (OpenAlex returns zero results → resolve() null). Consistency must
-// therefore come from the direct matcher over extracted cores.
+// therefore come from the direct matcher over extracted cores. Both arms of
+// the composite (legacy + staged, Codex round-6 fix) share this abstaining
+// resolver, matching the pinned expectations below: with a resolver that
+// abstains on everything, neither arm's positive-evidence paths (legacy's
+// associated-link corroboration; staged's resolved-segment proof) can fire,
+// so the composite verdict here is identical to the pre-composite single
+// checker's verdict.
 const abstainResolver = { resolve: jest.fn(async () => null) };
-const checker = () => createInstitutionConsistencyChecker({ resolver: abstainResolver });
+const legacyChecker = () => createInstitutionConsistencyChecker({ resolver: abstainResolver });
+const stagedChecker = () => createInstitutionConsistencyChecker({ resolver: abstainResolver, segmentComparison: true });
 
 const compare = (evidenceInstitution, finalAffiliation, resolvedInstitutions = [finalAffiliation]) =>
   institutionEvidenceConnectsIdentity({
     evidenceInstitution,
     resolvedInstitutions,
     finalAffiliation,
-    checker: checker(),
+    legacyChecker: legacyChecker(),
+    stagedChecker: stagedChecker(),
   });
 
 // Verbatim operands from the S400 production capture (request 1002903).
@@ -201,13 +209,115 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
   });
 
   test('resolved-institution direct match still short-circuits before any checker call', async () => {
-    const spy = { areConsistent: jest.fn() };
+    const legacySpy = { areConsistent: jest.fn() };
+    const stagedSpy = { areConsistent: jest.fn() };
     await expect(institutionEvidenceConnectsIdentity({
       evidenceInstitution: 'Columbia University',
       resolvedInstitutions: ['Columbia University'],
       finalAffiliation: 'Columbia University',
-      checker: spy,
+      legacyChecker: legacySpy,
+      stagedChecker: stagedSpy,
     })).resolves.toBe(true);
-    expect(spy.areConsistent).not.toHaveBeenCalled();
+    expect(legacySpy.areConsistent).not.toHaveBeenCalled();
+    expect(stagedSpy.areConsistent).not.toHaveBeenCalled();
+  });
+
+  test('legacy arm false + staged arm throws: composite propagates the throw (fail-closed, never swallowed to false)', async () => {
+    const legacySpy = { areConsistent: jest.fn().mockResolvedValue(false) };
+    const providerError = Object.assign(new Error('provider outage'), { code: 'provider_outage' });
+    const stagedSpy = { areConsistent: jest.fn().mockRejectedValue(providerError) };
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: 'Columbia University',
+      resolvedInstitutions: ['Some Other University'],
+      finalAffiliation: 'Columbia University Medical Center',
+      legacyChecker: legacySpy,
+      stagedChecker: stagedSpy,
+    })).rejects.toBe(providerError);
+    expect(legacySpy.areConsistent).toHaveBeenCalledTimes(1);
+    expect(stagedSpy.areConsistent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('institutionEvidenceConnectsIdentity — Codex round-6 composite fix (Wave 6, 2026-08-09)', () => {
+  // VUMC-class pin (Codex round-6 finding): a staged-only checker at this
+  // seam dropped the legacy checker's one-hop associated-link corroboration,
+  // regressing exactly this pair — the byline-attributed "related-but-
+  // distinct entity of the recorded affiliation" shape common in biomedical
+  // hospital-vs-university affiliations. The mocked resolver here resolves
+  // both names to DISTINCT identities, one carrying the other as a one-hop
+  // `associatedInstitutions` link — mirroring how the live OpenAlex resolver
+  // records this relationship (see institution-affiliation-consistency.js's
+  // `associatedIdentityMatches`, and the identical fixture shape in
+  // tests/unit/institution-pair-segment-comparison.test.js). Neither operand
+  // has a comma segment for the staged arm to exploit, so this pin is
+  // attributable to the legacy arm alone.
+  test('VUMC-class: legacy arm clears via one-hop associated-link corroboration; composite returns true (write path preserved)', async () => {
+    const vumcIdentity = {
+      openAlexId: 'I-VUMC',
+      displayName: 'Vanderbilt University Medical Center',
+      associatedInstitutions: ['Vanderbilt University'],
+    };
+    const vuIdentity = {
+      openAlexId: 'I-VU',
+      displayName: 'Vanderbilt University',
+      associatedInstitutions: [],
+    };
+    const namedRelResolver = {
+      resolve: jest.fn(async (name) => {
+        if (name === 'Vanderbilt University Medical Center') return vumcIdentity;
+        if (name === 'Vanderbilt University') return vuIdentity;
+        return null;
+      }),
+    };
+    const legacy = createInstitutionConsistencyChecker({ resolver: namedRelResolver });
+    const staged = createInstitutionConsistencyChecker({ resolver: namedRelResolver, segmentComparison: true });
+
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: 'Vanderbilt University Medical Center',
+      resolvedInstitutions: ['Vanderbilt University'],
+      finalAffiliation: 'Vanderbilt University',
+      legacyChecker: legacy,
+      stagedChecker: staged,
+    })).resolves.toBe(true);
+
+    // Ground the "legacy arm, not staged" attribution directly.
+    await expect(legacy.areConsistent('Vanderbilt University Medical Center', 'Vanderbilt University'))
+      .resolves.toBe(true);
+    await expect(staged.areConsistent('Vanderbilt University Medical Center', 'Vanderbilt University'))
+      .resolves.toBe(false);
+  });
+
+  // Sicheri-class pin (request 1002912, the Wave 6 fixture the segment-
+  // comparison opt-in was built for): evidence is a clean short name, the
+  // recorded affiliation adds a decoration segment, and the two resolve to
+  // DISTINCT real identities with no associated-link relationship — the
+  // legacy checker's one-hop corroboration cannot fire, only the staged
+  // checker's segment-whole match can. Live-faithful fixture identical to
+  // tests/unit/institution-pair-segment-comparison.test.js's Lunenfeld
+  // describe block.
+  test('Sicheri-class: legacy arm false, staged arm clears via segment-whole match; composite returns true', async () => {
+    const EVIDENCE = 'Lunenfeld-Tanenbaum Research Institute';
+    const AFFILIATION = 'Lunenfeld-Tanenbaum Research Institute, University of Toronto';
+    const identities = new Map([
+      [EVIDENCE, { openAlexId: 'I-LTRI', displayName: EVIDENCE, associatedInstitutions: [] }],
+      ['University of Toronto', {
+        openAlexId: 'I-UOFT', displayName: 'University of Toronto', associatedInstitutions: [],
+      }],
+    ]);
+    const liveFaithfulResolver = { resolve: jest.fn(async (name) => identities.get(name) || null) };
+    const legacy = createInstitutionConsistencyChecker({ resolver: liveFaithfulResolver });
+    const staged = createInstitutionConsistencyChecker({ resolver: liveFaithfulResolver, segmentComparison: true });
+
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: EVIDENCE,
+      resolvedInstitutions: ['Some Other Institution'],
+      finalAffiliation: AFFILIATION,
+      legacyChecker: legacy,
+      stagedChecker: staged,
+    })).resolves.toBe(true);
+
+    // Ground the "staged arm, not legacy" attribution directly.
+    await expect(legacy.areConsistent(EVIDENCE, AFFILIATION)).resolves.toBe(false);
+    await expect(staged.areConsistent(EVIDENCE, AFFILIATION)).resolves.toBe(true);
   });
 });

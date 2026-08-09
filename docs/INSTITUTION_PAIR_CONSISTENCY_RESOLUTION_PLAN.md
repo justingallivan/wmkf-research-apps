@@ -437,6 +437,78 @@ out of string decoration, not genuine disagreements.
 > `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`) — landed on
 > branch `feature/enrichment-segment-comparison`, pending Codex review and
 > owner-decided promotion to `main`, not yet promoted as of this entry.
+>
+> **Wave 6 round-6 — Codex adversarial finding + composite fix, 2026-08-09
+> (owner-approved: "Fix it, but I think you're starting to chase your
+> tail").** Codex review found that the staged-only checker landed above
+> deliberately drops the legacy checker's one-hop associated-link
+> corroboration (`institutionsConsistent`'s `associatedIdentityMatches`,
+> removed from the staged path by Wave 3e for a different, unrelated reason —
+> preventing system/campus and cross-institution auto-clears). At the
+> enrichment seam, dropping that corroboration is a regression, not a
+> tradeoff: `benchmarks/institution-pair-consistency/results/wave6-enrichment-flip-2026-08-09.json`
+> rows `named-rel-vumc-vanderbilt` and `named-rel-danafarber-harvard` show
+> incumbent (legacy) verdict `same-or-related` and staged verdict
+> `not-cleared` [VERIFIED via committed results artifact]. At this seam a
+> false verdict sets `institutionContradicted` → `identityNeedsReview` →
+> blocks email/ORCID/metrics/researcher writes, so the Wave 6 flip
+> regressed the VUMC-class byline shape (recorded affiliation names a
+> related-but-distinct entity of the byline institution — hospital vs
+> university, common in biomedical bylines).
+>
+> **Fix (compose, don't choose): accept a clear from EITHER arm.**
+> `enrich-recommended-service.js` now constructs BOTH checkers at the seam
+> — a legacy/default one and a staged (segment-comparison) one — sharing
+> ONE `createInstitutionIdentityResolver()` instance so live OpenAlex calls
+> are not doubled per candidate (mirrors
+> `benchmarks/institution-pair-consistency/run-pair-gates.js`'s two-arm
+> pattern). `institutionEvidenceConnectsIdentity` evaluates the legacy arm
+> first and only calls the staged arm when legacy is false, so provider
+> traffic is bounded; a `throw` from EITHER arm propagates unchanged to the
+> existing fail-closed catch (never swallowed into a bare `false` — a
+> comparison outage must read as "could not complete," never as an
+> affirmative contradiction). The tri-state null contract (missing operand),
+> the `institutionDirectMatch` fast path, and the
+> `identityConfirmed = !!identity && mayPersistIdentity(identity.status)`
+> conjunction are byte-identical [VERIFIED via source read this session].
+> `lib/services/institution-affiliation-consistency.js` is untouched by this
+> fix — `git diff` against it is empty [VERIFIED this session].
+>
+> The union is strictly additive versus pre-Wave-6 `main` production: every
+> pair the legacy arm alone cleared still clears (VUMC-class corroboration
+> restored); the only NEW clears are the staged arm's decoration clears
+> (request 1002912's Lunenfeld-Tanenbaum class), pinned false for every
+> sibling-institution shape by the 148-row uc-sibling live suite (unchanged
+> by this fix — the staged checker itself was not touched).
+>
+> New pins: `tests/unit/enrich-recommended-institution-evidence.test.js`
+> gains a VUMC-class test (legacy arm clears via associated-link
+> corroboration; composite true) and a Sicheri-class test (legacy arm false,
+> staged arm clears via segment-whole match; composite true via the staged
+> arm), plus a fail-closed pin (legacy false + staged throws → composite
+> throws, not false).
+> `tests/unit/institution-checker-consumer-scope.test.js` is re-pinned to
+> the new truth: `enrich-recommended-service.js` now has TWO
+> `createInstitutionConsistencyChecker` call sites (legacy `{ resolver }`,
+> staged `{ resolver, segmentComparison: true }` — the same shared resolver
+> instance), `segmentComparison: true` still appears exactly once there, and
+> the behavioral (value-based) capture asserts both checkers share one
+> resolver object. The live pair gate was not rerun for this fix — the
+> checker itself is unchanged, so the frozen Wave 6 gate result stands as
+> evidence for both arms individually; the composite's seam-level behavior is
+> covered by the new offline unit pins above.
+>
+> **SEAM STOP-RULE (owner-directed, 2026-08-09), mirroring the Stage 1
+> checker stop-rule above: this is the last enrichment-seam iteration. If a
+> subsequent review finds a further issue with how the enrichment seam
+> consumes the checker(s), the seam freezes as-is — the finding is recorded,
+> the closure claim is narrowed to what is proven, and the remainder routes
+> to Stage 2's typed parent/child relationships. No third checker or further
+> seam-level guard gets added here.** Rationale: two consecutive
+> owner-approved landings on this surface (the Wave 6 flip, then this
+> round-6 composite fix) is the tail-chasing pattern the Stage 1 stop-rule
+> was written to end; typed relationship classification is explicitly Stage
+> 2 scope, not a reason to keep iterating the seam's checker plumbing.
 
 Normalize both sides of `areConsistent` by comparing institution segments of
 decorated bylines before resolution and comparison. Implementation note
