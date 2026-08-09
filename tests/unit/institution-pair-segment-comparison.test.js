@@ -117,6 +117,61 @@ describe('segment-wise comparison (opt-in) — request-1002903 same-pairs', () =
   });
 });
 
+describe('segment-wise comparison (opt-in) — request 1002912 (Lunenfeld-Tanenbaum, Wave 6 fixture)', () => {
+  // Exact strings from benchmarks/institution-pair-consistency/cases/request-1002903-pairs.jsonl,
+  // caseId "1002912-lunenfeld". Unlike rows 1-4 above, the SHORT string here
+  // is the PubMed byline evidence and the LONG string is the recorded/claimed
+  // affiliation — the inverse decoration direction, so this pin exercises the
+  // rightSegments-vs-left branch of directMatchWithParentGuard rather than
+  // the leftSegments-vs-right branch rows 1-4 exercise.
+  const EVIDENCE = 'Lunenfeld-Tanenbaum Research Institute';
+  const AFFILIATION = 'Lunenfeld-Tanenbaum Research Institute, University of Toronto';
+
+  // Live-faithful stub (both live-verified 2026-08-09): "Lunenfeld-Tanenbaum
+  // Research Institute" and "University of Toronto" each resolve to their
+  // OWN distinct real identity — they are genuinely different organizations,
+  // not one collapsing into the other. The whole decorated compound string
+  // ("...Institute, University of Toronto" as one string) abstains, mirroring
+  // the S400 finding that decorated/compound strings return zero OpenAlex
+  // results. Step 1 (direct segment match) does NOT clear this pair: the
+  // EVIDENCE segment has a contiguous extension in its own operand (the
+  // whole-join fragment), which abstains, demoting it to 'parent' under
+  // step 1's strict policy. The clear instead comes from step 2: EVIDENCE is
+  // the whole left operand (always pool-admitted) and matches its own
+  // segment-pool entry on the right side by identity equality — the
+  // "shared string IS one of the whole operands" carve-out documented above
+  // buildPool's shared-fragment self-pair exclusion.
+  const identities = new Map([
+    [EVIDENCE, { openAlexId: 'I-LTRI', displayName: EVIDENCE, associatedInstitutions: [] }],
+    ['University of Toronto', {
+      openAlexId: 'I-UOFT', displayName: 'University of Toronto', associatedInstitutions: [],
+    }],
+  ]);
+  const liveFaithfulResolver = () => identityResolver(identities);
+
+  test('evidence (short) vs affiliation (long): consistent true', async () => {
+    const checker = createInstitutionConsistencyChecker({
+      resolver: liveFaithfulResolver(), segmentComparison: true,
+    });
+
+    await expect(checker.areConsistent(EVIDENCE, AFFILIATION)).resolves.toBe(true);
+  });
+
+  test('reverse argument order (affiliation, evidence): also consistent true', async () => {
+    const checker = createInstitutionConsistencyChecker({
+      resolver: liveFaithfulResolver(), segmentComparison: true,
+    });
+
+    await expect(checker.areConsistent(AFFILIATION, EVIDENCE)).resolves.toBe(true);
+  });
+
+  test('default path (segmentComparison omitted): stays false, matching the production mismatch banner this fixture pins as fixed', async () => {
+    const checker = createInstitutionConsistencyChecker({ resolver: liveFaithfulResolver() });
+
+    await expect(checker.areConsistent(EVIDENCE, AFFILIATION)).resolves.toBe(false);
+  });
+});
+
 describe('segment-wise comparison (opt-in) — genuine mismatches stay flagged', () => {
   test('Northwestern Feinberg vs Texas A&M → false (distinct identities)', async () => {
     const LEFT = 'Division of Nephrology and Hypertension, Northwestern University Feinberg School of Medicine, Chicago, IL';

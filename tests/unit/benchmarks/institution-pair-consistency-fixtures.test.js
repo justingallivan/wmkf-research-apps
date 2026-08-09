@@ -103,9 +103,9 @@ describe('institution-pair-consistency fixtures', () => {
   });
 
   describe('request-1002903-pairs.jsonl (tracked sanitized fixture)', () => {
-    it('parses as JSONL with exactly 5 rows', () => {
+    it('parses as JSONL with exactly 6 rows', () => {
       const rows = readJsonlRows(REQUEST_1002903_PATH);
-      expect(rows).toHaveLength(5);
+      expect(rows).toHaveLength(6);
     });
 
     it('every row has expected value in {same, distinct} only', () => {

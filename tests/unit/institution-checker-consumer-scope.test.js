@@ -2,12 +2,23 @@
  * Consumer-scope assertion (docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
  * owner decision 3, "Agent-runnable evaluation harness" deliverable 3).
  *
- * The Stage 1 segment-comparison opt-in must stay confined to the
- * affiliation-mismatch alert; the enrichment and identity-evidence consumers
- * must keep constructing the checker with its legacy (segmentComparison:
- * false) default. This test re-derives the call-site set by scanning the
- * live repo tree rather than trusting a fixed list, so a NEW call site or a
- * scope leak fails the test instead of silently expanding scope.
+ * Wave 6 (2026-08-09): the segment-comparison opt-in now covers TWO
+ * consumers — the affiliation-mismatch alert (unchanged) and the enrichment
+ * institution seam (`enrich-recommended-service.js`). Codex round-6 review
+ * found the enrichment seam's brief staged-only flip regressed the
+ * VUMC-class identity-corroboration write path (one-hop associated-link
+ * evidence the legacy/default checker path provides but the staged path
+ * deliberately drops per Wave 3e). The owner-approved fix composes both
+ * arms at that seam: `enrich-recommended-service.js` now constructs TWO
+ * checkers over one shared resolver — a legacy/default one and a staged
+ * (segment-comparison) one — and accepts a clear from either. This is why
+ * that file's call-site count below is 2, not 1, while `segmentComparison:
+ * true` still appears there exactly once (only the staged construction
+ * passes it). reviewer-identity-evidence.js is the sole remaining consumer
+ * that must keep constructing the checker with its legacy default. This test
+ * re-derives the call-site set by scanning the live repo tree rather than
+ * trusting a fixed list, so a NEW call site or a scope leak beyond these two
+ * files fails the test instead of silently expanding scope further.
  */
 
 const fs = require('fs');
@@ -140,23 +151,23 @@ describe('institution consistency checker: consumer scope', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  test('call sites are exactly the expected set, one occurrence each: definition + the three known consumers', () => {
-    // Map equality (not just key-set equality) so a SECOND call added inside
-    // an already-expected file (e.g. a stray extra checker construction in
-    // enrich-recommended-service.js) fails this test too, not just a call in
-    // a brand-new file.
+  test('call sites are exactly the expected set: definition + the three known consumers, enrich-recommended-service.js constructing TWO (legacy + staged composite, Wave 6 round-6 fix)', () => {
+    // Map equality (not just key-set equality) so a THIRD call added inside
+    // an already-expected file, or a second call anywhere else, fails this
+    // test too, not just a call in a brand-new file.
     const expected = new Map([
       ['lib/services/institution-affiliation-consistency.js', 1], // definition (the factory itself)
       ['lib/services/alert-reviewer-affiliation-mismatch.js', 1],
-      ['lib/services/workbench/enrich-recommended-service.js', 1],
+      ['lib/services/workbench/enrich-recommended-service.js', 2], // legacyChecker + stagedChecker
       ['lib/services/reviewer-identity-evidence.js', 1],
     ]);
     expect(callSitesByFile).toEqual(expected);
   });
 
-  test('segmentComparison: true appears exactly once, only in the affiliation-mismatch alert', () => {
+  test('segmentComparison: true appears exactly once each, only in the affiliation-mismatch alert and the enrichment seam', () => {
     expect(segmentComparisonTrueByFile).toEqual(new Map([
       ['lib/services/alert-reviewer-affiliation-mismatch.js', 1],
+      ['lib/services/workbench/enrich-recommended-service.js', 1],
     ]));
   });
 
@@ -168,17 +179,19 @@ describe('institution consistency checker: consumer scope', () => {
     expect(source).toMatch(/segmentComparison\s*=\s*false/);
   });
 
-  test('enrich-recommended-service.js constructs the checker with no options (bare call)', () => {
+  test('enrich-recommended-service.js constructs BOTH checkers over one shared resolver, only the staged one with the segment-comparison option', () => {
     const source = fs.readFileSync(
       path.join(REPO_ROOT, 'lib/services/workbench/enrich-recommended-service.js'),
       'utf8',
     );
-    expect(source).toMatch(/createInstitutionConsistencyChecker\(\s*\)/);
-    // Guard against a bare-looking call that secretly passes an options
-    // object across a line break (e.g. "createInstitutionConsistencyChecker(\n  {").
-    const callMatch = source.match(/createInstitutionConsistencyChecker\(([^)]*)\)/);
-    expect(callMatch).not.toBeNull();
-    expect(callMatch[1].trim()).toBe('');
+    // Guard against either call's options object being something other than
+    // the exact expected literal (e.g. a stray extra key, a dropped shared
+    // resolver, or a computed value across a line break).
+    const callMatches = [...source.matchAll(/createInstitutionConsistencyChecker\(([^)]*)\)/g)];
+    expect(callMatches).toHaveLength(2);
+    const [legacyArgs, stagedArgs] = callMatches.map((match) => match[1].trim());
+    expect(legacyArgs).toBe('{ resolver: sharedInstitutionResolver }');
+    expect(stagedArgs).toBe('{ resolver: sharedInstitutionResolver, segmentComparison: true }');
   });
 });
 
@@ -204,18 +217,27 @@ describe('institution consistency checker: consumer scope', () => {
  *     `deps` that omits `institutionConsistency` fires the real factory
  *     immediately, before any other body logic runs (the call short-circuits
  *     to `{ skipped: 'no_contact' }` right after, which is irrelevant here).
- *   - enrich-recommended-service.js: constructs the checker at a fixed POINT
+ *   - enrich-recommended-service.js: constructs TWO checkers at a fixed POINT
  *     inside the `enrichRecommended` pipeline (after PubMed verification,
  *     COI checks, and contact/bibliometric enrichment), not as an injected
  *     default parameter. Reaching it requires actually driving the pipeline
  *     with minimal stubs for its many collaborators; the outer function
  *     catches any downstream error and resolves via an `error` SSE event, so
  *     the capture only depends on the mocks being sufficient to reach that
- *     point, not on the rest of the pipeline succeeding.
+ *     point, not on the rest of the pipeline succeeding. Codex round-6
+ *     (2026-08-09): a staged-only checker at this seam regressed the
+ *     VUMC-class identity-corroboration write path, so the seam now
+ *     constructs a legacy/default checker and a staged (segment-comparison)
+ *     checker over ONE shared resolver instance and accepts a clear from
+ *     either. The captured value assertion below changed from a single-call,
+ *     one-object expectation to two calls: the first with only the shared
+ *     resolver, the second with the same shared resolver plus the
+ *     segment-comparison option.
  *   - reviewer-identity-evidence.js: constructs the checker at a fixed point
  *     inside the static `evaluateSuggestion` method, right after the
  *     OpenAlex author search resolves. Reaching it only requires stubbing
- *     OpenAlexService.searchAuthors to resolve.
+ *     OpenAlexService.searchAuthors to resolve. Remains the sole consumer
+ *     still constructing the checker with no arguments (legacy default).
  */
 describe('institution consistency checker: consumer scope (behavioral, value-based)', () => {
   function mockCheckerFactory() {
@@ -252,7 +274,7 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
     expect(factory.mock.calls[0]).toEqual([{ segmentComparison: true }]);
   });
 
-  test('enrich-recommended-service: factory called with no arguments', async () => {
+  test('enrich-recommended-service: factory called with exactly { segmentComparison: true }', async () => {
     const factory = mockCheckerFactory();
     let enrichRecommended;
     jest.isolateModules(() => {
@@ -339,8 +361,17 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
       userProfileId: null,
     }, onEvent);
 
-    expect(factory).toHaveBeenCalledTimes(1);
-    expect(factory.mock.calls[0]).toEqual([]);
+    expect(factory).toHaveBeenCalledTimes(2);
+    // First call: legacy checker, resolver-only. Second: staged checker,
+    // over the SAME shared resolver instance plus the segment-comparison
+    // option — deep-equal on the captured VALUES, immune to a bypass shape
+    // like `{ segmentComparison: someVar }` unless someVar's runtime value
+    // is literally `true`, and immune to a silently-un-shared resolver.
+    const [legacyArgs] = factory.mock.calls[0];
+    const [stagedArgs] = factory.mock.calls[1];
+    expect(Object.keys(legacyArgs)).toEqual(['resolver']);
+    expect(legacyArgs.resolver).toBeTruthy();
+    expect(stagedArgs).toEqual({ resolver: legacyArgs.resolver, segmentComparison: true });
   });
 
   test('reviewer-identity-evidence: factory called with no arguments', async () => {

@@ -195,9 +195,9 @@ describe('run-pair-gates core: case-file loading (pure fs, no network)', () => {
     }]);
   });
 
-  test('loadAllCases loads the three real Stage 1 fixtures (5 + 148 + 3 = 156 rows) plus any extras', () => {
+  test('loadAllCases loads the three real Stage 1 fixtures (6 + 148 + 3 = 157 rows) plus any extras', () => {
     const rows = loadAllCases([]);
-    expect(rows.length).toBe(156);
+    expect(rows.length).toBe(157);
     const families = new Set(rows.map((r) => r.family));
     expect(families).toEqual(new Set([
       'request-1002903-pairs.jsonl', 'uc-sibling-pairs.jsonl', 'named-relationship-pairs.jsonl',
