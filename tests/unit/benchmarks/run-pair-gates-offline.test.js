@@ -425,12 +425,12 @@ describe('run-pair-gates core: buildProvenance (F4 provenance block)', () => {
     const withoutKey = { ...process.env };
     delete withoutKey.OPENALEX_API_KEY;
     const original = process.env.OPENALEX_API_KEY;
-    process.env.OPENALEX_API_KEY = 'super-secret-value-must-not-appear';
+    process.env.OPENALEX_API_KEY = 'fake-sentinel-value-must-not-appear';
     try {
       const provenance = buildProvenance({ scriptPath, caseFiles: [caseFilePath] });
       expect(provenance.openAlexApiKeyPresent).toBe(true);
       const serialized = JSON.stringify(provenance);
-      expect(serialized).not.toContain('super-secret-value-must-not-appear');
+      expect(serialized).not.toContain('fake-sentinel-value-must-not-appear');
     } finally {
       if (original === undefined) delete process.env.OPENALEX_API_KEY;
       else process.env.OPENALEX_API_KEY = original;
