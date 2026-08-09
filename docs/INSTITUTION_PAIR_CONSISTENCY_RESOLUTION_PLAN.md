@@ -614,6 +614,32 @@ deployment sanity check, not a measurement instrument.
      ROR-backed stage targets. This result is measurement evidence only; it
      does not authorize combined-mode promotion or enrichment injection,
      which still require arm 2 plus owner sign-off.
+     **Arm 2 COMPLETED 2026-08-09** (local artifact
+     `outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-ror-arm2-2026-08-09.json`,
+     untracked per the same precedent): 40/40, zero provider failures on
+     both providers (ROR adapter: 31 requests, all 2xx, 0 timeouts/
+     transport failures/malformed responses). All five `evaluatePromotion`
+     gates pass with the SAME numbers as arm 1 — and that is the finding:
+     **every combined decision and outcome is identical to the baseline
+     across all 40 cases** [VERIFIED via per-case diff of both artifacts].
+     The headroom hypothesis is FALSIFIED on this benchmark: the ROR arm
+     resolved more claimed institutions (`claimed_institution_unresolved`
+     works-stage reasons dropped; resolver decisions: 21 resolved / 3
+     review / 0 unresolved), but in the only two cases whose works-stage
+     reason changed (hazard-10-a-patel, clean-01-ram-madabhushi) the newly
+     resolved institution then failed byline corroboration — `review
+     (claimed_institution_unresolved)` became `abstain
+     (no_institution_corroborated_byline)` with unchanged combined
+     outcomes. Institution resolution was not the binding constraint on
+     the frozen-40; byline corroboration is. Note the benchmark's claimed
+     affiliations are full institution names, so ROR's alias/short-form
+     advantage ("UCLA", "UC San Diego") is untested by this suite.
+     Consequence: the enrichment-injection gate's zero-false-binds
+     condition is met, but there is no measured benefit to justify the
+     authority change — recommendation recorded as do-not-inject on
+     current evidence; revisit only with a benchmark whose failure mode
+     is actually institution-resolution-bound (e.g. short-form
+     affiliations).
    - **(b) C3 replay: parked** — trigger unchanged (institution-resolver
      promotion returning to the table).
 
