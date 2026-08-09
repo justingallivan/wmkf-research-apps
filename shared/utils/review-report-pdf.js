@@ -113,23 +113,21 @@ export async function generateReviewReportPdf(report) {
     }
   }
 
-  for (const section of report.categoricalSections || []) {
+  // --- Per-question answer sections (multiselect + richtext, question order) ---
+  for (const section of report.answerSections || []) {
     const label = section.retired ? `${section.text} (prior cycle)` : section.text;
     builder.addSection(label);
-    for (const answer of section.answers) {
-      const value = answer.unreadable
-        ? 'Unreadable answer'
-        : answer.state === 'not-asked'
-          ? 'Not asked'
-          : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
-      builder.addKeyValue(answer.reviewerName || 'Unnamed reviewer', value);
+    if (section.type === 'multiselect') {
+      for (const answer of section.answers) {
+        const value = answer.unreadable
+          ? 'Unreadable answer'
+          : answer.state === 'not-asked'
+            ? 'Not asked'
+            : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
+        builder.addKeyValue(answer.reviewerName || 'Unnamed reviewer', value);
+      }
+      continue;
     }
-  }
-
-  // --- Narrative sections ---
-  for (const section of report.narrativeSections) {
-    const label = section.retired ? `${section.text} (prior cycle)` : section.text;
-    builder.addSection(label);
     for (const answer of section.answers) {
       builder.addSection(answer.reviewerName || 'Unnamed reviewer', 2);
       if (answer.state === 'not-asked') {

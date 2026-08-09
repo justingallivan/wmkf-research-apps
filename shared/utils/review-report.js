@@ -14,9 +14,9 @@
  *  1. `composeReviewReport(...)` — turn a `deriveReviewMatrix` result plus
  *     proposal identity into a report object: header, summary (counts +
  *     per-rating-question average/spread), ratings table (same rows/columns
- *     as the Compare grid), and per-richtext-question narrative sections
- *     (all reviewers' answers, in matrix order, "Prior cycle" flag carried
- *     through).
+ *     as the Compare grid), and per-question answer sections (multiselect +
+ *     richtext together, IN QUESTION ORDER; all reviewers' answers, "Prior
+ *     cycle" flag carried through).
  *  2. `htmlToBlocks(html)` — a pure tokenizer for the sanitizer's ALLOWLISTED
  *     GRAMMAR ONLY (lib/external/sanitize-review-html.js `ALLOWED_TAGS`:
  *     p, br, strong, b, em, i, ul, ol, li, h2, h3, blockquote, a — no
@@ -265,9 +265,11 @@ function roundOrNull(n) {
  *     rows:Array<{key:string, text:string, retired:boolean,
  *       cells:Array<{suggestionId:string, label:(string|null)}>,
  *       average:(number|null), min:(number|null), max:(number|null)}>},
- *   narrativeSections: Array<{key:string, text:string, retired:boolean,
- *     answers:Array<{suggestionId:string, reviewerName:(string|null),
- *       state:('answered'|'empty'|'not-asked'), blocks:Array}>},
+ *   answerSections: Array<{type:('multiselect'|'richtext'), key:string,
+ *     text:string, retired:boolean,
+ *     tallies?:Array, answers:Array<{suggestionId:string,
+ *       reviewerName:(string|null), state:('answered'|'empty'|'not-asked'),
+ *       unreadable?:boolean, labels?:Array<string>, blocks?:Array}>}>,
  * }}
  */
 export function composeReviewReport({
@@ -284,8 +286,6 @@ export function composeReviewReport({
     : { reviewers: [], questions: [] };
 
   const ratingQuestions = safeMatrix.questions.filter((q) => q.type === 'picklist');
-  const categoricalQuestions = safeMatrix.questions.filter((q) => q.type === 'multiselect');
-  const narrativeQuestions = safeMatrix.questions.filter((q) => q.type === 'richtext');
 
   const header = {
     requestNumber,
@@ -330,31 +330,39 @@ export function composeReviewReport({
 
   const reviewerName = new Map(safeMatrix.reviewers.map((r) => [r.suggestionId, r.name || null]));
 
-  const categoricalSections = categoricalQuestions.map((q) => ({
-    key: q.key,
-    text: q.text,
-    retired: !!q.retired,
-    tallies: Array.isArray(q.tallies) ? q.tallies : [],
-    answers: q.cells.map((c) => ({
-      suggestionId: c.suggestionId,
-      reviewerName: reviewerName.get(c.suggestionId) ?? null,
-      state: c.state,
-      unreadable: c.answerValuesUnreadable === true,
-      labels: Array.isArray(c.answerValues) ? c.answerValues.map((pair) => pair.label) : [],
-    })),
-  }));
-
-  const narrativeSections = narrativeQuestions.map((q) => ({
-    key: q.key,
-    text: q.text,
-    retired: !!q.retired,
-    answers: q.cells.map((c) => ({
-      suggestionId: c.suggestionId,
-      reviewerName: reviewerName.get(c.suggestionId) ?? null,
-      state: c.state,
-      blocks: c.state === 'answered' ? htmlToBlocks(c.answerHtml) : [],
-    })),
-  }));
+  // Per-question answer sections IN MATRIX (question) ORDER, one array for
+  // both section shapes. The former split into categoricalSections +
+  // narrativeSections made renderers print every multiselect before every
+  // narrative, so e.g. Q3 landed ahead of Q1/Q2 in the export.
+  const answerSections = safeMatrix.questions
+    .filter((q) => q.type === 'multiselect' || q.type === 'richtext')
+    .map((q) => (q.type === 'multiselect'
+      ? {
+        type: 'multiselect',
+        key: q.key,
+        text: q.text,
+        retired: !!q.retired,
+        tallies: Array.isArray(q.tallies) ? q.tallies : [],
+        answers: q.cells.map((c) => ({
+          suggestionId: c.suggestionId,
+          reviewerName: reviewerName.get(c.suggestionId) ?? null,
+          state: c.state,
+          unreadable: c.answerValuesUnreadable === true,
+          labels: Array.isArray(c.answerValues) ? c.answerValues.map((pair) => pair.label) : [],
+        })),
+      }
+      : {
+        type: 'richtext',
+        key: q.key,
+        text: q.text,
+        retired: !!q.retired,
+        answers: q.cells.map((c) => ({
+          suggestionId: c.suggestionId,
+          reviewerName: reviewerName.get(c.suggestionId) ?? null,
+          state: c.state,
+          blocks: c.state === 'answered' ? htmlToBlocks(c.answerHtml) : [],
+        })),
+      }));
 
   // Phase 4: optional synthesis section. Only present when a synthesis object
   // was passed in (plain object with the LLM-authored arrays/strings — never
@@ -373,8 +381,7 @@ export function composeReviewReport({
     header,
     summary,
     ratingsTable,
-    categoricalSections,
-    narrativeSections,
+    answerSections,
     synthesisSection,
   };
 }

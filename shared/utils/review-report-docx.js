@@ -204,35 +204,7 @@ export async function generateReviewReportDocx(report) {
     ratingsChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headRow, ...bodyRows] }));
   }
 
-  const categoricalChildren = [];
-  for (const section of report.categoricalSections || []) {
-    categoricalChildren.push(new Paragraph({
-      heading: HeadingLevel.HEADING_2,
-      spacing: { before: 300, after: 120 },
-      children: [new TextRun({
-        text: section.retired ? `${section.text} (prior cycle)` : section.text,
-        size: 26,
-        font: FONT,
-        bold: true,
-      })],
-    }));
-    for (const answer of section.answers) {
-      const value = answer.unreadable
-        ? 'Unreadable answer'
-        : answer.state === 'not-asked'
-          ? 'Not asked'
-          : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
-      categoricalChildren.push(new Paragraph({
-        spacing: { after: 80 },
-        children: [
-          bodyRun(`${answer.reviewerName || 'Unnamed reviewer'}: `, { bold: true }),
-          bodyRun(value, answer.unreadable ? { color: '996600' } : {}),
-        ],
-      }));
-    }
-  }
-
-  // --- Narrative sections ---
+  // --- Per-question answer sections (multiselect + richtext, question order) ---
   function runsToTextRuns(runs) {
     // A run's text may contain an embedded "\n" from a <br>; docx needs an
     // explicit line Break between segments rather than a literal newline
@@ -281,9 +253,9 @@ export async function generateReviewReportDocx(report) {
     }
   }
 
-  const narrativeChildren = [];
-  for (const section of report.narrativeSections) {
-    narrativeChildren.push(new Paragraph({
+  const answerChildren = [];
+  for (const section of report.answerSections || []) {
+    answerChildren.push(new Paragraph({
       heading: HeadingLevel.HEADING_2,
       spacing: { before: 300, after: 120 },
       children: [
@@ -292,18 +264,36 @@ export async function generateReviewReportDocx(report) {
       ],
     }));
 
+    if (section.type === 'multiselect') {
+      for (const answer of section.answers) {
+        const value = answer.unreadable
+          ? 'Unreadable answer'
+          : answer.state === 'not-asked'
+            ? 'Not asked'
+            : answer.labels.length > 0 ? answer.labels.join('; ') : 'No answer provided';
+        answerChildren.push(new Paragraph({
+          spacing: { after: 80 },
+          children: [
+            bodyRun(`${answer.reviewerName || 'Unnamed reviewer'}: `, { bold: true }),
+            bodyRun(value, answer.unreadable ? { color: '996600' } : {}),
+          ],
+        }));
+      }
+      continue;
+    }
+
     for (const answer of section.answers) {
-      narrativeChildren.push(new Paragraph({
+      answerChildren.push(new Paragraph({
         spacing: { before: 120, after: 60 },
         children: [bodyRun(answer.reviewerName || 'Unnamed reviewer', { bold: true })],
       }));
       if (answer.state === 'not-asked') {
-        narrativeChildren.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun('Not asked', { italics: true, color: '999999' })] }));
+        answerChildren.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun('Not asked', { italics: true, color: '999999' })] }));
       } else if (answer.state === 'empty' || answer.blocks.length === 0) {
-        narrativeChildren.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun('No answer provided', { italics: true, color: '999999' })] }));
+        answerChildren.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun('No answer provided', { italics: true, color: '999999' })] }));
       } else {
         for (const block of answer.blocks) {
-          narrativeChildren.push(blockToParagraph(block));
+          answerChildren.push(blockToParagraph(block));
         }
       }
     }
@@ -328,8 +318,7 @@ export async function generateReviewReportDocx(report) {
         ...summaryChildren,
         ...synthesisChildren,
         ...ratingsChildren,
-        ...categoricalChildren,
-        ...narrativeChildren,
+        ...answerChildren,
       ],
     }],
   });

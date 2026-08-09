@@ -6,7 +6,7 @@
  * allowlist (lib/external/sanitize-review-html.js ALLOWED_TAGS — p, br,
  * strong/b, em/i, ul/ol/li, h2/h3, blockquote, a), nesting, unknown-tag
  * degradation, empty/null input, malformed fragments, and the report
- * composition itself (header/summary/ratingsTable/narrativeSections) built
+ * composition itself (header/summary/ratingsTable/answerSections) built
  * on top of `deriveReviewMatrix`.
  */
 import { composeReviewReport, htmlToBlocks } from '../../shared/utils/review-report';
@@ -128,7 +128,7 @@ describe('composeReviewReport', () => {
     return { questionKey, questionOrder, questionType, questionText, answerText: null, answerHtml: null, answerValue: null, ...opts };
   }
 
-  test('composes header, summary, ratingsTable, and narrativeSections from a derived matrix', () => {
+  test('composes header, summary, ratingsTable, and answerSections from a derived matrix', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [
         row('impact', 1, 'picklist', 'Impact?', { answerText: 'High', answerValue: 4 }),
@@ -170,9 +170,10 @@ describe('composeReviewReport', () => {
     expect(impactRow.cells.find((c) => c.suggestionId === 'r1').label).toBe('High');
     expect(impactRow.cells.find((c) => c.suggestionId === 'r2').label).toBe('Medium');
 
-    expect(report.narrativeSections).toHaveLength(1);
-    const section = report.narrativeSections[0];
+    expect(report.answerSections).toHaveLength(1);
+    const section = report.answerSections[0];
     expect(section.key).toBe('comments');
+    expect(section.type).toBe('richtext');
     const r1Answer = section.answers.find((a) => a.suggestionId === 'r1');
     expect(r1Answer.state).toBe('answered');
     expect(r1Answer.blocks[0].runs.some((r) => r.text === 'work' && r.bold)).toBe(true);
@@ -181,7 +182,7 @@ describe('composeReviewReport', () => {
     expect(r2Answer.blocks).toEqual([]);
   });
 
-  test('carries the "Prior cycle" (retired) flag through to both ratingsTable rows and narrativeSections', () => {
+  test('carries the "Prior cycle" (retired) flag through to both ratingsTable rows and answerSections', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [
         row('oldRating', 5, 'picklist', 'Old rating?', { answerText: 'High', answerValue: 3 }),
@@ -194,7 +195,7 @@ describe('composeReviewReport', () => {
 
     expect(report.ratingsTable.rows[0].retired).toBe(true);
     expect(report.summary.ratingQuestions[0].retired).toBe(true);
-    expect(report.narrativeSections[0].retired).toBe(true);
+    expect(report.answerSections[0].retired).toBe(true);
   });
 
   test('zero submitted reviewers composes an empty-but-valid report, never throws', () => {
@@ -205,7 +206,7 @@ describe('composeReviewReport', () => {
     expect(report.summary.reviewsSubmitted).toBe(0);
     expect(report.summary.ratingQuestions).toEqual([]);
     expect(report.ratingsTable.rows).toEqual([]);
-    expect(report.narrativeSections).toEqual([]);
+    expect(report.answerSections).toEqual([]);
   });
 
   test('missing/null identity fields pass through as null rather than throwing', () => {
@@ -223,12 +224,12 @@ describe('composeReviewReport', () => {
     ];
     const matrix = deriveReviewMatrix(reviewers, null);
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' });
-    const answer = report.narrativeSections[0].answers[0];
+    const answer = report.answerSections[0].answers[0];
     expect(answer.state).toBe('empty');
     expect(answer.blocks).toEqual([]);
   });
 
-  test('multiselect questions compose categorical sections with tallies and unreadable markers', () => {
+  test('multiselect questions compose answer sections with tallies and unreadable markers', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [
         row('impactAreas', 3, 'multiselect', 'Impact areas?', {
@@ -249,14 +250,40 @@ describe('composeReviewReport', () => {
     });
 
     expect(report.summary.ratingQuestions).toEqual([]);
-    expect(report.categoricalSections).toHaveLength(1);
-    expect(report.categoricalSections[0].tallies).toEqual([
+    expect(report.answerSections).toHaveLength(1);
+    expect(report.answerSections[0].tallies).toEqual([
       { value: 1, label: 'Tools', count: 1, reviewers: [{ suggestionId: 'r1', name: 'Dr. A' }] },
       { value: 3, label: 'Broad interest', count: 1, reviewers: [{ suggestionId: 'r1', name: 'Dr. A' }] },
     ]);
-    expect(report.categoricalSections[0].answers).toEqual([
+    expect(report.answerSections[0].answers).toEqual([
       expect.objectContaining({ reviewerName: 'Dr. A', labels: ['Tools', 'Broad interest'], unreadable: false }),
       expect.objectContaining({ reviewerName: 'Dr. B', labels: [], unreadable: true }),
+    ]);
+  });
+
+  test('answerSections interleave multiselect and richtext in question order', () => {
+    // Regression: the former categoricalSections/narrativeSections split made
+    // renderers print every multiselect before every narrative, so a Q3
+    // multiselect landed ahead of Q1/Q2 narratives in the export.
+    const reviewers = [
+      reviewer('r1', 'Dr. A', [
+        row('priorArt', 1, 'richtext', 'Q1 Prior art?', { answerHtml: '<p>a</p>' }),
+        row('impacts', 2, 'richtext', 'Q2 Impacts?', { answerHtml: '<p>b</p>' }),
+        row('impactAreas', 3, 'multiselect', 'Q3 Impact areas?', {
+          answerText: 'Tools',
+          answerValues: [{ value: 1, label: 'Tools' }],
+        }),
+        row('risk', 4, 'picklist', 'Q4 Risk?', { answerText: 'Low', answerValue: 1 }),
+      ]),
+    ];
+    const report = composeReviewReport({
+      matrix: deriveReviewMatrix(reviewers, null),
+      generatedAtIso: '2026-07-03T00:00:00.000Z',
+    });
+    expect(report.answerSections.map((s) => [s.key, s.type])).toEqual([
+      ['priorArt', 'richtext'],
+      ['impacts', 'richtext'],
+      ['impactAreas', 'multiselect'],
     ]);
   });
 
