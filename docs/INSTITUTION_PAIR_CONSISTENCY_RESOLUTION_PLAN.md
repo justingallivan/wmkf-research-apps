@@ -140,7 +140,7 @@ out of string decoration, not genuine disagreements.
 > [RECHECKED after lib/services/institution-affiliation-consistency.js change:
 > opt-in `segmentComparison` default-off at :45; segment-wise comparison at
 > :67 with shared-fragment self-pair exclusion; default path in
-> `areConsistent` (:133) unchanged.]
+> `areConsistent` (:173 after the fail-closed guard edits) unchanged.]
 > [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
 > sole opt-in call site, `segmentComparison: true` at :66.]
 > [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
@@ -174,6 +174,20 @@ out of string decoration, not genuine disagreements.
 > Wave 2 built 2026-08-08 (live replay CLI + offline tests, consumer-scope
 > assertion test, enrichment copy/provenance fix for the `prior_flag` verdict
 > reason).
+>
+> **Known Stage 1 limitation — bare-parent step-2 dependency on live resolver
+> behavior.** If a bare system/parent string (e.g. "University of California")
+> ever *resolved* to an identity instead of abstaining, step 2 could pair a
+> campus operand's parent-fragment segment against the OTHER operand being
+> exactly that parent string (the shared-fragment exclusion deliberately
+> allows a fragment that equals a whole operand), and a campus-vs-parent pair
+> could auto-clear. Today the incumbent resolver abstains on bare "University
+> of California" (S400 ambiguity-tie behavior), so the seven campus-vs-parent
+> gate rows surface — but that part of safety invariant 2 rests on live
+> resolver behavior, not code structure. Regression net: the fixed
+> `uc-sibling-pairs.jsonl` suite replayed via `run-pair-gates.js` fails
+> non-zero the moment resolver behavior shifts. Structural fix is Stage 2's
+> typed parent/child relationships, not more string guards here.
 
 Normalize both sides of `areConsistent` by comparing institution segments of
 decorated bylines before resolution and comparison. Implementation note
