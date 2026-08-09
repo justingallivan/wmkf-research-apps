@@ -1,0 +1,45 @@
+{
+  "ranAt": "2026-08-09T15:46:57.293Z",
+  "cycle": "D26",
+  "slug": "smoke-d26",
+  "limit": 5,
+  "funnel": {
+    "suggestionsInCycle": 437,
+    "distinctPersonsInCycle": 415,
+    "personsFetched": 415,
+    "byIdentityStatus": {
+      "unresolved": 128,
+      "ambiguous": 6,
+      "null": 115,
+      "other_excluded": 166
+    },
+    "inScopeTotal": 249,
+    "limitApplied": 5,
+    "inScopeAfterLimit": 5,
+    "withClaimedInstitution": 5,
+    "claimedBlankButSuggestionAffiliationPresent_foundNotMeasured": 0,
+    "anchorTally": {
+      "personsInspected": 5,
+      "blankCount": 0,
+      "unparseableCount": 0,
+      "totalAnchors": 0,
+      "typeCounts": {}
+    },
+    "withEvidenceInstitution": 0,
+    "measurablePersons": 0
+  },
+  "pairs": [],
+  "resolverMetrics": null,
+  "ok": false,
+  "note": "No measurable pairs; see funnel for denominators. No checker replay was run.",
+  "provenance": {
+    "git": {
+      "sha": "76b25c5b366faf6f60626d6214972849fbe93e5f",
+      "dirty": true
+    },
+    "scriptSha256": "2535d30bab3874c1a9ce238c075134e083647c386cbd3fd7d54262a57a0657a5",
+    "caseFileHashes": [],
+    "nodeVersion": "v26.6.0",
+    "openAlexApiKeyPresent": true
+  }
+}
