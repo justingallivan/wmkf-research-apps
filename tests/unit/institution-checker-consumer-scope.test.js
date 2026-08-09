@@ -107,3 +107,198 @@ describe('institution consistency checker: consumer scope', () => {
     expect(callMatch[1].trim()).toBe('');
   });
 });
+
+/**
+ * Behavioral capture (Wave 3 item C — Codex bypass finding): the lexical
+ * scan above is a cheap belt, but it only reads source TEXT. A consumer
+ * that wrote `createInstitutionConsistencyChecker({ segmentComparison:
+ * someComputedFlag })`, imported a pre-built options object, or called the
+ * factory through an alias would still read as "passes an object" or "bare
+ * call" to a regex, while actually passing an arbitrary runtime VALUE. These
+ * tests mock the real `institution-affiliation-consistency` module's
+ * `createInstitutionConsistencyChecker` export with a `jest.fn()` spy, drive
+ * (or evaluate the default-parameter evaluation of) each consumer's REAL
+ * construction call, and assert on the captured argument VALUES — immune to
+ * aliasing, computed options, and line-break formatting.
+ *
+ * Provenance per consumer (verified by reading each file):
+ *   - alert-reviewer-affiliation-mismatch.js: constructs the checker as a
+ *     DEFAULT PARAMETER value (`institutionConsistency = createInstitution
+ *     ConsistencyChecker({ segmentComparison: true })`) destructured from
+ *     `deps` at function-entry time. A default parameter expression is only
+ *     evaluated when the caller omits that key, so calling the export with
+ *     `deps` that omits `institutionConsistency` fires the real factory
+ *     immediately, before any other body logic runs (the call short-circuits
+ *     to `{ skipped: 'no_contact' }` right after, which is irrelevant here).
+ *   - enrich-recommended-service.js: constructs the checker at a fixed POINT
+ *     inside the `enrichRecommended` pipeline (after PubMed verification,
+ *     COI checks, and contact/bibliometric enrichment), not as an injected
+ *     default parameter. Reaching it requires actually driving the pipeline
+ *     with minimal stubs for its many collaborators; the outer function
+ *     catches any downstream error and resolves via an `error` SSE event, so
+ *     the capture only depends on the mocks being sufficient to reach that
+ *     point, not on the rest of the pipeline succeeding.
+ *   - reviewer-identity-evidence.js: constructs the checker at a fixed point
+ *     inside the static `evaluateSuggestion` method, right after the
+ *     OpenAlex author search resolves. Reaching it only requires stubbing
+ *     OpenAlexService.searchAuthors to resolve.
+ */
+describe('institution consistency checker: consumer scope (behavioral, value-based)', () => {
+  function mockCheckerFactory() {
+    const factory = jest.fn(() => ({
+      areConsistent: jest.fn().mockResolvedValue(false),
+      resolve: jest.fn().mockResolvedValue(null),
+    }));
+    jest.doMock('../../lib/services/institution-affiliation-consistency', () => ({
+      createInstitutionConsistencyChecker: factory,
+      institutionsConsistent: jest.fn(() => false),
+    }));
+    return factory;
+  }
+
+  test('alert-reviewer-affiliation-mismatch: factory called with exactly { segmentComparison: true }', async () => {
+    let alertReviewerAffiliationMismatch;
+    const factory = mockCheckerFactory();
+    jest.isolateModules(() => {
+      ({ alertReviewerAffiliationMismatch } = require('../../lib/services/alert-reviewer-affiliation-mismatch.js'));
+    });
+
+    // Omitting `institutionConsistency` from deps is what fires the default
+    // parameter's factory call. `contactId`/`reviewer` are left empty so the
+    // function short-circuits to `{ skipped: 'no_contact' }` right after —
+    // the factory has already been invoked by then (default-param evaluation
+    // happens at function entry, before the body runs).
+    const out = await alertReviewerAffiliationMismatch({}, {});
+
+    expect(out).toEqual({ skipped: 'no_contact' });
+    expect(factory).toHaveBeenCalledTimes(1);
+    // Deep-equal on the captured VALUE: a bypass shape like
+    // `{ segmentComparison: someVar }` would only pass this assertion if
+    // someVar's runtime value is literally `true`.
+    expect(factory.mock.calls[0]).toEqual([{ segmentComparison: true }]);
+  });
+
+  test('enrich-recommended-service: factory called with no arguments', async () => {
+    const factory = mockCheckerFactory();
+    let enrichRecommended;
+    jest.isolateModules(() => {
+      jest.doMock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+        findApplicantRecommendedByRequest: jest.fn().mockResolvedValue([
+          { _wmkf_potentialreviewer_value: 'pr-1' },
+        ]),
+        setMatchReason: jest.fn(),
+      }));
+      jest.doMock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+        getById: jest.fn(), findByEmailCandidates: jest.fn(), update: jest.fn(),
+      }));
+      jest.doMock('../../lib/dataverse/adapters/researcher', () => ({
+        upsertByPotentialReviewer: jest.fn(), writeIdentityDecision: jest.fn(), clearIdentityFields: jest.fn(),
+      }));
+      jest.doMock('../../lib/services/discovery-service', () => ({
+        DiscoveryService: {
+          YEARS_LOOKBACK: 5,
+          pubMedVerificationContract: jest.fn(() => ({ enabled: false })),
+          isClearlyNonBiomedicalVerifierArea: jest.fn(() => true),
+          verifyClaudeSuggestions: jest.fn().mockImplementation(async (suggestions) => ({
+            verified: [], unverified: suggestions,
+          })),
+          checkCoauthorshipsForCandidates: jest.fn().mockImplementation(async (c) => c),
+        },
+      }));
+      jest.doMock('../../lib/services/deduplication-service', () => ({
+        DeduplicationService: { markInstitutionCOIResolved: jest.fn().mockImplementation(async (c) => c) },
+      }));
+      jest.doMock('../../lib/services/contact-enrichment-service', () => ({
+        ContactEnrichmentService: { enrichCandidates: jest.fn().mockResolvedValue({ enriched: [] }) },
+      }));
+      jest.doMock('../../lib/services/openalex-service', () => ({
+        OpenAlexService: { searchInstitutions: jest.fn(), getInstitution: jest.fn(), getWorksByAuthor: jest.fn() },
+      }));
+      jest.doMock('../../lib/services/claude-reviewer-service', () => ({
+        ClaudeReviewerService: { analyzeProposal: jest.fn() },
+      }));
+      jest.doMock('../../lib/services/proposal-pi-identity', () => ({
+        resolveProposalPI: jest.fn().mockResolvedValue(null),
+        appendPiName: jest.fn((names) => names || []),
+        piInstitutions: jest.fn(() => []),
+      }));
+      jest.doMock('../../lib/utils/proposal-authors', () => ({ deriveProposalAuthorNames: jest.fn(() => []) }));
+      jest.doMock('../../lib/services/reviewer-identity-resolver', () => ({
+        mayPersistIdentity: jest.fn(() => false), RESOLVER_SOURCED_FIELDS: [],
+      }));
+      jest.doMock('../../lib/services/backprop-reviewer-orcid', () => ({
+        backPropReviewerOrcidToContact: jest.fn(),
+      }));
+      jest.doMock('../../lib/services/reviewer-time-budget', () => ({
+        getReviewerTimeBudgetSeconds: jest.fn().mockResolvedValue(60),
+      }));
+      jest.doMock('../../lib/services/reviewer-request-context', () => ({
+        loadReviewerRequestContext: jest.fn(),
+      }));
+      jest.doMock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+        APPLICANT_ENRICHMENT_CACHE_VERSION: 4,
+        pruneCandidateForRoster: jest.fn((c) => c),
+      }));
+      jest.doMock('../../lib/services/reviewer-roster-store', () => ({
+        recordSurfaced: jest.fn().mockResolvedValue(0),
+        findCandidateBySuggestion: jest.fn().mockResolvedValue(null),
+      }));
+      jest.doMock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
+        loadApplicantKnownReviewerContext: jest.fn().mockResolvedValue({
+          applicantKnownReviewer: { status: 'known', name: 'Test Reviewer', affiliation: 'Test University' },
+          contactId: null,
+        }),
+      }));
+      jest.doMock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+
+      ({ enrichRecommended } = require('../../lib/services/workbench/enrich-recommended-service'));
+    });
+
+    const onEvent = jest.fn();
+    await enrichRecommended({
+      requestId: 'req-1',
+      blobUrl: undefined,
+      analysisResult: { proposalInfo: { authorInstitution: 'Some University' } },
+      proposalKey: 'proposal-key-1',
+      apiKey: 'fake-api-key',
+      actingUserSystemId: null,
+      userProfileId: null,
+    }, onEvent);
+
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(factory.mock.calls[0]).toEqual([]);
+  });
+
+  test('reviewer-identity-evidence: factory called with no arguments', async () => {
+    const factory = mockCheckerFactory();
+    let ReviewerIdentityEvidence;
+    jest.isolateModules(() => {
+      jest.doMock('../../lib/services/openalex-service', () => ({
+        OpenAlexService: {
+          searchAuthors: jest.fn().mockResolvedValue({ records: [], totalCount: 0 }),
+          getWorksByAuthor: jest.fn(),
+        },
+      }));
+      jest.doMock('../../lib/services/orcid-service', () => ({
+        ORCIDService: { findContact: jest.fn(), getWorks: jest.fn(), getProfile: jest.fn() },
+      }));
+      jest.doMock('../../lib/services/reviewer-identity-resolver', () => ({
+        resolveIdentity: jest.fn(() => ({ status: 'abstain', evidenceSummary: '' })),
+      }));
+      jest.doMock('../../lib/utils/contact-parser', () => ({
+        ContactParser: { stripHonorifics: jest.fn((s) => s) },
+      }));
+
+      ({ ReviewerIdentityEvidence } = require('../../lib/services/reviewer-identity-evidence'));
+    });
+
+    const result = await ReviewerIdentityEvidence.evaluateSuggestion(
+      { name: 'Test Person', suggestedInstitution: null },
+      { proposalInfo: {} },
+    );
+
+    expect(result.status).toBe('abstain');
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(factory.mock.calls[0]).toEqual([]);
+  });
+});

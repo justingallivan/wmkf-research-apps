@@ -41,6 +41,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_CONCURRENCY = 4;
@@ -307,6 +309,74 @@ function printTable(result) {
 }
 
 // ---------------------------------------------------------------------------
+// Provenance + overall gating (Codex F2/F4 findings). A resolver-metrics
+// provider-failure gate and the per-artifact provenance block are pure
+// functions of already-computed inputs, so both are exported for the offline
+// test — no network involved in exercising their shape/logic.
+// ---------------------------------------------------------------------------
+
+/**
+ * Combines the row-level gate (`runPairGates`'s `result.ok`) with the shared
+ * resolver's cumulative metrics. `metrics.providerFailures` is a monotonic
+ * counter that is never reset mid-run and is never decremented by a later
+ * success, so ANY nonzero value here means at least one OpenAlex call failed
+ * during this run — including a failure on a query that a different,
+ * unrelated query later resolved successfully. That must fail the gate even
+ * when every row's verdict happens to still be correct, because a row's
+ * `passed=true` cannot on its own distinguish "provider healthy, genuinely
+ * distinct" from "provider dead, checker abstained to a false that happened
+ * to match `expected`" (the F2 vacuous-pass mechanism). This is a deliberate
+ * defense-in-depth check alongside row-level error propagation, not a
+ * replacement for it.
+ */
+function gateOk(result, resolverMetrics) {
+  const rowsOk = Boolean(result?.ok);
+  const noProviderFailures = !resolverMetrics || resolverMetrics.providerFailures === 0;
+  return rowsOk && noProviderFailures;
+}
+
+function sha256File(filePath) {
+  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+}
+
+/**
+ * Best-effort git revision info. Never throws — a run outside a git checkout
+ * (or with git unavailable) still produces an artifact, just with null
+ * revision fields, rather than crashing the run.
+ */
+function gitRevisionInfo() {
+  const cwd = path.join(__dirname, '..', '..');
+  try {
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim();
+    const porcelain = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf8' });
+    return { sha, dirty: porcelain.trim().length > 0 };
+  } catch (err) {
+    return { sha: null, dirty: null, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Builds the per-artifact provenance block (Codex F4): git revision + dirty
+ * state, a sha256 of this script and of every case file actually consumed,
+ * node version, and whether OPENALEX_API_KEY was present in process.env —
+ * never the key value or any other env value. `scriptPath` is injected
+ * (rather than hardcoding __filename) so the offline test can exercise this
+ * against a temp script fixture without depending on the live file layout.
+ */
+function buildProvenance({ scriptPath, caseFiles }) {
+  return Object.freeze({
+    git: gitRevisionInfo(),
+    scriptSha256: sha256File(scriptPath),
+    caseFileHashes: caseFiles.map((filePath) => ({
+      file: path.relative(process.cwd(), filePath),
+      sha256: sha256File(filePath),
+    })),
+    nodeVersion: process.version,
+    openAlexApiKeyPresent: Boolean(process.env.OPENALEX_API_KEY),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CLI wiring
 // ---------------------------------------------------------------------------
 
@@ -412,7 +482,16 @@ async function main() {
   // eslint-disable-next-line global-require
   const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 
-  const sharedResolver = createInstitutionIdentityResolver();
+  // One shared resolver instance backs BOTH checker configurations (incumbent
+  // and staged) across BOTH fixture families for the whole run — its cache and
+  // `metrics` counters are cumulative over every row, not per-family or
+  // per-checker. propagateProviderErrors: true is load-bearing (Codex F2): the
+  // default (false) degrades a provider exception to a null resolution, which
+  // makes every distinct/related-surface row pass vacuously instead of
+  // surfacing the failure. With this set, a provider exception throws through
+  // checker.areConsistent into runOnePair's per-row error handling, which
+  // marks that row status:'error' and fails the run.
+  const sharedResolver = createInstitutionIdentityResolver({ propagateProviderErrors: true });
   const incumbentChecker = createInstitutionConsistencyChecker({
     resolver: sharedResolver,
     segmentComparison: false,
@@ -430,24 +509,42 @@ async function main() {
     timeoutMs: args.timeoutMs,
   });
 
-  printTable(result);
+  // Snapshot metrics only after every row has settled — the resolver's
+  // counters accumulate monotonically across the whole run and are never
+  // reset mid-run, so a mid-run read would be incomplete.
+  const resolverMetrics = sharedResolver.metrics;
+  const overallOk = gateOk(result, resolverMetrics);
+
+  printTable({ ...result, ok: overallOk });
+  console.log('\nResolver metrics (shared across both checker configs and both fixture families):', JSON.stringify(resolverMetrics));
+  if (resolverMetrics.providerFailures > 0) {
+    console.log(`\nGATE NOTE: ${resolverMetrics.providerFailures} provider failure(s) recorded — this fails the gate even if every row's verdict matched its expectation.`);
+  }
+
+  const caseFilesResolved = [...DEFAULT_CASE_FILES, ...args.extraCases];
+  const provenance = buildProvenance({ scriptPath: __filename, caseFiles: caseFilesResolved });
 
   if (!fs.existsSync(RESULTS_DIR)) fs.mkdirSync(RESULTS_DIR, { recursive: true });
   const artifact = {
     ranAt: new Date().toISOString(),
     slug: args.slug,
-    caseFiles: [...DEFAULT_CASE_FILES, ...args.extraCases].map((p) => path.relative(process.cwd(), p)),
+    caseFiles: caseFilesResolved.map((p) => path.relative(process.cwd(), p)),
     timeoutMs: args.timeoutMs,
     concurrency: DEFAULT_CONCURRENCY,
-    ok: result.ok,
+    // PASS means: every row's verdict matched its expectation AND zero
+    // resolver-recorded provider failures occurred anywhere in the run
+    // (Codex F2) — not just "no row-level errors".
+    ok: overallOk,
     summary: result.summary,
     families: result.families,
     rows: result.rows,
+    resolverMetrics,
+    provenance,
   };
   fs.writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`);
   console.log(`\nWrote results to ${outPath}`);
 
-  process.exit(result.ok ? 0 : 1);
+  process.exit(overallOk ? 0 : 1);
 }
 
 if (require.main === module) {
@@ -467,4 +564,8 @@ module.exports = {
   isForbiddenVerdict,
   missingRequiredFields,
   parseArgs,
+  gateOk,
+  sha256File,
+  gitRevisionInfo,
+  buildProvenance,
 };

@@ -19,7 +19,12 @@ const {
   parseArgs,
   loadCaseFile,
   loadAllCases,
+  gateOk,
+  sha256File,
+  buildProvenance,
 } = require(path.join('..', '..', '..', 'benchmarks', 'institution-pair-consistency', 'run-pair-gates.js'));
+const { createInstitutionConsistencyChecker } = require(path.join('..', '..', '..', 'lib', 'services', 'institution-affiliation-consistency.js'));
+const { createInstitutionIdentityResolver } = require(path.join('..', '..', '..', 'lib', 'services', 'institution-identity-resolver.js'));
 
 function stubChecker(verdictsByPairKey) {
   return {
@@ -214,5 +219,170 @@ describe('run-pair-gates core: CLI arg parsing (no network, no process.exit)', (
 
   test('parseArgs: missing slug leaves slug null', () => {
     expect(parseArgs([]).slug).toBeNull();
+  });
+});
+
+// -----------------------------------------------------------------------
+// Wave 3 B1/B2: provider-error propagation and provider-failure gating
+// (Codex F2 — the default resolver config silently degrades provider
+// exceptions to null resolutions, so distinct/related-surface rows pass
+// vacuously). These tests drive the REAL resolver + REAL checker over a
+// throwing OpenAlex-shaped stub adapter — no network — to prove the fix at
+// the integration seam the CLI actually uses, not just at the stub-checker
+// level the rest of this file exercises. Per the Wave 3 brief, these assert
+// runner mechanics only (error propagation, gating, provenance) — never
+// step-2 segment-comparison verdict specifics, which are owned by a
+// concurrently-changing module.
+// -----------------------------------------------------------------------
+describe('run-pair-gates core: provider-error propagation (F2 fix, real resolver + real checker)', () => {
+  function throwingOpenAlexAdapter() {
+    return {
+      searchInstitutions: jest.fn(async () => { throw new Error('OpenAlex unavailable (stub)'); }),
+      getInstitution: jest.fn(async () => { throw new Error('OpenAlex unavailable (stub)'); }),
+    };
+  }
+
+  test('propagateProviderErrors:true resolver + throwing provider fails the run instead of vacuously passing', async () => {
+    const resolver = createInstitutionIdentityResolver({
+      openAlexService: throwingOpenAlexAdapter(),
+      propagateProviderErrors: true,
+    });
+    const incumbentChecker = createInstitutionConsistencyChecker({ resolver, segmentComparison: false });
+    const stagedChecker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    const cases = [
+      {
+        caseId: 'live-throw-1', family: 'stub-family', left: 'Some Never Before Seen University', right: 'A Totally Different Institute', expected: 'distinct',
+      },
+    ];
+
+    const result = await runPairGates({ cases, incumbentChecker, stagedChecker });
+
+    // With the old default (propagateProviderErrors: false) this row would
+    // have passed vacuously: provider throw -> null resolution -> checker
+    // abstains to false -> "distinct" expectation trivially satisfied.
+    expect(result.ok).toBe(false);
+    expect(result.summary.errors).toBe(1);
+    expect(result.summary.passed).toBe(0);
+    expect(result.rows[0].status).toBe('error');
+    expect(resolver.metrics.providerFailures).toBeGreaterThan(0);
+  });
+
+  test('propagateProviderErrors:false (old default) is the vacuous-pass mechanism this fix closes — documented for contrast, not exercised by the live CLI', async () => {
+    const resolver = createInstitutionIdentityResolver({
+      openAlexService: throwingOpenAlexAdapter(),
+      propagateProviderErrors: false,
+    });
+    const incumbentChecker = createInstitutionConsistencyChecker({ resolver, segmentComparison: false });
+    const stagedChecker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    const cases = [
+      {
+        caseId: 'live-throw-2', family: 'stub-family', left: 'Some Never Before Seen University', right: 'A Totally Different Institute', expected: 'distinct',
+      },
+    ];
+
+    const result = await runPairGates({ cases, incumbentChecker, stagedChecker });
+
+    // Row-level gate passes vacuously under the old default...
+    expect(result.ok).toBe(true);
+    // ...which is exactly why B2's separate metrics-based gate exists: even
+    // though every row "passed", the resolver recorded a provider failure.
+    expect(resolver.metrics.providerFailures).toBeGreaterThan(0);
+    expect(gateOk(result, resolver.metrics)).toBe(false);
+  });
+});
+
+describe('run-pair-gates core: gateOk (F2 defense-in-depth — resolver-metrics provider-failure gate)', () => {
+  test('all rows pass, zero provider failures -> gate passes', () => {
+    const result = { ok: true };
+    expect(gateOk(result, { providerFailures: 0 })).toBe(true);
+  });
+
+  test('all rows pass, but resolver metrics report a nonzero provider failure -> gate FAILS', () => {
+    // Simulates a failure on a query that a different, later query resolved
+    // successfully: the row-level result looks clean, but the cumulative
+    // counter is nonzero and must still fail the run.
+    const result = { ok: true };
+    expect(gateOk(result, { providerFailures: 1 })).toBe(false);
+  });
+
+  test('row-level gate already failed -> gate FAILS regardless of resolver metrics', () => {
+    const result = { ok: false };
+    expect(gateOk(result, { providerFailures: 0 })).toBe(false);
+  });
+
+  test('no resolverMetrics argument -> falls back to the row-level gate only', () => {
+    expect(gateOk({ ok: true }, undefined)).toBe(true);
+    expect(gateOk({ ok: false }, undefined)).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------
+// Wave 3 B3: provenance block (Codex F4 — artifacts must be revision-
+// reproducible: git sha, dirty state, source/fixture hashes, node version,
+// and an env-key-presence boolean, never env values).
+// -----------------------------------------------------------------------
+describe('run-pair-gates core: buildProvenance (F4 provenance block)', () => {
+  let tmpDir;
+  let scriptPath;
+  let caseFilePath;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pair-gates-provenance-'));
+    scriptPath = path.join(tmpDir, 'fake-script.js');
+    fs.writeFileSync(scriptPath, '// fake script fixture\n');
+    caseFilePath = path.join(tmpDir, 'fake-cases.jsonl');
+    fs.writeFileSync(caseFilePath, '{"caseId":"x","left":"a","right":"b","expected":"same"}\n');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('sha256File hashes file contents deterministically', () => {
+    const first = sha256File(scriptPath);
+    const second = sha256File(scriptPath);
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test('buildProvenance returns the full provenance block shape', () => {
+    const provenance = buildProvenance({ scriptPath, caseFiles: [caseFilePath] });
+
+    expect(provenance.scriptSha256).toBe(sha256File(scriptPath));
+    expect(provenance.caseFileHashes).toEqual([
+      { file: path.relative(process.cwd(), caseFilePath), sha256: sha256File(caseFilePath) },
+    ]);
+    expect(provenance.nodeVersion).toBe(process.version);
+    expect(typeof provenance.openAlexApiKeyPresent).toBe('boolean');
+    expect(provenance).toHaveProperty('git');
+    expect(provenance.git).toHaveProperty('sha');
+    expect(provenance.git).toHaveProperty('dirty');
+  });
+
+  test('buildProvenance never leaks env values — only a boolean presence flag', () => {
+    const withoutKey = { ...process.env };
+    delete withoutKey.OPENALEX_API_KEY;
+    const original = process.env.OPENALEX_API_KEY;
+    process.env.OPENALEX_API_KEY = 'super-secret-value-must-not-appear';
+    try {
+      const provenance = buildProvenance({ scriptPath, caseFiles: [caseFilePath] });
+      expect(provenance.openAlexApiKeyPresent).toBe(true);
+      const serialized = JSON.stringify(provenance);
+      expect(serialized).not.toContain('super-secret-value-must-not-appear');
+    } finally {
+      if (original === undefined) delete process.env.OPENALEX_API_KEY;
+      else process.env.OPENALEX_API_KEY = original;
+    }
+  });
+
+  test('git revision info resolves against this real repo (sanity check, not mocked)', () => {
+    const provenance = buildProvenance({ scriptPath, caseFiles: [caseFilePath] });
+    // This repo IS a git checkout at test-run time, so a real sha should
+    // resolve — a null here would mean gitRevisionInfo's cwd or command is
+    // wrong, not that git is unavailable.
+    expect(provenance.git.sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(typeof provenance.git.dirty).toBe('boolean');
   });
 });

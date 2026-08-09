@@ -78,3 +78,81 @@ Run it directly (this directory is not itself test-discoverable — `jest`'s
 ```
 npx jest tests/unit/benchmarks/institution-pair-consistency-fixtures.test.js --runTestsByPath
 ```
+
+## Live replay CLI (`run-pair-gates.js`) and the `results/` artifacts
+
+`run-pair-gates.js` replays these case files through the real
+`createInstitutionConsistencyChecker()` (incumbent vs. staged
+`segmentComparison`) and the real `createInstitutionIdentityResolver()`, and
+writes a frozen artifact to `results/<slug>.json` for every run (never
+edited or deleted after the fact — see the header comment in
+`run-pair-gates.js` for the full contract and gate vocabulary).
+
+**One shared resolver instance serves both checker configurations (incumbent
+and staged) AND both fixture families for the whole run.** Its `metrics`
+counters (cache hits, provider searches/hydrations, provider failures, etc.)
+are cumulative over every row in the run, not scoped per-family or per-
+checker — there is no way to attribute a given provider failure to one
+fixture family from the artifact alone.
+
+### `GATE: PASS` semantics (Wave 3 on)
+
+As of Wave 3, `ok`/`GATE: PASS` in an artifact means **both**:
+
+1. every case's staged verdict matched its `expected` gate rule (no
+   forbidden verdict, no skip, no row-level error), **and**
+2. the shared resolver's cumulative `metrics.providerFailures` is exactly
+   zero for the whole run.
+
+Before Wave 3, only (1) was checked, and the resolver defaulted to
+`propagateProviderErrors: false` — a provider exception silently degraded to
+a null resolution, which made every `distinct`/`related-surface` row pass
+*vacuously* (the checker abstained to `false`, which happens to satisfy
+those rows' gate rule) instead of surfacing the failure as an error. That
+was Codex adversarial-review finding F2 against the live gate runner: a
+probe with an always-throwing provider produced `ok=true`. The fix
+(`7a1b6234`'s follow-up commit) sets `propagateProviderErrors: true` on the
+shared resolver, so a provider exception now throws through
+`checker.areConsistent` into the runner's existing per-row error handling
+(row `status: 'error'`, gate fail) — and, as defense-in-depth, condition (2)
+above fails the run even in the hypothetical case where every row's verdict
+still happened to be correct despite a recorded provider failure elsewhere
+in the run (e.g. a failure on one query that a different, unrelated query
+later resolved successfully — the counter is monotonic and never reset
+mid-run).
+
+### Historical artifacts: `stage1-wave2-2026-08-08.json`, `stage1-wave2b-2026-08-08.json`
+
+These two artifacts (`ok: false`, from before the F2 fix) are **historical,
+non-revision-reproducible observations**, not a regression suite:
+`run-pair-gates.js` itself, the failures they captured, and the fix all
+landed in a single commit (`7a1b6234`). There is no earlier commit at which
+the pre-fix runner and case fixtures can be replayed to reproduce them —
+replaying today's runner against today's fixtures no longer exercises the
+code path that produced them, and neither artifact carries a provenance
+block (added in Wave 3; see below) to pin exactly what was replayed.
+
+The durable falsification record going forward is
+`tests/unit/benchmarks/run-pair-gates-offline.test.js`'s
+`propagateProviderErrors` describe block, which encodes the same fail-open
+scenario (a throwing OpenAlex-shaped stub adapter, real resolver, real
+checker) as a deterministic, pinned jest regression. That is **stronger**
+evidence than replaying an old commit: the scenario is pinned exactly
+(no live-provider flakiness, no dependency on OpenAlex's current data), runs
+offline in CI on every change, and directly asserts both the row-level error
+propagation and the resolver-metrics gate rather than relying on a one-time
+live capture.
+
+`stage1-wave2c-2026-08-08.json` (`ok: true`, 145/145) remains the frozen
+record of the last live run under the pre-Wave-3 runner and is unaffected by
+this reclassification.
+
+### Provenance block (Wave 3 on)
+
+Every artifact from Wave 3 onward carries a `provenance` block: git HEAD
+sha, working-tree dirty boolean, sha256 of `run-pair-gates.js` itself, sha256
+of every case file consumed, the node version, and `openAlexApiKeyPresent` —
+a boolean recording only whether `OPENALEX_API_KEY` was set after
+`.env.local` was loaded, never the key value or any other env value. This is
+what makes a future artifact revision-reproducible (Codex finding F4); the
+three artifacts above predate it and are not.

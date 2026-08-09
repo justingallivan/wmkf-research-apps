@@ -44,12 +44,17 @@ describe('segment-wise comparison (opt-in) — request-1002903 same-pairs', () =
   const ROW4_LEFT = 'Department of Radiology, Vanderbilt University Institute of Imaging Science, Vanderbilt University Medical Center, Nashville, USA.';
   const ROW4_RIGHT = 'Vanderbilt University Medical Center';
 
-  // Fail-closed guard (post-live-gate hardening): a direct segment match with
-  // unproven contiguous extensions no longer auto-clears on string identity
-  // alone — the pair needs POSITIVE resolution evidence (the clean org segment
-  // resolving to the same identity on both sides). This mirrors live reality:
-  // S400 showed clean canonical names resolve while decorated strings return
-  // zero results.
+  // Fail-closed-then-tolerant guard (post-live-gate hardening, Wave 3b policy
+  // split): a direct segment match with unproven contiguous extensions no
+  // longer auto-clears on string identity alone at step 1 — the pair needs
+  // POSITIVE resolution evidence (the clean org segment resolving on its
+  // own). Deliberately NOT stubbed here: the city/state/zip decoration
+  // extensions (", La Jolla", ", Nashville", etc.). Live gate 2026-08-08
+  // confirmed these definitively abstain on the real resolver — this
+  // resolver mirrors that reality rather than optimistically resolving them,
+  // and rows 1-4 still clear true via step 2's 'admit' policy, which
+  // tolerates an abstaining extension once the fragment's OWN identity has
+  // resolved cleanly.
   const cleanOrgResolver = () => {
     const identity = (id, name) => ({ openAlexId: id, displayName: name, associatedInstitutions: [] });
     return identityResolver(new Map([
@@ -130,6 +135,11 @@ describe('segment-wise comparison (opt-in) — genuine mismatches stay flagged',
     const resolver = identityResolver(new Map([
       ['Northwestern University Feinberg School of Medicine', NW_IDENTITY],
       ['Texas A&M', TAMU_IDENTITY],
+      // ", Chicago" / ", Chicago, IL" extensions deliberately NOT stubbed
+      // (abstain): under step 2's 'admit' policy the NW fragment is still
+      // admitted to the pool (its own identity resolved), so the false
+      // verdict below is still genuinely produced by
+      // institutionsConsistent(NW_IDENTITY, TAMU_IDENTITY), not an empty pool.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
@@ -234,6 +244,9 @@ describe('segment-wise comparison (opt-in) — resolved-pair (step 2) fallback',
     const resolver = identityResolver(new Map([
       ['Broad Institute', BROAD_IDENTITY],
       [RIGHT, MIT_IDENTITY],
+      // ", Cambridge" / ", Cambridge, MA" extensions deliberately NOT stubbed
+      // (abstain): step 2's 'admit' policy still admits "Broad Institute"
+      // since its own identity resolved cleanly.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
@@ -319,6 +332,9 @@ describe('shared-fragment self-pair hardening (safety invariant 1)', () => {
     };
     const resolver = identityResolver(new Map([
       ['Harvard University', harvard],
+      // ", Cambridge" / ", Cambridge, MA" extensions deliberately NOT
+      // stubbed (abstain): step 2's 'admit' policy still admits the
+      // "Harvard University" fragment since its own identity resolved.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
@@ -368,6 +384,9 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
     };
     const resolver = identityResolver(new Map([
       ['Vanderbilt University Medical Center', vumc],
+      // ", Nashville" / ", Nashville, USA." extensions deliberately NOT
+      // stubbed (abstain, matching S400 reality). Step 2's 'admit' policy
+      // still admits the VUMC fragment since its own identity resolved.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
@@ -386,12 +405,247 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
     const resolver = identityResolver(new Map([
       ['North Carolina State University', ncsu],
       ['North Carolina State University, Raleigh', ncsu],
+      // "Raleigh, NC" / "Raleigh, NC, USA" deliberately NOT stubbed
+      // (abstain): under the 'admit' policy, one proven-decoration extension
+      // plus two abstaining ones still keeps the fragment in the pool.
     ]));
     const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
 
     await expect(checker.areConsistent(
       'Department of Chemistry, North Carolina State University, Raleigh, NC, USA',
       'North Carolina State University',
+    )).resolves.toBe(true);
+  });
+
+  test('Wave 3b: a fragment with an ABSTAINING (unresolvable) extension is ADMITTED to the step-2 pool and clears', async () => {
+    // Flipped 2026-08-08 (live gate 141/145): the fragment itself resolves,
+    // and its only contiguous extension abstains. Under step 2's 'admit'
+    // policy (buildPool's unprovenExtensionPolicy), an abstaining extension
+    // no longer demotes a fragment whose own identity resolved cleanly — it
+    // is treated as unproven-but-tolerated decoration, and the fragment
+    // stays in the pool to be tested via institutionsConsistent against the
+    // other operand's independently-resolved identity.
+    const org = {
+      openAlexId: 'I-ORG',
+      displayName: 'Example Research Institute',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['Example Research Institute', org],
+      // Deliberately NOT stubbed: 'Example Research Institute, Someplace' —
+      // the extension abstains; under 'admit' this no longer excludes the
+      // fragment (contrast with step 1's 'demote' policy, which still
+      // requires this to be proven — see the "campus vs bare parent" test
+      // above, where an abstaining extension keeps a STRING-ONLY match from
+      // auto-clearing).
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'Dept of X, Example Research Institute, Someplace',
+      'Example Research Institute',
+    )).resolves.toBe(true);
+    expect(resolver.resolve).toHaveBeenCalledWith('Example Research Institute', expect.anything());
+    expect(resolver.resolve).toHaveBeenCalledWith('Example Research Institute, Someplace', expect.anything());
+  });
+
+  test('Wave 3b accepted residual (documented, NOT fixed): campus vs bare parent can still clear when the bare parent RESOLVES and its campus extension definitively abstains', async () => {
+    // This is a DELIBERATE, DOCUMENTED gap, not a bug to patch here. It
+    // requires TWO independently-unlikely live conditions to co-occur:
+    //   1. The bare parent string ("University of California") resolves at
+    //      all — per S400 evidence this typically ABSTAINS live (it is
+    //      exactly the ambiguous-string case the resolver tends to reject).
+    //   2. The specific campus-extension string ("University of California,
+    //      Los Angeles") is ALSO missing from the resolver, despite being a
+    //      clean canonical institution name that would normally resolve fine
+    //      on its own (see vector 1 / probe A, where it DOES resolve and the
+    //      pair correctly stays false).
+    // When both hold, step 1's 'demote' policy still correctly refuses the
+    // string-only match (see "campus vs bare parent surfaces" above), but
+    // step 2 admits the bare-parent fragment (its own identity resolved) and
+    // the resulting directOnly-restricted crossing compares SYSTEM against
+    // SYSTEM (both sides resolved the identical bare string) — a genuine
+    // DIRECT identity match, not associated-link evidence, so CHANGE 1/2's
+    // restriction does not (and structurally cannot) block it.
+    //
+    // The obvious "fix" — rejecting a directOnly pairing whenever the
+    // matched candidate strings are textually identical — was evaluated and
+    // REJECTED: it also rejects the row-4 VUMC clear (request-1002903), where
+    // the listed institution string is textually identical on both sides for
+    // the exact same reason (a fragment resolving to the same identity as
+    // the whole operand it names). There is no purely structural rule that
+    // distinguishes "same string, same real institution" (VUMC, desired
+    // true) from "same string, ambiguous bare parent" (this residual,
+    // undesired true) without re-introducing the S400 false-positive risk
+    // this rule exists to prevent.
+    //
+    // Tripwire: the 7 campus-vs-parent rows in the live gate
+    // (benchmarks/institution-pair-consistency/) are the canary for this
+    // residual actually firing in production — if the bare-parent resolve
+    // rate rises (resolver improvement) while campus-extension coverage gaps
+    // remain, watch those rows specifically.
+    const system = {
+      openAlexId: 'I-system',
+      displayName: 'University of California',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['University of California', system],
+      // Deliberately NOT stubbed: 'University of California, Los Angeles' —
+      // the campus extension abstains.
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California, Los Angeles',
+      'University of California',
+    )).resolves.toBe(true);
+  });
+});
+
+describe('Wave 3 CHANGE 1 + CHANGE 2 — adversarial-review probes A/B/C (live-gate 2026-08-08)', () => {
+  // Shared identities across probes A-D, matching the review's exact shapes:
+  // SYSTEM = bare "University of California"; UCLA/UCSD are campuses whose
+  // associatedInstitutions link back to SYSTEM (a real OpenAlex one-hop
+  // relationship), never the reverse.
+  const buildIdentities = () => {
+    const system = {
+      openAlexId: 'I-system',
+      displayName: 'University of California',
+      associatedInstitutions: [],
+    };
+    const ucla = {
+      openAlexId: 'I-ucla',
+      displayName: 'University of California, Los Angeles',
+      associatedInstitutions: [{ openAlexId: 'I-system', displayName: 'University of California' }],
+    };
+    const ucsd = {
+      openAlexId: 'I-ucsd',
+      displayName: 'University of California, San Diego',
+      associatedInstitutions: [{ openAlexId: 'I-system', displayName: 'University of California' }],
+    };
+    return { system, ucla, ucsd };
+  };
+
+  test('vector 1 / probe A: campus vs bare parent (parent RESOLVES to SYSTEM) never auto-clears', async () => {
+    const { system, ucla } = buildIdentities();
+    const resolver = identityResolver(new Map([
+      ['University of California, Los Angeles', ucla],
+      ['University of California', system],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California, Los Angeles',
+      'University of California',
+    )).resolves.toBe(false);
+  });
+
+  test('vector 2 / probe B: sibling campuses never auto-clear even when the shared parent resolves', async () => {
+    const { system, ucla, ucsd } = buildIdentities();
+    const resolver = identityResolver(new Map([
+      ['University of California', system],
+      ['University of California, San Diego', ucsd],
+      ['University of California, Los Angeles', ucla],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'Dept of Chemistry, University of California, San Diego, La Jolla, California',
+      'University of California, Los Angeles',
+    )).resolves.toBe(false);
+  });
+
+  test('vector 3 / probe C: segmentComparison true — bare parent ABSTAINS, fallback must not clear via associated-link NAME match', async () => {
+    // The bare "University of California" resolver call abstains (null) —
+    // mirroring real-world ambiguity — while UCLA's associatedInstitutions
+    // contains an unresolved-looking entry named exactly "University of
+    // California". Pre-Wave-3, the areConsistent default fallback substituted
+    // the raw right-hand string on resolve failure and matched it against
+    // UCLA's associated institution BY NAME alone. CHANGE 2 must block that.
+    const ucla = {
+      openAlexId: 'I-ucla',
+      displayName: 'University of California, Los Angeles',
+      associatedInstitutions: [{ displayName: 'University of California' }],
+    };
+    const resolver = identityResolver(new Map([
+      ['University of California, Los Angeles', ucla],
+      // bare "University of California" deliberately NOT stubbed (abstains)
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California, Los Angeles',
+      'University of California',
+    )).resolves.toBe(false);
+  });
+
+  test('vector 4 / probe C with segmentComparison OMITTED (false): pins today\'s unchanged default-path behavior', async () => {
+    // Wave 3 CHANGE 2 is gated on segmentComparison === true (owner decision
+    // 3: enrichment and identity-evidence consumers on the default path must
+    // see byte-identical behavior). This pins that the pre-existing
+    // associated-link-by-name fallback still fires when segmentComparison is
+    // off — routed to Stage 2, not fixed here.
+    const ucla = {
+      openAlexId: 'I-ucla',
+      displayName: 'University of California, Los Angeles',
+      associatedInstitutions: [{ displayName: 'University of California' }],
+    };
+    const resolver = identityResolver(new Map([
+      ['University of California, Los Angeles', ucla],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver });
+
+    await expect(checker.areConsistent(
+      'University of California, Los Angeles',
+      'University of California',
+    )).resolves.toBe(true);
+  });
+});
+
+describe('Wave 3 — associated-link evidence still admissible for non-parent-fragment shapes', () => {
+  test('vector 6: Harvard Medical School vs Harvard University clears via associated link (no comma-fragment relation)', async () => {
+    // Neither operand contains the other as a contiguous comma-fragment, so
+    // the CHANGE 1/2 parent-shape restriction never engages and associated
+    // link evidence remains admissible, exactly as before Wave 3.
+    const harvard = {
+      openAlexId: 'I-harvard',
+      displayName: 'Harvard University',
+      associatedInstitutions: [],
+    };
+    const hms = {
+      openAlexId: 'I-hms',
+      displayName: 'Harvard Medical School',
+      associatedInstitutions: [{ openAlexId: 'I-harvard', displayName: 'Harvard University' }],
+    };
+    const resolver = identityResolver(new Map([
+      ['Harvard Medical School', hms],
+      ['Harvard University', harvard],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent('Harvard Medical School', 'Harvard University')).resolves.toBe(true);
+  });
+
+  test('vector 7: short whole operand ("MIT") still participates and matches a decorated MIT byline', async () => {
+    const mit = {
+      openAlexId: 'I-mit',
+      displayName: 'Massachusetts Institute of Technology',
+      associatedInstitutions: [],
+    };
+    const resolver = identityResolver(new Map([
+      ['MIT', mit],
+      ['Massachusetts Institute of Technology', mit],
+      // ", Cambridge" / ", Cambridge, MA" extensions deliberately NOT
+      // stubbed (abstain): step 2's 'admit' policy still admits the MIT
+      // fragment since its own identity resolved, and the crossing succeeds
+      // via a direct identity match against the "MIT" whole-operand candidate.
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'MIT',
+      'Department of Physics, Massachusetts Institute of Technology, Cambridge, MA',
     )).resolves.toBe(true);
   });
 });

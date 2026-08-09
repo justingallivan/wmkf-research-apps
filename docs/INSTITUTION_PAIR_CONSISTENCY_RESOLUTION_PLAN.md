@@ -138,9 +138,12 @@ out of string decoration, not genuine disagreements.
 > `normalizeAffiliationForComparison` untouched at :117; additive
 > `institutionSegments` at :152.]
 > [RECHECKED after lib/services/institution-affiliation-consistency.js change:
-> opt-in `segmentComparison` default-off at :45; segment-wise comparison at
-> :67 with shared-fragment self-pair exclusion; default path in
-> `areConsistent` (:173 after the fail-closed guard edits) unchanged.]
+> opt-in `segmentComparison` default-off at :138; segment-wise comparison at
+> :160 with shared-fragment self-pair exclusion and Wave 3 parent-fragment
+> pool policy (`classifyFragment` with per-call-site
+> `unprovenExtensionPolicy`); default path in `areConsistent` (:308; Wave 3
+> fallback guard gated strictly on `segmentComparison`) unchanged when the
+> flag is off.]
 > [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
 > sole opt-in call site, `segmentComparison: true` at :66.]
 > [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
@@ -158,8 +161,19 @@ out of string decoration, not genuine disagreements.
 > arm-2 evaluator flag); 55 focused tests green including a falsification
 > test for the shared-parent-fragment sibling hazard flagged during build.
 >
-> **Stage 1 live gate: PASS, 2026-08-08** — 145/145 pairs
-> (`benchmarks/institution-pair-consistency/results/stage1-wave2c-2026-08-08.json`):
+> **Stage 1 live gate history.** Wave 2c PASS (145/145,
+> `results/stage1-wave2c-2026-08-08.json`) is HISTORICAL: it predates the
+> hardened runner, so it carries no provider-failure proof or provenance
+> (Codex finding 2). Wave 3 FAIL (141/145,
+> `results/stage1-wave3-2026-08-08.json`) is the falsification record for
+> the strict-everywhere pool rule. **Current gate: Wave 3b PASS, 2026-08-08
+> — 145/145 with providerFailures 0 and a provenance block**
+> (`results/stage1-wave3b-2026-08-08.json`; provenance records a dirty
+> pre-commit tree — a clean-tree rerun follows the Wave 3 commit). The
+> original wave2c narrative below is retained for the family-level detail,
+> which the Wave 3b run reproduced:
+>
+> **Wave 2c detail (historical)** — 145/145 pairs:
 > all five 1002903 pairs behave to spec (four clear, the genuine mismatch
 > stays flagged), zero sibling auto-clears across 126 cross-campus pairs,
 > and all seven campus-vs-parent pairs surface. Two prior failed runs are
@@ -175,19 +189,71 @@ out of string decoration, not genuine disagreements.
 > assertion test, enrichment copy/provenance fix for the `prior_flag` verdict
 > reason).
 >
-> **Known Stage 1 limitation — bare-parent step-2 dependency on live resolver
-> behavior.** If a bare system/parent string (e.g. "University of California")
-> ever *resolved* to an identity instead of abstaining, step 2 could pair a
-> campus operand's parent-fragment segment against the OTHER operand being
-> exactly that parent string (the shared-fragment exclusion deliberately
-> allows a fragment that equals a whole operand), and a campus-vs-parent pair
-> could auto-clear. Today the incumbent resolver abstains on bare "University
-> of California" (S400 ambiguity-tie behavior), so the seven campus-vs-parent
-> gate rows surface — but that part of safety invariant 2 rests on live
-> resolver behavior, not code structure. Regression net: the fixed
-> `uc-sibling-pairs.jsonl` suite replayed via `run-pair-gates.js` fails
-> non-zero the moment resolver behavior shifts. Structural fix is Stage 2's
-> typed parent/child relationships, not more string guards here.
+> **Wave 3 remediation (2026-08-08, after Codex adversarial re-review of the
+> branch: needs-attention, 2 high + 2 medium).** An earlier revision of this
+> paragraph claimed the residual exposure was campus-vs-parent only and
+> Stage-1-only; offline probes falsified both halves, and Wave 3 closed the
+> in-scope paths:
+> 1. *Step-2 parent-fragment fail-open (was documented too narrowly).* With a
+>    resolver that resolves a bare parent string, step 2 auto-cleared BOTH
+>    campus-vs-parent (via the shared-fragment whole-operand exception) AND
+>    sibling campuses (parent fragment × associated-link) [VERIFIED via stub
+>    probes, S409]. Wave 3 fix, two revisions: the first cut excluded any
+>    fragment with an unresolvable extension from step-2 pools (strict fail
+>    closed everywhere) — empirically REJECTED: the live gate failed 141/145
+>    with all four 1002903 clears regressed, because real decoration
+>    extensions ("…, La Jolla", "…, Nashville") definitively abstain
+>    (`results/stage1-wave3-2026-08-08.json`, retained as the falsification
+>    record; providerFailures 0, so the misses are definitive, not outage).
+>    Final rule — a principled evidence split: step 1 (which clears on string
+>    match alone) and the whole-operand parent check stay strict (unproven
+>    extension demotes); step-2 pools, where clearing requires resolved
+>    identity evidence on BOTH sides, admit a fragment whose own identity
+>    resolved when its extensions merely abstain, and demote only on an
+>    extension resolving to a DIFFERENT identity. A whole operand that is
+>    itself a bare parent shape of the other operand earns direct-identity
+>    credit only in step-2 pairings (associated-link evidence withheld).
+>    ACCEPTED RESIDUAL (pinned in a labeled offline test): if a bare parent
+>    ever RESOLVES (it abstains today, S400) AND the campus extension string
+>    definitively misses, a campus-vs-parent pair auto-clears via step-2
+>    identity equality — the direct-only restriction cannot block identity
+>    equality without also breaking the row-4 VUMC clear. Two independently
+>    unlikely live conditions; the seven campus-vs-parent live gate rows are
+>    the tripwire. Total provider outage still surfaces (unresolved fragments
+>    never enter pools — invariant 3 holds).
+> 2. *Unguarded fallback under `segmentComparison: true`.* When the segment
+>    path abstained, the pre-existing default path could still auto-clear
+>    campus-vs-parent via an associated-institution NAME collision (resolver
+>    abstains on the bare parent → raw-string substitution at the fallback →
+>    name match against the campus's associated institution) [VERIFIED via
+>    stub probe, S409]. Wave 3 fix: with `segmentComparison: true`, when one
+>    whole operand equals a proper parent fragment of the other, the fallback
+>    accepts only direct identity matches — associated-link evidence is
+>    rejected for that pair shape.
+> 3. *Pre-existing main-branch hazard, DOCUMENTED NOT FIXED (owner risk
+>    acceptance).* The same name-collision fallback path exists on `main`
+>    with `segmentComparison: false` — the mode enrichment and
+>    identity-evidence use. It does not fire live today only because OpenAlex
+>    names the UC parent "University of California System" (string ≠
+>    "University of California") [VERIFIED: live gate campus-vs-parent rows
+>    surface; stub probe with colliding name auto-clears]. Per owner
+>    decision 3 (enrichment copy-only in Stage 1), Wave 3 leaves default-path
+>    behavior byte-identical and pins the current behavior in a labeled test;
+>    the structural fix (typed parent/child relationships) is Stage 2 scope.
+> 4. *Gate runner could PASS vacuously during provider failure* (default
+>    error suppression turned provider exceptions into abstains, which
+>    satisfy `distinct`/`related-surface` expectations). Wave 3 fix: the
+>    runner propagates provider errors, records resolver metrics, and fails
+>    on any recorded provider failure; artifacts now embed git HEAD, dirty
+>    state, runner/fixture sha256, node version, and a key-present boolean.
+>    `gate: PASS` now means "all expectations met AND zero provider
+>    failures".
+> 5. *Falsification-record classification.* The two failed wave-2 artifacts
+>    are historical, non-revision-reproducible observations (runner, failure,
+>    and fix landed in one commit); the durable falsification record is the
+>    offline jest regressions that pin those fail-open scenarios with stub
+>    resolvers — stronger evidence than replaying an old commit, because the
+>    scenarios are deterministic.
 
 Normalize both sides of `areConsistent` by comparing institution segments of
 decorated bylines before resolution and comparison. Implementation note
