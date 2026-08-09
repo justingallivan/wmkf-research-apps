@@ -1,0 +1,45 @@
+{
+  "ranAt": "2026-08-09T15:50:55.597Z",
+  "cycle": "D26",
+  "slug": "d26-full-2026-08-09",
+  "limit": null,
+  "funnel": {
+    "suggestionsInCycle": 437,
+    "distinctPersonsInCycle": 415,
+    "personsFetched": 415,
+    "byIdentityStatus": {
+      "unresolved": 128,
+      "ambiguous": 6,
+      "null": 115,
+      "other_excluded": 166
+    },
+    "inScopeTotal": 249,
+    "limitApplied": null,
+    "inScopeAfterLimit": 249,
+    "withClaimedInstitution": 216,
+    "claimedBlankButSuggestionAffiliationPresent_foundNotMeasured": 1,
+    "anchorTally": {
+      "personsInspected": 249,
+      "blankCount": 115,
+      "unparseableCount": 0,
+      "totalAnchors": 0,
+      "typeCounts": {}
+    },
+    "withEvidenceInstitution": 0,
+    "measurablePersons": 0
+  },
+  "pairs": [],
+  "resolverMetrics": null,
+  "ok": false,
+  "note": "No measurable pairs; see funnel for denominators. No checker replay was run.",
+  "provenance": {
+    "git": {
+      "sha": "87204f26e8792125b4ab67de3fff7a53fbe7f396",
+      "dirty": false
+    },
+    "scriptSha256": "326173c760e29ed3e341cea8c1409e0ce68119be8c65b6dd62a6001d0f4ee248",
+    "caseFileHashes": [],
+    "nodeVersion": "v26.6.0",
+    "openAlexApiKeyPresent": true
+  }
+}
