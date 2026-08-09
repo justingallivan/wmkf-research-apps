@@ -3,7 +3,7 @@ title: Institution Pair Consistency Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Staged plan to auto-resolve manufactured institution conflicts so staff adjudicate only genuine mismatches. Proposed; awaiting owner approval."
+summary: "Staged plan to auto-resolve manufactured institution conflicts. Stage 1 landed (alert + enrichment, Wave 6 2026-08-09); Stages 2-3 not yet built."
 canonical: false
 cataloged: 2026-08-08
 owner: product-engineering
@@ -20,6 +20,7 @@ related:
 # Institution Pair Consistency Resolution Plan
 
 <!-- [RECHECKED after lib/services/workbench/enrich-recommended-service.js change: Wave 2 branch diff is one display string in institutionVerdictReason (+1/−1); identity gate, checker construction, and write branches untouched; consumer set machine-enforced by tests/unit/institution-checker-consumer-scope.test.js] -->
+<!-- [SUPERSEDED 2026-08-09, Wave 6: the Wave 2 "checker construction ... untouched" claim above is now HISTORICAL, true only as of Wave 2. Wave 6 deliberately changed the enrichment checker construction to createInstitutionConsistencyChecker({ segmentComparison: true }) — the owner-approved landing of the S400 "accepted future fix." The identity gate (identityConfirmed AND institutionContradicted at identityNeedsReview), the fail-closed comparison_error catch, and reviewer-identity-evidence.js's checker (still legacy default) remain untouched. See the dated "Wave 6 — enrichment seam opt-in landed" section under Stage 1 and the updated owner decision 3 for the full reconciliation.] -->
 
 ## Status
 
@@ -46,6 +47,18 @@ lib/services/workbench/enrich-recommended-service.js change: finding 1's
 identity-gate/write-branch claims are unaffected by the Wave 2 branch diff,
 which is a single display string in `institutionVerdictReason` (+1/−1);
 see the decision-3 recheck marker for detail.]
+
+**Wave 6, 2026-08-09 — enrichment segment-comparison opt-in landed
+(owner-approved).** The `identityNeedsReview` gate, `upsertByPotentialReviewer`
+write branch, and every other write branch finding 1 named above are still
+unaffected — only the checker's construction options changed
+(`createInstitutionConsistencyChecker({ segmentComparison: true })`), not the
+gate logic around it. This is the checker-verdict authority change decision
+3 originally deferred behind a frozen-40 zero-regression gate plus owner
+sign-off; both conditions are now met (frozen-40 rerun identical to the
+2026-08-08 arm-1 baseline, per the updated decision 3 below) and the owner
+approved this landing directly. See "Wave 6 — enrichment seam opt-in landed"
+under Stage 1 for the full mechanism and gate evidence.
 
 Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
 substantial effort resolving conflicts that should be automatic — "Harvard
@@ -289,7 +302,10 @@ out of string decoration, not genuine disagreements.
 >    VUMC↔Vanderbilt-class auto-clears are explicitly Stage 2 scope. The
 >    default path is behavior-identical (enrichment/identity-evidence
 >    corroboration unchanged, decision 3 — verified via live probe and the
->    default-path pins); the earlier "branch widens the
+>    default-path pins) **as of Wave 4/5; superseded 2026-08-09 by Wave 6,
+>    which moves enrichment off this default path onto the staged
+>    (`segmentComparison: true`) path — see the Wave 6 entry above.
+>    identity-evidence remains on the default path, unchanged.** The earlier "branch widens the
 >    hazard" note inverts — post-Wave-4 the branch STRICTLY NARROWS alert
 >    auto-clearing relative to `main`. Remaining accepted residual:
 >    same-resolved-identity clears (the SYSTEM==SYSTEM class) are inherent
@@ -333,13 +349,19 @@ out of string decoration, not genuine disagreements.
 >    rejected for that pair shape.
 > 3. *Pre-existing main-branch hazard, DOCUMENTED NOT FIXED (owner risk
 >    acceptance).* The same name-collision fallback path exists on `main`
->    with `segmentComparison: false` — the mode enrichment and
->    identity-evidence use. It does not fire live today only because OpenAlex
+>    with `segmentComparison: false` — **as of Wave 3, the mode enrichment
+>    and identity-evidence both used; superseded 2026-08-09 by Wave 6, which
+>    moves enrichment onto the `segmentComparison: true` path, where Wave 3
+>    fix #2 (above) rejects associated-link evidence for this exact
+>    parent-fragment pair shape — enrichment is no longer exposed to this
+>    hazard. identity-evidence remains on the default path and remains
+>    exposed, unchanged.** It does not fire live today only because OpenAlex
 >    names the UC parent "University of California System" (string ≠
 >    "University of California") [VERIFIED: live gate campus-vs-parent rows
 >    surface; stub probe with colliding name auto-clears]. Per owner
->    decision 3 (enrichment copy-only in Stage 1), Wave 3 leaves default-path
->    behavior byte-identical and pins the current behavior in a labeled test;
+>    decision 3 (enrichment copy-only in Stage 1 through Wave 5), Wave 3
+>    leaves default-path behavior byte-identical and pins the current
+>    behavior in a labeled test;
 >    the structural fix (typed parent/child relationships) is Stage 2 scope.
 > 4. *Gate runner could PASS vacuously during provider failure* (default
 >    error suppression turned provider exceptions into abstains, which
@@ -355,6 +377,66 @@ out of string decoration, not genuine disagreements.
 >    offline jest regressions that pin those fail-open scenarios with stub
 >    resolvers — stronger evidence than replaying an old commit, because the
 >    scenarios are deterministic.
+>
+> **Wave 6 — enrichment seam opt-in landed, 2026-08-09 (owner-approved).**
+> `createInstitutionConsistencyChecker()` at
+> `lib/services/workbench/enrich-recommended-service.js:608` [VERIFIED via
+> source read this session] now constructs with `{ segmentComparison: true }`
+> — the checker-verdict authority change decision 3 originally deferred
+> (see "Enrichment verdict injection is identity-authority work" below,
+> marked superseded). Only the checker construction changed: the
+> `identityNeedsReview = !identityConfirmed || institutionContradicted`
+> conjunction, the fail-closed `comparison_error` catch, and the
+> `institutionEvidenceConnectsIdentity` null contract (a missing operand
+> still returns null, filtered out of decided comparisons) are byte-identical
+> [VERIFIED via source read this session]. `reviewer-identity-evidence.js`'s
+> checker construction is untouched (still the legacy no-args default); the
+> consumer-scope boundary is now TWO consumers on the staged path (the
+> mismatch alert and enrichment) and ONE on the legacy default
+> (identity-evidence), machine-enforced by the updated
+> `tests/unit/institution-checker-consumer-scope.test.js`.
+>
+> Motivating case: request 1002912, PubMed byline evidence
+> "Lunenfeld-Tanenbaum Research Institute" vs recorded/claimed affiliation
+> "Lunenfeld-Tanenbaum Research Institute, University of Toronto" — the
+> incumbent default cleared false (the production institution-mismatch
+> banner); the staged checker clears true in both argument orders
+> [VERIFIED via live OpenAlex probe, providerFailures 0, this session]. A
+> tracked fixture row (`request-1002903-pairs.jsonl`, caseId
+> `1002912-lunenfeld`) and unit pins
+> (`tests/unit/institution-pair-segment-comparison.test.js`) record this
+> case; the fixture row-count pin moved 5→6, the offline runner's total-row
+> pin moved 156→157.
+>
+> **Wave 6 live gate: PASS, 157/157, 2026-08-09**
+> (`benchmarks/institution-pair-consistency/results/wave6-enrichment-flip-2026-08-09.json`),
+> providerFailures 0, clean-tree provenance (git sha 2ba7222, dirty false).
+> The new `1002912-lunenfeld` row: incumbent `not-cleared`, staged
+> `same-or-related`, matching the live probe.
+>
+> **Wave 6 frozen-40 rerun: identical to the arm-1 baseline**
+> (`outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-enrichflip-2026-08-09.json`
+> vs
+> `...-baseline-2026-08-08.json`). All five `evaluatePromotion` gates pass
+> with the SAME numbers as the 2026-08-08 baseline: correctBindGain 8,
+> falseBinds 0, rightPersonPolicyBinds 1, misses 4, providerFailures 0.
+> Per-case decision fields (spine/works/combined status, reasonKey) are
+> byte-identical across all 40 cases [VERIFIED via per-case diff this
+> session]; the 13 rows with any byte difference differ only in live
+> OpenAlex works/candidate corpus churn between run dates (authorIds, DOIs,
+> worksCount), never in a decision outcome. Gate satisfied; the evaluator
+> does not exercise the flipped seam (import-trace verified: it imports
+> `reviewer-identity-evidence.js` but never calls
+> `institutionEvidenceConnectsIdentity`, which exists only in
+> `enrich-recommended-service.js`) — identical outcomes prove zero
+> regression on the frozen identity-evidence surface, not that the change
+> was untested.
+>
+> Rollout status: this is a Tier 1+ runtime change on the identity-gating
+> path (`main` auto-deploys per
+> `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`) — landed on
+> branch `feature/enrichment-segment-comparison`, pending Codex review and
+> owner-decided promotion to `main`, not yet promoted as of this entry.
 
 Normalize both sides of `areConsistent` by comparing institution segments of
 decorated bylines before resolution and comparison. Implementation note
@@ -367,8 +449,12 @@ same module to keep one home for affiliation parsing. The comparison is
 segment-wise (split on comma/semicolon boundaries, test each segment and
 progressive joins against the other operand) so a verdict of `same` can only
 arise from matching the other operand, never from free extraction. The
-behavior is opt-in at the checker factory and enabled only at the
-mismatch-alert call site per decision 3.
+behavior is opt-in at the checker factory. As originally built (through
+Wave 5) it was enabled only at the mismatch-alert call site per decision 3;
+**superseded 2026-08-09 by Wave 6**, which also enables it at the enrichment
+call site (owner-approved) — `reviewer-identity-evidence.js` remains the
+sole consumer still on the legacy default. See the Wave 6 entry above and
+the updated decision 3 below.
 
 - Expected effect: flips the four documented 1002903 byline-class false
   mismatches; leaves the possibly-substantive fifth flagged — the correct
@@ -524,8 +610,14 @@ Deliverables (Stage 1 builds the harness alongside the fix):
    forbidden verdict** — a partially executed run is a failed run, never a
    green one (Codex finding 4).
 3. **Consumer-scope assertion** — a focused test that the factory default is
-   unchanged and only the two in-scope call sites receive the new behavior,
-   so decision 3's boundary is machine-enforced rather than convention.
+   unchanged and only the in-scope call sites receive the new behavior, so
+   decision 3's boundary is machine-enforced rather than convention. As
+   originally built (through Wave 5), "in-scope" meant the mismatch alert
+   only; **superseded 2026-08-09 by Wave 6**, which deliberately widened the
+   test's own assertions to cover enrichment as a second in-scope consumer
+   (`tests/unit/institution-checker-consumer-scope.test.js`) —
+   identity-evidence remains the sole consumer the test still pins to the
+   legacy default.
 
 The live replay CLI replaces production-UI observation as the per-stage
 acceptance evidence; the post-promotion signed-in smoke remains a one-time
@@ -568,7 +660,8 @@ deployment sanity check, not a measurement instrument.
    the identity gate, checker construction, and every write branch cited
    above are untouched, and
    `tests/unit/institution-checker-consumer-scope.test.js` machine-enforces
-   the bare checker construction.] Therefore:
+   the bare checker construction.] Therefore, **as originally scoped
+   (through Wave 5)**:
    - **Full pair-verdict injection now: the affiliation-mismatch alert
      only** (`alert-reviewer-affiliation-mismatch.js`).
    - **Enrichment now: copy and provenance only** — the banner names the
@@ -583,10 +676,34 @@ deployment sanity check, not a measurement instrument.
      and a further owner decision.
    - The checker factory default stays unchanged; scope boundaries are
      machine-enforced by the harness's consumer-scope assertion.
+
+   **SUPERSEDED 2026-08-09, Wave 6 (owner-approved).** The unlock condition
+   above is met: the frozen-40 rerun with the enrichment checker
+   reconfigured to `{ segmentComparison: true }` passes all five
+   `evaluatePromotion` gates identically to the 2026-08-08 arm-1 baseline
+   (correctBindGain 8, falseBinds 0, rightPersonPolicyBinds 1, misses 4,
+   providerFailures 0; per-case decision fields byte-identical across all 40
+   cases) — see the Wave 6 entry under Stage 1 for the full artifact
+   comparison — and the owner approved this landing directly (this task).
+   Enrichment verdict injection has therefore moved from "copy and
+   provenance only" to **live at the checker-construction level**:
+   `enrich-recommended-service.js`'s `institutionConsistencyChecker` now
+   constructs with `{ segmentComparison: true }`, so
+   `institutionContradicted` (and therefore `identityNeedsReview`) can be
+   decided by the staged segment-comparison verdict, not only the legacy
+   raw-string comparison. Identity-evidence corroboration
+   (`reviewer-identity-evidence.js`) remains explicitly OUT of this Wave 6
+   landing — deferred behind its own further owner decision, unchanged from
+   the original scoping above; its checker construction is still the legacy
+   no-args default. The checker factory default itself is still unchanged
+   (`segmentComparison = false`); scope boundaries (now: two consumers
+   staged, one on default) remain machine-enforced by the updated
+   consumer-scope assertion.
    Note: the identity gate also requires the resolver to independently reach
    ≥probable, so a pair verdict can only ever clear the second of two
    vetoes; the rescope treats that as defense-in-depth to preserve, not as
-   license.
+   license. This remains true after Wave 6 — the AND-gate at
+   `identityNeedsReview` is untouched.
 4. **Measurement runs — run (a) UNPARKED 2026-08-08; run (b) still
    parked** (`outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md`).
    - **(a) Frozen-40 W2 rerun: authorized, two arms.** Arm 1 (baseline,
@@ -640,6 +757,19 @@ deployment sanity check, not a measurement instrument.
      current evidence; revisit only with a benchmark whose failure mode
      is actually institution-resolution-bound (e.g. short-form
      affiliations).
+
+     **This do-not-inject recommendation is about a different axis than
+     Wave 6 (2026-08-09) and remains in force, unaffected by it.** Arm 2
+     here swaps the institution RESOLVER inside the frozen-40 works-first
+     evaluation pipeline (incumbent → ROR-backed) — a `scripts/
+     evaluate-reviewer-works-first.js`-internal comparison that never
+     touches `enrich-recommended-service.js` or
+     `reviewer-identity-evidence.js`. Wave 6 instead flips the
+     `segmentComparison` OPTION on the existing incumbent-resolver checker
+     at the enrichment call site — a narrower, already-frozen (Stage 1
+     stop-rule) mechanism, not a resolver swap. Do-not-inject-ROR-resolver
+     and land-segment-comparison-at-enrichment are independent decisions;
+     nothing here reopens the ROR-resolver question.
    - **(b) C3 replay: parked** — trigger unchanged (institution-resolver
      promotion returning to the table).
 
