@@ -284,7 +284,7 @@ do not count as observation.
 
 | Session/date | Advisory instances / unique claims | Useful / false positive / repeated | Resolution: query / narrow / `[ASSUMED]` / ignored | Owner interrupted? | Sensitive evidence requested? | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| _Pending normal-session observation_ | — | — | — | — | — | — |
+| 2026-08-09 (S409 close) | 1 / 1 (universal shape) | Useful 1 / false positive 0 / repeated 0 | Query | No | No | Recorded event fired on a delegated plan-doc edit. The session-closing agent separately received scope/quantity and design-doc-assertion guards on an agent-wiki edit and resolved both by running disconfirming searches and re-reading the producing source before writing the claim. No `[ASSUMED]` label was needed; no owner check-in occurred. |
 
 Promotion remains pattern-specific, not detector-wide. A future blocking
 proposal must identify the exact claim shape, include observed examples from at

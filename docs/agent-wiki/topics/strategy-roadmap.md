@@ -186,9 +186,29 @@ document inventory, and individual implementation plans do not establish priorit
   `legacy-default`**. The subsequent PubMed-versus-Works-first diagnostic
   combined reviewer relevance, person identity, and institution normalization
   into one outcome vocabulary, so it does not establish a ROR promotion case.
-  Current sequencing is the read-only Fable strategic reset in
-  `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`; S2AFF profiling and any
-  further resolver implementation require a new owner decision. Both
+  The Fable strategic reset (`docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`)
+  is **COMPLETE as of 2026-08-09 (S409)** — do not re-run it as open work; S2AFF
+  profiling and any further resolver implementation still require a new owner
+  decision. **Two results supersede the ROR framing above.** (1) The frozen-40
+  arm-2 run with `--institution-resolver ror` produced promotion gates and
+  combined outcomes IDENTICAL to the arm-1 baseline (correctBindGain 8,
+  falseBinds 0, misses 4, providerFailures 0; only two works-stage reason
+  changes) — the headroom hypothesis is FALSIFIED on that benchmark, and the
+  do-not-inject recommendation stands; re-opening needs an
+  institution-resolution-bound benchmark (e.g. short-form affiliations), not
+  another frozen-40 run. Artifact:
+  `outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-ror-arm2-2026-08-09.json`
+  (untracked). (2) **The S400 byline false-mismatch class is FIXED in production
+  without ROR** (2026-08-09, merge `c632a90f`): the enrichment seam now clears
+  when either the legacy checker (one-hop associated-link corroboration) or the
+  staged segment-comparison checker (exact segment match + decoration proof)
+  clears. Any statement above that treats "flips 8/11 of the S400 byline false
+  mismatches" as a live ROR advantage, or that class as open, is HISTORICAL as
+  of that date. Measured on request 1002914's persisted Find roster: of 3 rows
+  carrying a mismatch banner, 1 clears as a genuine false alarm and 2 correctly
+  still surface as namesake binds; across 53 comparable pairs, 17 newly clear.
+  Both the checker and the seam now carry owner-directed stop-rules — see
+  `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` Stage 1 and Wave 6. Both
   assumed labels SETTLED by owner 2026-08-07: Zhou fixture verified as `review`
   (correct regardless of biographical ground truth, which stays open); EKA-class
   provenance-less affiliations get QUARANTINE-FOR-REVIEW (never silent drop, never

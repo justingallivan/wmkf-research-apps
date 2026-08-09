@@ -4,8 +4,11 @@ description: Owner cost model — institution-name errors are cheap at display/a
 metadata: 
   node_type: memory
   type: project
+  status: active
+  scope: reviewer
+  last_verified: 2026-08-09 (S409 — owner calibration restated; Wave 6 composite shipped under decision 3 gate discipline)
   originSessionId: 363a2e80-2dd8-483e-9088-3193c321799e
-  modified: 2026-08-09T15:07:54.428Z
+  modified: 2026-08-09T17:27:47.503Z
 ---
 
 Owner calibration (2026-08-09, Session 409 follow-on): institution names are
@@ -30,5 +33,10 @@ over-surfaces recreates the problem it was solving.
   and is in mild tension with this calibration; revisit at Stage 2 design.
 - The backstop does NOT extend to person-identity binding (enrichment /
   works-first): reviewers can't see or correct a wrong-person publication
-  bind, so decision 3 (enrichment frozen; changes gated on frozen-40
-  zero-false-bind) keeps its full force.
+  bind. Decision 3's gate discipline held: the one enrichment-comparison
+  change since (Wave 6 composite, production 2026-08-09 — seam clears when
+  legacy OR staged checker clears, strictly additive) shipped only after a
+  frozen-40 rerun identical to baseline (falseBinds 0), and the
+  `identityConfirmed` write-gate conjunction is untouched. A seam stop-rule
+  (owner-directed) now forbids further iteration there; findings route to
+  Stage 2 typed relationships.
