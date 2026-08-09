@@ -228,16 +228,16 @@ out of string decoration, not genuine disagreements.
 >    admitted-unproven bare-parent fragment could ALSO cross to a SIBLING
 >    campus whole via associated-link credit (bare parent resolves + one
 >    campus definitively misses) [VERIFIED via reproduced probe, S409] —
->    an invariant-1 violation, not acceptable-residual class. Wave 3c fix:
->    pool entries admitted despite an abstaining extension are TAGGED, and
->    any crossing involving a tagged entry clears via direct identity match
->    only — step-2 associated-link credit now requires both crossing
->    entries proven (a whole operand, or a fragment whose every extension
->    resolved to its own identity). Deliberate narrowing accepted with this
->    fix: admitted-unproven fragments lose legitimate associated-link
->    clears too (the offline Broad-Institute-vs-MIT decorated-fragment case
->    is re-pinned false); whole-operand corroboration (Harvard vs Harvard
->    Medical School) is unaffected.
+>    an invariant-1 violation, not acceptable-residual class. Wave 3c fix
+>    (HISTORICAL — the tagging mechanism described here was removed by
+>    Wave 4, which drops associated-link evidence from the staged path
+>    entirely): pool entries admitted despite an abstaining extension were
+>    TAGGED, and any crossing involving a tagged entry cleared via direct
+>    identity match only. Deliberate narrowing accepted with that fix: the
+>    offline Broad-Institute-vs-MIT decorated-fragment case was re-pinned
+>    false. (Its "whole-operand corroboration is unaffected" carve-out was
+>    itself superseded by Wave 4, which flipped Harvard↔HMS to surface per
+>    the relationship-policy table.)
 >    ACCEPTED RESIDUAL, now precisely IDENTITY-EQUALITY ONLY (pinned in a
 >    labeled offline test): if a bare parent ever RESOLVES (it abstains
 >    today, S400) AND the campus extension string definitively misses, a
