@@ -138,11 +138,12 @@ out of string decoration, not genuine disagreements.
 > `normalizeAffiliationForComparison` untouched at :117; additive
 > `institutionSegments` at :152.]
 > [RECHECKED after lib/services/institution-affiliation-consistency.js change:
-> opt-in `segmentComparison` default-off at :149; segment-wise comparison at
-> :171 with shared-fragment self-pair exclusion, Wave 3 parent-fragment pool
+> opt-in `segmentComparison` default-off at :180; segment-wise comparison at
+> :202 with shared-fragment self-pair exclusion, Wave 3 parent-fragment pool
 > policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`),
-> and Wave 3c `admittedUnproven` crossing tags; default path in
-> `areConsistent` (:351; fallback guard gated strictly on
+> Wave 3c `admittedUnproven` crossing tags, and Wave 3d extension-cap
+> overflow handling (overflow never certifies proven decoration); default
+> path in `areConsistent` (:389; fallback guard gated strictly on
 > `segmentComparison`) unchanged when the flag is off.]
 > [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
 > sole opt-in call site, `segmentComparison: true` at :66.]
@@ -239,6 +240,32 @@ out of string decoration, not genuine disagreements.
 >    one-sided definitive miss, and the real campuses resolve). Total
 >    provider outage still surfaces (unresolved fragments never enter
 >    pools — invariant 3 holds).
+>
+>    **Wave 3d (final fix round) and the STOP-RULE.** A third re-review
+>    round falsified the closure claim as then written: `fragmentExtensions`
+>    capped classification at the 3 shortest extensions, so a crafted
+>    byline whose contradictory extension is longest could be wrongly
+>    certified proven-decoration and earn associated-link credit
+>    [VERIFIED via reproduced probe, S409 — requires a bare parent that
+>    resolves, so live exposure is nil today]. Wave 3d makes the claim
+>    true: extension overflow forbids the 'decoration' classification
+>    (demote under strict policy, `admittedUnproven` under admit policy);
+>    the consumer-scope inventory widens to all runnable extensions and
+>    static dynamic-import specifiers. **Stop-rule (owner-directed,
+>    2026-08-08): this is the last Stage 1 checker iteration. If a
+>    subsequent adversarial review finds any further step-2 path, Stage 1
+>    freezes as-is — the finding is recorded, the closure claim is narrowed
+>    to what is proven, and the remainder routes to Stage 2's typed
+>    parent/child relationships. No fifth guard mechanism gets added to
+>    the string-side checker.** Rationale: three rounds produced
+>    progressively more contrived counterexamples, none live-reachable
+>    today — the step-2 crossing paths (rounds 2–3) all require a bare
+>    parent that resolves (live: abstains, S400), and round 1's fallback
+>    path required an associated-institution NAME collision (live: OpenAlex
+>    names the UC parent "University of California System", which does not
+>    collide); the composition of four interacting guards is a hand-rolled
+>    approximation of Stage 2's typed relationships, and further patching
+>    adds complexity faster than safety.
 > 2. *Unguarded fallback under `segmentComparison: true`.* When the segment
 >    path abstained, the pre-existing default path could still auto-clear
 >    campus-vs-parent via an associated-institution NAME collision (resolver

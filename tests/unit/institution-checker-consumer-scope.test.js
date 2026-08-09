@@ -19,7 +19,7 @@ const SCAN_ROOTS = ['lib', 'pages', 'shared'];
 const FILE_EXTENSIONS = new Set(['.js', '.jsx']);
 const EXCLUDED_DIR_NAMES = new Set(['node_modules', '.next', '.next.nosync', 'node_modules.nosync']);
 
-function listJsFiles(dir) {
+function listJsFiles(dir, extensions = FILE_EXTENSIONS) {
   const results = [];
   let entries;
   try {
@@ -31,8 +31,8 @@ function listJsFiles(dir) {
     if (EXCLUDED_DIR_NAMES.has(entry.name)) continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      results.push(...listJsFiles(fullPath));
-    } else if (FILE_EXTENSIONS.has(path.extname(entry.name))) {
+      results.push(...listJsFiles(fullPath, extensions));
+    } else if (extensions.has(path.extname(entry.name))) {
       results.push(fullPath);
     }
   }
@@ -66,16 +66,30 @@ function relPath(absPath) {
 // this test's allowlist (reviewed against owner decision 3) instead of
 // silently evading detection.
 const INVENTORY_SCAN_ROOTS = ['lib', 'pages', 'shared', 'scripts'];
+// Extensions actually present under lib/, pages/, shared/, scripts/ as of
+// this writing (verified by listing, not assumed): .js (982 files) and .mjs
+// (112 files, all under scripts/). .jsx, .cjs, .ts, and .tsx were checked
+// and found ZERO files in these roots — they are not included because there
+// is currently nothing of that kind to miss, not because they were skipped.
+// If any of those extensions is introduced under a scanned root later, this
+// set (and the allowlist assertion below) needs a deliberate re-check.
+const INVENTORY_FILE_EXTENSIONS = new Set(['.js', '.mjs']);
 const TARGET_MODULE_NO_EXT = path.join(REPO_ROOT, 'lib/services/institution-affiliation-consistency');
-// Matches `require('spec')` and the specifier of any `from 'spec'` clause
-// (covers `import x from`, `import { x } from`, and `export ... from`).
-const IMPORT_SPECIFIER_REGEX = /(?:require\(\s*['"]([^'"]+)['"]\s*\)|from\s+['"]([^'"]+)['"])/g;
+// Matches `require('spec')`, the specifier of any `from 'spec'` clause
+// (covers `import x from`, `import { x } from`, and `export ... from`), and
+// a static-string `import('spec')` dynamic import. LIMITATION (stated
+// honestly, not glossed over): this only catches a STATIC STRING literal
+// inside `import(...)`. A computed dynamic-import specifier
+// (`import(someVariable)`, `import(\`${dir}/x\`)`) cannot be resolved by a
+// text scan at all — that gap is a fundamental limit of static analysis, not
+// something this regex closes.
+const IMPORT_SPECIFIER_REGEX = /(?:require\(\s*['"]([^'"]+)['"]\s*\)|from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\))/g;
 
 function specifierResolvesToTargetModule(specifier, fromFile) {
   // Only relative specifiers can resolve to a same-repo path at all; a
   // bare/absolute specifier cannot be this module under any resolution rule.
   if (!specifier.startsWith('.')) return false;
-  const resolved = path.resolve(path.dirname(fromFile), specifier).replace(/\.(js|jsx|ts|tsx)$/, '');
+  const resolved = path.resolve(path.dirname(fromFile), specifier).replace(/\.(js|jsx|mjs|cjs|ts|tsx)$/, '');
   return resolved === TARGET_MODULE_NO_EXT;
 }
 
@@ -91,7 +105,7 @@ function findImportersOfCheckerModule(files) {
     let hit = false;
     IMPORT_SPECIFIER_REGEX.lastIndex = 0;
     while ((match = IMPORT_SPECIFIER_REGEX.exec(content))) {
-      const specifier = match[1] || match[2];
+      const specifier = match[1] || match[2] || match[3];
       if (specifierResolvesToTargetModule(specifier, file)) {
         hit = true;
         break;
@@ -103,7 +117,7 @@ function findImportersOfCheckerModule(files) {
 }
 
 function allInventorySourceFiles() {
-  return INVENTORY_SCAN_ROOTS.flatMap((root) => listJsFiles(path.join(REPO_ROOT, root)));
+  return INVENTORY_SCAN_ROOTS.flatMap((root) => listJsFiles(path.join(REPO_ROOT, root), INVENTORY_FILE_EXTENSIONS));
 }
 
 describe('institution consistency checker: consumer scope', () => {
@@ -382,6 +396,13 @@ describe('institution consistency checker: repo-wide import inventory (discovery
     ]);
   });
 
+  // Shared by every fixture below: the relative specifier a file placed in
+  // `fromDir` would need to reach the real checker module.
+  function relativeSpecifierFrom(fromDir) {
+    const raw = path.relative(fromDir, TARGET_MODULE_NO_EXT).split(path.sep).join('/');
+    return raw.startsWith('.') ? raw : `./${raw}`;
+  }
+
   describe('aliased-bypass fixture (proves the inventory is alias-proof and computed-option-proof)', () => {
     let tempDir;
 
@@ -394,11 +415,7 @@ describe('institution consistency checker: repo-wide import inventory (discovery
 
     test('a synthetic consumer that imports the factory under an alias, with a computed option, is still caught', () => {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'institution-checker-alias-fixture-'));
-      const targetSpecifier = path
-        .relative(tempDir, TARGET_MODULE_NO_EXT)
-        .split(path.sep)
-        .join('/');
-      const normalizedSpecifier = targetSpecifier.startsWith('.') ? targetSpecifier : `./${targetSpecifier}`;
+      const normalizedSpecifier = relativeSpecifierFrom(tempDir);
 
       const syntheticFile = path.join(tempDir, 'synthetic-aliased-consumer.js');
       fs.writeFileSync(
@@ -425,6 +442,82 @@ describe('institution consistency checker: repo-wide import inventory (discovery
 
       // The PATH-based inventory catches it anyway, mixed in with the real
       // production file set.
+      const files = [...allInventorySourceFiles(), syntheticFile];
+      const importers = findImportersOfCheckerModule(files);
+
+      expect(importers).toContain(relPath(syntheticFile));
+    });
+  });
+
+  // Wave 3c hardening (Codex re-review): the inventory previously only
+  // scanned .js/.jsx and only recognized `require(...)`/`from '...'`. These
+  // fixtures prove the widened scan (extensions + `import(...)`) actually
+  // catches the two gaps Codex named, rather than merely asserting the
+  // extension set and regex look right.
+  describe('widened-net fixtures (.mjs static import + dynamic import(), Codex re-review)', () => {
+    let tempDir;
+
+    afterEach(() => {
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+        tempDir = undefined;
+      }
+    });
+
+    test('a synthetic .mjs consumer using a static aliased ES import is caught (extension-coverage gap)', () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'institution-checker-mjs-fixture-'));
+      const normalizedSpecifier = relativeSpecifierFrom(tempDir);
+
+      const syntheticFile = path.join(tempDir, 'synthetic-esm-consumer.mjs');
+      fs.writeFileSync(
+        syntheticFile,
+        [
+          '// Synthetic bypass fixture: .mjs consumer, aliased ES import.',
+          `import { createInstitutionConsistencyChecker as mk } from '${normalizedSpecifier}';`,
+          'export function build(flag) {',
+          '  return mk({ segmentComparison: flag });',
+          '}',
+          '',
+        ].join('\n'),
+      );
+
+      // Before the extension widening, an .mjs file was never even listed by
+      // the scanner (INVENTORY_FILE_EXTENSIONS used to be .js/.jsx only) —
+      // confirm this fixture actually needs .mjs coverage to be found.
+      expect(path.extname(syntheticFile)).toBe('.mjs');
+      expect(INVENTORY_FILE_EXTENSIONS.has('.mjs')).toBe(true);
+
+      const files = [...allInventorySourceFiles(), syntheticFile];
+      const importers = findImportersOfCheckerModule(files);
+
+      expect(importers).toContain(relPath(syntheticFile));
+    });
+
+    test('a synthetic consumer using a static-string dynamic import() is caught (dynamic-import gap)', () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'institution-checker-dynamic-import-fixture-'));
+      const normalizedSpecifier = relativeSpecifierFrom(tempDir);
+
+      const syntheticFile = path.join(tempDir, 'synthetic-dynamic-import-consumer.js');
+      fs.writeFileSync(
+        syntheticFile,
+        [
+          "'use strict';",
+          '// Synthetic bypass fixture: static-string dynamic import(), no require/from.',
+          'async function build(flag) {',
+          `  const { createInstitutionConsistencyChecker: mk } = await import('${normalizedSpecifier}');`,
+          '  return mk({ segmentComparison: flag });',
+          '}',
+          'module.exports = { build };',
+          '',
+        ].join('\n'),
+      );
+
+      // Sanity: no `require(...)` or `from '...'` clause exists in this
+      // file — the old regex (pre-hardening) would not have matched it.
+      const syntheticContent = fs.readFileSync(syntheticFile, 'utf8');
+      expect(syntheticContent).not.toMatch(/require\(/);
+      expect(syntheticContent).not.toMatch(/\bfrom\s+['"]/);
+
       const files = [...allInventorySourceFiles(), syntheticFile];
       const importers = findImportersOfCheckerModule(files);
 

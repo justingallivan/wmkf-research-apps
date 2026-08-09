@@ -572,6 +572,71 @@ describe('parent-fragment guard on direct segment matches (owner decision 2)', (
       'University of California, San Diego',
     )).resolves.toBe(false);
   });
+
+  test('Wave 3d: extension-cap overflow never certifies proven decoration', async () => {
+    // Codex HIGH, reproduced against production code (2026-08-08):
+    // `fragmentExtensions` caps its resolver-call check to the 3 SHORTEST
+    // contiguous extensions. When a fragment has 4+ extensions and the
+    // contradictory one is the LONGEST (and therefore excluded from the
+    // capped check), the fragment could be wrongly classified 'decoration'
+    // (proven) on the strength of the 3 short ones alone.
+    //
+    // This LEFT operand comma-splits into "University of California" plus
+    // three short filler segments ("A", "Ab", "Abc") before "Los Angeles" —
+    // so the bare-parent fragment's contiguous extensions are: ", A"
+    // (checked), ", A, Ab" (checked), ", A, Ab, Abc" (checked), and the FULL
+    // operand string itself, "..., A, Ab, Abc, Los Angeles" (UNCHECKED —
+    // it's the 4th/longest match and the extension-count cap excludes it).
+    // The stub resolves the 3 checked short extensions to SYSTEM (same
+    // identity as the bare fragment — proving nothing wrong on their own)
+    // and the full/unchecked extension to UCLA (a genuinely different
+    // identity — the contradictory evidence the cap hid). RIGHT is UCSD, a
+    // sibling campus whose associatedInstitutions links back to SYSTEM.
+    //
+    // Pre-Wave-3d: the 3 checked extensions all matched the fragment's own
+    // SYSTEM identity, so classifyFragment certified 'decoration' (proven,
+    // admittedUnproven: false) — wrongly, since the unchecked 4th extension
+    // was the one that actually disproves it. That false "proof" let the
+    // SYSTEM fragment spend full associated-link evidence and cross UCSD's
+    // WHOLE operand via UCSD's associatedInstitutions -> SYSTEM link: a
+    // forbidden sibling-campus auto-clear.
+    //
+    // Wave 3d: `fragmentExtensions` reports `overflow: true` whenever more
+    // than 3 extensions exist; classifyFragment then refuses to certify
+    // 'decoration' regardless of what the checked 3 show — the fragment is
+    // still admitted to the pool (its own identity resolved), but forced
+    // `admittedUnproven: true`, so the crossing is restricted to
+    // institutionDirectMatch(SYSTEM, UCSD), which fails.
+    const system = {
+      openAlexId: 'I-system',
+      displayName: 'University of California',
+      associatedInstitutions: [],
+    };
+    const ucla = {
+      openAlexId: 'I-ucla',
+      displayName: 'University of California, A, Ab, Abc, Los Angeles',
+      associatedInstitutions: [],
+    };
+    const ucsd = {
+      openAlexId: 'I-ucsd',
+      displayName: 'University of California, San Diego',
+      associatedInstitutions: [{ openAlexId: 'I-system', displayName: 'University of California' }],
+    };
+    const resolver = identityResolver(new Map([
+      ['University of California', system],
+      ['University of California, A', system],
+      ['University of California, A, Ab', system],
+      ['University of California, A, Ab, Abc', system],
+      ['University of California, A, Ab, Abc, Los Angeles', ucla],
+      ['University of California, San Diego', ucsd],
+    ]));
+    const checker = createInstitutionConsistencyChecker({ resolver, segmentComparison: true });
+
+    await expect(checker.areConsistent(
+      'University of California, A, Ab, Abc, Los Angeles',
+      'University of California, San Diego',
+    )).resolves.toBe(false);
+  });
 });
 
 describe('Wave 3 CHANGE 1 + CHANGE 2 — adversarial-review probes A/B/C (live-gate 2026-08-08)', () => {
