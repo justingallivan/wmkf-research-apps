@@ -95,11 +95,13 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    inline-image path; replacing it prunes the original to SharePoint's recycle
    bin. Any live smoke of the replace control goes on a different request.
 
-2. **25 reviewer affiliation-mismatch alerts remain open**, oldest 2026-07-15.
-   Evidence: `node scripts/probe-reviewer-affiliation-alerts.mjs` (read-only) —
-   25 active, 50 resolved. The new automation only auto-resolves Contacts it links
-   going forward, so these will not clear themselves. Needs either a deliberate
-   linking pass or a decision that they are acceptable noise.
+2. ~~**25 reviewer affiliation-mismatch alerts remain open.**~~ **CLOSED by the
+   owner, 2026-08-10 (S413)** — Justin resolved them outside the app. Evidence:
+   `node scripts/probe-reviewer-affiliation-alerts.mjs` (read-only) now reports
+   **0 open, 75 resolved**; the total held at 75 (was 25 active + 50 resolved),
+   so the 25 were resolved in place, not deleted. No capped-scan alerts. Whether
+   each underlying affiliation was actually corrected in Dataverse was **not
+   verified by this probe** — it reports alert status only.
 
 3. **August 10 references beyond the work queue.** Evidence:
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (5 mentions),
@@ -146,10 +148,12 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 
 ### Verify Before Acting
 
-1. **Do NOT batch-resolve the remaining 25 affiliation alerts by key prefix.**
-   Evidence: `.claude-memory/feedback-list-and-confirm-before-bulk-deletes.md`
-   (S412 extension). Each remaining alert describes a mismatch that was never
-   fixed; resolving them destroys the only signal those reviewers need attention.
+1. **Do NOT batch-resolve affiliation alerts by key prefix.** The specific 25 rows
+   this warned about are gone (owner-resolved, S413) — but the rule stands for
+   every future alert. Evidence:
+   `.claude-memory/feedback-list-and-confirm-before-bulk-deletes.md` (S412
+   extension). An alert describes a mismatch; resolving one that was never fixed
+   destroys the only signal that reviewer needs attention.
    `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs` re-derives each row's
    justification at run time and refuses anything it cannot reproduce — reuse that
    pattern rather than a sweep.
