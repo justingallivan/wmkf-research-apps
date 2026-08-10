@@ -111,6 +111,12 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     imageUrl: null,
     hasImage: false,
     submittedAt: null,
+    // Staff replace capability (S412), computed server-side. False on DRAFTED —
+    // there is nothing returned to replace yet.
+    canReplace: false,
+    // Null because the shared deliverable fixture carries no _etag; the
+    // pass-through is pinned separately below.
+    deliverableEtag: null,
     // Outbound lifecycle timestamps. Null on the DRAFTED fixture — nothing has
     // been sent yet, so neither the invite nor the day-12 reminder has stamped.
     invitedAt: null,

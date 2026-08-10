@@ -89,3 +89,36 @@ export function isGranteeEditableStatus(v) {
   const n = Number(v);
   return Number.isInteger(n) && GRANTEE_EDITABLE_STATUSES.includes(n);
 }
+
+/**
+ * Statuses in which STAFF may replace what the grantee returned (image/caption)
+ * on their behalf, after a revision agreed off-portal by email (S412). The
+ * package is back and staff hold the pen.
+ *
+ * Deliberately disjoint from GRANTEE_EDITABLE_STATUSES: before Submitted there is
+ * nothing to replace, and at Revision Requested the grantee has the ball — a
+ * staff write there would be exactly the clobber that abstract-service's
+ * APPROVED_EDITABLE set already excludes that status to prevent. Complete and
+ * Closed No Response are settled.
+ *
+ * Lives here rather than in the service so the server-computed `canReplace` flag
+ * on the abstract GET and the service's own guard read ONE definition — a client
+ * that re-derives the rule is the failure recorded in
+ * .claude-memory/feedback-ui-gates-must-mirror-server-guards.md.
+ */
+export const STAFF_REPLACEABLE_STATUSES = [
+  GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+  GRANTEE_DELIVERABLE_STATUS.STAFF_REVIEW,
+];
+
+/**
+ * True iff staff may replace the package contents in status `v`. Fail-closed on
+ * null/unknown/non-numeric.
+ * @param {*} v
+ * @returns {boolean}
+ */
+export function isStaffReplaceableStatus(v) {
+  if (v === null || v === undefined || v === '') return false;
+  const n = Number(v);
+  return Number.isInteger(n) && STAFF_REPLACEABLE_STATUSES.includes(n);
+}

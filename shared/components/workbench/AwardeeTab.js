@@ -52,6 +52,21 @@ function computeDaysOverdue(invitedAt, responded) {
   return Math.max(0, Math.floor((Date.now() - due.getTime()) / 86400000));
 }
 
+/**
+ * A short token that changes whenever the stored image ref changes.
+ *
+ * The inline image's proxy URL is keyed on requestId alone, so after a staff
+ * replacement the src is byte-identical and neither React nor the browser cache
+ * re-fetches — staff would see the OLD image and reasonably conclude the replace
+ * failed. The stored ref ends in a fresh random nonce per upload, so its last
+ * path segment is a natural version tag.
+ */
+function imageVersionTag(ref) {
+  if (!ref) return '';
+  const seg = String(ref).split(/[/\\]/).pop() || '';
+  return seg.slice(-24);
+}
+
 // Mirrors formatMeetingDate in OverviewTab.
 function formatSubmissionDate(iso) {
   if (!iso) return null;
@@ -82,7 +97,21 @@ export default function AwardeeTab({ requestId, context }) {
   const [submission, setSubmission] = useState({
     caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
     invitedAt: null, remindedAt: null, daysOverdue: 0,
+    // Server-computed (S412). `canReplace` is the status rule for the staff
+    // replace path — never re-derived here, because a client copy of a server
+    // guard is exactly the S411 defect class. `deliverableEtag` is the package
+    // row's etag, sent back as If-Match so a concurrent change 409s.
+    canReplace: false, deliverableEtag: null,
   });
+  // Staff replacement of what the grantee returned, after a revision agreed over
+  // email (S412). Collapsed by default: it is the exception, not the routine.
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceCaption, setReplaceCaption] = useState('');
+  const [replaceFile, setReplaceFile] = useState(null);
+  const [replacing, setReplacing] = useState(false);
+  const [replaceMsg, setReplaceMsg] = useState(null);
+  const [replaceError, setReplaceError] = useState(null);
+  const replaceFileInputRef = useRef(null);
   // Which half of the tab is showing: 'invitation' (what goes out) or
   // 'submission' (what came back). Auto-advanced ONCE to 'submission' when the
   // first load finds a returned package — a PD arriving from the submit
@@ -244,6 +273,8 @@ export default function AwardeeTab({ requestId, context }) {
           invitedAt: data.invitedAt || null,
           remindedAt: data.remindedAt || null,
           daysOverdue: computeDaysOverdue(data.invitedAt, responded),
+          canReplace: Boolean(data.canReplace),
+          deliverableEtag: data.deliverableEtag || null,
         });
         // Open on what came back, but only if the PD has not already chosen a
         // pane. Latches either way so a refetch never re-steers the view.
@@ -418,6 +449,58 @@ export default function AwardeeTab({ requestId, context }) {
     setFetchingHtml(false);
   }
 
+  function closeReplace() {
+    setReplaceOpen(false);
+    setReplaceFile(null);
+    setReplaceCaption('');
+    setReplaceError(null);
+    setReplaceMsg(null);
+    // The file input keeps its selection across an unmount/remount of the panel,
+    // so clear the DOM value too — otherwise reopening shows a filename that is
+    // no longer in state and the Save button reads as wrongly disabled.
+    if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
+  }
+
+  /**
+   * Push a staff replacement of the grantee's image/caption.
+   *
+   * Sends the caption only when it actually changed: the service treats an absent
+   * caption as "leave it alone" and refuses a blank one, so posting the unchanged
+   * value on an image-only replace would be a pointless write.
+   */
+  async function replaceSubmission() {
+    if (!requestId || replacing) return;
+    setReplacing(true); setReplaceError(null); setReplaceMsg(null);
+    try {
+      const form = new FormData();
+      form.append('requestId', requestId);
+      form.append('etag', submission.deliverableEtag || '');
+      if (replaceCaptionChanged) form.append('caption', replaceCaption);
+      if (replaceFile) form.append('image', replaceFile);
+
+      const res = await fetch('/api/workbench/grantee-deliverables/replace-submission', {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReplaceError(data.error || 'Could not save the replacement.');
+      } else {
+        setReplaceMsg('Replacement saved.');
+        setReplaceFile(null);
+        if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
+        // Re-read so the pane shows the committed values and a fresh etag — the
+        // same best-effort reload the send path uses. loadAbstract swallows its
+        // own failures, so a reload error cannot turn a saved replacement into a
+        // reported one.
+        await loadAbstract();
+      }
+    } catch {
+      setReplaceError('Could not save the replacement.');
+    }
+    setReplacing(false);
+  }
+
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
   // Hidden entirely pre-submit: nothing to show until the grantee returns something.
   const hasSubmission = Boolean(submission.hasImage || submission.caption || submission.submittedAt);
@@ -449,6 +532,11 @@ export default function AwardeeTab({ requestId, context }) {
   const waiverAckedLabel = formatSubmissionDate(submission.submittedAt);
   const hasAbstract = abstractText.trim().length > 0;
   const abstractDirty = abstractText !== savedAbstractText;
+  // A replacement needs something to replace. Trimmed compare so re-saving the
+  // same caption with stray whitespace is not treated as a change (the server
+  // trims too, so it would be a no-op write).
+  const replaceCaptionChanged = replaceCaption.trim() !== (submission.caption || '').trim();
+  const replaceHasChange = Boolean(replaceFile) || (replaceCaptionChanged && replaceCaption.trim() !== '');
   const effectiveBaseBody = hasSavedBody ? savedBodyRaw : adminDefaultBody;
   const emailDefaultsUnavailable = emailDefaults.loaded && emailDefaults.unavailable;
   const emailDefaultsNotConfigured = emailDefaults.loaded
@@ -654,7 +742,7 @@ export default function AwardeeTab({ requestId, context }) {
               // plain <img> is the correct element here.
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`/api/workbench/grantee-deliverables/image?requestId=${encodeURIComponent(requestId)}`}
+                src={`/api/workbench/grantee-deliverables/image?requestId=${encodeURIComponent(requestId)}&v=${encodeURIComponent(imageVersionTag(submission.imageRef))}`}
                 alt={submission.caption || 'Grantee-submitted award image'}
                 onError={() => setImageBroken(true)}
                 className="max-h-64 max-w-full rounded border border-gray-200"
@@ -683,6 +771,75 @@ export default function AwardeeTab({ requestId, context }) {
               </p>
             )}
           </div>
+
+          {/* Staff replacement (S412). Revisions are agreed with the grantee over
+              email rather than through a built portal transition, so this is how
+              the agreed change actually reaches SharePoint and Dataverse.
+              `canReplace` is computed SERVER-side from the same status rule the
+              service enforces — do not re-derive it from `status` here. */}
+          {submission.canReplace && (
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              {!replaceOpen ? (
+                <button
+                  type="button"
+                  onClick={() => { setReplaceOpen(true); setReplaceCaption(submission.caption || ''); }}
+                  className="text-sm text-blue-700 underline"
+                >
+                  Replace image or caption on the grantee’s behalf
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-600">
+                    For a revision agreed with the grantee by email. This updates what
+                    publishes; it does not change the package status or notify them.
+                  </p>
+                  <label className="block text-sm">Caption
+                    <textarea
+                      aria-label="Replacement caption"
+                      value={replaceCaption}
+                      onChange={(e) => setReplaceCaption(e.target.value)}
+                      rows={3}
+                      className="w-full text-sm border rounded p-2"
+                    />
+                  </label>
+                  <label className="block text-sm">New image (optional)
+                    <input
+                      ref={replaceFileInputRef}
+                      aria-label="Replacement image"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
+                      className="block w-full text-sm"
+                    />
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Replacing the image removes the grantee’s previous file from the
+                    SharePoint folder.
+                  </p>
+                  {replaceError && <p role="alert" className="text-sm text-red-700">{replaceError}</p>}
+                  {replaceMsg && <p className="text-sm text-green-700">{replaceMsg}</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={replaceSubmission}
+                      disabled={replacing || !replaceHasChange}
+                      className="px-3 py-2 text-sm rounded bg-green-700 text-white disabled:opacity-50"
+                    >
+                      {replacing ? 'Saving…' : 'Save replacement'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeReplace}
+                      disabled={replacing}
+                      className="px-3 py-2 text-sm rounded border border-gray-400 text-gray-800 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
