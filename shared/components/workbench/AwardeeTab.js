@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
+import { GRANTEE_DELIVERABLE_LABEL, GRANTEE_DELIVERABLE_STATUS } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { fillInviteBody, fillInviteSubject, formatCobDate } from '../../config/granteeInviteEmail';
@@ -88,6 +88,13 @@ export default function AwardeeTab({ requestId, context }) {
   // SharePoint affordance. Reset per load (an event, not an effect) so switching
   // requests or refetching re-tries the image rather than staying broken.
   const [imageBroken, setImageBroken] = useState(false);
+  // Send-invitation modal step: null (closed) | 'confirm' | 'sending' | 'sent'.
+  // The send is deliberately BEHIND the confirm step — the button no longer
+  // sends, it opens this. Failures close the modal and surface on the existing
+  // inline error so the PD sees the message next to the compose fields they may
+  // need to fix. Mirrors the reviewer InviteEmailModal's preview→sending→sent
+  // shape without pulling in its batch/per-candidate machinery.
+  const [sendStep, setSendStep] = useState(null);
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
@@ -103,7 +110,6 @@ export default function AwardeeTab({ requestId, context }) {
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
-  const [sentMsg, setSentMsg] = useState(null);
   const [websiteHtml, setWebsiteHtml] = useState(null);
   const [fetchingHtml, setFetchingHtml] = useState(false);
   const [copyMsg, setCopyMsg] = useState(null);
@@ -286,7 +292,7 @@ export default function AwardeeTab({ requestId, context }) {
   }, [emailDefaults.subject, awardTitle]);
 
   async function generate(regenerate = false) {
-    setGenerating(true); setError(null); setSentMsg(null); setAbstractMsg(null);
+    setGenerating(true); setError(null); setAbstractMsg(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -326,22 +332,29 @@ export default function AwardeeTab({ requestId, context }) {
   }
 
   async function send() {
-    setSending(true); setError(null); setSentMsg(null);
+    setSendStep('sending');
+    setSending(true); setError(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/send-invite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, toEmail, ccEmail, subject: fillInviteSubject(subject, { title: awardTitle }), bodyText: body }),
       });
       const data = await res.json();
-      if (!res.ok) setError(data.error || 'Could not send the invitation.');
-      else {
+      if (!res.ok) {
+        setError(data.error || 'Could not send the invitation.');
+        setSendStep(null);
+      } else {
         setStatus(data.status);
-        setSentMsg('Invitation sent to the grantee.');
         // Best-effort: the server records invitedAt on the first status flip.
         // loadAbstract handles its own failures, so a sent email stays successful.
         await loadAbstract();
+        // Only after the reload, so the receipt can quote the recorded date.
+        setSendStep('sent');
       }
-    } catch { setError('Could not send the invitation.'); }
+    } catch {
+      setError('Could not send the invitation.');
+      setSendStep(null);
+    }
     setSending(false);
   }
 
@@ -435,6 +448,13 @@ export default function AwardeeTab({ requestId, context }) {
     && !emailDefaults.unavailable
     && ((emailDefaults.subject || '').trim() === '' || effectiveBaseBody.trim() === '');
   const emailTextReady = subject.trim() !== '' && body.trim() !== '';
+  // Re-sends are allowed by the service (non-downgrade, and the original invite
+  // date is deliberately kept), so the button stays enabled once Invited — but it
+  // must not look like a first send, or a stray click silently emails the grantee
+  // a second time.
+  const alreadyInvited = status === GRANTEE_DELIVERABLE_STATUS.INVITED
+    || status === GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT;
+  const sendButtonLabel = alreadyInvited ? 'Re-send invitation' : 'Send invitation';
   const canSend = hasAbstract
     && isEmail(toEmail)
     && (!ccEmail || isEmail(ccEmail))
@@ -498,7 +518,6 @@ export default function AwardeeTab({ requestId, context }) {
       </div>
 
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {sentMsg && <p className="text-sm text-green-700">{sentMsg}</p>}
 
       {/* Abstract editor — rendered in whichever pane matches its current mode
           (see abstractPane). Unmounting on a pane switch is safe: the working
@@ -689,11 +708,11 @@ export default function AwardeeTab({ requestId, context }) {
           </button>
           <button
             type="button"
-            onClick={send}
+            onClick={() => setSendStep('confirm')}
             disabled={!canSend}
             className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
           >
-            {sending ? 'Sending…' : 'Send invitation'}
+            {sending ? 'Sending…' : sendButtonLabel}
           </button>
         </div>
         <p className="text-xs text-gray-500">
@@ -748,6 +767,106 @@ export default function AwardeeTab({ requestId, context }) {
           />
         )}
       </section>
+
+      {/* Send-invitation modal. The confirm step is what the button now opens —
+          sending an invitation is an irreversible outbound email, and the old
+          inline receipt rendered at the TOP of the pane while the button sits at
+          the bottom, so the only feedback for a real send was off-screen.
+          Rendered last so it overlays; the backdrop and Cancel both close the
+          confirm step, but the sent step has only an explicit Done, because a
+          stray backdrop click should not dismiss the record of a real send. */}
+      {sendStep && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={sendStep === 'confirm' ? () => setSendStep(null) : undefined}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="grantee-send-modal-title"
+            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sendStep === 'sent' ? (
+              <>
+                <h4 id="grantee-send-modal-title" className="text-sm font-semibold text-green-800">
+                  ✓ Invitation sent
+                </h4>
+                <div className="text-sm text-gray-900">
+                  <p>Sent to {recipients?.pi?.name || 'the grantee'}</p>
+                  <p className="font-mono text-xs break-all text-gray-600">{toEmail}</p>
+                  {ccEmail && <p className="font-mono text-xs break-all text-gray-600">cc {ccEmail}</p>}
+                </div>
+                {dueLabel && (
+                  <p className="text-xs text-gray-600">
+                    Estimated response due {dueLabel}. A reminder sends automatically at day 12
+                    if they have not responded.
+                  </p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSendStep(null)}
+                    className="px-3 py-2 text-sm rounded bg-blue-700 text-white"
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h4 id="grantee-send-modal-title" className="text-sm font-semibold text-gray-900">
+                  {alreadyInvited ? 'Re-send this invitation?' : 'Send invitation?'}
+                </h4>
+                {alreadyInvited && (
+                  // The service keeps the ORIGINAL invite date on a re-send, so the
+                  // deadline the PD sees will not move. Say so before they commit.
+                  <p className="text-xs text-amber-700">
+                    This grantee has already been invited. Re-sending emails them again and keeps
+                    the original invitation date, so the estimated response date does not change.
+                  </p>
+                )}
+                <dl className="text-sm text-gray-900 space-y-1">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-700">To</dt>
+                    <dd className="font-mono text-xs break-all">{toEmail}</dd>
+                    {recipients?.pi?.name && <dd className="text-xs text-gray-600">{recipients.pi.name}</dd>}
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-700">Cc</dt>
+                    <dd className="font-mono text-xs break-all">{ccEmail || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-700">Subject</dt>
+                    <dd className="text-xs">{fillInviteSubject(subject, { title: awardTitle })}</dd>
+                  </div>
+                </dl>
+                <p className="text-xs text-gray-500">
+                  Sends a secure magic link and starts the 14-day response estimate.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSendStep(null)}
+                    disabled={sendStep === 'sending'}
+                    className="px-3 py-2 text-sm rounded border border-gray-400 text-gray-800 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={send}
+                    disabled={sendStep === 'sending'}
+                    className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+                  >
+                    {sendStep === 'sending' ? 'Sending…' : sendButtonLabel}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

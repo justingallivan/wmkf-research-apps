@@ -4,7 +4,7 @@
  * AwardeeTab (chunk 3d) — staff orchestration: load recipients → generate
  * abstract → send invite. Drives the three grantee-deliverables endpoints.
  */
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import {
   GRANTEE_INVITE_SEED_BODY,
@@ -132,6 +132,14 @@ function wireFetch({
 
 afterEach(() => { if (global.fetch?.mockRestore) global.fetch.mockRestore(); });
 
+// Sending is now behind a confirm modal: the page button OPENS it, the modal
+// button commits. Tests that exercise a real send go through both.
+function confirmSendInModal() {
+  const dialog = screen.getByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: /send invitation/i }));
+}
+
+
 test('loads recipients on mount and pre-fills To/Cc', async () => {
   wireFetch();
   render(<AwardeeTab requestId={REQ} />);
@@ -164,6 +172,9 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   const sendBtn = screen.getByRole('button', { name: /send invitation/i });
   expect(sendBtn).toBeEnabled();
   fireEvent.click(sendBtn);
+  // The page button only opens the confirm step — nothing has been sent yet.
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
+  confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
 
@@ -184,6 +195,7 @@ test('successful send reloads the recorded invite date into the status header', 
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
@@ -202,6 +214,7 @@ test('a failed post-send reload does not turn a successful send into an error', 
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
   expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
@@ -220,6 +233,10 @@ test('resolves grantee invite subject tokens in compose state and send payload',
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
 
   fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  // The modal shows the RESOLVED subject before the PD commits, so what they
+  // confirm is what actually goes out.
+  expect(within(screen.getByRole('dialog')).getByText('Legacy Quantum Widgets')).toBeInTheDocument();
+  confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
   expect(JSON.parse(sendCall[1].body).subject).toBe('Legacy Quantum Widgets');
@@ -914,4 +931,121 @@ test('a relative-path ref still renders inline; the proxy resolves it server-sid
   expect(screen.getByRole('img')).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /open image in sharepoint/i })).not.toBeInTheDocument();
   expect(screen.getByText(/path in the grantee SharePoint library/i)).toBeInTheDocument();
+});
+
+// ── Send-invitation confirm modal (S411) ──
+//
+// The page button used to send immediately and drop a receipt at the TOP of the
+// pane while the button sits at the bottom — so the only feedback for a real
+// outbound email was off-screen, and a stray second click re-sent it.
+
+const ready = (over = {}) => ({
+  effective: 'Ready abstract.', effectiveField: 'formatted', status: 100000000, editable: true, ...over,
+});
+
+test('the page button opens a confirm step and sends nothing on its own', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+
+  const dialog = screen.getByRole('dialog');
+  expect(dialog).toHaveAttribute('aria-modal', 'true');
+  expect(within(dialog).getByText('Send invitation?')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
+});
+
+test('the confirm step shows who the invitation goes to', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByText('monika.raj@emory.edu')).toBeInTheDocument();
+  expect(within(dialog).getByText('lorena.mclaren@emory.edu')).toBeInTheDocument();
+  expect(within(dialog).getByText('Monika Raj')).toBeInTheDocument();
+});
+
+test('Cancel closes the confirm step without sending', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /cancel/i }));
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
+});
+
+test('the sent receipt names the recipient and the estimated response date', async () => {
+  wireFetch({ abstract: ready(), sentInvitedAt: '2026-08-09T16:00:00Z' });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+
+  await waitFor(() => expect(screen.getByText(/✓ Invitation sent/)).toBeInTheDocument());
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByText(/Sent to Monika Raj/)).toBeInTheDocument();
+  // +14d from the recorded invite date, and the day-12 reminder is stated.
+  expect(within(dialog).getByText(/Estimated response due August 23, 2026/)).toBeInTheDocument();
+  expect(within(dialog).getByText(/reminder sends automatically at day 12/i)).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: /done/i }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  // The durable confirmation is the status header, which now carries the date.
+  expect(screen.getByText(/Invited Aug 9, 2026/)).toBeInTheDocument();
+});
+
+test('a send failure closes the modal and surfaces the error inline, next to the fields', async () => {
+  wireFetch({ abstract: ready(), sendOk: false });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+
+  await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent(/send failed/i);
+});
+
+test('an already-invited award relabels the button and warns before re-sending', async () => {
+  wireFetch({ abstract: ready({ status: 100000001, invitedAt: '2026-07-12T15:04:05Z' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/Status:/)).toHaveTextContent('Invited'));
+
+  // Not "Send invitation" — a re-send must not look like a first send.
+  const btn = screen.getByRole('button', { name: /re-send invitation/i });
+  fireEvent.click(btn);
+
+  const dialog = screen.getByRole('dialog');
+  expect(within(dialog).getByText('Re-send this invitation?')).toBeInTheDocument();
+  // The service keeps the original invite date, so the deadline will not move.
+  expect(within(dialog).getByText(/keeps the original invitation date/i)).toBeInTheDocument();
+});
+
+test('a reminder-sent award also offers a re-send, not a first send', async () => {
+  wireFetch({ abstract: ready({ status: 100000002, invitedAt: '2026-07-12T15:04:05Z' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/Status:/)).toHaveTextContent('Reminder Sent'));
+  expect(screen.getByRole('button', { name: /re-send invitation/i })).toBeInTheDocument();
+});
+
+test('the old top-of-pane sent banner is gone', async () => {
+  wireFetch({ abstract: ready() });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  confirmSendInModal();
+  await waitFor(() => expect(screen.getByText(/✓ Invitation sent/)).toBeInTheDocument());
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /done/i }));
+
+  // Dismissing the receipt leaves no stray inline banner behind.
+  expect(screen.queryByText('Invitation sent to the grantee.')).not.toBeInTheDocument();
 });
