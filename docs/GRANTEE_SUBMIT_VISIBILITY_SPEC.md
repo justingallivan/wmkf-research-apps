@@ -593,3 +593,11 @@ approved abstract, but nothing can move the row out of `Submitted`.
   deliverable rows, and an empty `Grantee_Uploads` folder; the rehearsal alert is resolved; the
   `grantee-deliverables` recipient override is absent from persisted config; and the Awardee tab is
   back to `Not started`. The one sent email remains as the intended audit record.
+  **SUPERSEDED 2026-08-09 (S411): that cleanup no longer describes live state.** A second owner
+  rehearsal on the same request produced a NEW submitted package — approved abstract, caption
+  ("Homer in a blimp"), and an image in `Grantee_Uploads` — and it was deliberately left in place as
+  the fixture that proved the inline-image path against real SharePoint bytes. `1002788` is currently
+  `Submitted` with **no in-app path forward**, because the post-`Submitted` transitions still have no
+  writer. Re-cleaning it is manual: delete the `wmkf_granteedeliverable` row, clear
+  `wmkf_abstractapproved` on the request, and remove the `Grantee_Uploads` file. Do not cite the
+  paragraph above as current state.
