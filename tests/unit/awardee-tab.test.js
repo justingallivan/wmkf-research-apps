@@ -1049,3 +1049,56 @@ test('the old top-of-pane sent banner is gone', async () => {
   // Dismissing the receipt leaves no stray inline banner behind.
   expect(screen.queryByText('Invitation sent to the grantee.')).not.toBeInTheDocument();
 });
+
+// ── Send gate mirrors the server (S411 fix) ──
+//
+// send-invite-service.js:82-88 refuses status < DRAFTED ("generate first") and
+// status >= SUBMITTED ("already submitted; a new invite cannot be sent"). The
+// button previously ignored status entirely, so on a submitted package it stayed
+// enabled and walked the PD through the whole confirm modal to a guaranteed 409
+// — reported from the 1002788 production run.
+
+test('a submitted package disables the send button and says why', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.', invitedAt: '2026-08-09T16:00:00Z' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/Status:/)).toHaveTextContent('Submitted'));
+
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+  expect(screen.getByText(/already returned this package/i)).toBeInTheDocument();
+});
+
+test('a disabled send button cannot open the confirm modal', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/Status:/)).toHaveTextContent('Submitted'));
+
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
+});
+
+test.each([
+  ['Complete', 100000006],
+  ['Closed No Response', 100000007],
+])('%s is past the send gate too', async (_label, status) => {
+  wireFetch({ abstract: { effective: 'Text.', effectiveField: 'approved', status, editable: false } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Text.'));
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.getByRole('button', { name: /send invitation/i })).toBeDisabled();
+});
+
+test.each([
+  ['Drafted', 100000000],
+  ['Invited', 100000001],
+  ['Reminder Sent', 100000002],
+])('%s can still be invited', async (_label, status) => {
+  wireFetch({ abstract: { effective: 'Ready abstract.', effectiveField: 'formatted', status, editable: true } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+  expect(screen.getByRole('button', { name: /send invitation|re-send invitation/i })).toBeEnabled();
+  expect(screen.queryByText(/already returned this package/i)).not.toBeInTheDocument();
+});

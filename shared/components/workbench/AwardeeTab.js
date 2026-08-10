@@ -455,7 +455,23 @@ export default function AwardeeTab({ requestId, context }) {
   const alreadyInvited = status === GRANTEE_DELIVERABLE_STATUS.INVITED
     || status === GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT;
   const sendButtonLabel = alreadyInvited ? 'Re-send invitation' : 'Send invitation';
-  const canSend = hasAbstract
+  // MIRRORS the server guard in send-invite-service.js:82-88, which refuses
+  // `status === null || status < DRAFTED` ("generate first") and
+  // `status >= SUBMITTED` ("already submitted; a new invite cannot be sent").
+  // Expressed as the same range rather than a list of values so the two cannot
+  // disagree if another option value is inserted. Without this the button stayed
+  // enabled on a submitted package and walked the PD through the whole confirm
+  // modal to a guaranteed 409 — reported from the 1002788 production run.
+  const invitableStatus = status !== null
+    && !Number.isNaN(status)
+    && status >= GRANTEE_DELIVERABLE_STATUS.DRAFTED
+    && status < GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+  // Distinguish "too early" from "too late" so the disabled state can say which.
+  const sendClosed = status !== null
+    && !Number.isNaN(status)
+    && status >= GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+  const canSend = invitableStatus
+    && hasAbstract
     && isEmail(toEmail)
     && (!ccEmail || isEmail(ccEmail))
     && !sending
@@ -693,9 +709,17 @@ export default function AwardeeTab({ requestId, context }) {
             Invitation email default not configured. Ask an admin to set the grantee invite subject and body before sending.
           </p>
         )}
-        {emailDefaults.loaded && !emailDefaultsUnavailable && !emailDefaultsNotConfigured && !emailTextReady && (
+        {emailDefaults.loaded && !emailDefaultsUnavailable && !emailDefaultsNotConfigured && !emailTextReady && !sendClosed && (
           <p className="text-sm text-amber-700">
             Enter a subject and body before sending.
+          </p>
+        )}
+        {sendClosed && (
+          // Say why the button is dead rather than leaving a greyed control with
+          // no explanation. The invitation half of the flow is genuinely over.
+          <p className="text-sm text-gray-600">
+            The grantee has already returned this package, so no further invitation can be
+            sent. See the Submission tab for what they sent.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -716,9 +740,11 @@ export default function AwardeeTab({ requestId, context }) {
           </button>
         </div>
         <p className="text-xs text-gray-500">
-          {hasAbstract
-            ? 'Preview opens the email in a new tab without sending. The first recorded invitation date starts the 14-day estimate; re-sends keep that date.'
-            : 'Generate the abstract before sending. (Preview works any time.)'}
+          {!hasAbstract
+            ? 'Generate the abstract before sending. (Preview works any time.)'
+            : sendClosed
+              ? 'Preview opens the email in a new tab without sending.'
+              : 'Preview opens the email in a new tab without sending. The first recorded invitation date starts the 14-day estimate; re-sends keep that date.'}
         </p>
       </section>
       )}
@@ -784,21 +810,21 @@ export default function AwardeeTab({ requestId, context }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="grantee-send-modal-title"
-            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl space-y-3"
+            className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-lg bg-white p-8 shadow-xl space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             {sendStep === 'sent' ? (
               <>
-                <h4 id="grantee-send-modal-title" className="text-sm font-semibold text-green-800">
+                <h4 id="grantee-send-modal-title" className="text-lg font-semibold text-green-800">
                   ✓ Invitation sent
                 </h4>
                 <div className="text-sm text-gray-900">
                   <p>Sent to {recipients?.pi?.name || 'the grantee'}</p>
-                  <p className="font-mono text-xs break-all text-gray-600">{toEmail}</p>
-                  {ccEmail && <p className="font-mono text-xs break-all text-gray-600">cc {ccEmail}</p>}
+                  <p className="font-mono text-sm break-all text-gray-600">{toEmail}</p>
+                  {ccEmail && <p className="font-mono text-sm break-all text-gray-600">cc {ccEmail}</p>}
                 </div>
                 {dueLabel && (
-                  <p className="text-xs text-gray-600">
+                  <p className="text-sm text-gray-600">
                     Estimated response due {dueLabel}. A reminder sends automatically at day 12
                     if they have not responded.
                   </p>
@@ -815,33 +841,33 @@ export default function AwardeeTab({ requestId, context }) {
               </>
             ) : (
               <>
-                <h4 id="grantee-send-modal-title" className="text-sm font-semibold text-gray-900">
+                <h4 id="grantee-send-modal-title" className="text-lg font-semibold text-gray-900">
                   {alreadyInvited ? 'Re-send this invitation?' : 'Send invitation?'}
                 </h4>
                 {alreadyInvited && (
                   // The service keeps the ORIGINAL invite date on a re-send, so the
                   // deadline the PD sees will not move. Say so before they commit.
-                  <p className="text-xs text-amber-700">
+                  <p className="text-sm text-amber-700">
                     This grantee has already been invited. Re-sending emails them again and keeps
                     the original invitation date, so the estimated response date does not change.
                   </p>
                 )}
-                <dl className="text-sm text-gray-900 space-y-1">
+                <dl className="text-sm text-gray-900 space-y-3">
                   <div>
-                    <dt className="text-xs font-medium text-gray-700">To</dt>
-                    <dd className="font-mono text-xs break-all">{toEmail}</dd>
-                    {recipients?.pi?.name && <dd className="text-xs text-gray-600">{recipients.pi.name}</dd>}
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">To</dt>
+                    <dd className="font-mono text-sm break-all">{toEmail}</dd>
+                    {recipients?.pi?.name && <dd className="text-sm text-gray-600">{recipients.pi.name}</dd>}
                   </div>
                   <div>
-                    <dt className="text-xs font-medium text-gray-700">Cc</dt>
-                    <dd className="font-mono text-xs break-all">{ccEmail || '—'}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Cc</dt>
+                    <dd className="font-mono text-sm break-all">{ccEmail || '—'}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-medium text-gray-700">Subject</dt>
-                    <dd className="text-xs">{fillInviteSubject(subject, { title: awardTitle })}</dd>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Subject</dt>
+                    <dd className="text-sm">{fillInviteSubject(subject, { title: awardTitle })}</dd>
                   </div>
                 </dl>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-gray-500">
                   Sends a secure magic link and starts the 14-day response estimate.
                 </p>
                 <div className="flex justify-end gap-2">
