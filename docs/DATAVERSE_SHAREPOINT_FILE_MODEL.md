@@ -638,6 +638,25 @@ The remaining controls are deliberately not collapsed into that pass:
   only remedy. The app token still holds only `Sites.Selected` and
   `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
   verify this itself.
+
+  **Do not resolve this to "Limited Access" (considered and rejected 2026-08-10).**
+  Limited Access is a system-assigned level granting only View Application Pages,
+  Browse User Information, Use Remote Interfaces, Use Client Integration Features,
+  and Open — **no edit, no delete.** If Members held it, ordinary staff could not
+  edit the Word artifacts at all, contradicting the staff-wide Editor Dashboard
+  audience (owner decision 39,
+  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`). The pilot contradicts it
+  empirically too: Justin edited Request `1003109` and produced version `2.0` under
+  his own identity, yet was denied the second-stage admin view — so he has at least
+  Edit/Contribute and is not a site-collection administrator. "Limited Access" in a
+  permissions view is commonly an artifact of unique item-level permissions
+  elsewhere in the site, which would itself be a finding.
+
+  **Question outstanding with Connor (asked 2026-08-10, S413):** in Site Settings →
+  Site Permissions, what level is listed next to the Members group (Edit,
+  Contribute, or other), and is Justin in that group or granted directly? The
+  second half matters — if Justin holds an elevated or direct grant, the pilot
+  never exercised the ordinary-editor path.
 - **[PARTIAL] Workbench recovery UI.** Current version and last-modified
   metadata are live. Version-history navigation and an administrator-only
   restore action are not implemented.

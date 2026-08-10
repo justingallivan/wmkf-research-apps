@@ -142,6 +142,23 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    ("limited control" is not a built-in permission level, so whether editors can
    delete is unresolved). Do not record any of these as cleared.
 
+   **PARKED 2026-08-10 pending three outstanding questions.** Justin is asking
+   Connor the permissions one; the other two need owners.
+   1. *(To Connor, asked)* In Site Settings → Site Permissions, what level is
+      listed next to the Members group, and is Justin in that group or granted
+      directly? "Limited control" was **considered and rejected** as meaning
+      Limited Access — that level grants no edit or delete, so it contradicts both
+      the staff-wide editing design and the pilot's own evidence that Justin
+      edited Request `1003109` while lacking site-collection admin rights. Detail
+      and the reasoning live in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+   2. *(To Connor, not yet asked)* What is the configured major-version limit,
+      and can an ordinary member delete a file or a version?
+   3. *(Needs an M365 compliance admin — not Connor)* Does any site- or
+      library-wide Purview retention policy apply to the `akoya_request` library?
+
+   **This blocks administrator restore only.** Version-history display and the
+   milestone producer do not depend on any of it — see Next Items.
+
 ### Owner Decision Needed
 
 1. **Should a staff image substitution leave an audit trace?** Evidence:
