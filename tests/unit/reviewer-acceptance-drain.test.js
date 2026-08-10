@@ -91,6 +91,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     alertEmail: jest.fn(async () => ({})),
     autoLinkAccount: jest.fn(async () => ({ skipped: 'no_exact_target' })),
     alertAffiliation: jest.fn(async () => ({})),
+    resolveAffiliation: jest.fn(async () => ({ resolvedCount: 0 })),
     sendAcceptanceEmail: jest.fn(async () => ({ sent: true })),
     notify: jest.fn(async () => ({ id: 1 })),
     quota: jest.fn(async () => ({ notified: false })),
@@ -394,6 +395,63 @@ describe('processReviewerAcceptanceJob', () => {
 
     expect(d.autoLinkAccount).toHaveBeenCalled();
     expect(d.alertAffiliation).not.toHaveBeenCalled();
+    expect(d.resolveAffiliation).toHaveBeenCalledWith(expect.objectContaining({
+      reviewer: expect.objectContaining({ wmkf_potentialreviewersid: REVIEWER_ID }),
+      contactId: 'contact-1',
+    }));
+    expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('clears a standing mismatch warning when the Contact was already linked correctly', async () => {
+    const d = deps();
+    d.autoLinkAccount.mockResolvedValueOnce({
+      linked: false,
+      alreadyLinked: true,
+      accountId: 'account-1',
+      accountName: 'Reviewer Org',
+    });
+
+    await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
+
+    expect(d.resolveAffiliation).toHaveBeenCalledTimes(1);
+    expect(d.alertAffiliation).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('treats a capped Account scan as an abstention, alerts ops once, and retains mismatch handling', async () => {
+    const d = deps();
+    d.autoLinkAccount.mockResolvedValueOnce({
+      skipped: 'account_scan_capped',
+      scannedCount: 5000,
+      totalCount: 5200,
+    });
+
+    await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
+
+    expect(d.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reviewer_contact_account_scan_capped',
+      severity: 'warning',
+      emailAdmins: true,
+      metadata: { scannedCount: 5000, totalCount: 5200 },
+      autoResolveKey: 'reviewer-contact-account-scan-capped',
+    }));
+    expect(d.alertAffiliation).toHaveBeenCalledTimes(1);
+    expect(d.resolveAffiliation).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('still completes mismatch handling when the capped-scan ops alert fails', async () => {
+    const d = deps();
+    d.autoLinkAccount.mockResolvedValueOnce({
+      skipped: 'account_scan_capped',
+      scannedCount: 5000,
+      totalCount: 5200,
+    });
+    d.notify.mockRejectedValueOnce(new Error('system_alerts unavailable'));
+
+    await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
+
+    expect(d.alertAffiliation).toHaveBeenCalledTimes(1);
     expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
   });
 

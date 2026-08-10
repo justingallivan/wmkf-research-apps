@@ -4,7 +4,7 @@
 
 import { autoLinkReviewerContactAccount } from '../../lib/services/auto-link-reviewer-contact-account.js';
 
-function makeDeps({ contact = {}, accounts = [], currentAccount, capped = false } = {}) {
+function makeDeps({ contact = {}, accounts = [], currentAccount, capped = false, totalCount } = {}) {
   return {
     contactsAdapter: {
       getInstitutionById: jest.fn().mockResolvedValue({
@@ -19,7 +19,7 @@ function makeDeps({ contact = {}, accounts = [], currentAccount, capped = false 
       }),
     },
     accountsAdapter: {
-      queryAllAccounts: jest.fn().mockResolvedValue({ records: accounts, capped }),
+      queryAllAccounts: jest.fn().mockResolvedValue({ records: accounts, capped, totalCount }),
       getById: jest.fn().mockResolvedValue(currentAccount || accounts[0] || null),
     },
     withDalContext: jest.fn((_label, fn) => fn()),
@@ -168,12 +168,17 @@ describe('autoLinkReviewerContactAccount', () => {
     expect(deps.contactsAdapter.setParentAccountIfEmpty).not.toHaveBeenCalled();
   });
 
-  test('fails retryably rather than trusting a capped Account population', async () => {
-    const deps = makeDeps({ capped: true });
+  test('abstains rather than writing or retrying from a capped Account population', async () => {
+    const deps = makeDeps({
+      accounts: [{ accountid: 'account-1', name: 'Florida International University', statecode: 0 }],
+      capped: true,
+      totalCount: 5001,
+    });
 
-    await expect(autoLinkReviewerContactAccount(args(), deps)).rejects.toMatchObject({
-      code: 'reviewer_contact_account_scan_capped',
-      retryable: true,
+    await expect(autoLinkReviewerContactAccount(args(), deps)).resolves.toEqual({
+      skipped: 'account_scan_capped',
+      scannedCount: 1,
+      totalCount: 5001,
     });
     expect(deps.contactsAdapter.setParentAccountIfEmpty).not.toHaveBeenCalled();
   });

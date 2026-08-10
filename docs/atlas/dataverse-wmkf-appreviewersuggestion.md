@@ -109,7 +109,11 @@ handling. In source pending promotion, accepted affiliation may additionally
 fill an **empty** Contact `parentcustomerid` only when the complete active
 Account population yields exactly one normalized exact match across Account
 name/AKA/legal/DC-AKA labels. Existing parents, ambiguous matches, and misses
-are never overwritten and continue to the affiliation-mismatch alert.
+are never overwritten and continue to the affiliation-mismatch alert. A
+capped/incomplete Account scan follows the same no-write residual-alert path
+and raises one deduplicated operations warning rather than retrying the whole
+acceptance job. Exact/already-correct links auto-resolve standing mismatch
+warnings for that reviewer.
 
 Decline structured capture:
 - `wmkf_declinereasonpicklist` (Picklist: `too-busy=100000000 | conflict-of-interest=100000001 | outside-expertise=100000002 | bad-timing=100000003 | other=100000004`)

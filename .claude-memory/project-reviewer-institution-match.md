@@ -25,6 +25,10 @@ At accepted-reviewer follow-up only:
 - Preserve any existing parent. Ambiguous/no-match cases continue to the staff
   mismatch alert. Never create Accounts or use fuzzy/ROR/OpenAlex similarity as
   write authority.
+- A capped Account scan is an incomplete-cardinality abstention, not a retry:
+  leave the Contact unchanged, emit one deduplicated operations warning, and
+  continue the reviewer-specific mismatch alert. A successful or already-correct
+  link auto-resolves that reviewer's standing mismatch warning.
 
 Source implementation pending promotion:
 `lib/services/auto-link-reviewer-contact-account.js`,

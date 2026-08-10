@@ -27,9 +27,13 @@ cases retain the staff warning.
 `lib/utils/reviewer-institution-account-match.js` implement this rule on the
 current branch pending promotion. `reviewer-acceptance-drain.js` invokes it
 after the withdrawal re-check and before the affiliation warning. Exact links
-suppress the warning; operational failures keep the durable acceptance job
-retryable and defer transient alert noise. `contact.setParentAccountIfEmpty`
-uses a fresh ETag, preserves every existing parent, and re-evaluates 412 races.
+suppress and auto-resolve the reviewer's standing warning. Transient
+operational failures keep the durable acceptance job retryable and defer alert
+noise. A capped Account scan is deliberately different: it cannot authorize a
+write, but it abstains, raises one deduplicated operations warning, continues
+the reviewer-specific mismatch check, and does not strand acceptance follow-up.
+`contact.setParentAccountIfEmpty` uses a fresh ETag, preserves every existing
+parent, and re-evaluates 412 races.
 
 **Evidence that changed the earlier alert-only decision:** the committed
 `scripts/probe-reviewer-contact-account-link-candidates.mjs` audit used the

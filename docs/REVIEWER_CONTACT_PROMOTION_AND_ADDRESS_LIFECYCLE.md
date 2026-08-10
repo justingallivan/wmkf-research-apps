@@ -385,9 +385,13 @@ target across `name`, `akoya_aka`, `wmkf_legalname`, or `wmkf_dc_aka`. The
 matcher performs no fuzzy scoring, inferred acronym expansion, or Account
 creation. Existing parents, ambiguity, and misses abstain. The target is
 re-read immediately before an ETag-conditional fill-only Contact PATCH; a 412
-re-evaluates and never overwrites the winner. Operational failures keep the
-durable acceptance job retryable and defer the mismatch warning, while genuine
-abstentions continue to that staff alert. Exact links suppress the warning.
+re-evaluates and never overwrites the winner. Transient operational failures
+keep the durable acceptance job retryable and defer the mismatch warning. A
+capped/incomplete Account scan cannot prove cardinality, so it abstains without
+retry, raises one deduplicated operations warning, and continues the
+reviewer-specific mismatch check. Other genuine abstentions do the same without
+the operations warning. Exact or already-correct links suppress and auto-resolve
+the reviewer's standing mismatch warning.
 
 ### Historical S388 baseline [HISTORICAL]
 
