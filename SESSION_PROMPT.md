@@ -84,9 +84,50 @@
    milestone freeze" — PLANNED, no producer. Design against Connor's answers:
    a low library version cap makes milestone snapshots the mechanism that
    preserves the original AI draft.
-2. **Dependabot: 3 vulnerabilities on the default branch (1 high, 2
-   moderate).** Evidence: push output 2026-08-09. The S409 prompt recorded
-   only 2 moderate — the **high** one is new and unexamined.
+2. ~~**Dependabot: 3 vulnerabilities on the default branch.**~~ **CLOSED
+   2026-08-09 (S411)** by `7662a12d`. Four advisory groups cleared, not three
+   — `js-yaml` and the `nanoid` 3.x range were `npm audit`-only and never
+   appeared in the Dependabot report. The `postcss` alert was self-inflicted:
+   the `next.postcss` override from `c325afd5` had inverted into a *downgrade*
+   once next started pinning a patched version, so it was removed rather than
+   re-pinned. Verified: `gh api .../dependabot/alerts` returns **0 open**.
+
+3. **Awardee-tab close-out tab (parked by owner 2026-08-09, resume next
+   session).** Owner ask: *"There's no reason for [Deliverable outputs] to
+   appear on the invitation page because we don't have them yet. I'm inclined
+   to move them from the submitted page as well, and to create a new tab that
+   allows PDs to close the task out."*
+
+   Two separable halves:
+   - **Layout (Tier 1).** A third pane holding `Deliverable outputs`, which
+     currently renders outside both panes (`AwardeeTab.js`, deliberately, since
+     it applies at any stage). Note the two outputs have **different scopes**
+     `[VERIFIED via cycle-export-service.js:12-14]`: "Copy website HTML" is
+     per-award, while "Cycle export" is the whole board cycle (~12–24 awards) —
+     the same button on every award in the cycle. Filing a cycle-wide artifact
+     under a per-award close-out needs a label at minimum.
+   - **Close-out actions (Tier 2, Dataverse writes).** This is the long-deferred
+     lifecycle build. `Staff Review` / `Revision Requested` / `Complete` /
+     `Closed No Response` still have **no writer** `[VERIFIED 2026-08-09 by
+     enumerating every write of wmkf_deliverablestatus — six write sites
+     covering only DRAFTED, INVITED, REMINDER_SENT, SUBMITTED; see
+     docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md]`.
+
+   **Owner questions, asked and deliberately not answered — do not invent
+   answers:**
+   1. What does `Complete` do operationally — bookkeeping only, or does it gate
+      what the cycle export / website HTML publish? The second changes the
+      behaviour of existing outputs.
+   2. Does close-out include `Revision Requested` (re-opens the portal to the
+      grantee)? If so, does it re-mint a magic link and email them, or does
+      staff re-send manually? Tokens are 30-day and minted per send
+      `[VERIFIED via grantee-token-lifecycle.js:26]`.
+
+   **Why it matters, concretely:** request `1002788` is now stuck at
+   `Submitted` with no in-app path forward. Every further end-to-end test costs
+   manual Dataverse surgery (delete the `wmkf_granteedeliverable` row, clear
+   `wmkf_abstractapproved`, remove the `Grantee_Uploads` file), and in
+   production a grantee who submits the wrong image cannot fix it.
 
 ### Owner Decision Needed
 
