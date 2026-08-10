@@ -13,11 +13,18 @@
  * Action-driven: no dedicated state-read endpoint — "Generate abstract" reuses an
  * existing one without a paid call, so it doubles as a load.
  *
- * Deliverable outputs (chunk 8 b/c, wired S271): "Copy website HTML" fetches the
- * single-award fragment and copies it to the clipboard; "Cycle export" opens the
- * combined printable HTML page for this request's board cycle. The cycle code
- * comes from the resolve-request `context` (meeting date → J{YY}/D{YY}); the link
- * is hidden when the request has no June/December cycle.
+ * Three panes (S412): Invitation (what goes out), Submission (what came back),
+ * Close-out (what staff do with it).
+ *
+ * Deliverable outputs (chunk 8 b/c, wired S271; moved into the Close-out pane in
+ * S412): "Copy website HTML" fetches the single-award fragment and copies it to
+ * the clipboard; "Cycle export" opens the combined printable HTML page for this
+ * request's whole board cycle — a wider scope than the per-award copy beside it.
+ * The cycle code comes from the resolve-request `context` (meeting date →
+ * J{YY}/D{YY}); the link is hidden when the request has no June/December cycle.
+ *
+ * The post-Submitted lifecycle transitions (Staff Review / Revision Requested /
+ * Complete / Closed No Response) still have NO writer and are not offered here.
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -502,7 +509,8 @@ export default function AwardeeTab({ requestId, context }) {
         )}
       </section>
 
-      {/* Two panes: what goes out, and what came back. The badge carries the
+      {/* Three panes following the deliverable's own arc: what goes out, what
+          came back, and what we do with it. The Submission badge carries the
           answer to "did they respond?" on the tab itself, so splitting the page
           never costs a click to find that out. */}
       <div className="flex gap-1 border-b border-gray-200" role="tablist">
@@ -514,6 +522,7 @@ export default function AwardeeTab({ requestId, context }) {
             badge: granteeResponded ? '✓ received' : 'pending',
             badgeClass: granteeResponded ? 'text-green-700' : 'text-gray-500',
           },
+          { key: 'closeout', label: 'Close-out' },
         ].map((t) => (
           <button
             key={t.key}
@@ -758,10 +767,17 @@ export default function AwardeeTab({ requestId, context }) {
       </section>
       )}
 
-      {/* Outside both panes: the outputs apply at any stage (the website fragment
-          renders whichever abstract is current), so burying them in one pane would
-          add a click to a routine action. */}
-      <section className="space-y-2 border-t border-gray-200 pt-4">
+      {/* Close-out: what staff do with the package once it is back. S411 kept
+          these in a shared footer on the reasoning that they apply at any stage;
+          that placement is superseded by the owner's 2026-08-09 close-out design,
+          which groups them as the third step of the deliverable's arc. They still
+          work at any stage — the website fragment renders whichever abstract is
+          current — the pane is where they belong, not a gate on when they run.
+          The lifecycle ACTIONS (Staff Review / Revision Requested / Complete /
+          Closed No Response) are deliberately NOT here: those are Dataverse
+          writes with no writer yet, blocked on two open owner questions. */}
+      {subTab === 'closeout' && (
+      <section className="space-y-2">
         <h4 className="text-sm font-medium text-gray-800">Deliverable outputs</h4>
         <p className="text-xs text-gray-500">
           Website-ready HTML for this award, and the combined printable page for the whole board cycle.
@@ -791,6 +807,26 @@ export default function AwardeeTab({ requestId, context }) {
             </span>
           )}
         </div>
+        {/* The two buttons above sit side by side but do NOT have the same blast
+            radius, and nothing in their labels says so. Cycle export opens the
+            whole cycle, including other PDs' awards — say that before it is
+            clicked, not after. Deliberately not "every award in the cycle": the
+            query also requires Awarded status, a project leader, and a research
+            program, and a row that fails to assemble is skipped
+            `[VERIFIED via cycle-export-service.js:57-61,42-44]`. */}
+        <p className="text-xs text-gray-500">
+          <strong>Copy website HTML</strong> covers this award only.
+          {cycleCode && (
+            // Only when the export is actually offered — describing the blast
+            // radius of a control that is not on the page is noise.
+            <>
+              {' '}
+              <strong>Cycle export</strong> covers the whole
+              {cycleLabel ? ` ${cycleLabel}` : ''} board cycle — the awarded
+              research grants in it, not just this one.
+            </>
+          )}
+        </p>
         {websiteHtml != null && (
           <textarea
             aria-label="Website HTML"
@@ -802,6 +838,7 @@ export default function AwardeeTab({ requestId, context }) {
           />
         )}
       </section>
+      )}
 
       {/* Send-invitation modal. The confirm step is what the button now opens —
           sending an invitation is an irreversible outbound email, and the old

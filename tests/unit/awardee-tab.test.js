@@ -346,7 +346,14 @@ test('Preview email renders into a new tab without sending (no send-invite call)
   openSpy.mockRestore();
 });
 
-// --- Deliverable outputs (chunk 8 b/c) ---
+// --- Deliverable outputs (chunk 8 b/c; Close-out pane since S412) ---
+
+// The outputs moved out of the shared footer into the third pane, so every test
+// below must open it first. Waits on the tab rather than assuming a render order.
+async function openCloseout() {
+  await waitFor(() => expect(screen.getByRole('tab', { name: /Close-out/ })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: /Close-out/ }));
+}
 
 test('Copy website HTML fetches the fragment, shows it, and copies to clipboard', async () => {
   wireFetch();
@@ -355,6 +362,7 @@ test('Copy website HTML fetches the fragment, shows it, and copies to clipboard'
 
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  await openCloseout();
 
   fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
   await waitFor(() => expect(screen.getByLabelText('Website HTML')).toBeInTheDocument());
@@ -374,6 +382,7 @@ test('Copy website HTML still shows the fragment when the clipboard API is unava
   });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  await openCloseout();
   fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
   await waitFor(() => expect(screen.getByLabelText('Website HTML')).toBeInTheDocument());
   expect(screen.getByText(/select the text below to copy/i)).toBeInTheDocument();
@@ -383,6 +392,7 @@ test('a website-html error surfaces and no fragment is shown', async () => {
   wireFetch({ websiteOk: false });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  await openCloseout();
   fireEvent.click(screen.getByRole('button', { name: /copy website html/i }));
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no request found/i));
   expect(screen.queryByLabelText('Website HTML')).not.toBeInTheDocument();
@@ -392,6 +402,7 @@ test('Cycle export link targets the cycle-export route for the request cycle', a
   wireFetch();
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  await openCloseout();
   const link = screen.getByRole('link', { name: /cycle export/i });
   expect(link).toHaveAttribute('href', '/api/workbench/grantee-deliverables/cycle-export?cycleCode=J26');
   expect(link).toHaveTextContent('June 2026');
@@ -402,6 +413,7 @@ test('Cycle export is unavailable (no link) when the request has no June/Decembe
   wireFetch();
   render(<AwardeeTab requestId={REQ} context={{ cycleCode: null }} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toBeInTheDocument());
+  await openCloseout();
   expect(screen.queryByRole('link', { name: /cycle export/i })).not.toBeInTheDocument();
   expect(screen.getByText(/cycle export unavailable/i)).toBeInTheDocument();
 });
@@ -876,12 +888,53 @@ test('a manual pane choice survives a later refetch', async () => {
   expect(screen.getByLabelText('To email')).toBeInTheDocument();
 });
 
-test('Deliverable outputs stay reachable from either pane', async () => {
+// S412 supersedes the S411 shared-footer placement: the outputs now live in a
+// third `Close-out` pane rather than below both panes. The behavior that changed
+// is exactly this — they are no longer visible from Invitation/Submission.
+
+test('Deliverable outputs live in the Close-out pane, not the shared footer', async () => {
   wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  await waitFor(() => expect(screen.getByText('Deliverable outputs')).toBeInTheDocument());
+  // Lands on Submission (a response exists) — the outputs must NOT be there.
+  await waitFor(() => expect(screen.getByRole('tab', { name: /Submission/ })).toHaveAttribute('aria-selected', 'true'));
+  expect(screen.queryByText('Deliverable outputs')).not.toBeInTheDocument();
+
   fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.queryByText('Deliverable outputs')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('tab', { name: /Close-out/ }));
   expect(screen.getByText('Deliverable outputs')).toBeInTheDocument();
+});
+
+test('the Close-out pane says the two outputs have different scopes', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByRole('tab', { name: /Close-out/ })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: /Close-out/ }));
+  expect(screen.getByText(/covers this award only/i)).toBeInTheDocument();
+  expect(screen.getByText(/covers the whole/i)).toBeInTheDocument();
+  expect(screen.getByText(/not just this one/i)).toBeInTheDocument();
+});
+
+test('the wider-scope warning is dropped when there is no cycle export to warn about', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={{ cycleCode: null }} />);
+  await openCloseout();
+  expect(screen.getByText(/cycle export unavailable/i)).toBeInTheDocument();
+  expect(screen.getByText(/covers this award only/i)).toBeInTheDocument();
+  expect(screen.queryByText(/not just this one/i)).not.toBeInTheDocument();
+});
+
+// The lifecycle half is Tier 2 and blocked on two owner questions. Pin that the
+// layout move did not smuggle in a status writer.
+test('the Close-out pane offers no lifecycle transition actions yet', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByRole('tab', { name: /Close-out/ })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: /Close-out/ }));
+  for (const label of [/staff review/i, /revision requested/i, /mark complete/i, /closed no response/i]) {
+    expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+  }
 });
 
 // ── Inline image (S411 increment 2) ──
