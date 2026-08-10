@@ -250,7 +250,7 @@ callers per CLAUDE.md's high-risk-workflow rule rather than assuming additivity.
 
 ### `imageRef` is not reliably a URL — the correctness trap
 
-`[VERIFIED via lib/services/grantee-upload.js:121]` The writer sets
+`[VERIFIED via lib/services/grantee-upload.js:134]` The writer sets
 ``newImageRef = uploadedItem.webUrl || `${folder}/${newFilename}` ``. The Graph `webUrl` is an
 absolute, clickable SharePoint URL and is the normal case — but the fallback is a **relative library
 path**, which would render as a broken same-origin link if linkified blindly.
@@ -538,8 +538,48 @@ branch:
   in the same file: only the newest generation may perform any post-await state write,
   including the latch and auto-advance.
 
-Still deferred, unchanged by this work: the in-app image proxy (the image remains a
-SharePoint link) and the `Staff Review` / `Revision Requested` / `Complete` /
+## Follow-up: inline image (2026-08-09, S411 increment 2)
+
+The "Rejected alternative: proxy the image through the app" decision above is
+**superseded by owner decision 2026-08-09.** The image now renders in the Awardee tab
+through `GET /api/workbench/grantee-deliverables/image?requestId=`
+(`requireAppAccess('reviewers')`, matching the sibling routes), served by
+`lib/services/workbench/grantee-deliverables/image-service.js`. The SharePoint
+affordance is **retained, not replaced** — the proxy 404s on a ref shape it does not
+recognize and 502s when Graph is unavailable, and the client falls back to the link on
+any image load error.
+
+The load-bearing constraint is that **the stored ref carries no drive/item identity.**
+The writer stores ``uploadedItem.webUrl || `${folder}/${filename}` ``
+`[VERIFIED via lib/services/grantee-upload.js:134]`, so `GraphService.downloadFile`
+(drive id + item id) cannot be addressed from it. The service therefore uses
+`GraphService.downloadFileByPath` and re-derives the folder from the request row
+through the writer's own newly exported `granteeUploadFolder` — one definition shared
+by writer and reader, because two copies would drift and staff would get a 404 for a
+file that exists. Persisting drive/item IDs at upload time would be the better
+contract; that is a Dataverse schema change and is deliberately **not** done here.
+
+Only the FILENAME comes from stored data, and it is the trust boundary:
+
+- It is matched against the exact server-controlled pattern the writer emits,
+  `{reqNum}_grantee_image_{8 hex}.{png|jpg|webp}` `[VERIFIED via grantee-upload.js:122]`,
+  and refused otherwise — so traversal, absolute paths, embedded separators, encoded
+  separators, and surprise extensions are impossible by construction rather than by
+  escaping. Note `downloadFileByPath` validates its `folderPath` but **not** its
+  `filename` `[VERIFIED via graph-service.js:527-532 — validatePath(folderPath) at :528, filename interpolated into the path at :532 with no check of its own. Disconfirming check: the sibling getFileMetadataByPath DOES type-check its filename, so the omission here is real and not a convention I missed.]`, so this check is the only one.
+- `Content-Type` is derived from that validated extension — never from the ref, never
+  from Graph's reported mimeType.
+- The bytes are re-sniffed with `sniffImageType` before serving, so a later
+  out-of-band replacement in the library cannot make the route mislabel content.
+- The response carries `X-Content-Type-Options: nosniff`, `Cache-Control: private,
+  no-store`, and `Content-Disposition: inline` with the server-minted filename. Graph
+  error detail never reaches the client.
+
+Both defences are mutation-checked: removing the filename allowlist fails 9 service
+tests, removing the magic-byte re-check fails 2.
+
+Still deferred, unchanged by this work: the `Staff Review` / `Revision Requested` /
+`Complete` /
 `Closed No Response` lifecycle transitions, which still have **no writer**.
 `[VERIFIED 2026-08-09 by enumerating every write of wmkf_deliverablestatus across
 lib/pages/shared/scripts — six write sites covering four of the eight option values:

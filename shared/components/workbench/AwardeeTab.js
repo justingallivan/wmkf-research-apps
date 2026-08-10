@@ -84,6 +84,10 @@ export default function AwardeeTab({ requestId, context }) {
   // refetch nor the auto-advance can yank the pane out from under a click.
   const [subTab, setSubTab] = useState('invitation');
   const subTabPinnedRef = useRef(false);
+  // Set by the inline image's own onError so a proxy 404/502 falls back to the
+  // SharePoint affordance. Reset per load (an event, not an effect) so switching
+  // requests or refetching re-tries the image rather than staying broken.
+  const [imageBroken, setImageBroken] = useState(false);
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
@@ -217,6 +221,7 @@ export default function AwardeeTab({ requestId, context }) {
         const responded = Boolean(
           data.hasImage || data.caption || data.submittedAt || data.effectiveField === 'approved',
         );
+        setImageBroken(false);
         setSubmission({
           caption: data.caption || null,
           imageRef: data.imageRef || null,
@@ -581,14 +586,33 @@ export default function AwardeeTab({ requestId, context }) {
               : <p className="text-sm text-gray-500">No caption provided.</p>}
           </div>
 
-          <div>
+          <div className="space-y-2">
             <p className="text-xs font-medium text-gray-700">Image</p>
+            {/* The image renders in-app through the staff-guarded proxy route.
+                The SharePoint affordance below is kept, not replaced: the proxy
+                can 404 on a ref shape it does not recognize or 502 when Graph is
+                unavailable, and in those cases the link is the only way to see
+                the file. `imageBroken` is set by the img's own onError (an event,
+                never an effect) and is reset per load in loadAbstract. */}
+            {submission.hasImage && !imageBroken && (
+              // next/image would route private, auth-guarded bytes through the
+              // optimizer and needs fixed dimensions; grantee images are
+              // arbitrary-sized and must stay behind requireAppAccess, so a
+              // plain <img> is the correct element here.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/workbench/grantee-deliverables/image?requestId=${encodeURIComponent(requestId)}`}
+                alt={submission.caption || 'Grantee-submitted award image'}
+                onError={() => setImageBroken(true)}
+                className="max-h-64 max-w-full rounded border border-gray-200"
+              />
+            )}
             {submission.imageUrl ? (
               <a
                 href={submission.imageUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-blue-700 hover:underline"
+                className="block text-sm text-blue-700 hover:underline"
               >
                 Open image in SharePoint ↗
               </a>
@@ -599,6 +623,11 @@ export default function AwardeeTab({ requestId, context }) {
               </p>
             ) : (
               <p className="text-sm text-gray-500">No image uploaded.</p>
+            )}
+            {submission.hasImage && imageBroken && (
+              <p className="text-xs text-gray-500">
+                The image could not be loaded in the app — open it in SharePoint instead.
+              </p>
             )}
           </div>
         </section>

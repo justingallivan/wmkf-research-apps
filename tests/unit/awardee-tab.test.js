@@ -857,3 +857,61 @@ test('Deliverable outputs stay reachable from either pane', async () => {
   fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
   expect(screen.getByText('Deliverable outputs')).toBeInTheDocument();
 });
+
+// ── Inline image (S411 increment 2) ──
+//
+// The image renders through the staff-guarded proxy route. The SharePoint
+// affordance is retained, not replaced, because the proxy can 404 on a ref shape
+// it does not recognize or 502 when Graph is down.
+
+test('a submitted image renders inline through the proxy route', async () => {
+  wireFetch({ abstract: submitted({ caption: 'Cryo-EM structure.', imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+
+  const img = screen.getByRole('img');
+  expect(img).toHaveAttribute('src', `/api/workbench/grantee-deliverables/image?requestId=${REQ}`);
+  // The caption doubles as alt text; screen readers get the grantee's own words.
+  expect(img).toHaveAttribute('alt', 'Cryo-EM structure.');
+  // The SharePoint link is kept alongside it, not replaced.
+  expect(screen.getByRole('link', { name: /open image in sharepoint/i })).toBeInTheDocument();
+});
+
+test('with no caption the inline image still carries descriptive alt text', async () => {
+  wireFetch({ abstract: submitted({ imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByRole('img')).toHaveAttribute('alt', 'Grantee-submitted award image');
+});
+
+test('a failed image load falls back to the SharePoint affordance', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.', imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+
+  fireEvent.error(screen.getByRole('img'));
+
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(screen.getByText(/could not be loaded in the app/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /open image in sharepoint/i })).toBeInTheDocument();
+});
+
+test('no image on the package renders neither an img nor a broken-image note', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(screen.getByText('No image uploaded.')).toBeInTheDocument();
+  expect(screen.queryByText(/could not be loaded in the app/i)).not.toBeInTheDocument();
+});
+
+test('a relative-path ref still renders inline; the proxy resolves it server-side', async () => {
+  // imageUrl is null (not linkifiable) but the proxy re-derives the path itself,
+  // so the in-app image is exactly the case this increment fixes.
+  wireFetch({ abstract: submitted({ caption: 'A caption.', imageRef: 'folder/Grantee_Uploads/x.png', hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.getByRole('img')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /open image in sharepoint/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/path in the grantee SharePoint library/i)).toBeInTheDocument();
+});
