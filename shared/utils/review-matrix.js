@@ -36,7 +36,8 @@
  * retired (non-live) keys. This is a deliberate, documented choice, not a
  * correctness claim about which snapshot is "right".
  *
- * @param {Array<{suggestionId:string, name?:string, answers?:Array<{
+ * @param {Array<{suggestionId:string, name?:string,
+ *   reviewerAffiliation?:string, affiliation?:string, answers?:Array<{
  *   questionKey:string, questionOrder:number, questionText:string,
  *   questionType:string, answerHtml:(string|null), answerText:(string|null),
  *   answerValue:(number|null)
@@ -50,7 +51,7 @@
  *   question falls back to snapshot order and none is marked retired (there is
  *   no live set to compare against).
  * @returns {{
- *   reviewers: Array<{suggestionId:string, name:(string|null)}>,
+ *   reviewers: Array<{suggestionId:string, name:(string|null), affiliation:(string|null)}>,
  *   questions: Array<{
  *     key:string, type:(string|null), text:string, retired:boolean,
  *     cells: Array<{suggestionId:string, state:('answered'|'empty'|'unreadable'|'not-asked'),
@@ -200,7 +201,21 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
   });
 
   return {
-    reviewers: reviewerList.map((r) => ({ suggestionId: r.suggestionId, name: r.name || null })),
+    reviewers: reviewerList.map((r) => {
+      // The accepted suggestion is the engagement-specific source of truth.
+      // The potential-reviewer person field is fallback-only for older rows.
+      const acceptedAffiliation = typeof r.reviewerAffiliation === 'string'
+        ? r.reviewerAffiliation.trim()
+        : '';
+      const personAffiliation = typeof r.affiliation === 'string'
+        ? r.affiliation.trim()
+        : '';
+      return {
+        suggestionId: r.suggestionId,
+        name: r.name || null,
+        affiliation: acceptedAffiliation || personAffiliation || null,
+      };
+    }),
     questions,
   };
 }

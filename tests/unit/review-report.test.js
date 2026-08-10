@@ -160,6 +160,10 @@ describe('composeReviewReport', () => {
     });
 
     expect(report.summary.reviewsSubmitted).toBe(2);
+    expect(report.reviewers).toEqual([
+      { suggestionId: 'r1', name: 'Dr. A', affiliation: null },
+      { suggestionId: 'r2', name: 'Dr. B', affiliation: null },
+    ]);
     expect(report.summary.ratingQuestions).toHaveLength(1);
     expect(report.summary.ratingQuestions[0]).toMatchObject({
       key: 'impact', average: 3, min: 2, max: 4, answeredCount: 2, totalReviewers: 2,
@@ -202,6 +206,7 @@ describe('composeReviewReport', () => {
     expect(() => composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' })).not.toThrow();
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' });
     expect(report.header.reviewerCount).toBe(0);
+    expect(report.reviewers).toEqual([]);
     expect(report.summary.reviewsSubmitted).toBe(0);
     expect(report.summary.ratingQuestions).toEqual([]);
     expect(report.answerSections).toEqual([]);
@@ -214,6 +219,31 @@ describe('composeReviewReport', () => {
     expect(report.header.requestTitle).toBeNull();
     expect(report.header.piName).toBeNull();
     expect(report.header.institution).toBeNull();
+  });
+
+  test('includes a normalized named reviewer roster outside the anonymous synthesis', () => {
+    const matrix = {
+      reviewers: [
+        {
+          suggestionId: 'r1',
+          name: ' John Hackett ',
+          affiliation: ' Florida International University ',
+        },
+        { suggestionId: 'r2', name: '', affiliation: '' },
+      ],
+      questions: [],
+    };
+    const report = composeReviewReport({
+      matrix,
+      generatedAtIso: '2026-07-03T00:00:00.000Z',
+      synthesis: { overall: 'A reviewer raised a concern.' },
+    });
+
+    expect(report.reviewers).toEqual([
+      { suggestionId: 'r1', name: 'John Hackett', affiliation: 'Florida International University' },
+      { suggestionId: 'r2', name: null, affiliation: null },
+    ]);
+    expect(report.synthesisSection.overall).toBe('A reviewer raised a concern.');
   });
 
   test('an "empty" cell (row exists, blank content) renders no label and empty blocks, distinct from not-asked', () => {
@@ -312,6 +342,24 @@ describe('composeReviewReport', () => {
     };
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
     expect(report.synthesisSection).toEqual(synthesis);
+  });
+
+  test('carries explicit stale currentness so renderers can distinguish the current roster', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const report = composeReviewReport({
+      matrix,
+      generatedAtIso: '2026-07-03T00:00:00.000Z',
+      synthesis: { overall: 'Earlier synthesis.' },
+      synthesisCurrent: false,
+    });
+    expect(report.synthesisSection).toEqual({
+      consensus: [],
+      disagreements: [],
+      keyConcerns: [],
+      ratingSummaries: [],
+      overall: 'Earlier synthesis.',
+      current: false,
+    });
   });
 
   test('a malformed synthesis (non-array fields, missing overall) is normalized rather than thrown', () => {

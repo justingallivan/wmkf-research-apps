@@ -254,10 +254,16 @@ function roundOrNull(n) {
  *   overall}`). Included in the composed report ONLY when passed — omitting
  *   it (or passing null/undefined) keeps the report byte-identical to a
  *   Phase-3-only export (no synthesis section rendered).
+ * @param {boolean|null} [params.synthesisCurrent] - exact-fingerprint
+ *   currentness from `proposal.reviewSynthesisState.current`. When false, the
+ *   renderers label the synthesis stale because the deterministic roster and
+ *   answers reflect the current submitted-review population.
  * @returns {{
  *   header: {requestNumber:(string|null), requestTitle:(string|null),
  *     piName:(string|null), institution:(string|null), generatedAtIso:string,
  *     reviewerCount:number},
+ *   reviewers: Array<{suggestionId:string, name:(string|null),
+ *     affiliation:(string|null)}>,
  *   summary: {reviewsSubmitted:number, ratingQuestions:Array<{key:string,
  *     text:string, retired:boolean, average:(number|null), min:(number|null),
  *     max:(number|null), answeredCount:number, totalReviewers:number}>},
@@ -277,6 +283,7 @@ export function composeReviewReport({
   matrix,
   generatedAtIso,
   synthesis = null,
+  synthesisCurrent = null,
 }) {
   const safeMatrix = matrix && Array.isArray(matrix.questions) && Array.isArray(matrix.reviewers)
     ? matrix
@@ -307,7 +314,20 @@ export function composeReviewReport({
     })),
   };
 
-  const reviewerName = new Map(safeMatrix.reviewers.map((r) => [r.suggestionId, r.name || null]));
+  // Identity is composed deterministically outside the LLM-authored
+  // synthesis: the report may list reviewers, while synthesized observations
+  // remain unattributed.
+  const reviewers = safeMatrix.reviewers.map((reviewer) => ({
+    suggestionId: reviewer.suggestionId,
+    name: typeof reviewer.name === 'string' && reviewer.name.trim()
+      ? reviewer.name.trim()
+      : null,
+    affiliation: typeof reviewer.affiliation === 'string' && reviewer.affiliation.trim()
+      ? reviewer.affiliation.trim()
+      : null,
+  }));
+
+  const reviewerName = new Map(reviewers.map((r) => [r.suggestionId, r.name]));
 
   // Per-question answer sections IN MATRIX (question) ORDER — every answered
   // question type in one flow. Ratings (picklist) render inline like the
@@ -368,11 +388,13 @@ export function composeReviewReport({
       keyConcerns: Array.isArray(synthesis.keyConcerns) ? synthesis.keyConcerns : [],
       ratingSummaries: Array.isArray(synthesis.ratingSummaries) ? synthesis.ratingSummaries : [],
       overall: typeof synthesis.overall === 'string' ? synthesis.overall : '',
+      ...(typeof synthesisCurrent === 'boolean' ? { current: synthesisCurrent } : {}),
     }
     : null;
 
   return {
     header,
+    reviewers,
     summary,
     answerSections,
     synthesisSection,

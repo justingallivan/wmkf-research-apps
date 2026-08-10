@@ -170,6 +170,43 @@ test('keeps a stored synthesis visible even when there are no accepted reviewer 
   expect(screen.getByText(/stale or predates lifecycle tracking/i)).toBeInTheDocument();
 });
 
+test('lists submitted reviewer names and accepted affiliations beside the anonymous synthesis', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'g1',
+          name: 'John Hackett',
+          reviewerAffiliation: 'Florida International University',
+          affiliation: 'Prior Institution',
+          reviewReceivedAt: '2026-08-10T00:00:00Z',
+          answers: [],
+        }],
+        reviewSynthesis: {
+          consensus: ['A reviewer found the approach compelling.'],
+          disagreements: [],
+          keyConcerns: [],
+          ratingSummaries: [],
+          overall: 'The reviewers were positive overall.',
+        },
+        reviewSynthesisState: { current: true },
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText((_, element) => (
+    element.tagName === 'LI'
+      && element.textContent === 'John Hackett — Florida International University'
+  ))).toBeInTheDocument();
+  expect(screen.getByText('A reviewer found the approach compelling.')).toBeInTheDocument();
+  expect(screen.queryByText('Prior Institution')).not.toBeInTheDocument();
+});
+
 test('manual early generation requires confirmation and sends confirmEarly:true', async () => {
   const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
   const proposal = {

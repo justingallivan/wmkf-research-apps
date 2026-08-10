@@ -5,7 +5,7 @@ status: active
 metadata: 
   node_type: memory
   type: project
-  last_verified: 2026-07-22 via alert service, acceptance drain, OpenAlex institution search, and IRS-BMF refresh source; backlog counts remain the 2026-07-10 probe
+  last_verified: 2026-08-10 via reviewer DTO, report composition/renderers, synthesis prompt, and writeup contracts; backlog counts remain the historical 2026-07-10 probe
   originSessionId: c3f606e9-2cc7-43e5-a6e6-f74614c159f9
 ---
 
@@ -26,6 +26,17 @@ auto-resolve. Compares the reviewer's reported affiliation
 (`wmkf_revieweraffiliation` on the accepted suggestion, or `contactEdits.affiliation`)
 to the linked contact's institution (`_parentcustomerid_value` account link, or
 `adx_organizationname`).
+
+**Separate consumption decision (owner-confirmed 2026-08-10):** displaying a
+reviewer's institution in current Reviews outputs and planned Pre-Site/Final
+writeups does **not** wait for CRM Account cleanup. For the exact submitted-
+review population, application/template code renders a named roster using the
+accepted suggestion's `wmkf_revieweraffiliation`, with potential-reviewer
+affiliation as fallback and an explicit missing state. The AI narrative remains
+anonymous, and Contact `parentcustomerid` is not a prerequisite. Current
+Reviews UI/DOCX/PDF support is built in source pending promotion; the
+Pre-Site/Final document producer remains planned. This display contract does
+not change the parked reviewer→Account auto-link decision below.
 
 **Read-only probe run 2026-07-10** (`scripts/probe-reviewer-affiliation-account-match.js`,
 reads `system_alerts` PG + Dataverse `accounts` + accepted `wmkf_appreviewersuggestions`;

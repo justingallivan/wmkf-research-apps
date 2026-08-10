@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis reliability are proven; lifecycle readiness/currentness is deployed disabled, pending signed-in verification and bounded smoke."
+summary: "Reviews and synthesis are production-proven; deterministic reviewer-affiliation rosters are built in source for the current UI and exports, pending promotion."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-28
@@ -46,8 +46,10 @@ semantic attempt, persisted valid synthesis, and wrote completed AI run
 reliability is production-proven. The lifecycle/readiness extension merged
 through PR #96 as `70956477` and reached READY production deployment
 `dpl_2tgAYjUXFFx4nQo7FgE2Z3TBMqP9`. Its Postgres migration is live, the ledger
-remained empty after deployment, and an authenticated cron probe confirmed
-automatic generation remains disabled.
+remained empty after deployment, and an authenticated cron probe first
+confirmed automatic generation was disabled. Signed-in verification then
+passed, Production automation was enabled, and the controlled bounded smoke
+completed successfully as recorded in decision 6 below.
 
 **Verification boundary update (S376):** no genuine external reviewer has used
 the form, but the owner-authorized staged production submission proved the
@@ -65,8 +67,9 @@ restored exactly while the new synthesis and audit remained.
 > The first two paragraphs below describe the pre-build S326 baseline. They are
 > retained as implementation history, not current Workbench behavior. Phases
 > 1–3 now provide Outstanding tracking, comparison/matrix, and DOCX/PDF export.
-> The remaining gap is release and live verification of the Phase-4 synthesis
-> lifecycle/readiness behavior described in decision 6 and Phase 4.
+> Phase-4 synthesis lifecycle/readiness is now deployed and production-proven.
+> The 2026-08-10 reviewer-affiliation roster addition is built and tested in
+> source but is not production-verified until its branch is promoted.
 
 The reviewer-facing submission pipeline is COMPLETE and LIVE (see
 `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md` and
@@ -168,6 +171,15 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    returned zero answers/drafts/eligible requests and the retained memo to
    Stale. PRs #98 and #99 closed the run-source and vanished-input cancellation
    defects; final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready.
+7. **Named roster, anonymous synthesis (owner-confirmed 2026-08-10).** Current
+   Reviews outputs list the submitted reviewers and their affiliations in a
+   deterministic roster, while AI-authored synthesis observations remain
+   unattributed. The engagement-specific accepted suggestion value
+   `wmkf_revieweraffiliation` wins; the potential-reviewer person's primary
+   affiliation is fallback-only, and a missing value is displayed explicitly.
+   Contact `parentcustomerid` is not required for this display contract. The
+   roster must be composed outside the prompt so the model cannot omit,
+   alter, hallucinate, or attach an identity to a synthesized observation.
 
 ## Phases (independently shippable, in order)
 
@@ -229,6 +241,14 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
+- **[VERIFIED via source and focused tests 2026-08-10; deployment pending.]**
+  The report model and both renderers add a named `Reviewers` roster for the
+  submitted-review population. Each row renders name plus accepted
+  self-reported affiliation, falling back to the person affiliation and then
+  the explicit `Not reported` state. The roster is separate from the existing
+  per-question material and AI synthesis. When synthesis currentness is false,
+  the export labels it stale and states that the roster/answers reflect current
+  submissions while synthesis may reflect an earlier reviewer set.
 
 ### Phase 4 — AI synthesis (BUILT; provisioned; prompt current in production)
 - Tier-1 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
@@ -267,7 +287,11 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   accepted/submitted count and shows Current/Stale plus readiness and
   queued/running/failed state. Early manual generation uses an explicit browser
   confirmation and sends `confirmEarly:true`. LLM output remains plain-text
-  only (no `dangerouslySetInnerHTML`).
+  only (no `dangerouslySetInnerHTML`). **[VERIFIED via source and focused tests
+  2026-08-10; deployment pending.]** When submitted reviews exist, the card
+  now renders their deterministic named affiliation roster above the anonymous
+  synthesis values. A non-current synthesis carries an explicit warning that
+  the roster is current while the synthesis may cover an earlier set.
 - `/api/cron/drain-review-syntheses` plus
   `review-synthesis-drain.js` implement the automatic all-in path with an exact
   request+fingerprint dedupe key, small leased claims, pre-generation

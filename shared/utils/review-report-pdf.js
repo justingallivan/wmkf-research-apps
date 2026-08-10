@@ -61,6 +61,18 @@ export async function generateReviewReportPdf(report) {
   builder.addMetadata('Reviews submitted', String(header.reviewerCount));
   builder.addDivider();
 
+  // --- Named reviewer roster ---
+  // Kept separate from the anonymous synthesis narrative by contract.
+  if (Array.isArray(report.reviewers) && report.reviewers.length > 0) {
+    builder.addSection('Reviewers');
+    for (const reviewer of report.reviewers) {
+      builder.addKeyValue(
+        reviewer.name || 'Unnamed reviewer',
+        reviewer.affiliation || 'Not reported',
+      );
+    }
+  }
+
   // --- Summary ---
   builder.addSection('Summary');
   builder.addParagraph(`${report.summary.reviewsSubmitted} review${report.summary.reviewsSubmitted === 1 ? '' : 's'} submitted.`);
@@ -74,7 +86,13 @@ export async function generateReviewReportPdf(report) {
   // --- Synthesis (Phase 4, optional — omitted entirely when not passed) ---
   if (report.synthesisSection) {
     const s = report.synthesisSection;
-    builder.addSection('AI Synthesis');
+    builder.addSection(s.current === false ? 'AI Synthesis (stale)' : 'AI Synthesis');
+    if (s.current === false) {
+      builder.addParagraph(
+        'The reviewer roster and answers reflect current submissions; this synthesis may reflect an earlier reviewer set.',
+        { font: 'italic' },
+      );
+    }
     if (s.consensus.length > 0) {
       builder.addKeyValue('Consensus', '');
       builder.addBulletList(s.consensus);
