@@ -48,6 +48,8 @@ function wireFetch({
   emailDefaults = defaultEmailDefaults(),
   sentInvitedAt = '2026-08-09T16:00:00Z',
   failAbstractReloadAfterSend = false,
+  replaceOk = true,
+  replaceNonce = 'bbbbbbbb',
 } = {}) {
   // Stateful effective-abstract mock (S278): GET returns the current state, the
   // generate POST seeds the draft, and PUT persists a PD edit so the editor flow
@@ -67,6 +69,9 @@ function wireFetch({
     invitedAt: abstract?.invitedAt ?? null,
     remindedAt: abstract?.remindedAt ?? null,
     invitationSent: false,
+    // Server-computed staff-replace capability + the package etag (S412).
+    canReplace: abstract?.canReplace ?? false,
+    deliverableEtag: abstract?.deliverableEtag ?? 'W/"d1"',
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
@@ -101,6 +106,25 @@ function wireFetch({
         imageUrl: state.imageUrl, hasImage: state.hasImage,
         submittedAt: state.submittedAt,
         invitedAt: state.invitedAt, remindedAt: state.remindedAt,
+        canReplace: state.canReplace, deliverableEtag: state.deliverableEtag,
+      }) };
+    }
+    if (u.includes('/grantee-deliverables/replace-submission')) {
+      if (!replaceOk) {
+        return { ok: false, json: async () => ({ error: 'This package changed since you loaded it.', code: 'stale' }) };
+      }
+      // Mirror the service: an absent caption field leaves it alone, and a new
+      // image lands as a fresh nonce ref (which is what re-keys the inline img).
+      const form = opts.body;
+      if (form.has('caption')) state.caption = form.get('caption');
+      if (form.has('image')) {
+        state.imageRef = `1002365_grantee_image_${replaceNonce}.png`;
+        state.hasImage = true;
+      }
+      state.deliverableEtag = 'W/"d2"';
+      return { ok: true, json: async () => ({
+        ok: true, caption: state.caption, imageRef: state.imageRef,
+        etag: state.deliverableEtag, status: state.status,
       }) };
     }
     if (u.includes('/grantee-deliverables/generate')) {
@@ -937,6 +961,108 @@ test('the Close-out pane offers no lifecycle transition actions yet', async () =
   }
 });
 
+// ── Staff replacement of the grantee submission (S412) ──
+//
+// Revisions are agreed over email, so this is how the agreed change reaches
+// SharePoint/Dataverse. The gating pin matters most: `canReplace` is computed
+// server-side, and the client must not re-derive it from status.
+
+const REPLACEABLE = { caption: 'Original caption.', hasImage: true, imageRef: 'a/1002365_grantee_image_aaaaaaaa.png', canReplace: true };
+
+async function openReplace() {
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: /replace image or caption/i }));
+}
+
+test('the replace control is hidden when the server says the package is not replaceable', async () => {
+  // Same submitted package, canReplace false — e.g. a Complete row. If the client
+  // re-derived the rule from status this would wrongly appear.
+  wireFetch({ abstract: submitted({ ...REPLACEABLE, canReplace: false }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: /replace image or caption/i })).not.toBeInTheDocument();
+});
+
+test('the replace control appears when the server says it may', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  expect(screen.getByLabelText('Replacement caption')).toHaveValue('Original caption.');
+});
+
+test('Save is disabled until something actually changes', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  const save = screen.getByRole('button', { name: /save replacement/i });
+  expect(save).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: 'Revised caption.' } });
+  expect(save).toBeEnabled();
+});
+
+test('a blank caption cannot be submitted (never clear the record)', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: '   ' } });
+  expect(screen.getByRole('button', { name: /save replacement/i })).toBeDisabled();
+});
+
+test('a caption replacement posts multipart with the package etag and reloads', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: 'Revised caption.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+
+  await waitFor(() => expect(screen.getByText(/replacement saved/i)).toBeInTheDocument());
+  const call = global.fetch.mock.calls.find(([u]) => String(u).includes('/replace-submission'));
+  expect(call[1].method).toBe('POST');
+  const form = call[1].body;
+  expect(form.get('requestId')).toBe(REQ);
+  expect(form.get('etag')).toBe('W/"d1"');
+  expect(form.get('caption')).toBe('Revised caption.');
+  // The reload re-read the committed value into the read-only display (scoped to
+  // the <p>, since the edit textarea holds the same text).
+  await waitFor(() => expect(screen.getByText('Revised caption.', { selector: 'p' })).toBeInTheDocument());
+});
+
+test('an image replacement re-keys the inline image so the browser refetches', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE), replaceNonce: 'cccccccc' });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
+  const srcBefore = screen.getByRole('img').getAttribute('src');
+  expect(srcBefore).toContain('aaaaaaaa');
+
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement image'), {
+    target: { files: [new File(['x'], 'new.png', { type: 'image/png' })] },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+
+  await waitFor(() => expect(screen.getByText(/replacement saved/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('img').getAttribute('src')).not.toBe(srcBefore));
+  expect(screen.getByRole('img').getAttribute('src')).toContain('cccccccc');
+});
+
+test('a rejected replacement surfaces the server message and does not claim success', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE), replaceOk: false });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: 'Revised caption.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/changed since you loaded it/i));
+  expect(screen.queryByText(/replacement saved/i)).not.toBeInTheDocument();
+});
+
+test('the panel warns that replacing removes the grantee original', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  expect(screen.getByText(/removes the grantee’s previous file/i)).toBeInTheDocument();
+});
+
 // ── Inline image (S411 increment 2) ──
 //
 // The image renders through the staff-guarded proxy route. The SharePoint
@@ -949,7 +1075,11 @@ test('a submitted image renders inline through the proxy route', async () => {
   await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
 
   const img = screen.getByRole('img');
-  expect(img).toHaveAttribute('src', `/api/workbench/grantee-deliverables/image?requestId=${REQ}`);
+  // The `v` tag is derived from the stored ref and changes on every upload, so a
+  // staff replacement re-fetches instead of showing the cached previous image.
+  expect(img).toHaveAttribute('src', expect.stringContaining(
+    `/api/workbench/grantee-deliverables/image?requestId=${REQ}&v=`,
+  ));
   // The caption doubles as alt text; screen readers get the grantee's own words.
   expect(img).toHaveAttribute('alt', 'Cryo-EM structure.');
   // The SharePoint link is kept alongside it, not replaced.

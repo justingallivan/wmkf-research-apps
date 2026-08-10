@@ -785,13 +785,19 @@ Because revisions are agreed over email, the grantee never re-enters the portal.
 What staff need is a way to put the revised material — a different image, a
 corrected caption — into SharePoint and Dataverse themselves.
 
-**Staff currently cannot write either field.** There is exactly one writer of the
-image and caption, `writeGranteeDeliverables`, and its only caller is the external
-portal's submit route `[VERIFIED via pages/api/external/grantee/[token]/submit.js:24;
-disconfirming check — a repo-wide grep for grantee-upload importers across lib/,
-pages/, and shared/ returns no other caller]`. The caption's read-only state on the
-staff surface is deliberate, not an oversight: "staff caption editing is a separate
-change with its own concurrency story" `[VERIFIED via abstract-service.js:124-126]`.
+**Staff could not write either field** when this was written. There was exactly one
+writer of the image and caption, `writeGranteeDeliverables`, whose only caller was
+the external portal's submit route `[VERIFIED 2026-08-10 via
+pages/api/external/grantee/[token]/submit.js:24; disconfirming check — a repo-wide
+grep for grantee-upload importers across lib/, pages/, and shared/ returned no
+other caller]`. The caption's read-only state on the staff surface was deliberate,
+not an oversight: "staff caption editing is a separate change with its own
+concurrency story".
+
+**BUILT 2026-08-10 (S412)** — see "As built" below. That separate change is now the
+`replace-submission` route/service, which owns its own concurrency story exactly as
+the note anticipated. The abstract GET's inline comment was updated in the same
+commit, so the quoted wording no longer appears in source.
 
 **The existing writer cannot simply be given a second caller.** It is built around
 grantee consent: `waiverVersionId` is required and it fails closed with
@@ -844,6 +850,45 @@ and cannot change it, while staff retain the pen. It is arguably the cheapest of
 the four transitions to add, since no consumer needs changing — only a writer and
 a Close-out button. It is called out here rather than designed because it was not
 part of the owner's parked design; adding it is additive and blocks nothing.
+
+### As built (2026-08-10, S412) — staff replace path
+
+Tier 2, on branch `staff-submission-replace`. Not merged at time of writing.
+
+| Piece | Path |
+|---|---|
+| Service (all logic) | `lib/services/workbench/grantee-deliverables/replace-submission-service.js` |
+| Route (thin shell, multipart) | `pages/api/workbench/grantee-deliverables/replace-submission.js` |
+| Status rule (one definition) | `shared/config/granteeDeliverableStatus.js` — `STAFF_REPLACEABLE_STATUSES` / `isStaffReplaceableStatus` |
+| Capability flag + package etag | `abstract-service.js` GET adds `canReplace`, `deliverableEtag` |
+| UI | `AwardeeTab.js` Submission pane, collapsed by default |
+| Tests | `tests/unit/grantee-replace-submission-service.test.js` (25), plus 8 in `awardee-tab.test.js` |
+
+Decisions worth not re-litigating:
+
+- **The status rule lives in the shared config, not the service.** The server
+  computes `canReplace` from it and the client renders that flag; the client never
+  re-derives the rule. That is the direct application of
+  `.claude-memory/feedback-ui-gates-must-mirror-server-guards.md`.
+- **`Revision Requested` is refused** by the gate, matching `APPROVED_EDITABLE`. If
+  the deferred transition is ever built, that refusal is the correct interaction:
+  the grantee holds the pen in that status.
+- **The rollback diverges from the portal writer on purpose.** That writer confirms
+  a commit with `ref === new && status === SUBMITTED`; this path writes no status,
+  so it confirms on the image ref alone. Copying the status term would misread a
+  committed write on a `Staff Review` row as a rollback and delete a referenced
+  image. The unit test that pins this deliberately uses a `Staff Review` fixture —
+  on `Submitted` the buggy check agrees and proves nothing. Verified by mutation.
+- **The rollback machinery is duplicated, not extracted.** Semantics differ
+  (one-row PATCH vs two-row changeset, no status term) and extraction would touch
+  the live grantee submit path for no behavioral gain.
+- **The inline image URL gained a `v` tag** derived from the stored ref, because
+  the proxy URL is keyed on `requestId` alone — without it a replacement leaves the
+  previous image on screen and reads as a failed save.
+
+Not done, deliberately: no audit trace distinguishing a staff substitution from the
+grantee's own upload (the open sub-question above), and no notification to the
+grantee — the email that agreed the revision is the record.
 
 ### Out of scope
 
