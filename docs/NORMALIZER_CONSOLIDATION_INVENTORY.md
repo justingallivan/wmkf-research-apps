@@ -25,6 +25,12 @@ companion characterization tests** (`tests/unit/normalizer-characterization/`).
 Everything below was verified by reading the current source and grepping for
 call sites; no claim here should be read as a plan or a recommendation.
 
+**2026-08-10 update:** accepted-reviewer Contact parent enrichment added a
+tenth institution normalizer, `normalizeReviewerInstitution`, shared by the
+runtime and its adjudication report. The inventory and counts now include it;
+the original “no production code was touched” statement describes the
+2026-08-07 inventory pass, not the later implementation.
+
 The independent research memo (`outputs/fuzzy-matching-independent-research-fable-2026-08-05.md`
 §1) asserted counts up front: "14 person-name normalizer definitions,
 reducible to 8 genuinely distinct algorithms" and "11 institution normalizer
@@ -383,10 +389,11 @@ conservative because a MISS here escalates to a full async
 `institutionConsistency.areConsistent` call (§2.2's `institutionDirectMatch`
 plus associated-institution one-hop check) rather than silently equating two
 different-looking names.
-- **Caller**: `alertReviewerAffiliationMismatch` — staff notification when an
-  accepted reviewer's self-reported affiliation differs from their linked CRM
-  contact's institution. Explicitly does NOT write any CRM field; the
-  comparison result only gates whether a human gets pinged.
+- **Caller**: `alertReviewerAffiliationMismatch` — residual staff notification
+  when an accepted reviewer's self-reported affiliation differs from their
+  linked CRM contact's institution. This helper itself writes no CRM field;
+  the acceptance drain invokes it only after the separate exact Account
+  auto-link has abstained.
 
 ### 2.8 Inline `normalizeInst` — `lib/services/integrity-matching-service.js:376`
 ```
@@ -418,6 +425,19 @@ as evidence), with its own stopword list.
 - **Caller**: `resultContradictsAnchor` (contact-enrichment tier-result
   validation: an enrichment result whose ORCID or institution contradicts the
   anchor identity is rejected).
+
+### 2.10 `normalizeReviewerInstitution` — `lib/utils/reviewer-institution-account-match.js`
+```
+trim → NFKC-normalize → lowercase(en-US) → replace every non-Unicode-letter/
+digit/whitespace character with a space → collapse whitespace → trim
+```
+Conservative equality key: no diacritic removal, legal-suffix stripping,
+stopword removal, acronym expansion, fuzzy scoring, or provider identity.
+- **Callers**: `buildReviewerAccountLabelIndex` indexes active CRM Account
+  `name`, `akoya_aka`, `wmkf_legalname`, and `wmkf_dc_aka`; accepted-reviewer
+  runtime linking requires the affiliation to reach exactly one Account.
+  `scripts/lib/reviewer-contact-account-link-report.mjs` re-exports the same
+  primitive, so the adjudication report and runtime cannot drift.
 
 ## 3. Nickname / name-variant maps
 
@@ -507,8 +527,9 @@ to **8**, matching the memo's claim exactly. See §6.
 | 7 | `normalizeAffiliationForCompare` | alert-reviewer-affiliation-mismatch.js:42 | edge punctuation/symbol trim only | string |
 | 8 | inline `normalizeInst` | integrity-matching-service.js:376 | lowercase+strip-non-alpha+ws (same shape as person #1/#2) | string |
 | 9 | `institutionTokens` | domain-evidence.js:18 | wraps person-normalizer §4#5+token-length/stopword filter | **token array** |
+| 10 | `normalizeReviewerInstitution` | reviewer-institution-account-match.js | NFKC+case-fold+Unicode punctuation→space+ws | string |
 
-**9 definitions found** (memo claimed 11). No second verbatim copy of a
+**10 definitions found** (memo claimed 11). No second verbatim copy of a
 "keyword-set extractor" was found: `fundingApis.js`'s Set-returning
 normalizer (#4) has no byte-identical twin anywhere else in the codebase —
 the closest kin are `domain-evidence.js`'s `institutionTokens` (#9) and
@@ -520,14 +541,14 @@ extraction) but different in stopword list, length threshold, and campus/
 conflict-veto list. **This is the one place my count diverges from the
 memo's — see §6.**
 
-By strict pipeline-shape comparison: **9 distinct algorithms** (every
+By strict pipeline-shape comparison: **10 distinct algorithms** (every
 definition here differs from every other in at least one structural way —
 suffix handling, abbreviation table, return type, or extraction-vs-strip
 strategy). Two pairs are close in SPIRIT but not code (#4 vs #9: both are
 significant-token extractors for veto-style contradiction checks, but
 different implementations with different tables) — if those are treated as
 one "significant-token overlap" algorithm family, the count drops to
-**7 distinct algorithms**, still short of the memo's claimed 6 (my inventory
+**8 distinct algorithms**, still short of the memo's claimed 6 (my inventory
 did not find a pair close enough to collapse to 6; see §6).
 
 ## 6. Reconciliation against the research memo's claims
@@ -536,8 +557,8 @@ did not find a pair close enough to collapse to 6; see §6).
 |---|---|---|
 | 14 person-name normalizer definitions | 14 | **Exact match** |
 | reducible to 8 distinct algorithms | 12 strict / 8 if honorific-set variants are treated as one parametrized step | **Matches under the looser reading; my strict reading says 12** |
-| 11 institution normalizer definitions | 9 | **Discrepancy: 2 fewer found.** Grepped broadly (`normalize`, `fold`, `institution` + `normaliz`) across `lib/`, `pages/`, `shared/`; did not exhaustively read every file with an `institution`-adjacent identifier (e.g. `field-primer-service.js`, `proposal-pi-identity.js` were checked and found to consume identity objects rather than define new normalizers). The memo may be counting the embedded `getKeyWords`/`keyInstitutionWords` helpers inside `deduplication-service.js` as separate definitions, or counting a file this pass missed. **Flagged, not resolved** — a consolidation effort should re-grep before relying on either count. |
-| 6 distinct institution algorithms, incl. 2 verbatim copies of a keyword-set extractor | 9 (or 7 if #4/#9 are merged as one family) — **no verbatim-copy pair found** | **Discrepancy.** No byte-identical institution-normalizer pair exists in the current source; every pair I compared differs in at least stopword list or return type. Possible explanations: the verbatim-copy claim referred to code since refactored, to a file outside my grep patterns, or to a different notion of "verbatim" (e.g. same INTENT/spirit rather than same source text) than this inventory used (byte-for-byte body comparison). |
+| 11 institution normalizer definitions | 10 | **Discrepancy: 1 fewer found.** The 2026-08-10 accepted-reviewer exact matcher added one definition after the original inventory. The earlier broad grep found nine; the memo may also count the embedded `getKeyWords`/`keyInstitutionWords` helpers inside `deduplication-service.js` as separate definitions, or a file this pass missed. **Flagged, not resolved** — re-grep before relying on either count. |
+| 6 distinct institution algorithms, incl. 2 verbatim copies of a keyword-set extractor | 10 (or 8 if #4/#9 are merged as one family) — **no verbatim-copy pair found** | **Discrepancy.** No byte-identical institution-normalizer pair exists in the current source; every pair I compared differs in at least stopword list or return type. Possible explanations: the verbatim-copy claim referred to code since refactored, to a file outside my grep patterns, or to a different notion of "verbatim" (e.g. same INTENT/spirit rather than same source text) than this inventory used (byte-for-byte body comparison). |
 | Two independent nickname maps (`NICKNAME_MAP`, `NAME_VARIANTS`) | Confirmed, §3 | **Exact match** |
 
 ## 7. Callers-at-risk: same string, different verdict, different seam
@@ -588,9 +609,10 @@ tests for the full battery):
 
 ## 8. What this document does not do
 
-No production file under `lib/`, `pages/`, or `shared/` was modified to
-produce this inventory. No threshold, table, or algorithm is recommended for
-change. The characterization tests in `tests/unit/normalizer-characterization/`
+The original 2026-08-07 inventory changed no production file under `lib/`,
+`pages/`, or `shared/`; the 2026-08-10 update records the subsequently added
+reviewer Account exact matcher. No broader threshold, table, or algorithm is
+recommended for change. The characterization tests in `tests/unit/normalizer-characterization/`
 pin TODAY'S behavior — including behavior this document flags as
 inconsistent or as a documentation/reality drift (e.g. §1.5's false "copied
 from" claim) — so that a later consolidation step has a regression net that

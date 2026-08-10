@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-08
+last_verified: 2026-08-10
 owner: product-engineering
 related:
   - lib/services/
@@ -71,6 +71,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Reviewer / honorarium
 
+- **`auto-link-reviewer-contact-account.js`** — Acceptance-only Contact parent-Account enrichment. It scans the complete active Account population and fills an empty `contact.parentcustomerid` only when the accepted self-reported affiliation has exactly one normalized exact match across Account name/AKA/legal/DC-AKA labels; existing parents, ambiguity, and misses abstain. Target freshness plus an ETag-conditional fill-only Contact write prevent stale or racing overwrites; operational failures retry through `reviewer_acceptance_jobs`.
 - **`review-receipt-guard.js`** — Shared terminal/finality/accepted/ETag authorization for every request-time review-receipt sink; classifiers turn a lost If-Match race into `engagement_ended`, `review_received_locked`, or `conflict`.
 - **`review-manager/terminal-transition-service.js`** — Dedicated fail-closed post-accept `withdrew`/`released` transition. Fresh per-row eligibility read, explicit partial-success statuses, and ETag-conditional writes so a concurrent submission wins. Staff-recorded `withdrew` also corrects the response to declined, atomically deletes the exact linked honorarium request, and cancels acceptance follow-up; `released` remains a status-only WMKF outcome.
 - **`review-manager/manual-review-entry-service.js`** — Staff rescue for recording a complete structured review from the Workbench Reviews tab. Reuses the external review question set, sanitizer, validator, canonical submission producer, and atomic ETag-guarded parent/answer-row changeset; deletes a stale external draft only after commit.
@@ -258,6 +259,7 @@ If you're touching a service or utility, read its header before this catalog. If
   versioned exact-address attestation, pending-conflict, and resolution bundle;
   malformed, oversized, unknown-version, and stored-email-mismatched state
   grants no send authority.
+- **`reviewer-institution-account-match.js`** — Shared conservative exact matcher used by the accepted-reviewer runtime and the Contact→Account adjudication report. NFKC/case/punctuation/whitespace normalization only; indexes active Account `name`, `akoya_aka`, `wmkf_legalname`, and `wmkf_dc_aka`; duplicate targets remain ambiguous and no fuzzy/acronym expansion is inferred.
 
 ### Secrets
 

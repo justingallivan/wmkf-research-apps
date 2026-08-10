@@ -67,7 +67,7 @@ describe('alertReviewerAffiliationMismatch', () => {
       autoResolveKey: 'reviewer-affiliation-mismatch:pr-1',
     });
     const message = deps.notify.mock.calls[0][0].message;
-    expect(message).toContain('The contact/account was NOT modified');
+    expect(message).toContain('The contact/account was not changed automatically');
     expect(message).toContain('NOTE: this may simply be a name variant');
   });
 

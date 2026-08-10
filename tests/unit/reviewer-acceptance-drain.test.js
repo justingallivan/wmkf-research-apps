@@ -89,6 +89,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     captureIdentity: jest.fn(async () => ({})),
     syncNameTitle: jest.fn(async () => ({})),
     alertEmail: jest.fn(async () => ({})),
+    autoLinkAccount: jest.fn(async () => ({ skipped: 'no_exact_target' })),
     alertAffiliation: jest.fn(async () => ({})),
     sendAcceptanceEmail: jest.fn(async () => ({ sent: true })),
     notify: jest.fn(async () => ({ id: 1 })),
@@ -128,7 +129,14 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.captureIdentity).toHaveBeenCalledWith(expect.objectContaining({ academicRank: 'Professor' }));
     expect(d.syncNameTitle).toHaveBeenCalledWith(expect.objectContaining({ trusted: true }));
     expect(d.alertEmail).toHaveBeenCalledWith(expect.objectContaining({ reviewerEmail: 'reviewer@example.org' }));
+    expect(d.autoLinkAccount).toHaveBeenCalledWith(expect.objectContaining({
+      contactId: 'contact-1',
+      reviewerAffiliation: 'Reviewer Org',
+      trustedAcceptance: true,
+    }));
     expect(d.alertAffiliation).toHaveBeenCalledWith(expect.objectContaining({ reviewerAffiliation: 'Reviewer Org' }));
+    expect(d.autoLinkAccount.mock.invocationCallOrder[0])
+      .toBeLessThan(d.alertAffiliation.mock.invocationCallOrder[0]);
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.quota).toHaveBeenCalledWith({ requestId: REQUEST_ID, actingUserSystemId: null });
     expect(d.jobs.mergeReviewerAcceptanceJobStep).toHaveBeenCalledWith(77, expect.any(String), 'acceptance_confirmation', expect.objectContaining({ claimedAt: expect.any(String) }));
@@ -361,7 +369,7 @@ describe('processReviewerAcceptanceJob', () => {
     d.ensureHonorarium.mockRejectedValueOnce(new Error('BILL down'));
 
     await expect(processReviewerAcceptanceJob(job(), d)).rejects.toMatchObject({
-      message: expect.stringContaining('honorarium_onboarding_retry_required'),
+      message: expect.stringContaining('reviewer_acceptance_followup_retry_required'),
       retryable: true,
       delaySeconds: 300,
     });
@@ -371,6 +379,34 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.syncNameTitle).toHaveBeenCalled();
     expect(d.sendAcceptanceEmail).toHaveBeenCalled();
     expect(d.quota).toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the mismatch warning after a confident Account link', async () => {
+    const d = deps();
+    d.autoLinkAccount.mockResolvedValueOnce({
+      linked: true,
+      accountId: 'account-1',
+      accountName: 'Reviewer Org',
+    });
+
+    await processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d);
+
+    expect(d.autoLinkAccount).toHaveBeenCalled();
+    expect(d.alertAffiliation).not.toHaveBeenCalled();
+    expect(d.jobs.completeReviewerAcceptanceJob).toHaveBeenCalled();
+  });
+
+  it('retries an operational Account-link failure without emitting transient mismatch noise', async () => {
+    const d = deps();
+    d.autoLinkAccount.mockRejectedValueOnce(new Error('Dataverse Account scan unavailable'));
+
+    await expect(processReviewerAcceptanceJob(job({ isAcceptRepeat: true }), d)).rejects.toMatchObject({
+      message: expect.stringContaining('reviewer_acceptance_followup_retry_required'),
+      retryable: true,
+    });
+
+    expect(d.alertAffiliation).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
   });
 

@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
+**Last verified:** Acceptance-time affiliation→Contact parent-Account source contract reconciled 2026-08-10 (source implementation pending promotion); runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
 **Live row count:** 724
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
@@ -104,8 +104,12 @@ propagation is field-specific, not all-or-nothing):
 The acceptance follow-up flow synchronizes reviewer-confirmed name, nickname,
 and title to the linked contact through
 `sync-reviewer-name-title-to-contact.js`; ORCID and board identity use their own
-capture paths. Email and affiliation differences remain engagement-scoped and
-drive mismatch/operations handling rather than silently overwriting the contact.
+capture paths. Email differences remain engagement-scoped and drive mismatch
+handling. In source pending promotion, accepted affiliation may additionally
+fill an **empty** Contact `parentcustomerid` only when the complete active
+Account population yields exactly one normalized exact match across Account
+name/AKA/legal/DC-AKA labels. Existing parents, ambiguous matches, and misses
+are never overwritten and continue to the affiliation-mismatch alert.
 
 Decline structured capture:
 - `wmkf_declinereasonpicklist` (Picklist: `too-busy=100000000 | conflict-of-interest=100000001 | outside-expertise=100000002 | bad-timing=100000003 | other=100000004`)

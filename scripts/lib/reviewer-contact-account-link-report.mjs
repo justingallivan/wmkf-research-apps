@@ -1,9 +1,15 @@
-const ACCOUNT_LABEL_FIELDS = [
-  ['name', 'name'],
-  ['akoya_aka', 'aka'],
-  ['wmkf_legalname', 'legal_name'],
-  ['wmkf_dc_aka', 'dc_aka'],
-];
+import {
+  buildReviewerAccountLabelIndex,
+  classifyReviewerAccountTargets,
+  nonBlankInstitution,
+  normalizeReviewerInstitution,
+} from '../../lib/utils/reviewer-institution-account-match.js';
+
+export {
+  buildReviewerAccountLabelIndex as buildAccountLabelIndex,
+  classifyReviewerAccountTargets as classifyContactAccountTargets,
+  normalizeReviewerInstitution as normalizeInstitution,
+};
 
 const AFFILIATION_SOURCE_PRIORITY = {
   accepted_suggestion: 0,
@@ -14,43 +20,7 @@ const AFFILIATION_SOURCE_PRIORITY = {
 };
 
 export function nonBlank(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-/**
- * Conservative exact-name normalization. It deliberately does not expand
- * acronyms, remove corporate suffixes, or perform fuzzy matching.
- */
-export function normalizeInstitution(value) {
-  return nonBlank(value)
-    .normalize('NFKC')
-    .toLocaleLowerCase('en-US')
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function buildAccountLabelIndex(accounts) {
-  const index = new Map();
-  for (const account of accounts || []) {
-    if (!account?.accountid || account.statecode === 1) continue;
-    for (const [field, labelType] of ACCOUNT_LABEL_FIELDS) {
-      const label = nonBlank(account[field]);
-      const key = normalizeInstitution(label);
-      if (!key) continue;
-      if (!index.has(key)) index.set(key, new Map());
-      const byAccount = index.get(key);
-      const existing = byAccount.get(account.accountid) || {
-        accountId: account.accountid,
-        accountName: nonBlank(account.name) || label,
-        matchedLabels: [],
-      };
-      existing.matchedLabels.push({ field: labelType, value: label });
-      byAccount.set(account.accountid, existing);
-    }
-  }
-  return index;
+  return nonBlankInstitution(value);
 }
 
 function evidenceSort(a, b) {
@@ -88,7 +58,7 @@ export function collectAffiliationEvidence({ reviewers = [], suggestions = [], c
   const grouped = new Map();
   for (const item of raw.sort(evidenceSort)) {
     const value = nonBlank(item.value);
-    const normalized = normalizeInstitution(value);
+    const normalized = normalizeReviewerInstitution(value);
     if (!normalized) continue;
     if (!grouped.has(normalized)) {
       grouped.set(normalized, { value, normalized, sources: [] });
@@ -96,35 +66,6 @@ export function collectAffiliationEvidence({ reviewers = [], suggestions = [], c
     grouped.get(normalized).sources.push({ ...item, value: undefined });
   }
   return [...grouped.values()];
-}
-
-export function classifyContactAccountTargets(evidence, accountLabelIndex) {
-  const targets = new Map();
-  const matchedEvidence = [];
-  const unmatchedEvidence = [];
-
-  for (const item of evidence || []) {
-    const matches = [...(accountLabelIndex.get(item.normalized)?.values() || [])];
-    if (matches.length === 0) {
-      unmatchedEvidence.push(item.value);
-      continue;
-    }
-    matchedEvidence.push({ affiliation: item.value, targets: matches.map((m) => m.accountId) });
-    for (const match of matches) {
-      const existing = targets.get(match.accountId) || { ...match, affiliations: [] };
-      existing.affiliations.push(item.value);
-      targets.set(match.accountId, existing);
-    }
-  }
-
-  const targetList = [...targets.values()].sort((a, b) =>
-    a.accountName.localeCompare(b.accountName) || a.accountId.localeCompare(b.accountId));
-  let status = 'no_affiliation';
-  if ((evidence || []).length > 0 && targetList.length === 0) status = 'no_exact_target';
-  if (targetList.length === 1) status = 'unique_exact_target';
-  if (targetList.length > 1) status = 'ambiguous_exact_targets';
-
-  return { status, targets: targetList, matchedEvidence, unmatchedEvidence };
 }
 
 export function csvCell(value) {

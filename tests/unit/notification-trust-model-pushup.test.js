@@ -482,6 +482,7 @@ function makeAcceptanceDrainDeps(overrides = {}) {
     captureIdentity: jest.fn().mockResolvedValue(undefined),
     syncNameTitle: jest.fn().mockResolvedValue(undefined),
     alertEmail: jest.fn().mockResolvedValue(undefined),
+    autoLinkAccount: jest.fn().mockResolvedValue({ skipped: 'no_exact_target' }),
     alertAffiliation: jest.fn().mockResolvedValue(undefined),
     quota: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -1299,6 +1300,7 @@ describe('notification trust-model already-covered characterization sites', () =
       captureIdentity: jest.fn().mockResolvedValue(undefined),
       syncNameTitle: jest.fn().mockResolvedValue(undefined),
       alertEmail: jest.fn().mockResolvedValue(undefined),
+      autoLinkAccount: jest.fn().mockResolvedValue({ skipped: 'no_exact_target' }),
       alertAffiliation: jest.fn().mockResolvedValue(undefined),
       sendAcceptanceEmail: jest.fn().mockResolvedValue(undefined),
       quota: jest.fn().mockResolvedValue(undefined),
@@ -1306,7 +1308,7 @@ describe('notification trust-model already-covered characterization sites', () =
 
     await expect(withDalContext('cron-drain-reviewer-acceptances', () =>
       processReviewerAcceptanceJob(job, deps),
-    )).rejects.toThrow(/honorarium_onboarding_retry_required/);
+    )).rejects.toThrow(/reviewer_acceptance_followup_retry_required/);
 
     expectTrustedNotify(seen, { type: 'honorarium_onboard_failed', source: 'reviewer-acceptance-drain' });
   });
