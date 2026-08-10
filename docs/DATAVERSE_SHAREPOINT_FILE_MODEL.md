@@ -516,8 +516,12 @@ a secondary hint because no edits can mean either “reviewed; no changes” or
 The Reviewed marker requires durable per-editor state, likely a child row keyed
 to the editor and registered artifact. Its exact granularity (request versus
 artifact stage), coordinator matrix, and access key remain design decisions.
-The first draft-functional delivery gate is 2026-08-10, before proposal intake
-begins around 2026-08-18. A human-in-the-loop Initial Assessment pilot must
+The first draft-functional delivery gate was targeted at 2026-08-10, before
+proposal intake begins around 2026-08-18. That date was a deliberately early
+**internal buffer, not an external commitment** (owner, 2026-08-10 / S412) and
+has passed unmet with administrator evidence still outstanding — expected, not
+slippage; see `docs/CURRENT_WORK_QUEUE.md` row 1 for the real completion gate.
+A human-in-the-loop Initial Assessment pilot must
 create and register a real canonical Word artifact, let authorized staff open
 and edit it, and let staff find and open that same registered artifact from
 both the Workbench and this dashboard. One safe failure/retry path must prove

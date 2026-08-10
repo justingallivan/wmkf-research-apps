@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-08-10
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -135,8 +135,12 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-1. close the partially successful human-in-the-loop Initial Assessment pilot
-   by 2026-08-10, ahead of proposal intake around 2026-08-18. The controlled
+1. close the partially successful human-in-the-loop Initial Assessment pilot.
+   Its 2026-08-10 target was a deliberately early **internal buffer, not an
+   external commitment** (owner, 2026-08-10 / S412); it passed unmet because the
+   administrator evidence is still outstanding with Connor, and that is expected
+   rather than slippage. Proposal intake around 2026-08-18 is the unchanged
+   external date. The controlled
    Request `1002788` rehearsal generated and registered the canonical
    SharePoint artifact, exposed that same item in Workbench and the cycle
    locator, created native version history, and proved exact-input no-duplicate
@@ -161,8 +165,8 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    Site Visit dossier, narrow request-scoped applicant-material upload, and
    transcript-summary provenance; and
 3. reuse the proven artifact registry/read contract for Pre Site Visit, Final
-   Writeup, and Initial Assessment scale-out. The August 10 pilot is
-   draft-functional proof rather than production readiness.
+   Writeup, and Initial Assessment scale-out. That pilot is draft-functional
+   proof rather than production readiness.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became

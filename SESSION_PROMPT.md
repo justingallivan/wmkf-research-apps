@@ -103,7 +103,16 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    each underlying affiliation was actually corrected in Dataverse was **not
    verified by this probe** — it reports alert status only.
 
-3. **August 10 references beyond the work queue.** Evidence:
+3. ~~**August 10 references beyond the work queue.**~~ **DONE (S413, 2026-08-10.)**
+   The owner's "internal buffer, not an external commitment" classification —
+   which previously lived only in `docs/CURRENT_WORK_QUEUE.md` row 1 — is now
+   propagated to the Calendar gate section of
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (a status banner
+   governing the document's later mentions), `docs/STRATEGY.md` items 1 and 3,
+   and `docs/agent-wiki/topics/strategy-roadmap.md` (both sites). Remaining
+   "August 10" strings are records of owner decisions made at the time and are
+   explicitly covered by the banner; they were left historical rather than
+   rewritten. Original evidence:
    `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (5 mentions),
    `docs/STRATEGY.md:164`. `docs/CURRENT_WORK_QUEUE.md:37` was corrected this
    session with the owner's clarification; the rest still read as a live deadline.

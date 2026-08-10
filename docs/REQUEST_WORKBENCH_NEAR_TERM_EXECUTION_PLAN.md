@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-01
+last_verified: 2026-08-10
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -30,9 +30,23 @@ the Atlas, tests, and live probes.
 
 ## Calendar gate
 
-The first fixed owner deadline is **2026-08-10**: the shared governed-artifact
-foundation and the J27 Initial Assessment must work end to end in draft form,
+The first internal target was **2026-08-10**: the shared governed-artifact
+foundation and the J27 Initial Assessment working end to end in draft form,
 ahead of proposal intake beginning around **2026-08-18**.
+
+> **Status as of 2026-08-10 (S413) — this date is NOT a live deadline.** The owner
+> classified 2026-08-10 as a **deliberately early internal buffer, not an external
+> commitment** (owner, 2026-08-10 / S412; recorded in `docs/CURRENT_WORK_QUEUE.md`
+> row 1). It has now passed without being met — the administrator evidence is still
+> outstanding with Connor — and **that is expected, not slippage.** Do not raise it
+> as a missed deadline or plan around it as a date. The real gate is the completion
+> decision in the work-queue row: administrator policy/access evidence obtained, and
+> product history/milestone controls recorded or built. The remaining external date,
+> proposal intake around **2026-08-18**, is unchanged.
+>
+> References to "August 10" further down this document are retained as the original
+> plan's framing and as records of owner decisions made at the time. Read them
+> against this status note, not as live commitments.
 
 The August 10 acceptance path is a real human-in-the-loop pilot. On
 2026-07-30, Request `1002788` completed the mechanics in steps 1–4 and 6
@@ -87,8 +101,8 @@ prove the configured version limit, second-stage administrator recovery,
 site/library Purview retention, or ordinary-editor least privilege; Workbench
 history/admin restore and milestone snapshots also remain unbuilt.
 Passing this draft-functional gate is not a broad production-readiness claim
-and does not require the later Pre-Site, Site Visit, or Final slices to be
-built by August 10.
+and never required the later Pre-Site, Site Visit, or Final slices to be built
+alongside it.
 
 “Week 1/2/3” below remain relative execution windows for later lifecycle work
 until those stages receive their own deadlines.
@@ -194,8 +208,10 @@ replace the explicit marker. The audience direction is staff-wide, including
 all PDs and designated staff proofreaders; exact app/file authorization still
 must be enforced rather than inferred from employment. Marker granularity
 (request versus artifact stage), coordinator view, and app-access key remain
-open. The first draft-functional delivery gate is August 10. App visibility
-and SharePoint file permission are separate controls and both must be enforced.
+open. The first draft-functional delivery gate was the August 10 internal
+buffer (see the Calendar gate status note — passed, not a live deadline). App
+visibility and SharePoint file permission are separate controls and both must
+be enforced.
 
 The detailed target contract and current-vs-planned boundary live in
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
@@ -767,7 +783,8 @@ Explicit non-goals during design freeze:
 > second-stage recovery, Purview retention, and ordinary-editor permissions,
 > plus Workbench history/admin restore and milestone snapshots.
 
-The August 10 minimum changes the former default. Exercise the now-live
+The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
+former default. Exercise the now-live
 governed artifact spine through the J27 Initial Assessment first;
 Pre Site Visit becomes a dependent reuse of that proven contract.
 

@@ -234,7 +234,8 @@ document inventory, and individual implementation plans do not establish priorit
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
 - Current near-term sequence: synthesis lifecycle closure → governed artifact
-  foundation plus the August 10 Initial Assessment pilot → remaining-tab
+  foundation plus the Initial Assessment pilot (its August 10 target was an
+  internal buffer, now passed — not a live deadline) → remaining-tab
   design freeze and dependent lifecycle slices. The 2026-07-27 Request
   `1002788` v2 smoke closed by its bounded-failure alternative; governed v3
   then became sole-current and the 2026-07-28 post-fix smoke persisted valid
@@ -344,9 +345,13 @@ document inventory, and individual implementation plans do not establish priorit
   proofreaders also need access. It reuses the typed registry and canonical
   SharePoint file; it is not a second editor. Marker granularity and coordinator
   view remain open.
-- Calendar direction (owner-confirmed 2026-07-28): the first fixed gate is a
-  human-in-the-loop, end-to-end Initial Assessment pilot by 2026-08-10, before
-  proposals begin arriving around 2026-08-18. The 2026-07-29 environment
+- Calendar direction (owner-confirmed 2026-07-28): the first gate is a
+  human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
+  2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10
+  date was a deliberately early internal buffer, not an external commitment
+  (owner, 2026-08-10 / S412), and has passed unmet with the administrator evidence
+  still outstanding — expected, not slippage. Do not treat it as a live deadline;
+  the work-queue row 1 completion decision is the real gate.** The 2026-07-29 environment
   decision is a controlled production rehearsal using colleague-created
   representative dummy requests; building the existing Dataverse sandbox
   organization into an integrated application/file test environment is out of
