@@ -376,8 +376,10 @@ deterministic identity conflicts alert staff and terminate without retry churn.
 Generic `setContactLink` failures abort before honorarium creation. A concurrent
 link to another contact uses the reviewer row's live link as authoritative.
 
-**Institution parent enrichment (source implementation pending promotion,
-2026-08-10).** After the post-honorarium withdrawal re-check proves the
+**Institution parent enrichment (LIVE in production since 2026-08-10, S412,
+merge `42abd72a`)** [VERIFIED via `origin/main`: unconditional call at
+`reviewer-acceptance-drain.js:611`, no env/feature gate]. After the
+post-honorarium withdrawal re-check proves the
 engagement is still accepted, the drain may fill an empty Contact
 `parentcustomerid`. Authority is only the accepted self-reported affiliation;
 the complete active Account population must yield exactly one normalized exact
@@ -779,7 +781,7 @@ exception.
 | 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking | **Implemented, S389** | Done |
 | 1 | Exact-address staff attestation, person-scoped trust-until-contradicted state, and no-dead-end remedy contract | **Approved and implemented in source, S391** | Wave 17 schema-first deploy + runtime promotion + controlled pilot |
 | 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, including honorarium opt-outs | **Implemented, S389** | Done |
-| 7 | Acceptance-time affiliation→empty Contact parent: unique normalized exact active Account label only; otherwise abstain + residual alert | **Implemented in source 2026-08-10; pending promotion** | Deploy and observe |
+| 7 | Acceptance-time affiliation→empty Contact parent: unique normalized exact active Account label only; otherwise abstain + residual alert | **LIVE in production 2026-08-10 (S412, merge `42abd72a`)** | Observe the next real reviewer acceptance |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |

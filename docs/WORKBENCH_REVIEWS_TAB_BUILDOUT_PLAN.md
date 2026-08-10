@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are production-proven; deterministic reviewer-affiliation rosters are built in source for the current UI and exports, pending promotion."
+summary: "Reviews and synthesis are production-proven; deterministic reviewer-affiliation rosters are live in the current UI and exports since 2026-08-10."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-07-28

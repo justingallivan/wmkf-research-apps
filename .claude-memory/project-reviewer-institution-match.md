@@ -30,7 +30,8 @@ At accepted-reviewer follow-up only:
   continue the reviewer-specific mismatch alert. A successful or already-correct
   link auto-resolves that reviewer's standing mismatch warning.
 
-Source implementation pending promotion:
+Source implementation, live in production since 2026-08-10 (S412, merge
+`42abd72a`):
 `lib/services/auto-link-reviewer-contact-account.js`,
 `lib/utils/reviewer-institution-account-match.js`,
 `lib/dataverse/adapters/contact.js`, and

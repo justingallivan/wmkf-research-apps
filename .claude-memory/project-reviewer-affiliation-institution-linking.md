@@ -24,8 +24,9 @@ similarity, or fall back to discovery affiliation. Ambiguous and unmatched
 cases retain the staff warning.
 
 **Source state:** `lib/services/auto-link-reviewer-contact-account.js` and
-`lib/utils/reviewer-institution-account-match.js` implement this rule on the
-current branch pending promotion. `reviewer-acceptance-drain.js` invokes it
+`lib/utils/reviewer-institution-account-match.js` implement this rule and are
+**live in production on `main` since 2026-08-10 (S412, merge `42abd72a`)**.
+`reviewer-acceptance-drain.js` invokes it
 after the withdrawal re-check and before the affiliation warning. Exact links
 suppress and auto-resolve the reviewer's standing warning. Transient
 operational failures keep the durable acceptance job retryable and defer alert
