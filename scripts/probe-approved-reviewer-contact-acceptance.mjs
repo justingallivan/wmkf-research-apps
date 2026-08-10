@@ -14,10 +14,16 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { v5 as uuidv5 } from 'uuid';
 import {
   RESPONSE_TYPE_MAP,
   REVIEW_STATUS_MAP,
 } from '../shared/config/reviewerLifecycle.js';
+import { normalizeOrcid } from '../lib/utils/orcid-normalize.js';
+
+// Must stay byte-identical to the durable acceptance-promotion namespace in
+// lib/bill/honorarium-onboard-orchestrator.js.
+const ACCEPTED_REVIEWER_CONTACT_GUID_NAMESPACE = '17834a61-9e55-5ce6-a0df-f08b53a73dd1';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(__dirname, '..', '.env.local');
@@ -109,7 +115,7 @@ function suggestionSummary(row) {
 const live = await withDalContext('probe-approved-reviewer-contact-acceptance', async () => {
   const [reviewerResult, suggestionResult] = await Promise.all([
     potentialReviewerAdapter.queryAllReviewers({
-      select: 'wmkf_potentialreviewersid,_wmkf_contact_value,statecode',
+      select: 'wmkf_potentialreviewersid,wmkf_orcid,_wmkf_contact_value,statecode',
       filter: '_wmkf_contact_value ne null',
       orderby: 'wmkf_potentialreviewersid asc',
     }),
@@ -134,12 +140,12 @@ const live = await withDalContext('probe-approved-reviewer-contact-acceptance', 
   };
 });
 
-const reviewerIdsByContact = new Map();
+const reviewersByContact = new Map();
 for (const reviewer of live.reviewers) {
   const contactId = String(reviewer._wmkf_contact_value || '').toLowerCase();
   if (!contactIds.has(contactId)) continue;
-  if (!reviewerIdsByContact.has(contactId)) reviewerIdsByContact.set(contactId, []);
-  reviewerIdsByContact.get(contactId).push(String(reviewer.wmkf_potentialreviewersid).toLowerCase());
+  if (!reviewersByContact.has(contactId)) reviewersByContact.set(contactId, []);
+  reviewersByContact.get(contactId).push(reviewer);
 }
 
 const suggestionsByReviewer = new Map();
@@ -151,7 +157,9 @@ for (const suggestion of live.suggestions) {
 
 const people = manifest.links.map((link) => {
   const contactId = String(link.contactId).toLowerCase();
-  const potentialReviewerIds = reviewerIdsByContact.get(contactId) || [];
+  const linkedReviewers = reviewersByContact.get(contactId) || [];
+  const potentialReviewerIds = linkedReviewers
+    .map((reviewer) => String(reviewer.wmkf_potentialreviewersid).toLowerCase());
   const suggestions = potentialReviewerIds.flatMap((reviewerId) => suggestionsByReviewer.get(reviewerId) || []);
   const evidenceRows = suggestions.filter(hasAcceptanceEvidence);
   const currentRows = suggestions.filter(currentAcceptance);
@@ -160,11 +168,35 @@ const people = manifest.links.map((link) => {
     : evidenceRows.length > 0
       ? 'historical_acceptance_only'
       : 'no_acceptance_evidence';
+  const deterministicContactIds = linkedReviewers.flatMap((reviewer) => {
+    const reviewerId = String(reviewer.wmkf_potentialreviewersid).replace(/[{}]/g, '').toLowerCase();
+    const ids = [{
+      identityKey: `reviewer:${reviewerId}`,
+      contactId: uuidv5(`reviewer:${reviewerId}`, ACCEPTED_REVIEWER_CONTACT_GUID_NAMESPACE),
+    }];
+    const normalized = normalizeOrcid(reviewer.wmkf_orcid);
+    if (normalized.state === 'valid') {
+      ids.push({
+        identityKey: `orcid:${normalized.id}`,
+        contactId: uuidv5(`orcid:${normalized.id}`, ACCEPTED_REVIEWER_CONTACT_GUID_NAMESPACE),
+      });
+    }
+    return ids;
+  });
+  const promotionMatch = deterministicContactIds.find((candidate) => candidate.contactId === contactId) || null;
+  const contactOrigin = acceptanceCategory === 'no_acceptance_evidence'
+    ? 'preexisting_or_other_nonacceptance_link'
+    : promotionMatch
+      ? 'acceptance_promotion_created'
+      : 'preexisting_or_other_link';
   return {
     reviewer: link.reviewer,
     contactId,
     potentialReviewerIds,
     acceptanceCategory,
+    contactOrigin,
+    promotionIdentityKey: promotionMatch?.identityKey || null,
+    deterministicContactIds,
     suggestionCount: suggestions.length,
     invitedSuggestionCount: suggestions.filter((row) => row.wmkf_invited === true).length,
     declinedSuggestionCount: suggestions.filter((row) => row.wmkf_declined === true).length,
@@ -188,6 +220,12 @@ const report = {
     historicalAcceptanceOnly: count('historical_acceptance_only'),
     noAcceptanceEvidence: count('no_acceptance_evidence'),
     allHaveAcceptanceEvidence: count('no_acceptance_evidence') === 0,
+    acceptedContactsCreatedByPromotion: people.filter((person) =>
+      person.acceptanceCategory !== 'no_acceptance_evidence'
+      && person.contactOrigin === 'acceptance_promotion_created').length,
+    acceptedPreexistingOrOtherContacts: people.filter((person) =>
+      person.acceptanceCategory !== 'no_acceptance_evidence'
+      && person.contactOrigin === 'preexisting_or_other_link').length,
   },
   people,
   noAcceptanceEvidence: people.filter((person) => person.acceptanceCategory === 'no_acceptance_evidence'),
