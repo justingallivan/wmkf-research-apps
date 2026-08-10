@@ -13,6 +13,8 @@ related:
   - "pages/api/external/grantee/[token]/submit.js"
   - shared/components/workbench/AwardeeTab.js
   - lib/services/workbench/grantee-deliverables/abstract-service.js
+  - shared/config/granteeDeliverableStatus.js
+  - lib/external/grantee-token-lifecycle.js
 ---
 
 # Grantee Submission Visibility — Spec
@@ -644,4 +646,129 @@ blocked on the two owner questions recorded in `SESSION_PROMPT.md`: what `Comple
 means for the cycle export / website publish, and whether close-out includes
 `Revision Requested` (and if so, whether the transition re-mints a magic link).
 A unit test pins that the new pane offers no such action, so the layout move
-cannot quietly grow a status writer.
+cannot quietly grow a status writer. The design for those actions — placement,
+form, and guards, still unbuilt — is the next section.
+
+## Design: close-out lifecycle actions (2026-08-10, S412) — NOT BUILT
+
+**Status: DESIGN ONLY.** Nothing in this section exists in code. It records the
+placement decision and the constraints discovered while making it, so the build
+does not have to re-derive them. Tier 2 (Dataverse writes) — it needs a branch,
+characterization coverage, and an explicit owner decision to merge.
+
+### `Revision Requested` goes on the Submission pane, not Close-out
+
+The Close-out pane holds the **terminal** transitions (`Complete`,
+`Closed No Response`) and the outputs published once a package is settled.
+`Revision Requested` is different in kind: it does not close anything out, it
+re-opens the loop and sends the grantee back to the portal. Placing it beside the
+two actions that end the workflow would put the one action that continues it in
+the wrong group. It attaches to the thing being judged — the caption and image on
+the Submission pane — because that is where the PD is looking when they decide.
+
+**It is not a second copy of the Invitation compose form.** The invitation is a
+templated body with placeholder fill and a saved per-PD custom version; a revision
+request needs a field the invitation has no analogue for — *what needs changing*.
+That free-text reason is the payload. Without it the grantee is told to revise and
+not told what to revise.
+
+The placement-versus-reuse tension dissolves through the pattern S411 already
+established for the invitation send: the button does not send, it opens a modal
+that carries the confirm and the compose. A modal is pane-independent, so the form
+never has to be duplicated into a second pane. **Do not build a second inline
+compose surface.** Two send surfaces with independently derived enable conditions
+is the exact failure class recorded in
+`.claude-memory/feedback-ui-gates-must-mirror-server-guards.md`.
+
+### The portal re-open half is already built
+
+`REVISION_REQUESTED` is already in the grantee-editable allowlist
+`[VERIFIED via shared/config/granteeDeliverableStatus.js:78 — GRANTEE_EDITABLE_STATUSES
+contains DRAFTED, INVITED, REMINDER_SENT, REVISION_REQUESTED. Disconfirming check:
+SUBMITTED, STAFF_REVIEW, COMPLETE, and CLOSED_NO_RESPONSE are absent, so the list
+is a real whitelist and not an accidental catch-all]`, and both external routes
+read that one list — the context route to decide what renders editable
+`[VERIFIED via pages/api/external/grantee/[token]/context.js:110]` and the submit
+route to decide what it accepts `[VERIFIED via pages/api/external/grantee/[token]/submit.js:91]`.
+Both fail closed on null/unknown.
+
+**Consequence:** the moment something writes `REVISION_REQUESTED`, the grantee can
+edit and re-submit. No portal change is required — the context route checks
+`editable` *before* falling through to the read-only "received / under review"
+branch, and `REVISION_REQUESTED` is in the editable allowlist and absent from
+`SUBMITTED_VIEW_STATUSES` `[VERIFIED via context.js:37-41 (the set contains only
+SUBMITTED, STAFF_REVIEW, COMPLETE) and :110-113 (branch order)]`. The missing piece
+is only the writer and its notification.
+
+**But the transition is not neutral for staff, by existing deliberate design.**
+`REVISION_REQUESTED` is excluded from the set of statuses in which staff may edit
+the *approved* abstract, with the reason stated in source — "a grantee resubmit
+would clobber the fix" `[VERIFIED via abstract-service.js:46-50 — APPROVED_EDITABLE
+contains only SUBMITTED and STAFF_REVIEW]`. So requesting revisions hands the
+abstract back: the Awardee tab's editor goes read-only and shows its existing
+"Read-only in the current status." note until the grantee re-submits. That is the
+correct behavior — two writers on one field is the bug it prevents — but it must be
+stated in the confirm modal, because a PD who requests revisions *in order to* fix
+the text themselves will find the editor locked and no explanation of why.
+
+### The email is the mechanism, not an option
+
+Grantee tokens are stateless signed JWTs with a **30-day** expiry, no stored hash,
+and no revocation `[VERIFIED via lib/external/grantee-token-lifecycle.js:10-16 (design
+note) and :26 (DEFAULT_TTL_DAYS = 30)]`. By the time a package has been submitted
+and reviewed, the original invitation link is plausibly past 30 days — so a
+revision request must mint and send a fresh link. "Staff re-send manually" is not a
+distinct option; it is the same send performed by hand.
+
+Two properties to design around rather than discover:
+
+- **Re-minting does not revoke.** An unexpired original token keeps working after a
+  new one is issued. Same grantee, so not an access-control problem — but a revision
+  request cannot be used to cut off access, and nothing should be written that
+  implies it can.
+- **Status, not the token, is the gate.** Because tokens cannot be revoked, the
+  status allowlist is the only thing standing between a stale link and a write. Any
+  new transition must keep that allowlist authoritative.
+
+### Known UI consequence to resolve during the build
+
+The Submission tab badge derives `✓ received` from the presence of a submitted
+package — `hasImage || caption || submittedAt || effectiveField === 'approved'`
+`[VERIFIED via AwardeeTab.js:236-239]`, with no status term in it. A package under
+`Revision Requested` still has all of those, so the badge would read `✓ received`
+while the status header reads `Revision Requested` — a visible disagreement between
+two elements a few pixels apart. Decide the badge's third state as part of the
+build; do not leave it to fall out of the existing boolean.
+
+### Still open — owner decisions
+
+1. **What `Complete` means.** Bookkeeping only, or does it gate what the cycle
+   export and website HTML publish? The second changes the behavior of shipped
+   outputs and is the reason this is Tier 2 rather than Tier 1.
+2. **Whether close-out includes `Revision Requested` at all.** The mechanism
+   question that used to accompany this one — re-mint versus manual re-send — is
+   **answered above by the 30-day stateless token**, and is no longer an owner
+   decision. What remains is only whether the transition is offered.
+
+### `Staff Review` is already wired on the read side — only its writer is missing
+
+Worth correcting a natural assumption: `Staff Review` is not an inert placeholder.
+It has two live consumers, both of which already behave correctly for it:
+
+- The grantee portal renders the read-only "received / under review" confirmation
+  for it `[VERIFIED via context.js:37-41]`.
+- Staff **may** edit the approved abstract in it — it is one of only two statuses
+  where that is allowed `[VERIFIED via abstract-service.js:48-50]`.
+
+Read together, those two make `Staff Review` the status that already means exactly
+what staff would want it to mean: the grantee is told their package is in review
+and cannot change it, while staff retain the pen. It is arguably the cheapest of
+the four transitions to add, since no consumer needs changing — only a writer and
+a Close-out button. It is called out here rather than designed because it was not
+part of the owner's parked design; adding it is additive and blocks nothing.
+
+### Out of scope
+
+The `Complete` and `Closed No Response` transitions are not designed here — the
+first is blocked on owner question 1 above, and the second has no discussed
+trigger (manual, or automatic after some overdue threshold?).
