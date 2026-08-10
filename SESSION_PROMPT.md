@@ -129,11 +129,18 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 
 ### Blocked — Waiting On External Response
 
-1. **Initial Assessment pilot: administrative evidence.** Evidence:
+1. **Initial Assessment pilot: administrative evidence — PARTIALLY ANSWERED
+   2026-08-10 (S413).** Evidence:
    `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` §"Required follow-up"
-   item 5; brief emailed to Connor 2026-08-09. Four read-only checks (version
-   limits, second-stage recovery, Purview retention, editor least privilege).
-   **No response as of 2026-08-10.** Do not treat silence as a pass.
+   item 5, now carrying Connor's verbatim replies. Of the four read-only checks:
+   version limits **still open** (versioning confirmed on, limit unanswered —
+   and the limit is the part that matters); second-stage recovery **reported
+   absent**, which is unusual for SharePoint Online and should be confirmed by
+   someone with site-collection admin rights before any durability guarantee
+   rests on it; Purview retention **unanswered** ("not familiar with purview") and
+   needs an M365 compliance admin instead; editor least privilege **ambiguous**
+   ("limited control" is not a built-in permission level, so whether editors can
+   delete is unresolved). Do not record any of these as cleared.
 
 ### Owner Decision Needed
 

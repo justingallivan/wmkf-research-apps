@@ -144,7 +144,7 @@ remain open.
 | Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the deployed read model overlays current Graph values in the response only | Both live consumers display the same current/missing/unavailable/unchecked semantics | PASS — Request `1003109` displayed current SharePoint version `2.0` in both consumers on deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` |
 | Native version inspection/restore | Disposable file in the production Request library was uploaded twice, then prior version `1.0` was downloaded and restored | SharePoint retained `2.0` and `1.0`; restore created `3.0` and exact current bytes matched version one | Graph version list/content/restore operations | PASS — controlled probe only; no Request `1003109` mutation |
 | First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
-| Administrative library controls | Direct policy/permission probes and signed-in administrator view | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL/UNKNOWN — library limits, second-stage recovery, site/library retention, and least-privilege editor policy remain open |
+| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | STILL PARTIAL/UNKNOWN after the 2026-08-10 replies — major versioning confirmed on (limit still unknown); second-stage bin reported absent (unusual, confirm); Purview unanswered and rerouted to a compliance admin; "limited control" is not a built-in permission level, so editor delete rights remain unresolved |
 | Workbench history/restore and milestone freeze | No current producer/action | Current metadata readback exists; no milestone snapshot row/artifact is created | Workbench shows current version/time but no history link or administrator restore | PLANNED |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
 | Approved canonical input follow-up | Signed-in Workbench generation read `Reviewer Materials/Proposal_1003109.pdf` (33,011 extracted characters; text SHA-256 `0fc490d0fc1c635878f36b35376f952e0e35ea8225441c4fe2644f0e3456f36e`) | Row `3cec63a4-768c-f111-ab0f-6045bd018a07`; input fingerprint `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`; generation key `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f` | Workbench showed `Ready · Draft` and the exact recomputation matched both stored identities | PASS |
@@ -197,13 +197,33 @@ not an intervening staff edit. Version `2.0` later hashed to
    `1003109`: SharePoint version `2.0` is attributed to Justin Gallivan,
    Foundation Opportunity no longer contains the staff-input marker, and both
    consumers resolve the same stable item.
-5. **Partially completed 2026-07-30:** response-only current SharePoint
-   metadata display, native version inspection/restore, and signed-in
-   first-stage recycle recovery are production-proved. Complete the
-   administrator checks for library version limits, second-stage recovery,
-   site/library Purview retention, and ordinary-editor least privilege; then
-   add Workbench version-history/admin restore and milestone snapshots before
-   calling the artifact system production-ready.
+5. **Partially completed 2026-07-30; administrator replies received
+   2026-08-10 (S413).** Response-only current SharePoint metadata display,
+   native version inspection/restore, and signed-in first-stage recycle
+   recovery are production-proved. Connor's replies to the four administrator
+   checks, verbatim: **"Major versioning is on" / "No second-stage recycle
+   bin" / "Not familiar with purview" / "Site members have 'limited
+   control'".** Only the second is a clean answer, and it is a negative one.
+   Standing state after those replies:
+   - **Version limits — still open.** Versioning being *on* was already proved
+     empirically (`1.0 → 2.0 → 3.0`); the configured *limit* is the unanswered
+     part and is what governs whether an old version survives.
+   - **Second-stage recovery — reported absent; confirm before relying on it.**
+     A tenant with no site-collection recycle bin is unusual, and the reply may
+     instead reflect the same access denial Justin hit. Needs someone with
+     site-collection administrator rights.
+   - **Purview retention — unanswered, and needs a different owner.** "Not
+     familiar with purview" routes this to an M365 compliance administrator.
+   - **Editor least privilege — ambiguous.** "Limited control" is not a
+     built-in SharePoint permission level. The operative question — whether an
+     ordinary editor can delete the file or its versions — is unresolved.
+
+   Two of four therefore remain genuinely open, one is ambiguous, and one is a
+   negative finding pending confirmation. Add Workbench version-history/admin
+   restore and milestone snapshots before calling the artifact system
+   production-ready, and settle the milestone pointer-vs-copy question
+   (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Board milestone freeze) — these
+   replies make a pointer-only milestone materially less safe.
 6. Attribution policy is settled: SharePoint native version history is the
    required human-edit audit surface, while system-generated Dataverse
    registry writes may use service-principal attribution.

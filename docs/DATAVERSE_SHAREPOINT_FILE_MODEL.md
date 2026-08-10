@@ -597,26 +597,63 @@ or in the first-stage bin.
 
 The remaining controls are deliberately not collapsed into that pass:
 
-- **[UNKNOWN] Library version-limit policy.** The library exposes version
-  history, but its configured limit requires SharePoint administrator
-  inspection (for example, `Get-SPOListVersionPolicy`); the current Graph
-  application read does not prove the limit.
-- **[PARTIAL] Second-stage recycle recovery.** Removing the probes from the
-  first-stage bin exercised the transition, but Justin's signed-in account was
-  denied access to `AdminRecycleBin.aspx?view=13`. A site collection
-  administrator must inspect and exercise second-stage recovery.
-- **[UNKNOWN] Retention.** The controlled Request `1003109` item's Graph
-  `retentionLabel` response contained no label fields. That does not prove
-  that no site- or library-wide Microsoft Purview retention policy applies.
-- **[UNKNOWN] Least-privilege human editing.** The app token contains only
-  `Sites.Selected`; `/sites/{siteId}/permissions` returned `403 accessDenied`,
-  so it cannot enumerate its own site grants. The ordinary-editor permission
-  design still needs an administrator audit.
+> **Administrator response received 2026-08-10 (S413), from Connor, verbatim:**
+> "Major versioning is on" / "No second-stage recycle bin" / "Not familiar with
+> purview" / "Site members have 'limited control'". One of the four questions is
+> cleanly answered; the classifications below record what each reply does and does
+> not settle. Connor's replies are an administrator's report, not a probe — treat
+> the surprising one (no second-stage bin) as needing confirmation before any
+> durability guarantee rests on it.
+
+- **[PARTIAL] Library version-limit policy.** Connor confirms **major versioning
+  is on** — which the pilot had already shown empirically by observing `1.0 → 2.0
+  → 3.0`. The **configured limit is still unknown**, and the limit, not the
+  on/off state, is what determines whether an old version survives. Still needs
+  administrator inspection (for example, `Get-SPOListVersionPolicy`).
+- **[ANSWERED — NEGATIVE, confirm before relying on it] Second-stage recycle
+  recovery.** Connor reports **no second-stage recycle bin**. Taken at face value,
+  an item purged from (or aged out of) the first-stage bin is **unrecoverable**,
+  and there is no administrator safety net behind ordinary deletion.
+  **Confirm this one.** SharePoint Online provisions a site-collection
+  (second-stage) recycle bin by default, and the standard 93-day window is shared
+  across both stages; a tenant with none is unusual. The reply may equally mean
+  "I could not access it" or "it is empty" — the same access denial Justin hit at
+  `AdminRecycleBin.aspx?view=13` on 2026-07-30. Do not record "no second-stage
+  recovery exists" as platform fact until someone with site-collection
+  administrator rights confirms it.
+- **[UNKNOWN — reroute] Retention.** Connor replied "not familiar with purview,"
+  which does not answer the question and tells us he is **not the right owner for
+  it**. The controlled Request `1003109` item's Graph `retentionLabel` response
+  contained no label fields, which still does not prove that no site- or
+  library-wide Microsoft Purview retention policy applies. Needs a Microsoft 365
+  compliance/Purview administrator, not the SharePoint site owner.
+- **[AMBIGUOUS] Least-privilege human editing.** Connor reports site members have
+  **"limited control"**. That is **not a standard SharePoint permission level** —
+  the built-in levels are Full Control, Design, Edit, Contribute, Read, and the
+  auto-assigned Limited Access — so it is either a paraphrase or a custom level.
+  The operative question is unresolved: **can an ordinary editor delete the file
+  or its version history?** Edit and Contribute both permit item deletion; Read
+  does not. This compounds with the second-stage finding above — if members can
+  delete and there is genuinely no second-stage bin, first-stage recovery is the
+  only remedy. The app token still holds only `Sites.Selected` and
+  `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
+  verify this itself.
 - **[PARTIAL] Workbench recovery UI.** Current version and last-modified
   metadata are live. Version-history navigation and an administrator-only
   restore action are not implemented.
 - **[PLANNED] Board milestone freeze.** No immutable milestone snapshot
-  operation exists yet.
+  operation exists yet. The provisioned fields (`wmkf_milestoneversionid`,
+  `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat` —
+  `lib/dataverse/adapters/request-document.js:38-40`, read at
+  `lib/services/initial-assessment/artifact-service.js:257-259`, written
+  nowhere) describe a **pointer to a SharePoint version plus a drift hash, not a
+  copy of the bytes.** After the 2026-08-10 administrator replies above, a
+  pointer-only milestone rests on three things that are unknown, unconfirmed, or
+  ambiguous: the version limit, whether a second-stage bin exists, and whether
+  ordinary editors can delete. A milestone that copies bytes to a separate
+  governed location would not depend on any of them. Decide pointer-vs-copy
+  before building the producer — it is the difference between "immutable" being
+  a guarantee and being an aspiration.
 
 Platform references:
 [Microsoft Graph file versions](https://learn.microsoft.com/en-us/graph/api/driveitem-list-versions?view=graph-rest-1.0),
