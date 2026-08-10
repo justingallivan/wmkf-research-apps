@@ -29,13 +29,13 @@ import { fillInviteBody, fillInviteSubject, formatCobDate } from '../../config/g
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
 /**
- * Whole days past the requested response date, or 0 when not applicable.
+ * Whole days past the derived response-date estimate, or 0 when not applicable.
  *
- * The deadline is invite + 14d, matching formatCobDate — the same definition that
- * fills the invitation email's "COB {{dueDate}}", so the page can never contradict
- * what the grantee was told. Called from the load path rather than render: reading
- * the clock during render is impure (react-hooks/purity) and would let an
- * incidental re-render change the number.
+ * The estimate is the recorded invite date + 14d, matching formatCobDate. It can
+ * differ from the staff-editable date expanded into the email at compose time;
+ * re-sends keep the first recorded invite date. Called from the load path rather
+ * than render: reading the clock during render is impure (react-hooks/purity) and
+ * would let an incidental re-render change the number.
  */
 function computeDaysOverdue(invitedAt, responded) {
   if (!invitedAt || responded) return 0;
@@ -116,6 +116,7 @@ export default function AwardeeTab({ requestId, context }) {
   const prevProfileIdRef = useRef(undefined);
   const subjectDirtyRef = useRef(false);
   const defaultLoadSeqRef = useRef(0);
+  const abstractLoadSeqRef = useRef(0);
 
   const { preferences, currentProfile } = useProfile();
   // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
@@ -193,14 +194,17 @@ export default function AwardeeTab({ requestId, context }) {
   // draft) so the PD can review/edit whatever will publish — including a
   // grantee-returned version, which "Generate abstract" never surfaces. Guarded by
   // currentRequestIdRef so a slow load for a previous request can't clobber state
-  // after the PD switches requests.
+  // after the PD switches requests, and by a generation so overlapping loads for
+  // the same request cannot land out of order.
   const loadAbstract = useCallback(async () => {
     if (!requestId) return;
     const loadRequestId = requestId;
+    const seq = abstractLoadSeqRef.current + 1;
+    abstractLoadSeqRef.current = seq;
     try {
       const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
       const data = await res.json();
-      if (currentRequestIdRef.current !== loadRequestId) return;
+      if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
       if (res.ok) {
         setAbstractText(data.effective || '');
         setSavedAbstractText(data.effective || '');
@@ -325,7 +329,13 @@ export default function AwardeeTab({ requestId, context }) {
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || 'Could not send the invitation.');
-      else { setStatus(data.status); setSentMsg('Invitation sent to the grantee.'); }
+      else {
+        setStatus(data.status);
+        setSentMsg('Invitation sent to the grantee.');
+        // Best-effort: the server records invitedAt on the first status flip.
+        // loadAbstract handles its own failures, so a sent email stays successful.
+        await loadAbstract();
+      }
     } catch { setError('Could not send the invitation.'); }
     setSending(false);
   }
@@ -400,11 +410,10 @@ export default function AwardeeTab({ requestId, context }) {
   // mode rather than sitting in a fixed pane, so the editor is always next to the
   // work it belongs to. Keyed off abstractField, the same signal the copy uses.
   const abstractPane = abstractField === 'approved' ? 'submission' : 'invitation';
-  // Response deadline, derived from the invite date with the SAME +14d helper that
-  // fills the invitation email's "COB {{dueDate}}" — one definition, so the page
-  // can never disagree with what the grantee was told. It is derived, not stored:
-  // an invitation composed and sent on different days would shift the emailed date
-  // relative to this one. The reminder cron fires at day 12 (reminders service).
+  // Response-date estimate, derived from the first recorded invite date + 14d. It
+  // can differ from the staff-editable date expanded into the email at compose time.
+  // Re-sends retain the original invite timestamp; the reminder cron fires at day
+  // 12 from that same timestamp (reminders service).
   const invitedLabel = formatSubmissionDate(submission.invitedAt);
   const remindedLabel = formatSubmissionDate(submission.remindedAt);
   const dueLabel = submission.invitedAt ? formatCobDate(new Date(submission.invitedAt)) : null;
@@ -442,12 +451,12 @@ export default function AwardeeTab({ requestId, context }) {
         <p className="text-xs text-gray-500">
           {invitedLabel ? `Invited ${invitedLabel}` : 'Not yet invited'}
           {remindedLabel && ` · reminded ${remindedLabel}`}
-          {dueLabel && !granteeResponded && ` · response due ${dueLabel}`}
+          {dueLabel && !granteeResponded && ` · estimated response due ${dueLabel}`}
           {granteeResponded && ' · response received'}
         </p>
         {daysOverdue > 0 && (
           <p className="text-xs text-amber-700">
-            No response {daysOverdue} {daysOverdue === 1 ? 'day' : 'days'} past the requested date.
+            No response {daysOverdue} {daysOverdue === 1 ? 'day' : 'days'} past the estimated response date.
           </p>
         )}
       </section>
@@ -543,7 +552,7 @@ export default function AwardeeTab({ requestId, context }) {
           <p className="text-sm text-gray-700">No submission received yet.</p>
           <p className="text-xs text-gray-500">
             {invitedLabel
-              ? `The grantee was invited ${invitedLabel}${dueLabel ? ` and asked to respond by ${dueLabel}` : ''}.`
+              ? `The grantee was invited ${invitedLabel}${dueLabel ? `; the recorded invite date gives an estimated response date of ${dueLabel}` : ''}.`
               : 'Send the invitation from the Invitation tab to start the process.'}
           </p>
           <p className="text-xs text-gray-500">
@@ -660,7 +669,7 @@ export default function AwardeeTab({ requestId, context }) {
         </div>
         <p className="text-xs text-gray-500">
           {hasAbstract
-            ? 'Preview opens the email in a new tab without sending. Send emails the grantee and starts the 14-day clock.'
+            ? 'Preview opens the email in a new tab without sending. The first recorded invitation date starts the 14-day estimate; re-sends keep that date.'
             : 'Generate the abstract before sending. (Preview works any time.)'}
         </p>
       </section>

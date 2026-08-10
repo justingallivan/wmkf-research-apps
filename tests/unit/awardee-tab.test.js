@@ -4,7 +4,7 @@
  * AwardeeTab (chunk 3d) — staff orchestration: load recipients → generate
  * abstract → send invite. Drives the three grantee-deliverables endpoints.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import {
   GRANTEE_INVITE_SEED_BODY,
@@ -45,6 +45,8 @@ function wireFetch({
   abstract = null,
   saveOk = true,
   emailDefaults = defaultEmailDefaults(),
+  sentInvitedAt = '2026-08-09T16:00:00Z',
+  failAbstractReloadAfterSend = false,
 } = {}) {
   // Stateful effective-abstract mock (S278): GET returns the current state, the
   // generate POST seeds the draft, and PUT persists a PD edit so the editor flow
@@ -63,6 +65,7 @@ function wireFetch({
     submittedAt: abstract?.submittedAt ?? null,
     invitedAt: abstract?.invitedAt ?? null,
     remindedAt: abstract?.remindedAt ?? null,
+    invitationSent: false,
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
@@ -82,6 +85,9 @@ function wireFetch({
         state.effective = b.text;
         state.etag = 'W/"saved"';
         return { ok: true, json: async () => ({ ok: true, field: state.effectiveField || 'formatted', etag: state.etag, status: state.status }) };
+      }
+      if (state.invitationSent && failAbstractReloadAfterSend) {
+        throw new Error('reload failed');
       }
       return { ok: true, json: async () => ({
         effective: state.effective, effectiveField: state.effectiveField,
@@ -103,6 +109,11 @@ function wireFetch({
         : { ok: false, json: async () => ({ error: 'no applicant abstract' }) };
     }
     if (u.includes('/grantee-deliverables/send-invite')) {
+      if (sendOk) {
+        state.status = 100000001;
+        state.invitedAt = sentInvitedAt;
+        state.invitationSent = true;
+      }
       return sendOk
         ? { ok: true, json: async () => ({ ok: true, status: 100000001 }) }
         : { ok: false, json: async () => ({ error: 'send failed' }) };
@@ -161,6 +172,40 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   expect(JSON.parse(sendCall[1].body)).toMatchObject({
     requestId: REQ, toEmail: 'monika.raj@emory.edu', ccEmail: 'lorena.mclaren@emory.edu',
   });
+});
+
+test('successful send reloads the recorded invite date into the status header', async () => {
+  wireFetch({
+    abstract: {
+      effective: 'Ready abstract.', effectiveField: 'formatted', status: 100000000, editable: true,
+    },
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+
+  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
+  expect(screen.getByText(/Invited Aug 9, 2026/)).toBeInTheDocument();
+  expect(screen.queryByText('Not yet invited')).not.toBeInTheDocument();
+});
+
+test('a failed post-send reload does not turn a successful send into an error', async () => {
+  wireFetch({
+    abstract: {
+      effective: 'Ready abstract.', effectiveField: 'formatted', status: 100000000, editable: true,
+    },
+    failAbstractReloadAfterSend: true,
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
+
+  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+
+  await waitFor(() => expect(screen.getByText(/invitation sent/i)).toBeInTheDocument());
+  expect(screen.getByText(/Status:/)).toHaveTextContent('Invited');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 test('resolves grantee invite subject tokens in compose state and send payload', async () => {
@@ -609,12 +654,82 @@ test('a caption containing markup renders as literal text', async () => {
 // split, the badge that answers "did they respond?" without a click, and the
 // empty state that replaced the silence.
 
+test('a stale mount load cannot overwrite a newer post-generate load for the same request', async () => {
+  let resolveMountAbstract;
+  const mountAbstract = new Promise((resolve) => { resolveMountAbstract = resolve; });
+  let abstractGetCount = 0;
+
+  global.fetch = jest.fn((url) => {
+    const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) {
+      return Promise.resolve({ ok: true, json: async () => defaultEmailDefaults() });
+    }
+    if (u.includes('/grantee-deliverables/recipients')) {
+      return Promise.resolve({ ok: true, json: async () => ({
+        pi: { name: 'Monika Raj', email: 'monika.raj@emory.edu', hasEmail: true },
+        liaison: { name: 'Lorena McLaren', email: 'lorena.mclaren@emory.edu', hasEmail: true },
+      }) });
+    }
+    if (u.includes('/grantee-deliverables/generate')) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ abstractFormatted: 'Generated draft.', status: 100000000 }),
+      });
+    }
+    if (u.includes('/grantee-deliverables/abstract')) {
+      abstractGetCount += 1;
+      if (abstractGetCount === 1) return mountAbstract;
+      return Promise.resolve({ ok: true, json: async () => ({
+        effective: 'Newer approved abstract.',
+        effectiveField: 'approved',
+        etag: 'W/"newer"',
+        status: 100000003,
+        editable: true,
+        caption: 'Newer caption.',
+        hasImage: false,
+        submittedAt: '2026-08-09T16:00:00Z',
+        invitedAt: '2026-07-20T16:00:00Z',
+        remindedAt: '2026-08-01T16:00:00Z',
+      }) });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  });
+
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(abstractGetCount).toBe(1));
+
+  fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Newer approved abstract.'));
+  expect(screen.getByRole('tab', { name: /Submission/ })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByText('✓ received')).toBeInTheDocument();
+
+  await act(async () => {
+    resolveMountAbstract({ ok: true, json: async () => ({
+      effective: 'Older mount abstract.',
+      effectiveField: 'formatted',
+      etag: 'W/"older"',
+      status: 100000000,
+      editable: true,
+      caption: null,
+      hasImage: false,
+      submittedAt: null,
+      invitedAt: null,
+      remindedAt: null,
+    }) });
+    await mountAbstract;
+  });
+
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Newer approved abstract.');
+  expect(screen.getByRole('tab', { name: /Submission/ })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByText('✓ received')).toBeInTheDocument();
+});
+
 test('status header shows the invite date and the derived response deadline', async () => {
   wireFetch({ abstract: { invitedAt: '2026-07-12T15:04:05Z' } });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  // +14d from the invite, the same helper that fills the email's COB {{dueDate}}.
+  // +14d from the recorded invite date; this is an estimate, not the editable email date.
   await waitFor(() => expect(screen.getByText(/Invited Jul 12, 2026/)).toBeInTheDocument());
-  expect(screen.getByText(/response due July 26, 2026/)).toBeInTheDocument();
+  expect(screen.getByText(/estimated response due July 26, 2026/)).toBeInTheDocument();
 });
 
 test('status header shows the reminder date once the day-12 cron has sent one', async () => {
@@ -623,18 +738,18 @@ test('status header shows the reminder date once the day-12 cron has sent one', 
   await waitFor(() => expect(screen.getByText(/reminded Jul 24, 2026/)).toBeInTheDocument());
 });
 
-test('an unanswered invitation past the deadline is called out; a fresh one is not', async () => {
+test('an unanswered invitation past the estimated date is called out; a fresh one is not', async () => {
   const longAgo = new Date(Date.now() - 20 * 86400000).toISOString();
   wireFetch({ abstract: { invitedAt: longAgo } });
   const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
-  await waitFor(() => expect(screen.getByText(/past the requested date/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/past the estimated response date/i)).toBeInTheDocument());
   expect(screen.getByText(/No response 6 days past/i)).toBeInTheDocument();
   unmount();
 
   wireFetch({ abstract: { invitedAt: new Date(Date.now() - 2 * 86400000).toISOString() } });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
-  expect(screen.queryByText(/past the requested date/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/past the estimated response date/i)).not.toBeInTheDocument();
 });
 
 test('a submitted package never shows an overdue warning, however old the invite', async () => {
@@ -642,7 +757,7 @@ test('a submitted package never shows an overdue warning, however old the invite
   wireFetch({ abstract: submitted({ invitedAt: longAgo, caption: 'A caption.' }) });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
-  expect(screen.queryByText(/past the requested date/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/past the estimated response date/i)).not.toBeInTheDocument();
   expect(screen.getByText(/response received/)).toBeInTheDocument();
 });
 
@@ -665,7 +780,7 @@ test('pre-submit the Submission pane explains the silence instead of rendering n
   await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
   fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
   expect(screen.getByText('No submission received yet.')).toBeInTheDocument();
-  expect(screen.getByText(/invited Jul 12, 2026 and asked to respond by July 26, 2026/i)).toBeInTheDocument();
+  expect(screen.getByText(/recorded invite date gives an estimated response date of July 26, 2026/i)).toBeInTheDocument();
   expect(screen.queryByText('Grantee submission')).not.toBeInTheDocument();
 });
 

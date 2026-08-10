@@ -509,11 +509,34 @@ What changed, all in `AwardeeTab.js` plus two additive read fields:
 
 `invitedAt` / `remindedAt` were added to the abstract GET (`abstract-service.js`).
 Both were **already** in `DELIVERABLE_SELECT` for the reminder cron, so this exposes
-existing reads rather than widening the projection. The deadline reuses
-`formatCobDate` (invite + 14d), the same helper that fills the invitation email's
-`COB {{dueDate}}`, so the page cannot contradict what the grantee was told; the day-12
-reminder threshold lives in the reminders cron. `computeDaysOverdue` runs on the load
-path, not in render — reading the clock during render trips `react-hooks/purity`.
+existing reads rather than widening the projection. The header shows an **estimated**
+response date derived by applying `formatCobDate` (+14d) to the recorded first-invite
+timestamp. It is not an authoritative copy of the date in the grantee's email: the
+email date is expanded at compose time and the body remains staff-editable, while
+`wmkf_inviteddate` is stamped later when the first Drafted→Invited status write
+succeeds. Re-sends from Invited or Reminder Sent deliberately retain that original
+timestamp and therefore the same estimate. A successful email whose first status/date
+write fails can remain persisted-but-undated until reconciled. The day-12 reminder
+threshold also uses the recorded first-invite timestamp. `computeDaysOverdue` runs on
+the load path, not in render — reading the clock during render trips
+`react-hooks/purity`.
+
+Two defects found by adversarial review before this merged, both fixed in the same
+branch:
+
+- **A successful send now reloads.** The send handler set status and a confirmation
+  but never re-read, so on every first send the header rendered `Status: Invited`
+  directly above `Not yet invited` until something else triggered a load. The reload
+  is best-effort — `loadAbstract` swallows its own failures, so a reload error cannot
+  turn a sent email into a reported failure.
+- **`loadAbstract` is generation-guarded.** It previously rejected stale responses only
+  when `requestId` changed, so two overlapping loads of the *same* request could land
+  out of order — the older one overwriting the newer abstract, etag, status, invite
+  dates, and badge state. It also latched `subTabPinnedRef` permanently on whichever
+  response arrived first, letting a stale snapshot pin the wrong pane for the session.
+  It now mirrors the `defaultLoadSeqRef` pattern already used by `loadEmailDefaults`
+  in the same file: only the newest generation may perform any post-await state write,
+  including the latch and auto-advance.
 
 Still deferred, unchanged by this work: the in-app image proxy (the image remains a
 SharePoint link) and the `Staff Review` / `Revision Requested` / `Complete` /
