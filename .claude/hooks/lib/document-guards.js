@@ -243,6 +243,24 @@ const UNCERTAINTY_RE = /\bTBD\b|\[ASSUMED\b|unknown|not yet (?:counted|derived|v
 const COUNT_CONTEXT_RE = /\b(?:count|total|union|baseline|routes?|files?|coverage|wave|delta|in-scope|scope|census|inventory|arithmetic)\b/i;
 const CLOSED_COUNT_RE = /\b\d+\b|\b\d+\s*(?:\+|x|\*)\s*\d+|\b\d+\s+of\s+\d+\b/i;
 const QUALIFIED_COUNT_RE = /\[(?:ASSUMED|TBD|DERIVED-FROM|ASSUMED-DERIVED)[:\]]/i;
+// `docs/FOO.md:171-176` and `lib/bar.js:611` are source citations: the digits are
+// line numbers, not quantities. Without this, every [VERIFIED via file:line] line
+// in a plan doc registers as an unqualified count claim.
+const PATH_CITATION_RE = /[\w./@-]+\.[A-Za-z0-9]+:\d+(?:\s*[-–]\s*\d+)?/g;
+// The DERIVED-FROM escape hatch's own boilerplate reads "independent of TBD count",
+// which otherwise makes the very line that RESOLVES an uncertainty register as a
+// fresh one — pairing it against every other count in the document.
+const RESOLVED_MARKER_RE = /\[(?:DERIVED-FROM|ASSUMED-DERIVED)\b[^\]]*\]/gi;
+
+// Digits that remain after source citations are removed.
+function quantityText(line) {
+  return String(line == null ? '' : line).replace(PATH_CITATION_RE, ' ');
+}
+
+// Text as it reads for uncertainty purposes, with resolution markers removed.
+function uncertaintyText(line) {
+  return String(line == null ? '' : line).replace(RESOLVED_MARKER_RE, ' ');
+}
 const SUBJECTS = [
   ['route', /\broutes?\b|pages\/api\//i],
   ['file', /\bfiles?\b/i],
@@ -279,18 +297,21 @@ function findAssumptionQuantityLeaks(text) {
   const closedClaims = [];
 
   lines.forEach((line, index) => {
-    if (UNCERTAINTY_RE.test(line) && COUNT_CONTEXT_RE.test(line)) {
+    const uncertain = uncertaintyText(line);
+    if (UNCERTAINTY_RE.test(uncertain) && COUNT_CONTEXT_RE.test(uncertain)) {
       uncertainties.push({ line, lineNumber: index + 1, subjects: subjectSet(line) });
       return;
     }
     // Markdown ordered-list ordinals describe sequence, not quantity. Judge
     // the remaining text so `1. Verify every route` does not become a bogus
     // numeric coverage claim merely because the line also contains "route".
-    const claimText = line.replace(/^\s*\d+[.)]\s+/, '');
+    // Source citations are stripped for the same reason: `foo.js:611` is an
+    // address, not a count.
+    const claimText = quantityText(line.replace(/^\s*\d+[.)]\s+/, ''));
     if (
       CLOSED_COUNT_RE.test(claimText) &&
       COUNT_CONTEXT_RE.test(line) &&
-      !UNCERTAINTY_RE.test(line) &&
+      !UNCERTAINTY_RE.test(uncertain) &&
       !QUALIFIED_COUNT_RE.test(line)
     ) {
       closedClaims.push({ line, lineNumber: index + 1, subjects: subjectSet(line) });

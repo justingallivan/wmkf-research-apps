@@ -227,7 +227,15 @@ visible in the artifact or delegation prompt — never a silent env var:
 - **`scope-claim-reminder.js`** — `PreToolUse(Write|Edit)`, now BLOCKS plan docs that mix an
   unresolved quantity (TBD/[ASSUMED]) with unqualified derived counts on the same subject.
   Escapes: keep the derived count visibly `[ASSUMED]`, or add `[DERIVED-FROM: <probe>]`;
-  historical log lines must state their resolution inline.
+  historical log lines must state their resolution inline. **Two false positives fixed
+  S413 (2026-08-10)** — source citations (`foo.js:611`, `FOO.md:171-176`) were counted as
+  quantities, so any plan doc citing sources by line blocked on an unrelated `[ASSUMED]`
+  elsewhere in the file; and the `[DERIVED-FROM: …; independent of TBD count]` escape's own
+  boilerplate made the resolving line register as *fresh* uncertainty, so applying the
+  prescribed remedy re-triggered the block. Both are regression-tested in
+  `.claude/hooks/lib/document-guards.test.js` alongside a test that the genuine invariant
+  still blocks. If this guard blocks sound content, suspect the heuristic before rewording
+  the doc — see `.claude-memory/feedback-dont-tune-against-hook-source.md`.
 - **`plan-named-source-read-guard.js`** — `PreToolUse(Write|Edit)`, BLOCKS when the text a
   plan-doc edit INTRODUCES (delta-scoped — an unrelated paragraph edit does not re-litigate
   every path a long historical plan already names) names a live `pages/`/`lib/` source file

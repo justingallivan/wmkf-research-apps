@@ -60,6 +60,37 @@ test('allows visibly qualified derived counts', () => {
   assert.strictEqual(leaks.length, 0);
 });
 
+test('source citations are addresses, not counts', () => {
+  // `file.md:171-176` line numbers previously registered as unqualified count
+  // claims, so any plan doc citing sources by line blocked on an unrelated
+  // [ASSUMED] elsewhere in the file.
+  const leaks = findAssumptionQuantityLeaks([
+    '- [VERIFIED via `docs/API_ROUTE_SECURITY_MATRIX.md:171-176`] Export and roster routes are documented.',
+    '- [VERIFIED via `pages/api/workbench/export-candidates.js:1-14`] The export route writes no Dataverse data.',
+    '- [ASSUMED] Staff probably expect the saved list, not live results; confirm export scope.',
+  ].join('\n'));
+  assert.strictEqual(leaks.length, 0);
+});
+
+test('a DERIVED-FROM marker resolves its line instead of becoming new uncertainty', () => {
+  // The marker's own boilerplate says "independent of TBD count". That must not
+  // turn the resolving line into an uncertainty source for other count lines.
+  const leaks = findAssumptionQuantityLeaks([
+    '| Wave arithmetic | [DERIVED-FROM: scripts/probe.js:12; independent of TBD count] 49 routes |',
+    '| Later total | 12 routes |',
+  ].join('\n'));
+  assert.strictEqual(leaks.length, 0);
+});
+
+test('still blocks a genuine unresolved count beside an unqualified one', () => {
+  // The invariant the guard exists for must survive both fixes above.
+  const leaks = findAssumptionQuantityLeaks([
+    '- The full route union is TBD until the Stage 0 census lands.',
+    '- Coverage today is 49 routes across the union.',
+  ].join('\n'));
+  assert.strictEqual(leaks.length > 0, true);
+});
+
 test('recognizes visible NOT-READ escapes tied to the source path', () => {
   assert.strictEqual(
     hasNotReadEscape('pages/api/foo.js [NOT-READ: pages/api/foo.js — future route]', 'pages/api/foo.js'),
