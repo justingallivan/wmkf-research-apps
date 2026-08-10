@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+// The statuses this component knows how to render. Kept as an allowlist so an
+// unrecognized value falls into the visible gap branch, not into silence.
+const KNOWN_STATUSES = ['current', 'missing', 'unavailable'];
 
 function formatTimestamp(value) {
   if (!value) return null;
@@ -26,6 +30,22 @@ export default function ArtifactVersionHistory({ requestId }) {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const loadSequence = useRef(0);
+
+  // The parent currently remounts this component per request
+  // (`key={requestId}` at pages/workbench/[requestId].js:166), which alone would
+  // reset the state below. This guard does not rely on that: it lives in another
+  // file, and if the key were ever dropped, an in-flight response would paint one
+  // request's editor names under a different request. On an attribution surface
+  // that is a misleading audit trail, not a cosmetic glitch — so the staleness is
+  // checked here too, mirroring the parent tab's own loadSequence pattern.
+  useEffect(() => {
+    loadSequence.current += 1;
+    setOpen(false);
+    setState(null);
+    setError(null);
+    setLoading(false);
+  }, [requestId]);
 
   const toggle = async () => {
     if (open) {
@@ -34,6 +54,7 @@ export default function ArtifactVersionHistory({ requestId }) {
     }
     setOpen(true);
     if (state || loading) return;
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setError(null);
     try {
@@ -41,14 +62,15 @@ export default function ArtifactVersionHistory({ requestId }) {
         `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`,
       );
       const body = await response.json().catch(() => ({}));
+      if (loadSequence.current !== sequence) return;
       if (!response.ok) {
         throw new Error(body.error || `Failed to load version history (${response.status})`);
       }
       setState(body);
     } catch (loadError) {
-      setError(loadError.message);
+      if (loadSequence.current === sequence) setError(loadError.message);
     } finally {
-      setLoading(false);
+      if (loadSequence.current === sequence) setLoading(false);
     }
   };
 
@@ -115,6 +137,19 @@ export default function ArtifactVersionHistory({ requestId }) {
             <p className="text-xs text-amber-800">
               SharePoint version history is unavailable right now. The document itself is
               unaffected.
+            </p>
+          )}
+
+          {/*
+            Allowlist, not a denylist: a status this UI does not recognize must say
+            something rather than render an empty open panel. Without this branch a
+            future status value would look like "no history" — silence that reads as
+            a fact about the document instead of a gap in this component.
+          */}
+          {!loading && !error && state && !KNOWN_STATUSES.includes(state.status) && (
+            <p className="text-xs text-amber-800">
+              Version history could not be displayed. This is a display gap, not a
+              statement about the document.
             </p>
           )}
         </div>

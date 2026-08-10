@@ -82,6 +82,57 @@ it('surfaces a failed request as an error rather than an empty list', async () =
   ).toBeInTheDocument());
 });
 
+it('says an unrecognized status is a display gap rather than rendering silence', async () => {
+  // Silence here would read as "this document has no history", which is a claim
+  // about the document rather than about this component.
+  mockFetch({ status: 'something_new', versions: [], hasMore: false, limit: 0 });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/display gap, not a statement about the document/i),
+  ).toBeInTheDocument());
+});
+
+it('discards an in-flight response when the request changes underneath it', async () => {
+  // Attribution for request A must never paint under request B.
+  //
+  // The discriminating step is REOPENING after the switch. Merely asserting the
+  // stale name is absent right after the swap proves nothing — the panel is
+  // closed either way. It is on reopen that the two behaviours diverge: with the
+  // sequence guard the stale write is dropped, state stays null, and reopening
+  // refetches; without it the stale response is stored and `if (state) return`
+  // serves request A's editor under request B.
+  let resolveStale;
+  global.fetch = jest.fn().mockReturnValue(new Promise((resolve) => { resolveStale = resolve; }));
+  const { rerender } = render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  rerender(<ArtifactVersionHistory requestId="99999999-9999-9999-9999-999999999999" />);
+  resolveStale({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: 'current',
+      hasMore: false,
+      limit: 20,
+      versions: [{ versionId: '3.0', isCurrent: true, lastModifiedBy: 'Stale Editor' }],
+    }),
+  });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  mockFetch({
+    status: 'current',
+    hasMore: false,
+    limit: 20,
+    versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Fresh Editor' }],
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText('Fresh Editor')).toBeInTheDocument());
+  expect(screen.queryByText('Stale Editor')).not.toBeInTheDocument();
+});
+
 it('offers no restore control — that half is blocked on administrator evidence', async () => {
   mockFetch({
     status: 'current',
