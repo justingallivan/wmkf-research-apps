@@ -52,3 +52,31 @@ describe('account.queryAccounts (characterization)', () => {
       .rejects.toThrow('transient');
   });
 });
+
+describe('account.queryAllAccounts', () => {
+  test('forwards a filtered complete-scan query to DynamicsService.queryAllRecords', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [{ accountid: GUID, name: 'Some University', statecode: 0 }],
+      totalCount: 1,
+      capped: false,
+    });
+    const options = {
+      select: 'accountid,name,statecode',
+      filter: 'statecode eq 0',
+      orderby: 'name asc',
+    };
+    const out = await account.queryAllAccounts(options);
+    expect(out).toEqual({
+      records: [{ accountid: GUID, name: 'Some University', statecode: 0 }],
+      totalCount: 1,
+      capped: false,
+    });
+    expect(query).toHaveBeenCalledWith('accounts', options);
+  });
+
+  test('propagates a complete-scan failure', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockRejectedValue(new Error('export failed'));
+    await expect(account.queryAllAccounts({ select: 'accountid', filter: 'statecode eq 0' }))
+      .rejects.toThrow('export failed');
+  });
+});

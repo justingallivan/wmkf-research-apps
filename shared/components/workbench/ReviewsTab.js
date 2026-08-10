@@ -46,6 +46,16 @@ function formatDate(iso) {
     : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function reviewerAffiliationOf(reviewer) {
+  const acceptedAffiliation = typeof reviewer?.reviewerAffiliation === 'string'
+    ? reviewer.reviewerAffiliation.trim()
+    : '';
+  const personAffiliation = typeof reviewer?.affiliation === 'string'
+    ? reviewer.affiliation.trim()
+    : '';
+  return acceptedAffiliation || personAffiliation || null;
+}
+
 // Reviews tab rating order, and the projection field that holds each value.
 const RATING_KEYS = ['riskLevel', 'overallAssessment'];
 const PROJECTION_FIELD = {
@@ -65,7 +75,7 @@ function RatingCell({ fieldKey, value }) {
 
 function ReviewCard({ reviewer }) {
   const received = formatDate(reviewer.reviewReceivedAt);
-  const affiliation = reviewer.reviewerAffiliation || reviewer.affiliation || null;
+  const affiliation = reviewerAffiliationOf(reviewer);
   const hasFile = !!reviewer.reviewSharePointFolder;
   return (
     <Card hover={false}>
@@ -315,6 +325,7 @@ function yyyymmdd(date) {
 function ExportMenu({ proposal, submitted, liveQuestions }) {
   const [busy, setBusy] = useState(null); // 'docx' | 'pdf' | null
   const [error, setError] = useState(null);
+  const synthesisCurrent = proposal?.reviewSynthesisState?.current ?? null;
 
   const buildReport = useCallback(() => {
     const matrix = deriveReviewMatrix(submitted, liveQuestions);
@@ -328,8 +339,9 @@ function ExportMenu({ proposal, submitted, liveQuestions }) {
       // Phase 4: include the stored AI synthesis when present (additive —
       // omitting it keeps the export byte-identical to the Phase 3 shape).
       synthesis: proposal?.reviewSynthesis ?? null,
+      synthesisCurrent,
     });
-  }, [proposal, submitted, liveQuestions]);
+  }, [proposal, submitted, liveQuestions, synthesisCurrent]);
 
   const filenameBase = `reviews-${proposal?.requestNumber || proposal?.proposalId || 'export'}-${yyyymmdd(new Date())}`;
 
@@ -402,7 +414,7 @@ function CompareView({ submitted, liveQuestions }) {
 // as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
 // contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
 // parsed server-side, or null when never generated / parse failed).
-function SynthesisCard({ requestId, synthesis, state, onUpdated }) {
+function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
@@ -517,6 +529,29 @@ function SynthesisCard({ requestId, synthesis, state, onUpdated }) {
         <p className="text-sm text-gray-500 mt-2">No synthesis generated yet.</p>
       ) : (
         <div className="mt-3 space-y-3 text-sm">
+          {reviewers.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-700">Reviewers</div>
+              <ul className="mt-1 space-y-0.5 text-gray-800">
+                {reviewers.map((reviewer) => {
+                  const affiliation = reviewerAffiliationOf(reviewer);
+                  return (
+                    <li key={reviewer.suggestionId}>
+                      <span className="font-medium text-gray-900">
+                        {reviewer.name || 'Unnamed reviewer'}
+                      </span>
+                      {affiliation ? ` — ${affiliation}` : ' — Affiliation not reported'}
+                    </li>
+                  );
+                })}
+              </ul>
+              {state?.current !== true && (
+                <p className="text-xs text-amber-700 mt-1">
+                  This roster reflects current submitted reviews; the stale synthesis below may reflect an earlier reviewer set.
+                </p>
+              )}
+            </div>
+          )}
           {synthesis.consensus?.length > 0 && (
             <div>
               <div className="text-xs font-semibold text-gray-700">Consensus</div>
@@ -582,6 +617,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
   const canSend = !!reviewer.materialsSentAt;
+  const affiliation = reviewerAffiliationOf(reviewer);
 
   const handleSend = useCallback(async () => {
     setSending(true);
@@ -612,7 +648,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
     <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-b-0">
       <div className="min-w-0">
         <div className="font-semibold text-gray-900">{reviewer.name || 'Unnamed reviewer'}</div>
-        {reviewer.affiliation && <div className="text-sm text-gray-600 truncate">{reviewer.affiliation}</div>}
+        {affiliation && <div className="text-sm text-gray-600 truncate">{affiliation}</div>}
         <div className="text-xs text-gray-400 mt-0.5">
           {Number.isInteger(reviewer.daysSinceMaterialsSent)
             ? `${reviewer.daysSinceMaterialsSent} day${reviewer.daysSinceMaterialsSent === 1 ? '' : 's'} outstanding`
@@ -749,6 +785,7 @@ export default function ReviewsTab({ requestId }) {
           requestId={requestId}
           synthesis={proposal?.reviewSynthesis ?? null}
           state={proposal?.reviewSynthesisState ?? null}
+          reviewers={submitted}
           onUpdated={load}
         />
       </div>
@@ -835,6 +872,7 @@ export default function ReviewsTab({ requestId }) {
         requestId={requestId}
         synthesis={proposal?.reviewSynthesis ?? null}
         state={proposal?.reviewSynthesisState ?? null}
+        reviewers={submitted}
         onUpdated={load}
       />
     </div>

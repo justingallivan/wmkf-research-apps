@@ -132,7 +132,7 @@ describe('deriveReviewMatrix', () => {
       ]),
     ];
     const matrix = deriveReviewMatrix(reviewers, null);
-    expect(matrix.reviewers).toEqual([{ suggestionId: 'r1', name: 'Solo' }]);
+    expect(matrix.reviewers).toEqual([{ suggestionId: 'r1', name: 'Solo', affiliation: null }]);
     const q = matrix.questions.find((x) => x.key === 'impact');
     expect(q.average).toBe(3);
     expect(q.answeredCount).toBe(1);
@@ -142,6 +142,32 @@ describe('deriveReviewMatrix', () => {
     const matrix = deriveReviewMatrix([], null);
     expect(matrix.reviewers).toEqual([]);
     expect(matrix.questions).toEqual([]);
+  });
+
+  test('reviewer roster prefers accepted self-reported affiliation and falls back to person affiliation', () => {
+    const matrix = deriveReviewMatrix([
+      {
+        suggestionId: 'r1',
+        name: 'Dr. Accepted',
+        reviewerAffiliation: ' Florida International University ',
+        affiliation: 'Prior Institution',
+        answers: [],
+      },
+      {
+        suggestionId: 'r2',
+        name: 'Dr. Legacy',
+        reviewerAffiliation: ' ',
+        affiliation: 'Legacy University',
+        answers: [],
+      },
+      { suggestionId: 'r3', name: 'Dr. Unknown', answers: [] },
+    ], null);
+
+    expect(matrix.reviewers).toEqual([
+      { suggestionId: 'r1', name: 'Dr. Accepted', affiliation: 'Florida International University' },
+      { suggestionId: 'r2', name: 'Dr. Legacy', affiliation: 'Legacy University' },
+      { suggestionId: 'r3', name: 'Dr. Unknown', affiliation: null },
+    ]);
   });
 
   test('fetcher null (fail-soft): falls back to snapshot-order-only and does not mark questions retired', () => {

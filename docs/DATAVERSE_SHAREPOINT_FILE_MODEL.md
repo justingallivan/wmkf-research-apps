@@ -235,10 +235,21 @@ Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 
+The review-derived portion has two presentation channels over that same exact
+submitted-review population. Application/template code renders a named reviewer
+roster; `review-synthesis.generate` supplies anonymous observations. For each
+roster row, use the engagement-specific accepted
+`wmkf_appreviewersuggestion.wmkf_revieweraffiliation` first, then the
+potential-reviewer person's primary affiliation, then an explicit
+missing-affiliation state. Do not make Contact `parentcustomerid` a prerequisite
+and do not ask the model to reproduce the roster. This keeps names and
+affiliations legible without attributing a synthesized point to a person.
+
 The Site Visit date, not review completeness, controls distribution. A
 zero-review document is valid and states that no reviews were received as of
 its evidence timestamp. Otherwise the review-derived portion carries submitted
-review count/coverage and an as-of stamp. A later review makes that portion
+review count/coverage, its matching named-affiliation roster, and an as-of
+stamp. A later review makes that portion
 visibly stale and supports deliberate synthesis regeneration without
 regenerating the proposal core.
 
@@ -284,7 +295,10 @@ link is not required for this minimum contract.
 There is no separate Site Visit Writeup. Creating the Final copies the selected
 Pre-Site version and then lets the PD incorporate site observations, late
 reviews, transcript evidence, and editorial changes into the independent Final
-artifact.
+artifact. The copied review roster and anonymous narrative retain the selected
+Pre-Site evidence snapshot. Any deliberate late-review refresh in the Final
+updates roster, coverage/as-of metadata, and anonymous synthesis together while
+preserving the prior Final version.
 
 ### Site Visit dossier and transcript-derived artifacts
 

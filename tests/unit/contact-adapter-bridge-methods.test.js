@@ -11,6 +11,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   getInstitutionById,
+  setParentAccountIfEmpty,
   findManyByPortalOid,
   findManyByEmailLowercased,
   setPortalOid,
@@ -39,6 +40,93 @@ describe('contact.getInstitutionById', () => {
     expect(get).toHaveBeenCalledWith('contacts', 'contact-1', {
       select: 'contactid,adx_organizationname,_parentcustomerid_value',
     });
+  });
+});
+
+describe('contact.setParentAccountIfEmpty', () => {
+  test('fills an empty parent with an ETag-conditional Account bind', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      contactid: 'contact-1',
+      _parentcustomerid_value: null,
+      _etag: 'W/"5"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await setParentAccountIfEmpty('contact-1', 'account-1', {
+      actingUserSystemId: 'user-1',
+    });
+
+    expect(out).toEqual({ action: 'write', accountId: 'account-1' });
+    expect(update).toHaveBeenCalledWith('contacts', 'contact-1', {
+      'parentcustomerid_account@odata.bind': '/accounts(account-1)',
+    }, {
+      actingUserSystemId: 'user-1',
+      ifMatch: 'W/"5"',
+    });
+  });
+
+  test('never overwrites a different existing parent', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      contactid: 'contact-1',
+      _parentcustomerid_value: 'account-other',
+      _etag: 'W/"5"',
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await setParentAccountIfEmpty('contact-1', 'account-1');
+
+    expect(out).toEqual({
+      action: 'conflict',
+      reason: 'parent_already_populated',
+      existingParentId: 'account-other',
+      accountId: 'account-1',
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('re-evaluates a 412 race and noops when the same Account won', async () => {
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({ contactid: 'contact-1', _parentcustomerid_value: null, _etag: 'W/"1"' })
+      .mockResolvedValueOnce({ contactid: 'contact-1', _parentcustomerid_value: 'ACCOUNT-1', _etag: 'W/"2"' });
+    jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(
+      Object.assign(new Error('Precondition Failed'), { status: 412 }),
+    );
+
+    await expect(setParentAccountIfEmpty('contact-1', 'account-1')).resolves.toEqual({
+      action: 'noop',
+      reason: 'already_linked',
+      accountId: 'account-1',
+    });
+  });
+
+  test('re-evaluates a 412 race and preserves a different parent that won', async () => {
+    jest.spyOn(DynamicsService, 'getRecord')
+      .mockResolvedValueOnce({ contactid: 'contact-1', _parentcustomerid_value: null, _etag: 'W/"1"' })
+      .mockResolvedValueOnce({ contactid: 'contact-1', _parentcustomerid_value: 'account-other', _etag: 'W/"2"' });
+    jest.spyOn(DynamicsService, 'updateRecord').mockRejectedValueOnce(
+      Object.assign(new Error('Precondition Failed'), { status: 412 }),
+    );
+
+    await expect(setParentAccountIfEmpty('contact-1', 'account-1')).resolves.toEqual({
+      action: 'conflict',
+      reason: 'parent_already_populated',
+      existingParentId: 'account-other',
+      accountId: 'account-1',
+    });
+  });
+
+  test('refuses a bare write when the Contact GET has no ETag', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+      contactid: 'contact-1',
+      _parentcustomerid_value: null,
+    });
+    const update = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await expect(setParentAccountIfEmpty('contact-1', 'account-1')).rejects.toMatchObject({
+      code: 'reviewer_contact_parent_etag_missing',
+      retryable: true,
+    });
+    expect(update).not.toHaveBeenCalled();
   });
 });
 

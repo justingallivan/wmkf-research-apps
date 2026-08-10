@@ -318,9 +318,20 @@ The Pre-Site draft has two independently refreshable source layers:
    requested amount, project period, or named request relationships, source
    those values from Dataverse rather than asking the model to infer them from
    the proposal.
-2. **Review-derived analysis.** Use `review-synthesis.generate` over **all
-   currently submitted reviews**. Staff do not select a subset. Staff may edit
-   the resulting synthesis in the canonical Word document.
+2. **Review-derived material.** Use the exact **currently submitted review**
+   population for two separately rendered outputs; staff do not select a
+   subset:
+
+   - a deterministic named reviewer roster composed by application code, with
+     the engagement-specific accepted `wmkf_revieweraffiliation` first, the
+     potential-reviewer person's primary affiliation as fallback, and an
+     explicit missing-affiliation state; and
+   - anonymous analysis from `review-synthesis.generate`, whose observations
+     continue to say “a reviewer” / “reviewers” rather than naming the person
+     who made a point.
+   Staff may edit the resulting synthesis in the canonical Word document, but
+   the template—not the model—renders reviewer names and affiliations. Contact
+   `parentcustomerid` is not a prerequisite for the roster.
 
 The two named prompt surfaces do not currently have the same runtime posture:
 
@@ -347,7 +358,9 @@ Therefore:
   the review section states that no reviews were received as of the document's
   evidence timestamp;
 - one or more reviews use the latest `review-synthesis.generate` output and
-  disclose submitted-review count/coverage and as-of time;
+  disclose submitted-review count/coverage and as-of time; the same evidence
+  snapshot supplies the named affiliation roster, so roster and synthesis
+  cannot silently describe different reviewer populations;
 - a late review makes the review-derived section stale and permits
   `review-synthesis.generate` to run again;
 - rerunning review synthesis does not regenerate the proposal-derived core;
@@ -355,6 +368,12 @@ Therefore:
 - because staff may have edited the Word prose, a new synthesis must not
   silently overwrite that section. The Workbench presents a deliberate
   refresh/incorporation action and preserves the earlier distributed version.
+
+The Final Writeup initially inherits the exact named roster and anonymous
+review section from the selected Pre-Site version. If staff deliberately
+incorporates late reviews into the Final, the roster, coverage/as-of stamp, and
+anonymous synthesis refresh together as one review-evidence snapshot; the
+prior Final version remains preserved.
 
 Use the supplied Pre-Site and Final example documents plus the current prompts
 as the starting design reference. Formatting and section structure may change
@@ -953,14 +972,22 @@ Owner-decided:
     product history/milestone controls remain open. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
-    required human-edit audit surface.
+    required human-edit audit surface; and
+45. on 2026-08-10 the owner required both current Reviews outputs and the
+    planned Pre-Site/Final proposal writeups to list reviewer names and
+    affiliations while leaving observations anonymous. The roster is
+    deterministic application/template output from the submitted-review
+    population: accepted suggestion affiliation first, potential-reviewer
+    affiliation fallback, explicit missing state, and no dependency on the
+    linked Contact's `parentcustomerid`.
 
 Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
 2. first approved Pre-Site Word template and prompt/template compatibility
-   contract;
+   contract, implementing the decided deterministic reviewer roster alongside
+   the anonymous review narrative;
 3. administrator verification of the target library's configured version
    limit, second-stage recycle recovery, applicable site/library Purview
    retention, and ordinary-editor least-privilege policy; stable-identity

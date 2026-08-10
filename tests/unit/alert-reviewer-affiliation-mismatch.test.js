@@ -2,7 +2,11 @@
  * @jest-environment node
  */
 
-import { alertReviewerAffiliationMismatch } from '../../lib/services/alert-reviewer-affiliation-mismatch.js';
+import {
+  alertReviewerAffiliationMismatch,
+  resolveReviewerAffiliationMismatch,
+  reviewerAffiliationMismatchAutoResolveKey,
+} from '../../lib/services/alert-reviewer-affiliation-mismatch.js';
 
 function makeDeps(overrides = {}) {
   return {
@@ -67,7 +71,7 @@ describe('alertReviewerAffiliationMismatch', () => {
       autoResolveKey: 'reviewer-affiliation-mismatch:pr-1',
     });
     const message = deps.notify.mock.calls[0][0].message;
-    expect(message).toContain('The contact/account was NOT modified');
+    expect(message).toContain('The contact/account was not changed automatically');
     expect(message).toContain('NOTE: this may simply be a name variant');
   });
 
@@ -162,6 +166,43 @@ describe('alertReviewerAffiliationMismatch', () => {
     expect(deps.warn).toHaveBeenCalledWith(
       '[alert-reviewer-affiliation-mismatch] alert failed (non-fatal):',
       'system_alerts down',
+    );
+  });
+});
+
+describe('reviewer affiliation mismatch alert lifecycle', () => {
+  test('builds the same stable key for alert creation and successful-link cleanup', () => {
+    expect(reviewerAffiliationMismatchAutoResolveKey(baseArgs())).toBe(
+      'reviewer-affiliation-mismatch:pr-1',
+    );
+    expect(reviewerAffiliationMismatchAutoResolveKey(baseArgs({
+      reviewer: { wmkf_potentialreviewersid: null, _wmkf_contact_value: 'contact-pointer' },
+    }))).toBe('reviewer-affiliation-mismatch:contact-1');
+  });
+
+  test('calls the stable key to auto-resolve warnings after a successful link', async () => {
+    const autoResolve = jest.fn().mockResolvedValue(2);
+
+    await expect(resolveReviewerAffiliationMismatch(baseArgs(), { autoResolve }))
+      .resolves.toEqual({
+        resolvedCount: 2,
+        autoResolveKey: 'reviewer-affiliation-mismatch:pr-1',
+      });
+    expect(autoResolve).toHaveBeenCalledWith('reviewer-affiliation-mismatch:pr-1');
+  });
+
+  test('auto-resolve failure is best-effort and does not reopen the warning path', async () => {
+    const warn = jest.fn();
+    const autoResolve = jest.fn().mockRejectedValue(new Error('system_alerts unavailable'));
+
+    await expect(resolveReviewerAffiliationMismatch(baseArgs(), { autoResolve, warn }))
+      .resolves.toEqual({
+        skipped: 'auto_resolve_failed',
+        autoResolveKey: 'reviewer-affiliation-mismatch:pr-1',
+      });
+    expect(warn).toHaveBeenCalledWith(
+      '[alert-reviewer-affiliation-mismatch] auto-resolve failed (non-fatal):',
+      'system_alerts unavailable',
     );
   });
 });

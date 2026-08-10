@@ -194,7 +194,7 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 
 - [PLANNED] Capture institution and department as separate engagement-scoped fields at acceptance for board writeups.
 - [ASSUMED] Decide whether official writeups also need a full display affiliation string in addition to institution-only plus department.
-- [ASSUMED] Decide whether account matching is worth the risk/cost; prior reviewer/contact work treated affiliation mismatch as alert-only rather than auto-linking.
+- [VERIFIED via `lib/services/auto-link-reviewer-contact-account.js`] The owner approved a narrow acceptance-time subset and it is implemented in source pending promotion: fill only an empty Contact parent when the accepted affiliation has exactly one active normalized exact CRM Account label match; preserve existing parents and alert on ambiguous/unmatched residuals.
 
 ## 4. Positive / Negative Flag And Searchable Notes After Reviewer Is Added
 

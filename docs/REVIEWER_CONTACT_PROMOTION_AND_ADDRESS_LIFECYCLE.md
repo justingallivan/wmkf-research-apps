@@ -6,7 +6,7 @@ status: active
 summary: "Current reviewer contact-promotion contract plus remaining address-provenance and staleness decisions."
 canonical: false
 cataloged: 2026-07-30
-last_verified: 2026-07-31
+last_verified: 2026-08-10
 owner: product-engineering
 related:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
@@ -376,6 +376,23 @@ deterministic identity conflicts alert staff and terminate without retry churn.
 Generic `setContactLink` failures abort before honorarium creation. A concurrent
 link to another contact uses the reviewer row's live link as authoritative.
 
+**Institution parent enrichment (source implementation pending promotion,
+2026-08-10).** After the post-honorarium withdrawal re-check proves the
+engagement is still accepted, the drain may fill an empty Contact
+`parentcustomerid`. Authority is only the accepted self-reported affiliation;
+the complete active Account population must yield exactly one normalized exact
+target across `name`, `akoya_aka`, `wmkf_legalname`, or `wmkf_dc_aka`. The
+matcher performs no fuzzy scoring, inferred acronym expansion, or Account
+creation. Existing parents, ambiguity, and misses abstain. The target is
+re-read immediately before an ETag-conditional fill-only Contact PATCH; a 412
+re-evaluates and never overwrites the winner. Transient operational failures
+keep the durable acceptance job retryable and defer the mismatch warning. A
+capped/incomplete Account scan cannot prove cardinality, so it abstains without
+retry, raises one deduplicated operations warning, and continues the
+reviewer-specific mismatch check. Other genuine abstentions do the same without
+the operations warning. Exact or already-correct links suppress and auto-resolve
+the reviewer's standing mismatch warning.
+
 ### Historical S388 baseline [HISTORICAL]
 
 Contact promotion ran inside the per-recipient send loop, immediately **after**
@@ -663,11 +680,14 @@ Two things are missing, and neither is plumbing:
 - **No staff affordance** to act on a mismatch.
 
 **Sibling precedent:** `alert-reviewer-affiliation-mismatch.js` performs this
-comparison for *accepted* reviewers and deliberately only alerts, reasoning that
-"free-text affiliation names have variants, acronyms, and AKAs that are not safe
-to auto-resolve" (`:1-10`). That judgment transfers to institutions but **not**
-to email addresses, which are exact-comparable — so an address mismatch is a far
-better candidate for a decisive staff prompt than an affiliation mismatch is.
+comparison for *accepted* reviewers. The source implementation pending
+promotion now precedes it with a narrower deterministic Account matcher: one
+exact active CRM label target may fill an empty parent; every existing-parent,
+ambiguous, unmatched, fuzzy, or provider-similarity case still only alerts.
+That conservative institution judgment does **not** transfer to email
+addresses, which are exact-comparable — so an address mismatch remains a far
+better candidate for a decisive staff prompt than a residual affiliation
+mismatch is.
 
 ### Replacement design [DRAFT]
 
@@ -759,6 +779,7 @@ exception.
 | 0 | **Remove send-time contact promotion** — invitation success does not merit creation/linking | **Implemented, S389** | Done |
 | 1 | Exact-address staff attestation, person-scoped trust-until-contradicted state, and no-dead-end remedy contract | **Approved and implemented in source, S391** | Wave 17 schema-first deploy + runtime promotion + controlled pilot |
 | 2 | Acceptance-time promotion scope (§4.1): every identity-bearing accept, including honorarium opt-outs | **Implemented, S389** | Done |
+| 7 | Acceptance-time affiliation→empty Contact parent: unique normalized exact active Account label only; otherwise abstain + residual alert | **Implemented in source 2026-08-10; pending promotion** | Deploy and observe |
 | 3 | Contact provenance attribute(s) (§3) | Justin + Dataverse schema | §3 |
 | 4 | Durable vs disposable home for the non-response signal (§5.2) | Justin | §5 |
 | 6 | **`reviewer_confirmed` address source (§5.4)** — write the reviewer's own confirmation back to provenance; needs an explicit carve-out from §2.1 terminality | Justin | §5.4 |

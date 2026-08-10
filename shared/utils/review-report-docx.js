@@ -92,6 +92,31 @@ export async function generateReviewReportDocx(report) {
     }),
   ];
 
+  // --- Named reviewer roster ---
+  // Kept separate from the anonymous synthesis narrative by contract.
+  const reviewerChildren = [];
+  if (Array.isArray(report.reviewers) && report.reviewers.length > 0) {
+    reviewerChildren.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 120 },
+        children: [new TextRun({ text: 'Reviewers', size: 26, font: FONT, bold: true })],
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({ children: [headerCell('Name', 45), headerCell('Affiliation', 55)] }),
+          ...report.reviewers.map((reviewer) => new TableRow({
+            children: [
+              bodyCell(reviewer.name || 'Unnamed reviewer', 45),
+              bodyCell(reviewer.affiliation || 'Not reported', 55),
+            ],
+          })),
+        ],
+      }),
+    );
+  }
+
   // --- Summary section ---
   const summaryChildren = [
     new Paragraph({
@@ -134,8 +159,22 @@ export async function generateReviewReportDocx(report) {
     synthesisChildren.push(new Paragraph({
       heading: HeadingLevel.HEADING_2,
       spacing: { before: 300, after: 120 },
-      children: [new TextRun({ text: 'AI Synthesis', size: 26, font: FONT, bold: true })],
+      children: [new TextRun({
+        text: s.current === false ? 'AI Synthesis (stale)' : 'AI Synthesis',
+        size: 26,
+        font: FONT,
+        bold: true,
+      })],
     }));
+    if (s.current === false) {
+      synthesisChildren.push(new Paragraph({
+        spacing: { after: 120 },
+        children: [bodyRun(
+          'The reviewer roster and answers reflect current submissions; this synthesis may reflect an earlier reviewer set.',
+          { italics: true, color: '996600' },
+        )],
+      }));
+    }
     function bulletList(title, items) {
       if (!items || items.length === 0) return;
       synthesisChildren.push(new Paragraph({
@@ -296,6 +335,7 @@ export async function generateReviewReportDocx(report) {
       properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
       children: [
         ...headerChildren,
+        ...reviewerChildren,
         ...summaryChildren,
         ...synthesisChildren,
         ...answerChildren,
