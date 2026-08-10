@@ -43,3 +43,22 @@ a failed pre-commit hook away — bypassing the check instead of fixing what it'
 - A single clean rewrite informed by verified facts, or doing the work directly instead of delegating,
   beats repeated hook-informed tuning attempts. Cap yourself at one retry after understanding the cause;
   if it still blocks, stop and hand the user the draft plus the exact block message.
+
+## S413 extension — when the escape hatch itself triggers the guard, it's a hook bug
+
+The one-retry cap above is what surfaces this. In S413 `scope-claim-reminder` blocked a doc
+edit; the single permitted correction was the hook's OWN prescribed marker
+(`[DERIVED-FROM: …; independent of TBD count]`), and it re-blocked *harder* — the marker text
+contains "TBD" and "count", so the line that RESOLVES an uncertainty registered as a fresh one.
+A remedy that provably cannot succeed is a defect in the checker, not a phrasing problem.
+
+The tell that separates this from hill-climbing: you stopped after one attempt and the failure
+was **structural and demonstrable** (the documented escape hatch is self-defeating), not "the
+matcher still doesn't like my wording."
+
+**How to apply:** surface it to the user with the evidence and offer fixing the heuristic as an
+option — harness infra is their call, never a unilateral edit to make your own block go away.
+If they approve, fix the detection logic and **mutation-test each fix** (revert it; the matching
+test must fail) plus one test asserting the genuine invariant still blocks, so the guard is
+narrowed rather than disarmed. Do not weaken a guard you merely find inconvenient — this applies
+only when the block is provably wrong on sound content.
