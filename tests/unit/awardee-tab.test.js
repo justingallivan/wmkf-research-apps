@@ -44,6 +44,7 @@ function wireFetch({
   websiteOk = true,
   abstract = null,
   saveOk = true,
+  staleSave = false,
   emailDefaults = defaultEmailDefaults(),
   sentInvitedAt = '2026-08-09T16:00:00Z',
   failAbstractReloadAfterSend = false,
@@ -80,6 +81,10 @@ function wireFetch({
     }
     if (u.includes('/grantee-deliverables/abstract')) {
       if ((opts.method || 'GET') === 'PUT') {
+        if (staleSave) {
+          // Mirrors the route's 409 stale body, which drives saveAbstract's reload.
+          return { ok: false, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
+        }
         if (!saveOk) return { ok: false, json: async () => ({ error: 'Could not save the abstract.' }) };
         const b = JSON.parse(opts.body);
         state.effective = b.text;
@@ -848,7 +853,7 @@ test('a manual pane choice survives a later refetch', async () => {
   // so the effective field is still the draft. That puts the editor (and its
   // Generate button) on Invitation while the caption sits on Submission — the one
   // realistic shape where a refetch can be triggered from the pane the PD chose.
-  wireFetch({ abstract: {
+  wireFetch({ staleSave: true, abstract: {
     effective: 'Draft the grantee did not touch.',
     effectiveField: 'formatted',
     editable: true,
@@ -861,9 +866,13 @@ test('a manual pane choice survives a later refetch', async () => {
 
   fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
   expect(screen.getByLabelText('To email')).toBeInTheDocument();
-  // Regenerating reloads the abstract; the pane must not jump back under the PD.
-  fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
-  await waitFor(() => expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true'));
+  // A stale-conflict save reloads the abstract (saveAbstract's `code: 'stale'`
+  // branch). Regenerate is no longer available on a returned package, so this is
+  // the reload path that still exists here. The pane must not jump back.
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'An edit long enough to save.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true');
   expect(screen.getByLabelText('To email')).toBeInTheDocument();
 });
 
@@ -1101,4 +1110,52 @@ test.each([
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
   expect(screen.getByRole('button', { name: /send invitation|re-send invitation/i })).toBeEnabled();
   expect(screen.queryByText(/already returned this package/i)).not.toBeInTheDocument();
+});
+
+// ── Regenerate is an outbound-phase action (S411 fix) ──
+//
+// Reported from the 1002788 production run: "Regenerate abstract" still showed
+// on the Submission pane. It is worse than nonsensical there — it burns a paid
+// LLM call and overwrites wmkf_abstractformatted (the historical draft, i.e.
+// what was actually sent) while the published text is wmkf_abstractapproved,
+// which it does not touch. Nothing visible changes, so the loss is silent.
+
+test('the regenerate button is gone once the grantee has returned the package', async () => {
+  wireFetch({ abstract: submitted({ caption: 'Homer in a blimp', imageRef: SP_URL, imageUrl: SP_URL, hasImage: true }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+
+  // The approved-abstract editor is still here and still editable…
+  expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument();
+  // …but the outbound-phase action is not offered.
+  expect(screen.queryByRole('button', { name: /regenerate abstract/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /generate abstract/i })).not.toBeInTheDocument();
+});
+
+test('a submitted package with no approved abstract also hides regenerate', async () => {
+  // hasSubmission via caption alone: the grantee returned something, so the
+  // outbound phase is over even though the abstract is still the draft.
+  wireFetch({ abstract: {
+    effective: 'Draft the grantee did not touch.',
+    effectiveField: 'formatted',
+    status: 100000003,
+    editable: false,
+    caption: 'A caption.',
+    submittedAt: '2026-08-09T16:00:00Z',
+  } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.queryByRole('button', { name: /regenerate abstract/i })).not.toBeInTheDocument();
+});
+
+test.each([
+  ['Drafted', 100000000],
+  ['Invited', 100000001],
+  ['Reminder Sent', 100000002],
+])('regenerate is still offered at %s, through the whole outbound phase', async (_label, status) => {
+  wireFetch({ abstract: { effective: 'Draft text.', effectiveField: 'formatted', status, editable: true } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.'));
+  expect(screen.getByRole('button', { name: /regenerate abstract/i })).toBeInTheDocument();
 });

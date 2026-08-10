@@ -541,14 +541,23 @@ export default function AwardeeTab({ requestId, context }) {
           cursor position is lost, never an edit. */}
       {subTab === abstractPane && (
       <section className="space-y-2">
-        <button
-          type="button"
-          onClick={() => generate(hasAbstract)}
-          disabled={generating}
-          className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
-        >
-          {generating ? 'Working…' : hasAbstract ? 'Regenerate abstract' : 'Generate abstract'}
-        </button>
+        {/* Generating is an OUTBOUND-phase action: it drafts the text that gets
+            sent to the grantee. Once they have returned the package it is both
+            pointless and destructive — it would burn a paid LLM call and
+            overwrite the historical draft (what we sent) while the published
+            text is the approved version it does not touch, so nothing visible
+            would change. The server refuses it too (generate-service); this just
+            stops offering it. */}
+        {!granteeResponded && (
+          <button
+            type="button"
+            onClick={() => generate(hasAbstract)}
+            disabled={generating}
+            className="px-3 py-2 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+          >
+            {generating ? 'Working…' : hasAbstract ? 'Regenerate abstract' : 'Generate abstract'}
+          </button>
+        )}
         {hasAbstract && (
           <div className="space-y-1">
             <p className="text-xs text-gray-600">

@@ -120,3 +120,54 @@ test('non-downgrade: regenerate at Invited persists the text but never patches s
   expect(patchDeliverable).not.toHaveBeenCalled();
   expect(body).toMatchObject({ regenerated: true, status: GRANTEE_DELIVERABLE_STATUS.INVITED });
 });
+
+// ── Regenerate is refused once the grantee has returned the package (S411) ──
+//
+// Reported from the 1002788 production run. A post-submission regenerate burns a
+// paid LLM call and overwrites wmkf_abstractformatted — the historical draft,
+// i.e. what was actually sent to the grantee — while the published text is
+// wmkf_abstractapproved, which this path never touches. Nothing visible changes,
+// so the loss is silent. Mirrors send-invite-service's range guard.
+
+test.each([
+  ['Submitted', GRANTEE_DELIVERABLE_STATUS.SUBMITTED],
+  ['Staff Review', GRANTEE_DELIVERABLE_STATUS.STAFF_REVIEW],
+  ['Revision Requested', GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED],
+  ['Complete', GRANTEE_DELIVERABLE_STATUS.COMPLETE],
+  ['Closed No Response', GRANTEE_DELIVERABLE_STATUS.CLOSED_NO_RESPONSE],
+])('regenerate at %s → 409 before the paid call, and no write', async (_label, status) => {
+  getById.mockResolvedValue(row({ wmkf_abstractformatted: 'The draft that was actually sent.' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(status));
+
+  await expect(generateDeliverableAbstract(args({ regenerate: true })))
+    .rejects.toMatchObject({ httpStatus: 409 });
+
+  // The whole point: no LLM spend, and the historical draft is untouched.
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(patchDeliverable).not.toHaveBeenCalled();
+});
+
+test('the REUSE path still works after submission — it is also the tab load', async () => {
+  getById.mockResolvedValue(row({ wmkf_abstractformatted: 'The draft that was actually sent.' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.SUBMITTED));
+
+  const out = await generateDeliverableAbstract(args({ regenerate: false }));
+
+  expect(out).toMatchObject({ reused: true, status: GRANTEE_DELIVERABLE_STATUS.SUBMITTED });
+  expect(generateGranteeAbstract).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['Drafted', GRANTEE_DELIVERABLE_STATUS.DRAFTED],
+  ['Invited', GRANTEE_DELIVERABLE_STATUS.INVITED],
+  ['Reminder Sent', GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT],
+])('regenerate at %s is still allowed — the outbound phase is not over', async (_label, status) => {
+  getById.mockResolvedValue(row({ wmkf_abstractformatted: 'Old draft.' }));
+  ensureDeliverableForRequest.mockResolvedValue(deliverable(status));
+  generateGranteeAbstract.mockResolvedValue({ abstractFormatted: 'A regenerated draft, long enough.', runId: 'r1', model: 'm' });
+
+  await expect(generateDeliverableAbstract(args({ regenerate: true }))).resolves.toMatchObject({ persisted: true });
+  expect(generateGranteeAbstract).toHaveBeenCalled();
+});
