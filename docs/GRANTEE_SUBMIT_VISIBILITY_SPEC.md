@@ -656,7 +656,20 @@ placement decision and the constraints discovered while making it, so the build
 does not have to re-derive them. Tier 2 (Dataverse writes) — it needs a branch,
 characterization coverage, and an explicit owner decision to merge.
 
-### `Revision Requested` goes on the Submission pane, not Close-out
+### `Revision Requested` as a built transition — DEFERRED by owner decision 2026-08-10
+
+**Read this before the subsection below.** The owner decided 2026-08-10 that
+revisions are handled **case-by-case over email**, not through a built status
+transition. Staff will agree the change with the grantee directly and then need to
+put the result into SharePoint/Dataverse themselves — see "The actual requirement:
+a staff-side replace path" below, which is the work this unblocks.
+
+The design that follows is retained because it is verified and would be the right
+shape *if* the transition is ever built — but it is **not** the current direction.
+Under the email approach the grantee never returns to the portal, so the token
+re-mint, the portal re-open, and the status write are all unnecessary.
+
+### If it were built: `Revision Requested` goes on the Submission pane, not Close-out
 
 The Close-out pane holds the **terminal** transitions (`Complete`,
 `Closed No Response`) and the outputs published once a package is settled.
@@ -740,15 +753,80 @@ while the status header reads `Revision Requested` — a visible disagreement be
 two elements a few pixels apart. Decide the badge's third state as part of the
 build; do not leave it to fall out of the existing boolean.
 
-### Still open — owner decisions
+### Owner decisions — RESOLVED 2026-08-10
 
-1. **What `Complete` means.** Bookkeeping only, or does it gate what the cycle
-   export and website HTML publish? The second changes the behavior of shipped
-   outputs and is the reason this is Tier 2 rather than Tier 1.
-2. **Whether close-out includes `Revision Requested` at all.** The mechanism
-   question that used to accompany this one — re-mint versus manual re-send — is
-   **answered above by the 30-day stateless token**, and is no longer an owner
-   decision. What remains is only whether the transition is offered.
+**1. What `Complete` means.** The grantee's responsibility for the task is done,
+and downstream processing is **eligible** to go forward. The owner intends this as
+a **precedent for other task types not yet built**, so implement the semantic, not
+a grantee-deliverables special case.
+
+Two consequences the build must respect:
+
+- **Today no consumer reads deliverable status at all.** The cycle export filters
+  on cycle window, Awarded request status, a non-null project leader, and research
+  program — there is **no deliverable-status term in the query**
+  `[VERIFIED via cycle-export-service.js:57-61]`. So downstream currently proceeds
+  regardless of whether the grantee ever responded, which is the opposite of the
+  semantic above.
+- **Sequencing is load-bearing.** Nothing can write `COMPLETE` today. If
+  eligibility becomes a hard filter *before* the writer exists and existing rows
+  are backfilled, **the cycle export returns nothing**. Required order: writer →
+  backfill → gate. The first version should **warn rather than exclude** — an
+  export that silently drops awards is far harder to notice than one that flags
+  them, and this is a shipped output.
+
+**2. Whether close-out includes `Revision Requested`.** No — handled case-by-case
+over email instead. See the deferral notice at the top of this design section. The
+work this actually unblocks is below.
+
+### The actual requirement: a staff-side replace path
+
+Because revisions are agreed over email, the grantee never re-enters the portal.
+What staff need is a way to put the revised material — a different image, a
+corrected caption — into SharePoint and Dataverse themselves.
+
+**Staff currently cannot write either field.** There is exactly one writer of the
+image and caption, `writeGranteeDeliverables`, and its only caller is the external
+portal's submit route `[VERIFIED via pages/api/external/grantee/[token]/submit.js:24;
+disconfirming check — a repo-wide grep for grantee-upload importers across lib/,
+pages/, and shared/ returns no other caller]`. The caption's read-only state on the
+staff surface is deliberate, not an oversight: "staff caption editing is a separate
+change with its own concurrency story" `[VERIFIED via abstract-service.js:124-126]`.
+
+**The existing writer cannot simply be given a second caller.** It is built around
+grantee consent: `waiverVersionId` is required and it fails closed with
+`policy_misconfigured` when absent, because a missing value means "a bug or a
+bypassed route" `[VERIFIED via grantee-upload.js:87-89]`. It also re-stamps status
+to `SUBMITTED` `[VERIFIED via grantee-upload.js:139]`. A staff replacement has no
+waiver acknowledgment to supply and should not move status. This needs a **new,
+narrower writer**, not a new caller.
+
+**Consent decision (owner, 2026-08-10):** the original waiver **stands**. Consent is
+assigned at first submission; a resubmission is a narrow, agreed change; a grantee
+withholding publication consent is unlikely and the case is expected to be rare
+overall. So the replace path does **not** re-record consent and does not need a new
+acknowledgment. The concern was raised — a submitted package *is* the consent
+record, so replacing its contents breaks that identity — and the owner accepted it
+knowingly. Do not reintroduce a consent step without a new decision.
+
+Shape of the work (Tier 2 — new write surface, needs characterization coverage):
+
+- Lives on the **Submission pane**, next to what it edits. The placement reasoning
+  from the deferred transition design above transfers unchanged.
+- Reuses the safe machinery: `granteeUploadFolder` (one definition shared by writer
+  and reader), the server-controlled filename pattern the writer emits, magic-byte
+  validation, and the SharePoint cleanup helper `[VERIFIED via image-service.js:29-37
+  for the shared folder/filename contract]`.
+- Does **not** reuse the consent path or the status write.
+- Open sub-question, not yet decided: whether replacing an image should leave any
+  audit trace distinguishing "what the grantee submitted" from "what staff
+  substituted". The existing writer already deletes the prior image on replacement
+  — it lists the folder, matches `grantee_image_`, excludes the newly uploaded item
+  by id, and cleans up the rest, best-effort and non-fatal
+  `[VERIFIED via grantee-upload.js:195-209; the source calls this "orphan cleanup,
+  never data loss"]`. If a staff writer copies that behavior, the grantee's original
+  leaves the folder and survives only in SharePoint's own recycle bin / version
+  history, with no in-app record that a substitution happened.
 
 ### `Staff Review` is already wired on the read side — only its writer is missing
 
@@ -769,6 +847,6 @@ part of the owner's parked design; adding it is additive and blocks nothing.
 
 ### Out of scope
 
-The `Complete` and `Closed No Response` transitions are not designed here — the
-first is blocked on owner question 1 above, and the second has no discussed
-trigger (manual, or automatic after some overdue threshold?).
+`Closed No Response` is not designed here — it has no discussed trigger (manual, or
+automatic after some overdue threshold?). `Complete` now has settled semantics
+(above) but its writer, backfill, and consumer gate are a separate build.
