@@ -479,6 +479,53 @@ Where the shipped code differs from, or resolves, the plan above:
   `11e486bd` removed that race and production deployment
   `dpl_7X6q5XYog3YcuJoAfXuaMQ3zE4xM` reached READY with all canonical aliases. Scoped gates, the full
   **539-suite / 6509-test** run, and the production build passed before promotion.
+## Follow-up: Awardee-tab restructure (2026-08-09, S411)
+
+Feature 2 shipped the submission surface but rendered it in one long scroll with the
+invitation, and hid it entirely pre-submit. In practice that made "the grantee has not
+responded" indistinguishable from "this surface was never built" — the owner went
+looking for the feature on request `1002365` (status `Invited`) and found nothing,
+which is exactly what the code was written to do. Legibility, not a defect.
+
+What changed, all in `AwardeeTab.js` plus two additive read fields:
+
+- **Two panes, `Invitation` and `Submission`**, replacing the single scroll. The
+  `Submission` tab label carries a badge (`pending` / `✓ received`), so the answer to
+  "did they respond?" never costs a click. The first load auto-advances to
+  `Submission` when there is a response, then latches — a later refetch cannot
+  re-steer a pane the PD chose.
+- **A persistent status header** above both panes: status, invite date, reminder date,
+  and the derived response deadline. Overdue awards say how many days past.
+- **A real empty state** where the silence used to be.
+- **The abstract editor follows its own mode**, since it is dual-purpose: the draft
+  sits under `Invitation`, the grantee-approved version under `Submission`.
+  `granteeResponded` (submission fields **or** `effectiveField === 'approved'`) drives
+  the badge, auto-advance, and empty state together — an approved abstract is only
+  ever written by the portal's submit path, so it is itself proof of a response. The
+  first cut keyed those off the narrower `hasSubmission` and could render the
+  approved-abstract editor into a pane that simultaneously said "No submission
+  received yet"; two existing tests caught it.
+- **`Deliverable outputs` stays outside both panes** — it applies at any stage.
+
+`invitedAt` / `remindedAt` were added to the abstract GET (`abstract-service.js`).
+Both were **already** in `DELIVERABLE_SELECT` for the reminder cron, so this exposes
+existing reads rather than widening the projection. The deadline reuses
+`formatCobDate` (invite + 14d), the same helper that fills the invitation email's
+`COB {{dueDate}}`, so the page cannot contradict what the grantee was told; the day-12
+reminder threshold lives in the reminders cron. `computeDaysOverdue` runs on the load
+path, not in render — reading the clock during render trips `react-hooks/purity`.
+
+Still deferred, unchanged by this work: the in-app image proxy (the image remains a
+SharePoint link) and the `Staff Review` / `Revision Requested` / `Complete` /
+`Closed No Response` lifecycle transitions, which still have **no writer**.
+`[VERIFIED 2026-08-09 by enumerating every write of wmkf_deliverablestatus across
+lib/pages/shared/scripts — six write sites covering four of the eight option values:
+generate-service.js:67,144 → DRAFTED; send-invite-service.js:125 → INVITED;
+cron/grantee-deliverable-reminders-service.js:215,257 → REMINDER_SENT;
+grantee-upload.js:126 → SUBMITTED. The other four values appear only in read-side
+guards.]` So a submitted package has no in-app path forward: staff can edit the
+approved abstract, but nothing can move the row out of `Submitted`.
+
 - **Cleanup is verified, not assumed.** Request `1002788` again has a null approved abstract, zero
   deliverable rows, and an empty `Grantee_Uploads` folder; the rehearsal alert is resolved; the
   `grantee-deliverables` recipient override is absent from persisted config; and the Awardee tab is

@@ -24,9 +24,26 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { GRANTEE_DELIVERABLE_LABEL } from '../../config/granteeDeliverableStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
-import { fillInviteBody, fillInviteSubject } from '../../config/granteeInviteEmail';
+import { fillInviteBody, fillInviteSubject, formatCobDate } from '../../config/granteeInviteEmail';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
+
+/**
+ * Whole days past the requested response date, or 0 when not applicable.
+ *
+ * The deadline is invite + 14d, matching formatCobDate — the same definition that
+ * fills the invitation email's "COB {{dueDate}}", so the page can never contradict
+ * what the grantee was told. Called from the load path rather than render: reading
+ * the clock during render is impure (react-hooks/purity) and would let an
+ * incidental re-render change the number.
+ */
+function computeDaysOverdue(invitedAt, responded) {
+  if (!invitedAt || responded) return 0;
+  const due = new Date(invitedAt);
+  if (Number.isNaN(due.getTime())) return 0;
+  due.setDate(due.getDate() + 14);
+  return Math.max(0, Math.floor((Date.now() - due.getTime()) / 86400000));
+}
 
 // Mirrors formatMeetingDate in OverviewTab.
 function formatSubmissionDate(iso) {
@@ -57,7 +74,16 @@ export default function AwardeeTab({ requestId, context }) {
   // into an href; `imageRef` may be a relative SharePoint library path.
   const [submission, setSubmission] = useState({
     caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
+    invitedAt: null, remindedAt: null, daysOverdue: 0,
   });
+  // Which half of the tab is showing: 'invitation' (what goes out) or
+  // 'submission' (what came back). Auto-advanced ONCE to 'submission' when the
+  // first load finds a returned package — a PD arriving from the submit
+  // notification lands on the thing they were told about. `subTabPinnedRef`
+  // latches on the first load or the first manual click, so neither a later
+  // refetch nor the auto-advance can yank the pane out from under a click.
+  const [subTab, setSubTab] = useState('invitation');
+  const subTabPinnedRef = useRef(false);
   const [recipients, setRecipients] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
@@ -181,13 +207,28 @@ export default function AwardeeTab({ requestId, context }) {
         setAbstractField(data.effectiveField || null);
         setAbstractEtag(data.etag || '');
         setAbstractEditable(Boolean(data.editable));
+        // Mirrors `granteeResponded` in the render — an approved abstract counts
+        // as a response, and it is where the editor for that abstract lives, so
+        // landing on the other pane would hide it behind a click.
+        const responded = Boolean(
+          data.hasImage || data.caption || data.submittedAt || data.effectiveField === 'approved',
+        );
         setSubmission({
           caption: data.caption || null,
           imageRef: data.imageRef || null,
           imageUrl: data.imageUrl || null,
           hasImage: Boolean(data.hasImage),
           submittedAt: data.submittedAt || null,
+          invitedAt: data.invitedAt || null,
+          remindedAt: data.remindedAt || null,
+          daysOverdue: computeDaysOverdue(data.invitedAt, responded),
         });
+        // Open on what came back, but only if the PD has not already chosen a
+        // pane. Latches either way so a refetch never re-steers the view.
+        if (!subTabPinnedRef.current) {
+          subTabPinnedRef.current = true;
+          if (responded) setSubTab('submission');
+        }
         if (data.status !== undefined) setStatus(data.status);
       }
     } catch { /* abstract load is best-effort; "Generate abstract" still works */ }
@@ -345,6 +386,32 @@ export default function AwardeeTab({ requestId, context }) {
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
   // Hidden entirely pre-submit: nothing to show until the grantee returns something.
   const hasSubmission = Boolean(submission.hasImage || submission.caption || submission.submittedAt);
+  // Did the grantee come back at all? Broader than hasSubmission on purpose: an
+  // approved abstract is only ever written by the portal's submit path, so it is
+  // itself proof of a response even when the package carried no caption or image
+  // (or when those were later cleared). Everything that answers "did they
+  // respond?" — the badge, the auto-advance, the empty state — keys off THIS, so
+  // the pane can never simultaneously host the approved-abstract editor and claim
+  // nothing was received.
+  const granteeResponded = hasSubmission || abstractField === 'approved';
+  // Which pane the abstract editor belongs in. It is dual-mode: pre-submit it is
+  // the draft being prepared for sending (outbound); once the grantee has
+  // approved a version it is what publishes (inbound result). It follows its own
+  // mode rather than sitting in a fixed pane, so the editor is always next to the
+  // work it belongs to. Keyed off abstractField, the same signal the copy uses.
+  const abstractPane = abstractField === 'approved' ? 'submission' : 'invitation';
+  // Response deadline, derived from the invite date with the SAME +14d helper that
+  // fills the invitation email's "COB {{dueDate}}" — one definition, so the page
+  // can never disagree with what the grantee was told. It is derived, not stored:
+  // an invitation composed and sent on different days would shift the emailed date
+  // relative to this one. The reminder cron fires at day 12 (reminders service).
+  const invitedLabel = formatSubmissionDate(submission.invitedAt);
+  const remindedLabel = formatSubmissionDate(submission.remindedAt);
+  const dueLabel = submission.invitedAt ? formatCobDate(new Date(submission.invitedAt)) : null;
+  // Read from state, not computed here: the clock is measured once at load
+  // (see computeDaysOverdue) because reading Date.now() during render is impure
+  // and would give an unstable result on any incidental re-render.
+  const daysOverdue = submission.daysOverdue;
   const waiverAckedLabel = formatSubmissionDate(submission.submittedAt);
   const hasAbstract = abstractText.trim().length > 0;
   const abstractDirty = abstractText !== savedAbstractText;
@@ -365,14 +432,65 @@ export default function AwardeeTab({ requestId, context }) {
 
   return (
     <div className="space-y-6">
+      {/* Status header — always visible, above the panes. The whole point is that
+          "where does this award stand" must never be something you have to click a
+          pane to discover; that ambiguity is what sent staff looking for a
+          submission surface that was simply empty. */}
       <section>
         <h3 className="text-sm font-semibold text-gray-900">Grantee deliverables</h3>
         <p className="text-sm text-gray-600">Status: <strong>{statusLabel}</strong></p>
+        <p className="text-xs text-gray-500">
+          {invitedLabel ? `Invited ${invitedLabel}` : 'Not yet invited'}
+          {remindedLabel && ` · reminded ${remindedLabel}`}
+          {dueLabel && !granteeResponded && ` · response due ${dueLabel}`}
+          {granteeResponded && ' · response received'}
+        </p>
+        {daysOverdue > 0 && (
+          <p className="text-xs text-amber-700">
+            No response {daysOverdue} {daysOverdue === 1 ? 'day' : 'days'} past the requested date.
+          </p>
+        )}
       </section>
+
+      {/* Two panes: what goes out, and what came back. The badge carries the
+          answer to "did they respond?" on the tab itself, so splitting the page
+          never costs a click to find that out. */}
+      <div className="flex gap-1 border-b border-gray-200" role="tablist">
+        {[
+          { key: 'invitation', label: 'Invitation' },
+          {
+            key: 'submission',
+            label: 'Submission',
+            badge: granteeResponded ? '✓ received' : 'pending',
+            badgeClass: granteeResponded ? 'text-green-700' : 'text-gray-500',
+          },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={subTab === t.key}
+            onClick={() => { subTabPinnedRef.current = true; setSubTab(t.key); }}
+            className={`px-3 py-2 text-sm border-b-2 -mb-px ${
+              subTab === t.key
+                ? 'border-blue-700 text-gray-900 font-medium'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {t.label}
+            {t.badge && <span className={`ml-2 text-xs ${t.badgeClass}`}>{t.badge}</span>}
+          </button>
+        ))}
+      </div>
 
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {sentMsg && <p className="text-sm text-green-700">{sentMsg}</p>}
 
+      {/* Abstract editor — rendered in whichever pane matches its current mode
+          (see abstractPane). Unmounting on a pane switch is safe: the working
+          copy, dirty flag, and etag all live in this component's state, so only
+          cursor position is lost, never an edit. */}
+      {subTab === abstractPane && (
       <section className="space-y-2">
         <button
           type="button"
@@ -415,8 +533,26 @@ export default function AwardeeTab({ requestId, context }) {
           </div>
         )}
       </section>
+      )}
 
-      {hasSubmission && (
+      {/* Empty state. Pre-submit this pane used to render nothing at all, which
+          made "the grantee has not responded" and "this feature does not exist"
+          look identical. Say which one it is. */}
+      {subTab === 'submission' && !granteeResponded && (
+        <section className="space-y-1 rounded border border-dashed border-gray-300 p-4">
+          <p className="text-sm text-gray-700">No submission received yet.</p>
+          <p className="text-xs text-gray-500">
+            {invitedLabel
+              ? `The grantee was invited ${invitedLabel}${dueLabel ? ` and asked to respond by ${dueLabel}` : ''}.`
+              : 'Send the invitation from the Invitation tab to start the process.'}
+          </p>
+          <p className="text-xs text-gray-500">
+            Their caption and image will appear here, and you will be emailed when they submit.
+          </p>
+        </section>
+      )}
+
+      {subTab === 'submission' && hasSubmission && (
         <section className="space-y-2">
           <h4 className="text-sm font-medium text-gray-800">Grantee submission</h4>
           {waiverAckedLabel && (
@@ -459,6 +595,7 @@ export default function AwardeeTab({ requestId, context }) {
         </section>
       )}
 
+      {subTab === 'invitation' && (
       <section className="space-y-2">
         <h4 className="text-sm font-medium text-gray-800">Invitation</h4>
         <label className="block text-sm">To (PI)
@@ -527,8 +664,12 @@ export default function AwardeeTab({ requestId, context }) {
             : 'Generate the abstract before sending. (Preview works any time.)'}
         </p>
       </section>
+      )}
 
-      <section className="space-y-2">
+      {/* Outside both panes: the outputs apply at any stage (the website fragment
+          renders whichever abstract is current), so burying them in one pane would
+          add a click to a routine action. */}
+      <section className="space-y-2 border-t border-gray-200 pt-4">
         <h4 className="text-sm font-medium text-gray-800">Deliverable outputs</h4>
         <p className="text-xs text-gray-500">
           Website-ready HTML for this award, and the combined printable page for the whole board cycle.

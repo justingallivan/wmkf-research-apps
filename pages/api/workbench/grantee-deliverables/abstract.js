@@ -6,7 +6,8 @@
  *
  *   GET ?requestId=  -> { abstractFormatted, abstractApproved, effective,
  *                         effectiveField, etag, status, statusLabel, editable,
- *                         caption, imageRef, imageUrl, hasImage, submittedAt }
+ *                         caption, imageRef, imageUrl, hasImage, submittedAt,
+ *                         invitedAt, remindedAt }
  *   PUT { requestId, text, etag, baseField }
  *
  * Thin multi-verb route shell (Route→Service Consolidation Plan, Stage 4

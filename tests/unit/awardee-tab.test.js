@@ -61,6 +61,8 @@ function wireFetch({
     imageUrl: abstract?.imageUrl ?? null,
     hasImage: abstract?.hasImage ?? false,
     submittedAt: abstract?.submittedAt ?? null,
+    invitedAt: abstract?.invitedAt ?? null,
+    remindedAt: abstract?.remindedAt ?? null,
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
@@ -87,6 +89,7 @@ function wireFetch({
         caption: state.caption, imageRef: state.imageRef,
         imageUrl: state.imageUrl, hasImage: state.hasImage,
         submittedAt: state.submittedAt,
+        invitedAt: state.invitedAt, remindedAt: state.remindedAt,
       }) };
     }
     if (u.includes('/grantee-deliverables/generate')) {
@@ -596,4 +599,146 @@ test('a caption containing markup renders as literal text', async () => {
   expect(screen.getByText(hostile)).toBeInTheDocument();
   expect(container.querySelector('script')).toBeNull();
   expect(container.querySelector('b')).toBeNull();
+});
+
+// ── Status header + Invitation/Submission panes (S411) ──
+//
+// The page previously rendered outbound work and inbound results in one scroll,
+// and the inbound half disappeared entirely when empty — so "the grantee has not
+// responded" and "this surface does not exist" looked identical. These pin the
+// split, the badge that answers "did they respond?" without a click, and the
+// empty state that replaced the silence.
+
+test('status header shows the invite date and the derived response deadline', async () => {
+  wireFetch({ abstract: { invitedAt: '2026-07-12T15:04:05Z' } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  // +14d from the invite, the same helper that fills the email's COB {{dueDate}}.
+  await waitFor(() => expect(screen.getByText(/Invited Jul 12, 2026/)).toBeInTheDocument());
+  expect(screen.getByText(/response due July 26, 2026/)).toBeInTheDocument();
+});
+
+test('status header shows the reminder date once the day-12 cron has sent one', async () => {
+  wireFetch({ abstract: { invitedAt: '2026-07-12T15:04:05Z', remindedAt: '2026-07-24T09:00:00Z' } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/reminded Jul 24, 2026/)).toBeInTheDocument());
+});
+
+test('an unanswered invitation past the deadline is called out; a fresh one is not', async () => {
+  const longAgo = new Date(Date.now() - 20 * 86400000).toISOString();
+  wireFetch({ abstract: { invitedAt: longAgo } });
+  const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText(/past the requested date/i)).toBeInTheDocument());
+  expect(screen.getByText(/No response 6 days past/i)).toBeInTheDocument();
+  unmount();
+
+  wireFetch({ abstract: { invitedAt: new Date(Date.now() - 2 * 86400000).toISOString() } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  expect(screen.queryByText(/past the requested date/i)).not.toBeInTheDocument();
+});
+
+test('a submitted package never shows an overdue warning, however old the invite', async () => {
+  const longAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+  wireFetch({ abstract: submitted({ invitedAt: longAgo, caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.queryByText(/past the requested date/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/response received/)).toBeInTheDocument();
+});
+
+test('the Submission tab badge answers "did they respond?" without a click', async () => {
+  wireFetch({ abstract: { invitedAt: '2026-07-12T15:04:05Z' } });
+  const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('pending')).toBeInTheDocument());
+  // Still on the outbound pane — the answer came from the badge, not a click.
+  expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true');
+  unmount();
+
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('✓ received')).toBeInTheDocument());
+});
+
+test('pre-submit the Submission pane explains the silence instead of rendering nothing', async () => {
+  wireFetch({ abstract: { invitedAt: '2026-07-12T15:04:05Z' } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
+  expect(screen.getByText('No submission received yet.')).toBeInTheDocument();
+  expect(screen.getByText(/invited Jul 12, 2026 and asked to respond by July 26, 2026/i)).toBeInTheDocument();
+  expect(screen.queryByText('Grantee submission')).not.toBeInTheDocument();
+});
+
+test('with no invitation sent, the empty state points at the Invitation tab', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('To email')).toHaveValue('monika.raj@emory.edu'));
+  fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
+  expect(screen.getByText(/Send the invitation from the Invitation tab/i)).toBeInTheDocument();
+});
+
+test('the panes actually separate outbound from inbound', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  // Auto-advanced to the response, since there is one.
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+  expect(screen.queryByLabelText('To email')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.getByLabelText('To email')).toBeInTheDocument();
+  expect(screen.queryByText('Grantee submission')).not.toBeInTheDocument();
+});
+
+test('the approved-abstract editor follows its mode into the Submission pane', async () => {
+  // effectiveField 'approved' with NO caption/image: the editor must still be
+  // reachable and the pane must not claim nothing was received. This is the
+  // regression test for the first cut, where the editor rendered into a pane
+  // whose empty state simultaneously said "No submission received yet."
+  wireFetch({ abstract: { effective: 'Approved text.', effectiveField: 'approved', status: 100000006, editable: false } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Approved text.'));
+  expect(screen.getByRole('tab', { name: /Submission/ })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByText('✓ received')).toBeInTheDocument();
+  expect(screen.queryByText('No submission received yet.')).not.toBeInTheDocument();
+});
+
+test('the draft abstract editor lives with the invitation', async () => {
+  wireFetch({ abstract: { effective: 'Draft text.', effectiveField: 'formatted', editable: true } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.'));
+  expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
+  expect(screen.queryByLabelText('Formatted abstract')).not.toBeInTheDocument();
+});
+
+test('a manual pane choice survives a later refetch', async () => {
+  // A submitted package whose grantee left the abstract alone: approved is empty,
+  // so the effective field is still the draft. That puts the editor (and its
+  // Generate button) on Invitation while the caption sits on Submission — the one
+  // realistic shape where a refetch can be triggered from the pane the PD chose.
+  wireFetch({ abstract: {
+    effective: 'Draft the grantee did not touch.',
+    effectiveField: 'formatted',
+    editable: true,
+    caption: 'A caption.',
+    submittedAt: '2026-07-12T15:04:05Z',
+  } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  // Auto-advanced to the response.
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.getByLabelText('To email')).toBeInTheDocument();
+  // Regenerating reloads the abstract; the pane must not jump back under the PD.
+  fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
+  await waitFor(() => expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true'));
+  expect(screen.getByLabelText('To email')).toBeInTheDocument();
+});
+
+test('Deliverable outputs stay reachable from either pane', async () => {
+  wireFetch({ abstract: submitted({ caption: 'A caption.' }) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Deliverable outputs')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: /Invitation/ }));
+  expect(screen.getByText('Deliverable outputs')).toBeInTheDocument();
 });

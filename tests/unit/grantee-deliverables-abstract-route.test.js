@@ -111,6 +111,10 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     imageUrl: null,
     hasImage: false,
     submittedAt: null,
+    // Outbound lifecycle timestamps. Null on the DRAFTED fixture — nothing has
+    // been sent yet, so neither the invite nor the day-12 reminder has stamped.
+    invitedAt: null,
+    remindedAt: null,
   });
 });
 

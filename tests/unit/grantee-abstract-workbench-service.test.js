@@ -120,6 +120,36 @@ describe('load: grantee submission fields (caption / image / waiver time)', () =
   });
 });
 
+describe('load: outbound lifecycle timestamps', () => {
+  test('invited row surfaces invitedAt with remindedAt still null', async () => {
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED,
+      wmkf_inviteddate: '2026-07-12T15:04:05Z',
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.invitedAt).toBe('2026-07-12T15:04:05Z');
+    expect(body.remindedAt).toBeNull();
+  });
+
+  test('reminder-sent row surfaces both dates', async () => {
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.REMINDER_SENT,
+      wmkf_inviteddate: '2026-07-12T15:04:05Z',
+      wmkf_remindeddate: '2026-07-24T09:00:00Z',
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.invitedAt).toBe('2026-07-12T15:04:05Z');
+    expect(body.remindedAt).toBe('2026-07-24T09:00:00Z');
+  });
+
+  test('no deliverable row → both null, no throw', async () => {
+    getDeliverableForRequest.mockResolvedValue(null);
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.invitedAt).toBeNull();
+    expect(body.remindedAt).toBeNull();
+  });
+});
+
 test('save: baseField flip → 409 stale with currentField in the body, no write', async () => {
   getById.mockResolvedValue(row({ wmkf_abstractapproved: APPROVED }));
   getDeliverableForRequest.mockResolvedValue({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED });
