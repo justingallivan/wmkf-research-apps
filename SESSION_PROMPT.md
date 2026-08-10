@@ -1,4 +1,9 @@
-# Session 413 Prompt: Close-out pane shipped, staff replace path built-not-merged, reviewer auto-linking live
+# Session 413 Prompt: Close-out pane shipped, staff replace path merged (S413), reviewer auto-linking live
+
+> **S413 update, 2026-08-10.** The staff replace path is **merged and in
+> production** (`221ac40a`). The Session 412 summary below is retained as the
+> historical handoff and still describes it as unmerged — that was true at the
+> time of writing; "Next Items" item 1 carries the current state.
 
 > **Handoff, 2026-08-10 (Session 412).** Two production deploys, both verified
 > Ready. Shipped the Awardee Close-out pane, settled both open close-out owner
@@ -82,12 +87,13 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 
 ### Verified Open
 
-1. **Merge `staff-submission-replace`.** Evidence: branch on origin at `79e64317`;
-   3 commits ahead of `5529b8c3`. Reviewed adversarially, all findings fixed and
-   mutation-checked, 7172/7172, gates and build green. Tier 2 — needs a deliberate
-   merge + push. **Rehearsal caveat:** request `1002788`'s image is the fixture
-   that proved the inline-image path; replacing it prunes the original to
-   SharePoint's recycle bin. Test on a different request.
+1. ~~**Merge `staff-submission-replace`.**~~ **DONE (S413, 2026-08-10.)** Merged to
+   `main` as `221ac40a` (no conflicts; the branch and the 10 main-only commits
+   touched disjoint files) and deployed to production. Post-merge evidence:
+   7206/7206 unit, all gates green, production build green. **Rehearsal caveat
+   still stands:** request `1002788`'s image is the fixture that proved the
+   inline-image path; replacing it prunes the original to SharePoint's recycle
+   bin. Any live smoke of the replace control goes on a different request.
 
 2. **25 reviewer affiliation-mismatch alerts remain open**, oldest 2026-07-15.
    Evidence: `node scripts/probe-reviewer-affiliation-alerts.mjs` (read-only) —
@@ -151,7 +157,7 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 2. **Request `1002788` is still `Submitted` with a live package** — approved
    abstract, caption "Homer in a blimp", and an image in `Grantee_Uploads`. It has
    **no in-app path forward**: the post-`Submitted` transitions still have no
-   writer, and the staff replace path (unmerged) does not move status. Re-cleaning
+   writer, and the staff replace path (now merged) does not move status. Re-cleaning
    is manual: delete the `wmkf_granteedeliverable` row, clear
    `wmkf_abstractapproved`, remove the SharePoint file.
 
@@ -181,7 +187,7 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 | File | Purpose |
 |------|---------|
 | `shared/components/workbench/AwardeeTab.js` | Three panes; Close-out holds the outputs; Submission holds the staff replace control |
-| `lib/services/workbench/grantee-deliverables/replace-submission-service.js` | Staff image/caption writer (unmerged branch). Rollback confirms on image ref ALONE — never add a status term |
+| `lib/services/workbench/grantee-deliverables/replace-submission-service.js` | Staff image/caption writer (live on `main` since `221ac40a`). Rollback confirms on image ref ALONE — never add a status term |
 | `shared/config/granteeDeliverableStatus.js` | `STAFF_REPLACEABLE_STATUSES` / `isStaffReplaceableStatus` — one definition, server-computed into `canReplace` |
 | `lib/services/auto-link-reviewer-contact-account.js` | Live acceptance-time Contact→Account auto-link; exact-match only, fill-only, no Account creation |
 | `lib/utils/reviewer-institution-account-match.js` | Exact normalized matcher; ambiguity abstains |
@@ -193,14 +199,13 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
 ## Testing
 
 ```bash
-npx jest tests/unit                       # 7161/7161 on main
+npx jest tests/unit                       # 7206/7206 on main after 221ac40a
 npm run check:types
 
-# Staff replace path (on the branch)
-git checkout staff-submission-replace
+# Staff replace path (now on main)
 npx jest tests/unit/grantee-replace-submission-service.test.js \
   tests/unit/grantee-deliverables-replace-submission-route.test.js \
-  tests/unit/awardee-tab.test.js --runTestsByPath   # 7172/7172 full suite
+  tests/unit/awardee-tab.test.js --runTestsByPath
 
 # Reviewer auto-link / alert lifecycle
 npx jest tests/unit/auto-link-reviewer-contact-account.test.js \

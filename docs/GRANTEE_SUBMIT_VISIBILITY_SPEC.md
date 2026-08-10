@@ -853,7 +853,8 @@ part of the owner's parked design; adding it is additive and blocks nothing.
 
 ### As built (2026-08-10, S412) — staff replace path
 
-Tier 2, on branch `staff-submission-replace`. Not merged at time of writing.
+Tier 2. Built on branch `staff-submission-replace` (S412); merged to `main` as
+`221ac40a` and deployed to production 2026-08-10 (S413).
 
 | Piece | Path |
 |---|---|
