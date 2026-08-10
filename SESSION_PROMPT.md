@@ -1,216 +1,211 @@
-# Session 412 Prompt: Awardee tab restructured and production-verified; close-out parked
+# Session 413 Prompt: Close-out pane shipped, staff replace path built-not-merged, reviewer auto-linking live
 
-> **Handoff, 2026-08-09 (Session 411).** Nine commits, all merged to `main` and
-> deployed (plus this handoff commit). Two red-state cleanups at the top (dependency CVEs, a red
-> unit suite on `main`), then an owner-driven rebuild of the Workbench Awardee
-> tab that was verified by live production testing — which found four defects
-> that unit tests structurally could not: two cosmetic (receipt placement, modal
-> size) and two substantive, both detailed below. The grantee close-out tab was designed,
-> then parked by the owner.
+> **Handoff, 2026-08-10 (Session 412).** Two production deploys, both verified
+> Ready. Shipped the Awardee Close-out pane, settled both open close-out owner
+> questions, then built and adversarially reviewed a staff image/caption replace
+> path (on a branch, **not merged**). Took ownership of a Codex worktree whose
+> work had diverged from its brief, reviewed it, merged it, and retired the
+> worktree. Resolved 9 of 34 reviewer affiliation alerts — deliberately not all 34.
 
-## Session 411 Summary
+## Session 412 Summary
 
 ### What Was Completed
 
-1. **All dependency vulnerabilities cleared** (`7662a12d`). Four advisory
-   groups, not the three Dependabot reported — `js-yaml` and the `nanoid` 3.x
-   range were `npm audit`-only. The `postcss` alert was self-inflicted: the
-   `next.postcss` override from `c325afd5` had inverted into a *downgrade* once
-   next began pinning a patched version, so it was removed rather than re-pinned.
-   `gh api .../dependabot/alerts` now returns **0 open**.
+1. **Awardee Close-out pane** (`54dd8e70`, `fdfd2c47`, merged `693ca670`,
+   deployed `dpl_3QG8gRV2u66epwSnpFF7DQ1V6eJU`). `Deliverable outputs` moved out
+   of the shared footer into a third pane, so the tab follows the deliverable's
+   arc: Invitation → Submission → Close-out. This **supersedes** the S411
+   decision that the outputs stay outside both panes; the original paragraph is
+   retained and marked superseded rather than rewritten, and its test was
+   rewritten to assert the new placement. The pane also names the two outputs'
+   differing scopes — deliberately avoiding "every award in the cycle", since the
+   export also requires Awarded status, a project leader, and a research program
+   `[VERIFIED via cycle-export-service.js:57-61]`.
 
-2. **`main`'s unit suite was red and nobody knew** (`3e679eed`). `b9f023ef`
-   ("Compose legacy + staged institution checkers") landed earlier the same day
-   and left a `toHaveBeenCalledTimes(1)` assertion behind after making the seam
-   run two arms. Runtime behavior was correct; only the assertion was stale. It
-   surfaced only because the full suite was run while verifying unrelated
-   dependency bumps.
+2. **Both close-out owner questions answered** (`357b5dd8`, `5529b8c3`).
+   - **`Complete`** = the grantee's responsibility is done and downstream is
+     *eligible* to proceed. Intended as a **precedent for other task types not yet
+     built** — implement the semantic, not a grantee special case.
+   - **`Revision Requested`** = NOT built as a transition; revisions are handled
+     case-by-case over email. The transition design is retained but marked
+     deferred.
 
-3. **Awardee tab split into Invitation / Submission panes** (`5566b68c`).
-   Persistent status header (status, invite date, reminder date, derived
-   response estimate, days overdue), a `pending` / `✓ received` badge so "did
-   they respond?" costs no click, and a real empty state where silence used to
-   be. `invitedAt`/`remindedAt` added to the abstract GET — both were already in
-   `DELIVERABLE_SELECT`, so this exposed existing reads.
+3. **Staff replace path built** (branch `staff-submission-replace`, 3 commits,
+   pushed, **NOT merged**). The email-based revision decision surfaced the real
+   gap: staff could not write the image or caption at all. `writeGranteeDeliverables`
+   has exactly one caller and cannot take a second — it requires an acknowledged
+   waiver version and re-stamps status. New narrower writer + multipart route +
+   Submission-pane control gated on a server-computed `canReplace`.
 
-4. **Two Codex adversarial-review findings fixed** (`42178c6e`). A missing
-   post-send reload (every first send rendered `Status: Invited` above `Not yet
-   invited`) and an unguarded same-request load race that could land stale and
-   permanently latch the wrong pane. Also **retracted an overclaim of mine** —
-   "the page cannot contradict what the grantee was told" was false and is gone
-   from code, UI copy, and docs.
+4. **Adversarial review found three defects; all fixed** (`79e64317`). A
+   folder-wide prune that could delete a concurrent winner, a caption-only
+   response-drop reported as failure, and a route trust boundary with zero direct
+   coverage. Each fix mutation-checked.
 
-5. **Inline image, production-verified** (`a6a9b4fc`). New
-   `GET /api/workbench/grantee-deliverables/image`, staff-guarded. Supersedes
-   the spec's "Rejected alternative: proxy the image through the app". Verified
-   against **real SharePoint bytes** in the owner's rehearsal.
+5. **Codex worktree taken over, reviewed, merged, retired** (merge `42abd72a`,
+   deployed `dpl_DmKM3MX9JUsywP6ivnhRwNmZsSYG`). Eight commits: reviewer names and
+   affiliations in Current Reviews and exported reports, Contact→Account reporting
+   tools, and guarded acceptance-drain auto-linking. **The work diverged from the
+   brief I wrote** (which asked for Dataverse search + admin alert triage) — worth
+   knowing when reading the branch name.
 
-6. **Send confirm modal** (`6b7a4d9d`), then **gated and resized**
-   (`d3c0ab4f`), then **regeneration refused post-submission** (`31d33344`).
-   See "Found only by production testing" below.
+6. **9 of 34 reviewer affiliation alerts resolved** (`b2ce907e`). Scope was an
+   allowlist, not a prefix sweep — see "Verify Before Acting" below.
 
-7. **Close-out tab designed and parked** (`3a5a1f9f`). Owner asked to park; the
-   item is recorded below with its unanswered questions.
+### Live production behavior that changed today
 
-### Found only by production testing (read this before the next UI change)
+The reviewer acceptance drain now fills an **empty** Contact parent when the
+accepted affiliation is an exact normalized match to exactly one active Account
+(name / AKA / legal name / DC AKA), and auto-resolves the matching mismatch alert.
+Existing parents are never overwritten, Account creation is structurally
+impossible (the adapter exposes only `queryAllAccounts`/`getById`), and a capped
+Account scan abstains. **This path is live from `dpl_DmKM3MX9JUsywP6ivnhRwNmZsSYG`
+forward — the next reviewer acceptance exercises it for real.** Nine Contacts were
+linked in a pre-merge authorized production pass and independently re-verified.
 
-Unit-green merges shipped four defects that owner clicking found immediately.
-Recorded as `.claude-memory/feedback-ui-gates-must-mirror-server-guards.md`:
+### Commits (all pushed; both production deploys verified Ready)
 
-- **Send button ignored status.** `send-invite-service.js:85` refuses
-  `status >= SUBMITTED`; `canSend` never consulted status. Having just moved the
-  send behind a confirm modal made it *worse* — a full dialog, then a guaranteed
-  409.
-- **Regenerate had no server guard at all.** On a submitted package it would
-  burn a paid LLM call and overwrite `wmkf_abstractformatted` (the historical
-  draft — what was actually sent) while the published text is
-  `wmkf_abstractapproved`, which that path never touches. Nothing visible would
-  change: silent loss of the "what we sent vs what they approved" record. Fixed
-  at **both** layers.
-- The counter-instance worth copying: **Save edits gets this right** —
-  `abstract-service.js` computes `editable` server-side and returns it, so the
-  client never re-derives the rule.
+- `54dd8e70` — Move Deliverable outputs into a third Close-out pane
+- `fdfd2c47` — Drop the wider-scope note when cycle export is unavailable
+- `357b5dd8` — Record the close-out lifecycle-actions design (not built)
+- `5529b8c3` — Record the resolved close-out owner decisions
+- `42abd72a` — Merge: reviewer affiliation rosters and Contact→Account auto-linking
+  (preserving `ad32e28c`, `3b3e4c4c`, `ec276423`, `8d078159`, `dd667a23`,
+  `6e323a4c`, `8bb5a0b0`, `99268074`)
+- `b2ce907e` — Resolve the 9 genuinely-fixed reviewer affiliation alerts
 
-### Commits (all pushed; each production deploy verified Ready)
+On the unmerged branch: `eae535db`, `f3f2d42a`, `79e64317`.
 
-- `3e679eed` — Pin the two-arm institution checker at the enrichment seam
-- `7662a12d` — Clear all Dependabot and npm-audit vulnerabilities
-- `5566b68c` — Split the Awardee tab into Invitation and Submission panes
-- `42178c6e` — Fix two adversarial-review findings on the Awardee tab split
-- `a6a9b4fc` — Render the grantee award image inline on the Awardee tab
-- `6b7a4d9d` — Put the grantee invitation send behind a confirm modal
-- `d3c0ab4f` — Gate the send button on status; enlarge the confirm modal
-- `31d33344` — Refuse abstract regeneration once the grantee has returned it
-- `3a5a1f9f` — Log the Awardee close-out tab as a next-session item
-
-Unit suite **7037 → 7124**.
+Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172**.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Awardee close-out tab** — owner-parked 2026-08-09, resume on request.
-   Evidence: `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md`; no writer exists for
-   `Staff Review` / `Revision Requested` / `Complete` / `Closed No Response`
-   `[VERIFIED 2026-08-09 by enumerating every write of wmkf_deliverablestatus —
-   six sites covering only DRAFTED, INVITED, REMINDER_SENT, SUBMITTED]`.
-   - **Layout half (Tier 1):** move `Deliverable outputs` out of the shared
-     footer into a third pane. Note the two outputs have **different scopes**
-     `[VERIFIED via cycle-export-service.js:13]` — "Copy website HTML" is
-     per-award, "Cycle export" is the whole board cycle (~12–24 awards, the
-     source comment's figure, not a measured count).
-   - **Actions half (Tier 2, Dataverse writes):** blocked on the two owner
-     questions under "Owner Decision Needed" below. Do not invent answers.
+1. **Merge `staff-submission-replace`.** Evidence: branch on origin at `79e64317`;
+   3 commits ahead of `5529b8c3`. Reviewed adversarially, all findings fixed and
+   mutation-checked, 7172/7172, gates and build green. Tier 2 — needs a deliberate
+   merge + push. **Rehearsal caveat:** request `1002788`'s image is the fixture
+   that proved the inline-image path; replacing it prunes the original to
+   SharePoint's recycle bin. Test on a different request.
 
-2. **Workbench version history, administrator restore, milestone snapshots.**
+2. **25 reviewer affiliation-mismatch alerts remain open**, oldest 2026-07-15.
+   Evidence: `node scripts/probe-reviewer-affiliation-alerts.mjs` (read-only) —
+   25 active, 50 resolved. The new automation only auto-resolves Contacts it links
+   going forward, so these will not clear themselves. Needs either a deliberate
+   linking pass or a decision that they are acceptable noise.
+
+3. **August 10 references beyond the work queue.** Evidence:
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (5 mentions),
+   `docs/STRATEGY.md:164`. `docs/CURRENT_WORK_QUEUE.md:37` was corrected this
+   session with the owner's clarification; the rest still read as a live deadline.
+   `/sweep`-shaped, not a one-line edit.
+
+4. **Workbench version history, administrator restore, milestone snapshots.**
    Evidence: `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` evidence
-   matrix row "Workbench history/restore and milestone freeze" — PLANNED, no
-   producer. Unchanged this session. Design against Connor's answers.
+   matrix — PLANNED, no producer. Administrator *restore* depends on Connor's
+   answers; **milestone snapshots and history display do not** and could move now.
+
+5. **Optional cleanup:** `origin/codex/alert-triage-dataverse-probe` still exists
+   at `99268074`. Fully contained in `main`; kept as a free backup. Delete when
+   you want.
 
 ### Blocked — Waiting On External Response
 
 1. **Initial Assessment pilot: administrative evidence.** Evidence:
-   `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` §"Required
-   follow-up" item 5; brief at `outputs/sharepoint-admin-check-brief.md`
-   (untracked), emailed to Connor 2026-08-09. Four read-only checks. **When
-   answers arrive:** record as verified evidence in the pilot report. Do not
-   treat silence as a pass. No response as of session end.
+   `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` §"Required follow-up"
+   item 5; brief emailed to Connor 2026-08-09. Four read-only checks (version
+   limits, second-stage recovery, Purview retention, editor least privilege).
+   **No response as of 2026-08-10.** Do not treat silence as a pass.
 
 ### Owner Decision Needed
 
-1. **What `Complete` means for a grantee deliverable.** Bookkeeping only, or
-   does it gate what the cycle export / website HTML publish? The second option
-   changes the behavior of existing outputs. Blocks the close-out build.
-2. **Whether close-out includes `Revision Requested`.** It re-opens the portal
-   to the grantee. If yes: does the transition re-mint a magic link and email
-   them, or does staff re-send manually? Tokens are 30-day, minted per send
-   `[VERIFIED via grantee-token-lifecycle.js:26]`. Blocks the close-out build.
+1. **Should a staff image substitution leave an audit trace?** Evidence:
+   `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` "As built" section. The writer deletes
+   the prior image on replacement, so the grantee's original leaves the folder and
+   survives only in SharePoint's recycle bin, with no in-app record that a
+   substitution happened. Consent is settled (original waiver stands); this is a
+   "what does the record say we published" question. Cheap now, awkward to retrofit.
+2. **What triggers `Closed No Response`?** Manual, or automatic after an overdue
+   threshold? Blocks the last undesigned transition.
 3. **Per-send deadline override divergence.** Evidence:
-   `render-emails-service.js:271` and `send-emails-service.js:916`. An override
-   on an already-dated request emails a date the portal can never show. Options:
-   keep request date authoritative as staff practice, or persist overrides
-   unconditionally (behavior change). Unchanged this session.
-4. **Residual Reviews-surface duplication.** Evidence: `ReviewsTab.js`,
-   `review-report-docx.js`. Owner said "looks good for now" — drop only on
-   explicit request. Unchanged this session.
-5. **Whether the cycle measurement tool gets live evidence re-discovery.**
-   Evidence: `benchmarks/institution-pair-consistency/results/cycle-measure-d26-full-2026-08-09.json`
-   (249 in scope → 0 with evidence anchors). Justin said he would test further.
-6. **Whether `DEVELOPMENT_LOG.md` is revived or formally retired.** Evidence:
-   file tail "Last Updated: May 14, 2026"; S409, S410, and S411 added no entries
-   by design.
-7. **Whether the "August 10 gate" is a live external commitment.** Evidence:
-   `docs/CURRENT_WORK_QUEUE.md` item 1 (`last_verified` 2026-07-30); the pilot
-   report does not name that date. **It is tomorrow as of this handoff
-   (2026-08-09) and still unconfirmed** — raise it early, and confirm with the
-   owner before treating it as missed or met.
-
-### Parked
-
-1. **Stage 2 typed institution relationships.** Evidence:
-   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` stop-rules. Re-open
-   trigger: a named owner decision, not accumulated findings.
-2. **Retired-table operational scripts** (25 non-archive scripts referencing
-   dropped `reviewer_suggestions` — count inherited, **re-derive before
-   acting**). Needs owner-approved scope + caller review.
+   `render-emails-service.js:271`, `send-emails-service.js:916`. Unchanged.
+4. **Whether `DEVELOPMENT_LOG.md` is revived or formally retired.** Evidence: file
+   tail "Last Updated: May 14, 2026"; S409–S412 added no entries. **No entry was
+   added this session deliberately** — writing one would preempt this decision.
+5. **Residual Reviews-surface duplication.** Owner said "looks good for now"; drop
+   only on explicit request.
+6. **Cycle measurement tool live evidence re-discovery.** Justin said he would test
+   further.
 
 ### Verify Before Acting
 
-1. **Request `1002788` is NOT clean.** The spec's "Cleanup is verified, not
-   assumed" paragraph describes the 2026-07-30 state and is explicitly marked
-   superseded. It now holds a **live submitted package** — approved abstract,
-   caption "Homer in a blimp", and an image in `Grantee_Uploads` — deliberately
-   left as the fixture that proved the inline-image path. It is stuck at
-   `Submitted` with no in-app path forward. Re-cleaning is manual: delete the
-   `wmkf_granteedeliverable` row, clear `wmkf_abstractapproved`, remove the
-   SharePoint file.
-2. **Any claim the enrichment path is "frozen"/"behavior-identical".**
-   Superseded as of `c632a90f`; read the Wave 6 section of the plan doc.
-3. **Production resolver authority.** Still `legacy-default`; verify live
-   configuration before claiming otherwise.
-4. **Portal deadline correctness for the ZZTEST request.** The portal shows the
-   stored `wmkf_reviewduedate` (Sep 9, 2026 for the test copy). If staff
-   expected Aug 12, the request record needs correcting — data, not rendering.
+1. **Do NOT batch-resolve the remaining 25 affiliation alerts by key prefix.**
+   Evidence: `.claude-memory/feedback-list-and-confirm-before-bulk-deletes.md`
+   (S412 extension). Each remaining alert describes a mismatch that was never
+   fixed; resolving them destroys the only signal those reviewers need attention.
+   `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs` re-derives each row's
+   justification at run time and refuses anything it cannot reproduce — reuse that
+   pattern rather than a sweep.
+
+2. **Request `1002788` is still `Submitted` with a live package** — approved
+   abstract, caption "Homer in a blimp", and an image in `Grantee_Uploads`. It has
+   **no in-app path forward**: the post-`Submitted` transitions still have no
+   writer, and the staff replace path (unmerged) does not move status. Re-cleaning
+   is manual: delete the `wmkf_granteedeliverable` row, clear
+   `wmkf_abstractapproved`, remove the SharePoint file.
+
+3. **The `Complete` gate has a sequencing trap.** Nothing writes `COMPLETE` today,
+   and no consumer reads deliverable status — the cycle export query has no such
+   term `[VERIFIED via cycle-export-service.js:57-61]`. Applying an eligibility
+   filter before the writer exists and rows are backfilled would **empty the cycle
+   export**. Order: writer → backfill → gate, and warn rather than exclude first.
+
+4. **Retired-table operational scripts** (25 non-archive scripts referencing
+   dropped `reviewer_suggestions`; count corroborated by
+   `docs/CURRENT_WORK_QUEUE.md`). Still needs caller review + owner-approved scope.
 
 ### Do Not Reopen Without New Decision
 
-1. **ROR strategic reset** — closed in S409. Re-opening requires an
-   institution-resolution-bound benchmark.
-2. **Institution checker / enrichment seam iteration** — two owner stop-rules
-   (2026-08-09). Findings freeze-and-document to Stage 2.
-3. **Promotion via the S408 15-row diagnostic** — compares different contracts;
-   not a promotion gate.
-4. **S328 post-submit downloads / separate Ratings table / picklist-free card
-   details** — superseded by owner decisions 2026-08-09 (S410).
-5. **"Reject the image proxy for v1"** — superseded by owner decision
-   2026-08-09 (S411). The proxy is built, merged, and verified against real
-   SharePoint bytes.
+1. **`Revision Requested` as a built transition** — deferred by owner 2026-08-10
+   in favour of case-by-case email.
+2. **Re-consent on staff replacement** — owner decided the original waiver stands;
+   the concern was raised and knowingly accepted.
+3. **The S411 shared-footer placement of `Deliverable outputs`** — superseded.
+4. **ROR strategic reset**, **institution checker / enrichment seam iteration**,
+   **S408 15-row promotion diagnostic**, **S328 post-submit downloads** — all
+   closed by prior owner decisions.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/workbench/AwardeeTab.js` | Two panes, status header, send confirm modal, inline image. The session's main surface |
-| `lib/services/workbench/grantee-deliverables/image-service.js` | Streams the grantee image; filename allowlist is the trust boundary |
-| `pages/api/workbench/grantee-deliverables/image.js` | Staff-guarded binary route; private-material egress |
-| `lib/services/workbench/grantee-deliverables/generate-service.js` | Regenerate now refused at status >= Submitted |
-| `lib/services/workbench/grantee-deliverables/send-invite-service.js` | The status guard (`:85`) the UI must mirror |
-| `lib/services/grantee-upload.js` | Exports `granteeUploadFolder` — one definition shared by writer and reader |
-| `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` | Two S411 follow-up sections + the superseded-cleanup notice |
-| `.claude-memory/feedback-ui-gates-must-mirror-server-guards.md` | The session's durable lesson |
+| `shared/components/workbench/AwardeeTab.js` | Three panes; Close-out holds the outputs; Submission holds the staff replace control |
+| `lib/services/workbench/grantee-deliverables/replace-submission-service.js` | Staff image/caption writer (unmerged branch). Rollback confirms on image ref ALONE — never add a status term |
+| `shared/config/granteeDeliverableStatus.js` | `STAFF_REPLACEABLE_STATUSES` / `isStaffReplaceableStatus` — one definition, server-computed into `canReplace` |
+| `lib/services/auto-link-reviewer-contact-account.js` | Live acceptance-time Contact→Account auto-link; exact-match only, fill-only, no Account creation |
+| `lib/utils/reviewer-institution-account-match.js` | Exact normalized matcher; ambiguity abstains |
+| `scripts/probe-reviewer-affiliation-alerts.mjs` | Read-only alert enumeration |
+| `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs` | Allowlist resolve; re-derives justification at run time |
+| `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` | Close-out design, resolved owner decisions, staff replace "As built" |
+| `.claude-memory/feedback-mutation-test-with-the-discriminating-fixture.md` | This session's durable lesson |
 
 ## Testing
 
 ```bash
-# Awardee tab + grantee deliverables focused suites (all green at session end)
-npx jest tests/unit/awardee-tab.test.js \
-  tests/unit/grantee-image-service.test.js \
-  tests/unit/grantee-deliverables-image-route.test.js \
-  tests/unit/grantee-generate-workbench-service.test.js \
-  tests/unit/grantee-abstract-workbench-service.test.js \
-  tests/unit/grantee-deliverables-abstract-route.test.js --runTestsByPath
-
-npx jest tests/unit          # 7124/7124 at session end
+npx jest tests/unit                       # 7161/7161 on main
 npm run check:types
-npm run build                # Turbopack; verify the /api/.../image route appears
+
+# Staff replace path (on the branch)
+git checkout staff-submission-replace
+npx jest tests/unit/grantee-replace-submission-service.test.js \
+  tests/unit/grantee-deliverables-replace-submission-route.test.js \
+  tests/unit/awardee-tab.test.js --runTestsByPath   # 7172/7172 full suite
+
+# Reviewer auto-link / alert lifecycle
+npx jest tests/unit/auto-link-reviewer-contact-account.test.js \
+  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
+  tests/unit/reviewer-acceptance-drain.test.js --runTestsByPath
+
+node scripts/probe-reviewer-affiliation-alerts.mjs   # read-only, no writes
 ```

@@ -30,6 +30,7 @@
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md; project-institution-identity-cost-calibration.md (alert-tier false clears cheap — reviewer self-corrects; identity-bind tier stays strict)
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-thoroughness-default.md; feedback-truncation-is-breakage-not-completion.md; feedback-apply-measurement-artifacts-in-both-directions.md
 - Review posture: feedback-self-review-before-delegating-review.md; feedback-author-adversarial-pass-first.md; feedback-dont-self-certify-convergence.md
+- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md (pick the fixture where the correct and buggy predicates disagree; a mutation that leaves the suite green means the test is decorative)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md; feedback-user-facing-error-copy-voice.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 

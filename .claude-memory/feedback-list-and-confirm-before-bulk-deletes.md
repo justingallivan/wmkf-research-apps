@@ -37,3 +37,16 @@ The root error was treating a narrow directive ("clean up the test") as if it im
 - A user's deletion directive scopes to the noun they named. If they said "the file," delete one file. If they said "everything in folder X," then loop.
 - "I'm pretty sure they're all test files" is not authorization. The cost of asking is one extra turn; the cost of being wrong is data loss + recovery work + erosion of trust.
 - Related: [[feedback-verify-before-destructive-carryover]] (the same principle applied to stale plan items, not adjacent artifacts).
+
+**Extension — bulk state mutation that destroys signal (S412, 2026-08-10).** The
+rule is not only about deletion. Asked to "batch resolve the historical reviewer
+affiliation alerts", the honest scope was 9 of 34 open rows: only 9 Contacts had
+actually been linked, so resolving everything matching the key prefix would have
+cleared 25 alerts whose mismatch was never fixed — and the alert was the sole
+record that those reviewers needed attention. Nothing would have resurfaced them.
+Listing the two populations separately and confirming took one turn; the owner
+then chose the narrow set plus one confirmed test-data row. Apply the same test to
+any bulk status flip, archive, dismiss, acknowledge, or mark-done: **ask what
+signal the row carries and whether the condition it describes is actually gone**,
+and prefer an allowlist whose justification the script can re-derive at run time
+over a prefix/pattern sweep.
