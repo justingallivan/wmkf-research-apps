@@ -25,6 +25,7 @@
  *   node scripts/probe-reviewer-contact-account-link-candidates.mjs --all
  *   node scripts/probe-reviewer-contact-account-link-candidates.mjs --json
  *   node scripts/probe-reviewer-contact-account-link-candidates.mjs --csv
+ *   node scripts/probe-reviewer-contact-account-link-candidates.mjs --json --output /tmp/report.json
  */
 
 import fs from 'fs';
@@ -64,6 +65,16 @@ if (outputModes.length > 1) {
   process.exit(1);
 }
 const showAll = args.has('--all');
+const outputArgIndex = process.argv.indexOf('--output');
+const outputPath = outputArgIndex >= 0 ? process.argv[outputArgIndex + 1] : null;
+if (outputArgIndex >= 0 && (!outputPath || outputPath.startsWith('--'))) {
+  console.error('--output requires a file path.');
+  process.exit(1);
+}
+if (outputPath && outputModes.length === 0) {
+  console.error('--output requires either --json or --csv.');
+  process.exit(1);
+}
 
 const { withDalContext } = await import('../lib/dataverse/core/context.js');
 const accountAdapter = await import('../lib/dataverse/adapters/account.js');
@@ -287,10 +298,20 @@ const report = await withDalContext('probe-reviewer-contact-account-link-candida
   };
 });
 
+let renderedOutput = null;
 if (args.has('--json')) {
-  console.log(JSON.stringify(report, null, 2));
+  renderedOutput = `${JSON.stringify(report, null, 2)}\n`;
 } else if (args.has('--csv')) {
-  process.stdout.write(toCsv(report.rows));
+  renderedOutput = toCsv(report.rows);
+}
+
+if (outputPath) {
+  const resolvedOutputPath = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(resolvedOutputPath), { recursive: true });
+  fs.writeFileSync(resolvedOutputPath, renderedOutput, 'utf8');
+  console.log(`Report written to ${resolvedOutputPath}`);
+} else if (renderedOutput !== null) {
+  process.stdout.write(renderedOutput);
 } else {
   printHuman(report);
 }
