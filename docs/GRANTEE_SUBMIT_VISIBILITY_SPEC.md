@@ -506,6 +506,10 @@ What changed, all in `AwardeeTab.js` plus two additive read fields:
   approved-abstract editor into a pane that simultaneously said "No submission
   received yet"; two existing tests caught it.
 - **`Deliverable outputs` stays outside both panes** — it applies at any stage.
+  **SUPERSEDED 2026-08-10 (S412) by owner decision:** the outputs now live in a
+  third `Close-out` pane. See "Follow-up: Close-out pane (2026-08-10, S412)" below.
+  The reasoning above was not wrong about *when* the outputs apply — it was wrong
+  that a shared footer was the only way to say so.
 
 `invitedAt` / `remindedAt` were added to the abstract GET (`abstract-service.js`).
 Both were **already** in `DELIVERABLE_SELECT` for the reminder cron, so this exposes
@@ -601,3 +605,43 @@ approved abstract, but nothing can move the row out of `Submitted`.
   writer. Re-cleaning it is manual: delete the `wmkf_granteedeliverable` row, clear
   `wmkf_abstractapproved` on the request, and remove the `Grantee_Uploads` file. Do not cite the
   paragraph above as current state.
+
+## Follow-up: Close-out pane (2026-08-10, S412)
+
+The layout half of the owner's parked close-out design. **Tier 1 only — no
+Dataverse writes.** The `Deliverable outputs` section moved out of the shared
+footer into a third `Close-out` pane, so the tab now follows the deliverable's
+own arc: `Invitation` (what goes out) → `Submission` (what came back) →
+`Close-out` (what staff do with it).
+
+This **supersedes** the S411 decision at "**`Deliverable outputs` stays outside
+both panes**" above. That reasoning — the outputs apply at any stage, so burying
+them costs a click — was right about *when* they apply and wrong that a footer
+was the only way to express it. Nothing about *when* the outputs can run changed:
+the website fragment still renders whichever abstract is current, and the pane is
+reachable at any status. The cost accepted is one click from `Invitation` or
+`Submission`.
+
+Also new: the pane states that the two outputs have **different scopes**, which
+nothing in their labels conveyed. `Copy website HTML` is per-award; `Cycle export`
+opens the whole board cycle, including other PDs' awards. The copy deliberately
+does not say "every award in the cycle" — the export query additionally requires
+Awarded status, a non-null project leader, and a research program, and a row that
+fails to assemble is skipped fail-soft `[VERIFIED via
+lib/services/workbench/grantee-deliverables/cycle-export-service.js:57-61 (filter)
+and :42-44 (fail-soft skip)]`.
+
+**The lifecycle actions half is NOT built and was not started.** `Staff Review` /
+`Revision Requested` / `Complete` / `Closed No Response` still have **no writer**
+`[VERIFIED 2026-08-10 by re-enumerating every `wmkf_deliverablestatus` write across
+lib/, pages/, shared/, scripts/ — the runtime write sites remain
+generate-service.js:83,160 → DRAFTED; send-invite-service.js:125 → INVITED;
+cron/grantee-deliverable-reminders-service.js:215,257 → REMINDER_SENT;
+grantee-upload.js:139 → SUBMITTED. Line numbers shifted from the S411 enumeration;
+the set did not. The only other writes are in scripts/smoke-grantee-deliverable-write.mjs,
+a disposable smoke fixture using raw option-set literals.]` Building them stays
+blocked on the two owner questions recorded in `SESSION_PROMPT.md`: what `Complete`
+means for the cycle export / website publish, and whether close-out includes
+`Revision Requested` (and if so, whether the transition re-mints a magic link).
+A unit test pins that the new pane offers no such action, so the layout move
+cannot quietly grow a status writer.
