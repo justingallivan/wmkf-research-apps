@@ -946,12 +946,18 @@ test('a late namesake substitution is rejected even when PubMed matched the list
   const { events, onEvent } = recorder();
   await enrichRecommended(args(), onEvent);
 
-  expect(areInstitutionsConsistent).toHaveBeenCalledTimes(1);
-  expect(areInstitutionsConsistent).toHaveBeenCalledWith(
+  // Wave 6 composite (b9f023ef): the seam runs the legacy arm first and the
+  // staged arm only when legacy does not clear. The default mock returns false,
+  // so both arms run — and both must compare the SAME pair (current-run PubMed
+  // evidence vs the enriched final affiliation). Asserting the whole call list,
+  // rather than a bare count, keeps this pinned to the pair and still fails if
+  // either arm is dropped from the composite.
+  const expectedPair = [
     'University of Illinois Urbana-Champaign',
     'York University',
     expect.objectContaining({ signal: expect.anything() }),
-  );
+  ];
+  expect(areInstitutionsConsistent.mock.calls).toEqual([expectedPair, expectedPair]);
   expect(events.at(-1).data.recommended[0]).toMatchObject({
     name: 'Dr. Rec One',
     needsIdentification: true,
