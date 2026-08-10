@@ -815,10 +815,17 @@ export default function AwardeeTab({ requestId, context }) {
             program, and a row that fails to assemble is skipped
             `[VERIFIED via cycle-export-service.js:57-61,42-44]`. */}
         <p className="text-xs text-gray-500">
-          <strong>Copy website HTML</strong> covers this award only.{' '}
-          <strong>Cycle export</strong> covers the whole
-          {cycleLabel ? ` ${cycleLabel}` : ''} board cycle — the awarded research
-          grants in it, not just this one.
+          <strong>Copy website HTML</strong> covers this award only.
+          {cycleCode && (
+            // Only when the export is actually offered — describing the blast
+            // radius of a control that is not on the page is noise.
+            <>
+              {' '}
+              <strong>Cycle export</strong> covers the whole
+              {cycleLabel ? ` ${cycleLabel}` : ''} board cycle — the awarded
+              research grants in it, not just this one.
+            </>
+          )}
         </p>
         {websiteHtml != null && (
           <textarea

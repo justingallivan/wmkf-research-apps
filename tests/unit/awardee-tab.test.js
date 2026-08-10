@@ -916,6 +916,15 @@ test('the Close-out pane says the two outputs have different scopes', async () =
   expect(screen.getByText(/not just this one/i)).toBeInTheDocument();
 });
 
+test('the wider-scope warning is dropped when there is no cycle export to warn about', async () => {
+  wireFetch();
+  render(<AwardeeTab requestId={REQ} context={{ cycleCode: null }} />);
+  await openCloseout();
+  expect(screen.getByText(/cycle export unavailable/i)).toBeInTheDocument();
+  expect(screen.getByText(/covers this award only/i)).toBeInTheDocument();
+  expect(screen.queryByText(/not just this one/i)).not.toBeInTheDocument();
+});
+
 // The lifecycle half is Tier 2 and blocked on two owner questions. Pin that the
 // layout move did not smuggle in a status writer.
 test('the Close-out pane offers no lifecycle transition actions yet', async () => {
