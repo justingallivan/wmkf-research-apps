@@ -110,7 +110,7 @@
     "cors": "^2.8.6",
     "csv-parse": "^6.2.1",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.13",
     "exceljs": "^4.4.0",
     "express-rate-limit": "^8.6.1",
     "formidable": "^3.5.4",
@@ -155,9 +155,6 @@
   },
   "overrides": {
     "brace-expansion": "$brace-expansion",
-    "next": {
-      "postcss": "8.5.18"
-    },
     "sharp": "0.35.0",
     "uuid": "11.1.1"
   }
