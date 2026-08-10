@@ -226,6 +226,22 @@ test('a committed response-drop on a Staff Review row keeps the image and succee
   expect(cleanupSharePointItems).not.toHaveBeenCalled();
 });
 
+test('a committed caption-only response-drop succeeds with a fresh etag', async () => {
+  patchDeliverable.mockRejectedValue(new Error('socket hang up'));
+  getDeliverableForRequest
+    .mockResolvedValueOnce(pkg())
+    .mockResolvedValueOnce(pkg({ wmkf_imagecaption: 'Revised caption.', _etag: 'W/"2"' }))
+    .mockResolvedValueOnce(pkg({ wmkf_imagecaption: 'Revised caption.', _etag: 'W/"2"' }));
+
+  await expect(call({ caption: '  Revised caption.  ' })).resolves.toMatchObject({
+    ok: true,
+    caption: 'Revised caption.',
+    etag: 'W/"2"',
+  });
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(cleanupSharePointItems).not.toHaveBeenCalled();
+});
+
 test('an unknown post-error state leaves the upload in place', async () => {
   patchDeliverable.mockRejectedValue(new Error('boom'));
   getDeliverableForRequest
@@ -238,10 +254,11 @@ test('an unknown post-error state leaves the upload in place', async () => {
 
 // ── Prior-image prune ──
 
-test('prunes the prior image after a committed replacement, excluding the new item', async () => {
+test('prunes only the exact prior image after a committed replacement', async () => {
   GraphService.listFiles.mockResolvedValue([
     { id: 'old-item', name: `${REQNUM}_grantee_image_aaaaaaaa.png` },
     { id: 'new-item', name: `${REQNUM}_grantee_image_bbbbbbbb.png` },
+    { id: 'concurrent-item', name: `${REQNUM}_grantee_image_cccccccc.png` },
     { id: 'unrelated', name: 'some-other-document.pdf' },
   ]);
   await call({ imageFile: imageFile() });
@@ -250,6 +267,61 @@ test('prunes the prior image after a committed replacement, excluding the new it
     [{ id: 'old-item', name: `${REQNUM}_grantee_image_aaaaaaaa.png` }],
     'grantee-replace-orphan',
   );
+});
+
+test('an interleaved replacement cannot prune the later committed image', async () => {
+  const originalRef = `${FOLDER}/${REQNUM}_grantee_image_aaaaaaaa.png`;
+  const imageARef = `https://sp.example/${FOLDER}/${REQNUM}_grantee_image_bbbbbbbb.png`;
+  const imageBRef = `https://sp.example/${FOLDER}/${REQNUM}_grantee_image_cccccccc.png`;
+  const listing = [
+    { id: 'original-item', name: `${REQNUM}_grantee_image_aaaaaaaa.png` },
+    { id: 'a-item', name: `${REQNUM}_grantee_image_bbbbbbbb.png` },
+    { id: 'b-item', name: `${REQNUM}_grantee_image_cccccccc.png` },
+  ];
+
+  GraphService.uploadFile
+    .mockResolvedValueOnce({ id: 'a-item', webUrl: imageARef })
+    .mockResolvedValueOnce({ id: 'b-item', webUrl: imageBRef });
+  getDeliverableForRequest
+    .mockResolvedValueOnce(pkg({ wmkf_imagefileref: originalRef, _etag: ETAG }))
+    .mockResolvedValueOnce(pkg({ wmkf_imagefileref: imageARef, _etag: 'W/"2"' }))
+    .mockResolvedValueOnce(pkg({ wmkf_imagefileref: imageBRef, _etag: 'W/"3"' }))
+    .mockResolvedValueOnce(pkg({ wmkf_imagefileref: imageBRef, _etag: 'W/"3"' }));
+
+  let releaseAList;
+  let markAListing;
+  const aReachedPrune = new Promise((resolve) => { markAListing = resolve; });
+  GraphService.listFiles
+    .mockImplementationOnce(() => {
+      markAListing();
+      return new Promise((resolve) => { releaseAList = resolve; });
+    })
+    .mockResolvedValueOnce(listing);
+
+  const replaceA = call({ imageFile: imageFile(), clientEtag: ETAG });
+  await aReachedPrune;
+  const replaceB = call({ imageFile: imageFile(), clientEtag: 'W/"2"' });
+  await replaceB;
+  releaseAList(listing);
+  await replaceA;
+
+  const prunedItems = cleanupSharePointItems.mock.calls
+    .filter(([, , label]) => label === 'grantee-replace-orphan')
+    .flatMap(([, items]) => items);
+  expect(prunedItems).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'original-item' }),
+    expect.objectContaining({ id: 'a-item' }),
+  ]));
+  expect(prunedItems).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: 'b-item' }),
+  ]));
+});
+
+test('an unrecognized prior ref skips pruning rather than guessing from the folder', async () => {
+  getDeliverableForRequest.mockResolvedValue(pkg({ wmkf_imagefileref: 'https://sp.example/not-a-writer-name.png' }));
+  await call({ imageFile: imageFile() });
+  expect(GraphService.listFiles).not.toHaveBeenCalled();
+  expect(cleanupSharePointItems).not.toHaveBeenCalled();
 });
 
 test('a prune failure does not fail the committed replacement', async () => {

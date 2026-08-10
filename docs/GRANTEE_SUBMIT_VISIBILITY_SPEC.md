@@ -886,6 +886,36 @@ Decisions worth not re-litigating:
   the proxy URL is keyed on `requestId` alone — without it a replacement leaves the
   previous image on screen and reads as a failed save.
 
+Three defects found by adversarial review and fixed before merge:
+
+- **The prior-image cleanup deletes one exact file, not a folder pattern.** The
+  first cut copied the portal writer's sweep — list the folder, delete everything
+  matching `grantee_image_` except the new item. Two staff replacing in sequence
+  can defeat that: A commits, B reloads and commits, then A's delayed prune deletes
+  B's file while Dataverse points at it. The cleanup now resolves the exact
+  pre-write ref through `imageFilenameFromRef` and deletes only that item; an
+  unrecognized ref skips the prune entirely, because an orphan is strictly safer
+  than deleting a referenced image. **The portal writer still has the folder-wide
+  sweep** `[VERIFIED via lib/services/grantee-upload.js:195-209 — the filter is
+  still `/grantee_image_/i` minus the new item id; the branch leaves that file
+  untouched]` — deliberately not changed, since that path has one actor (the
+  grantee) and it is the live submit route.
+- **The commit re-read now runs for every request shape.** It was inside
+  `if (uploadedItem)`, so a caption-only write whose PATCH response dropped after
+  committing returned 502 — the client kept a stale etag and the retry 409'd on a
+  change that had actually saved.
+- **The route's own trust boundary is now tested.** Service and UI tests both
+  bypassed the handler, so every branch test passed with `requireAppAccess`, the
+  GUID check, `withDalContext`, the caption cap, or the busboy limits deleted.
+
+Each guard above was mutation-checked — reintroducing the defect fails the test
+that names it. Five mutations were run: the folder-wide prune (fails the exact-prune
+and interleaved tests), the caption-only re-read gate, and deletion of the route's
+auth guard, GUID guard, caption cap, and busboy limits (each failing only its own
+tests). The caption-only mutation also failed the unknown-post-error test, which is
+an artifact of how that mutation was applied — it threw before the re-read — not
+evidence of a loose assertion.
+
 Not done, deliberately: no audit trace distinguishing a staff substitution from the
 grantee's own upload (the open sub-question above), and no notification to the
 grantee — the email that agreed the revision is the record.
