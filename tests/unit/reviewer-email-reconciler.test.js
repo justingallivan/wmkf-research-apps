@@ -31,13 +31,20 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'n1' })) },
 }));
+jest.mock('../../lib/services/alert-service', () => ({
+  __esModule: true,
+  default: { autoResolve: jest.fn(async () => 1) },
+}));
 
 const rosterStore = require('../../lib/services/reviewer-roster-store');
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const NotificationService = require('../../lib/services/notification-service').default;
+const AlertService = require('../../lib/services/alert-service').default;
 const { reconcileReviewerEmails } = require('../../lib/services/reviewer-email-reconciler');
+
+const ALERT_KEY = (sug) => `reviewer-email-reconcile:${sug}`;
 
 const REQ = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SUG = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -188,4 +195,129 @@ test('a row error is recorded, never fatal to the batch', async () => {
   warn.mockRestore();
   expect(r.errors).toHaveLength(1);
   expect(r.written).toHaveLength(1); // the second row still processed
+});
+
+// ─────────────── Retraction (S414) ───────────────
+// `autoResolveKey` only DEDUPES new alerts, so before this a needs-merge alert
+// outlived its condition forever. The danger in fixing that is the mirror of the
+// affiliation-alert lesson: retracting an alert whose duplicate still exists
+// destroys the only standing signal. These tests pin BOTH directions.
+
+test('RETRACT: a deselected suggestion auto-resolves its stale alert', async () => {
+  // The live alert-383 shape: the duplicate row was removed from the request, so
+  // the cron has no work item left and the alert is stale.
+  seed(vettedCandidate(), { wmkf_selected: false });
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).toHaveBeenCalledWith(ALERT_KEY(SUG));
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'deselected', count: 1 }]);
+  expect(r.skipped).toBe(1);
+});
+
+test('RETRACT: the person already having an email auto-resolves the alert', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'ava.mercer@example.org' });
+  const r = await reconcileReviewerEmails({});
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'email_present', count: 1 }]);
+});
+
+test('RETRACT: a vanished suggestion auto-resolves the alert', async () => {
+  seed(vettedCandidate());
+  suggestionAdapter.findById.mockResolvedValue(null);
+  const r = await reconcileReviewerEmails({});
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'suggestion_gone', count: 1 }]);
+});
+
+test('RETRACT: a successful write and repoint each retract', async () => {
+  seed(vettedCandidate());
+  const written = await reconcileReviewerEmails({});
+  expect(written.retracted).toEqual([{ suggestionId: SUG, reason: 'written', count: 1 }]);
+
+  jest.clearAllMocks();
+  AlertService.autoResolve.mockResolvedValue(1);
+  seed(vettedCandidate());
+  potentialReviewerAdapter.getById.mockResolvedValue({});
+  potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });
+  suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue(null);
+  const repointed = await reconcileReviewerEmails({});
+  expect(repointed.retracted).toEqual([{ suggestionId: SUG, reason: 'repointed', count: 1 }]);
+});
+
+test('NO RETRACT: keeper_has_suggestion still alerts and never retracts', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });
+  suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue({ wmkf_appreviewersuggestionid: 'other' });
+  const r = await reconcileReviewerEmails({});
+  expect(r.alerted[0]).toMatchObject({ reason: 'keeper_has_suggestion' });
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.retracted).toEqual([]);
+});
+
+test('NO RETRACT: an ambiguous owner leaves the standing signal intact', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ ambiguous: true, count: 2, rows: [] });
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.retracted).toEqual([]);
+});
+
+test('NO RETRACT: a stale-roster request mismatch says nothing about the alert', async () => {
+  // The roster row points at a different request than the suggestion actually
+  // belongs to. That is roster staleness, NOT evidence the duplicate is resolved.
+  seed(vettedCandidate(), { _wmkf_request_value: 'ffffffff-ffff-ffff-ffff-ffffffffffff' });
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.skipped).toBe(1);
+});
+
+test('NO RETRACT: a contradictory same-person owner is not treated as resolved', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: PERSON, row: { statecode: 0 } });
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.retracted).toEqual([]);
+});
+
+test('dryRun never retracts', async () => {
+  seed(vettedCandidate(), { wmkf_selected: false });
+  const r = await reconcileReviewerEmails({ dryRun: true });
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.retracted).toEqual([]);
+});
+
+test('a retraction failure is non-fatal and leaves the outcome intact', async () => {
+  seed(vettedCandidate());
+  AlertService.autoResolve.mockRejectedValue(new Error('pg down'));
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const r = await reconcileReviewerEmails({});
+  warn.mockRestore();
+  expect(r.written).toHaveLength(1); // the write still counts
+  expect(r.retracted).toEqual([]);
+  expect(r.errors).toHaveLength(0);
+});
+
+test('retracted is only recorded when a row was actually updated', async () => {
+  // autoResolve returns 0 when no alert existed — the common case. A no-op must
+  // not inflate the retracted list, or the cron log implies work that never happened.
+  seed(vettedCandidate());
+  AlertService.autoResolve.mockResolvedValue(0);
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).toHaveBeenCalledWith(ALERT_KEY(SUG));
+  expect(r.retracted).toEqual([]);
+});
+
+test('the emitted autoResolveKey is EXACTLY the key retraction matches on', async () => {
+  // Load-bearing coupling: alertNeedsMerge and retractNeedsMerge must derive the
+  // key from one definition. If they drift, alerts are raised under one key and
+  // retracted under another — retraction silently no-ops forever (fail-open).
+  seed(vettedCandidate());
+  potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });
+  suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue({ wmkf_appreviewersuggestionid: 'other' });
+  await reconcileReviewerEmails({});
+  const emitted = NotificationService.notify.mock.calls[0][0].autoResolveKey;
+
+  jest.clearAllMocks();
+  AlertService.autoResolve.mockResolvedValue(1);
+  seed(vettedCandidate(), { wmkf_selected: false }); // a retracting outcome
+  await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).toHaveBeenCalledWith(emitted);
 });

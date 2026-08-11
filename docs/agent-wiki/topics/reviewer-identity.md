@@ -205,20 +205,26 @@ it, and otherwise **alerts instead of guessing** — three kinds
 - `ambiguous_owner` — more than one active record owns the email.
 - `inactive_owner` — the sole owner is deactivated.
 
-**An active alert is not evidence the condition still holds.** `autoResolveKey`
-is used *only* to dedup new alerts (`lib/services/alert-service.js:22-32`), and
-nothing ever calls `AlertService.autoResolve` for this key — the string
-`reviewer-email-reconcile:` appears exactly once repo-wide, at the emission site
-`[VERIFIED via repo-wide grep, 2026-08-11]`. So the alert survives a fix, and
-dedup means a *silent* night is indistinguishable from a resolved one. Never
-infer either direction from the alert alone.
+**The reconciler now RETRACTS its own alerts (S414).** Any row reaching a
+non-alert outcome auto-resolves its prior alert
+`[VERIFIED via lib/services/reviewer-email-reconciler.js retractNeedsMerge + 5
+call sites; tests/unit/reviewer-email-reconciler.test.js]`. It fires on: email
+landed, suggestion gone, suggestion deselected, write, repoint. It deliberately
+does **not** fire on the ambiguous skips (no vetted email, missing personId,
+contradictory same-person owner) or on a stale-roster request mismatch — those
+leave the duplicate intact, and retracting there would destroy the only standing
+signal, the mirror of the affiliation-alert lesson in
+`feedback-list-and-confirm-before-bulk-deletes`. Both directions are pinned by
+tests, and all three over/under-retraction mutations were verified to fail the
+suite.
 
-This is an **outlier, not a convention**: `auth-bypass-monitor`, `migration-drift`,
-`alert-reviewer-affiliation-mismatch`, `pricing-canary`, and `spend-check` all
-call `AlertService.autoResolve` to retract their own alerts when the condition
-clears `[VERIFIED via repo-wide grep, 2026-08-11]`. Adding an auto-resolve pass to
-the reconciler — retracting the alert when its ladder now reaches a non-alert
-outcome — is unbuilt but would remove the manual step entirely.
+Before S414 `autoResolveKey` only *deduped* new alerts
+(`lib/services/alert-service.js:22-32`), so an alert outlived its condition
+indefinitely and a silent night was indistinguishable from a resolved one. Alerts
+raised before the fix still clear on the next nightly run that revisits the row —
+but only while the candidate remains in the roster batch window, so a long-stale
+alert may still need a manual resolve. `retracted` now appears in the cron log
+line and the run details.
 
 Resolve that ambiguity with the read-only probe, which replays the decision
 ladder against live Dataverse and returns
