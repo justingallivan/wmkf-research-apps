@@ -706,12 +706,14 @@ The remaining controls are deliberately not collapsed into that pass:
   level can still be *named* Edit with Delete Items unchecked. Asking for the
   level's name therefore does not answer the question; the checkbox state is the
   only closing evidence.** Related, and answerable without an administrator:
-  SharePoint has **no separate move or rename permission**. Rename is
-  `Edit Items` — so anyone who can edit can already rename, and a rename cannot
-  orphan an artifact because both consumers resolve by stable drive/item ID —
-  and move-out-of-library is `Add Items` at the destination plus `Delete Items`
-  at the source, so it collapses into the same delete question rather than being
-  a fifth one.
+  the documented list-permission set contains **no separate move or rename
+  permission** `[VERIFIED via the same page — absence across the full documented
+  set]`. Their decomposition — rename as `Edit Items`, move-out-of-library as
+  `Add Items` at the destination plus `Delete Items` at the source — is
+  `[ASSUMED]`, inferred rather than stated. Either way the consequence holds:
+  anyone who can edit can already rename, a rename cannot orphan an artifact
+  because both consumers resolve by stable drive/item ID, and move authority
+  collapses into the same delete question rather than being a fifth one.
 
   **The 2026-08-10 delete attempts did NOT settle this — do not cite them as
   evidence either way.** Two attempts against `Application Cover Page.docx`

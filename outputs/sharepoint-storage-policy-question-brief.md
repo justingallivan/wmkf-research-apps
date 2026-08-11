@@ -245,9 +245,12 @@ answerable by one non-destructive read.
 ### Q8 — Move / rename authority
 
 **Answerable from documentation now; no administrator needed.**
-`[VERIFIED via Microsoft documentation]` SharePoint has **no separate "move" or
-"rename" permission**. Renaming a file is an `Edit Items` operation; moving it
-is `Add Items` at the destination plus `Delete Items` at the source. Therefore:
+`[VERIFIED via Microsoft documentation]` The documented list-permission set
+contains **no separate "move" or "rename" permission** — verified as an absence
+across the full documented set, not inferred. Their decomposition — renaming as
+an `Edit Items` operation, moving as `Add Items` at the destination plus
+`Delete Items` at the source — is `[ASSUMED]`; Microsoft states the permission
+set, not the mapping. The consequences hold under either reading:
 
 - Anyone who can edit can rename. **This is already true today** and cannot be
   restricted without removing editing.
