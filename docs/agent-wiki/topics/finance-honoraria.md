@@ -43,9 +43,42 @@ months, possibly permanently.** Reviewer onboarding will instead use the
 reviewer's address plus existing foundation systems. Do not build on or propose
 the BILL API pipeline without a new owner decision; the BILL code stays dormant,
 not deleted (`BILL_ENABLED` unset in every Vercel environment — verified
-2026-07-12 — so `onboardReviewer()` degrades to alert_only). Detail:
-`project-honorarium-payment-landscape` memory. The 2026-07-01 posture below
-remains the live mechanical state.
+2026-07-12). Detail: `project-honorarium-payment-landscape` memory. The
+2026-07-01 posture below remains the live mechanical state.
+
+**`BILL_ONBOARDING_DEFERRED` misconfiguration, 2026-07-02 → 2026-08-10 (fixed
+S414).** The flag was present in Production and Preview since ~2026-06-10 but its
+stored value was not the literal string `'true'`; `onboardReviewer()` tests it
+with strict `===` `[VERIFIED via lib/bill/onboard-reviewer-service.js:90]`. The
+bug was inert until honorarium go-live on 2026-07-02 opened the path, so every
+reviewer accept from that same day fell through to the `BILL_ENABLED !== 'true'`
+branch and wrote a `bill_manual_onboarding` warning alert
+`[VERIFIED via :94-96, :544-566]`. **61 alerts accumulated**, first
+`2026-07-02 17:48 UTC`, last `2026-08-10 19:52 UTC`, before the flag was
+overwritten to exactly `true` on Production and Preview and production redeployed
+`[VERIFIED via read-only system_alerts census, 2026-08-11; denominator is
+COUNT(*) over all statuses, not the 29+32 split]`. All 61 are now resolved.
+
+**No BILL API call ever fired** `[VERIFIED via three disconfirming checks,
+2026-08-11]`: `BILL_ENABLED` is unset (second lock); zero
+`bill_unavailable` / `bill_unhandled_error` / `bill_invalid_input` alerts exist,
+and all three are reachable only past the `BILL_ENABLED` gate; and
+`bill_onboarding_state` holds **0 rows**, though reservation precedes any BILL
+side effect, so a row would exist had the flow gone further.
+
+Two follow-ons. The flag is now stored **non-sensitive**, so its value is
+readable and this class of drift is detectable — it was previously Sensitive,
+which is why a wrong value went unnoticed for five weeks. And the "no new alerts"
+half of the fix is confirmed only by observing an accept *after* the redeploy, so
+treat that as **[ASSUMED]** until the census re-runs clean.
+
+**Timestamp trap when querying `system_alerts`:** `created_at` is
+`timestamp without time zone` holding UTC `[VERIFIED via information_schema,
+2026-08-11]`. The JS Postgres client re-reads it as local time, shifting every
+value by the local offset (+7h here) — so `MIN`/`MAX` read back through the
+driver are wrong by that much. Compare and render with `to_char(...)` in SQL, not
+in JS. The admin panel renders Pacific, so a `19:52 UTC` row displays as
+`12:52 PM`.
 
 **Current posture (2026-07-01 decision; live 2026-07-02):** full BILL.com onboarding
 remains deferred, but the portal is the sole creator of reviewer honorarium
