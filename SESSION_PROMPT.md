@@ -13,11 +13,14 @@
 > regression directions on branch `codex/reviewer-alert-retraction`. It is not
 > production behavior until deliberately promoted. The Opus follow-up then found
 > the remaining confirmed P1: a missing Dataverse suggestion throws 404 rather
-> than returning null. The branch now maps only 404 to `suggestion_gone`, handles
-> excluded rows through a read-only lifecycle lookup, gates unvetted Dataverse
-> reads on standing alert keys, reports `wouldRetract` in dry-run, and aligns the
-> probe. Focused suites pass 30 + 58 + 3; the current full unit suite passes 575
-> suites / 7,270 tests.
+> than returning null. The branch now maps only Dataverse's structured
+> ObjectDoesNotExist response (`404`, `0x80040217`) to `suggestion_gone`; every
+> other 404 remains an error. It handles excluded rows through a read-only
+> lifecycle lookup, gates unvetted reads on standing alert keys, reports only
+> known-open `wouldRetract` entries (with an explicit incomplete-preview flag),
+> treats missing people as non-reconcilable, and aligns the probe's request
+> binding. Focused suites pass 153/153; the current full unit suite passes 575
+> suites / 7,283 tests.
 
 > **Handoff, 2026-08-11 (Session 414).** Seven commits, all on `main`, all pushed.
 > Fixed a five-week production misconfiguration that had been emitting a
@@ -62,11 +65,14 @@
    *deduped*, so an alert outlived its condition forever and a silent night was
    indistinguishable from a resolved one. Now retracts on: email landed,
    suggestion gone, deselected, applicant-excluded, write, repoint. The branch
-   follow-up maps thrown 404 to gone without weakening the fail-closed action
-   lookup; open-alert key gating avoids lifecycle reads for unvetted rows with
-   no standing signal, and dry-run reports `wouldRetract`. Deliberately NOT on the ambiguous
+   follow-up maps only record-scoped ObjectDoesNotExist 404s to gone without
+   weakening the fail-closed action lookup; systemic 404s remain row errors;
+   open-alert key gating avoids lifecycle reads for unvetted rows with no
+   standing signal; dry-run reports only confirmed-open `wouldRetract` entries
+   and exposes incomplete previews; missing people remain non-reconcilable.
+   Deliberately NOT on the ambiguous
    skips or a stale-roster request mismatch — retracting there would destroy the
-   only standing signal. 12 tests; **4 mutations verified to fail the suite**.
+   only standing signal. 35 focused reconciler tests; **4 mutations verified to fail the suite**.
    `/contract-reconcile` caught a real defect mid-build: the emission still built
    the alert key inline while retraction used a new helper — two definitions that
    drift silently and fail open.
@@ -210,10 +216,10 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 ## Testing
 
 ```bash
-npx jest tests/unit                                    # 7270/7270 on codex/reviewer-alert-retraction
+npx jest tests/unit                                    # 7283/7283 on codex/reviewer-alert-retraction
 npm run check:types
 
-npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 30 tests
+npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 35 tests
 
 # Is a needs-merge alert still true? (read-only; per-invocation operator flag)
 DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \

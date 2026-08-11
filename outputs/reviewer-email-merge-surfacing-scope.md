@@ -29,7 +29,7 @@
 > still requires a new request-scoped roster-contact path, so it is parked until
 > a fresh probe returns `STILL_BLOCKED`. The review also found an ordering defect
 > in S414 retraction; `3872d97c` fixes the ordering and the branch follow-up
-> hardens the 404/excluded lifecycle reads after Opus review
+> hardens the record-scoped 404/excluded lifecycle reads after Opus review
 > (`codex/reviewer-alert-retraction`, branch-only until promoted). The merge-auth
 > documentation trail is now investigated; owner intent for this destructive
 > route remains unresolved. See the outcome and evidence matrix in

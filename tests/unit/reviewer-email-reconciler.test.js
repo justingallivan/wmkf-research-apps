@@ -20,7 +20,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
-  getById: jest.fn(async () => ({})),
+  getForEmailReconcile: jest.fn(async () => ({})),
   findByEmailCandidates: jest.fn(async () => ({ none: true })),
   update: jest.fn(async () => undefined),
 }));
@@ -78,7 +78,7 @@ function seed(candidate, sug = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([ALERT_KEY(SUG)]);
-  potentialReviewerAdapter.getById.mockResolvedValue({}); // person has no email
+  potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({}); // person has no email
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ none: true });
   suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue(null);
   potentialReviewerAdapter.update.mockResolvedValue(undefined);
@@ -144,7 +144,7 @@ test('does NOT repoint to an INACTIVE single owner → alert', async () => {
 
 test('idempotent: person already has an email → skipped', async () => {
   seed(vettedCandidate());
-  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'existing@example.org' });
+  potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({ wmkf_emailaddress: 'existing@example.org' });
   const r = await reconcileReviewerEmails({});
   expect(r.skipped).toBe(1);
   expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
@@ -233,7 +233,7 @@ test('NO RETRACT: a selected suggestion without a currently vetted email keeps i
   seed(vettedCandidate({ identityStatus: 'ambiguous' }));
   const r = await reconcileReviewerEmails({});
   expect(AlertService.autoResolve).not.toHaveBeenCalled();
-  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getForEmailReconcile).not.toHaveBeenCalled();
   expect(r.skipped).toBe(1);
 });
 
@@ -244,6 +244,14 @@ test('unvetted row without an open keyed alert skips the Dataverse lifecycle rea
   expect(suggestionAdapter.getForEmailReconcile).not.toHaveBeenCalled();
   expect(r.skipped).toBe(1);
   expect(r.errors).toEqual([]);
+});
+
+test('vetted row without an open keyed alert still runs the normal write path', async () => {
+  seed(vettedCandidate());
+  AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([]);
+  const r = await reconcileReviewerEmails({});
+  expect(suggestionAdapter.getForEmailReconcile).toHaveBeenCalledWith(SUG);
+  expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
 });
 
 test('open-alert key scan failure falls back to checking unvetted lifecycles', async () => {
@@ -258,7 +266,7 @@ test('open-alert key scan failure falls back to checking unvetted lifecycles', a
 
 test('RETRACT: the person already having an email auto-resolves the alert', async () => {
   seed(vettedCandidate());
-  potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'ava.mercer@example.org' });
+  potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({ wmkf_emailaddress: 'ava.mercer@example.org' });
   const r = await reconcileReviewerEmails({});
   expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'email_present', count: 1 }]);
 });
@@ -268,6 +276,21 @@ test('RETRACT: a vanished suggestion auto-resolves the alert', async () => {
   suggestionAdapter.getForEmailReconcile.mockResolvedValue(null);
   const r = await reconcileReviewerEmails({});
   expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'suggestion_gone', count: 1 }]);
+});
+
+test('NO RETRACT: a systemic Dataverse 404 is a row error, not evidence the suggestion is gone', async () => {
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }));
+  suggestionAdapter.getForEmailReconcile.mockRejectedValue(Object.assign(new Error('bad entity path'), {
+    serviceName: 'dataverse',
+    status: 404,
+    dataverseCode: '0x8006088a',
+  }));
+  const warn = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const r = await reconcileReviewerEmails({});
+  warn.mockRestore();
+  expect(r.errors).toHaveLength(1);
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.retracted).toEqual([]);
 });
 
 test('RETRACT: an applicant-excluded suggestion is lifecycle-conclusive without a row error', async () => {
@@ -288,7 +311,7 @@ test('RETRACT: a successful write and repoint each retract', async () => {
   jest.clearAllMocks();
   AlertService.autoResolve.mockResolvedValue(1);
   seed(vettedCandidate());
-  potentialReviewerAdapter.getById.mockResolvedValue({});
+  potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue({});
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ one: true, id: KEEPER, row: { statecode: 0 } });
   suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue(null);
   const repointed = await reconcileReviewerEmails({});
@@ -330,12 +353,43 @@ test('NO RETRACT: a contradictory same-person owner is not treated as resolved',
   expect(r.retracted).toEqual([]);
 });
 
+test('NO RETRACT: a missing person is non-reconcilable and preserves the alert', async () => {
+  seed(vettedCandidate());
+  potentialReviewerAdapter.getForEmailReconcile.mockResolvedValue(null);
+  const r = await reconcileReviewerEmails({});
+  expect(potentialReviewerAdapter.findByEmailCandidates).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.skipped).toBe(1);
+});
+
 test('dryRun reports intended retractions without mutating alerts', async () => {
   seed(vettedCandidate(), { wmkf_selected: false });
   const r = await reconcileReviewerEmails({ dryRun: true });
   expect(AlertService.autoResolve).not.toHaveBeenCalled();
   expect(r.retracted).toEqual([]);
   expect(r.wouldRetract).toEqual([{ suggestionId: SUG, reason: 'deselected' }]);
+  expect(r.retractionPreviewComplete).toBe(true);
+});
+
+test('dryRun omits no-op retraction attempts when no keyed alert is open', async () => {
+  seed(vettedCandidate(), { wmkf_selected: false });
+  AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([]);
+  const r = await reconcileReviewerEmails({ dryRun: true });
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.wouldRetract).toEqual([]);
+  expect(r.retractionPreviewComplete).toBe(true);
+});
+
+test('dryRun marks the retraction preview incomplete when the open-key scan fails', async () => {
+  seed(vettedCandidate(), { wmkf_selected: false });
+  AlertService.getOpenAutoResolveKeysByType.mockRejectedValue(new Error('pg down'));
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const r = await reconcileReviewerEmails({ dryRun: true });
+  warn.mockRestore();
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(r.wouldRetract).toEqual([]);
+  expect(r.retractionPreviewComplete).toBe(false);
 });
 
 test('a retraction failure is non-fatal and leaves the outcome intact', async () => {

@@ -11,7 +11,11 @@ import {
   isKnownEntitySet,
   selectFields,
 } from '../../lib/dataverse/core/entity-registry.js';
-import { adapterError } from '../../lib/dataverse/core/errors.js';
+import {
+  adapterError,
+  DATAVERSE_RECORD_NOT_FOUND_CODE,
+  isDataverseRecordNotFound,
+} from '../../lib/dataverse/core/errors.js';
 
 const VALID_GUID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -147,5 +151,24 @@ describe('errors.adapterError', () => {
     expect('code' in err).toBe(false);
     expect('status' in err).toBe(false);
     expect('details' in err).toBe(false);
+  });
+});
+
+describe('errors.isDataverseRecordNotFound', () => {
+  test('accepts only the structured Dataverse ObjectDoesNotExist 404', () => {
+    expect(isDataverseRecordNotFound({
+      serviceName: 'dataverse',
+      status: 404,
+      dataverseCode: DATAVERSE_RECORD_NOT_FOUND_CODE,
+    })).toBe(true);
+  });
+
+  test.each([
+    [{ serviceName: 'dataverse', status: 404, dataverseCode: '0x8006088a' }, 'bad entity-set segment'],
+    [{ serviceName: 'dataverse', status: 404 }, 'unstructured 404'],
+    [{ serviceName: 'graph', status: 404, dataverseCode: DATAVERSE_RECORD_NOT_FOUND_CODE }, 'wrong service'],
+    [{ serviceName: 'dataverse', status: 503, dataverseCode: DATAVERSE_RECORD_NOT_FOUND_CODE }, 'wrong status'],
+  ])('rejects %s (%s)', (error) => {
+    expect(isDataverseRecordNotFound(error)).toBe(false);
   });
 });

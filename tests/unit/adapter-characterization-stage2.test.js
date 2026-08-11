@@ -135,6 +135,25 @@ describe('potential-reviewer.getById (characterization)', () => {
     await pr.getById(undefined);
     expect(g).toHaveBeenCalledWith('wmkf_potentialreviewerses', undefined, { select: PR_SELECT });
   });
+
+  test('email-reconcile lookup maps only record-scoped Dataverse 404 to null', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(Object.assign(new Error('gone'), {
+      serviceName: 'dataverse',
+      status: 404,
+      dataverseCode: '0x80040217',
+    }));
+    await expect(pr.getForEmailReconcile(GUID_A)).resolves.toBeNull();
+  });
+
+  test('email-reconcile lookup preserves a systemic Dataverse 404', async () => {
+    const error = Object.assign(new Error('bad entity set'), {
+      serviceName: 'dataverse',
+      status: 404,
+      dataverseCode: '0x8006088a',
+    });
+    jest.spyOn(DynamicsService, 'getRecord').mockRejectedValue(error);
+    await expect(pr.getForEmailReconcile(GUID_A)).rejects.toBe(error);
+  });
 });
 
 // ─────────────────────── researcher ───────────────────────

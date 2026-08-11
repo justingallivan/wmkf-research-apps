@@ -44,8 +44,8 @@ export default async function handler(req, res) {
     // closed an alert would leave no trace of why it closed.
     const acted = result.written.length + result.repointed.length + result.alerted.length
       + result.retracted.length + result.wouldRetract.length;
-    if (acted || result.errors.length) {
-      console.log(`[cron:reviewer-email-reconcile] scanned=${result.scanned} wrote=${result.written.length} repointed=${result.repointed.length} alerted=${result.alerted.length} retracted=${result.retracted.length} wouldRetract=${result.wouldRetract.length} skipped=${result.skipped} errors=${result.errors.length} dryRun=${dryRun}`);
+    if (acted || result.errors.length || result.retractionPreviewComplete === false) {
+      console.log(`[cron:reviewer-email-reconcile] scanned=${result.scanned} wrote=${result.written.length} repointed=${result.repointed.length} alerted=${result.alerted.length} retracted=${result.retracted.length} wouldRetract=${result.wouldRetract.length} retractionPreviewComplete=${result.retractionPreviewComplete} skipped=${result.skipped} errors=${result.errors.length} dryRun=${dryRun}`);
     }
 
     await MaintenanceService.completeRun(runId, {

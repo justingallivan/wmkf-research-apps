@@ -288,8 +288,22 @@ describe('findById action chokepoint', () => {
   });
 
   test('read-only email reconciliation lookup maps Dataverse 404 to suggestion-gone null', async () => {
-    DynamicsService.getRecord.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+    DynamicsService.getRecord.mockRejectedValue(Object.assign(new Error('not found'), {
+      serviceName: 'dataverse',
+      status: 404,
+      dataverseCode: '0x80040217',
+    }));
     await expect(getForEmailReconcile(SUGGESTION_ID)).resolves.toBeNull();
+  });
+
+  test('read-only email reconciliation lookup preserves a systemic Dataverse 404', async () => {
+    const error = Object.assign(new Error('bad entity set'), {
+      serviceName: 'dataverse',
+      status: 404,
+      dataverseCode: '0x8006088a',
+    });
+    DynamicsService.getRecord.mockRejectedValue(error);
+    await expect(getForEmailReconcile(SUGGESTION_ID)).rejects.toBe(error);
   });
 
   test('read-only email reconciliation lookup preserves non-404 failures', async () => {

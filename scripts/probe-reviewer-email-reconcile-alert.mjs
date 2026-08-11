@@ -147,16 +147,21 @@ async function rosterState(suggestionId) {
     SELECT request_id, status, updated_at,
            candidate->>'emailPersistAllowed'                      AS persist_top,
            candidate->'contactEnrichment'->>'emailPersistAllowed' AS persist_nested
-      FROM reviewer_find_roster
+     FROM reviewer_find_roster
      WHERE candidate->>'suggestionId' = ${suggestionId}
+     ORDER BY updated_at DESC
      LIMIT 1`;
   if (!row.rows.length) return { present: false };
 
+  const requestId = row.rows[0].request_id;
   const batch = await findReconcilableCandidates(args.rosterLimit);
-  const idx = batch.findIndex((r) => eq(r.candidate?.suggestionId, suggestionId));
+  const idx = batch.findIndex((r) => (
+    eq(r.candidate?.suggestionId, suggestionId) && eq(r.requestId, requestId)
+  ));
   const inWindow = idx >= 0;
   return {
     present: true,
+    requestId,
     rosterStatus: row.rows[0].status,
     updatedAt: row.rows[0].updated_at,
     persistAllowed: row.rows[0].persist_top === 'true' || row.rows[0].persist_nested === 'true',
@@ -189,7 +194,10 @@ async function probeOne(t) {
   // 2. replay the reconciler ladder against live Dataverse (all GETs)
   const sug = await suggestionAdapter.getForEmailReconcile(t.suggestionId);
   if (!sug) { console.log('\nVERDICT: ALREADY_RESOLVED — suggestion no longer exists.'); return; }
-  const belongs = !t.requestId || eq(sug._wmkf_request_value, t.requestId);
+  // The roster row is the cron's current request binding. Alert metadata is
+  // historical evidence and is only a fallback for ad-hoc/no-roster probes.
+  const boundRequestId = roster.requestId || t.requestId;
+  const belongs = !boundRequestId || eq(sug._wmkf_request_value, boundRequestId);
   console.log(`\nsuggestion: selected=${!!sug.wmkf_selected} belongsToRequest=${belongs}`);
   if (!belongs) {
     console.log('\nVERDICT: NOT_RECONCILABLE — suggestion belongs to another request; the cron deliberately preserves the alert.');
@@ -214,7 +222,15 @@ async function probeOne(t) {
   }
 
   const personId = sug._wmkf_potentialreviewer_value;
-  const person = personId ? await potentialReviewerAdapter.getById(personId) : null;
+  if (!personId) {
+    console.log('\nVERDICT: NOT_RECONCILABLE — selected suggestion has no person binding; the cron deliberately preserves the alert.');
+    return;
+  }
+  const person = await potentialReviewerAdapter.getForEmailReconcile(personId);
+  if (!person) {
+    console.log('\nVERDICT: NOT_RECONCILABLE — the bound person no longer exists; the cron deliberately preserves the alert.');
+    return;
+  }
   console.log(`person ${short(personId)}: name="${person?.wmkf_name || ''}" email=${person?.wmkf_emailaddress || '(empty)'} statecode=${person?.statecode}`);
   if (person?.wmkf_emailaddress) {
     console.log('\nVERDICT: ALREADY_RESOLVED — the person now has an email; the cron skips it. Resolve the alert.');
@@ -244,7 +260,7 @@ async function probeOne(t) {
     return;
   }
 
-  const keeperSug = await suggestionAdapter.findByPotentialReviewerAndRequest(owner.id, t.requestId || sug._wmkf_request_value);
+  const keeperSug = await suggestionAdapter.findByPotentialReviewerAndRequest(owner.id, boundRequestId || sug._wmkf_request_value);
   if (keeperSug) {
     console.log(`keeper's suggestion on this request: ${short(keeperSug.wmkf_appreviewersuggestionid)} selected=${!!keeperSug.wmkf_selected}`);
     console.log('\nVERDICT: STILL_BLOCKED (keeper_has_suggestion) — BOTH records hold a suggestion on this request.');
