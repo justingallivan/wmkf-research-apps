@@ -168,6 +168,14 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
       the staff-wide editing design and the pilot's own evidence that Justin
       edited Request `1003109` while lacking site-collection admin rights. Detail
       and the reasoning live in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+      **Best instrument — no email needed if Justin can reach the page:** open
+      the Members group's permission *level* and read its **Delete Items** and
+      **Delete Versions** checkboxes. That answers question 2's remaining half
+      too, and reveals the real level name behind "limited control".
+      **A 2026-08-10 delete attempt is NOT evidence** — it returned
+      `File is checked out to another user` (`0x80060728`), a lock conflict, not
+      a rights denial. Do not retry by deleting: with no confirmed second-stage
+      recycle bin, a success would destroy the artifact to test its durability.
    2. *(Version limit ANSWERED 2026-08-10 — do not re-ask.)* The signed-in
       Versioning Settings page for `akoya_request` reads: major versions only,
       **no time limit**, **keep 500 major versions**, drafts unchecked, check-out

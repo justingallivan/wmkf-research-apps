@@ -654,7 +654,28 @@ The remaining controls are deliberately not collapsed into that pass:
   auto-assigned Limited Access — so it is either a paraphrase or a custom level.
   The operative question is unresolved: **can an ordinary editor delete the file
   or its version history?** Edit and Contribute both permit item deletion; Read
-  does not. This compounds with the second-stage finding above — if members can
+  does not.
+
+  **A delete attempt on 2026-08-10 did NOT answer this — do not cite it as
+  evidence.** Justin tried to delete a file Connor created and received
+  `File is checked out to another user` (error `0x80060728`). That is a **lock
+  conflict, not a permission denial**: SharePoint refused because the file was
+  held (Word open, or an explicit check-out), so the permission level was never
+  the deciding factor. A rights failure surfaces as `Access denied`, not this.
+  The attempt is therefore null evidence in both directions.
+
+  **Do not retry this by deleting.** With no confirmed second-stage recycle bin
+  (above), a successful delete would have left the first-stage bin as the only
+  remedy — testing a durability question by destroying the artifact whose
+  durability is in question. **Resolve it by reading the permission definition
+  instead:** Site Settings → Site permissions → the Members group's level →
+  open the level and read its **Delete Items** and **Delete Versions**
+  checkboxes. That is non-destructive, answers *delete versions* as well as
+  *delete file* (a file-delete test cannot), and simultaneously reveals the real
+  level name behind Connor's "limited control". If an empirical check is still
+  wanted, use a disposable file the tester created, in a non-governed location,
+  that nobody has open — and note it only establishes delete-own, since some
+  configurations permit that while restricting delete-others. This compounds with the second-stage finding above — if members can
   delete and there is genuinely no second-stage bin, first-stage recovery is the
   only remedy. The app token still holds only `Sites.Selected` and
   `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
