@@ -17,8 +17,8 @@
  *   STILL_BLOCKED    — the duplicate persists; a human merge is still required.
  *   SELF_HEALING     — the blocker cleared; the next cron would fix the row and
  *                      auto-resolve its alert.
- *   ALREADY_RESOLVED — the suggestion is gone/deselected or the person now has
- *                      an email; the alert is stale.
+ *   ALREADY_RESOLVED — the suggestion is gone/excluded/deselected or the person
+ *                      now has an email; the alert is stale.
  *   NOT_RECONCILABLE — the roster lacks a vetted email or the live suggestion
  *                      no longer matches the alert's request binding; the cron
  *                      deliberately preserves the alert.
@@ -186,11 +186,8 @@ async function probeOne(t) {
     console.log(`        in tonight's top-${roster.windowSize} window: ${roster.inWindow ? `yes (rank ${roster.rank})` : 'NO'}`);
     if (roster.inWindow) console.log(`        vetted email now: ${roster.vetted ? roster.vetted.email : 'NONE (projection not "ready")'}`);
   }
-  const email = (roster.inWindow && roster.vetted?.email) || t.email;
-  if (!email) { console.log('\nVERDICT: NOT_RECONCILABLE — no vetted email available.'); return; }
-
   // 2. replay the reconciler ladder against live Dataverse (all GETs)
-  const sug = await suggestionAdapter.findById(t.suggestionId);
+  const sug = await suggestionAdapter.getForEmailReconcile(t.suggestionId);
   if (!sug) { console.log('\nVERDICT: ALREADY_RESOLVED — suggestion no longer exists.'); return; }
   const belongs = !t.requestId || eq(sug._wmkf_request_value, t.requestId);
   console.log(`\nsuggestion: selected=${!!sug.wmkf_selected} belongsToRequest=${belongs}`);
@@ -198,8 +195,21 @@ async function probeOne(t) {
     console.log('\nVERDICT: NOT_RECONCILABLE — suggestion belongs to another request; the cron deliberately preserves the alert.');
     return;
   }
+  if (suggestionAdapter.isExcluded(sug)) {
+    console.log('\nVERDICT: ALREADY_RESOLVED — the suggestion is applicant-excluded, so no human work item remains.');
+    return;
+  }
   if (!sug.wmkf_selected) {
     console.log('\nVERDICT: ALREADY_RESOLVED — the suggestion is deselected, so no human work item remains.');
+    return;
+  }
+
+  // A still-selected row must carry a currently vetted roster address. Alert
+  // metadata is historical evidence, not current contact authority; falling
+  // back to t.email here would claim the cron can write an address it will skip.
+  const email = roster.inWindow ? roster.vetted?.email : null;
+  if (!email) {
+    console.log('\nVERDICT: NOT_RECONCILABLE — no currently vetted roster email is available; the cron deliberately preserves the alert.');
     return;
   }
 

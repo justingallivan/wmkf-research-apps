@@ -209,26 +209,38 @@ it, and otherwise **alerts instead of guessing** — three kinds
 - `ambiguous_owner` — more than one active record owns the email.
 - `inactive_owner` — the sole owner is deactivated.
 
-**The reconciler RETRACTS its own alerts (S414, ordering correction in
-`3872d97c`).** Any row reaching a
-non-alert outcome auto-resolves its prior alert
-`[VERIFIED via lib/services/reviewer-email-reconciler.js retractNeedsMerge + 5
+**The reconciler RETRACTS its own alerts (S414, hardened after the Opus
+review).** Any row reaching a non-alert outcome auto-resolves its prior alert
+`[VERIFIED via lib/services/reviewer-email-reconciler.js retractNeedsMerge + 6
 call sites; tests/unit/reviewer-email-reconciler.test.js]`. It fires on: email
-landed, suggestion gone, suggestion deselected, write, repoint. It deliberately
-does **not** fire on a still-selected row's ambiguous skips (no vetted email,
-missing personId, contradictory same-person owner) or on a stale-roster request
-mismatch — those leave the duplicate intact, and retracting there would destroy
-the only standing signal, the mirror of the affiliation-alert lesson in
-`feedback-list-and-confirm-before-bulk-deletes`. Both directions are pinned by
-tests.
+landed, suggestion gone, suggestion deselected, applicant-excluded, write, and
+repoint. The read-only `getForEmailReconcile` adapter maps only a Dataverse 404
+to gone and returns an excluded row for lifecycle classification; ordinary
+action callers still use the fail-closed `findById`. Non-404 Dataverse failures
+remain per-row errors. `[VERIFIED via
+lib/dataverse/adapters/reviewer-suggestion.js getForEmailReconcile;
+tests/unit/reviewer-suggestion-disposition.test.js]`
+
+It deliberately does **not** retract a still-selected row on ambiguous skips
+(no vetted email, missing personId, contradictory same-person owner) or on a
+stale-roster request mismatch — those leave the duplicate intact, and
+retracting there would destroy the only standing signal, the mirror of the
+affiliation-alert lesson in `feedback-list-and-confirm-before-bulk-deletes`.
+Both directions are pinned by tests.
 
 The initial S414 ordering checked `pickVettedEmail()` before live suggestion
 lifecycle. Production alert 383 had become both deselected and currently
 unvetted, so eleven later successful nightly runs skipped it before reaching the
-retraction branch. `3872d97c` moves gone/deselected checks ahead of contact
-vetting and adds regression coverage that a selected unvetted row still retains
-its signal. This correction is committed on `codex/reviewer-alert-retraction`;
-do not describe it as live until that branch is deliberately promoted.
+retraction branch. `3872d97c` moved gone/deselected checks ahead of contact
+vetting. The follow-up implementation reads the open alert keys once: an
+unvetted row with no standing keyed alert skips Dataverse, while an unvetted row
+with an open alert is classified for gone/deselected/excluded lifecycle evidence.
+If the key query fails, the reconciler checks all candidate lifecycles rather
+than assuming no alerts. `[VERIFIED via
+lib/services/alert-service.js getOpenAutoResolveKeysByType;
+tests/unit/alert-service-open-keys.test.js; 30 focused reconciler tests]` This
+correction remains branch-only; do not describe it as live until deliberately
+promoted.
 
 Before S414 `autoResolveKey` only *deduped* new alerts
 (`lib/services/alert-service.js:22-32`), so an alert outlived its condition
@@ -236,7 +248,8 @@ indefinitely and a silent night was indistinguishable from a resolved one. Alert
 raised before the fix still clear on the next nightly run that revisits the row —
 but only while the candidate remains in the roster batch window, so a long-stale
 alert may still need a manual resolve. `retracted` now appears in the cron log
-line and the run details.
+line and the run details. Dry-run adds `wouldRetract` entries for the retractions
+it would attempt and performs no alert mutation.
 
 Resolve that ambiguity with the read-only probe, which replays the decision
 ladder against live Dataverse and returns
@@ -247,14 +260,17 @@ DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs
   scripts/probe-reviewer-email-reconcile-alert.mjs --all
 ```
 
-The flag is required by the interlock for a local prod read
+The probe evaluates suggestion lifecycle before looking for a currently vetted
+email and never substitutes stale alert metadata for the roster's current
+authority. The flag is required by the interlock for a local prod read
 (`lib/dataverse/core/interlock.js:326-330`) and is a per-invocation operator act —
 do not persist it in `.env.local`. **Worked example (S414):** alert 383
 (`keeper_has_suggestion`, 2026-07-30) probed **ALREADY_RESOLVED** — the duplicate
 suggestion had been deselected. It remains the sole active alert row until the
 ordering correction is promoted and a non-dry-run sweep revisits it.
-Note the probe clears the *reconciler's* work item; it does not establish that the
-duplicate `wmkf_potentialreviewers` records were merged.
+An `ALREADY_RESOLVED` verdict means the *reconciler's* work item is stale; the
+read-only probe does not clear the alert or establish that the duplicate
+`wmkf_potentialreviewers` records were merged.
 
 ## Standard Probe
 

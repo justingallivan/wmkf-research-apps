@@ -18,13 +18,33 @@ ever been stored, it is no longer actionable, and eleven later successful nightl
 runs raised no new instance `[VERIFIED via bounded system_alerts +
 maintenance_runs queries rendered with to_char(), 2026-08-11 16:32 UTC]`.
 
-The review did expose a defect in the prior retraction fix. The sole historical
+The initial Codex review exposed an ordering defect in the prior retraction fix. The sole historical
 alert remains `active` even though its suggestion is deselected because the
 reconciler checked `pickVettedEmail()` before the live suggestion lifecycle; the
 row's current contact is no longer vetted, so execution never reached the
 `deselected` retraction branch. Commit `3872d97c` moves contact vetting behind the
 gone/deselected checks and adds both regression directions. This is committed on
 `codex/reviewer-alert-retraction` but is **not production behavior until promoted**.
+
+The subsequent Claude Opus review found one confirmed P1 beyond that ordering
+fix: the Dataverse client throws on a missing suggestion, but the reconciler
+treated `findById()` as though it returned `null`. A merge can hard-delete the
+loser suggestion while the Postgres roster retains its anchor, so that 404 made
+the row error instead of retracting `suggestion_gone`. The branch follow-up now
+uses a read-only lifecycle adapter that maps only 404 to gone, returns excluded
+rows for classification, and preserves non-404 errors. It also reads open alert
+keys once so unvetted rows without a standing alert do not cause a Dataverse
+scan; a key-query failure falls back to checking every candidate lifecycle.
+Dry-run reports intended retractions in `wouldRetract`, and the probe follows
+the same lifecycle-first ordering without trusting stale alert email metadata.
+`[VERIFIED via focused suites: reconciler 30, adapter 58, alert key query 3]`
+
+The report's applicant-excluded scenario is real as a lifecycle contract but is
+**not a second demonstrated P1**: the action lookup intentionally rejects such
+rows, while the current application source has no writer that sets the excluded
+picklist value. External/manual Dataverse writes could still create one, so the
+read-only reconciler handles it as conclusively resolved. Treat that mechanism
+as conditional/latent unless a live row proves otherwise.
 
 Re-open product work only when a fresh probe returns `STILL_BLOCKED`. At that
 point, evaluate the narrow request-scoped information-only hint first. Do not
@@ -69,6 +89,7 @@ Two facts sharpen it:
 | `c0562ded` | `scripts/probe-reviewer-email-reconcile-alert.mjs` — read-only probe replaying the reconciler ladder against live Dataverse; returns STILL_BLOCKED / SELF_HEALING / ALREADY_RESOLVED / NOT_RECONCILABLE. Needs `DATAVERSE_ALLOW_PROD_READS=yes` per invocation. |
 | `80b85408` | Initial alert-retraction implementation. It covers email landed, suggestion gone/deselected, write, and repoint, but its contact-vetting order left the sole production alert stranded. |
 | `3872d97c` | Codex correction: evaluate gone/deselected lifecycle evidence before current contact vetting; selected unvetted rows still retain their standing alert. Focused suite now 27 tests. Branch-only until promoted. |
+| Branch follow-up after Opus review | Maps thrown Dataverse 404 to `suggestion_gone`, classifies applicant-excluded without weakening action guards, gates unvetted reads on open alert keys, makes dry-run retractions observable, and aligns the probe. Focused suites: 30 + 58 + 3. Branch-only until promoted. |
 
 **Consequence:** there are zero actionable instances, but not zero active alert
 rows. Alert 383 is the only row ever created and remains `active`; the read-only
@@ -186,8 +207,9 @@ deactivation. See
 1. **No new runtime build now.** One historical, already-resolved condition and
    no recurrence across eleven later successful runs do not justify a route/UI
    contract with no live smoke case.
-2. **Fix lifecycle retraction first.** Commit `3872d97c` is the smallest change
-   that removes the known operational noise without broadening destructive reach.
+2. **Fix lifecycle retraction first.** `3872d97c` corrected the observed ordering;
+   the Opus follow-up closes the confirmed thrown-404 gap and adds the narrow
+   lifecycle/read controls above without broadening destructive reach.
 3. **Information-only remains the first product option after recurrence.** It
    would surface the roster-vetted address and keep the existing Edit → PATCH →
    fresh 409 proof. It still requires a new request-scoped data path and stale
@@ -207,7 +229,9 @@ deactivation. See
 |---|---|---|---|---|
 | Alert incidence is one historical row and zero actionable cases | nightly reconciler | `system_alerts`; live Dataverse suggestion | `/admin`; read-only probe | VERIFIED |
 | No recurrence after creation | nightly cron | eleven later `maintenance_runs`, all completed, zero alerted | operational decision | VERIFIED |
-| Initial retraction misses deselected rows that are no longer vetted | roster scan → `pickVettedEmail` formerly before `findById` lifecycle branches | roster candidate + live suggestion + active alert | `AlertService.autoResolve` never reached | VERIFIED / FIXED IN SOURCE |
+| Initial retraction misses deselected rows that are no longer vetted | roster scan → `pickVettedEmail` formerly before lifecycle branches | roster candidate + live suggestion + active alert | `AlertService.autoResolve` never reached | VERIFIED / FIXED IN SOURCE |
+| Missing suggestion throws 404 instead of returning null | roster anchor → read-only lifecycle lookup | stale Postgres `suggestionId` + hard-deleted Dataverse loser | `suggestion_gone` retraction | VERIFIED P1 / FIXED IN SOURCE |
+| Applicant-excluded is a demonstrated production blocker | read-only lifecycle lookup | excluded Dataverse suggestion | keyed retraction | CONDITIONAL; handled, but no current app writer/live case proved |
 | Invite row can show the roster-vetted address without a new data contract | `my-candidates` DTO | Dataverse person projection only; roster contact absent | `ReviewerInvitePanel` | REFUTED |
 | Stored-alert merge is safe | alert metadata → merge route | non-atomic Dataverse writes/deletes | merge modal | REFUTED / NO-SHIP |
 | Merge caller is request-authorized | app-level route guard | no requestId or pair-membership check | destructive merge service | REFUTED / OWNER DECISION |
@@ -278,7 +302,7 @@ Structural fixes: work-order verdict/evidence matrix; rejected-scope disposition
   active wiki, route matrix, merge design, memories, probe, and session handoff
 Semantic omissions found: initial retraction ordering; Invite DTO lacks roster
   contact; S207 predates the destructive merge route; predicate is not auth
-Gates/probes: focused 27/27; full unit 7,261/7,261; lint 0 errors
+Initial gates/probes: focused 27/27; full unit 7,261/7,261; lint 0 errors
   (62 existing warnings); types green; API-route, agent-wiki, fact-consistency,
   memory-router, doc-symbol, doc-currency, docs-catalog, and build-claim gates
   green with every available self-test run sequentially; production census and
@@ -289,3 +313,10 @@ Remaining UNKNOWN/ASSUMED: owner authorization decision for merge remains open;
   branch fix is not assumed deployed
 Verdict: RECONCILED
 ```
+
+Follow-up implementation audit after the Opus report: focused suites pass
+30/30 + 58/58 + 3/3; full unit passes 575 suites / 7,270 tests; changed-file
+lint and types are green. Atlas, API-route, Dataverse-access, route-service,
+agent-wiki, fact-consistency, doc-currency, doc-symbol, build-claim, and
+docs-catalog gates are green; every applicable detector self-test was run
+sequentially. The current-state sweep found no remaining stale lifecycle claim.

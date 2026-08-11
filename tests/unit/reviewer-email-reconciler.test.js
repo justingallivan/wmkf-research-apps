@@ -13,7 +13,8 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   __esModule: true,
-  findById: jest.fn(),
+  getForEmailReconcile: jest.fn(),
+  isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 'excluded'),
   findByPotentialReviewerAndRequest: jest.fn(async () => null),
   repointToPotentialReviewer: jest.fn(async () => undefined),
 }));
@@ -33,7 +34,10 @@ jest.mock('../../lib/services/notification-service', () => ({
 }));
 jest.mock('../../lib/services/alert-service', () => ({
   __esModule: true,
-  default: { autoResolve: jest.fn(async () => 1) },
+  default: {
+    getOpenAutoResolveKeysByType: jest.fn(async () => []),
+    autoResolve: jest.fn(async () => 1),
+  },
 }));
 
 const rosterStore = require('../../lib/services/reviewer-roster-store');
@@ -63,7 +67,7 @@ const vettedCandidate = (over = {}) => ({
 
 function seed(candidate, sug = {}) {
   rosterStore.findReconcilableCandidates.mockResolvedValue([{ requestId: REQ, candidate }]);
-  suggestionAdapter.findById.mockResolvedValue({
+  suggestionAdapter.getForEmailReconcile.mockResolvedValue({
     _wmkf_request_value: REQ,
     _wmkf_potentialreviewer_value: PERSON,
     wmkf_selected: true,
@@ -73,6 +77,7 @@ function seed(candidate, sug = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([ALERT_KEY(SUG)]);
   potentialReviewerAdapter.getById.mockResolvedValue({}); // person has no email
   potentialReviewerAdapter.findByEmailCandidates.mockResolvedValue({ none: true });
   suggestionAdapter.findByPotentialReviewerAndRequest.mockResolvedValue(null);
@@ -96,7 +101,7 @@ test('Find-row anchor: reconciles a roster candidate stamped with suggestionId a
     source: 'claude_search',
   }));
   const r = await reconcileReviewerEmails({});
-  expect(suggestionAdapter.findById).toHaveBeenCalledWith(SUG);
+  expect(suggestionAdapter.getForEmailReconcile).toHaveBeenCalledWith(SUG);
   expect(r.scanned).toBe(1);
   expect(r.written).toEqual([{ requestId: REQ, suggestionId: SUG, personId: PERSON, email: 'ava.mercer@example.org' }]);
 });
@@ -187,7 +192,7 @@ test('a row error is recorded, never fatal to the batch', async () => {
     { requestId: REQ, candidate: vettedCandidate() },
     { requestId: REQ, candidate: vettedCandidate({ suggestionId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' }) },
   ]);
-  suggestionAdapter.findById
+  suggestionAdapter.getForEmailReconcile
     .mockRejectedValueOnce(new Error('boom'))
     .mockResolvedValue({ _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: PERSON, wmkf_selected: true });
   const warn = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -232,6 +237,25 @@ test('NO RETRACT: a selected suggestion without a currently vetted email keeps i
   expect(r.skipped).toBe(1);
 });
 
+test('unvetted row without an open keyed alert skips the Dataverse lifecycle read', async () => {
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }));
+  AlertService.getOpenAutoResolveKeysByType.mockResolvedValue([]);
+  const r = await reconcileReviewerEmails({});
+  expect(suggestionAdapter.getForEmailReconcile).not.toHaveBeenCalled();
+  expect(r.skipped).toBe(1);
+  expect(r.errors).toEqual([]);
+});
+
+test('open-alert key scan failure falls back to checking unvetted lifecycles', async () => {
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }), { wmkf_selected: false });
+  AlertService.getOpenAutoResolveKeysByType.mockRejectedValue(new Error('pg down'));
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const r = await reconcileReviewerEmails({});
+  warn.mockRestore();
+  expect(suggestionAdapter.getForEmailReconcile).toHaveBeenCalledWith(SUG);
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'deselected', count: 1 }]);
+});
+
 test('RETRACT: the person already having an email auto-resolves the alert', async () => {
   seed(vettedCandidate());
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_emailaddress: 'ava.mercer@example.org' });
@@ -240,10 +264,20 @@ test('RETRACT: the person already having an email auto-resolves the alert', asyn
 });
 
 test('RETRACT: a vanished suggestion auto-resolves the alert', async () => {
-  seed(vettedCandidate());
-  suggestionAdapter.findById.mockResolvedValue(null);
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }));
+  suggestionAdapter.getForEmailReconcile.mockResolvedValue(null);
   const r = await reconcileReviewerEmails({});
   expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'suggestion_gone', count: 1 }]);
+});
+
+test('RETRACT: an applicant-excluded suggestion is lifecycle-conclusive without a row error', async () => {
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }), {
+    wmkf_selected: false,
+    wmkf_applicantdisposition: 'excluded',
+  });
+  const r = await reconcileReviewerEmails({});
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'applicant_excluded', count: 1 }]);
+  expect(r.errors).toEqual([]);
 });
 
 test('RETRACT: a successful write and repoint each retract', async () => {
@@ -296,11 +330,12 @@ test('NO RETRACT: a contradictory same-person owner is not treated as resolved',
   expect(r.retracted).toEqual([]);
 });
 
-test('dryRun never retracts', async () => {
+test('dryRun reports intended retractions without mutating alerts', async () => {
   seed(vettedCandidate(), { wmkf_selected: false });
   const r = await reconcileReviewerEmails({ dryRun: true });
   expect(AlertService.autoResolve).not.toHaveBeenCalled();
   expect(r.retracted).toEqual([]);
+  expect(r.wouldRetract).toEqual([{ suggestionId: SUG, reason: 'deselected' }]);
 });
 
 test('a retraction failure is non-fatal and leaves the outcome intact', async () => {

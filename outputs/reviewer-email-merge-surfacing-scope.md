@@ -28,8 +28,9 @@
 > across eleven later successful nightly runs. The safer information-only idea
 > still requires a new request-scoped roster-contact path, so it is parked until
 > a fresh probe returns `STILL_BLOCKED`. The review also found an ordering defect
-> in S414 retraction; `3872d97c` fixes it on
-> `codex/reviewer-alert-retraction` (branch-only until promoted). The merge-auth
+> in S414 retraction; `3872d97c` fixes the ordering and the branch follow-up
+> hardens the 404/excluded lifecycle reads after Opus review
+> (`codex/reviewer-alert-retraction`, branch-only until promoted). The merge-auth
 > documentation trail is now investigated; owner intent for this destructive
 > route remains unresolved. See the outcome and evidence matrix in
 > `outputs/reviewer-email-alert-routing-codex-work-order.md`.
@@ -90,8 +91,9 @@ only if a staffer happens to type the duplicate address into Edit and trips a 40
 ### Interaction with the S414 retraction (shipped this session)
 
 The reconciler now auto-resolves its own alert when a row reaches a non-alert
-outcome (`lib/services/reviewer-email-reconciler.js` `retractNeedsMerge`, 5 call
-sites). Either merge outcome therefore clears the alert on the next nightly run:
+outcome (`lib/services/reviewer-email-reconciler.js` `retractNeedsMerge`, 6 call
+sites; gone, deselected, applicant-excluded, email-present, write, or repoint).
+Either merge outcome therefore clears the alert on the next nightly run:
 
 - keep the email-owner ⇒ loser suggestion deleted ⇒ `suggestion_gone` ⇒ retract
 - Swap, keep the empty record ⇒ email lands on it ⇒ `email_present` ⇒ retract

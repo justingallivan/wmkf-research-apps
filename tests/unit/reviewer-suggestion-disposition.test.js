@@ -22,6 +22,7 @@ const {
   notExcludedFilter,
   isExcluded,
   findById,
+  getForEmailReconcile,
   findByRequest,
   findApplicantRecommendedByRequest,
   upsert,
@@ -275,6 +276,26 @@ describe('findById action chokepoint', () => {
     };
     DynamicsService.getRecord.mockResolvedValue(row);
     await expect(findById(SUGGESTION_ID)).resolves.toBe(row);
+  });
+
+  test('read-only email reconciliation lookup returns applicant-excluded rows for lifecycle handling', async () => {
+    const row = {
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+    };
+    DynamicsService.getRecord.mockResolvedValue(row);
+    await expect(getForEmailReconcile(SUGGESTION_ID)).resolves.toBe(row);
+  });
+
+  test('read-only email reconciliation lookup maps Dataverse 404 to suggestion-gone null', async () => {
+    DynamicsService.getRecord.mockRejectedValue(Object.assign(new Error('not found'), { status: 404 }));
+    await expect(getForEmailReconcile(SUGGESTION_ID)).resolves.toBeNull();
+  });
+
+  test('read-only email reconciliation lookup preserves non-404 failures', async () => {
+    const error = Object.assign(new Error('Dataverse unavailable'), { status: 503 });
+    DynamicsService.getRecord.mockRejectedValue(error);
+    await expect(getForEmailReconcile(SUGGESTION_ID)).rejects.toBe(error);
   });
 });
 

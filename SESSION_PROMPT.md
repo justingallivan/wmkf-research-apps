@@ -1,4 +1,4 @@
-# Session 416 Prompt: reviewer-alert retraction corrected; routing UI parked after Codex review
+# Session 416 Prompt: reviewer-alert retraction hardened after Opus review; routing UI parked
 
 > **Codex follow-through, 2026-08-11.** The work order is decided: build no new
 > reviewer-email alert-routing UI now. Production history contains exactly one
@@ -7,12 +7,17 @@
 > require a new request-scoped roster-contact path; direct alert-to-merge remains
 > NO-SHIP. Re-open product work only after a fresh probe returns `STILL_BLOCKED`.
 >
-> The review found why the sole row is still `active`: the S414 reconciler tested
+> The first review found why the sole row is still `active`: the S414 reconciler tested
 > current contact authority before live suggestion lifecycle, and this deselected
 > row is no longer vetted. Commit `3872d97c` fixes the ordering and adds both
 > regression directions on branch `codex/reviewer-alert-retraction`. It is not
-> production behavior until deliberately promoted. Full unit suite: 574 suites,
-> 7,261 tests passed.
+> production behavior until deliberately promoted. The Opus follow-up then found
+> the remaining confirmed P1: a missing Dataverse suggestion throws 404 rather
+> than returning null. The branch now maps only 404 to `suggestion_gone`, handles
+> excluded rows through a read-only lifecycle lookup, gates unvetted Dataverse
+> reads on standing alert keys, reports `wouldRetract` in dry-run, and aligns the
+> probe. Focused suites pass 30 + 58 + 3; the current full unit suite passes 575
+> suites / 7,270 tests.
 
 > **Handoff, 2026-08-11 (Session 414).** Seven commits, all on `main`, all pushed.
 > Fixed a five-week production misconfiguration that had been emitting a
@@ -52,10 +57,14 @@
    ladder against live Dataverse → STILL_BLOCKED / SELF_HEALING /
    ALREADY_RESOLVED / NOT_RECONCILABLE. All three refusal paths tested.
 
-4. **Alert auto-retraction shipped** (`80b85408`). `autoResolveKey` only
+4. **Alert auto-retraction shipped** (`80b85408`) and is hardened on
+   `codex/reviewer-alert-retraction`. `autoResolveKey` only
    *deduped*, so an alert outlived its condition forever and a silent night was
    indistinguishable from a resolved one. Now retracts on: email landed,
-   suggestion gone, deselected, write, repoint. Deliberately NOT on the ambiguous
+   suggestion gone, deselected, applicant-excluded, write, repoint. The branch
+   follow-up maps thrown 404 to gone without weakening the fail-closed action
+   lookup; open-alert key gating avoids lifecycle reads for unvetted rows with
+   no standing signal, and dry-run reports `wouldRetract`. Deliberately NOT on the ambiguous
    skips or a stale-roster request mismatch — retracting there would destroy the
    only standing signal. 12 tests; **4 mutations verified to fail the suite**.
    `/contract-reconcile` caught a real defect mid-build: the emission still built
@@ -201,10 +210,10 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 ## Testing
 
 ```bash
-npx jest tests/unit                                    # 7261/7261 on codex/reviewer-alert-retraction
+npx jest tests/unit                                    # 7270/7270 on codex/reviewer-alert-retraction
 npm run check:types
 
-npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 27 tests
+npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 30 tests
 
 # Is a needs-merge alert still true? (read-only; per-invocation operator flag)
 DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \
