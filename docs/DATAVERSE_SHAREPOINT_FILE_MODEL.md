@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-11
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -604,6 +604,12 @@ The remaining controls are deliberately not collapsed into that pass:
 > not settle. Connor's replies are an administrator's report, not a probe — treat
 > the surprising one (no second-stage bin) as needing confirmation before any
 > durability guarantee rests on it.
+>
+> **Owner routing, exact non-technical questions, read-only UI paths, closing
+> criteria, and send-ready messages for the three still-open checks:
+> `outputs/sharepoint-storage-policy-question-brief.md` (2026-08-11 / S415).**
+> Nothing was sent and no administrator was contacted; the messages are drafts
+> for Justin.
 
 - **[ANSWERED 2026-08-10 (S413)] Library version-limit policy.**
   **[VERIFIED via the signed-in Versioning Settings page for `akoya_request`,
@@ -642,12 +648,46 @@ The remaining controls are deliberately not collapsed into that pass:
   `AdminRecycleBin.aspx?view=13` on 2026-07-30. Do not record "no second-stage
   recovery exists" as platform fact until someone with site-collection
   administrator rights confirms it.
+
+  **[VERIFIED via Microsoft documentation 2026-08-11 (S415)] There is a
+  documented mechanism that explains both the reply and the denial without the
+  bin being absent:** "The second-stage Recycle Bin isn't visible to end users
+  (only the first-stage Recycle Bin is), but site collection admins can view and
+  restore content from there"
+  ([retention for SharePoint and OneDrive](https://learn.microsoft.com/en-us/purview/retention-policies-sharepoint)).
+  The operative question is therefore **who holds site collection administrator
+  rights on this site** — an unknown nobody has asked yet, and the same person
+  can also answer the Purview/Preservation-Hold half. Microsoft's own support
+  text likewise treats "you don't have permission to access it" as a first-class
+  reason for not seeing a Recycle Bin. Whether the second-stage bin can be
+  disabled outright in SharePoint Online is **[ASSUMED — no official statement
+  found either way]**; do not write "it cannot be disabled" into a durable doc.
+  Also documented: a 93-day retention period **spans both stages** (it is not
+  93 + 93), items deleted from the second-stage bin are purged immediately, and
+  Microsoft retains backups 14 days past deletion for a support-initiated
+  point-in-time restore.
 - **[UNKNOWN — reroute] Retention.** Connor replied "not familiar with purview,"
   which does not answer the question and tells us he is **not the right owner for
   it**. The controlled Request `1003109` item's Graph `retentionLabel` response
   contained no label fields, which still does not prove that no site- or
   library-wide Microsoft Purview retention policy applies. Needs a Microsoft 365
   compliance/Purview administrator, not the SharePoint site owner.
+
+  **[VERIFIED via Microsoft documentation 2026-08-11 (S415)]** The closing check
+  is **Policy lookup** (Microsoft Purview portal → Data lifecycle management →
+  Policy lookup → Site, exact URL, no wildcards), plus a site-collection
+  administrator checking Site contents for a **Preservation Hold library** — a
+  hidden system location SharePoint creates when a site is in scope, visible
+  only to site collection admins. Retention policies are not the only hold
+  source: eDiscovery holds and Litigation Hold preserve independently.
+  **This question has upside, not just risk:** "For items that are subject to a
+  retention policy (or an eDiscovery hold), the versioning limits for the
+  document library are ignored … old versions aren't automatically purged and
+  users are prevented from deleting versions." A positive answer would defuse
+  both the editor-delete and lowered-version-limit risks. A **records** or
+  **regulatory record** label would instead block deletion *and* (for regulatory
+  records) editing outright — which would conflict with the editable-writeup
+  product model and must be escalated, not celebrated.
 - **[AMBIGUOUS] Least-privilege human editing.** Connor reports site members have
   **"limited control"**. That is **not a standard SharePoint permission level** —
   the built-in levels are Full Control, Design, Edit, Contribute, Read, and the
@@ -655,6 +695,23 @@ The remaining controls are deliberately not collapsed into that pass:
   The operative question is unresolved: **can an ordinary editor delete the file
   or its version history?** Edit and Contribute both permit item deletion; Read
   does not.
+
+  **[VERIFIED via Microsoft documentation 2026-08-11 (S415)]** The platform half
+  is now settled precisely
+  ([understanding permission levels](https://learn.microsoft.com/en-us/sharepoint/understanding-permission-levels)):
+  **Edit and Contribute each grant both `Delete Items` and `Delete Versions`**;
+  `Manage Permissions` is granted only by Full Control and Manage Hierarchy; and
+  the Members group holds **Edit** by default. **But "You can change any of the
+  default permission levels, except Full Control and Limited Access" — so a
+  level can still be *named* Edit with Delete Items unchecked. Asking for the
+  level's name therefore does not answer the question; the checkbox state is the
+  only closing evidence.** Related, and answerable without an administrator:
+  SharePoint has **no separate move or rename permission**. Rename is
+  `Edit Items` — so anyone who can edit can already rename, and a rename cannot
+  orphan an artifact because both consumers resolve by stable drive/item ID —
+  and move-out-of-library is `Add Items` at the destination plus `Delete Items`
+  at the source, so it collapses into the same delete question rather than being
+  a fifth one.
 
   **The 2026-08-10 delete attempts did NOT settle this — do not cite them as
   evidence either way.** Two attempts against `Application Cover Page.docx`

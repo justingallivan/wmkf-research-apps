@@ -6,7 +6,7 @@ status: active
 summary: Request 1003109 proves the core pilot; native version and first-stage recovery pass while administrative controls remain.
 canonical: false
 cataloged: 2026-07-30
-last_verified: 2026-07-30
+last_verified: 2026-08-11
 owner: product-engineering
 related:
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
@@ -126,10 +126,14 @@ deletion, Justin's signed-in SharePoint session found the probe in the
 first-stage recycle bin, restored it, and Graph confirmed the same item and
 exact contents were live. The probe was deleted again; both controlled probe
 artifacts were removed from the first-stage bin. Justin was denied access to
-the second-stage administrator recycle-bin view. Library version limits,
-site/library Purview retention, ordinary-editor permissions, Workbench
-history/restore controls, and immutable Board milestone snapshots therefore
-remain open.
+the second-stage administrator recycle-bin view. That audit therefore did not
+establish library version limits, site/library Purview retention, or
+ordinary-editor permissions, and left Workbench history/restore controls and
+immutable Board milestone snapshots unbuilt. **Standing state since:** the
+version limit was answered on 2026-08-10 from the signed-in Versioning Settings
+page and Workbench version-history display shipped in S413; second-stage
+recovery, Purview retention, ordinary-editor permissions, administrator restore,
+and milestone snapshots remain open (item 5 below).
 
 ## Evidence matrix
 
@@ -206,21 +210,40 @@ not an intervening staff edit. Version `2.0` later hashed to
    bin" / "Not familiar with purview" / "Site members have 'limited
    control'".** Only the second is a clean answer, and it is a negative one.
    Standing state after those replies:
-   - **Version limits — still open.** Versioning being *on* was already proved
-     empirically (`1.0 → 2.0 → 3.0`); the configured *limit* is the unanswered
-     part and is what governs whether an old version survives.
+   - **Version limits — ANSWERED 2026-08-10, independently of Connor.**
+     Versioning being *on* was already proved empirically (`1.0 → 2.0 → 3.0`);
+     the configured *limit* was then read directly from the signed-in Versioning
+     Settings page for `akoya_request` and captured to PDF: **major versions
+     only, no time limit, keep 500 major versions, drafts unchecked, check-out
+     not required.** Accidental pruning is therefore not a material risk. The
+     residual is administrative, not accidental: 500 is a setting an
+     administrator can lower, lowering it prunes immediately, and the value is
+     not readable programmatically. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`
+     "Version and data-protection contract".
    - **Second-stage recovery — reported absent; confirm before relying on it.**
      A tenant with no site-collection recycle bin is unusual, and the reply may
-     instead reflect the same access denial Justin hit. Needs someone with
-     site-collection administrator rights.
+     instead reflect the same access denial Justin hit. Microsoft documents that
+     view as invisible to end users and available only to site collection
+     administrators, which is a complete alternative explanation for both the
+     reply and the denial. Needs someone with site-collection administrator
+     rights.
    - **Purview retention — unanswered, and needs a different owner.** "Not
      familiar with purview" routes this to an M365 compliance administrator.
    - **Editor least privilege — ambiguous.** "Limited control" is not a
      built-in SharePoint permission level. The operative question — whether an
-     ordinary editor can delete the file or its versions — is unresolved.
+     ordinary editor can delete the file or its versions — is unresolved. Note
+     that reading the level's *name* does not answer it either: Microsoft
+     documents that every default level except Full Control and Limited Access
+     can be modified in place, so the checkbox state of **Delete Items** and
+     **Delete Versions** is the only closing evidence.
 
-   Two of four therefore remain genuinely open, one is ambiguous, and one is a
-   negative finding pending confirmation. Add Workbench version-history/admin
+   One of the four is therefore answered (version policy), and three remain:
+   second-stage recovery is a negative report pending confirmation, Purview
+   retention is unanswered and rerouted, and editor least privilege is
+   ambiguous. Routing, owner-by-owner questions, closing criteria, and
+   send-ready messages are in
+   `outputs/sharepoint-storage-policy-question-brief.md` (2026-08-11 / S415).
+   Add Workbench version-history/admin
    restore and milestone snapshots before calling the artifact system
    production-ready, and settle the milestone pointer-vs-copy question
    (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Board milestone freeze) — these

@@ -86,9 +86,12 @@ Graph-current version/last-modified metadata, and both signed-in consumers
 displayed the same current version `2.0`. The remaining target-library controls
 are controlled follow-up work. A disposable production-library audit subsequently
 proved native previous-version inspection/restore and signed-in first-stage
-recycle recovery. Administrator verification of configured version limits,
-second-stage recovery, Purview retention, and editor least privilege remains
-open, as do Workbench history/admin restore and immutable milestone snapshots.
+recycle recovery. The configured version limit is answered (500 major versions,
+no time limit, read from the signed-in Versioning Settings page 2026-08-10);
+administrator verification of second-stage recovery, Purview retention, and
+editor least privilege remains open, as do Workbench history/admin restore and
+immutable milestone snapshots. Owner routing and closing criteria for the three
+open ones: `outputs/sharepoint-storage-policy-question-brief.md`.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

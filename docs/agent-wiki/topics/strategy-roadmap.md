@@ -266,10 +266,12 @@ document inventory, and individual implementation plans do not establish priorit
   Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`;
   native previous-version inspection/restore and signed-in first-stage
   recycle recovery also passed in the production Request library.
-  Administrator checks for version limits, second-stage recovery, retention,
-  and editor permissions plus Workbench history/admin restore and milestone
-  snapshots remain open. See
-  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
+  The version-limit check is answered (500 major versions, no time limit,
+  read from the signed-in Versioning Settings page 2026-08-10); administrator
+  checks for second-stage recovery, retention, and editor permissions plus
+  Workbench history/admin restore and milestone snapshots remain open. See
+  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, the near-term plan, and
+  `outputs/sharepoint-storage-policy-question-brief.md` for owner routing.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;
   supply authoritative request metadata from Dataverse; use

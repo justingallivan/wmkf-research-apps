@@ -106,9 +106,12 @@ proved prior-version inspection/download and restore to a new current version
 with exact expected bytes. Justin then restored the deleted probe from the
 first-stage recycle bin, and Graph confirmed the same item and exact contents
 live. Both probes were removed from the first-stage bin after testing. Justin
-was denied the second-stage administrator view. Connor's 2026-08-10 replies left
-configured version limits, site/library Purview retention, and ordinary-editor
-least privilege still open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
+was denied the second-stage administrator view. The configured version limit was
+then read from the signed-in Versioning Settings page (2026-08-10): major
+versions only, no time limit, keep 500 major versions, check-out not required.
+Second-stage recovery, site/library Purview retention, and ordinary-editor least
+privilege remain open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, and
+`outputs/sharepoint-storage-policy-question-brief.md` for owner routing).
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
 from the Ready registry row and never from the caller. **Administrator restore and

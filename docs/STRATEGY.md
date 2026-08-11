@@ -156,10 +156,12 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    deployed and live-verified in both consumers on Request `1003109` via
    production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. A disposable
    production-library audit also proved previous-version inspection/restore
-   and signed-in first-stage recycle recovery. Next obtain administrator
-   evidence for version limits, second-stage recovery, retention, and editor
-   least privilege, and build Workbench history/admin restore plus milestone
-   snapshots;
+   and signed-in first-stage recycle recovery. The version-limit check is
+   answered (500 major versions, no time limit, 2026-08-10). Next obtain
+   administrator evidence for second-stage recovery, retention, and editor
+   least privilege — routing and closing criteria in
+   `outputs/sharepoint-storage-policy-question-brief.md` — and build Workbench
+   history/admin restore plus milestone snapshots;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

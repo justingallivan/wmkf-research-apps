@@ -176,10 +176,14 @@ denied the second-stage administrator recycle-bin view. The app's
 `Sites.Selected` token could read the drive/list but received `403` when
 enumerating site permissions. An item-level retention-label read returned no
 label fields, which does not establish whether a site/library Purview policy
-applies. Library version limits, second-stage recovery, retention, and
-ordinary-editor permission design therefore still require administrator
-evidence. The Workbench current-metadata portion is live; its version-history
-link/admin restore and the Board milestone freeze remain planned.
+applies. **Update 2026-08-10:** the library version limit was subsequently read
+from the signed-in Versioning Settings page — major versions only, no time
+limit, keep 500 major versions, check-out not required — so that element is
+closed. Second-stage recovery, retention, and ordinary-editor permission design
+still require administrator evidence; owner routing and closing criteria are in
+`outputs/sharepoint-storage-policy-question-brief.md`. The Workbench
+current-metadata portion is live; its version-history link/admin restore and the
+Board milestone freeze remain planned.
 
 ### Cycle-wide editing
 
@@ -779,9 +783,10 @@ Explicit non-goals during design freeze:
 > on Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`.
 > A controlled production-library probe also passed native previous-version
 > inspection/restore and signed-in first-stage recycle recovery. The remaining
-> pilot acceptance work is the administrator audit of version limits,
-> second-stage recovery, Purview retention, and ordinary-editor permissions,
-> plus Workbench history/admin restore and milestone snapshots.
+> pilot acceptance work is the administrator audit of second-stage recovery,
+> Purview retention, and ordinary-editor permissions (the version-limit element
+> was answered 2026-08-10), plus Workbench history/admin restore and milestone
+> snapshots.
 
 The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
 former default. Exercise the now-live
@@ -1005,9 +1010,10 @@ Still required:
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract, implementing the decided deterministic reviewer roster alongside
    the anonymous review narrative;
-3. administrator verification of the target library's configured version
-   limit, second-stage recycle recovery, applicable site/library Purview
-   retention, and ordinary-editor least-privilege policy; stable-identity
+3. administrator verification of second-stage recycle recovery, applicable
+   site/library Purview retention, and ordinary-editor least-privilege policy
+   (the configured version limit is answered — 500 major versions, no time
+   limit, read 2026-08-10); stable-identity
    metadata read-through, consumer display, native version restore,
    first-stage recycle recovery, and production registry/pointer readback are
    complete;
