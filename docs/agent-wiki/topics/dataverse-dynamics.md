@@ -68,6 +68,18 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   **Prod flipped 2026-07-04 (S330):** `DATAVERSE_DAL_ENFORCEMENT=on` set as an explicit
   Vercel production env var and redeployed (aliased `reviews.wmkeck.org`) — enforcement is
   live in ALL environments; initial runtime-log scan clean.
+  **This flag fails OPEN in production — the interlock does not (S414).** Only the
+  literal `'on'` enables it; any *other* value (a stray quote, `'on\n'` from an
+  `echo`-piped write) is neither `'on'` nor `'off'`, so it falls through to
+  `NODE_ENV !== 'production'` = `false` and enforcement is silently **off**
+  `[VERIFIED via lib/services/dynamics-context.js:124-129]`. Compare
+  `resolveInterlockMode`, where an invalid value fails closed to `'on'`
+  `[VERIFIED via lib/dataverse/core/interlock.js:77-85]`. Do not describe the two
+  flags as sharing a failure posture. The var was Sensitive (write-only,
+  unverifiable) until S414 made it **non-sensitive**; keep it readable, and set it
+  with `vercel env add --value on`, never `echo`. The S414 conversion rewrote it to
+  `on` blind, since the prior value could not be read — so "production enforcement
+  was continuously on since 2026-07-04" is **[ASSUMED]**, not verified.
   **Resolved (Session 330, 2026-07-04):** the email-write helpers
   `createEmailActivity`/`addEmailAttachment`/`sendEmail` in
   `lib/services/dynamics/email.js` call `assertTrustedDalContext` as their first
