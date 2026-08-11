@@ -656,13 +656,61 @@ The remaining controls are deliberately not collapsed into that pass:
   or its version history?** Edit and Contribute both permit item deletion; Read
   does not.
 
-  **A delete attempt on 2026-08-10 did NOT answer this — do not cite it as
-  evidence.** Justin tried to delete a file Connor created and received
-  `File is checked out to another user` (error `0x80060728`). That is a **lock
-  conflict, not a permission denial**: SharePoint refused because the file was
-  held (Word open, or an explicit check-out), so the permission level was never
-  the deciding factor. A rights failure surfaces as `Access denied`, not this.
-  The attempt is therefore null evidence in both directions.
+  **The 2026-08-10 delete attempts did NOT settle this — do not cite them as
+  evidence either way.** Two attempts against `Application Cover Page.docx`
+  (`Request Folders - Akoya > Phase I`) both returned
+  `File is checked out to another user` (error `0x80060728`), at 20:00:46 and
+  20:06:54 Pacific. **The observed asymmetry is the finding: the same user could
+  open and edit the file — the library shows it `Modified 8/10/2026 8:05 PM` by
+  that user — but could not delete it.**
+
+  Note that `File is checked out to another user` is a **misleading catch-all**.
+  SharePoint emits it for any lock, including one held by the Office
+  co-authoring service on the acting user's own behalf. It is **not** the
+  permissions message; a rights failure surfaces as `Access denied`. So the
+  message alone distinguishes nothing.
+
+  **Two hypotheses remain live, with opposite consequences. Neither is
+  established — do not build on either until the check below is run.**
+
+  - **H1 — transient self-lock.** The 20:06:54 attempt came **109 seconds after
+    that same user's own 20:05 edit**, inside the window where SharePoint still
+    holds the editing lock after a Word session closes. If this is the cause,
+    **ordinary members CAN delete**, and the durability risk this document has
+    been designing around is real.
+  - **H2 — custom permission level without Delete.** Both standard levels that
+    grant editing (Contribute, Edit) **also grant Delete Items**, so
+    edit-yes/delete-no is not possible under a standard level. A custom
+    "Contribute minus Delete" level would produce exactly this asymmetry — and
+    would explain Connor's otherwise unexplained **"limited control"** as a real
+    custom level rather than a paraphrase. If this is the cause, **members
+    CANNOT delete**, member-caused loss drops sharply, and administrator restore
+    is unblocked.
+
+  **Discriminating check — non-destructive, run both halves:**
+  1. Add the **"Checked Out To"** column to the library view. **Blank** → no
+     check-out exists, favouring H1; then close Word entirely, wait ~15 minutes,
+     and retry the delete — success confirms H1. **A name** → a real check-out,
+     and the holder is named; if it is the akoyaGO app or a service account,
+     that is a systemic finding in its own right (see the orphaned-check-out
+     causes: explicit check-out never checked in, a died Word/upload session, or
+     upload while a required column was empty).
+  2. Read the Members group's permission **level definition** and look for
+     **Delete Items** / **Delete Versions**. This settles H2 directly and is
+     authoritative regardless of what the lock turns out to be.
+
+  **Do not discriminate these by deleting a governed artifact.** With no
+  confirmed second-stage recycle bin (above), a success would leave the
+  first-stage bin as the only remedy — destroying an artifact to test whether
+  artifacts survive destruction. Use a disposable file the tester created, in a
+  non-governed location, that nobody has open; note even that only establishes
+  delete-own, since some configurations permit that while restricting
+  delete-others.
+
+  **H2 being true would NOT reopen the milestone copy decision.** Delete rights
+  are one of four reasons recorded there; copy also survives an administrator
+  lowering the version limit, unreadable retention policy, and the missing
+  second-stage bin.
 
   **Do not retry this by deleting.** With no confirmed second-stage recycle bin
   (above), a successful delete would have left the first-stage bin as the only

@@ -172,10 +172,27 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
       the Members group's permission *level* and read its **Delete Items** and
       **Delete Versions** checkboxes. That answers question 2's remaining half
       too, and reveals the real level name behind "limited control".
-      **A 2026-08-10 delete attempt is NOT evidence** — it returned
-      `File is checked out to another user` (`0x80060728`), a lock conflict, not
-      a rights denial. Do not retry by deleting: with no confirmed second-stage
-      recycle bin, a success would destroy the artifact to test its durability.
+      **New 2026-08-10 observation, unresolved — two live hypotheses.** Two
+      delete attempts on `Application Cover Page.docx` both returned
+      `File is checked out to another user` (`0x80060728`), yet **the same user
+      could open and edit that file** (library shows `Modified 8:05 PM` by
+      them). That message is a catch-all for any lock, not the permissions
+      message, so it settles nothing by itself:
+      **H1 — transient self-lock** (the failed attempt was 109 seconds after
+      their own edit) → members CAN delete;
+      **H2 — custom "Contribute minus Delete" level** (both standard editing
+      levels also grant Delete Items, so edit-yes/delete-no cannot happen under
+      a standard one) → members CANNOT delete, and "limited control" is finally
+      explained.
+      **Discriminate non-destructively:** add the **"Checked Out To"** column
+      (blank favours H1 — then close Word, wait ~15 min, retry; a name reveals
+      the holder, and an app/service account is its own finding), *and* read the
+      permission level, which settles H2 outright. Full reasoning and the
+      orphaned-check-out causes are in
+      `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+      Do not discriminate by deleting a governed artifact: with no confirmed
+      second-stage recycle bin, success destroys the artifact to test its
+      durability. **H2 would not reopen the milestone copy decision.**
    2. *(Version limit ANSWERED 2026-08-10 — do not re-ask.)* The signed-in
       Versioning Settings page for `akoya_request` reads: major versions only,
       **no time limit**, **keep 500 major versions**, drafts unchecked, check-out
