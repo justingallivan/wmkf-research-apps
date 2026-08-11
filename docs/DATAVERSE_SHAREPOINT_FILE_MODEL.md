@@ -605,11 +605,32 @@ The remaining controls are deliberately not collapsed into that pass:
 > the surprising one (no second-stage bin) as needing confirmation before any
 > durability guarantee rests on it.
 
-- **[PARTIAL] Library version-limit policy.** Connor confirms **major versioning
-  is on** — which the pilot had already shown empirically by observing `1.0 → 2.0
-  → 3.0`. The **configured limit is still unknown**, and the limit, not the
-  on/off state, is what determines whether an old version survives. Still needs
-  administrator inspection (for example, `Get-SPOListVersionPolicy`).
+- **[ANSWERED 2026-08-10 (S413)] Library version-limit policy.**
+  **[VERIFIED via the signed-in Versioning Settings page for `akoya_request`,
+  captured to PDF and read directly.]** The full configuration:
+
+  | Setting | Value |
+  |---|---|
+  | Document Version History | **Create major versions** only (minor/draft versions **off**) |
+  | Version time limit | **No time limit** — versions are never deleted by age |
+  | Version count limit | **Keep 500 major versions** |
+  | Keep drafts for N major versions | unchecked |
+  | Content approval | No |
+  | Require check out | **No** (this is what permits the Word co-authoring behaviour the pilot observed) |
+
+  This closes the question and **confirms Connor's "major versioning is on"
+  independently**, matching the pilot's empirical `1.0 → 2.0 → 3.0`.
+
+  **Consequence for durability: version *pruning* is no longer a material risk.**
+  500 major versions with no age-based expiry is far beyond the realistic life
+  of an assessment document — **[ASSUMED, n=1]** on the version-production rate:
+  Word coalesces an editing session into a single version rather than one per
+  save, evidenced only by Request `1003109`, where one multi-field editing
+  session produced exactly one version (`2.0`). No probe has measured this
+  across sessions or co-authors, so treat "≈1 version per session" as a
+  working estimate, not a measured rate. Note the residual: 500 is a **setting, not a
+  law** — an administrator can lower it, and lowering prunes immediately. So
+  this removes the *accidental* pruning risk, not the *administrative* one.
 - **[ANSWERED — NEGATIVE, confirm before relying on it] Second-stage recycle
   recovery.** Connor reports **no second-stage recycle bin**. Taken at face value,
   an item purged from (or aged out of) the first-stage bin is **unrecoverable**,
@@ -663,16 +684,15 @@ The remaining controls are deliberately not collapsed into that pass:
   `https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request`.
   A `_layouts/15/VersionSettings.aspx?List={guid}` deep link built from that
   GUID was **tried on 2026-08-10 and returned an unexpected error.** The
-  identity is not in doubt — only that URL form is. **[ASSUMED] the cause**: it
-  was not isolated. Three candidates remain open and were not discriminated —
-  insufficient rights (these pages require *Manage Lists*, which ordinary
-  members do not hold), Microsoft having moved the versioning-settings page in
-  recent tenants, or the classic page name simply being wrong here. The sibling
-  `listedit.aspx?List={guid}` form was suggested as a discriminator but its
-  result was never recorded. Do not present a reconstructed deep link to an
-  administrator as though it works; send the UI path. If someone does test the
-  deep links, note that a rights-based failure would itself be weak evidence
-  toward the unresolved member-permission question above. Read three values: major-vs-minor versioning
+  identity is not in doubt — only that URL form is. **Rights are ruled out as
+  the cause**: the same user reached this page through the UI minutes later and
+  captured it, so the account held sufficient permission the whole time. The
+  remaining candidates — Microsoft having relocated the versioning-settings page
+  in recent tenants, or the classic page name simply being wrong here — were
+  **[ASSUMED, not discriminated]**; the `listedit.aspx?List={guid}` probe that
+  would separate them was never run, and there is now no reason to run it.
+  Operative rule: send an administrator the UI path, never a reconstructed
+  deep link. Read three values: major-vs-minor versioning
   mode, the major-version limit (unchecked = unlimited), and the draft limit.
   **That page sets the limit as well as showing it, and lowering the number
   prunes existing versions immediately** — it is a look-and-report, never a
@@ -705,13 +725,32 @@ The remaining controls are deliberately not collapsed into that pass:
   `lib/dataverse/adapters/request-document.js:38-40`, read at
   `lib/services/initial-assessment/artifact-service.js:257-259`, written
   nowhere) describe a **pointer to a SharePoint version plus a drift hash, not a
-  copy of the bytes.** After the 2026-08-10 administrator replies above, a
-  pointer-only milestone rests on three things that are unknown, unconfirmed, or
-  ambiguous: the version limit, whether a second-stage bin exists, and whether
-  ordinary editors can delete. A milestone that copies bytes to a separate
-  governed location would not depend on any of them. Decide pointer-vs-copy
-  before building the producer — it is the difference between "immutable" being
-  a guarantee and being an aspiration.
+  copy of the bytes.**
+
+  **DECIDED 2026-08-10 (S413): copy the bytes.** The owner chose copy; the three
+  provisioned fields are kept as identity/provenance **beside** a retained
+  snapshot rather than instead of one. Nothing is sunk in the pointer design —
+  those fields are written nowhere — so the switch costs no migration. Note that
+  copy is also what roadmap requirement 5 above already asked for ("retained
+  DOCX and/or PDF snapshot"); the fields were provisioned ahead of the decision,
+  not as the decision.
+
+  **Record the reasoning honestly, because one leg of it changed after the
+  choice was made.** Pointer-only durability rested on three things. The
+  Versioning Settings capture above then **answered the first**: the version
+  limit is 500 majors with no age expiry, so accidental pruning is not a
+  material risk, and that argument for copying is now weak. The case rests on
+  the remaining two — **no confirmed second-stage recycle bin**, and
+  **unresolved whether ordinary editors can delete** the file or its versions —
+  plus a fourth that no administrator answer can remove: a version *limit* is a
+  setting an administrator can lower at any time, and lowering it prunes
+  immediately. A retained copy depends on none of them.
+
+  Anyone reopening this should know the strongest single argument is not
+  probability but remedy: under a pointer, `wmkf_milestonecontenthash` can only
+  detect that the milestone is gone; under a copy, it proves the retained bytes
+  are intact. For a Board record, detection without recovery is a different
+  product, not a cheaper one.
 
 ### Version-listing behaviour — probed live 2026-08-10 (S413)
 

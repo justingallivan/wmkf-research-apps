@@ -128,9 +128,17 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    retires the mock-coverage gap, since every test on this path stubs its
    outbound boundary. No follow-up needed.
    **Administrator restore** stays blocked on Connor's outstanding answers.
-   **Milestone snapshots** stay blocked on the owner's pointer-vs-copy decision —
-   Connor's replies (major versioning on, no second-stage recycle bin) make
-   copy-bytes the stronger option, but that is the owner's call, not a default.
+   **Milestone snapshots — pointer-vs-copy is DECIDED: copy the bytes** (owner,
+   2026-08-10). The producer is now **unblocked and buildable**: retain a DOCX
+   (and/or PDF) snapshot in a separate governed location, keeping
+   `wmkf_milestoneversionid` / `wmkf_milestonecontenthash` /
+   `wmkf_milestonecreatedat` as identity beside the copy rather than instead of
+   it. Nothing is sunk — those fields are written nowhere today.
+   Read the reasoning in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` before
+   building, including the honest note that the version-limit leg of the
+   argument weakened after the decision (the limit turned out to be a
+   comfortable 500), leaving editor-delete rights and the missing second-stage
+   bin carrying the case.
 
 5. **Optional cleanup:** `origin/codex/alert-triage-dataverse-probe` still exists
    at `99268074`. Fully contained in `main`; kept as a free backup. Delete when
@@ -160,8 +168,12 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
       the staff-wide editing design and the pilot's own evidence that Justin
       edited Request `1003109` while lacking site-collection admin rights. Detail
       and the reasoning live in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-   2. *(To Connor, not yet asked)* What is the configured major-version limit,
-      and can an ordinary member delete a file or a version?
+   2. *(Version limit ANSWERED 2026-08-10 — do not re-ask.)* The signed-in
+      Versioning Settings page for `akoya_request` reads: major versions only,
+      **no time limit**, **keep 500 major versions**, drafts unchecked, check-out
+      not required. **Still open from this item:** can an ordinary member delete
+      a file or a version? That is now the single unresolved durability
+      question, and it folds into question 1.
    3. *(Needs an M365 compliance admin — not Connor)* Does any site- or
       library-wide Purview retention policy apply to the `akoya_request` library?
 
