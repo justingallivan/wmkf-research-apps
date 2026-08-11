@@ -674,6 +674,32 @@ The remaining controls are deliberately not collapsed into that pass:
   before building the producer — it is the difference between "immutable" being
   a guarantee and being an aspiration.
 
+### Version-listing behaviour — probed live 2026-08-10 (S413)
+
+Read-only probe against a real governed artifact (Request `1003109`'s Initial
+Assessment item, 2 versions). Settles the premise the version-history read is
+built on. **[VERIFIED via live Graph probe; n=1 item, 2 versions — see the
+limitation below.]**
+
+| Question | Result |
+|---|---|
+| Does `/versions` honour `$orderby`? | **No — but it returns HTTP 200.** `lastModifiedDateTime desc` and the ascending form returned the *identical* order. Accepted and silently ignored. |
+| Default order | Newest-first in this observation (`2.0` then `1.0`). |
+| Does `$top` page? | Yes — `$top=1` returned one row plus an `@odata.nextLink`. |
+
+Consequences, and why the read is shaped the way it is:
+
+- **A single ordered query is not available.** The bounded-scan design in
+  `GraphService.listFileVersions` cannot be collapsed into one `$orderby` request;
+  that option was tested and does not exist. Do not re-propose it.
+- **A 200 is not evidence of support here.** Checking only the status code would
+  have produced exactly the wrong conclusion. Any future claim that this endpoint
+  honours a query option needs a behavioural check, not a status check.
+- **Limitation:** one item with two versions says nothing about ordering under
+  many versions, concurrent edits, or after a restore. Default order is therefore
+  treated as observed-not-guaranteed, and the current-version identity is still
+  resolved from the item's own `publication.versionId` rather than from position.
+
 Platform references:
 [Microsoft Graph file versions](https://learn.microsoft.com/en-us/graph/api/driveitem-list-versions?view=graph-rest-1.0),
 [SharePoint version history](https://learn.microsoft.com/en-us/sharepoint/document-library-version-history-limits),
