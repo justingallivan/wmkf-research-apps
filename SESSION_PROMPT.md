@@ -118,10 +118,19 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    session with the owner's clarification; the rest still read as a live deadline.
    `/sweep`-shaped, not a one-line edit.
 
-4. **Workbench version history, administrator restore, milestone snapshots.**
-   Evidence: `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` evidence
-   matrix — PLANNED, no producer. Administrator *restore* depends on Connor's
-   answers; **milestone snapshots and history display do not** and could move now.
+4. **Workbench version history — display SHIPPED, smoke outstanding.**
+   Built S413 and merged to `main` at `147d3e49`; production deploy reached
+   Ready. **One thing left before it can be called verified:** a signed-in smoke
+   on Request `1003109` — open the Initial Assessment tab, click
+   `View version history`, expect `2.0` marked current with Justin's name, `1.0`
+   below, and no truncation note. Every test on this path mocks its outbound
+   boundary and the ordering probe called Graph directly, so route→service→Graph
+   has never run end to end. Until that click happens the honest claim is
+   "built and unit-verified".
+   **Administrator restore** stays blocked on Connor's outstanding answers.
+   **Milestone snapshots** stay blocked on the owner's pointer-vs-copy decision —
+   Connor's replies (major versioning on, no second-stage recycle bin) make
+   copy-bytes the stronger option, but that is the owner's call, not a default.
 
 5. **Optional cleanup:** `origin/codex/alert-triage-dataverse-probe` still exists
    at `99268074`. Fully contained in `main`; kept as a free backup. Delete when
@@ -156,8 +165,10 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    3. *(Needs an M365 compliance admin — not Connor)* Does any site- or
       library-wide Purview retention policy apply to the `akoya_request` library?
 
-   **This blocks administrator restore only.** Version-history display and the
-   milestone producer do not depend on any of it — see Next Items.
+   **This blocks administrator restore only.** The version-history display did
+   not depend on any of it and shipped in S413 (`147d3e49`); the milestone
+   producer does not depend on it either and is blocked on an owner decision
+   instead — see Next Items.
 
 ### Owner Decision Needed
 
