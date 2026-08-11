@@ -1,7 +1,7 @@
 {
-  "generated": "2026-07-27T01:24:47.654Z",
+  "generated": "2026-08-11T16:07:45.319Z",
   "summary": {
-    "live_drift_findings": 0,
+    "live_drift_findings": 7,
     "probe_errors": 0
   },
   "bucket_meta": {
@@ -39,7 +39,50 @@
   "drift_buckets": {
     "spec_without_entity": [],
     "entity_without_atlas": [],
-    "stale_row_count": [],
+    "stale_row_count": [
+      {
+        "entity": "wmkf_app_reviewer_suggestion",
+        "atlas_claim": 724,
+        "live_count": 777,
+        "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
+      },
+      {
+        "entity": "wmkf_appreviewersuggestion",
+        "atlas_claim": 724,
+        "live_count": 777,
+        "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
+      },
+      {
+        "entity": "wmkf_appreviewersuggestions",
+        "atlas_claim": 724,
+        "live_count": 777,
+        "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
+      },
+      {
+        "entity": "wmkf_granteedeliverable",
+        "atlas_claim": 3,
+        "live_count": 4,
+        "source_file": "docs/atlas/dataverse-wmkf-granteedeliverable.md"
+      },
+      {
+        "entity": "wmkf_granteedeliverables",
+        "atlas_claim": 3,
+        "live_count": 4,
+        "source_file": "docs/atlas/dataverse-wmkf-granteedeliverable.md"
+      },
+      {
+        "entity": "wmkf_potentialreviewers",
+        "atlas_claim": 4427,
+        "live_count": 4465,
+        "source_file": "docs/atlas/dataverse-wmkf-potentialreviewers.md"
+      },
+      {
+        "entity": "wmkf_potentialreviewerses",
+        "atlas_claim": 4427,
+        "live_count": 4465,
+        "source_file": "docs/atlas/dataverse-wmkf-potentialreviewers.md"
+      }
+    ],
     "doc_label_collision": [],
     "postgres_table_mismatch": []
   },
