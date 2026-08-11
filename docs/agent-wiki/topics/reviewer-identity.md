@@ -191,6 +191,52 @@ Build considerations: the identity resolution pipeline crosses OpenAlex, ORCID, 
 - Structured PI and COI: `project-reviewer-pi-identity-structured`, `project-reviewer-coi-rely-on-self-disclosure`, `project-reviewer-coi-concern-surfacing`.
 - Matching and institution contacts: `project-reviewer-institution-match`, `project-contact-promotion-permission`, `project-institution-foundation-liaison`.
 
+## `reviewer_email_reconcile_needs_merge` Alerts — Read Before Acting
+
+The nightly `reviewer-email-reconciler` cron (`0 4 * * *` UTC) recovers reviewer
+emails that enrichment found but that never reached Dataverse. It writes the email
+when nobody owns it, repoints the suggestion when exactly one ACTIVE record owns
+it, and otherwise **alerts instead of guessing** — three kinds
+`[VERIFIED via lib/services/reviewer-email-reconciler.js:57-113]`:
+
+- `keeper_has_suggestion` — the email's owner ("keeper") already holds a
+  suggestion on this request, so repointing would 412 on the `(person,request)`
+  alt key. The keeper's row counts **even when `wmkf_selected=false`**.
+- `ambiguous_owner` — more than one active record owns the email.
+- `inactive_owner` — the sole owner is deactivated.
+
+**An active alert is not evidence the condition still holds.** `autoResolveKey`
+is used *only* to dedup new alerts (`lib/services/alert-service.js:22-32`), and
+nothing ever calls `AlertService.autoResolve` for this key — the string
+`reviewer-email-reconcile:` appears exactly once repo-wide, at the emission site
+`[VERIFIED via repo-wide grep, 2026-08-11]`. So the alert survives a fix, and
+dedup means a *silent* night is indistinguishable from a resolved one. Never
+infer either direction from the alert alone.
+
+This is an **outlier, not a convention**: `auth-bypass-monitor`, `migration-drift`,
+`alert-reviewer-affiliation-mismatch`, `pricing-canary`, and `spend-check` all
+call `AlertService.autoResolve` to retract their own alerts when the condition
+clears `[VERIFIED via repo-wide grep, 2026-08-11]`. Adding an auto-resolve pass to
+the reconciler — retracting the alert when its ladder now reaches a non-alert
+outcome — is unbuilt but would remove the manual step entirely.
+
+Resolve that ambiguity with the read-only probe, which replays the decision
+ladder against live Dataverse and returns
+STILL_BLOCKED / SELF_HEALING / ALREADY_RESOLVED / NOT_RECONCILABLE:
+
+```bash
+DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \
+  scripts/probe-reviewer-email-reconcile-alert.mjs --all
+```
+
+The flag is required by the interlock for a local prod read
+(`lib/dataverse/core/interlock.js:326-330`) and is a per-invocation operator act —
+do not persist it in `.env.local`. **Worked example (S414):** alert 383
+(`keeper_has_suggestion`, 2026-07-30) probed **ALREADY_RESOLVED** — the duplicate
+suggestion had been deselected, so the cron had skipped it every night since.
+Note the probe clears the *reconciler's* work item; it does not establish that the
+duplicate `wmkf_potentialreviewers` records were merged.
+
 ## Standard Probe
 
 Start with:
