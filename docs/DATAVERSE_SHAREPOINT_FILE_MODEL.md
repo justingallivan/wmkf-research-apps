@@ -639,6 +639,31 @@ The remaining controls are deliberately not collapsed into that pass:
   `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
   verify this itself.
 
+  **The major-version limit is likewise not readable programmatically — stop
+  trying.** [VERIFIED via live Graph probe 2026-08-10 (S413)] `GET
+  /drives/{driveId}/list` returns `200` for this library but its `list` facet
+  carries exactly three keys — `contentTypesEnabled`, `hidden`, `template` — and a
+  case-insensitive `version*limit` search over the whole response body matched
+  nothing. The call returned `200`, so this is a **permissions-independent**
+  gap rather than another `Sites.Selected` denial: the app is authorized to read
+  the list and the settings simply are not in the response. [ASSUMED, not probed]
+  that no other Graph v1.0 or beta endpoint exposes them — only the `list`
+  resource was tested, so a future need could re-check `beta` before concluding
+  it is impossible. It must be read from the settings page by a human
+  with library access:
+
+  ```
+  https://appriver3651007194.sharepoint.com/sites/akoyaGO/_layouts/15/VersionSettings.aspx?List=%7Bfd037f0b-8df4-41f5-8fed-c3984d351918%7D
+  ```
+
+  (list GUID `fd037f0b-8df4-41f5-8fed-c3984d351918`, resolved from the drive by
+  the same probe; UI path is library → gear → Library settings → More library
+  settings → Versioning settings). Read three values: major-vs-minor versioning
+  mode, the major-version limit (unchecked = unlimited), and the draft limit.
+  **That page sets the limit as well as showing it, and lowering the number
+  prunes existing versions immediately** — it is a look-and-report, never a
+  change-and-report.
+
   **Do not resolve this to "Limited Access" (considered and rejected 2026-08-10).**
   Limited Access is a system-assigned level granting only View Application Pages,
   Browse User Information, Use Remote Interfaces, Use Client Integration Features,
