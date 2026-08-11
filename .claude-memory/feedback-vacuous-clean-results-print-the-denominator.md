@@ -44,5 +44,37 @@ evidence when the size of the searched set is stated next to it.
   glob that silently matched nothing, and a scanner whose file list came back empty — assert
   the input set is non-empty before trusting the verdict.
 
+## Extension — estimate the denominator BEFORE proposing the probe (S413, 2026-08-10)
+
+The rule above governs *reporting* a sweep. It applies one step earlier too: **to
+proposing one.**
+
+S413. To settle how many SharePoint versions a Word editing session produces, I offered
+to sweep every governed artifact and report the version distribution. The owner stopped
+it with one sentence: *"Our apps are new so we haven't created more than a handful."* The
+population was app-created files sitting at version `1.0` because nothing had edited them.
+The sweep would have returned "almost every file has one version" — measuring how new the
+system was, not how Word behaves. Clean, confident, and worthless.
+
+**Why:** a probe against a population that cannot exhibit the phenomenon returns a clean
+result that reads exactly like a real finding. Printing the denominator would have exposed
+it *after* spending the owner's time; asking what the population contains costs nothing
+*before*.
+
+**How to apply:**
+- Before proposing any survey, state what the population is and **what a clean result
+  would mean**. If "nothing found" is indistinguishable from "nothing could have been
+  found", the probe is not worth running — say so instead of running it.
+- Ask the owner about population size when they know the system's history better than the
+  repo does. Newness, seed data, and test-only records are invisible to a row count.
+- A probe with a tiny population can still be worth running when **a single positive is
+  itself decisive** (S413: checking whether *any* governed artifact sits in a checked-out
+  state — one hit is a finding at any N). Distinguish "needs a distribution" from "needs
+  one instance"; only the former requires a real denominator.
+- When a proposed probe dies this way, prefer the **controlled experiment** (construct the
+  condition on a disposable artifact) or the **authoritative config read** over a survey of
+  organic data.
+
 Related: [[feedback-falsify-not-confirm]], [[feedback-dont-self-certify-convergence]],
-[[feedback-completeness-by-scanner-not-enumeration]].
+[[feedback-completeness-by-scanner-not-enumeration]],
+[[feedback-thoroughness-default]].

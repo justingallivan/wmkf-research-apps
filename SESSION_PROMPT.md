@@ -1,301 +1,232 @@
-# Session 413 Prompt: Close-out pane shipped, staff replace path merged (S413), reviewer auto-linking live
+# Session 414 Prompt: Version history shipped and live-verified; milestone design decided (S413)
 
-> **S413 update, 2026-08-10.** The staff replace path is **merged and in
-> production** (`221ac40a`). The Session 412 summary below is retained as the
-> historical handoff and still describes it as unmerged — that was true at the
-> time of writing; "Next Items" item 1 carries the current state.
+> **Handoff, 2026-08-10 (Session 413).** Two merges to `main`, both deployed and
+> verified Ready. Shipped read-only SharePoint version history on the Initial
+> Assessment tab after four adversarial review rounds, then **live-verified it**
+> with a signed-in smoke — the first end-to-end execution of that route→service→
+> Graph chain, which every test mocks. Settled three SharePoint questions with
+> live evidence (version-ordering, version policy, and that the version limit is
+> unreadable via Graph), and the owner decided milestone snapshots **copy bytes**
+> rather than store a pointer, which unblocks that producer.
 
-> **Handoff, 2026-08-10 (Session 412).** Two production deploys, both verified
-> Ready. Shipped the Awardee Close-out pane, settled both open close-out owner
-> questions, then built and adversarially reviewed a staff image/caption replace
-> path (on a branch, **not merged**). Took ownership of a Codex worktree whose
-> work had diverged from its brief, reviewed it, merged it, and retired the
-> worktree. Resolved 9 of 34 reviewer affiliation alerts — deliberately not all 34.
-
-## Session 412 Summary
+## Session 413 Summary
 
 ### What Was Completed
 
-1. **Awardee Close-out pane** (`54dd8e70`, `fdfd2c47`, merged `693ca670`,
-   deployed `dpl_3QG8gRV2u66epwSnpFF7DQ1V6eJU`). `Deliverable outputs` moved out
-   of the shared footer into a third pane, so the tab follows the deliverable's
-   arc: Invitation → Submission → Close-out. This **supersedes** the S411
-   decision that the outputs stay outside both panes; the original paragraph is
-   retained and marked superseded rather than rewritten, and its test was
-   rewritten to assert the new placement. The pane also names the two outputs'
-   differing scopes — deliberately avoiding "every award in the cycle", since the
-   export also requires Awarded status, a project leader, and a research program
-   `[VERIFIED via cycle-export-service.js:57-61]`.
+1. **Staff replace path merged** (`221ac40a`). The `staff-submission-replace`
+   branch was 10 commits behind `main` but touched a disjoint file set; clean
+   merge, no conflicts. 7206/7206 unit, all gates green, deployed.
 
-2. **Both close-out owner questions answered** (`357b5dd8`, `5529b8c3`).
-   - **`Complete`** = the grantee's responsibility is done and downstream is
-     *eligible* to proceed. Intended as a **precedent for other task types not yet
-     built** — implement the semantic, not a grantee special case.
-   - **`Revision Requested`** = NOT built as a transition; revisions are handled
-     case-by-case over email. The transition design is retained but marked
-     deferred.
+2. **25 reviewer affiliation alerts closed by the owner** — resolved outside the
+   app. Verified with the read-only probe: **0 open / 75 resolved**, total held
+   at 75, so they were resolved in place rather than deleted. The probe reports
+   alert status only; whether each underlying affiliation was corrected in
+   Dataverse was **not** verified.
 
-3. **Staff replace path built** (branch `staff-submission-replace`, 3 commits,
-   pushed, **NOT merged**). The email-based revision decision surfaced the real
-   gap: staff could not write the image or caption at all. `writeGranteeDeliverables`
-   has exactly one caller and cannot take a second — it requires an acknowledged
-   waiver version and re-stamps status. New narrower writer + multipart route +
-   Submission-pane control gated on a server-computed `canReplace`.
+3. **Read-only SharePoint version history shipped** (merge `147d3e49`). Fetched
+   only when staff open the disclosure on the Initial Assessment tab: route →
+   service → `GraphService.listFileVersions` → UI. Drive/item identity comes from the registry row and is
+   never accepted from the caller; a stale `expectedArtifactId` returns 409
+   rather than showing another artifact's editors. **No restore action and no
+   Dataverse write** — a test asserts the restore control's absence.
 
-4. **Adversarial review found three defects; all fixed** (`79e64317`). A
-   folder-wide prune that could delete a concurrent winner, a caption-only
-   response-drop reported as failure, and a route trust boundary with zero direct
-   coverage. Each fix mutation-checked.
+4. **Four adversarial review rounds, ~9 defects** — and each round found defects
+   in the previous round's fixes, including one fix that reintroduced the bug its
+   predecessor closed. Resolved structurally in the end: the current version is
+   fetched **before** pagination, so materializing it never competes with the
+   bounded scan for the deadline.
 
-5. **Codex worktree taken over, reviewed, merged, retired** (merge `42abd72a`,
-   deployed `dpl_DmKM3MX9JUsywP6ivnhRwNmZsSYG`). Eight commits: reviewer names and
-   affiliations in Current Reviews and exported reports, Contact→Account reporting
-   tools, and guarded acceptance-drain auto-linking. **The work diverged from the
-   brief I wrote** (which asked for Dataverse search + admin alert triage) — worth
-   knowing when reading the branch name.
+5. **Live-verified by signed-in smoke** (`22f27e71`) — see "Live production
+   behavior" below. This retired the mock-coverage gap.
 
-6. **9 of 34 reviewer affiliation alerts resolved** (`b2ce907e`). Scope was an
-   allowlist, not a prefix sweep — see "Verify Before Acting" below.
+6. **Three SharePoint facts settled by live evidence:**
+   - **Version ordering** (`2da7054b`): Graph accepts `$orderby` on `/versions`
+     with **HTTP 200 and silently ignores it**. The client-side sort and page cap
+     are therefore platform-forced, not defensive. Do not re-propose `$orderby`.
+   - **Version policy** (`75c7831c`): read from the signed-in Versioning Settings
+     page — major versions only, **no time limit**, **keep 500 major versions**,
+     drafts unchecked, check-out not required.
+   - **The version limit is not readable via Graph** (`e352d161`):
+     `GET /drives/{driveId}/list` returns **200** — so this is a
+     permissions-independent gap, not another `Sites.Selected` denial. The facet
+     carries only `contentTypesEnabled`, `hidden`, `template`.
+
+7. **Milestone pointer-vs-copy DECIDED: copy the bytes** (owner). Recorded with
+   the honest caveat that one leg of the argument weakened *after* the decision —
+   the version limit turned out to be a comfortable 500, so accidental pruning is
+   not a material risk.
+
+8. **`scope-claim-reminder` hook false positives fixed** (`e26c5fa0`) — path
+   citations were being read as quantities, and the hook's own prescribed
+   resolution marker re-triggered the block.
 
 ### Live production behavior that changed today
 
-The reviewer acceptance drain now fills an **empty** Contact parent when the
-accepted affiliation is an exact normalized match to exactly one active Account
-(name / AKA / legal name / DC AKA), and auto-resolves the matching mismatch alert.
-Existing parents are never overwritten, Account creation is structurally
-impossible (the adapter exposes only `queryAllAccounts`/`getById`), and a capped
-Account scan abstains. **This path is live from `dpl_DmKM3MX9JUsywP6ivnhRwNmZsSYG`
-forward — the next reviewer acceptance exercises it for real.** Nine Contacts were
-linked in a pre-merge authorized production pass and independently re-verified.
+The Initial Assessment tab now offers **`View version history`** per artifact,
+fetched only on staff disclosure — never on page load. Verified live on Request
+`1003109`: rendered `Version 2.0 · current · Justin Gallivan · Jul 30 6:33 PM`
+over `Version 1.0 · SharePoint App · Jul 30 5:28 PM`, no truncation note. Two
+cross-checks passed: those timestamps equal the direct-Graph probe's UTC values
+converted to Pacific (proving the chain returns what a direct Graph call does),
+and the `current` badge agrees with the tab header's separately-issued
+`publication.versionId` read.
 
-### Commits (all pushed; both production deploys verified Ready)
+### Commits (all pushed; production deploys verified Ready)
 
-- `54dd8e70` — Move Deliverable outputs into a third Close-out pane
-- `fdfd2c47` — Drop the wider-scope note when cycle export is unavailable
-- `357b5dd8` — Record the close-out lifecycle-actions design (not built)
-- `5529b8c3` — Record the resolved close-out owner decisions
-- `42abd72a` — Merge: reviewer affiliation rosters and Contact→Account auto-linking
-  (preserving `ad32e28c`, `3b3e4c4c`, `ec276423`, `8d078159`, `dd667a23`,
-  `6e323a4c`, `8bb5a0b0`, `99268074`)
-- `b2ce907e` — Resolve the 9 genuinely-fixed reviewer affiliation alerts
+- `221ac40a` — Merge: staff image/caption replace path
+- `147d3e49` — Merge: read-only SharePoint version history (8 branch commits)
+- `2da7054b` — Settle the Graph version-ordering premise with a live probe
+- `5f04002d` — Reconcile durable docs to the shipped display
+- `22f27e71` — Close the display: live-verified by signed-in smoke
+- `e352d161` — Record that the major-version limit is not readable via Graph
+- `ccf4d965` — Correct the versioning-settings deep link: untested, and it failed
+- `75c7831c` — Record the library version policy; settle pointer-vs-copy as copy
+- `aeac48d2` — Record the delete attempt as null evidence, and route around it
+- `10b8f9a0` — Record both hypotheses for the edit-yes/delete-no asymmetry
 
-On the unmerged branch: `eae535db`, `f3f2d42a`, `79e64317`.
-
-Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172**.
+Unit suite on `main`: **7247/7247**.
 
 ## Next Items
 
 ### Verified Open
 
-1. ~~**Merge `staff-submission-replace`.**~~ **DONE (S413, 2026-08-10.)** Merged to
-   `main` as `221ac40a` (no conflicts; the branch and the 10 main-only commits
-   touched disjoint files) and deployed to production. Post-merge evidence:
-   7206/7206 unit, all gates green, production build green. **Rehearsal caveat
-   still stands:** request `1002788`'s image is the fixture that proved the
-   inline-image path; replacing it prunes the original to SharePoint's recycle
-   bin. Any live smoke of the replace control goes on a different request.
-
-2. ~~**25 reviewer affiliation-mismatch alerts remain open.**~~ **CLOSED by the
-   owner, 2026-08-10 (S413)** — Justin resolved them outside the app. Evidence:
-   `node scripts/probe-reviewer-affiliation-alerts.mjs` (read-only) now reports
-   **0 open, 75 resolved**; the total held at 75 (was 25 active + 50 resolved),
-   so the 25 were resolved in place, not deleted. No capped-scan alerts. Whether
-   each underlying affiliation was actually corrected in Dataverse was **not
-   verified by this probe** — it reports alert status only.
-
-3. ~~**August 10 references beyond the work queue.**~~ **DONE (S413, 2026-08-10.)**
-   The owner's "internal buffer, not an external commitment" classification —
-   which previously lived only in `docs/CURRENT_WORK_QUEUE.md` row 1 — is now
-   propagated to the Calendar gate section of
-   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (a status banner
-   governing the document's later mentions), `docs/STRATEGY.md` items 1 and 3,
-   and `docs/agent-wiki/topics/strategy-roadmap.md` (both sites). Remaining
-   "August 10" strings are records of owner decisions made at the time and are
-   explicitly covered by the banner; they were left historical rather than
-   rewritten. Original evidence:
-   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (5 mentions),
-   `docs/STRATEGY.md:164`. `docs/CURRENT_WORK_QUEUE.md:37` was corrected this
-   session with the owner's clarification; the rest still read as a live deadline.
-   `/sweep`-shaped, not a one-line edit.
-
-4. **Workbench version history — display SHIPPED AND LIVE-VERIFIED. Closed.**
-   Built S413, merged to `main` at `147d3e49`, production deploy Ready, and
-   confirmed by signed-in smoke on Request `1003109`: the tab rendered
-   `Version 2.0 · current · Justin Gallivan · Jul 30 6:33 PM` over
-   `Version 1.0 · SharePoint App · Jul 30 5:28 PM`, no truncation note. Those
-   timestamps match the direct-Graph probe's UTC values converted to Pacific,
-   so route→service→Graph returns what a direct Graph call returns — which
-   retires the mock-coverage gap, since every test on this path stubs its
-   outbound boundary. No follow-up needed.
-   **Administrator restore** stays blocked on Connor's outstanding answers.
-   **Milestone snapshots — pointer-vs-copy is DECIDED: copy the bytes** (owner,
-   2026-08-10). The producer is now **unblocked and buildable**: retain a DOCX
-   (and/or PDF) snapshot in a separate governed location, keeping
+1. **Build the milestone snapshot producer.** Evidence:
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze" — now marked
+   **DECIDED: copy the bytes** (owner, 2026-08-10), so this is **unblocked**.
+   Retain a DOCX (and/or PDF) snapshot in a separate governed location, keeping
    `wmkf_milestoneversionid` / `wmkf_milestonecontenthash` /
-   `wmkf_milestonecreatedat` as identity beside the copy rather than instead of
-   it. Nothing is sunk — those fields are written nowhere today.
-   Read the reasoning in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` before
-   building, including the honest note that the version-limit leg of the
-   argument weakened after the decision (the limit turned out to be a
-   comfortable 500), leaving editor-delete rights and the missing second-stage
-   bin carrying the case.
+   `wmkf_milestonecreatedat` as identity **beside** the copy rather than instead
+   of it. Nothing is sunk — those three fields are written nowhere today
+   (`lib/dataverse/adapters/request-document.js:38-40`, read at
+   `lib/services/initial-assessment/artifact-service.js:257-259`). Read the
+   recorded reasoning before building; it deliberately includes which leg of the
+   argument weakened after the decision.
 
-5. **Optional cleanup:** `origin/codex/alert-triage-dataverse-probe` still exists
-   at `99268074`. Fully contained in `main`; kept as a free backup. Delete when
-   you want.
+2. **Two SharePoint checks that need no email and would close a blocker.**
+   Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` H1/H2 block. Both are
+   non-destructive and settle whether ordinary members can delete:
+   (a) add the **"Checked Out To"** column to the `akoya_request` view;
+   (b) open the Members group's permission **level** and read **Delete Items** /
+   **Delete Versions**. See "Verify Before Acting" for the safety constraint.
 
-### Blocked — Waiting On External Response
-
-1. **Initial Assessment pilot: administrative evidence — PARTIALLY ANSWERED
-   2026-08-10 (S413).** Evidence:
-   `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` §"Required follow-up"
-   item 5, now carrying Connor's verbatim replies. Of the four read-only checks:
-   version limits **still open** (versioning confirmed on, limit unanswered —
-   and the limit is the part that matters); second-stage recovery **reported
-   absent**, which is unusual for SharePoint Online and should be confirmed by
-   someone with site-collection admin rights before any durability guarantee
-   rests on it; Purview retention **unanswered** ("not familiar with purview") and
-   needs an M365 compliance admin instead; editor least privilege **ambiguous**
-   ("limited control" is not a built-in permission level, so whether editors can
-   delete is unresolved). Do not record any of these as cleared.
-
-   **PARKED 2026-08-10 pending three outstanding questions.** Justin is asking
-   Connor the permissions one; the other two need owners.
-   1. *(To Connor, asked)* In Site Settings → Site Permissions, what level is
-      listed next to the Members group, and is Justin in that group or granted
-      directly? "Limited control" was **considered and rejected** as meaning
-      Limited Access — that level grants no edit or delete, so it contradicts both
-      the staff-wide editing design and the pilot's own evidence that Justin
-      edited Request `1003109` while lacking site-collection admin rights. Detail
-      and the reasoning live in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-      **Best instrument — no email needed if Justin can reach the page:** open
-      the Members group's permission *level* and read its **Delete Items** and
-      **Delete Versions** checkboxes. That answers question 2's remaining half
-      too, and reveals the real level name behind "limited control".
-      **New 2026-08-10 observation, unresolved — two live hypotheses.** Two
-      delete attempts on `Application Cover Page.docx` both returned
-      `File is checked out to another user` (`0x80060728`), yet **the same user
-      could open and edit that file** (library shows `Modified 8:05 PM` by
-      them). That message is a catch-all for any lock, not the permissions
-      message, so it settles nothing by itself:
-      **H1 — transient self-lock** (the failed attempt was 109 seconds after
-      their own edit) → members CAN delete;
-      **H2 — custom "Contribute minus Delete" level** (both standard editing
-      levels also grant Delete Items, so edit-yes/delete-no cannot happen under
-      a standard one) → members CANNOT delete, and "limited control" is finally
-      explained.
-      **Discriminate non-destructively:** add the **"Checked Out To"** column
-      (blank favours H1 — then close Word, wait ~15 min, retry; a name reveals
-      the holder, and an app/service account is its own finding), *and* read the
-      permission level, which settles H2 outright. Full reasoning and the
-      orphaned-check-out causes are in
-      `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
-      Do not discriminate by deleting a governed artifact: with no confirmed
-      second-stage recycle bin, success destroys the artifact to test its
-      durability. **H2 would not reopen the milestone copy decision.**
-   2. *(Version limit ANSWERED 2026-08-10 — do not re-ask.)* The signed-in
-      Versioning Settings page for `akoya_request` reads: major versions only,
-      **no time limit**, **keep 500 major versions**, drafts unchecked, check-out
-      not required. **Still open from this item:** can an ordinary member delete
-      a file or a version? That is now the single unresolved durability
-      question, and it folds into question 1.
-   3. *(Needs an M365 compliance admin — not Connor)* Does any site- or
-      library-wide Purview retention policy apply to the `akoya_request` library?
-
-   **This blocks administrator restore only.** The version-history display did
-   not depend on any of it and shipped in S413 (`147d3e49`); the milestone
-   producer does not depend on it either and is blocked on an owner decision
-   instead — see Next Items.
+3. **Optional cleanup:** `origin/staff-submission-replace`,
+   `origin/artifact-version-history`, and `origin/codex/alert-triage-dataverse-probe`
+   are all fully contained in `main` and kept as free backups. Delete when you want.
 
 ### Owner Decision Needed
 
 1. **Should a staff image substitution leave an audit trace?** Evidence:
-   `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` "As built" section. The writer deletes
-   the prior image on replacement, so the grantee's original leaves the folder and
-   survives only in SharePoint's recycle bin, with no in-app record that a
-   substitution happened. Consent is settled (original waiver stands); this is a
-   "what does the record say we published" question. Cheap now, awkward to retrofit.
+   `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` "As built". The writer deletes the
+   prior image on replacement, so the grantee's original leaves the folder and
+   survives only in SharePoint's recycle bin, with no in-app record. Consent is
+   settled; this is "what does the record say we published". Cheap now, awkward
+   to retrofit.
 2. **What triggers `Closed No Response`?** Manual, or automatic after an overdue
    threshold? Blocks the last undesigned transition.
 3. **Per-send deadline override divergence.** Evidence:
    `render-emails-service.js:271`, `send-emails-service.js:916`. Unchanged.
-4. **Whether `DEVELOPMENT_LOG.md` is revived or formally retired.** Evidence: file
-   tail "Last Updated: May 14, 2026"; S409–S412 added no entries. **No entry was
-   added this session deliberately** — writing one would preempt this decision.
+4. **Whether `DEVELOPMENT_LOG.md` is revived or formally retired.** Evidence:
+   file tail "Last Updated: May 14, 2026"; S409–S413 added no entries. **No entry
+   was added this session deliberately** — writing one would preempt this decision.
 5. **Residual Reviews-surface duplication.** Owner said "looks good for now"; drop
    only on explicit request.
-6. **Cycle measurement tool live evidence re-discovery.** Justin said he would test
-   further.
+6. **Cycle measurement tool live evidence re-discovery.** Justin said he would
+   test further.
+
+### Blocked — Waiting On External Response
+
+1. **Initial Assessment pilot: administrative evidence — NARROWED 2026-08-10.**
+   Evidence: `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` evidence
+   matrix. Of the original four checks:
+   - **Version policy — ANSWERED. Do not re-ask.** (see Summary item 6.)
+   - **Second-stage recycle recovery — reported absent**, unusual for SharePoint
+     Online. Confirm with site-collection admin rights before any durability
+     guarantee rests on it.
+   - **Purview retention — unanswered** ("not familiar with purview"). Needs an
+     **M365 compliance admin**, not Connor.
+   - **Editor delete rights — the one unresolved durability question**, and now
+     with two competing hypotheses (Next Items item 2 has the checks).
+
+   **This blocks administrator restore only.** The version-history display shipped
+   without it; the milestone producer is unblocked by the copy decision.
 
 ### Verify Before Acting
 
-1. **Do NOT batch-resolve affiliation alerts by key prefix.** The specific 25 rows
-   this warned about are gone (owner-resolved, S413) — but the rule stands for
-   every future alert. Evidence:
-   `.claude-memory/feedback-list-and-confirm-before-bulk-deletes.md` (S412
-   extension). An alert describes a mismatch; resolving one that was never fixed
-   destroys the only signal that reviewer needs attention.
-   `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs` re-derives each row's
-   justification at run time and refuses anything it cannot reproduce — reuse that
-   pattern rather than a sweep.
+1. **Do not resolve the delete-rights question by deleting a governed artifact.**
+   With no confirmed second-stage recycle bin, a *successful* delete is the bad
+   outcome — destroying an artifact to test whether artifacts survive destruction.
+   Use the non-destructive checks in Next Items item 2. A disposable
+   tester-created file in a non-governed location only establishes delete-**own**.
 
-2. **Request `1002788` is still `Submitted` with a live package** — approved
-   abstract, caption "Homer in a blimp", and an image in `Grantee_Uploads`. It has
-   **no in-app path forward**: the post-`Submitted` transitions still have no
-   writer, and the staff replace path (now merged) does not move status. Re-cleaning
-   is manual: delete the `wmkf_granteedeliverable` row, clear
-   `wmkf_abstractapproved`, remove the SharePoint file.
+2. **The two 2026-08-10 delete attempts are NULL evidence — do not cite them.**
+   `File is checked out to another user` (`0x80060728`) is a catch-all for any
+   lock, not the permissions message. The real finding is the **asymmetry**: the
+   same user could edit the file but not delete it, which no standard permission
+   level allows.
 
-3. **The `Complete` gate has a sequencing trap.** Nothing writes `COMPLETE` today,
-   and no consumer reads deliverable status — the cycle export query has no such
-   term `[VERIFIED via cycle-export-service.js:57-61]`. Applying an eligibility
-   filter before the writer exists and rows are backfilled would **empty the cycle
-   export**. Order: writer → backfill → gate, and warn rather than exclude first.
+3. **Do NOT batch-resolve affiliation alerts by key prefix.** Evidence:
+   `.claude-memory/feedback-list-and-confirm-before-bulk-deletes.md`. An alert
+   describes a mismatch; resolving one that was never fixed destroys the only
+   signal that reviewer needs attention. Reuse
+   `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs`, which re-derives each
+   row's justification at run time and refuses what it cannot reproduce.
 
-4. **Retired-table operational scripts** (25 non-archive scripts referencing
-   dropped `reviewer_suggestions`; count corroborated by
-   `docs/CURRENT_WORK_QUEUE.md`). Still needs caller review + owner-approved scope.
+4. **Request `1002788` is still `Submitted` with a live package** and has no
+   in-app path forward. Re-cleaning is manual: delete the `wmkf_granteedeliverable`
+   row, clear `wmkf_abstractapproved`, remove the SharePoint file. Also: request
+   `1002788`'s image is the fixture that proved the inline-image path — any live
+   smoke of the replace control goes on a **different** request.
+
+5. **The `Complete` gate has a sequencing trap.** Nothing writes `COMPLETE`, and
+   no consumer reads deliverable status `[VERIFIED via cycle-export-service.js:57-61]`.
+   Applying an eligibility filter before the writer exists would **empty the cycle
+   export**. Order: writer → backfill → gate; warn rather than exclude first.
+
+6. **Retired-table operational scripts** (25 non-archive scripts referencing
+   dropped `reviewer_suggestions`). Still needs caller review + owner-approved scope.
 
 ### Do Not Reopen Without New Decision
 
-1. **`Revision Requested` as a built transition** — deferred by owner 2026-08-10
-   in favour of case-by-case email.
-2. **Re-consent on staff replacement** — owner decided the original waiver stands;
-   the concern was raised and knowingly accepted.
-3. **The S411 shared-footer placement of `Deliverable outputs`** — superseded.
-4. **ROR strategic reset**, **institution checker / enrichment seam iteration**,
-   **S408 15-row promotion diagnostic**, **S328 post-submit downloads** — all
-   closed by prior owner decisions.
+1. **Milestone pointer-vs-copy** — owner decided **copy** 2026-08-10. H2 turning
+   out true would not reopen it; delete rights are one of four reasons.
+2. **`$orderby` on Graph `/versions`** — probed live; returns 200 and is silently
+   ignored. The sort and page cap stay.
+3. **Another adversarial round on the version-history feature** — four rounds plus
+   a live smoke; the marginal reading pass is spent.
+4. **`Revision Requested` as a built transition** — deferred in favour of email.
+5. **Re-consent on staff replacement** — original waiver stands; knowingly accepted.
+6. **The S411 shared-footer placement of `Deliverable outputs`** — superseded.
+7. **ROR strategic reset**, **institution checker / enrichment seam iteration**,
+   **S408 15-row promotion diagnostic**, **S328 post-submit downloads** — closed.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/workbench/AwardeeTab.js` | Three panes; Close-out holds the outputs; Submission holds the staff replace control |
-| `lib/services/workbench/grantee-deliverables/replace-submission-service.js` | Staff image/caption writer (live on `main` since `221ac40a`). Rollback confirms on image ref ALONE — never add a status term |
-| `shared/config/granteeDeliverableStatus.js` | `STAFF_REPLACEABLE_STATUSES` / `isStaffReplaceableStatus` — one definition, server-computed into `canReplace` |
-| `lib/services/auto-link-reviewer-contact-account.js` | Live acceptance-time Contact→Account auto-link; exact-match only, fill-only, no Account creation |
-| `lib/utils/reviewer-institution-account-match.js` | Exact normalized matcher; ambiguity abstains |
-| `scripts/probe-reviewer-affiliation-alerts.mjs` | Read-only alert enumeration |
-| `scripts/resolve-fixed-reviewer-affiliation-alerts.mjs` | Allowlist resolve; re-derives justification at run time |
-| `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md` | Close-out design, resolved owner decisions, staff replace "As built" |
-| `.claude-memory/feedback-mutation-test-with-the-discriminating-fixture.md` | This session's durable lesson |
+| `lib/services/graph-service.js` | `listFileVersions` — current version fetched BEFORE pagination; 3-page cap; `$orderby` is a no-op (probed) |
+| `lib/services/initial-assessment/artifact-service.js` | `listInitialAssessmentArtifactVersions` — resolves the Ready row server-side; 409 on `expectedArtifactId` mismatch |
+| `pages/api/workbench/initial-assessment/versions.js` | GET only, `requireAppAccess('reviewers')`, both GUIDs validated before any adapter call. **No restore branch** |
+| `shared/components/workbench/ArtifactVersionHistory.js` | Fetched on staff disclosure only; status allowlist with a visible fall-through; `loadSequence` stale guard |
+| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Version policy, the copy decision and its reasoning, H1/H2, and what is unreadable via Graph |
+| `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Evidence matrix — version history now PASS |
+| `.claude-memory/feedback-share-codex-verbatim.md` | A tool result is not a user-visible message |
+| `.claude-memory/feedback-vacuous-clean-results-print-the-denominator.md` | S413 extension: estimate the denominator BEFORE proposing a probe |
 
 ## Testing
 
 ```bash
-npx jest tests/unit                       # 7206/7206 on main after 221ac40a
+npx jest tests/unit                       # 7247/7247 on main
 npm run check:types
 
-# Staff replace path (now on main)
-npx jest tests/unit/grantee-replace-submission-service.test.js \
-  tests/unit/grantee-deliverables-replace-submission-route.test.js \
-  tests/unit/awardee-tab.test.js --runTestsByPath
+# Version history (all four layers)
+npx jest tests/unit/graph-service-versions.test.js \
+  tests/unit/initial-assessment-artifact-versions.test.js \
+  tests/unit/workbench-initial-assessment-versions-route.test.js \
+  tests/unit/artifact-version-history.test.js --runTestsByPath
 
-# Reviewer auto-link / alert lifecycle
-npx jest tests/unit/auto-link-reviewer-contact-account.test.js \
-  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
-  tests/unit/reviewer-acceptance-drain.test.js --runTestsByPath
+# NOTE: every test above stubs its outbound boundary. Green here does NOT
+# establish that the route→service→Graph chain works; only a signed-in smoke
+# does (last run 2026-08-10 on request 1003109, PASS).
 
 node scripts/probe-reviewer-affiliation-alerts.mjs   # read-only, no writes
 ```
