@@ -652,13 +652,27 @@ The remaining controls are deliberately not collapsed into that pass:
   it is impossible. It must be read from the settings page by a human
   with library access:
 
-  ```
-  https://appriver3651007194.sharepoint.com/sites/akoyaGO/_layouts/15/VersionSettings.aspx?List=%7Bfd037f0b-8df4-41f5-8fed-c3984d351918%7D
-  ```
+  **Prefer the UI path; the one classic deep link tried here failed.**
 
-  (list GUID `fd037f0b-8df4-41f5-8fed-c3984d351918`, resolved from the drive by
-  the same probe; UI path is library → gear → Library settings → More library
-  settings → Versioning settings). Read three values: major-vs-minor versioning
+  > `https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request`
+  > → gear → Library settings → More library settings → Versioning settings
+
+  The library **identity** below is [VERIFIED via the same live Graph probe]
+  (`GET /drives/{driveId}/list` → `200`): list GUID
+  `fd037f0b-8df4-41f5-8fed-c3984d351918`, webUrl
+  `https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request`.
+  A `_layouts/15/VersionSettings.aspx?List={guid}` deep link built from that
+  GUID was **tried on 2026-08-10 and returned an unexpected error.** The
+  identity is not in doubt — only that URL form is. **[ASSUMED] the cause**: it
+  was not isolated. Three candidates remain open and were not discriminated —
+  insufficient rights (these pages require *Manage Lists*, which ordinary
+  members do not hold), Microsoft having moved the versioning-settings page in
+  recent tenants, or the classic page name simply being wrong here. The sibling
+  `listedit.aspx?List={guid}` form was suggested as a discriminator but its
+  result was never recorded. Do not present a reconstructed deep link to an
+  administrator as though it works; send the UI path. If someone does test the
+  deep links, note that a rights-based failure would itself be weak evidence
+  toward the unresolved member-permission question above. Read three values: major-vs-minor versioning
   mode, the major-version limit (unchecked = unlimited), and the draft limit.
   **That page sets the limit as well as showing it, and lowering the number
   prunes existing versions immediately** — it is a look-and-report, never a
