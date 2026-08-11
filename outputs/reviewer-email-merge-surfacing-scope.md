@@ -1,6 +1,30 @@
 # Scope: surface `reviewer_email_reconcile_needs_merge` where the decision-maker is
 
-**Status:** proposal, nothing built. Written S414 (2026-08-11) for adversarial review.
+> **NO-SHIP as scoped — Codex adversarial review, 2026-08-11 (4 high, 1 medium).**
+> Do not implement §3 from this document. All load-bearing findings were
+> independently verified. The decisive one: the existing merge entry point
+> re-derives ownership **live** and attaches `conflictingRecordId` only for a
+> single ACTIVE owner, refusing to open merge mode otherwise
+> `[VERIFIED via lib/services/reviewer-finder/my-candidates-service.js:833-838]`.
+> The proposed `initialMerge` would have replaced that live proof with a
+> day-old Postgres alert and fed it into a flow that deletes suggestion rows
+> (`reviewer-merge.js:428-437`) and deactivates a person (`:499-500`) with no
+> transaction — a safety regression, not a stale button. Also refuted: §2's
+> "collision, not a block" framing is too strong (blocked and collisions are
+> orthogonal), and only `keeper_has_suggestion` yields a mergeable pair —
+> `ambiguous_owner` has none and `inactive_owner` carries no `keeperId` at all,
+> so §3 could not have served two of the three alert kinds.
+>
+> **Spun out as a separate live issue:** §2's "route auth = the same access the
+> tab already requires" was offered as evidence of safety; it is instead a
+> pre-existing gap. `pages/api/reviewer-finder/merge-candidates.js:22-36` takes
+> only `{keeperId, loserId}` — never a `requestId` — behind app-level
+> `requireAppAccess`, and `computeCanManage` is documented "Cosmetic only …
+> FAILS OPEN" (`shared/components/reviewers/reviewer-modes.js:86-96`). This
+> exposure exists today and is independent of this proposal.
+
+**Status:** proposal, nothing built — **superseded by the review verdict above**.
+Written S414 (2026-08-11) for adversarial review.
 **Reviewer: challenge the approach, not the prose.** Every claim below carries
 `file:line`. Verify them — several were wrong on first pass this session.
 
