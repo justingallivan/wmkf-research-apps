@@ -572,7 +572,7 @@ Only the FILENAME comes from stored data, and it is the trust boundary:
   and refused otherwise — so traversal, absolute paths, embedded separators, encoded
   separators, and surprise extensions are impossible by construction rather than by
   escaping. Note `downloadFileByPath` validates its `folderPath` but **not** its
-  `filename` `[VERIFIED via graph-service.js:527-532 — validatePath(folderPath) at :528, filename interpolated into the path at :532 with no check of its own. Disconfirming check: the sibling getFileMetadataByPath DOES type-check its filename, so the omission here is real and not a convention I missed.]`, so this check is the only one.
+  `filename` `[VERIFIED via graph-service.js:601-606 — validatePath(folderPath) at :602, filename interpolated into the path at :606 with no check of its own. Disconfirming check: the sibling getFileMetadataByPath DOES type-check its filename, so the omission here is real and not a convention I missed. RECHECKED S413 after listFileVersions was inserted above it: the behavior is unchanged; only the line numbers shifted from :527-532.]`, so this check is the only one.
 - `Content-Type` is derived from that validated extension — never from the ref, never
   from Graph's reported mimeType.
 - The bytes are re-sniffed with `sniffImageType` before serving, so a later

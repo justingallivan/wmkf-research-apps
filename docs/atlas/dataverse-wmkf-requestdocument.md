@@ -106,9 +106,14 @@ proved prior-version inspection/download and restore to a new current version
 with exact expected bytes. Justin then restored the deleted probe from the
 first-stage recycle bin, and Graph confirmed the same item and exact contents
 live. Both probes were removed from the first-stage bin after testing. Justin
-was denied the second-stage administrator view; configured version limits,
-site/library Purview retention, ordinary-editor least privilege, Workbench
-history/admin restore, and immutable milestone snapshots remain open.
+was denied the second-stage administrator view. Connor's 2026-08-10 replies left
+configured version limits, site/library Purview retention, and ordinary-editor
+least privilege still open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
+**Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
+`GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
+from the Ready registry row and never from the caller. **Administrator restore and
+immutable milestone snapshots remain open**, restore because it depends on the
+permission evidence above.
 
 ## Ownership
 
@@ -207,7 +212,8 @@ transition.
    Response-only current-version refresh and display in both consumers are
    deployed and live-verified on Request `1003109` via deployment
    `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native version restore and first-stage
-   recycle recovery also pass. Administrator policy/access evidence and
-   Workbench history/admin restore plus milestone snapshots remain open.
+   recycle recovery also pass. Workbench version-history display shipped S413
+   (2026-08-10, read-only). Administrator policy/access evidence, administrator
+   restore, and milestone snapshots remain open.
 
 No live command in this sequence is authorized merely by this page.

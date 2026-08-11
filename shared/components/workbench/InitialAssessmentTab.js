@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
+import ArtifactVersionHistory from './ArtifactVersionHistory';
 
 export default function InitialAssessmentTab({ requestId }) {
   const [artifact, setArtifact] = useState(null);
@@ -153,10 +154,16 @@ export default function InitialAssessmentTab({ requestId }) {
               )}
             </div>
             {ready && artifact.file && (
-              <ArtifactFileMetadata
-                file={artifact.file}
-                linkLabel={`Open ${artifact.file.name || 'Initial Assessment'} in Word/SharePoint →`}
-              />
+              <>
+                <ArtifactFileMetadata
+                  file={artifact.file}
+                  linkLabel={`Open ${artifact.file.name || 'Initial Assessment'} in Word/SharePoint →`}
+                />
+                <ArtifactVersionHistory
+                  requestId={requestId}
+                  expectedArtifactId={artifact.artifactId}
+                />
+              </>
             )}
             {artifact.lastError && (
               <p className="mt-3 text-red-700">

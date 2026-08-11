@@ -1,0 +1,238 @@
+/**
+ * @jest-environment jsdom
+ */
+
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import ArtifactVersionHistory from '../../shared/components/workbench/ArtifactVersionHistory';
+
+const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
+const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
+
+function mockFetch(body, ok = true, status = 200) {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok,
+    status,
+    json: async () => body,
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+it('does not fetch version history until staff open the disclosure', () => {
+  mockFetch({ status: 'current', versions: [], hasMore: false, limit: 20 });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it('lists versions newest-first with the editor name and a current marker', async () => {
+  mockFetch({
+    status: 'current',
+    hasMore: false,
+    limit: 20,
+    versions: [
+      { versionId: '3.0', isCurrent: true, lastModifiedBy: 'Justin Gallivan', lastModified: '2026-08-03T00:00:00Z' },
+      { versionId: '2.0', isCurrent: false, lastModifiedBy: 'Connor Example', lastModified: '2026-08-02T00:00:00Z' },
+    ],
+  });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText('Version 3.0')).toBeInTheDocument());
+  expect(screen.getByText('current')).toBeInTheDocument();
+  // Attribution is the audit surface, not decoration — it must render.
+  expect(screen.getByText('Justin Gallivan')).toBeInTheDocument();
+  expect(screen.getByText('Connor Example')).toBeInTheDocument();
+});
+
+it('counts the rows it rendered, not the cap, and claims nothing about recency', async () => {
+  // The discriminating fixture: FEWER rows than the limit. A bounded scan can
+  // return 3 rows with limit 20, so reporting the cap would tell staff they are
+  // looking at 20 versions. Calling them "most recent" would also assert an
+  // ordering the response explicitly does not guarantee.
+  mockFetch({
+    status: 'current',
+    hasMore: true,
+    limit: 20,
+    versions: [
+      { versionId: '3.0', isCurrent: true },
+      { versionId: '2.0', isCurrent: false },
+      { versionId: '1.0', isCurrent: false },
+    ],
+  });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/Showing 3 versions\. Additional versions may exist/),
+  ).toBeInTheDocument());
+  expect(screen.queryByText(/20/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/most recent/i)).not.toBeInTheDocument();
+});
+
+it('pluralizes a single truncated row correctly', async () => {
+  mockFetch({
+    status: 'current',
+    hasMore: true,
+    limit: 20,
+    versions: [{ versionId: '3.0', isCurrent: true }],
+  });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/Showing 1 version\. Additional versions may exist/),
+  ).toBeInTheDocument());
+});
+
+it('reports an unavailable history without implying the document is damaged', async () => {
+  mockFetch({ status: 'unavailable', versions: [], hasMore: false, limit: 0 });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/version history is unavailable right now/i),
+  ).toBeInTheDocument());
+});
+
+it('surfaces a failed request as an error rather than an empty list', async () => {
+  mockFetch({ error: 'Failed to load version history (500)' }, false, 500);
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText('Failed to load version history (500)'),
+  ).toBeInTheDocument());
+});
+
+it('reports an artifact replacement conflict and never renders replacement history', async () => {
+  mockFetch({
+    error: 'This Initial Assessment document was replaced.',
+    code: 'artifact_replaced',
+    versions: [{ versionId: '9.0', lastModifiedBy: 'Replacement Editor' }],
+  }, false, 409);
+  render(
+    <ArtifactVersionHistory requestId={REQUEST_ID} expectedArtifactId={ARTIFACT_ID} />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText(
+    'This document was replaced. Refresh the page before viewing version history.',
+  )).toBeInTheDocument());
+  expect(screen.queryByText('Replacement Editor')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(
+    `expectedArtifactId=${ARTIFACT_ID}`,
+  ));
+});
+
+it('says an unrecognized status is a display gap rather than rendering silence', async () => {
+  // Silence here would read as "this document has no history", which is a claim
+  // about the document rather than about this component.
+  mockFetch({ status: 'something_new', versions: [], hasMore: false, limit: 0 });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/display gap, not a statement about the document/i),
+  ).toBeInTheDocument());
+});
+
+it('discards an in-flight response when the request changes underneath it', async () => {
+  // Attribution for request A must never paint under request B.
+  //
+  // The discriminating step is REOPENING after the switch. Merely asserting the
+  // stale name is absent right after the swap proves nothing — the panel is
+  // closed either way. It is on reopen that the two behaviours diverge: with the
+  // sequence guard the stale write is dropped, state stays null, and reopening
+  // refetches; without it the stale response is stored and `if (state) return`
+  // serves request A's editor under request B.
+  let resolveStale;
+  global.fetch = jest.fn().mockReturnValue(new Promise((resolve) => { resolveStale = resolve; }));
+  const { rerender } = render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  rerender(<ArtifactVersionHistory requestId="99999999-9999-9999-9999-999999999999" />);
+  resolveStale({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: 'current',
+      hasMore: false,
+      limit: 20,
+      versions: [{ versionId: '3.0', isCurrent: true, lastModifiedBy: 'Stale Editor' }],
+    }),
+  });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  mockFetch({
+    status: 'current',
+    hasMore: false,
+    limit: 20,
+    versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Fresh Editor' }],
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText('Fresh Editor')).toBeInTheDocument());
+  expect(screen.queryByText('Stale Editor')).not.toBeInTheDocument();
+});
+
+it('clears cached history when the artifact changes within the same request', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'current',
+        hasMore: false,
+        limit: 20,
+        versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Original Editor' }],
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'current',
+        hasMore: false,
+        limit: 20,
+        versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Replacement Editor' }],
+      }),
+    });
+  const { rerender } = render(
+    <ArtifactVersionHistory requestId={REQUEST_ID} expectedArtifactId={ARTIFACT_ID} />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+  await screen.findByText('Original Editor');
+
+  rerender(
+    <ArtifactVersionHistory
+      requestId={REQUEST_ID}
+      expectedArtifactId="55555555-5555-5555-5555-555555555555"
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await screen.findByText('Replacement Editor');
+  expect(screen.queryByText('Original Editor')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+it('offers no restore control — that half is blocked on administrator evidence', async () => {
+  mockFetch({
+    status: 'current',
+    hasMore: false,
+    limit: 20,
+    versions: [
+      { versionId: '3.0', isCurrent: true },
+      { versionId: '2.0', isCurrent: false },
+    ],
+  });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText('Version 2.0')).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: /restore/i })).not.toBeInTheDocument();
+});
