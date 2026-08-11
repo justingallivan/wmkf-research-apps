@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import ArtifactVersionHistory from '../../shared/components/workbench/ArtifactVersionHistory';
 
 const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
+const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
 
 function mockFetch(body, ok = true, status = 200) {
   global.fetch = jest.fn().mockResolvedValue({
@@ -82,6 +83,26 @@ it('surfaces a failed request as an error rather than an empty list', async () =
   ).toBeInTheDocument());
 });
 
+it('reports an artifact replacement conflict and never renders replacement history', async () => {
+  mockFetch({
+    error: 'This Initial Assessment document was replaced.',
+    code: 'artifact_replaced',
+    versions: [{ versionId: '9.0', lastModifiedBy: 'Replacement Editor' }],
+  }, false, 409);
+  render(
+    <ArtifactVersionHistory requestId={REQUEST_ID} expectedArtifactId={ARTIFACT_ID} />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(screen.getByText(
+    'This document was replaced. Refresh the page before viewing version history.',
+  )).toBeInTheDocument());
+  expect(screen.queryByText('Replacement Editor')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining(
+    `expectedArtifactId=${ARTIFACT_ID}`,
+  ));
+});
+
 it('says an unrecognized status is a display gap rather than rendering silence', async () => {
   // Silence here would read as "this document has no history", which is a claim
   // about the document rather than about this component.
@@ -131,6 +152,47 @@ it('discards an in-flight response when the request changes underneath it', asyn
 
   await waitFor(() => expect(screen.getByText('Fresh Editor')).toBeInTheDocument());
   expect(screen.queryByText('Stale Editor')).not.toBeInTheDocument();
+});
+
+it('clears cached history when the artifact changes within the same request', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'current',
+        hasMore: false,
+        limit: 20,
+        versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Original Editor' }],
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'current',
+        hasMore: false,
+        limit: 20,
+        versions: [{ versionId: '1.0', isCurrent: true, lastModifiedBy: 'Replacement Editor' }],
+      }),
+    });
+  const { rerender } = render(
+    <ArtifactVersionHistory requestId={REQUEST_ID} expectedArtifactId={ARTIFACT_ID} />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+  await screen.findByText('Original Editor');
+
+  rerender(
+    <ArtifactVersionHistory
+      requestId={REQUEST_ID}
+      expectedArtifactId="55555555-5555-5555-5555-555555555555"
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await screen.findByText('Replacement Editor');
+  expect(screen.queryByText('Original Editor')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(2);
 });
 
 it('offers no restore control — that half is blocked on administrator evidence', async () => {

@@ -18,6 +18,7 @@ import { ServiceHttpError } from '../../lib/services/service-http-error';
 import handler from '../../pages/api/workbench/initial-assessment/versions';
 
 const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
+const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
 
 function responseHarness() {
   const res = {
@@ -51,11 +52,30 @@ beforeEach(() => {
 
 it('returns the service version list for a GUID requestId', async () => {
   const res = responseHarness();
-  await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
+  await handler({
+    method: 'GET',
+    query: { requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID },
+  }, res);
 
   expect(res.statusCode).toBe(200);
-  expect(listInitialAssessmentArtifactVersions).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(listInitialAssessmentArtifactVersions).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+  });
   expect(res.body.versions[0]).toMatchObject({ versionId: '2.0', isCurrent: true });
+});
+
+it('rejects a missing or non-GUID expectedArtifactId before reaching the service', async () => {
+  for (const expectedArtifactId of [undefined, "1' or '1'='1"]) {
+    const res = responseHarness();
+    await handler({
+      method: 'GET',
+      query: { requestId: REQUEST_ID, ...(expectedArtifactId ? { expectedArtifactId } : {}) },
+    }, res);
+
+    expect(res.statusCode).toBe(400);
+  }
+  expect(listInitialAssessmentArtifactVersions).not.toHaveBeenCalled();
 });
 
 it('rejects a non-GUID requestId before reaching the service', async () => {
@@ -82,6 +102,18 @@ it('refuses unauthenticated callers before reaching the service', async () => {
   expect(listInitialAssessmentArtifactVersions).not.toHaveBeenCalled();
 });
 
+it('requires the reviewers app key with the exact request and response objects', async () => {
+  const req = {
+    method: 'GET',
+    query: { requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID },
+  };
+  const res = responseHarness();
+
+  await handler(req, res);
+
+  expect(requireAppAccess).toHaveBeenCalledWith(req, res, 'reviewers');
+});
+
 it('rejects non-GET methods', async () => {
   const res = responseHarness();
   await handler({ method: 'POST', query: { requestId: REQUEST_ID } }, res);
@@ -98,7 +130,14 @@ it('maps a ServiceHttpError to its own status rather than a 500', async () => {
     }),
   );
   const res = responseHarness();
-  await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
+  await handler({
+    method: 'GET',
+    query: { requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID },
+  }, res);
 
   expect(res.statusCode).toBe(404);
+  expect(listInitialAssessmentArtifactVersions).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+  });
 });

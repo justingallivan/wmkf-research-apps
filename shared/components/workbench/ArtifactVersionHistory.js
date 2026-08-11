@@ -15,8 +15,8 @@ function formatTimestamp(value) {
  * Native SharePoint version history for one request's canonical artifact.
  *
  * Fetched ONLY when staff open the disclosure — never on page load. Each open
- * costs a Graph round-trip, and the tab renders for every request whether or not
- * anyone wants the history.
+ * starts a bounded Graph metadata + paginated-history read sequence, and the tab
+ * renders for every request whether or not anyone wants the history.
  *
  * Attribution is the point of this surface, not decoration: pilot owner-decision
  * 6 settled that SharePoint native version history is the human-edit audit
@@ -25,7 +25,7 @@ function formatTimestamp(value) {
  * Read-only by design. There is no restore control here — that is the
  * administrator half, blocked on outstanding SharePoint permission evidence.
  */
-export default function ArtifactVersionHistory({ requestId }) {
+export default function ArtifactVersionHistory({ requestId, expectedArtifactId }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function ArtifactVersionHistory({ requestId }) {
     setState(null);
     setError(null);
     setLoading(false);
-  }, [requestId]);
+  }, [expectedArtifactId, requestId]);
 
   const toggle = async () => {
     if (open) {
@@ -59,11 +59,15 @@ export default function ArtifactVersionHistory({ requestId }) {
     setError(null);
     try {
       const response = await fetch(
-        `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`,
+        `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`
+          + `&expectedArtifactId=${encodeURIComponent(expectedArtifactId)}`,
       );
       const body = await response.json().catch(() => ({}));
       if (loadSequence.current !== sequence) return;
       if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error('This document was replaced. Refresh the page before viewing version history.');
+        }
         throw new Error(body.error || `Failed to load version history (${response.status})`);
       }
       setState(body);

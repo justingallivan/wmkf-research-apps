@@ -159,7 +159,10 @@ export default function InitialAssessmentTab({ requestId }) {
                   file={artifact.file}
                   linkLabel={`Open ${artifact.file.name || 'Initial Assessment'} in Word/SharePoint →`}
                 />
-                <ArtifactVersionHistory requestId={requestId} />
+                <ArtifactVersionHistory
+                  requestId={requestId}
+                  expectedArtifactId={artifact.artifactId}
+                />
               </>
             )}
             {artifact.lastError && (

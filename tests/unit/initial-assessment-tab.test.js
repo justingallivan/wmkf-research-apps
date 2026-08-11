@@ -64,6 +64,18 @@ it('lets staff refresh a Ready artifact so changed authoritative inputs can crea
   ));
 });
 
+it('binds version history to the artifact currently displayed', async () => {
+  render(<InitialAssessmentTab requestId={REQUEST_ID} />);
+
+  await screen.findByText(/Current in SharePoint · version 2\.0 · modified/);
+  fireEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    `/api/workbench/initial-assessment/versions?requestId=${REQUEST_ID}`
+      + '&expectedArtifactId=44444444-4444-4444-4444-444444444444',
+  ));
+});
+
 it('does not let a polling tick strand a retry in the generating state', async () => {
   jest.useFakeTimers();
   let resolvePost;

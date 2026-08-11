@@ -48,6 +48,8 @@ import {
 } from '../../shared/config/requestDocument.js';
 
 const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
+const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
+const REPLACEMENT_ARTIFACT_ID = '55555555-5555-5555-5555-555555555555';
 
 function readyRow(overrides = {}) {
   return {
@@ -97,6 +99,31 @@ it('rejects a non-GUID requestId before any adapter call', async () => {
   expect(requestDocumentAdapter.findByRequest).not.toHaveBeenCalled();
 });
 
+it('409s when the displayed artifact was replaced within the same request', async () => {
+  requestDocumentAdapter.findByRequest.mockResolvedValue({
+    records: [
+      readyRow({
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+      }),
+      readyRow({
+        wmkf_requestdocumentid: REPLACEMENT_ARTIFACT_ID,
+        createdon: '2026-08-02T00:00:00Z',
+        wmkf_sharepointdriveid: 'replacement-drive',
+        wmkf_sharepointitemid: 'replacement-item',
+      }),
+    ],
+  });
+
+  await expect(listInitialAssessmentArtifactVersions({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+  })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: expect.objectContaining({ code: 'artifact_replaced' }),
+  });
+  expect(GraphService.listFileVersions).not.toHaveBeenCalled();
+});
+
 it('404s when the request has no Ready artifact', async () => {
   requestDocumentAdapter.findByRequest.mockResolvedValue({
     records: [readyRow({ wmkf_operationstatus: 100000000 })],
@@ -118,13 +145,21 @@ it('ignores a superseded row rather than reading its history', async () => {
   expect(GraphService.listFileVersions).not.toHaveBeenCalled();
 });
 
-it('marks only the newest version as current', async () => {
+it('preserves Graph authoritative current markers instead of assigning by array position', async () => {
+  GraphService.listFileVersions.mockResolvedValue({
+    versions: [
+      { versionId: '3.0', isCurrent: false, lastModified: '2026-08-03T00:00:00Z' },
+      { versionId: '2.0', isCurrent: true, lastModified: '2026-08-02T00:00:00Z' },
+    ],
+    hasMore: false,
+    limit: 20,
+  });
   const result = await listInitialAssessmentArtifactVersions({ requestId: REQUEST_ID });
 
   expect(result.status).toBe('current');
   expect(result.versions.map((v) => [v.versionId, v.isCurrent])).toEqual([
-    ['3.0', true],
-    ['2.0', false],
+    ['3.0', false],
+    ['2.0', true],
   ]);
 });
 

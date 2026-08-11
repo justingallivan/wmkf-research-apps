@@ -1,15 +1,14 @@
 /**
  * API: /api/workbench/initial-assessment/versions
  *
- * GET ?requestId=<guid> → native SharePoint version history for that request's
- *                         canonical Initial Assessment artifact, newest first.
+ * GET ?requestId=<guid>&expectedArtifactId=<guid> → native SharePoint version
+ * history for the exact Initial Assessment artifact the caller is displaying.
  *
- * Keyed on `requestId` rather than the registry row id so the contract matches
- * the sibling `/api/workbench/initial-assessment` read the Workbench already
- * uses: the caller asks about the artifact it is displaying, and the service
- * resolves the same Ready, non-superseded row. The SharePoint drive/item
- * identity is read from that row server-side and is never accepted from the
- * caller.
+ * `expectedArtifactId` binds the lazy history read to the artifact DTO already
+ * rendered by the Workbench. If regeneration replaced that row in the meantime,
+ * the service returns 409 instead of showing the replacement's editors under the
+ * stale file link. SharePoint drive/item identity still comes only from the
+ * selected registry row and is never accepted from the caller.
  *
  * READ-ONLY. Restoring a version is deliberately absent — that is the
  * administrator half, blocked on the outstanding SharePoint permission evidence
@@ -51,7 +50,15 @@ export default async function handler(req, res) {
       if (!isGuid(requestId)) {
         return res.status(400).json({ error: 'requestId is required and must be a GUID' });
       }
-      const body = await listInitialAssessmentArtifactVersions({ requestId });
+      const expectedArtifactId = req.query.expectedArtifactId
+        ? String(req.query.expectedArtifactId).trim()
+        : null;
+      if (!isGuid(expectedArtifactId)) {
+        return res.status(400).json({
+          error: 'expectedArtifactId is required and must be a GUID',
+        });
+      }
+      const body = await listInitialAssessmentArtifactVersions({ requestId, expectedArtifactId });
       return res.status(200).json(body);
     } catch (error) {
       return sendError(res, error);
