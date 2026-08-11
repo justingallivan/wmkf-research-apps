@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: security
-  last_verified: 2026-08-11 against source (S414)
+  last_verified: 2026-08-11 against route/service source, API route matrix, S207 rationale, and S289 design
 ---
 
 ## Recall Rule
@@ -51,9 +51,17 @@ caller-supplied scope to authorize against. Do not mistake either for a guard.
 **Pre-existing — not introduced by any S414 proposal.** Surfaced while scoping an
 Invite-tab merge affordance (that scope was killed; see
 `outputs/reviewer-email-merge-surfacing-scope.md`). **Owner decision pending.**
-Not yet investigated: whether `docs/API_ROUTE_SECURITY_MATRIX.md` records this
-posture deliberately, and whether the S207 org-open decision was ever meant to
-cover a destructive merge.
+
+The documentation trail is now investigated. The API route matrix explicitly
+records app-level auth and attributes safety to the merge block predicate. The
+S289 merge design made the same explicit choice: merge auth matches
+`my-candidates`, while the loser predicate limits data eligibility. The older
+S207 rationale kept the then-reused reviewer write APIs org-open for a small,
+trusted staff, but it predates the merge route and names field/file/email/token
+operations—not arbitrary-pair suggestion deletion plus person deactivation.
+Therefore the current route posture is deliberate in S289, but the evidence does
+not establish that the owner intended S207's trust decision to cover this later
+destructive primitive. The predicate is not caller or request authorization.
 
 ## How to apply
 

@@ -1,4 +1,18 @@
-# Session 415 Prompt: Two silent env misconfigurations fixed; alert auto-retraction shipped; merge-surfacing killed on review (S414)
+# Session 416 Prompt: reviewer-alert retraction corrected; routing UI parked after Codex review
+
+> **Codex follow-through, 2026-08-11.** The work order is decided: build no new
+> reviewer-email alert-routing UI now. Production history contains exactly one
+> alert of this type, its condition is already resolved, and eleven later
+> successful nightly runs created no recurrence. The information-only idea would
+> require a new request-scoped roster-contact path; direct alert-to-merge remains
+> NO-SHIP. Re-open product work only after a fresh probe returns `STILL_BLOCKED`.
+>
+> The review found why the sole row is still `active`: the S414 reconciler tested
+> current contact authority before live suggestion lifecycle, and this deselected
+> row is no longer vetted. Commit `3872d97c` fixes the ordering and adds both
+> regression directions on branch `codex/reviewer-alert-retraction`. It is not
+> production behavior until deliberately promoted. Full unit suite: 574 suites,
+> 7,261 tests passed.
 
 > **Handoff, 2026-08-11 (Session 414).** Seven commits, all on `main`, all pushed.
 > Fixed a five-week production misconfiguration that had been emitting a
@@ -76,19 +90,12 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 
 ### Verified Open
 
-1. **Codex leads the reviewer-email alert routing redesign.**
-   Evidence: `outputs/reviewer-email-alert-routing-codex-work-order.md` (`a3a39122`).
-   Self-contained work order: the owner's objective, the killed proposal, Codex's
-   five findings verbatim, independent verification of each, and explicit
-   authority to conclude "build nothing". **Launch a fresh Codex session against
-   it.** Note zero live instances of the alert remain.
-
-2. **Milestone snapshot producer** — carried from S413, still open.
+1. **Milestone snapshot producer** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze",
    DECIDED copy-the-bytes (owner, 2026-08-10). The three `wmkf_milestone*` fields
    are written nowhere today (`lib/dataverse/adapters/request-document.js:38-40`).
 
-3. **Two non-destructive SharePoint checks** — carried from S413, still open.
+2. **Two non-destructive SharePoint checks** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` H1/H2 block. (a) add
    "Checked Out To" to the `akoya_request` view; (b) read the Members permission
    level's Delete Items / Delete Versions.
@@ -103,10 +110,13 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
    OPEN" (`shared/components/reviewers/reviewer-modes.js:86-96`). Any
    reviewer-finder user can POST two GUIDs and execute a globally destructive
    merge (deletes suggestions, deactivates a person). Disconfirming check run —
-   `actingUserSystemId` is write *attribution*, not authorization. Not yet
-   investigated: whether `docs/API_ROUTE_SECURITY_MATRIX.md` records this
-   deliberately, and whether S207's org-open decision was meant to cover a
-   destructive merge.
+   `actingUserSystemId` is write *attribution*, not authorization.
+   The documentation trail is now investigated: S289 deliberately reused
+   app-level auth and treats the loser block predicate as the safety boundary;
+   S207 predates the merge route and names less destructive reused reviewer
+   operations. The predicate limits data eligibility, not caller authorization.
+   Owner decision remains required on whether this later destructive primitive
+   should stay org-open.
 
 2. **`DEVELOPMENT_LOG.md` revive or formally retire** — carried, still unanswered.
    Evidence: file tail "Last Updated: May 14, 2026"; S409–S414 added no entries.
@@ -119,9 +129,12 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 
 ### Parked
 
-1. **Invite-tab surfacing of needs-merge alerts.** Re-open trigger: a *new* live
-   instance of the alert appears AND owner decision #1 above is resolved. Zero
-   live instances today.
+1. **Invite-tab surfacing of needs-merge alerts.** Codex verdict: build nothing
+   now. Re-open trigger: a new alert probes `STILL_BLOCKED`; evaluate a
+   request-scoped information-only hint first. Direct alert-to-merge additionally
+   requires owner decision #1, live semantic binding, safe orientation, and
+   partial-failure recovery. Current state is one stale active row and zero
+   actionable instances—not zero active rows.
 
 ### Verify Before Acting
 
@@ -174,7 +187,7 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 
 | File | Purpose |
 |------|---------|
-| `outputs/reviewer-email-alert-routing-codex-work-order.md` | **Start here for the reviewer-alert work.** Codex has the lead |
+| `outputs/reviewer-email-alert-routing-codex-work-order.md` | Codex verdict, evidence matrix, re-open trigger, and killed design record |
 | `outputs/reviewer-email-merge-surfacing-scope.md` | The killed proposal, annotated NO-SHIP |
 | `lib/services/reviewer-email-reconciler.js` | `retractNeedsMerge` + `alertKeyFor` — one key definition for both directions |
 | `scripts/probe-reviewer-email-reconcile-alert.mjs` | Read-only: is a needs-merge alert still true? |
@@ -188,10 +201,10 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 ## Testing
 
 ```bash
-npx jest tests/unit                                    # 7259/7259 on main
+npx jest tests/unit                                    # 7261/7261 on codex/reviewer-alert-retraction
 npm run check:types
 
-npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 25 tests
+npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 27 tests
 
 # Is a needs-merge alert still true? (read-only; per-invocation operator flag)
 DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-10
+last_verified: 2026-08-11
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -24,6 +24,8 @@ source_files:
   - lib/services/ror-institution-decision.js
   - lib/services/ror-institution-identity-resolver.js
   - lib/services/reviewer-roster-store.js
+  - lib/services/reviewer-email-reconciler.js
+  - lib/services/alert-service.js
   - lib/services/proposal-pi-identity.js
   - lib/dataverse/adapters/potential-reviewer.js
   - lib/dataverse/adapters/reviewer-suggestion.js
@@ -34,6 +36,7 @@ source_files:
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/render-emails.js
+  - scripts/probe-reviewer-email-reconcile-alert.mjs
   - lib/utils/reviewer-invite.js
   - shared/components/reviewers/reviewer-search-logic.js
   - shared/components/reviewers/ReviewerSearchSection.js
@@ -57,6 +60,7 @@ watch_paths:
   - lib/utils/reviewer-institution-account-match.js
   - lib/services/reviewer-identity-binding-writer.js
   - lib/services/reviewer-identity-runtime.js
+  - lib/services/reviewer-email-reconciler.js
   - lib/services/ror-institution-*.js
   - pages/api/workbench/reviewer-roster.js
   - pages/api/review-manager/send-emails.js
@@ -205,18 +209,26 @@ it, and otherwise **alerts instead of guessing** — three kinds
 - `ambiguous_owner` — more than one active record owns the email.
 - `inactive_owner` — the sole owner is deactivated.
 
-**The reconciler now RETRACTS its own alerts (S414).** Any row reaching a
+**The reconciler RETRACTS its own alerts (S414, ordering correction in
+`3872d97c`).** Any row reaching a
 non-alert outcome auto-resolves its prior alert
 `[VERIFIED via lib/services/reviewer-email-reconciler.js retractNeedsMerge + 5
 call sites; tests/unit/reviewer-email-reconciler.test.js]`. It fires on: email
 landed, suggestion gone, suggestion deselected, write, repoint. It deliberately
-does **not** fire on the ambiguous skips (no vetted email, missing personId,
-contradictory same-person owner) or on a stale-roster request mismatch — those
-leave the duplicate intact, and retracting there would destroy the only standing
-signal, the mirror of the affiliation-alert lesson in
+does **not** fire on a still-selected row's ambiguous skips (no vetted email,
+missing personId, contradictory same-person owner) or on a stale-roster request
+mismatch — those leave the duplicate intact, and retracting there would destroy
+the only standing signal, the mirror of the affiliation-alert lesson in
 `feedback-list-and-confirm-before-bulk-deletes`. Both directions are pinned by
-tests, and all three over/under-retraction mutations were verified to fail the
-suite.
+tests.
+
+The initial S414 ordering checked `pickVettedEmail()` before live suggestion
+lifecycle. Production alert 383 had become both deselected and currently
+unvetted, so eleven later successful nightly runs skipped it before reaching the
+retraction branch. `3872d97c` moves gone/deselected checks ahead of contact
+vetting and adds regression coverage that a selected unvetted row still retains
+its signal. This correction is committed on `codex/reviewer-alert-retraction`;
+do not describe it as live until that branch is deliberately promoted.
 
 Before S414 `autoResolveKey` only *deduped* new alerts
 (`lib/services/alert-service.js:22-32`), so an alert outlived its condition
@@ -239,7 +251,8 @@ The flag is required by the interlock for a local prod read
 (`lib/dataverse/core/interlock.js:326-330`) and is a per-invocation operator act —
 do not persist it in `.env.local`. **Worked example (S414):** alert 383
 (`keeper_has_suggestion`, 2026-07-30) probed **ALREADY_RESOLVED** — the duplicate
-suggestion had been deselected, so the cron had skipped it every night since.
+suggestion had been deselected. It remains the sole active alert row until the
+ordering correction is promoted and a non-dry-run sweep revisits it.
 Note the probe clears the *reconciler's* work item; it does not establish that the
 duplicate `wmkf_potentialreviewers` records were merged.
 

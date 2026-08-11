@@ -7,6 +7,30 @@ reviewed and killed; you own the redesign, including rejecting the framing below
 **Read first:** `outputs/reviewer-email-merge-surfacing-scope.md` (the killed
 proposal, now annotated NO-SHIP) and the verbatim review in §5.
 
+## Codex outcome — 2026-08-11
+
+**Verdict: build no new alert-routing UI now.** The direct alert-to-merge design
+remains NO-SHIP. The information-only alternative is safer, but it is not a
+copy-only change: the Invite DTO does not contain the roster's vetted contact,
+so it would require a new request-scoped read/join and consumer state. Production
+history does not justify that surface yet: exactly one alert of this type has
+ever been stored, it is no longer actionable, and eleven later successful nightly
+runs raised no new instance `[VERIFIED via bounded system_alerts +
+maintenance_runs queries rendered with to_char(), 2026-08-11 16:32 UTC]`.
+
+The review did expose a defect in the prior retraction fix. The sole historical
+alert remains `active` even though its suggestion is deselected because the
+reconciler checked `pickVettedEmail()` before the live suggestion lifecycle; the
+row's current contact is no longer vetted, so execution never reached the
+`deselected` retraction branch. Commit `3872d97c` moves contact vetting behind the
+gone/deselected checks and adds both regression directions. This is committed on
+`codex/reviewer-alert-retraction` but is **not production behavior until promoted**.
+
+Re-open product work only when a fresh probe returns `STILL_BLOCKED`. At that
+point, evaluate the narrow request-scoped information-only hint first. Do not
+re-open alert-driven merge unless the pre-existing merge authorization gap,
+live semantic binding, orientation, and partial-failure recovery are resolved.
+
 ---
 
 ## 1. The owner's problem — this is the actual objective
@@ -20,8 +44,9 @@ vetted reviewer email. The owner's words:
 > the user that can make the call of which address wins. It just seems like a
 > very inefficient process."
 
-That objective is **unchanged and still open.** The review killed one solution,
-not the problem.
+That objective remains valid, but the current evidence does not justify a new
+runtime surface. The review killed one solution; the Codex outcome above parks
+the broader product work behind a fresh actionable recurrence.
 
 Two facts sharpen it:
 
@@ -42,12 +67,14 @@ Two facts sharpen it:
 | Commit | What |
 |---|---|
 | `c0562ded` | `scripts/probe-reviewer-email-reconcile-alert.mjs` — read-only probe replaying the reconciler ladder against live Dataverse; returns STILL_BLOCKED / SELF_HEALING / ALREADY_RESOLVED / NOT_RECONCILABLE. Needs `DATAVERSE_ALLOW_PROD_READS=yes` per invocation. |
-| `80b85408` | The reconciler now **retracts its own alerts** when a row reaches a non-alert outcome (email landed, suggestion gone, deselected, write, repoint). Deliberately does NOT retract on ambiguous skips or a stale-roster request mismatch. 12 tests; 4 mutations verified to fail. |
+| `80b85408` | Initial alert-retraction implementation. It covers email landed, suggestion gone/deselected, write, and repoint, but its contact-vetting order left the sole production alert stranded. |
+| `3872d97c` | Codex correction: evaluate gone/deselected lifecycle evidence before current contact vetting; selected unvetted rows still retain their standing alert. Focused suite now 27 tests. Branch-only until promoted. |
 
-**Consequence:** the backlog problem is largely solved. Alert 383 — the only
-active one — probed `ALREADY_RESOLVED` (its suggestion had been deselected, so
-the cron had skipped it nightly since 2026-07-30). **There are currently zero
-live instances of this alert.** Weigh that when deciding whether to build at all.
+**Consequence:** there are zero actionable instances, but not zero active alert
+rows. Alert 383 is the only row ever created and remains `active`; the read-only
+probe returns `ALREADY_RESOLVED` because its suggestion is deselected. Eleven
+subsequent successful nightly runs raised no new alerts and failed to retract it
+because of the ordering defect corrected by `3872d97c`.
 
 ---
 
@@ -146,31 +173,44 @@ person — for records in requests they are not viewing.
 This exists now and is not introduced by any proposal here. It may be an
 intentional consequence of the S207 "org-open" decision, but that decision
 should be re-examined against a *destructive* merge. **Owner decision needed.**
-Check `docs/API_ROUTE_SECURITY_MATRIX.md` and the S207 rationale before
-proposing changes. Not yet investigated.
+The documentation trail is now checked: the API matrix and S289 merge design
+record the app-level posture deliberately, while S207 predates this route and
+does not explicitly decide arbitrary-pair suggestion deletion/person
+deactivation. See
+`.claude-memory/project-merge-candidates-authorization-gap.md`.
 
 ---
 
-## 7. What Codex should decide
+## 7. Codex decisions
 
-You have the lead. Legitimate outcomes include "build nothing."
+1. **No new runtime build now.** One historical, already-resolved condition and
+   no recurrence across eleven later successful runs do not justify a route/UI
+   contract with no live smoke case.
+2. **Fix lifecycle retraction first.** Commit `3872d97c` is the smallest change
+   that removes the known operational noise without broadening destructive reach.
+3. **Information-only remains the first product option after recurrence.** It
+   would surface the roster-vetted address and keep the existing Edit → PATCH →
+   fresh 409 proof. It still requires a new request-scoped data path and stale
+   response handling, so defer it until a fresh `STILL_BLOCKED` case exists.
+4. **Alert-driven merge remains NO-SHIP.** Any future version requires a
+   server-issued intent bound to request, suggestion, person pair, address,
+   ownership result, kind, and ETags, plus explicit orientation and recovery.
+5. **The authorization gap remains a separate owner decision and blocks making
+   merge easier to reach.** The S289 merge design deliberately reused app-level
+   auth, but the older S207 rationale named reused reviewer write APIs before
+   this destructive merge route existed. A low-risk loser predicate is data
+   eligibility, not caller authorization.
 
-1. **Is any build justified with zero live instances?** The auto-resolve may
-   have removed most of the pain. The honest default may be to wait for a
-   recurrence rather than ship against a case with no test data and no smoke.
-2. **If something is built, what shape?** The review's answer is a server-issued
-   merge intent that replays the reconciler ladder and binds
-   requestId/suggestionId/personId/email/owner/kind/ETags, rejecting execution
-   when any binding changes.
-3. **A cheaper option not yet evaluated:** surface the enrichment-known address
-   on the row as *information only*, with no merge button, and let the staffer
-   use the existing Edit control. The normal PATCH then runs and, on a 409, opens
-   the existing merge mode **with fresh live proof**. This routes staff *into*
-   the safe entry point instead of around it, and adds no destructive surface.
-   It does **not** fix the inverted orientation or §6. Claude proposed this after
-   the review; it has not been reviewed or verified — treat as unvetted.
-4. **The orientation default**, if merge is ever launched from an alert.
-5. **Whether §6 blocks any of this** — arguably it should.
+### Evidence matrix
+
+| Claim | Producer / entry | Persistence / truth | Consumer | Status |
+|---|---|---|---|---|
+| Alert incidence is one historical row and zero actionable cases | nightly reconciler | `system_alerts`; live Dataverse suggestion | `/admin`; read-only probe | VERIFIED |
+| No recurrence after creation | nightly cron | eleven later `maintenance_runs`, all completed, zero alerted | operational decision | VERIFIED |
+| Initial retraction misses deselected rows that are no longer vetted | roster scan → `pickVettedEmail` formerly before `findById` lifecycle branches | roster candidate + live suggestion + active alert | `AlertService.autoResolve` never reached | VERIFIED / FIXED IN SOURCE |
+| Invite row can show the roster-vetted address without a new data contract | `my-candidates` DTO | Dataverse person projection only; roster contact absent | `ReviewerInvitePanel` | REFUTED |
+| Stored-alert merge is safe | alert metadata → merge route | non-atomic Dataverse writes/deletes | merge modal | REFUTED / NO-SHIP |
+| Merge caller is request-authorized | app-level route guard | no requestId or pair-membership check | destructive merge service | REFUTED / OWNER DECISION |
 
 ---
 
@@ -190,7 +230,7 @@ Recorded so they are not repeated, not as apology.
    derived from a real reading of `reviewer-merge.js:258-277` but stated as
    though it settled executability. `blocked` and `collisions` are orthogonal.
 4. **Risks named, then not weighed.** The scope doc's §5 listed the destructive
-   button and zero live instances, then recommended building anyway. Naming a
+   button and zero actionable cases, then recommended building anyway. Naming a
    risk is not weighing it.
 5. **Polish questions instead of the upstream question.** Three open questions
    were asked about button placement and timing; none asked whether alert-driven
@@ -219,3 +259,33 @@ read. **Verify this document's claims rather than inheriting them.**
   reason retraction is deliberately conservative),
   `feedback-ui-gates-must-mirror-server-guards` (directly on point for §6),
   `docs/agent-wiki/topics/reviewer-identity.md` (alert semantics + probe usage).
+
+---
+
+## 10. Sweep closeout
+
+```text
+Sweep mode: Mode B — domain truth audit
+Domain/claim: reviewer-email alert routing, lifecycle, and merge reachability
+Authoritative evidence: reconciler/roster/merge source and callers; bounded
+  production system_alerts + maintenance_runs query; read-only Dataverse probe;
+  focused/full unit tests; S207/S289 decisions and API security matrix
+Claims: 6 → VERIFIED 3 / PARTIAL 0 / PLANNED 0 / ASSUMED 0 /
+             STALE-CONFLICT 3 (refuted design/authorization claims) / UNKNOWN 0
+Restatement surfaces: 10 → AGREE 0 / STALE 9 corrected /
+                         HISTORICAL 1 / UNRELATED 0
+Structural fixes: work-order verdict/evidence matrix; rejected-scope disposition;
+  active wiki, route matrix, merge design, memories, probe, and session handoff
+Semantic omissions found: initial retraction ordering; Invite DTO lacks roster
+  contact; S207 predates the destructive merge route; predicate is not auth
+Gates/probes: focused 27/27; full unit 7,261/7,261; lint 0 errors
+  (62 existing warnings); types green; API-route, agent-wiki, fact-consistency,
+  memory-router, doc-symbol, doc-currency, docs-catalog, and build-claim gates
+  green with every available self-test run sequentially; production census and
+  read-only lifecycle probe rerun at 2026-08-11 16:32 UTC; webpack production
+  build passed after canonical Turbopack hit the documented sandbox port panic
+Remaining live STALE: 0 within this domain
+Remaining UNKNOWN/ASSUMED: owner authorization decision for merge remains open;
+  branch fix is not assumed deployed
+Verdict: RECONCILED
+```

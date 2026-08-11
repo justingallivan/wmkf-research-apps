@@ -22,6 +22,17 @@
 > `requireAppAccess`, and `computeCanManage` is documented "Cosmetic only …
 > FAILS OPEN" (`shared/components/reviewers/reviewer-modes.js:86-96`). This
 > exposure exists today and is independent of this proposal.
+>
+> **Final Codex disposition (2026-08-11): build nothing now.** A bounded live
+> census found one historical alert row, zero actionable cases, and no new alert
+> across eleven later successful nightly runs. The safer information-only idea
+> still requires a new request-scoped roster-contact path, so it is parked until
+> a fresh probe returns `STILL_BLOCKED`. The review also found an ordering defect
+> in S414 retraction; `3872d97c` fixes it on
+> `codex/reviewer-alert-retraction` (branch-only until promoted). The merge-auth
+> documentation trail is now investigated; owner intent for this destructive
+> route remains unresolved. See the outcome and evidence matrix in
+> `outputs/reviewer-email-alert-routing-codex-work-order.md`.
 
 **Status:** proposal, nothing built — **superseded by the review verdict above**.
 Written S414 (2026-08-11) for adversarial review.

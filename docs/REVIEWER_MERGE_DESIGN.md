@@ -292,6 +292,15 @@ commit (not amended). Target ≤ ~1100 net lines per chunk.
     (trust-boundary gate). Route is **POST-only**: `POST {keeperId, loserId}` returns
     the read-only plan; `POST {…, fieldChoices, confirm:true}` executes. Register in
     `docs/API_ROUTE_SECURITY_MATRIX.md`. Route tests.
+  - **Current authorization caveat (2026-08-11; owner decision pending):** the
+    S289 choice above is deliberate, but its block predicate limits the *loser
+    record's data eligibility*; it does not authorize the caller or pair. The
+    route receives no `requestId` and checks no request membership, so any app
+    user with two known GUIDs can invoke this globally destructive primitive.
+    S207's older org-open rationale predates this route and did not explicitly
+    decide arbitrary-pair suggestion deletion/person deactivation. Do not make
+    merge easier to discover until the owner resolves this boundary. See
+    `.claude-memory/project-merge-candidates-authorization-gap.md`.
 - **Chunk 4 — UI merge mode (`CandidateEditModal`).**
   - On a 409 carrying `conflictingRecordId` (saved-Candidates PATCH only — guard on
     `candidate.potentialReviewerId` + `!onApply && !confirmMode`), switch to merge

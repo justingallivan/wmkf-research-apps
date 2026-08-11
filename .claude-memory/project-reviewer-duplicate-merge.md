@@ -29,6 +29,11 @@ predicate** (positive whitelist: an unknown lifecycle field defaults to *blockin
 re-evaluated at execute time from live source, is the load-bearing safety rule, NOT a
 permission gate. That's why auth is the same as my-candidates: the predicate, not the
 role, restricts merge to the low-risk case so the colleague who hit the bug can fix it.
+This records the S289 design rationale, not a proof of caller authorization. The
+route still receives no `requestId` and performs no request-membership or pair
+authorization; whether app-level access is sufficient for this destructive
+primitive remains an owner decision. Read
+[[project-merge-candidates-authorization-gap]] before changing merge discovery.
 
 **Hazards that already bit (Codex post-impl S289):** picking a field from the loser
 must `isSet()`-guard so an empty loser value can't null the keeper (and `emailMoves`

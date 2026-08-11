@@ -3,12 +3,11 @@
  * READ-ONLY probe for a `reviewer_email_reconcile_needs_merge` alert.
  *
  * Answers the question the alert itself cannot: **is this still true today?**
- * Nothing auto-resolves these alerts — `autoResolveKey` is used only to dedup
- * new ones (`lib/services/alert-service.js:22-32`), and the key appears exactly
- * once in the repo (`lib/services/reviewer-email-reconciler.js:44`). So an
- * active alert may describe a condition that was fixed weeks ago, and a silent
- * night means "suppressed by dedup", not "resolved". This probe replays the
- * reconciler's decision ladder against live Dataverse and reports the verdict.
+ * The reconciler auto-resolves its keyed alert after conclusive non-alert
+ * outcomes. An active row can still be stale when it predates retraction, falls
+ * outside the roster window, or hits a lifecycle/contact ordering defect. This
+ * probe replays the decision ladder against live Dataverse and reports the
+ * verdict without assuming that a silent night means resolved.
  *
  * It performs NO writes. Every Dataverse call is a GET (the OAuth token
  * exchange is the only POST); every Postgres statement is a SELECT. There is
@@ -16,11 +15,13 @@
  *
  * Verdicts:
  *   STILL_BLOCKED    — the duplicate persists; a human merge is still required.
- *   SELF_HEALING     — the blocker cleared; tonight's cron would fix it itself,
- *                      so just resolve the alert.
- *   ALREADY_RESOLVED — the person now has an email; the alert is stale.
- *   NOT_RECONCILABLE — the roster no longer offers a vetted email for this
- *                      candidate, so the cron will not act at all.
+ *   SELF_HEALING     — the blocker cleared; the next cron would fix the row and
+ *                      auto-resolve its alert.
+ *   ALREADY_RESOLVED — the suggestion is gone/deselected or the person now has
+ *                      an email; the alert is stale.
+ *   NOT_RECONCILABLE — the roster lacks a vetted email or the live suggestion
+ *                      no longer matches the alert's request binding; the cron
+ *                      deliberately preserves the alert.
  *
  * Usage:
  *   DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs \
@@ -193,8 +194,12 @@ async function probeOne(t) {
   if (!sug) { console.log('\nVERDICT: ALREADY_RESOLVED — suggestion no longer exists.'); return; }
   const belongs = !t.requestId || eq(sug._wmkf_request_value, t.requestId);
   console.log(`\nsuggestion: selected=${!!sug.wmkf_selected} belongsToRequest=${belongs}`);
-  if (!belongs || !sug.wmkf_selected) {
-    console.log('\nVERDICT: ALREADY_RESOLVED — the cron now skips this row (deselected or moved).');
+  if (!belongs) {
+    console.log('\nVERDICT: NOT_RECONCILABLE — suggestion belongs to another request; the cron deliberately preserves the alert.');
+    return;
+  }
+  if (!sug.wmkf_selected) {
+    console.log('\nVERDICT: ALREADY_RESOLVED — the suggestion is deselected, so no human work item remains.');
     return;
   }
 
@@ -209,7 +214,7 @@ async function probeOne(t) {
   const owner = await potentialReviewerAdapter.findByEmailCandidates(email);
   if (owner.none) {
     console.log(`owner of ${email}: NONE`);
-    console.log('\nVERDICT: SELF_HEALING — no competing owner; the next nightly run WRITES the email. Just resolve the alert.');
+    console.log('\nVERDICT: SELF_HEALING — no competing owner; the next nightly run WRITES the email and auto-resolves the alert.');
     return;
   }
   if (owner.ambiguous) {
@@ -238,7 +243,7 @@ async function probeOne(t) {
     return;
   }
   console.log("keeper's suggestion on this request: NONE");
-  console.log('\nVERDICT: SELF_HEALING — the blocker cleared; the next nightly run REPOINTS automatically. Just resolve the alert.');
+  console.log('\nVERDICT: SELF_HEALING — the blocker cleared; the next nightly run REPOINTS and auto-resolves the alert.');
 }
 
 const targets = await loadTargets();
