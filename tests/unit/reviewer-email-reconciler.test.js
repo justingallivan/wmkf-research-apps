@@ -204,12 +204,31 @@ test('a row error is recorded, never fatal to the batch', async () => {
 // destroys the only standing signal. These tests pin BOTH directions.
 
 test('RETRACT: a deselected suggestion auto-resolves its stale alert', async () => {
-  // The live alert-383 shape: the duplicate row was removed from the request, so
-  // the cron has no work item left and the alert is stale.
+  // The duplicate row was removed from the request, so the cron has no work item
+  // left and the alert is stale.
   seed(vettedCandidate(), { wmkf_selected: false });
   const r = await reconcileReviewerEmails({});
   expect(AlertService.autoResolve).toHaveBeenCalledWith(ALERT_KEY(SUG));
   expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'deselected', count: 1 }]);
+  expect(r.skipped).toBe(1);
+});
+
+test('RETRACT: a deselected suggestion retracts even when its roster email is no longer vetted', async () => {
+  // Production alert 383 still qualifies for the roster scan, but its current
+  // identity decision makes pickVettedEmail return null. Lifecycle evidence is
+  // independent of whether the old contact claim remains authoritative.
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }), { wmkf_selected: false });
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).toHaveBeenCalledWith(ALERT_KEY(SUG));
+  expect(r.retracted).toEqual([{ suggestionId: SUG, reason: 'deselected', count: 1 }]);
+  expect(r.skipped).toBe(1);
+});
+
+test('NO RETRACT: a selected suggestion without a currently vetted email keeps its standing alert', async () => {
+  seed(vettedCandidate({ identityStatus: 'ambiguous' }));
+  const r = await reconcileReviewerEmails({});
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.getById).not.toHaveBeenCalled();
   expect(r.skipped).toBe(1);
 });
 
