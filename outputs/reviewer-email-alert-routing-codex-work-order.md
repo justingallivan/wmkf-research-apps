@@ -23,14 +23,15 @@ alert remains `active` even though its suggestion is deselected because the
 reconciler checked `pickVettedEmail()` before the live suggestion lifecycle; the
 row's current contact is no longer vetted, so execution never reached the
 `deselected` retraction branch. Commit `3872d97c` moves contact vetting behind the
-gone/deselected checks and adds both regression directions. This is committed on
-`codex/reviewer-alert-retraction` but is **not production behavior until promoted**.
+gone/deselected checks and adds both regression directions. The complete
+Opus-reviewed hardening was promoted through `5f7baf9a` in Vercel Production
+deployment `dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5` (READY, 2026-08-11).
 
 The subsequent Claude Opus review found one confirmed P1 beyond that ordering
 fix: the Dataverse client throws on a missing suggestion, but the reconciler
 treated `findById()` as though it returned `null`. A merge can hard-delete the
 loser suggestion while the Postgres roster retains its anchor, so that 404 made
-the row error instead of retracting `suggestion_gone`. The branch follow-up now
+the row error instead of retracting `suggestion_gone`. The promoted follow-up
 uses a read-only lifecycle adapter that maps only Dataverse's structured
 ObjectDoesNotExist response (`404`, code `0x80040217`) to gone, returns excluded
 rows for classification, and preserves every other 404/error. It also reads open alert
@@ -94,8 +95,8 @@ Two facts sharpen it:
 |---|---|
 | `c0562ded` | `scripts/probe-reviewer-email-reconcile-alert.mjs` — read-only probe replaying the reconciler ladder against live Dataverse; returns STILL_BLOCKED / SELF_HEALING / ALREADY_RESOLVED / NOT_RECONCILABLE. Needs `DATAVERSE_ALLOW_PROD_READS=yes` per invocation. |
 | `80b85408` | Initial alert-retraction implementation. It covers email landed, suggestion gone/deselected, write, and repoint, but its contact-vetting order left the sole production alert stranded. |
-| `3872d97c` | Codex correction: evaluate gone/deselected lifecycle evidence before current contact vetting; selected unvetted rows still retain their standing alert. Focused suite now 27 tests. Branch-only until promoted. |
-| Branch follow-up after Opus review | Maps record-scoped Dataverse ObjectDoesNotExist 404s to `suggestion_gone` while preserving systemic 404s as errors; classifies applicant-excluded without weakening action guards; gates unvetted reads on open alert keys; makes dry-run retractions accurate and explicitly incomplete after a failed key scan; treats missing people as non-reconcilable; and aligns the probe's request binding. Focused suites: 35 + 59 + 28 + 28 + 3. Branch-only until promoted. |
+| `3872d97c` | Codex correction: evaluate gone/deselected lifecycle evidence before current contact vetting; selected unvetted rows still retain their standing alert. Focused suite now 27 tests. Promoted 2026-08-11. |
+| `fa71755d`, `a7fc1a0a`, `5f7baf9a` — Opus follow-up | Maps record-scoped Dataverse ObjectDoesNotExist 404s to `suggestion_gone` while preserving systemic 404s as errors; classifies applicant-excluded without weakening action guards; gates unvetted reads on open alert keys; makes dry-run retractions accurate and explicitly incomplete after a failed key scan; treats missing people as non-reconcilable; aligns the probe's request binding; and corrects the lifecycle JSDoc. Focused suites: 35 + 59 + 28 + 28 + 3. Promoted 2026-08-11; Opus verdict READY. |
 
 **Consequence:** there are zero actionable instances, but not zero active alert
 rows. Alert 383 is the only row ever created and remains `active`; the read-only
@@ -318,7 +319,7 @@ Initial gates/probes: focused 27/27; full unit 7,261/7,261; lint 0 errors
   build passed after canonical Turbopack hit the documented sandbox port panic
 Remaining live STALE: 0 within this domain
 Remaining UNKNOWN/ASSUMED: owner authorization decision for merge remains open;
-  branch fix is not assumed deployed
+  no manual post-promotion cron execution was performed
 Verdict: RECONCILED
 ```
 
@@ -331,3 +332,11 @@ sequentially. Canonical Turbopack hit the documented worker-port sandbox panic
 even on the approved retry; the documented `next build --webpack` fallback
 passed with zero errors/warnings. The current-state sweep found no remaining
 stale lifecycle claim.
+
+Promotion audit: Opus reviewed `fa71755d..a7fc1a0a` read-only and returned READY
+with no P0/P1/P2 findings; `5f7baf9a` corrected its sole code-comment P3. The
+feature preview was READY before the six-commit fast-forward to `main`; Vercel
+Production deployment `dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5` reached READY, the
+public sign-in path followed redirects to HTTP 200, and the immediate deployment
+error scan returned no logs. Rollback source commit: `85cbf402`. No cron was
+manually invoked during promotion.

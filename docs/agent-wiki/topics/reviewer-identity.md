@@ -242,8 +242,8 @@ If the key query fails, the reconciler checks all candidate lifecycles rather
 than assuming no alerts. `[VERIFIED via
 lib/services/alert-service.js getOpenAutoResolveKeysByType;
 tests/unit/alert-service-open-keys.test.js; 35 focused reconciler tests]` This
-correction remains branch-only; do not describe it as live until deliberately
-promoted.
+correction and its Opus follow-up are live on `main` through `5f7baf9a`
+(`dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5`, READY 2026-08-11).
 
 Before S414 `autoResolveKey` only *deduped* new alerts
 (`lib/services/alert-service.js:22-32`), so an alert outlived its condition

@@ -10,17 +10,19 @@
 > The first review found why the sole row is still `active`: the S414 reconciler tested
 > current contact authority before live suggestion lifecycle, and this deselected
 > row is no longer vetted. Commit `3872d97c` fixes the ordering and adds both
-> regression directions on branch `codex/reviewer-alert-retraction`. It is not
-> production behavior until deliberately promoted. The Opus follow-up then found
+> regression directions. The Opus follow-up then found
 > the remaining confirmed P1: a missing Dataverse suggestion throws 404 rather
-> than returning null. The branch now maps only Dataverse's structured
+> than returning null. The production path now maps only Dataverse's structured
 > ObjectDoesNotExist response (`404`, `0x80040217`) to `suggestion_gone`; every
 > other 404 remains an error. It handles excluded rows through a read-only
 > lifecycle lookup, gates unvetted reads on standing alert keys, reports only
 > known-open `wouldRetract` entries (with an explicit incomplete-preview flag),
 > treats missing people as non-reconcilable, and aligns the probe's request
 > binding. Focused suites pass 153/153; the current full unit suite passes 575
-> suites / 7,283 tests.
+> suites / 7,283 tests. Opus returned READY on `fa71755d..a7fc1a0a`; the final
+> JSDoc clarification is `5f7baf9a`. The six-commit fast-forward was promoted to
+> `main` and Vercel Production on 2026-08-11 (`dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5`,
+> READY). No manual cron run was performed during promotion.
 
 > **Handoff, 2026-08-11 (Session 414).** Seven commits, all on `main`, all pushed.
 > Fixed a five-week production misconfiguration that had been emitting a
@@ -60,11 +62,11 @@
    ladder against live Dataverse → STILL_BLOCKED / SELF_HEALING /
    ALREADY_RESOLVED / NOT_RECONCILABLE. All three refusal paths tested.
 
-4. **Alert auto-retraction shipped** (`80b85408`) and is hardened on
-   `codex/reviewer-alert-retraction`. `autoResolveKey` only
+4. **Alert auto-retraction shipped** (`80b85408`) and its Opus-reviewed hardening
+   is live on `main` through `5f7baf9a`. `autoResolveKey` only
    *deduped*, so an alert outlived its condition forever and a silent night was
    indistinguishable from a resolved one. Now retracts on: email landed,
-   suggestion gone, deselected, applicant-excluded, write, repoint. The branch
+   suggestion gone, deselected, applicant-excluded, write, repoint. The promoted
    follow-up maps only record-scoped ObjectDoesNotExist 404s to gone without
    weakening the fail-closed action lookup; systemic 404s remain row errors;
    open-alert key gating avoids lifecycle reads for unvetted rows with no
@@ -216,7 +218,7 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 ## Testing
 
 ```bash
-npx jest tests/unit                                    # 7283/7283 on codex/reviewer-alert-retraction
+npx jest tests/unit                                    # 7283/7283 before promotion to main
 npm run check:types
 
 npx jest tests/unit/reviewer-email-reconciler.test.js --runTestsByPath  # 35 tests
