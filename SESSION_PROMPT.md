@@ -118,15 +118,15 @@ Unit suite on `main`: **7161/7161**. On `staff-submission-replace`: **7172/7172*
    session with the owner's clarification; the rest still read as a live deadline.
    `/sweep`-shaped, not a one-line edit.
 
-4. **Workbench version history — display SHIPPED, smoke outstanding.**
-   Built S413 and merged to `main` at `147d3e49`; production deploy reached
-   Ready. **One thing left before it can be called verified:** a signed-in smoke
-   on Request `1003109` — open the Initial Assessment tab, click
-   `View version history`, expect `2.0` marked current with Justin's name, `1.0`
-   below, and no truncation note. Every test on this path mocks its outbound
-   boundary and the ordering probe called Graph directly, so route→service→Graph
-   has never run end to end. Until that click happens the honest claim is
-   "built and unit-verified".
+4. **Workbench version history — display SHIPPED AND LIVE-VERIFIED. Closed.**
+   Built S413, merged to `main` at `147d3e49`, production deploy Ready, and
+   confirmed by signed-in smoke on Request `1003109`: the tab rendered
+   `Version 2.0 · current · Justin Gallivan · Jul 30 6:33 PM` over
+   `Version 1.0 · SharePoint App · Jul 30 5:28 PM`, no truncation note. Those
+   timestamps match the direct-Graph probe's UTC values converted to Pacific,
+   so route→service→Graph returns what a direct Graph call returns — which
+   retires the mock-coverage gap, since every test on this path stubs its
+   outbound boundary. No follow-up needed.
    **Administrator restore** stays blocked on Connor's outstanding answers.
    **Milestone snapshots** stay blocked on the owner's pointer-vs-copy decision —
    Connor's replies (major versioning on, no second-stage recycle bin) make
