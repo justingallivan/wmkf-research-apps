@@ -29,7 +29,7 @@
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md (mirror the service's precondition guard in the enable condition; prefer a server-computed capability flag)
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md; project-institution-identity-cost-calibration.md (alert-tier false clears cheap — reviewer self-corrects; identity-bind tier stays strict)
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-thoroughness-default.md; feedback-truncation-is-breakage-not-completion.md; feedback-apply-measurement-artifacts-in-both-directions.md
-- Review posture: feedback-self-review-before-delegating-review.md; feedback-author-adversarial-pass-first.md; feedback-dont-self-certify-convergence.md
+- Review posture: feedback-self-review-before-delegating-review.md; feedback-author-adversarial-pass-first.md; feedback-dont-self-certify-convergence.md; feedback-weigh-the-risks-you-name.md (a named risk is not a discharged risk; settle soundness before asking polish questions)
 - Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md (pick the fixture where the correct and buggy predicates disagree; a mutation that leaves the suite green means the test is decorative)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-stakeholder-email-tone.md; feedback-review-panel-tone.md; feedback-user-facing-error-copy-voice.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
@@ -50,7 +50,7 @@
 - Dataverse / Dynamics / Explorer / CRM facts: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md; project-cache-hit-rate-review.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
-- Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
+- Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-merge-candidates-authorization-gap.md (S414 — merge route takes no requestId, UI gate is cosmetic/fail-open; owner decision pending)
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel / CI / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
