@@ -235,7 +235,16 @@ not an intervening staff edit. Version `2.0` later hashed to
      that reading the level's *name* does not answer it either: Microsoft
      documents that every default level except Full Control and Limited Access
      can be modified in place, so the checkbox state of **Delete Items** and
-     **Delete Versions** is the only closing evidence.
+     **Delete Versions** is the only closing evidence. **Update 2026-08-11
+     (S415):** a signed-in screenshot showed "limited control" is the modern Site
+     Permissions pane's own label for the Site members group, not a permission
+     level — so the custom-level hypothesis weakens and a transient self-lock
+     becomes the likelier reading of the 2026-08-10 delete refusal. The same
+     screenshot showed **`Everyone except external users` in Site members**, so
+     the editor audience is currently every licensed tenant user. A live attempt
+     to read the level definition was blocked by access, not willingness. See
+     `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and
+     `outputs/sharepoint-storage-policy-question-brief.md` §1a.
 
    One of the four is therefore answered (version policy), and three remain:
    second-stage recovery is a negative report pending confirmation, Purview

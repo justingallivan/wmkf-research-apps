@@ -82,6 +82,67 @@ Recommended sequencing (§9): the site-collection-administrator identity questio
 
 ---
 
+## 1a. Live attempt with Connor — 2026-08-11, partial, resumed tomorrow
+
+Justin and Connor worked the Connor-owned questions live. **No question closed**,
+but the session produced two real findings and eliminated three access paths.
+
+**Evidence captured:** a screenshot of the **modern Site Permissions pane**
+("Manage who has access to this site") for `/sites/akoyaGO`, showing exactly:
+
+| Group shown | Label shown | Members shown |
+|---|---|---|
+| Site owners | full control | `akoyaGO Owners` |
+| Site members | **limited control** | `akoyaGO Members`, **Everyone except external users** |
+| Site visitors | no control | None |
+
+**Finding 1 — "limited control" is resolved, and it is not a permission level.**
+`[VERIFIED via screenshot 2026-08-11]` The phrase is the modern pane's own fixed
+descriptive label for the Site members group, sitting beside "full control" and
+"no control" for the other two. Connor's 2026-08-10 reply quoted this UI string
+verbatim and was accurate reporting. It is **not** a custom level, and it says
+nothing about Delete Items.
+
+*Consequence:* **H2 loses its main support and the lean flips to H1.** The
+"custom Contribute-minus-Delete level" hypothesis rested largely on "limited
+control" sounding like a real custom level; it isn't one. H1 (transient
+self-lock during the acting user's own Word session) is now the more likely
+explanation for the 2026-08-10 delete refusal — which would mean ordinary
+members **can** delete. Still `[OPEN]`: this shifts the prior, it does not close
+Q5. The checkbox read remains the only closing evidence. Note also that Microsoft
+has a documented issue where this pane displays inaccurate permission levels, so
+nothing in it can serve as a definition either way.
+
+**Finding 2 — NEW, and larger than the question that surfaced it: the editor
+audience is the whole tenant directory.** `[VERIFIED via screenshot 2026-08-11]`
+**"Everyone except external users"** is a member of Site members, i.e. holds
+edit rights on the library containing the governed writeups.
+`[VERIFIED via Microsoft documentation]` "This security group is added to the
+Members group automatically on Modern Team sites with *Public* privacy settings,
+so that users in Microsoft 365 can access and edit the SharePoint site." So this
+is a public M365 group-connected team site, and every licensed user in the
+tenant — not a granted staff set — can edit these documents today. See Q12.
+
+**Access paths eliminated this session** (all `[VERIFIED via live attempt]`):
+
+- The modern pane's **Advanced permissions settings** link could not be found.
+- `_layouts/15/settings.aspx`, `user.aspx?view=perms`, and `role.aspx` "don't
+  work" for the accounts tried. This is the **second** time a classic
+  `_layouts/15/…` URL has failed on this tenant (after
+  `VersionSettings.aspx?List={guid}` on 2026-08-10). Two independent failures
+  make "classic pages are reachable here by URL" a claim to stop relying on —
+  though note the versioning page *was* reachable through UI navigation, so the
+  pages exist; it is the URL entry that fails.
+- PowerShell was not available in the session (SharePoint Online Management
+  Shell is Windows-only; PnP.PowerShell needs an Entra app client ID since 2024).
+
+**Therefore the remaining Connor-side asks are blocked on tooling, not on
+willingness.** Tomorrow's session should open with acquiring *one* working
+surface — an admin PowerShell session, or a signed-in path into classic Site
+Settings — rather than re-asking the questions.
+
+---
+
 ## 2. Open questions
 
 | # | Question | Status | Owner |
@@ -97,6 +158,8 @@ Recommended sequencing (§9): the site-collection-administrator identity questio
 | Q9 | Who can lower the 500-major-version limit, and would we detect it? | `[OPEN]` | Connor / site owner + Justin |
 | Q10 | Is Microsoft's 14-day post-deletion backup / point-in-time restore reachable for us, and by whom? | `[OPEN]` | M365 admin (DFT) |
 | Q11 | **Acceptance thresholds:** what evidence does Justin require before declaring the artifact system production-ready? | `[OPEN]` — product decision | Justin |
+| Q12 | **NEW 2026-08-11.** "Everyone except external users" holds edit rights — is tenant-wide edit access deliberate or an unremoved default, and is the site Public or Private? | `[VERIFIED]` that the group is in Members; `[OPEN]` whether it is intended | Connor / site owner + Justin |
+| Q13 | **NEW 2026-08-11.** Which surface can this tenant's classic permission pages actually be reached from, given two URL failures? | `[OPEN]` — blocks Q5, Q6, Q9 | Connor / site owner |
 
 ---
 
@@ -290,6 +353,40 @@ set, not the mapping. The consequences hold under either reading:
 `[OPEN]` — a product decision, not an evidence question. See §7 for the proposed
 closing criteria; Justin's job is to accept, tighten, or waive them.
 
+### Q12 — Tenant-wide edit access (new, 2026-08-11)
+
+- `[VERIFIED via screenshot 2026-08-11]` "Everyone except external users" is in
+  the Site members group for `/sites/akoyaGO`.
+- `[VERIFIED via Microsoft documentation]` That group is auto-added to Members on
+  Modern Team sites with **Public** privacy, granting access and edit to every
+  licensed user in the directory.
+- `[OPEN]` Whether this is deliberate, whether the site is Public or Private
+  today, and whether removing that group in favour of the actual staff group
+  would break anything (GOapply, Power Automate flows, and akoyaGO's own service
+  identities all touch this site, so this is **not** a safe unilateral change).
+- **Why it matters here:** every other question in this brief asks what an
+  *ordinary editor* can do. This one asks **how many ordinary editors there
+  are** — and the answer today is "everyone with a license." It multiplies
+  whatever Q5 turns out to be, in either direction. It is also the one finding
+  so far that is actionable without any further evidence.
+- **Do not treat this as a defect until Q5 is known.** If Delete Items is
+  unchecked, tenant-wide *edit* is a much smaller matter than tenant-wide
+  *delete*.
+
+### Q13 — A working administrative surface (new, 2026-08-11)
+
+- `[VERIFIED via live attempt 2026-08-11]` The modern pane's Advanced permissions
+  settings link was not findable, and `settings.aspx` / `user.aspx?view=perms` /
+  `role.aspx` did not work for the accounts tried. `[VERIFIED via repository]`
+  `VersionSettings.aspx?List={guid}` also failed on 2026-08-10.
+- `[ASSUMED]` Cause not discriminated: trimmed/redirected classic pages on this
+  tenant, an account without the rights those pages require, or the URL forms
+  being wrong here. The one counter-data-point is that the Versioning Settings
+  page **was** reached by UI navigation on 2026-08-10, so the classic pages
+  exist and are permitted to at least one account.
+- **This now gates Q5, Q6, and Q9.** Tomorrow's first move is to obtain one
+  working surface, not to re-ask the questions.
+
 ---
 
 ## 4. Decision / evidence owner map
@@ -473,6 +570,19 @@ delete-others.
 ---
 
 ## 9. Recommended sequencing
+
+**Revised 2026-08-11 after the live attempt.** Step 0 now precedes everything on
+the Connor side: **get one working administrative surface (Q13).** The questions
+are already written and Connor is willing; what failed was access. Options, in
+order of expected cost: have Connor navigate to classic Site Settings through
+the UI rather than by URL (the route that worked for the Versioning page on
+2026-08-10); or get a Windows machine with the SharePoint Online Management
+Shell and SharePoint-admin credentials; or register an Entra app for
+PnP.PowerShell, which also answers the second-stage bin directly via
+`Get-PnPRecycleBinItem -SecondStage`. Do not re-ask the questions until one of
+these exists.
+
+Then:
 
 1. **Ask Q2 first (site collection administrator identity).** One question, and
    it names the person who can answer Q1 and half of Q4. Cheapest unblock in the

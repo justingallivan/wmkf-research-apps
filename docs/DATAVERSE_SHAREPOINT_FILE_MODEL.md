@@ -688,7 +688,43 @@ The remaining controls are deliberately not collapsed into that pass:
   **regulatory record** label would instead block deletion *and* (for regulatory
   records) editing outright — which would conflict with the editable-writeup
   product model and must be escalated, not celebrated.
-- **[AMBIGUOUS] Least-privilege human editing.** Connor reports site members have
+- **[AMBIGUOUS — but "limited control" itself is now RESOLVED, 2026-08-11 (S415)]
+  Least-privilege human editing.**
+
+  **[VERIFIED via a signed-in screenshot of the modern Site Permissions pane,
+  2026-08-11]** "Limited control" is the **modern pane's own fixed descriptive
+  label** for the Site members group, shown beside "full control" (Site owners)
+  and "no control" (Site visitors). Connor quoted the UI string verbatim and
+  reported accurately. **It is not a custom permission level and it settles
+  nothing about Delete Items.** Consequence: **H2 below loses its main support
+  and the lean flips to H1** — the custom "Contribute minus Delete" hypothesis
+  rested largely on that phrase sounding like a real level. The question stays
+  open; only the checkbox read closes it. Microsoft also has a documented issue
+  where this pane displays inaccurate permission levels, so it cannot serve as a
+  definition in either direction.
+
+  **[VERIFIED via the same screenshot] NEW and larger than the question that
+  surfaced it: `Everyone except external users` is a member of Site members**,
+  i.e. holds edit rights on this library. **[VERIFIED via Microsoft
+  documentation]** that group "is added to the Members group automatically on
+  Modern Team sites with *Public* privacy settings, so that users in Microsoft
+  365 can access and edit the SharePoint site." So the editor audience for the
+  governed writeups is **every licensed user in the tenant**, not a granted staff
+  set. Whether that is deliberate is **[OPEN]**; do not treat it as a defect
+  before the delete-rights answer, and do **not** change it unilaterally —
+  GOapply, Power Automate flows, and akoyaGO service identities all touch this
+  site. Tracked as Q12 in `outputs/sharepoint-storage-policy-question-brief.md`.
+
+  **[VERIFIED via live attempt 2026-08-11] Access, not willingness, is the
+  blocker.** The pane's *Advanced permissions settings* link was not findable,
+  and `_layouts/15/settings.aspx`, `user.aspx?view=perms`, and `role.aspx` did
+  not work for the accounts tried — the second such classic-URL failure on this
+  tenant after `VersionSettings.aspx?List={guid}`. PowerShell was unavailable
+  (SPO Management Shell is Windows-only; PnP needs an Entra app client ID since
+  2024). **Get one working administrative surface before re-asking any of these
+  questions.**
+
+  The original framing follows and still stands. Connor reports site members have
   **"limited control"**. That is **not a standard SharePoint permission level** —
   the built-in levels are Full Control, Design, Edit, Contribute, Read, and the
   auto-assigned Limited Access — so it is either a paraphrase or a custom level.
