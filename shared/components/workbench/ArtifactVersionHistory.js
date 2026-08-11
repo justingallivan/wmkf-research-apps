@@ -122,9 +122,16 @@ export default function ArtifactVersionHistory({ requestId, expectedArtifactId }
                   ))}
                 </ul>
                 {state.hasMore && (
+                  // Count the rows actually rendered, and claim nothing about
+                  // recency. `limit` is the cap, not the number returned — a
+                  // bounded scan can return 3 rows with limit 20 — and because
+                  // unseen pages are explicitly not assumed to be ordered, the
+                  // rows shown are not provably "the most recent". Overstating
+                  // either would misdescribe an audit record.
                   <p className="mt-2 text-xs text-gray-500">
-                    Showing the {state.limit} most recent versions. Older versions exist in
-                    SharePoint.
+                    Showing {state.versions.length}{' '}
+                    version{state.versions.length === 1 ? '' : 's'}. Additional versions may
+                    exist in SharePoint.
                   </p>
                 )}
               </>

@@ -48,7 +48,32 @@ it('lists versions newest-first with the editor name and a current marker', asyn
   expect(screen.getByText('Connor Example')).toBeInTheDocument();
 });
 
-it('says so when the list is truncated instead of implying it is complete', async () => {
+it('counts the rows it rendered, not the cap, and claims nothing about recency', async () => {
+  // The discriminating fixture: FEWER rows than the limit. A bounded scan can
+  // return 3 rows with limit 20, so reporting the cap would tell staff they are
+  // looking at 20 versions. Calling them "most recent" would also assert an
+  // ordering the response explicitly does not guarantee.
+  mockFetch({
+    status: 'current',
+    hasMore: true,
+    limit: 20,
+    versions: [
+      { versionId: '3.0', isCurrent: true },
+      { versionId: '2.0', isCurrent: false },
+      { versionId: '1.0', isCurrent: false },
+    ],
+  });
+  render(<ArtifactVersionHistory requestId={REQUEST_ID} />);
+  await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
+
+  await waitFor(() => expect(
+    screen.getByText(/Showing 3 versions\. Additional versions may exist/),
+  ).toBeInTheDocument());
+  expect(screen.queryByText(/20/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/most recent/i)).not.toBeInTheDocument();
+});
+
+it('pluralizes a single truncated row correctly', async () => {
   mockFetch({
     status: 'current',
     hasMore: true,
@@ -59,7 +84,7 @@ it('says so when the list is truncated instead of implying it is complete', asyn
   await userEvent.click(screen.getByRole('button', { name: 'View version history' }));
 
   await waitFor(() => expect(
-    screen.getByText(/Showing the 20 most recent versions/),
+    screen.getByText(/Showing 1 version\. Additional versions may exist/),
   ).toBeInTheDocument());
 });
 
