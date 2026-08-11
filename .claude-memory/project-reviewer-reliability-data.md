@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-07-24 via production deployment, controlled smoke, terminal-transition-service, Dynamics email service, and Atlas
+  last_verified: 2026-08-11 via source and read-only production Dataverse for the extension gap; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -58,6 +58,27 @@ whether reviewers are on time and reliable — not just participation counts.
    append-only dispatch entity keyed to the email activity.
 5. **Keep payability separate.** It annotates genuinely completed reviews and
    does not replace terminal engagement status.
+
+## Verified per-reviewer extension gap (Session 416, 2026-08-11)
+
+- [VERIFIED via source + read-only production Dataverse probe] Request `1002926`
+  has proposal-wide `wmkf_reviewduedate=2026-09-09`; Mohammad Hafezi (the live
+  reviewer row is spelled `Mohamed Hafezi`) accepted and was granted an
+  individual extension to 2026-09-14. No suggestion-level due
+  date exists, so the portal and acceptance/calendar surfaces retain September 9.
+- Both automatic reminder flags on that request are null, which the cron treats
+  as disabled (`=== true` is required). His current portal token expires
+  2026-11-04, and final submission enforces token/lifecycle state rather than the
+  displayed request due date. The September 14 exception is operationally safe,
+  but it is tracked outside the product.
+- **Verified open product action:** add a staff-editable per-suggestion review-due
+  override and route one effective due date through staff display, external
+  context, acceptance email/calendar generation, review-due reminders, and token
+  issuance/regeneration. Keep invitation response timing separate.
+- Do not conflate that mutable operational override with the append-only
+  dispatch/deadline evidence needed for reviewer-reliability measurement. Run
+  `/contract-reconcile` before implementation; this crosses Dataverse schema,
+  staff UI/API, external portal, email, cron, token lifecycle, Atlas, and tests.
 
 ## Terminal-status implementation boundary
 

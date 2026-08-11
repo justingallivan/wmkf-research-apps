@@ -1,121 +1,67 @@
-# Session 416 Prompt: reviewer-alert retraction hardened after Opus review; routing UI parked
+# Session 417 Prompt: per-reviewer due-date override; SharePoint policy input pending
 
-> **Codex follow-through, 2026-08-11.** The work order is decided: build no new
-> reviewer-email alert-routing UI now. Production history contains exactly one
-> alert of this type, its condition is already resolved, and eleven later
-> successful nightly runs created no recurrence. The information-only idea would
-> require a new request-scoped roster-contact path; direct alert-to-merge remains
-> NO-SHIP. Re-open product work only after a fresh probe returns `STILL_BLOCKED`.
->
-> The first review found why the sole row is still `active`: the S414 reconciler tested
-> current contact authority before live suggestion lifecycle, and this deselected
-> row is no longer vetted. Commit `3872d97c` fixes the ordering and adds both
-> regression directions. The Opus follow-up then found
-> the remaining confirmed P1: a missing Dataverse suggestion throws 404 rather
-> than returning null. The production path now maps only Dataverse's structured
-> ObjectDoesNotExist response (`404`, `0x80040217`) to `suggestion_gone`; every
-> other 404 remains an error. It handles excluded rows through a read-only
-> lifecycle lookup, gates unvetted reads on standing alert keys, reports only
-> known-open `wouldRetract` entries (with an explicit incomplete-preview flag),
-> treats missing people as non-reconcilable, and aligns the probe's request
-> binding. Focused suites pass 153/153; the current full unit suite passes 575
-> suites / 7,283 tests. Opus returned READY on `fa71755d..a7fc1a0a`; the final
-> JSDoc clarification is `5f7baf9a`. The six-commit fast-forward was promoted to
-> `main` and Vercel Production on 2026-08-11 (`dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5`,
-> READY). No manual cron run was performed during promotion.
-
-> **Handoff, 2026-08-11 (Session 414).** Seven commits, all on `main`, all pushed.
-> Fixed a five-week production misconfiguration that had been emitting a
-> per-reviewer alert on every accept, made three fail-open-ish env flags
-> auditable, shipped alert auto-retraction with mutation-verified tests, and
-> took a design proposal to adversarial review — which killed it, correctly.
-> A pre-existing authorization gap was found and spun out for an owner decision.
-
-## Session 414 Summary
+## Session 416 Summary
 
 ### What Was Completed
 
-1. **BILL manual-onboarding alert fixed at its source** (`beae09a9`, `49ee5c76`).
-   `BILL_ONBOARDING_DEFERRED` was *present* in Production and Preview since
-   ~2026-06-10 but its value was not the literal `'true'` the strict `===`
-   requires (`lib/bill/onboard-reviewer-service.js:90`). Inert until the
-   2026-07-02 honorarium go-live opened the path; from that same day every
-   reviewer accept fell through to the `BILL_ENABLED !== 'true'` branch.
-   **61 alerts** accumulated (2026-07-02 17:48 → 2026-08-10 19:52 UTC). Flag
-   overwritten to exactly `true` on both targets, stored **non-sensitive** so the
-   value is readable, production redeployed. All 61 resolved. **No BILL API call
-   ever fired** — verified three ways: `BILL_ENABLED` unset, zero alerts of the
-   types reachable past that gate, and `bill_onboarding_state` holds 0 rows.
+1. **Reviewer-alert retraction hardening promoted.** The Codex work order was
+   implemented, reviewed twice by Claude Opus, and fast-forwarded to `main`.
+   Missing Dataverse suggestions now map to `suggestion_gone` only for the
+   structured record-missing response; systemic 404s remain errors. Lifecycle
+   ordering, excluded rows, open-alert gating, dry-run truthfulness, and probe
+   request binding were hardened. Opus returned READY. Vercel Production deploy
+   `dpl_ZyyAd6v77dDUq4kYscWsXMoikdq5` reached READY; no manual cron run followed.
 
-2. **Dataverse enforcement flags made auditable** (`157f0ff2`).
-   `DATAVERSE_TARGET_INTERLOCK` (Prod + Preview) and `DATAVERSE_DAL_ENFORCEMENT`
-   (Prod) were Sensitive/unreadable. Both now non-sensitive and explicitly `on`.
-   **The two do NOT share a failure posture** and the docs implied they did:
-   `resolveInterlockMode` fails CLOSED on an invalid value
-   (`interlock.js:77-85`), while `isDalEnforcementOn` falls through to
-   `NODE_ENV !== 'production'` = `false` — **fails OPEN in production**
-   (`dynamics-context.js:124-129`). `DATAVERSE_DAL_ENFORCEMENT` had no
-   `CREDENTIALS_RUNBOOK` row at all; added.
+2. **Reviewer due-date extension gap verified end to end.** Source tracing and a
+   read-only production probe established that due dates live only on
+   `akoya_request`; there is no per-reviewer override or suppression control.
+   Request `1002926` has a September 9 due date. Mohammad Hafezi (live reviewer
+   row: `Mohamed Hafezi`) has accepted and was granted September 14; both
+   automatic reminder flags are unset/disabled,
+   his token remains valid through November 4, and the submit endpoint does not
+   enforce the displayed due date. No operational intervention is needed for
+   this case, but the portal/calendar retain September 9.
 
-3. **Read-only probe for needs-merge alerts** (`c0562ded`).
-   `scripts/probe-reviewer-email-reconcile-alert.mjs` replays the reconciler
-   ladder against live Dataverse → STILL_BLOCKED / SELF_HEALING /
-   ALREADY_RESOLVED / NOT_RECONCILABLE. All three refusal paths tested.
-
-4. **Alert auto-retraction shipped** (`80b85408`) and its Opus-reviewed hardening
-   is live on `main` through `5f7baf9a`. `autoResolveKey` only
-   *deduped*, so an alert outlived its condition forever and a silent night was
-   indistinguishable from a resolved one. Now retracts on: email landed,
-   suggestion gone, deselected, applicant-excluded, write, repoint. The promoted
-   follow-up maps only record-scoped ObjectDoesNotExist 404s to gone without
-   weakening the fail-closed action lookup; systemic 404s remain row errors;
-   open-alert key gating avoids lifecycle reads for unvetted rows with no
-   standing signal; dry-run reports only confirmed-open `wouldRetract` entries
-   and exposes incomplete previews; missing people remain non-reconcilable.
-   Deliberately NOT on the ambiguous
-   skips or a stale-roster request mismatch — retracting there would destroy the
-   only standing signal. 35 focused reconciler tests; **4 mutations verified to fail the suite**.
-   `/contract-reconcile` caught a real defect mid-build: the emission still built
-   the alert key inline while retraction used a new helper — two definitions that
-   drift silently and fail open.
-
-5. **Merge-surfacing proposal killed on adversarial review** (`3abcdd14`,
-   `25b53167`, `a3a39122`). See "Do Not Reopen" #1 and the work order.
-
-### Live production behavior that changed today
-
-- Reviewer accepts no longer emit `bill_manual_onboarding` alerts; `/admin` shows
-  0 active (was 29).
-- `BILL_ONBOARDING_DEFERRED`, `DATAVERSE_TARGET_INTERLOCK`,
-  `DATAVERSE_DAL_ENFORCEMENT` are all readable in `vercel env ls` now.
-- Production redeployed twice; **69 cron runs since the second redeploy, all
-  `completed`, zero failed** `[VERIFIED via maintenance_runs, 15:51 UTC]`.
+3. **SharePoint storage-policy questions paused for owner input.** Connor's input
+   is expected 2026-08-12. Do not infer policy decisions before it arrives.
 
 ### Commits
-- `beae09a9` — Fix the BILL manual-onboarding alert at its source and record the drift
-- `49ee5c76` — Make the BILL deferred-flag value auditable in the credentials runbook
-- `157f0ff2` — Make the Dataverse enforcement flags auditable and record their failure asymmetry
-- `c0562ded` — Add a read-only probe for reviewer_email_reconcile_needs_merge alerts
-- `80b85408` — Retract reviewer_email_reconcile_needs_merge alerts when the condition clears
-- `3abcdd14` — Scope doc: surfacing the needs-merge alert in the Invite tab
-- `25b53167` — Mark the merge-surfacing scope NO-SHIP after adversarial review
-- `a3a39122` — Codex work order: reviewer email alert routing, Codex takes the lead
+- `3872d97c` — Fix reviewer alert lifecycle retraction ordering
+- `7c254d90` — Record Codex reviewer alert routing verdict
+- `fa71755d` — Harden reviewer alert lifecycle reconciliation
+- `a7fc1a0a` — Address Opus reviewer alert follow-up
+- `5f7baf9a` — Clarify reviewer suggestion missing-record contract
+- `c75a4a42` — Record reviewer alert production promotion
 
-Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start and after.
+No runtime code changed during the due-date investigation. Full unit suite before
+promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Milestone snapshot producer** — carried from S413, still open.
+1. **Build a per-reviewer review-due-date override.** Owner explicitly deferred
+   this to Session 417. Evidence: source consumers of request-level
+   `wmkf_reviewduedate`; live request `1002926`; active memory
+   `.claude-memory/project-reviewer-reliability-data.md`. Run
+   `/contract-reconcile` before implementation. The change crosses a new
+   suggestion-level DateOnly field/schema wave, staff edit API/UI (before and
+   after acceptance), effective-date projection, external portal, acceptance
+   email/calendar, review-due cron, token issuance/regeneration, Atlas, and
+   tests. Keep the invitation response deadline separate. Do not conflate this
+   mutable extension with immutable communicated-deadline evidence for reviewer
+   reliability.
+
+2. **Milestone snapshot producer** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze",
    DECIDED copy-the-bytes (owner, 2026-08-10). The three `wmkf_milestone*` fields
    are written nowhere today (`lib/dataverse/adapters/request-document.js:38-40`).
 
-2. **Two non-destructive SharePoint checks** — carried from S413, still open.
+3. **Two non-destructive SharePoint checks** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` H1/H2 block. (a) add
    "Checked Out To" to the `akoya_request` view; (b) read the Members permission
-   level's Delete Items / Delete Versions.
+   level's Delete Items / Delete Versions. Connor's related storage-policy input
+   is expected 2026-08-12; keep policy-dependent conclusions blocked until then.
 
 ### Owner Decision Needed
 
@@ -204,6 +150,12 @@ Unit suite on `main`: **7259/7259**. All 29 rubric gates green at session start 
 
 | File | Purpose |
 |------|---------|
+| `.claude-memory/project-reviewer-reliability-data.md` | Current extension gap, production example, and boundary between mutable overrides and immutable deadline evidence |
+| `lib/services/review-manager/campaign-config-service.js` | Current request-level due-date read/write contract |
+| `lib/services/reviewer-reminder-sweep.js` | Automatic reminder eligibility and request-level due-date consumption |
+| `lib/services/external-review/context-service.js` | Portal's displayed request-level submission deadline |
+| `lib/services/reviewer-acceptance-email.js` | Acceptance copy and calendar attachment use the request-level deadline |
+| `lib/external/reviewer-token-ttl.js` | Token-expiry policy that a per-reviewer effective date must reach |
 | `outputs/reviewer-email-alert-routing-codex-work-order.md` | Codex verdict, evidence matrix, re-open trigger, and killed design record |
 | `outputs/reviewer-email-merge-surfacing-scope.md` | The killed proposal, annotated NO-SHIP |
 | `lib/services/reviewer-email-reconciler.js` | `retractNeedsMerge` + `alertKeyFor` — one key definition for both directions |
