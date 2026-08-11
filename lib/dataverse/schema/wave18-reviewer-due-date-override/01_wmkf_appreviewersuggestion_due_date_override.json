@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_appreviewersuggestion-review-due-date-override",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive per-engagement operational review due-date override. Null means fall back to akoya_request.wmkf_reviewduedate. DateOnly prevents timezone drift across portal display, reminder scheduling, calendar attachments, and token-expiry math. This mutable field is not immutable communicated-deadline evidence. Deploy this wave before runtime code that selects the field. Run scripts/preflight-reviewer-due-date-override-field.mjs first; schema apply is creation-only and will not repair a divergent existing field.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ReviewDueDateOverride",
+      "displayName": "Review Due Date Override",
+      "format": "DateOnly",
+      "behavior": "DateOnly",
+      "description": "Optional operational review deadline for this reviewer engagement. Empty uses the request-level review due date. Mutable and audited; not the source of truth for historical communicated-deadline evidence."
+    }
+  ]
+}

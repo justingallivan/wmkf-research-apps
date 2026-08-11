@@ -92,6 +92,7 @@ describe('getMyCandidates', () => {
       akoya_requestnum: 'R-1',
       akoya_title: 'A Proposal',
       wmkf_meetingdate: '2026-06-15',
+      wmkf_reviewduedate: '2026-09-01',
     });
     suggestionAdapter.findByRequest.mockResolvedValue([{
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -99,6 +100,7 @@ describe('getMyCandidates', () => {
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_sources: 'literature_retrieved',
       wmkf_responsetype: 100000000,
+      wmkf_reviewduedateoverride: '2026-09-15',
     }]);
     potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
       select.includes('wmkf_organizationname')
@@ -116,6 +118,9 @@ describe('getMyCandidates', () => {
       name: 'Dr X',
       affiliation: 'MIT',
       responseType: 'accepted', // optionset → string code mapping preserved
+      reviewDueDateOverride: '2026-09-15',
+      requestReviewDeadline: '2026-09-01',
+      effectiveReviewDeadline: '2026-09-15',
     });
     expect(resolveByEmail).not.toHaveBeenCalled(); // explicit request skips PD scope
   });
@@ -305,6 +310,39 @@ describe('patchMyCandidates', () => {
       message: 'Candidate updated',
       updated: { suggestionId: SUGGESTION_ID, accepted: true },
     });
+  });
+
+  test('per-reviewer due-date override accepts YYYY-MM-DD and explicit null clearing', async () => {
+    await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2026-09-15' },
+      actingUserSystemId: SYS,
+    });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenLastCalledWith(
+      SUGGESTION_ID,
+      { reviewDueDateOverride: '2026-09-15' },
+      { actingUserSystemId: SYS },
+    );
+
+    await patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: null },
+      actingUserSystemId: SYS,
+    });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenLastCalledWith(
+      SUGGESTION_ID,
+      { reviewDueDateOverride: null },
+      { actingUserSystemId: SYS },
+    );
+  });
+
+  test('per-reviewer due-date override rejects malformed input before adapter write', async () => {
+    await expect(patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: '09/15/2026' },
+      actingUserSystemId: SYS,
+    })).rejects.toMatchObject({
+      httpStatus: 400,
+      message: 'reviewDueDateOverride must be a YYYY-MM-DD date or null',
+    });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
   test('restore: true re-selects via restore() and returns the restore envelope', async () => {

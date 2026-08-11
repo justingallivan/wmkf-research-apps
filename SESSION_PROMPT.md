@@ -38,19 +38,19 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
 
 ## Next Items
 
-### Verified Open
+### Active / Verified Open
 
-1. **Build a per-reviewer review-due-date override.** Owner explicitly deferred
-   this to Session 417. Evidence: source consumers of request-level
-   `wmkf_reviewduedate`; live request `1002926`; active memory
-   `.claude-memory/project-reviewer-reliability-data.md`. Run
-   `/contract-reconcile` before implementation. The change crosses a new
-   suggestion-level DateOnly field/schema wave, staff edit API/UI (before and
-   after acceptance), effective-date projection, external portal, acceptance
-   email/calendar, review-due cron, token issuance/regeneration, Atlas, and
-   tests. Keep the invitation response deadline separate. Do not conflate this
-   mutable extension with immutable communicated-deadline evidence for reviewer
-   reliability.
+1. **Per-reviewer review-due-date override — staged, not deployed (2026-08-11).**
+   Feature branch `codex/reviewer-due-date-override` implements the new nullable
+   suggestion-level DateOnly field, shared pre/post-accept staff editor,
+   existing PATCH writer, effective-date projection, portal,
+   acceptance-email/calendar, review-due reminder, and token
+   issuance/regeneration fan-out. `/contract-reconcile` and `/sweep` were run;
+   focused tests are green. [VERIFIED via read-only production metadata] the
+   field is ABSENT, so Wave 18 schema apply/publish/exact verification must
+   precede Tier-2 runtime promotion. Invitation response timing remains
+   separate; the mutable override is not immutable communicated-deadline
+   evidence for reviewer reliability.
 
 2. **Milestone snapshot producer** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze",

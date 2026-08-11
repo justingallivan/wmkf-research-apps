@@ -85,6 +85,7 @@ describe('reviewer-suggestion merge helpers', () => {
     expect(opts.filter).toBe(`_wmkf_potentialreviewer_value eq ${LOSER}`);
     expect(opts.filter).not.toMatch(/selected/); // removed rows must be included
     expect(opts.select).toMatch(/_wmkf_honorariumrequest_value/); // engagement signal present
+    expect(opts.select).toMatch(/wmkf_reviewduedateoverride/);
     expect(opts.select).toMatch(/wmkf_sources/); // applicant-provenance gate (collision union) present
   });
 

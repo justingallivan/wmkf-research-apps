@@ -32,11 +32,10 @@ const GUID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PD_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 // PD-scope request $select strings (Codex S329 review: pin select/top too, not
-// just filters). findAcceptedByPD adds wmkf_organizationname and the
-// reviewer-return deadline — real, deliberate
-// divergence between the two request queries.
+// just filters). Both PD projections carry the reviewer-return deadline;
+// findAcceptedByPD additionally carries wmkf_organizationname.
 const PD_REQUEST_SELECT =
-  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_abstract,' +
+  'akoya_requestid,akoya_requestnum,akoya_title,wmkf_meetingdate,wmkf_reviewduedate,wmkf_abstract,' +
   '_akoya_applicantid_value,_wmkf_projectleader_value,_wmkf_grantprogram_value,' +
   '_wmkf_programareaserved_value';
 const PD_ACCEPTED_REQUEST_SELECT =

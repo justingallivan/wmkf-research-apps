@@ -61,6 +61,7 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_completedat: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
+  wmkf_reviewduedateoverride: null,
 };
 
 let original;

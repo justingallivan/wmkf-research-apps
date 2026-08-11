@@ -21,6 +21,7 @@ jest.mock('../../lib/external/calendar-invite.js', () => ({
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults.js';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature.js';
+import { buildReviewDueIcs } from '../../lib/external/calendar-invite.js';
 import { sendAcceptanceConfirmationEmail } from '../../lib/services/reviewer-acceptance-email.js';
 
 const OLD_ENV = process.env.NOTIFICATION_EMAIL_FROM;
@@ -39,6 +40,7 @@ beforeEach(() => {
   jest.restoreAllMocks();
   readRequiredEmailDefaults.mockReset().mockResolvedValue(defaultsOk());
   resolveSignatureForRequest.mockReset().mockResolvedValue({ signature: 'Program Director' });
+  buildReviewDueIcs.mockReset().mockReturnValue(null);
   process.env.NOTIFICATION_EMAIL_FROM = 'fallback@wmkf.org';
 });
 
@@ -120,6 +122,32 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
 
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       to: 'confirmed@current.edu',
+    }));
+  });
+
+  test('suggestion due-date override wins in both the email body and calendar invite', async () => {
+    jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue(null);
+    const send = jest.spyOn(DynamicsService, 'createAndSendEmail').mockResolvedValue(undefined);
+    buildReviewDueIcs.mockReturnValue(Buffer.from('calendar'));
+
+    await sendAcceptanceConfirmationEmail({
+      suggestion: {
+        wmkf_appreviewersuggestionid: 'sug-override',
+        wmkf_reviewduedateoverride: '2026-08-05',
+      },
+      request: {
+        akoya_requestid: 'req-override',
+        akoya_title: 'Override Proposal',
+        wmkf_reviewduedate: '2026-08-01',
+      },
+      reviewer: { wmkf_name: 'Jane Reviewer', wmkf_emailaddress: 'jane@reviewer.org' },
+    });
+
+    expect(buildReviewDueIcs).toHaveBeenCalledWith(expect.objectContaining({
+      reviewDueDate: '2026-08-05',
+    }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      body: expect.stringContaining('August 5, 2026'),
     }));
   });
 });

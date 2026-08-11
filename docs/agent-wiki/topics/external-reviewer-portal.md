@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-06
+last_verified: 2026-08-11
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -154,18 +154,22 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
-- **The portal's "Submission deadline" is the request's review due date, not the token expiry (2026-08-09).**
-  `/context` exposes `reviewDeadline` (`wmkf_reviewduedate`, the same field the
-  email templates fall back to) and `MaterialsView` renders it YMD-local (a UTC
+- **The portal's "Submission deadline" is the operational review due date, not the token expiry (2026-08-11).**
+  Current production exposes the request's `wmkf_reviewduedate`. Wave 18 source
+  on `codex/reviewer-due-date-override` instead resolves
+  `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` first and falls back
+  to the request date; `/context` exposes that value as `reviewDeadline` and
+  `MaterialsView` renders it YMD-local (a UTC
   parse would show the prior day west of UTC). `tokenExpiresAt` (magic-link
   expiry — review due + grace per `lib/external/reviewer-token-ttl.js`, 90 days
   for accepted reviewers) stays in the payload but is no longer shown as a
   deadline; before this fix the page displayed it under that label, and for an
   accepted reviewer with a future due date it sits 90 days past the emailed
-  deadline. Residual divergence: a per-send composer
-  deadline override is persisted to the request only when `wmkf_reviewduedate`
-  was unset, so an override on a dated request still emails a date the portal
-  can't see.
+  deadline. [VERIFIED via read-only production metadata 2026-08-11] the Wave 18
+  field is still ABSENT, so schema-first provisioning and runtime promotion are
+  required before the override behavior is production-live. The dedicated
+  per-engagement override closes the prior composer/portal divergence once
+  promoted; response timing remains separate.
 - **Post-accept and post-submit notices name the assigned Program Director (2026-08-09).**
   `/context` looks up the request's `_wmkf_programdirector_value` system user
   (best-effort; requires active + name + email) for the `accepted-pre-materials`,

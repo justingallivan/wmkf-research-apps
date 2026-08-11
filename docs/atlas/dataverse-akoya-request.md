@@ -89,6 +89,14 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 
 Schema spec: `lib/dataverse/schema/wave7-reviewer-engagement/akoya_request-reviewer-engagement.json` (isolated wave, same drift-avoidance reason as wave2-triagestatus). The matching per-reviewer marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion` (see that Atlas page).
 
+**Wave 18 transition (not yet deployed, 2026-08-11):** this request field
+remains the proposal-wide default. The staged reviewer-due-date feature adds a
+nullable `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; consumers use
+that engagement value first and fall back here. Production metadata proves the
+new suggestion field is still absent, so current production remains
+request-only until schema-first provisioning and runtime promotion. The request
+campaign editor continues to own this default and response timing is unchanged.
+
 **Grantee Deliverables Portal abstract fields (S268/S271).** The request keeps only the abstract text
 that is semantically part of the award/request record:
 - `wmkf_abstractformatted` (Memo, 32000) — AI style-guide abstract drafted FROM the applicant's `wmkf_abstract` (the source above); shown to the grantee to edit/approve. Not overwritten by the grantee edit. **Writers:** `grantee-deliverables/generate` (AI draft) and, S278, `grantee-deliverables/abstract` PUT (PD refine before send — editable in null/Drafted/Invited/Reminder Sent).

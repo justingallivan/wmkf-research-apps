@@ -97,12 +97,14 @@ describe('token-lifecycle', () => {
   });
 
   describe('ensureToken', () => {
-    function row({ hash = null, revoked = false, expires = null } = {}) {
+    function row({ hash = null, revoked = false, expires = null, accepted = false, dueOverride = null } = {}) {
       return {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         wmkf_externaltokenhash: hash,
         wmkf_externaltokenrevoked: revoked,
         wmkf_externaltokenexpires: expires,
+        wmkf_accepted: accepted,
+        wmkf_reviewduedateoverride: dueOverride,
         _wmkf_request_value: REQUEST_ID,
       };
     }
@@ -144,6 +146,22 @@ describe('token-lifecycle', () => {
       }));
       const result = await ensureToken(SUGGESTION_ID);
       expect(result.minted).toBe(true);
+    });
+
+    test('new mint uses the suggestion override for accepted-reviewer expiry', async () => {
+      const dueOverride = '2099-09-15';
+      const expectedExpiry = new Date(
+        Date.parse(`${dueOverride}T23:59:59Z`) + 90 * 24 * 60 * 60 * 1000,
+      );
+      DynamicsService.getRecord
+        .mockResolvedValueOnce(row({ accepted: true, dueOverride }))
+        .mockResolvedValueOnce({ wmkf_reviewduedate: '2099-09-01' });
+
+      const result = await ensureToken(SUGGESTION_ID);
+
+      expect(result.minted).toBe(true);
+      expect(DynamicsService.updateRecord.mock.calls[0][2].wmkf_externaltokenexpires)
+        .toBe(expectedExpiry.toISOString());
     });
 
     test('returns no_request when suggestion has no linked request', async () => {

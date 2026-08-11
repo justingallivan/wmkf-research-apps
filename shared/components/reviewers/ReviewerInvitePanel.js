@@ -39,6 +39,7 @@ import RemoveEntirelyModal from './RemoveEntirelyModal';
 import ReleaseEmailModal from './ReleaseEmailModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
+import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 
 function StatusChip({ c }) {
   const tones = {
@@ -472,6 +473,16 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                       </span>
                     )}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
+                  </div>
+                  <div className="mt-1">
+                    <ReviewerDueDateEditor
+                      suggestionId={c.suggestionId}
+                      overrideDate={c.reviewDueDateOverride}
+                      effectiveDate={c.effectiveReviewDeadline}
+                      defaultDate={c.requestReviewDeadline}
+                      canManage={canManage}
+                      onSaved={onRefresh}
+                    />
                   </div>
                   {!c.email && !c.invited && (
                     <div className="mt-1.5 p-2 rounded border border-amber-300 bg-amber-50 text-xs text-amber-800">

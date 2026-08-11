@@ -246,6 +246,8 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         daysSinceMaterialsSent: expect.any(Number),
         reminderSentAt: '2026-06-22T00:00:00Z',
         reminderCount: 1,
+        reviewDueDateOverride: null,
+        effectiveReviewDeadline: '2026-09-09',
         reviewReceivedAt: '2026-06-28T12:00:00Z',
         submitted: true,
         reviewFilename: 'review.pdf',

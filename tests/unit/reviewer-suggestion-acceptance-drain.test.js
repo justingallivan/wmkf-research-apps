@@ -18,7 +18,7 @@ describe('getForAcceptanceDrain', () => {
     const spy = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_appreviewersuggestionid: SUGGESTION_ID, wmkf_accepted: true });
     const row = await getForAcceptanceDrain(SUGGESTION_ID);
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
-      select: 'wmkf_appreviewersuggestionid,wmkf_accepted,wmkf_declined,wmkf_responsetype,wmkf_reviewstatus,wmkf_reviewreceivedat,wmkf_responsereceivedat,wmkf_honorariumoptout,wmkf_reviewerfirstname,wmkf_reviewerlastname,wmkf_reviewernickname,wmkf_reviewertitle,wmkf_revieweraffiliation,wmkf_revieweremail,wmkf_reviewerorcid,_wmkf_honorariumrequest_value,_wmkf_request_value,_wmkf_potentialreviewer_value',
+      select: 'wmkf_appreviewersuggestionid,wmkf_accepted,wmkf_declined,wmkf_responsetype,wmkf_reviewstatus,wmkf_reviewreceivedat,wmkf_responsereceivedat,wmkf_honorariumoptout,wmkf_reviewerfirstname,wmkf_reviewerlastname,wmkf_reviewernickname,wmkf_reviewertitle,wmkf_revieweraffiliation,wmkf_reviewduedateoverride,wmkf_revieweremail,wmkf_reviewerorcid,_wmkf_honorariumrequest_value,_wmkf_request_value,_wmkf_potentialreviewer_value',
     });
     expect(row.wmkf_accepted).toBe(true);
   });

@@ -24,7 +24,7 @@ describe('getForTokenStatus', () => {
     const spy = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ wmkf_appreviewersuggestionid: SUGGESTION_ID });
     await getForTokenStatus(SUGGESTION_ID);
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
-      select: 'wmkf_appreviewersuggestionid,wmkf_externaltokenhash,wmkf_externaltokenrevoked,wmkf_externaltokenexpires,_wmkf_request_value,wmkf_applicantdisposition',
+      select: 'wmkf_appreviewersuggestionid,wmkf_externaltokenhash,wmkf_externaltokenrevoked,wmkf_externaltokenexpires,wmkf_accepted,wmkf_reviewduedateoverride,_wmkf_request_value,wmkf_applicantdisposition',
     });
   });
 });

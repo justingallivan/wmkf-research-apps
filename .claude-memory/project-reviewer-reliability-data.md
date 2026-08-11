@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-reliability-data
-description: "Owner goal (S369) — capture whether a reviewer is on time and reliable; terminal status is the active prerequisite, durable deadline evidence is a separate dispatch-ledger design."
+description: "Owner goal (S369) — capture whether a reviewer is on time and reliable; terminal status is live, a mutable per-engagement due-date override is staged, and durable deadline evidence remains a separate dispatch-ledger design."
 status: active
 metadata:
   node_type: memory
@@ -71,10 +71,18 @@ whether reviewers are on time and reliable — not just participation counts.
   2026-11-04, and final submission enforces token/lifecycle state rather than the
   displayed request due date. The September 14 exception is operationally safe,
   but it is tracked outside the product.
-- **Verified open product action:** add a staff-editable per-suggestion review-due
-  override and route one effective due date through staff display, external
-  context, acceptance email/calendar generation, review-due reminders, and token
-  issuance/regeneration. Keep invitation response timing separate.
+- **Implementation staged on `codex/reviewer-due-date-override` (2026-08-11):**
+  [VERIFIED via branch source and focused tests] a nullable DateOnly
+  `wmkf_reviewduedateoverride`, shared Invite/Track editor, existing
+  `my-candidates` PATCH writer, override-first resolver, and the full staff →
+  portal/email/calendar/reminder/token consumer fan-out are implemented.
+  Invitation response timing remains separate. A fresh re-add clears the stale
+  override; editing alone does not rotate a live delivered token.
+- **Production remains request-only:** [VERIFIED via read-only typed metadata
+  2026-08-11] `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is ABSENT
+  in production. Required release order is Wave 18 schema apply/publish/exact
+  verification, then deliberate Tier-2 runtime promotion. No schema write or
+  runtime promotion has occurred from this branch.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,

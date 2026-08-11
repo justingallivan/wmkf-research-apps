@@ -5,7 +5,7 @@ type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-07-27 via lib/external source, upload service, proxy allowlist, and current token-lifecycle callers; external deployment remains date-bounded
+last_verified: 2026-08-11 via lib/external source, token-lifecycle callers, focused tests, and read-only production metadata for the pending Wave 18 field; external deployment remains date-bounded
 ---
 
 ## Recall Rule
@@ -47,9 +47,13 @@ promotion and Vercel Blob retirement were observed on 2026-05-03
 keys expiry on accepted status via `computeReviewerTokenExpiry`
 (`lib/external/reviewer-token-ttl.js`): accepted → review-due + 90d,
 invitee/non-responder → review-due + 2d cap, no sane future due date → 90d
-fallback. `regenerate-token`/`ensureToken` retain the flat 90-day default;
-`extendForPostSubmissionWindow` supplies the seven-day modify window; upload
-requires `wmkf_reviewstatus >= materials_sent`.
+fallback. On feature branch `codex/reviewer-due-date-override`, all normal mint
+paths (`send-emails`, reminder sends, `regenerate-token`, and `ensureToken`) use
+the suggestion override first and the request date second. Production remains
+request-only because the Wave 18 suggestion column was [VERIFIED via read-only
+metadata 2026-08-11] ABSENT; schema must precede runtime promotion.
+`extendForPostSubmissionWindow` still supplies the seven-day modify window;
+upload requires `wmkf_reviewstatus >= materials_sent`.
 
 **How to apply:**
 - Don't rebuild any of the above. Reuse the `lib/external/*` primitives (`token-lifecycle`, `verify-suggestion-token`, `reviewer-materials`, `review-form-schema`) for new external-facing flows.

@@ -261,6 +261,24 @@ describe('/api/external/review/[token]/context', () => {
     });
   });
 
+  it('returns the suggestion due-date override instead of the request default', async () => {
+    verifySuggestionToken.mockResolvedValue({
+      ...verifiedSuggestion,
+      suggestion: {
+        ...verifiedSuggestion.suggestion,
+        wmkf_reviewduedateoverride: '2026-08-20',
+      },
+    });
+    getRequestSharePointBuckets.mockResolvedValue([]);
+
+    const req = createMockReq({ method: 'GET', query: { token: 'good-token' } });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res._data.reviewDeadline).toBe('2026-08-20');
+  });
+
   it('returns only the exact reviewer proposal file for the verified request', async () => {
     verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
     getRequestSharePointBuckets.mockResolvedValue([
@@ -469,8 +487,8 @@ describe('/api/external/review/[token]/context', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(Object.keys(res._data).sort()).toEqual([
       'engagementState', 'etag', 'files', 'ok', 'policies', 'prefill',
-      'programDirector', 'proposal', 'questionSetVersion', 'questions', 'reviewer',
-      'submission', 'tokenExpiresAt',
+      'programDirector', 'proposal', 'questionSetVersion', 'questions', 'reviewDeadline',
+      'reviewer', 'submission', 'tokenExpiresAt',
     ]);
     expect(res._data.ok).toBe(true);
     expect(res._data.engagementState.view).toBe('stage2a');

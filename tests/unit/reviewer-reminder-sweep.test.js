@@ -359,6 +359,32 @@ describe('sweepReviewDueReminders', () => {
     expect(email.body).toContain('Your review is due by');
   });
 
+  test('per-reviewer override controls eligibility, rendered date, and minted-token expiry', async () => {
+    const override = ymdDaysFromNow(10);
+    const expectedExpiry = new Date(
+      Date.parse(`${override}T23:59:59Z`) + 90 * DAY,
+    );
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate({
+      wmkf_reviewduedateoverride: override,
+    })] });
+    installReads({ request: reviewDueRequest({
+      wmkf_reviewduedate: ymdDaysFromNow(30),
+      wmkf_reviewduereminderleaddays: 40,
+    }) });
+
+    const r = await sweepReviewDueReminders();
+
+    expect(r.sent).toBe(1);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      expiresAt: expectedExpiry,
+    }));
+    expect(createAndSendEmail.mock.calls[0][0].body).toContain(
+      new Date(`${override}T12:00:00Z`).toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+      }),
+    );
+  });
+
   test('candidate query allowlists materials_sent/under_review and excludes both terminal values', async () => {
     queryAllRecords.mockResolvedValue({ records: [] });
     await sweepReviewDueReminders();

@@ -197,6 +197,24 @@ test('render never mints; a placeholder template receives the non-live send-time
   expect(out.stats.ready).toBe(2);
 });
 
+test('per-reviewer due-date override wins over composer and request dates', async () => {
+  findById.mockResolvedValueOnce(suggestion({ wmkf_reviewduedateoverride: '2099-09-15' }));
+  getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+  getRequestById.mockResolvedValueOnce({ ...request, wmkf_reviewduedate: '2099-09-01' });
+
+  const out = await renderEmails({
+    suggestionIds: [SUG1],
+    template: { subject: 'Review due {{reviewDueDate}}', body: 'Due: {{reviewDueDate}}' },
+    settings: { reviewDueDate: '2099-09-05' },
+    actingUserSystemId: null,
+  });
+
+  expect(out.drafts[0]).toMatchObject({
+    subject: 'Review due September 15, 2099',
+    body: 'Due: September 15, 2099',
+  });
+});
+
 test('no suggestion rows resolve → RenderEmailsError 404 with the pinned message', async () => {
   findById.mockResolvedValue(null);
   const err = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null })

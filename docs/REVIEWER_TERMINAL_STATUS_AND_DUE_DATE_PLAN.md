@@ -35,6 +35,22 @@ The HMAC materials-repair endpoint, due-date columns, and inline due-date stamp
 are not part of the active slice. Git history preserves the discarded design;
 this document owns the current boundary.
 
+## Separate operational due-date override — staged 2026-08-11
+
+The later per-reviewer extension request is intentionally narrower than the
+deferred reliability-evidence design below. Feature branch
+`codex/reviewer-due-date-override` stages one nullable DateOnly
+`wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; null falls back to the
+request date, and one shared resolver feeds staff display, portal context,
+email/calendar copy, reminders, and token mint/regeneration. It is mutable
+operational state, not proof of the deadline communicated in an ordered
+dispatch.
+
+[VERIFIED via read-only production metadata 2026-08-11] the field is absent in
+production. The Wave 18 schema must be applied, published, and verified exact
+before the runtime branch is promoted. This does not change the deferred
+append-only dispatch-evidence requirement in this plan.
+
 ## Production release — 2026-07-24
 
 [VERIFIED via the live metadata preflight and

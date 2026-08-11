@@ -306,7 +306,11 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:199-246`] Saved candidate rows do not include aggregate review counts or last completed/submitted review date.
 - [VERIFIED via `pages/api/review-manager/reviewers.js:208-245`] Track reviewer rows do not include cross-request aggregate history.
 - [ASSUMED] "Completed a review" needs a business definition: reviewer submitted a review (`wmkf_reviewreceivedat`) versus PD closed it out (`wmkf_completedat` / `reviewStatus=complete`).
-- [VERIFIED via `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md:55`] Request-level reviewer campaign config includes `wmkf_reviewduedate`, and review-due reminders use it as the deadline for accepted/materials-sent/not-submitted reviewers.
+- [VERIFIED via feature-branch source/tests 2026-08-11] Wave 18 stages a nullable
+  per-engagement `wmkf_reviewduedateoverride`; review-due reminders and other
+  operational consumers use it first and fall back to request-level
+  `wmkf_reviewduedate`. [VERIFIED via read-only production metadata] the new
+  field is still absent in production pending schema-first promotion.
 
 **Proposed Approach**
 
@@ -314,7 +318,9 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [PLANNED] Add a read helper that queries suggestions by potential reviewer id and computes count plus last date.
 - [PLANNED] Decide whether count means accepted, review submitted, or PD completed; expose the label accordingly.
 - [PLANNED] Keep review history out of candidate capture; it is derived after review lifecycle events exist.
-- [PLANNED] Compute lateness automatically by comparing the request's review due date to the review receipt/submission date.
+- [PLANNED] Compute lateness automatically by comparing the effective
+  per-engagement due date (suggestion override, then request default) to the
+  review receipt/submission date.
 - [PLANNED] Allow a PD to override the automatic late/not-late assessment when entering post-closeout notes.
 - [PLANNED] Add aggregate fields to `my-candidates` only if staff need prior-review history while deciding whom to invite; otherwise prefer Track Reviewers, completed-review views, or a reviewer-pool surface.
 - [PLANNED] Consider caching only if the cross-reviewer query volume is too high for a request with many candidates.
@@ -358,7 +364,9 @@ M for derived counts and last-date display; L if staff need drill-down history r
 **Post-Review / Reviewer-Memory Work**
 
 1. [PLANNED] Add review-history aggregation from `wmkf_appreviewersuggestion`.
-2. [PLANNED] Add automatic lateness calculation from `wmkf_reviewduedate` and review receipt/submission date, with PD override during notes entry.
+2. [PLANNED] Add automatic lateness calculation from the effective due date
+   (`wmkf_reviewduedateoverride ?? wmkf_reviewduedate`) and review
+   receipt/submission date, with PD override during notes entry.
 3. [PLANNED] Add optional review-history workbook/report columns after defining "completed review."
 4. [PLANNED] Add optional PD closeout feedback: "would ask again?" flag plus required notes.
 5. [PLANNED] Add controlled expertise-tag tables only if free tags in `wmkf_keywords` are insufficient.

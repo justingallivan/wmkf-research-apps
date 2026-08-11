@@ -132,6 +132,7 @@ describe('getReviewers', () => {
         _wmkf_potentialreviewer_value: 'person-1',
         wmkf_accepted: true,
         wmkf_reviewstatus: 100000001,
+        wmkf_reviewduedateoverride: '2026-09-15',
       },
       { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, wmkf_accepted: false },
     ]);
@@ -145,6 +146,8 @@ describe('getReviewers', () => {
       suggestionId: IDS[0],
       reviewStatus: 'materials_sent',
       tokenState: 'not_minted',
+      reviewDueDateOverride: '2026-09-15',
+      effectiveReviewDeadline: '2026-09-15',
       answers: [],
     });
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1 });

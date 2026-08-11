@@ -25,7 +25,7 @@ describe('getForTokenRegeneration', () => {
     const row = await getForTokenRegeneration(SUGGESTION_ID);
 
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID, {
-      select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition',
+      select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride',
     });
     expect(row._wmkf_request_value).toBe(REQUEST_ID);
   });

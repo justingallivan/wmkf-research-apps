@@ -545,6 +545,25 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
     expect(resultOf(emitted).sent).toHaveLength(1);
   });
 
+  test('send-time mint uses the accepted reviewer override instead of the request default', async () => {
+    const override = '2099-09-15';
+    const expectedExpiry = new Date(
+      Date.parse(`${override}T23:59:59Z`) + 90 * 24 * 60 * 60 * 1000,
+    );
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewduedateoverride: override,
+    });
+    REQUEST = { ...REQUEST, wmkf_reviewduedate: '2099-09-01' };
+
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUG_OK,
+      expiresAt: expectedExpiry,
+    }));
+  });
+
   test('S2: a JWT located in the SUBJECT with none in the body is extracted and verified (extraction domain matches the stamp domain)', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     const emitted = await run({

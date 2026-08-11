@@ -39,6 +39,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 // or every test 400s before reaching the lifecycle logic it means to exercise.
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const REQUEST_DUE = '2099-09-01';
 
 beforeEach(() => {
   clearAppAccessCache();
@@ -90,11 +91,18 @@ describe('/api/review-manager/regenerate-token', () => {
 
   it('mints a replacement token for the requested suggestion and linked request', async () => {
     mockAuthenticatedUser(2, ['review-manager']);
-    DynamicsService.getRecord.mockResolvedValue({
-      wmkf_appreviewersuggestionid: SUGGESTION_ID,
-      _wmkf_request_value: REQUEST_ID,
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'akoya_requests') return { wmkf_reviewduedate: REQUEST_DUE };
+      return {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_accepted: true,
+        wmkf_reviewduedateoverride: null,
+      };
     });
-    const expiresAt = new Date(Date.now() + 60_000);
+    const expiresAt = new Date(
+      Date.parse(`${REQUEST_DUE}T23:59:59Z`) + 90 * 24 * 60 * 60 * 1000,
+    );
     mintAndStore.mockResolvedValue({
       url: 'https://app.example/external/review/new-token',
       expiresAt,
@@ -103,7 +111,7 @@ describe('/api/review-manager/regenerate-token', () => {
 
     const req = createMockReq({
       method: 'POST',
-      body: { suggestionId: SUGGESTION_ID, expiresAt: expiresAt.toISOString() },
+      body: { suggestionId: SUGGESTION_ID },
     });
     const res = createMockRes();
 
@@ -112,7 +120,12 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
-      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition' },
+      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride' },
+    );
+    expect(DynamicsService.getRecord).toHaveBeenCalledWith(
+      'akoya_requests',
+      REQUEST_ID,
+      { select: 'wmkf_reviewduedate' },
     );
     expect(mintAndStore).toHaveBeenCalledWith({
       suggestionId: SUGGESTION_ID,
@@ -146,8 +159,20 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('rejects a past expiresAt before minting', async () => {
+  it('ignores a client-supplied past expiresAt and derives a safe server expiry', async () => {
     mockAuthenticatedUser(2, ['review-manager']);
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'akoya_requests') return { wmkf_reviewduedate: REQUEST_DUE };
+      return {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_accepted: true,
+      };
+    });
+    const serverExpiry = new Date(
+      Date.parse(`${REQUEST_DUE}T23:59:59Z`) + 90 * 24 * 60 * 60 * 1000,
+    );
+    mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt: serverExpiry, jti: 'j' });
     const req = createMockReq({
       method: 'POST',
       body: { suggestionId: SUGGESTION_ID, expiresAt: new Date(Date.now() - 60_000).toISOString() },
@@ -156,8 +181,10 @@ describe('/api/review-manager/regenerate-token', () => {
 
     await handler(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      expiresAt: serverExpiry,
+    }));
   });
 
   it('mints for a caller holding only the additive reviewers grant', async () => {
@@ -280,4 +307,3 @@ describe('/api/review-manager/revoke-token', () => {
     expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
   });
 });
-

@@ -25,6 +25,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import { Card, Button } from '../Layout';
 import {
   STATUS_PIPELINE,
@@ -1778,6 +1779,7 @@ export default function ReviewerManagePanel({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewer</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Action</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                 {canManage && (
@@ -1815,6 +1817,17 @@ export default function ReviewerManagePanel({
                     </td>
                     <td className="px-4 py-3">
                       <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <ReviewerDueDateEditor
+                        suggestionId={r.suggestionId}
+                        overrideDate={r.reviewDueDateOverride}
+                        effectiveDate={r.effectiveReviewDeadline}
+                        defaultDate={proposal.reviewDeadline}
+                        canManage={canManage}
+                        onSaved={onRefresh}
+                        compact
+                      />
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {lastAction ? formatDate(lastAction) : '—'}
