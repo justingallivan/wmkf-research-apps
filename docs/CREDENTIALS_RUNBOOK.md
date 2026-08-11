@@ -166,7 +166,7 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | Variable | Purpose | Default / Notes |
 |----------|---------|-----------------|
 | `BILL_ENABLED` | Master gate for automated BILL onboarding in `lib/bill/onboard-reviewer-service.js`. | unset/`false` → `alert_only` unless `BILL_ONBOARDING_DEFERRED=true` short-circuits first |
-| `BILL_ONBOARDING_DEFERRED` | Cycle-level lock that skips the BILL tail silently after the honorarium request exists. | no-BILL cycle: `true`; unset only when ready to call BILL |
+| `BILL_ONBOARDING_DEFERRED` | Cycle-level lock that skips the BILL tail silently after the honorarium request exists. Tested with strict `===` against the literal string `'true'` (`lib/bill/onboard-reviewer-service.js:90`), so any other value — including `'true\n'` from an `echo`-piped write — silently falls through to the per-reviewer `alert_only` branch. **Set it with `vercel env add ... --value true`, never `echo`.** Deliberately stored **non-sensitive** so the value is readable; keep it that way. | no-BILL cycle: `true`; unset only when ready to call BILL |
 | `BILL_BASE_URL` | BILL API base URL used by login and API requests. | Required when `BILL_ENABLED=true`; keep to the approved BILL gateway host |
 | `BILL_DEV_KEY` | BILL developer key used for login and request headers. | Required when `BILL_ENABLED=true` |
 | `BILL_USERNAME` / `BILL_PASSWORD` | BILL login credentials for the configured organization. | Required when `BILL_ENABLED=true` |
