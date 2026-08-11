@@ -627,16 +627,19 @@ The remaining controls are deliberately not collapsed into that pass:
   This closes the question and **confirms Connor's "major versioning is on"
   independently**, matching the pilot's empirical `1.0 → 2.0 → 3.0`.
 
-  **Consequence for durability: version *pruning* is no longer a material risk.**
+  **Consequence for durability: the configured ceiling is no longer unknown.**
   500 major versions with no age-based expiry is far beyond the realistic life
   of an assessment document — **[ASSUMED, n=1]** on the version-production rate:
   Word coalesces an editing session into a single version rather than one per
   save, evidenced only by Request `1003109`, where one multi-field editing
   session produced exactly one version (`2.0`). No probe has measured this
   across sessions or co-authors, so treat "≈1 version per session" as a
-  working estimate, not a measured rate. Note the residual: 500 is a **setting, not a
-  law** — an administrator can lower it, and lowering prunes immediately. So
-  this removes the *accidental* pruning risk, not the *administrative* one.
+  working estimate, not a measured rate. Note the residual: 500 is a **setting,
+  not a law**. **[VERIFIED via Microsoft documentation 2026-08-11]** If an
+  administrator lowers a count limit, SharePoint gradually trims up to 20 old
+  versions on each later file update until the new limit is reached; it does not
+  prune all excess versions immediately. This leaves an administrative-change
+  plus later-editing risk.
 - **[ANSWERED — NEGATIVE, confirm before relying on it] Second-stage recycle
   recovery.** Connor reports **no second-stage recycle bin**. Taken at face value,
   an item purged from (or aged out of) the first-stage bin is **unrecoverable**,
@@ -679,7 +682,8 @@ The remaining controls are deliberately not collapsed into that pass:
   administrator checking Site contents for a **Preservation Hold library** — a
   hidden system location SharePoint creates when a site is in scope, visible
   only to site collection admins. Retention policies are not the only hold
-  source: eDiscovery holds and Litigation Hold preserve independently.
+  source for a SharePoint site: eDiscovery case holds preserve independently.
+  Litigation Hold is an Exchange mailbox control, not a SharePoint-site hold.
   **This question has upside, not just risk:** "For items that are subject to a
   retention policy (or an eDiscovery hold), the versioning limits for the
   document library are ignored … old versions aren't automatically purged and
@@ -688,41 +692,39 @@ The remaining controls are deliberately not collapsed into that pass:
   **regulatory record** label would instead block deletion *and* (for regulatory
   records) editing outright — which would conflict with the editable-writeup
   product model and must be escalated, not celebrated.
-- **[AMBIGUOUS — but "limited control" itself is now RESOLVED, 2026-08-11 (S415)]
+- **[AMBIGUOUS — Connor's wording is explained but the role remains OPEN,
+  2026-08-11 (S415)]
   Least-privilege human editing.**
 
   **[VERIFIED via a signed-in screenshot of the modern Site Permissions pane,
-  2026-08-11]** "Limited control" is the **modern pane's own fixed descriptive
-  label** for the Site members group, shown beside "full control" (Site owners)
-  and "no control" (Site visitors). Connor quoted the UI string verbatim and
-  reported accurately. **It is not a custom permission level and it settles
-  nothing about Delete Items.** Consequence: **H2 below loses its main support
-  and the lean flips to H1** — the custom "Contribute minus Delete" hypothesis
-  rested largely on that phrase sounding like a real level. The question stays
-  open; only the checkbox read closes it. Microsoft also has a documented issue
-  where this pane displays inaccurate permission levels, so it cannot serve as a
-  definition in either direction.
+  2026-08-11]** The pane displayed "limited control" for Site members beside
+  "full control" for owners and "no control" for visitors. Connor quoted that
+  UI string accurately. **[VERIFIED via Microsoft documentation]** "Limited
+  control" is not a documented built-in permission-level name. **[OPEN]** The
+  screenshot and current documentation do not prove that these captions are
+  fixed across all modern panes, and the screenshot does not reveal the actual
+  assigned role. It therefore settles nothing about Delete Items and does not
+  rank H1 versus H2; only the assigned role definition closes the question.
 
-  **[VERIFIED via the same screenshot] NEW and larger than the question that
-  surfaced it: `Everyone except external users` is a member of Site members**,
-  i.e. holds edit rights on this library. **[VERIFIED via Microsoft
-  documentation]** that group "is added to the Members group automatically on
-  Modern Team sites with *Public* privacy settings, so that users in Microsoft
-  365 can access and edit the SharePoint site." So the editor audience for the
-  governed writeups is **every licensed user in the tenant**, not a granted staff
-  set. Whether that is deliberate is **[OPEN]**; do not treat it as a defect
-  before the delete-rights answer, and do **not** change it unilaterally —
-  GOapply, Power Automate flows, and akoyaGO service identities all touch this
-  site. Tracked as Q12 in `outputs/sharepoint-storage-policy-question-brief.md`.
+  **[VERIFIED via the same screenshot] `Everyone except external users` is shown
+  in Site members.** **[VERIFIED via Microsoft documentation]** EEEU contains
+  all internal users and excludes guests; it does not mean "every licensed
+  user." It is automatic on public group-connected team sites and can also be
+  manually added on private group-connected sites. **[OPEN]** The screenshot
+  does not establish site type/privacy, the actual Members role, or whether the
+  `akoya_request` library inherits site permissions. It proves a broad
+  site-membership principal, not tenant-wide edit rights on the governed
+  writeups. Do not change it unilaterally — GOapply, Power Automate flows, and
+  akoyaGO service identities all touch this site. Tracked as Q12 in the brief.
 
   **[VERIFIED via live attempt 2026-08-11] Access, not willingness, is the
   blocker.** The pane's *Advanced permissions settings* link was not findable,
   and `_layouts/15/settings.aspx`, `user.aspx?view=perms`, and `role.aspx` did
   not work for the accounts tried — the second such classic-URL failure on this
   tenant after `VersionSettings.aspx?List={guid}`. PowerShell was unavailable
-  (SPO Management Shell is Windows-only; PnP needs an Entra app client ID since
-  2024). **Get one working administrative surface before re-asking any of these
-  questions.**
+  in that session. **[VERIFIED via PnP/CLI documentation]** PnP.PowerShell and
+  CLI for Microsoft 365 are cross-platform alternatives, but tenant use needs a
+  registered/consented Entra app and the appropriate operator role.
 
   The original framing follows and still stands. Connor reports site members have
   **"limited control"**. That is **not a standard SharePoint permission level** —
@@ -740,16 +742,22 @@ The remaining controls are deliberately not collapsed into that pass:
   the Members group holds **Edit** by default. **But "You can change any of the
   default permission levels, except Full Control and Limited Access" — so a
   level can still be *named* Edit with Delete Items unchecked. Asking for the
-  level's name therefore does not answer the question; the checkbox state is the
-  only closing evidence.** Related, and answerable without an administrator:
+  level's name therefore does not answer the question; library inheritance and
+  the effective role's permissions are the closing evidence.** **[VERIFIED via
+  current Microsoft documentation]**
+  default Owners/Members/Visitors group permissions cannot be modified on a team
+  site connected to a Microsoft 365 group. **[OPEN]** This site's type/connection
+  is not established, so the actual assignment must still be read. Related:
   the documented list-permission set contains **no separate move or rename
   permission** `[VERIFIED via the same page — absence across the full documented
   set]`. Their decomposition — rename as `Edit Items`, move-out-of-library as
   `Add Items` at the destination plus `Delete Items` at the source — is
-  `[ASSUMED]`, inferred rather than stated. Either way the consequence holds:
-  anyone who can edit can already rename, a rename cannot orphan an artifact
-  because both consumers resolve by stable drive/item ID, and move authority
-  collapses into the same delete question rather than being a fifth one.
+  `[ASSUMED]`, inferred rather than stated. The consequences do **not** follow
+  from the absence alone: rename and move authority remain `[OPEN]` until an
+  authoritative mapping is found or an authorized disposable non-governed test
+  is run. **[VERIFIED via repository/source]** Both consumers resolve stored
+  drive/item identity and refresh the current `webUrl`; source does not prove
+  that SharePoint preserves item identity across every cross-library move.
 
   **The 2026-08-10 delete attempts did NOT settle this — do not cite them as
   evidence either way.** Two attempts against `Application Cover Page.docx`
@@ -773,26 +781,24 @@ The remaining controls are deliberately not collapsed into that pass:
     holds the editing lock after a Word session closes. If this is the cause,
     **ordinary members CAN delete**, and the durability risk this document has
     been designing around is real.
-  - **H2 — custom permission level without Delete.** Both standard levels that
+  - **H2 — permission assignment without Delete.** Both standard levels that
     grant editing (Contribute, Edit) **also grant Delete Items**, so
     edit-yes/delete-no is not possible under a standard level. A custom
-    "Contribute minus Delete" level would produce exactly this asymmetry — and
-    would explain Connor's otherwise unexplained **"limited control"** as a real
-    custom level rather than a paraphrase. If this is the cause, **members
+    "Contribute minus Delete" level would produce exactly this asymmetry. If
+    this is the cause, **members
     CANNOT delete**, member-caused loss drops sharply, and administrator restore
     is unblocked.
 
-  **Discriminating check — non-destructive, run both halves:**
-  1. Add the **"Checked Out To"** column to the library view. **Blank** → no
-     check-out exists, favouring H1; then close Word entirely, wait ~15 minutes,
-     and retry the delete — success confirms H1. **A name** → a real check-out,
-     and the holder is named; if it is the akoyaGO app or a service account,
-     that is a systemic finding in its own right (see the orphaned-check-out
-     causes: explicit check-out never checked in, a died Word/upload session, or
-     upload while a required column was empty).
-  2. Read the Members group's permission **level definition** and look for
-     **Delete Items** / **Delete Versions**. This settles H2 directly and is
-     authoritative regardless of what the lock turns out to be.
+  **Non-destructive checks:**
+  1. Add the **"Checked Out To"** column to the library view. A current name
+     establishes a current explicit checkout and identifies its holder. A blank
+     value now cannot reconstruct the historical 2026-08-10 lock and does not
+     favour H1.
+  2. Read whether `akoya_request` inherits site permissions, then inspect the
+     role assignment actually effective for ordinary editors and its **Delete
+     Items** / **Delete Versions** permissions. The site-level Members role alone
+     is insufficient if the library has unique permissions. This settles current
+     delete authority independently of what the historical lock was.
 
   **Do not discriminate these by deleting a governed artifact.** With no
   confirmed second-stage recycle bin (above), a success would leave the
@@ -811,31 +817,34 @@ The remaining controls are deliberately not collapsed into that pass:
   (above), a successful delete would have left the first-stage bin as the only
   remedy — testing a durability question by destroying the artifact whose
   durability is in question. **Resolve it by reading the permission definition
-  instead:** Site Settings → Site permissions → the Members group's level →
-  open the level and read its **Delete Items** and **Delete Versions**
+  instead:** first read the library's inheritance/unique-permission state, then
+  open the role actually effective for ordinary editors and read its **Delete
+  Items** and **Delete Versions**
   checkboxes. That is non-destructive, answers *delete versions* as well as
   *delete file* (a file-delete test cannot), and simultaneously reveals the real
   level name behind Connor's "limited control". If an empirical check is still
-  wanted, use a disposable file the tester created, in a non-governed location,
-  that nobody has open — and note it only establishes delete-own, since some
-  configurations permit that while restricting delete-others. This compounds with the second-stage finding above — if members can
+     wanted, use a disposable file the tester created, in a non-governed location,
+     that nobody has open — and note it only establishes delete-own, since some
+     configurations permit that while restricting delete-others. This compounds with the second-stage finding above — if members can
   delete and there is genuinely no second-stage bin, first-stage recovery is the
-  only remedy. The app token still holds only `Sites.Selected` and
-  `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
-  verify this itself.
+  only remedy. **[VERIFIED via live read-only probe 2026-08-11]** The app token
+  holds only `Sites.Selected` and `/sites/{siteId}/permissions` returns `403
+  accessDenied`. **[VERIFIED via Microsoft documentation]** That endpoint
+  requires `Sites.FullControl.All` and enumerates application permission
+  resources, not human SharePoint role assignments, so it would not answer the
+  Members checkbox question even with broader consent.
 
-  **The major-version limit is likewise not readable programmatically — stop
-  trying.** [VERIFIED via live Graph probe 2026-08-10 (S413)] `GET
+  **The major-version limit is not exposed on the Graph list facet.** [VERIFIED
+  via live Graph probe 2026-08-10 (S413)] `GET
   /drives/{driveId}/list` returns `200` for this library but its `list` facet
   carries exactly three keys — `contentTypesEnabled`, `hidden`, `template` — and a
   case-insensitive `version*limit` search over the whole response body matched
   nothing. The call returned `200`, so this is a **permissions-independent**
   gap rather than another `Sites.Selected` denial: the app is authorized to read
-  the list and the settings simply are not in the response. [ASSUMED, not probed]
-  that no other Graph v1.0 or beta endpoint exposes them — only the `list`
-  resource was tested, so a future need could re-check `beta` before concluding
-  it is impossible. It must be read from the settings page by a human
-  with library access:
+  the list and the settings are not in that response. **[VERIFIED via Microsoft
+  and PnP documentation 2026-08-11]** This is not a general programmatic gap:
+  `Get-SPOListVersionPolicy` and cross-platform `Get-PnPListVersionPolicy` read
+  the effective library policy with suitable SharePoint authorization.
 
   **Prefer the UI path; the one classic deep link tried here failed.**
 
@@ -858,9 +867,9 @@ The remaining controls are deliberately not collapsed into that pass:
   Operative rule: send an administrator the UI path, never a reconstructed
   deep link. Read three values: major-vs-minor versioning
   mode, the major-version limit (unchecked = unlimited), and the draft limit.
-  **That page sets the limit as well as showing it, and lowering the number
-  prunes existing versions immediately** — it is a look-and-report, never a
-  change-and-report.
+  **That page sets the limit as well as showing it.** Lowering a count limit
+  gradually trims excess old versions on subsequent file updates, up to 20 per
+  new version — it is a look-and-report, never a change-and-report.
 
   **Do not resolve this to "Limited Access" (considered and rejected 2026-08-10).**
   Limited Access is a system-assigned level granting only View Application Pages,
@@ -906,9 +915,10 @@ The remaining controls are deliberately not collapsed into that pass:
   material risk, and that argument for copying is now weak. The case rests on
   the remaining two — **no confirmed second-stage recycle bin**, and
   **unresolved whether ordinary editors can delete** the file or its versions —
-  plus a fourth that no administrator answer can remove: a version *limit* is a
-  setting an administrator can lower at any time, and lowering it prunes
-  immediately. A retained copy depends on none of them.
+  plus a fourth that remains independently useful: a version *limit* is a
+  setting an administrator can lower at any time, after which later edits
+  gradually trim excess versions. An authorized SharePoint/PnP check can detect
+  the setting, but a retained copy depends on neither monitoring nor the policy.
 
   Anyone reopening this should know the strongest single argument is not
   probability but remedy: under a pointer, `wmkf_milestonecontenthash` can only

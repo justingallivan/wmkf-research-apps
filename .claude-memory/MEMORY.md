@@ -19,7 +19,7 @@
 - Carryover / destructive work: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md; feedback-verify-additive-carryover-not-just-destructive.md
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md
-- External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md; reference-sharepoint-modern-permissions-pane-labels.md (an admin quoting "limited control" is quoting UI, not configuration)
+- External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md; reference-sharepoint-modern-permissions-pane-labels.md (a pane caption or site membership screenshot does not prove the assigned role or library inheritance)
 - Delegated work: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md; ../docs/AGENT_COLLABORATION_PLAN.md
 - Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; reference-vercel-sensitive-env-unreadable.md
 

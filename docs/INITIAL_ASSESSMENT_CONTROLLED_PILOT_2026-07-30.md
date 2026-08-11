@@ -148,7 +148,7 @@ and milestone snapshots remain open (item 5 below).
 | Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the deployed read model overlays current Graph values in the response only | Both live consumers display the same current/missing/unavailable/unchecked semantics | PASS — Request `1003109` displayed current SharePoint version `2.0` in both consumers on deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` |
 | Native version inspection/restore | Disposable file in the production Request library was uploaded twice, then prior version `1.0` was downloaded and restored | SharePoint retained `2.0` and `1.0`; restore created `3.0` and exact current bytes matched version one | Graph version list/content/restore operations | PASS — controlled probe only; no Request `1003109` mutation |
 | First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
-| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. Second-stage bin still reported absent (unusual, confirm); Purview unanswered and rerouted to a compliance admin; "limited control" is not a built-in permission level, so **editor delete rights remain the one unresolved durability question**. New 2026-08-10 evidence, unresolved: the same user could **edit** a Phase I file but **not delete** it (both attempts returned `0x80060728`, a lock catch-all rather than the permissions message). That asymmetry is impossible under a standard editing level, so it is either a transient self-lock (attempt was 109s after their own edit) or a custom "Contribute minus Delete" level — see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` for the two hypotheses and the non-destructive discriminating check |
+| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; Graph site-permission-resource enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. Second-stage bin still reported absent (unusual, confirm); Purview unanswered and rerouted to a compliance admin; the actual Members role, its delete permissions, and whether `akoya_request` inherits the broad EEEU site membership remain unresolved. The two Phase I delete attempts returned `0x80060728`, a lock catch-all rather than a permissions message, and settle nothing. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the adversarially corrected brief for non-destructive routes. |
 | Workbench version-history display | `View version history` disclosure on the Initial Assessment tab, lazy-fetched per staff click | Read-only. Lists native SharePoint versions for the exact displayed artifact via Graph; a replacement race returns 409 rather than another artifact's editors; no Dataverse write and no snapshot row | Workbench shows editor attribution per version, current-first, with honest truncation reporting | PASS — shipped S413 (2026-08-10) at merge `147d3e49` and **live-verified by signed-in smoke** on Request `1003109`. The tab rendered `Version 2.0 · current · Justin Gallivan · Jul 30, 2026 6:33 PM` over `Version 1.0 · SharePoint App · Jul 30, 2026 5:28 PM`, with no truncation note. Two independent cross-checks passed: those timestamps equal the direct-Graph probe's `2.0@2026-07-31T01:33:55Z` / `1.0@2026-07-31T00:28:08Z` converted to Pacific, so the route→service→Graph chain returns the same versions as a direct Graph call; and the `current` badge agrees with the tab header's `2.0`, which is a genuinely separate read — the header resolves `publication.versionId` through `currentMetadata` at page load [VERIFIED via `lib/services/graph-service.js:410`, `lib/services/initial-assessment/artifact-service.js:286`], while the history path issues its own item read on the disclosure click [VERIFIED via `lib/services/graph-service.js:491`], so this is two requests agreeing rather than one value rendered twice. This retires the mock-coverage gap — until this smoke, all three test files stubbed their outbound boundary [VERIFIED via `tests/unit/graph-service-versions.test.js:45`, `tests/unit/workbench-initial-assessment-versions-route.test.js:11`, `tests/unit/initial-assessment-artifact-versions.test.js:5`] and the chain had never executed end to end |
 | Workbench administrator restore and milestone freeze | No current producer/action | No milestone snapshot row/artifact is created; no restore path exists in the app | Workbench has no administrator restore control | PLANNED — restore stays blocked on the outstanding SharePoint permission evidence in the row above; the milestone snapshot producer is blocked on the owner's pointer-vs-copy decision |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
@@ -215,11 +215,14 @@ not an intervening staff edit. Version `2.0` later hashed to
      the configured *limit* was then read directly from the signed-in Versioning
      Settings page for `akoya_request` and captured to PDF: **major versions
      only, no time limit, keep 500 major versions, drafts unchecked, check-out
-     not required.** Accidental pruning is therefore not a material risk. The
-     residual is administrative, not accidental: 500 is a setting an
-     administrator can lower, lowering it prunes immediately, and the value is
-     not readable programmatically. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`
-     "Version and data-protection contract".
+     not required.** The configured ceiling is therefore no longer unknown. The
+     residual is administrative: an administrator can lower it and SharePoint
+     then gradually trims excess old versions on later file updates. The Graph
+     list facet does not expose the policy, but SharePoint-admin
+     `Get-SPOListVersionPolicy` and cross-platform `Get-PnPListVersionPolicy`
+     are read-only programmatic checks. See
+     `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Version and data-protection
+     contract".
    - **Second-stage recovery — reported absent; confirm before relying on it.**
      A tenant with no site-collection recycle bin is unusual, and the reply may
      instead reflect the same access denial Justin hit. Microsoft documents that
@@ -234,15 +237,18 @@ not an intervening staff edit. Version `2.0` later hashed to
      ordinary editor can delete the file or its versions — is unresolved. Note
      that reading the level's *name* does not answer it either: Microsoft
      documents that every default level except Full Control and Limited Access
-     can be modified in place, so the checkbox state of **Delete Items** and
-     **Delete Versions** is the only closing evidence. **Update 2026-08-11
+     can be modified in place, so library inheritance plus the effective role's
+     **Delete Items** and **Delete Versions** state are the closing evidence.
+     **Update 2026-08-11
      (S415):** a signed-in screenshot showed "limited control" is the modern Site
-     Permissions pane's own label for the Site members group, not a permission
-     level — so the custom-level hypothesis weakens and a transient self-lock
-     becomes the likelier reading of the 2026-08-10 delete refusal. The same
-     screenshot showed **`Everyone except external users` in Site members**, so
-     the editor audience is currently every licensed tenant user. A live attempt
-     to read the level definition was blocked by access, not willingness. See
+     Permissions pane's displayed wording for the Site members group, not a
+     documented built-in permission-level name. It does not reveal the assigned
+     role and does not rank the lock-versus-rights hypotheses. The same
+     screenshot showed **`Everyone except external users` in Site members**.
+     That proves a broad site-level internal-user principal, but site
+     type/privacy, the actual Members role, and whether `akoya_request` inherits
+     site permissions remain open. A live attempt to read the level definition
+     was blocked by access, not willingness. See
      `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and
      `outputs/sharepoint-storage-policy-question-brief.md` §1a.
 
