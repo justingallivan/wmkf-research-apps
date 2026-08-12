@@ -1,4 +1,8 @@
 import { resolveEffectiveReviewDueDate } from '../../lib/external/reviewer-due-date.js';
+import {
+  currentYmdInTimeZone,
+  isCurrentOrFutureYmd,
+} from '../../lib/utils/date-ymd.js';
 
 describe('resolveEffectiveReviewDueDate', () => {
   test('a valid suggestion override wins over the request default', () => {
@@ -24,5 +28,18 @@ describe('resolveEffectiveReviewDueDate', () => {
       overrideDate: '',
       defaultDate: 'not-a-date',
     })).toBeNull();
+  });
+});
+
+describe('reviewer due-date calendar boundary', () => {
+  test('uses the Foundation timezone on both sides of Pacific midnight', () => {
+    const justBeforeMidnight = new Date('2026-08-11T06:59:00Z');
+    const justAfterMidnight = new Date('2026-08-11T07:01:00Z');
+
+    expect(currentYmdInTimeZone(justBeforeMidnight)).toBe('2026-08-10');
+    expect(currentYmdInTimeZone(justAfterMidnight)).toBe('2026-08-11');
+    expect(isCurrentOrFutureYmd('2026-08-10', { now: justBeforeMidnight })).toBe(true);
+    expect(isCurrentOrFutureYmd('2026-08-10', { now: justAfterMidnight })).toBe(false);
+    expect(isCurrentOrFutureYmd('not-a-date', { now: justAfterMidnight })).toBe(false);
   });
 });

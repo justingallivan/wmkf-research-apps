@@ -309,8 +309,9 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via feature-branch source/tests 2026-08-11] Wave 18 stages a nullable
   per-engagement `wmkf_reviewduedateoverride`; review-due reminders and other
   operational consumers use it first and fall back to request-level
-  `wmkf_reviewduedate`. [VERIFIED via read-only production metadata] the new
-  field is still absent in production pending schema-first promotion.
+  `wmkf_reviewduedate`, and non-null writes must be today or later in the
+  Foundation-Pacific calendar. [VERIFIED via read-only production metadata] the
+  new field is still absent in production pending schema-first promotion.
 
 **Proposed Approach**
 

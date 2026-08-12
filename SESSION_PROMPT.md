@@ -45,12 +45,18 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    suggestion-level DateOnly field, shared pre/post-accept staff editor,
    existing PATCH writer, effective-date projection, portal,
    acceptance-email/calendar, review-due reminder, and token
-   issuance/regeneration fan-out. `/contract-reconcile` and `/sweep` were run;
-   focused tests are green. [VERIFIED via read-only production metadata] the
-   field is ABSENT, so Wave 18 schema apply/publish/exact verification must
-   precede Tier-2 runtime promotion. Invitation response timing remains
-   separate; the mutable override is not immutable communicated-deadline
-   evidence for reviewer reliability.
+   issuance/regeneration fan-out. The Opus adversarial follow-up is addressed:
+   past overrides now fail closed using the Foundation-Pacific calendar date,
+   request due-date read failure falls back to the established 90-day mint
+   window, and discriminating tests cover later-override reminder deferral.
+   Owner decision: the accepted-reviewer token's due + 90d expiry is
+   intentionally retained through the Board meeting; ordinary roughly two-week
+   extensions do not rotate an issued link. `/contract-reconcile` and `/sweep`
+   were run. [VERIFIED via read-only production metadata] the field is ABSENT,
+   so Wave 18 schema apply/publish/exact verification must precede Tier-2
+   runtime promotion. Invitation response timing remains separate; the mutable
+   override is not immutable communicated-deadline evidence for reviewer
+   reliability, and the per-send composer can still diverge from stored state.
 
 2. **Milestone snapshot producer** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze",

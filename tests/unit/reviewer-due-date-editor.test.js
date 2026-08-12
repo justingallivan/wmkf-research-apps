@@ -4,6 +4,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerDueDateEditor from '../../shared/components/reviewers/ReviewerDueDateEditor';
+import { currentYmdInTimeZone } from '../../lib/utils/date-ymd';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -27,7 +28,9 @@ test('shows the effective request default and saves a reviewer-specific date', a
   );
 
   fireEvent.click(screen.getByRole('button', { name: /review due: sep 1, 2026/i }));
-  fireEvent.change(screen.getByLabelText(/reviewer-specific review due date/i), {
+  const dateInput = screen.getByLabelText(/reviewer-specific review due date/i);
+  expect(dateInput).toHaveAttribute('min', currentYmdInTimeZone());
+  fireEvent.change(dateInput, {
     target: { value: '2026-09-15' },
   });
   fireEvent.click(screen.getByRole('button', { name: /^save$/i }));

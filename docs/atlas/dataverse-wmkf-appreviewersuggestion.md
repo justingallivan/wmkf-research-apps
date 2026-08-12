@@ -68,7 +68,9 @@ Outreach timestamps:
 - [VERIFIED via feature-branch source/tests] `wmkf_reviewduedateoverride` is a
   nullable DateTime DateOnly column on one reviewer/request engagement. Null
   means use `akoya_request.wmkf_reviewduedate`; it does not copy the request
-  value and existing rows retain proposal-wide behavior.
+  value and existing rows retain proposal-wide behavior. Staff may write only
+  today or a future date, evaluated in the Foundation's Pacific time zone;
+  null remains the supported clear/reset value.
 - [VERIFIED via feature-branch source/tests] The existing
   `/api/reviewer-finder/my-candidates` PATCH seam writes or clears the field,
   and both Invite Reviewers and Track Reviewers expose the same shared editor.
@@ -81,9 +83,14 @@ Outreach timestamps:
   Invitation response timing remains independently derived from
   `wmkf_emailsentat + wmkf_respondoffsetdays`.
 - Saving the mutable override does not rotate an already-delivered live token.
-  The next send, reminder, acceptance mint, or explicit regeneration uses the
-  effective date. This operational field is not append-only evidence of which
-  deadline was communicated; the dispatch-ledger design remains separate.
+  Materials sends, reminder sends, acceptance-time mints, and explicit
+  regeneration use the effective date. Accepted-reviewer tokens intentionally
+  remain valid until 90 days after that date to cover the Board meeting, so a
+  normal roughly two-week extension does not need token rotation. If the
+  request due-date read fails while minting, `ensureToken` falls back to the
+  established now + 90d window instead of suppressing the token. This
+  operational field is not append-only evidence of which deadline was
+  communicated; the dispatch-ledger design remains separate.
 - [VERIFIED via read-only production metadata 2026-08-11] Production does not
   yet contain the field. Runtime promotion is blocked on schema-first Wave 18
   provisioning and exact post-publish verification.
@@ -181,9 +188,9 @@ Methods:
   fields only when empty, honors "excluded wins", and is race-safe. Merge
   provenance union may require the current suggestion ETag; a missing/stale
   value forces a re-plan. Returns `{ id, created, selected }`.
-- `ensureStaffManualCandidate({ potentialReviewerId, requestId, … })` — **Workbench manual reviewer add**. Idempotently materializes/reselects a non-excluded staff-added row, **unions** `staff_manual` into existing `wmkf_sources` (no clobber), preserves applicant recommendation state when an existing row already has it, honors "excluded wins" (`{ skippedExcluded: true }`), and catches a lost alternate-key create race. Unlike lazy applicant ingestion, this is an explicit staff action, so an existing soft-deleted non-excluded row is re-selected. **Re-add fresh start (S343):** when the re-selected row was *removed* (`wmkf_selected===false`), `ENGAGEMENT_STAMP_RESET` clears the stale engagement stamps (`wmkf_invited=false`; `wmkf_emailsentat`, `wmkf_respondremindersentat`, `wmkf_remindersentat`, `wmkf_remindercount`, `wmkf_materialssentat`, `wmkf_reviewreceivedat`, `wmkf_responsereceivedat`, `wmkf_thankyousentat`, `wmkf_completedat`, `wmkf_withdrawnsufficientat`, `wmkf_proposalfirstaccessed` = `null`) so the row returns to a clean engagement lifecycle; an already-active row's stamps are left untouched. The re-select PATCHes are ETag-guarded from the fetched row; on 412 they re-fetch, source-union without reset if the row is now active, or retry the reset if it is still removed.
+- `ensureStaffManualCandidate({ potentialReviewerId, requestId, … })` — **Workbench manual reviewer add**. Idempotently materializes/reselects a non-excluded staff-added row, **unions** `staff_manual` into existing `wmkf_sources` (no clobber), preserves applicant recommendation state when an existing row already has it, honors "excluded wins" (`{ skippedExcluded: true }`), and catches a lost alternate-key create race. Unlike lazy applicant ingestion, this is an explicit staff action, so an existing soft-deleted non-excluded row is re-selected. **Re-add fresh start (S343):** when the re-selected row was *removed* (`wmkf_selected===false`), `ENGAGEMENT_STAMP_RESET` clears the stale engagement stamps (`wmkf_invited=false`; `wmkf_emailsentat`, `wmkf_respondremindersentat`, `wmkf_remindersentat`, `wmkf_remindercount`, `wmkf_materialssentat`, `wmkf_reviewreceivedat`, `wmkf_responsereceivedat`, `wmkf_thankyousentat`, `wmkf_completedat`, `wmkf_withdrawnsufficientat`, `wmkf_proposalfirstaccessed`, `wmkf_reviewduedateoverride` = `null`) so the row returns to a clean engagement lifecycle; an already-active row's stamps are left untouched. The re-select PATCHes are ETag-guarded from the fetched row; on 412 they re-fetch, source-union without reset if the row is now active, or retry the reset if it is still removed.
 - `dismissLegacyDeclineReferral({ suggestionId, requestId })` — validates the exact declined source row and rejects structured envelopes, then ETag-conditionally stores a compact resolved prefix before the original legacy text. Request-scoped, idempotent, and retries one 412. Structured closure is derived read-side from exact existing `referred` candidate evidence.
-- `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt`. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
+- `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt` and validates a non-null `reviewDueDateOverride` as today-or-future Foundation-Pacific `YYYY-MM-DD`. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
 - `applyStaffReviewerWithdrawal(id, { ifMatch, actingUserSystemId, deleteHonorariumRequestId })` — PD-recorded post-accept withdrawal. Requires the fresh row ETag; atomically writes `accepted=false`, `declined=true`, declined response metadata, `reviewStatus=withdrew`, and token revocation while deleting the exact server-read linked honorarium `akoya_request` in one changeset. Without an honorarium link, performs the same ETag-guarded row correction as one PATCH.
 - `softDelete(id)` — sets `wmkf_selected = false`
 - `hardDeleteById(id)` — merge-support hard delete for an un-engaged colliding loser row (pre-existing, S289 merge)
@@ -283,7 +290,7 @@ table on 2026-06-04; this Dataverse entity is the sole live suggestion ledger.
 
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
-- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (long review window); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). In the Wave 18 feature branch, `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; production remains request-only until schema-first promotion. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
+- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). In the Wave 18 feature branch, `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; an `ensureToken` request-read failure also degrades to now + 90d. Production remains request-only until schema-first promotion. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
 - Token expiry is **event-driven**, not absolute — capped vs long at mint by accepted status, extension on submission, revocation on regenerate.
 - `wmkf_reviewbloburl` retains historical Vercel Blob URLs for legacy rows but the active write target is `wmkf_reviewsharepointfolder` (Vercel Blob retired 2026-05-03 via commit `2277d23`).
 

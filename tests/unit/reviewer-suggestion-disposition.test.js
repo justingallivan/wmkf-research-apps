@@ -255,6 +255,16 @@ describe('restore scope guard (Codex S285 review High)', () => {
   });
 });
 
+describe('review due-date override adapter boundary', () => {
+  test('rejects a past DateOnly value before any Dataverse read or write', async () => {
+    await expect(updateLifecycle(SUGGESTION_ID, {
+      reviewDueDateOverride: '2000-01-01',
+    })).rejects.toThrow('reviewDueDateOverride must be today or later');
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+});
+
 describe('findById action chokepoint', () => {
   test('throws on an applicant-excluded row', async () => {
     DynamicsService.getRecord.mockResolvedValue({

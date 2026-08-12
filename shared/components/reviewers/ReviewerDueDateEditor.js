@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { currentYmdInTimeZone } from '../../../lib/utils/date-ymd';
 
 function formatDate(value) {
   if (!value) return 'Not set';
@@ -31,6 +32,7 @@ export default function ReviewerDueDateEditor({
   const [draft, setDraft] = useState(overrideDate || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [minimumDate] = useState(() => currentYmdInTimeZone());
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
 
@@ -117,6 +119,7 @@ export default function ReviewerDueDateEditor({
         <input
           type="date"
           value={draft}
+          min={minimumDate}
           onChange={(event) => setDraft(event.target.value)}
           disabled={saving}
           aria-label="Reviewer-specific review due date"

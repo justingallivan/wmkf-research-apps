@@ -164,6 +164,27 @@ describe('token-lifecycle', () => {
         .toBe(expectedExpiry.toISOString());
     });
 
+    test('request due-date read failure preserves the established 90-day mint fallback', async () => {
+      const now = new Date('2026-08-11T12:00:00Z');
+      jest.useFakeTimers().setSystemTime(now);
+      const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+      DynamicsService.getRecord
+        .mockResolvedValueOnce(row({ accepted: true }))
+        .mockRejectedValueOnce(new Error('request unavailable'));
+
+      try {
+        const result = await ensureToken(SUGGESTION_ID);
+
+        expect(result).toEqual({ minted: true });
+        expect(DynamicsService.updateRecord.mock.calls[0][2].wmkf_externaltokenexpires)
+          .toBe(new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString());
+        expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('using fallback TTL'));
+      } finally {
+        errorLog.mockRestore();
+        jest.useRealTimers();
+      }
+    });
+
     test('returns no_request when suggestion has no linked request', async () => {
       DynamicsService.getRecord.mockResolvedValue({
         wmkf_appreviewersuggestionid: SUGGESTION_ID,

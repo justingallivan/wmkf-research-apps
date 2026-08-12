@@ -77,7 +77,10 @@ whether reviewers are on time and reliable — not just participation counts.
   `my-candidates` PATCH writer, override-first resolver, and the full staff →
   portal/email/calendar/reminder/token consumer fan-out are implemented.
   Invitation response timing remains separate. A fresh re-add clears the stale
-  override; editing alone does not rotate a live delivered token.
+  override; past dates fail closed using the Foundation-Pacific calendar date.
+  Editing alone does not rotate a live delivered token. The accepted-reviewer
+  due + 90d window is intentionally retained through the Board meeting and is
+  comfortably longer than ordinary roughly two-week reviewer extensions.
 - **Production remains request-only:** [VERIFIED via read-only typed metadata
   2026-08-11] `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is ABSENT
   in production. Required release order is Wave 18 schema apply/publish/exact

@@ -165,11 +165,17 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   for accepted reviewers) stays in the payload but is no longer shown as a
   deadline; before this fix the page displayed it under that label, and for an
   accepted reviewer with a future due date it sits 90 days past the emailed
-  deadline. [VERIFIED via read-only production metadata 2026-08-11] the Wave 18
-  field is still ABSENT, so schema-first provisioning and runtime promotion are
-  required before the override behavior is production-live. The dedicated
-  per-engagement override closes the prior composer/portal divergence once
-  promoted; response timing remains separate.
+  deadline. The accepted-reviewer token's 90-day post-due window is intentional:
+  it keeps the materials link usable through the Board meeting, so a normal
+  roughly two-week reviewer extension does not require token rotation. Saving
+  an override does not rotate an already-delivered token. Staff may set the
+  override only to today or a future Foundation-Pacific date. [VERIFIED via
+  read-only production metadata 2026-08-11] the Wave 18 field is still ABSENT,
+  so schema-first provisioning and runtime promotion are required before the
+  override behavior is production-live. The dedicated per-engagement override
+  lets staff keep the portal, reminders, calendar, and future token mints aligned
+  when they use it; the existing per-send composer date remains ephemeral and
+  can still diverge from stored deadline state. Response timing remains separate.
 - **Post-accept and post-submit notices name the assigned Program Director (2026-08-09).**
   `/context` looks up the request's `_wmkf_programdirector_value` system user
   (best-effort; requires active + name + email) for the `accepted-pre-materials`,

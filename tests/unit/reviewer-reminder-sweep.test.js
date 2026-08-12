@@ -368,7 +368,7 @@ describe('sweepReviewDueReminders', () => {
       wmkf_reviewduedateoverride: override,
     })] });
     installReads({ request: reviewDueRequest({
-      wmkf_reviewduedate: ymdDaysFromNow(30),
+      wmkf_reviewduedate: ymdDaysFromNow(60),
       wmkf_reviewduereminderleaddays: 40,
     }) });
 
@@ -383,6 +383,23 @@ describe('sweepReviewDueReminders', () => {
         month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
       }),
     );
+  });
+
+  test('a later per-reviewer override defers a reminder that the request date would send', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate({
+      wmkf_reviewduedateoverride: ymdDaysFromNow(30),
+    })] });
+    installReads({ request: reviewDueRequest({
+      wmkf_reviewduedate: ymdDaysFromNow(10),
+      wmkf_reviewduereminderleaddays: 20,
+    }) });
+
+    const r = await sweepReviewDueReminders();
+
+    expect(r.sent).toBe(0);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('candidate query allowlists materials_sent/under_review and excludes both terminal values', async () => {

@@ -143,8 +143,9 @@ Stage-2a stamps: `wmkf_honorariumoptout`, `wmkf_withdrawnsufficientat`, `wmkf_co
 **Pending, not in production (Wave 18):**
 `wmkf_reviewduedateoverride` (DateTime, DateOnly, nullable) is staged as an
 operational per-engagement override whose null fallback is
-`akoya_request.wmkf_reviewduedate`. [VERIFIED 2026-08-11 via read-only typed
-metadata] production returned ABSENT. Schema manifest:
+`akoya_request.wmkf_reviewduedate`; the runtime accepts only today or a future
+Foundation-Pacific date. [VERIFIED 2026-08-11 via read-only typed metadata]
+production returned ABSENT. Schema manifest:
 `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`.
 Apply/publish/verify the wave before runtime promotion; do not include this
 field in the live-production inventory above until the post-publish probe
