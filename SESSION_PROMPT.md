@@ -40,7 +40,7 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
 
 ### Active / Verified Open
 
-1. **Per-reviewer review-due-date override — production-live; signed-in retry pending (2026-08-11).**
+1. **Per-reviewer review-due-date override — production-live; signed-in smoke passed (2026-08-11).**
    Main implements the nullable
    suggestion-level DateOnly field, an accepted-row Track Reviewers extension
    modal, dedicated authenticated writer, effective-date projection, portal,
@@ -77,8 +77,18 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    the linked active reviewer held the confirmed name/email. [VERIFIED via the
    exact read-only production row probe, main `ccb7e0c8`, Vercel
    `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] production now uses
-   the linked reviewer only to fill missing snapshot identity; owner retry of
-   that same extension remains the final signed-in smoke.
+   the linked reviewer only to fill missing snapshot identity. [VERIFIED via
+   owner production smoke on Request `1002788`] the retry then saved the
+   extension and automatically delivered the deadline email. The received
+   message exposed one final copy defect: it greeted the legacy fixture as
+   `Dear Test Homer,`. The admin body now requires `{{greeting}}`, which reuses
+   the established reviewer honorific helper and renders `Dear Dr. Homer,`;
+   the live Dataverse setting was rebaselined to the same source default.
+   [VERIFIED via main `6526a934`, Vercel production deployment
+   `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, the webpack
+   production build, and live `/api/auth/status` HTTP 200] that correction is
+   production-live. The calendar attachment contract remains covered by the
+   service tests; this copy-only correction did not send another test email.
    Invitation response timing remains separate; the mutable
    override is not immutable communicated-deadline evidence for reviewer
    reliability. The prior pre-accept editor and generic `my-candidates` write

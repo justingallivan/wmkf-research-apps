@@ -71,8 +71,17 @@ append-only dispatch-evidence requirement in this plan.
 [VERIFIED via the exact read-only production Request `1002788`/Test Homer row
 probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live
 HTTP checks] the legacy identity fallback is production-live. The first
-signed-in attempt correctly made no deadline write; owner retry remains the
-final browser smoke.
+signed-in attempt correctly made no deadline write. [VERIFIED via owner
+production smoke on Request `1002788`] the retry saved the extension and
+automatically delivered the deadline email. That received message exposed a
+final copy defect (`Dear Test Homer,`). The admin body now requires
+`{{greeting}}`, resolved through the shared reviewer honorific helper to
+`Dear Dr. Homer,`; the live Dataverse setting was rebaselined to the same
+source default. [VERIFIED via main `6526a934`, Vercel production deployment
+`dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build,
+and live HTTP 200] the correction is production-live. The calendar update
+contract remains test-covered; no second test email was sent for this
+copy-only correction.
 
 ## Production release — 2026-07-24
 

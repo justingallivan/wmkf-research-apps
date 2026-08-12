@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select and Request 1002788 identity probes, non-clobbering settings seed, Vercel production deployments, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
+  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select and Request 1002788 identity probes plus owner extension/email smoke, non-clobbering and honorific-rebaselined settings, Vercel production deployments, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -110,8 +110,16 @@ whether reviewers are on time and reliable — not just participation counts.
   blank legacy Test Homer engagement snapshots despite a complete linked active
   reviewer. [VERIFIED via the exact read-only production row probe, main
   `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks]
-  the snapshot-first/linked-person fallback is production-live; owner retry of
-  that same extension remains the final signed-in smoke.
+  the snapshot-first/linked-person fallback is production-live. [VERIFIED via
+  owner production smoke on Request `1002788`] the retry saved the extension
+  and automatically delivered the deadline email. The received email exposed
+  a final greeting defect (`Dear Test Homer,`). The admin body now requires
+  `{{greeting}}`, resolved through the established reviewer honorific helper to
+  `Dear Dr. Homer,`, and the live Dataverse setting exactly matches that source
+  default. [VERIFIED via main `6526a934`, Vercel production deployment
+  `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build,
+  and live HTTP 200] the honorific correction is production-live. No second
+  test email was sent for the copy-only correction.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,
