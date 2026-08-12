@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select probes, non-clobbering settings seed, Vercel production deployment, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
+  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select and Request 1002788 identity probes, non-clobbering settings seed, Vercel production deployments, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -79,8 +79,11 @@ whether reviewers are on time and reliable — not just participation counts.
   implemented. A non-null extension must be strictly after the request's
   original deadline, with no maximum; the PD may restore the original date.
   Saving or restoring first validates the admin body, Dynamics impersonation
-  setting, assigned sender, confirmed recipient, signature, and calendar; it
-  then ETag-commits the date
+  setting, assigned sender, confirmed recipient, signature, and calendar.
+  Confirmed engagement snapshot name/email take precedence; legacy missing
+  snapshot values fall back field-by-field to the server-read linked reviewer
+  person, and absence from both sources still fails before the write. It then
+  ETag-commits the date
   and automatically dispatches the fixed-subject email. Only an actual Dynamics
   dispatch failure leaves the date saved without the notice. The open modal
   exposes a server-fresh retry, and an existing extension always offers Resend
@@ -95,7 +98,7 @@ whether reviewers are on time and reliable — not just participation counts.
   comfortably longer than ordinary roughly two-week reviewer extensions.
   Claude Opus's final adversarial verification returned READY after the
   preflight, retry-state, error-classification, and copy corrections; the final
-  local gates passed at 610 suites / 7,714 tests, 27 focused extension tests,
+  local gates passed at 610 suites / 7,717 tests, 30 focused extension tests,
   and a successful webpack production build.
 - **Wave 18 is production-live:** [VERIFIED via production
   create/publish/exact/runtime-select probes, the non-clobbering settings seed,
@@ -103,8 +106,12 @@ whether reviewers are on time and reliable — not just participation counts.
   `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 /
   2026-08-12 UTC] the suggestion override, admin body, and runtime are live.
   The production route rejects unauthenticated writes before service entry; a
-  signed-in browser smoke remains unrun because the available sessions were
-  signed out.
+  first signed-in Request `1002788` attempt correctly made no write but exposed
+  blank legacy Test Homer engagement snapshots despite a complete linked active
+  reviewer. [VERIFIED via the exact read-only production row probe, main
+  `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks]
+  the snapshot-first/linked-person fallback is production-live; owner retry of
+  that same extension remains the final signed-in smoke.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,

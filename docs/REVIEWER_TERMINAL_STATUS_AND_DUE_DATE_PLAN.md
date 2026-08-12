@@ -44,7 +44,10 @@ request date. The accepted-row Track Reviewers modal permits a non-null date
 only when it is strictly after that request date (and current/future in the
 Foundation-Pacific calendar), with no maximum. Its dedicated writer first
 validates the admin body, Dynamics impersonation setting, assigned sender,
-confirmed recipient, signature, and calendar; it then ETag-commits the change
+confirmed recipient, signature, and calendar. Confirmed engagement snapshot
+name/email take precedence; legacy missing snapshot values fall back
+field-by-field to the server-read linked reviewer person, while absence from
+both sources still fails before the write. It then ETag-commits the change
 and automatically dispatches the
 fixed-subject message. Only an actual Dynamics dispatch failure leaves the date
 saved without the notice. The open modal supports a server-fresh retry, and an
@@ -64,6 +67,12 @@ non-clobbering `email.reviewer_extension.body` seed, main `8647af33`, Vercel
 2026-08-12 UTC] the field, setting, and runtime are production-live. This does
 not change the deferred
 append-only dispatch-evidence requirement in this plan.
+
+[VERIFIED via the exact read-only production Request `1002788`/Test Homer row
+probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live
+HTTP checks] the legacy identity fallback is production-live. The first
+signed-in attempt correctly made no deadline write; owner retry remains the
+final browser smoke.
 
 ## Production release — 2026-07-24
 

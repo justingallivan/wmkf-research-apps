@@ -40,14 +40,16 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
 
 ### Active / Verified Open
 
-1. **Per-reviewer review-due-date override — staged, not deployed (2026-08-11).**
-   Feature branch `codex/reviewer-due-date-override` implements the new nullable
+1. **Per-reviewer review-due-date override — production-live; signed-in retry pending (2026-08-11).**
+   Main implements the nullable
    suggestion-level DateOnly field, an accepted-row Track Reviewers extension
    modal, dedicated authenticated writer, effective-date projection, portal,
    acceptance-email/calendar, review-due reminder, and token
    issuance/regeneration fan-out. A save/restore first validates the email
    body, Dynamics impersonation setting, assigned sender, confirmed recipient,
-   signature, and calendar; it then
+   signature, and calendar; confirmed engagement snapshots take precedence,
+   while legacy blank name/email snapshots fall back to the linked reviewer
+   person record. It then
    ETag-commits the date and automatically dispatches the fixed-subject message.
    Only an actual Dynamics dispatch failure can preserve the changed date
    without the notice. The open modal offers a server-fresh retry, and an
@@ -56,7 +58,7 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    proposal's original deadline, with no maximum. Claude Opus's final
    adversarial verification returned **READY** after the preflight, retry-state,
    error-classification, and copy corrections. Latest verification is **610
-   suites / 7,714 tests**, with **27/27** focused extension tests and a successful
+   suites / 7,717 tests**, with **30/30** focused extension tests and a successful
    webpack production build. The earlier Opus adversarial follow-up is also
    addressed:
    past overrides now fail closed using the Foundation-Pacific calendar date,
@@ -70,6 +72,13 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    field is live and EXACT. [VERIFIED via the non-clobbering setting seed, main
    `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP
    checks] the admin body and Tier-2 runtime are now production-live.
+   The first signed-in Request `1002788` attempt correctly made no write but
+   exposed a legacy Test Homer row whose engagement snapshots were blank while
+   the linked active reviewer held the confirmed name/email. [VERIFIED via the
+   exact read-only production row probe, main `ccb7e0c8`, Vercel
+   `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] production now uses
+   the linked reviewer only to fill missing snapshot identity; owner retry of
+   that same extension remains the final signed-in smoke.
    Invitation response timing remains separate; the mutable
    override is not immutable communicated-deadline evidence for reviewer
    reliability. The prior pre-accept editor and generic `my-candidates` write
