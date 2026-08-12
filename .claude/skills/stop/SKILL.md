@@ -78,6 +78,14 @@ uncommitted changes — they may cause issues on another machine.
 
    If unsure whether something is milestone-worthy, default to NOT writing an entry. Skipping is the right answer most weeks.
 
+   **Handoff requirement:** Before completing the handoff, make an explicit
+   milestone determination. If the session shipped a new production capability,
+   production cutover, new architecture, strategic pivot, incident outcome, or
+   removal of a deprecated capability, the handoff is incomplete until the
+   corresponding DEVELOPMENT_LOG.md entry exists. Otherwise report that no
+   milestone entry was required. This is based on what shipped, not on session
+   cadence.
+
 ## Step 4: Commit Documentation Updates
 
 After updating documentation files — re-verify the branch immediately before the
@@ -113,6 +121,7 @@ Verify the push succeeded. If it fails:
 Display:
 - List of commits made this session
 - Documentation files that were updated
+- Milestone-log determination: entry added (with headline), or no entry required
 - Confirmation that changes are pushed to remote
 - Reminder of next steps for the next session
 

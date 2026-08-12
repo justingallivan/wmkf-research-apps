@@ -3771,7 +3771,3 @@ Codex in parallel wrote `docs/INTAKE_PORTAL_ITEM_6_MAKER_PORTAL_TESTS.md` (823 l
 - **GoApply coexistence shapes schema decisions.** Item 6's path collapsed because Connor confirmed GoApply still writes the same fields the drain wants to write. Read-only conversions (rollup fields) are off the table for any field GoApply touches until the GoApply replacement is complete.
 - **Live `EntityDefinitions` probing during meetings is high-leverage.** Item 5's "verify Connor live" step landed 3 field reuses in 5 minutes that would otherwise have shipped as net-new fields, defeating the human-legibility principle that the morning session had just locked in.
 - **Background `codex-rescue` agents can't get Bash permission grants.** Two attempts in this session stalled; relaunched in foreground both times. Use foreground for `codex-rescue` until permission flow improves.
-
----
-
-Last Updated: May 14, 2026

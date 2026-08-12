@@ -123,11 +123,7 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    Owner decision remains required on whether this later destructive primitive
    should stay org-open.
 
-2. **`DEVELOPMENT_LOG.md` revive or formally retire** — carried, still unanswered.
-   Evidence: file tail "Last Updated: May 14, 2026"; S409–S414 added no entries.
-   **No entry added this session, deliberately** — writing one would preempt this.
-
-3. Carried unchanged from S413: staff image substitution audit trace; what
+2. Carried unchanged from S413: staff image substitution audit trace; what
    triggers `Closed No Response`; per-send deadline override divergence
    (`render-emails-service.js:271`, `send-emails-service.js:916`); residual
    Reviews-surface duplication; cycle measurement tool live evidence.
@@ -187,6 +183,10 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    Graph `/versions`; another adversarial round on version history; `Revision
    Requested`; re-consent on staff replacement; S411 shared-footer placement;
    ROR reset / institution checker / S408 diagnostic / S328 downloads.
+5. **Whether to retire `DEVELOPMENT_LOG.md`.** Owner confirmed 2026-08-11 that it remains
+   the milestone record, not a per-session activity log. The stale static footer
+   was removed, and `/stop` now requires an explicit milestone determination at
+   handoff; a shipped milestone must be logged before handoff completes.
 
 ## Key Files Reference
 
