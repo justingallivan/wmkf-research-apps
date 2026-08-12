@@ -4,15 +4,11 @@ This module supports the W.M. Keck Foundation in matching research proposals to 
 
 ## Key Files
 
-- `data/consultant_expertise.csv` — Master reviewer database (38 entries; 13-column schema below)
+- `data/consultant_expertise.csv` — Master reviewer database
 - `src/reviewer_matcher.jsx` — React dashboard for browsing and AI-assisted matching
 - `docs/SKILL_reviewer_matching.md` — Full operational procedures for Phase I batch and Phase II individual matching
 - `docs/PROJECT_CONTEXT.md` — Complete project context including roster details, matching conventions, and known gaps
 - `docs/J26_usage_report.md` — J26 usage statistics and per-reviewer profiles
-
-## CSV Schema (13 columns; semicolons only, no commas in data)
-
-Name, Role_Type, Role, Affiliation, ORCID, Primary_Fields, Keywords, Subfields_Specialties, Methods_Techniques, Distinctions, Expertise, Keck_Affiliation, Keck_Affiliation_Details
 
 ## Matching Rules — Always Enforce
 
