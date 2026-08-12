@@ -455,10 +455,17 @@ write-path review: staff-side sends (invitation, reminders, materials, thank-you
 labeled "recorded" with a delivery-not-confirmed caveat because those stamps survive a
 failed dispatch; response and receipt stamps are labeled from their DTO evidence; only
 genuine reviewer-originated portal access/responses/submissions assert reviewer action.
-`reviewStatus=released` has no timestamp writer, so it is surfaced as an undated
-current-status header and as the Last Action summary; it is not inserted into the dated
-timeline. Actor identity is absent by construction — the reviewer DTO carries no
-acting-user field. Full findings and the Phase 2/3 gates:
+**Last Action precedence — the undated header wins only when nothing dates the
+transition.** `reviewStatus=released` has no timestamp writer anywhere, so it is
+surfaced as an undated current-status header and as the Last Action summary, never
+inserted into the dated timeline. `withdrew` is the opposite case: its writer stamps
+`wmkf_responsereceivedat` in the same write as the status, so the dated "Withdrawal
+recorded by staff" event stays in Last Action — staff triage on *when* a withdrawal was
+recorded. Both symmetrical shortcuts are wrong and both are pinned by tests: deferring
+to the header for every terminal status hides the withdrawal date (Codex round 4), and
+preferring dated activity whenever any exists puts a released reviewer's Last Action
+back on a stale old reminder (Codex round 3). Actor identity is absent by construction —
+the reviewer DTO carries no acting-user field. Full findings and the Phase 2/3 gates:
 `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
 
 ## Durable Memory
