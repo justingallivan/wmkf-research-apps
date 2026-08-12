@@ -125,11 +125,13 @@ describe('ReviewerActivityDrawer', () => {
     expect(screen.getAllByText(/delivery not confirmed/i)).toHaveLength(items.length);
   });
 
-  it('states the derived, current-engagement scope so staff do not read it as a ledger', () => {
+  it('states the operational-summary scope so staff do not read it as an audit trail', () => {
     render(<ReviewerActivityDrawer reviewer={REVIEWER} onClose={jest.fn()} />);
 
-    expect(screen.getByText(/current engagement/i)).toBeInTheDocument();
-    expect(screen.getByText(/Deadline extensions are not listed/i)).toBeInTheDocument();
+    const note = screen.getByText(/operational summary/i);
+    expect(note).toHaveTextContent(/not a complete audit trail/i);
+    expect(note).toHaveTextContent(/overwritten and prior-engagement transitions cannot be reconstructed/i);
+    expect(note).toHaveTextContent(/Deadline extensions are not listed/i);
   });
 
   it('shows an explicit empty state rather than a bare panel', () => {

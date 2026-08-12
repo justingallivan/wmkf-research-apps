@@ -3,9 +3,10 @@
  *
  * Every event here is computed at read time from lifecycle stamps already on the
  * reviewer suggestion. Nothing is materialized and nothing is backfilled: re-added
- * reviewers have had their stamps cleared by `ENGAGEMENT_STAMP_RESET_ENTRIES`
- * (`lib/dataverse/adapters/reviewer-suggestion.js`), so this history describes the
- * CURRENT engagement only and cannot reconstruct prior ones. See
+ * reviewers have had those stamps cleared by `ENGAGEMENT_STAMP_RESET_ENTRIES`
+ * (`lib/dataverse/adapters/reviewer-suggestion.js`). This is an operational summary
+ * of the current row, not an audit log, and it cannot reconstruct overwritten or
+ * prior transitions. See
  * `outputs/reviewer-activity-history-opus-review-2026-08-11.md` findings 3 and 11.
  *
  * Evidence tiers (finding 4). Several staff-side stamps are claimed BEFORE dispatch
@@ -14,14 +15,14 @@
  * can finish `unconfirmed` (`send-emails-service.js:747-800`). Those events are
  * therefore labeled "recorded" and carry `deliveryProven: false`; the wording must
  * never assert that mail reached the reviewer. Reviewer-originated portal access is
- * proof of the thing it names. Response and receipt stamps are classified from the
- * row's actual write-path evidence, not from the bare timestamp.
+ * proof of the thing it names. Response stamps are classified from the current
+ * response type. Receipt provenance stays neutral because the supporting filename,
+ * answer rows, and staff-upload flag are not engagement-scoped.
  *
  * Review receipt is the exception and is decided per row — see `isSyntheticReceipt`.
- * A staff close-out fabricates `wmkf_reviewreceivedat`, so the actor who "owns" an
- * event is NOT a safe guide to whether it happened; only the write path is. That
- * mistake is what an initial version of this module made (Codex adversarial review,
- * 2026-08-12).
+ * A staff close-out fabricates `wmkf_reviewreceivedat`, so the bare stamp proves only
+ * that a receipt was recorded. It does not prove who submitted a review or through
+ * which path (Codex adversarial review, 2026-08-12).
  *
  * DELIBERATE EXCLUSIONS — do not add these back without addressing the reason:
  *
@@ -40,8 +41,8 @@
  *   in the repository ever writes a value to it — `reviewer-suggestion.js:1957` only
  *   ever nulls it. An event derived from it could never fire.
  *
- * Every field used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`, which is what makes
- * the drawer's "current engagement only" wording literally true rather than aspirational.
+ * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`. Auxiliary
+ * fields that survive reset must never be used to strengthen an event's provenance.
  *
  * Actor identity is absent by construction — the reviewer DTO carries no acting-user
  * field. Attribution would mean reading Dataverse field audit (finding 7/10).
@@ -105,7 +106,7 @@ export const EVENT_DESCRIPTORS = [
     key: 'review_received',
     field: 'reviewReceivedAt',
     rawField: 'wmkf_reviewreceivedat',
-    label: 'Review submitted through portal',
+    label: 'Review receipt recorded',
     deliveryProven: true,
     order: 90,
   },
@@ -140,9 +141,6 @@ export const UNPROVEN_DELIVERY_NOTE = 'Recorded in the record; delivery not conf
 
 /** Shown instead when the receipt stamp was fabricated by a close-out. */
 export const SYNTHETIC_RECEIPT_NOTE = 'Recorded by close-out; no submitted review on record.';
-
-/** Shown when staff attested receipt rather than a reviewer portal submission. */
-export const STAFF_RECEIPT_NOTE = 'Recorded by staff; not a portal submission.';
 
 const RESPONSE_EVENT_BY_TYPE = Object.freeze({
   accepted: {
@@ -200,27 +198,18 @@ const TERMINAL_STATUS_HAS_DATED_EVENT = Object.freeze({
  * review was RECEIVED, "NOT the PD's closeout", and the S369 note at 1641-1646
  * records a past bug that re-created exactly this false positive.
  *
- * Two signals separate fabricated from genuine:
- *  - Identical instants. Both stamps come from one `now` in one payload, so a
- *    fabricated pair matches exactly. A real receipt closed out later differs.
- *  - Independent evidence. A genuine submission leaves an uploaded `reviewFilename`
- *    or narrative `answers` rows; a fabricated one leaves neither.
- *
- * Evidence wins over the timestamp test: a reviewer who submits and is closed out in
- * the same instant still has answers or a file, and reads as proven.
+ * Identical instants are the only engagement-scoped signal available: both stamps
+ * come from one `now` in one payload, so a fabricated pair matches exactly. A real
+ * receipt closed out later differs. Filename, answer, and staff-upload fields cannot
+ * override this test because they survive remove/re-add and may describe a prior
+ * engagement.
  */
 export function isSyntheticReceipt(reviewer) {
   if (!reviewer?.reviewReceivedAt || !reviewer?.completedAt) return false;
-  if (reviewer.reviewFilename) return false;
-  if (Array.isArray(reviewer.answers) && reviewer.answers.length > 0) return false;
 
   const received = parseTime(reviewer.reviewReceivedAt);
   const completed = parseTime(reviewer.completedAt);
   return received !== null && received === completed;
-}
-
-export function isStaffAttestedReceipt(reviewer) {
-  return Boolean(reviewer?.reviewReceivedAt && reviewer.reviewUploadedByStaff === true);
 }
 
 export function responseEventEvidence(reviewer) {
@@ -260,14 +249,6 @@ export function reviewReceiptEvidence(reviewer) {
       label: 'Review recorded at close-out',
       deliveryProven: false,
       unprovenNote: SYNTHETIC_RECEIPT_NOTE,
-    };
-  }
-
-  if (isStaffAttestedReceipt(reviewer)) {
-    return {
-      label: 'Review receipt attested by staff',
-      deliveryProven: false,
-      unprovenNote: STAFF_RECEIPT_NOTE,
     };
   }
 

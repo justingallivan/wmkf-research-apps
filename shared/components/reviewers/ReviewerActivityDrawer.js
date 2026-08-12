@@ -102,10 +102,10 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
         </div>
 
         <p id={noteId} className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-          Derived from this reviewer&rsquo;s current record. It covers the current engagement
-          only — if the reviewer was removed and re-added, earlier activity is no longer
-          recorded. Deadline extensions are not listed: the record stores the new deadline,
-          not when it was granted.
+          Derived from this reviewer&rsquo;s current record. This is an operational summary,
+          not a complete audit trail; overwritten and prior-engagement transitions cannot
+          be reconstructed. Deadline extensions are not listed because the record stores
+          the new deadline, not when it was granted.
         </p>
 
         {terminalStatus && (

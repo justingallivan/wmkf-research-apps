@@ -17,7 +17,6 @@ const {
   EVENT_DESCRIPTORS,
   isSyntheticReceipt,
   SYNTHETIC_RECEIPT_NOTE,
-  STAFF_RECEIPT_NOTE,
   currentTerminalStatus,
   latestActivitySummary,
 } = require('../../shared/components/reviewers/reviewer-activity-history');
@@ -83,7 +82,7 @@ describe('buildActivityHistory', () => {
     expect(proven.materials_sent).toBe(false);
     expect(proven.review_reminder).toBe(false);
     expect(proven.thankyou).toBe(false);
-    // Reviewer-originated portal access/submission: the stamp exists because the reviewer did the thing.
+    // Portal access and the neutral row-level receipt event prove the thing they name.
     expect(proven.portal_first_accessed).toBe(true);
     expect(proven.response_received).toBe(true);
     expect(proven.review_received).toBe(true);
@@ -221,31 +220,22 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
     expect(receipt.unprovenNote).toBe(SYNTHETIC_RECEIPT_NOTE);
   });
 
-  it('keeps a genuine portal submission proven when answers exist', () => {
-    // Same instant, but the reviewer left narrative answers -- evidence beats the
-    // timestamp test, so a submit-then-immediately-close-out row stays proven.
+  it.each([
+    ['answer rows', { answers: [{ questionKey: 'summary', value: 'Old answer' }] }],
+    ['an uploaded filename', { reviewFilename: 'old-review.pdf' }],
+    ['a staff-upload flag', { reviewUploadedByStaff: true }],
+  ])('does not let stale %s defeat close-out demotion', (_label, staleEvidence) => {
     const events = buildActivityHistory({
       suggestionId: 'c2',
       reviewReceivedAt: CLOSEOUT_INSTANT,
       completedAt: CLOSEOUT_INSTANT,
-      answers: [{ questionKey: 'summary', value: 'Strong proposal' }],
+      ...staleEvidence,
     });
     const receipt = events.find(e => e.key === 'review_received');
 
-    expect(receipt.deliveryProven).toBe(true);
-    expect(receipt.label).toBe('Review submitted through portal');
-  });
-
-  it('keeps a genuine receipt proven when an uploaded review file exists', () => {
-    const events = buildActivityHistory({
-      suggestionId: 'c3',
-      reviewReceivedAt: CLOSEOUT_INSTANT,
-      completedAt: CLOSEOUT_INSTANT,
-      answers: [],
-      reviewFilename: 'review-lovelace.pdf',
-    });
-
-    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+    expect(receipt.deliveryProven).toBe(false);
+    expect(receipt.label).toBe('Review recorded at close-out');
+    expect(receipt.unprovenNote).toBe(SYNTHETIC_RECEIPT_NOTE);
   });
 
   it('keeps a receipt proven when close-out happened later than the receipt', () => {
@@ -256,7 +246,9 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
       answers: [],
     });
 
-    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+    const receipt = events.find(e => e.key === 'review_received');
+    expect(receipt.deliveryProven).toBe(true);
+    expect(receipt.label).toBe('Review receipt recorded');
   });
 
   it('leaves a receipt with no close-out alone', () => {
@@ -267,38 +259,23 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
     });
 
     expect(isSyntheticReceipt({ reviewReceivedAt: '2026-08-01T09:00:00Z' })).toBe(false);
-    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+    const receipt = events.find(e => e.key === 'review_received');
+    expect(receipt.deliveryProven).toBe(true);
+    expect(receipt.label).toBe('Review receipt recorded');
   });
 
-  it('labels the mark-received-no-file staff path as a staff attestation', () => {
+  it('keeps staff receipt provenance neutral', () => {
     const events = buildActivityHistory({
       suggestionId: 'c7',
       reviewReceivedAt: '2026-08-04T09:00:00Z',
       reviewUploadedByStaff: true,
-      reviewFilename: null,
-      answers: [],
-    });
-    const receipt = events.find(e => e.key === 'review_received');
-
-    expect(receipt.label).toBe('Review receipt attested by staff');
-    expect(receipt.deliveryProven).toBe(false);
-    expect(receipt.unprovenNote).toBe(STAFF_RECEIPT_NOTE);
-    expect(receipt.label).not.toBe('Review submitted through portal');
-  });
-
-  it('labels the staff review-upload path as a staff attestation even with a file', () => {
-    const events = buildActivityHistory({
-      suggestionId: 'c8',
-      reviewReceivedAt: '2026-08-04T09:00:00Z',
-      reviewUploadedByStaff: true,
       reviewFilename: 'staff-upload.pdf',
-      answers: [],
     });
     const receipt = events.find(e => e.key === 'review_received');
 
-    expect(receipt.label).toBe('Review receipt attested by staff');
-    expect(receipt.deliveryProven).toBe(false);
-    expect(receipt.unprovenNote).toBe(STAFF_RECEIPT_NOTE);
+    expect(receipt.label).toBe('Review receipt recorded');
+    expect(receipt.deliveryProven).toBe(true);
+    expect(receipt.label).not.toMatch(/portal|staff|reviewer submitted/i);
   });
 
   it('does not demote any event other than the receipt', () => {
@@ -356,6 +333,12 @@ describe('engagement-scope invariant', () => {
       expect(typeof descriptor.rawField).toBe('string');
       expect(descriptor.rawField).toMatch(/^wmkf_/);
     }
+  });
+
+  it('keeps the receipt descriptor free of provenance claims', () => {
+    const receipt = EVENT_DESCRIPTORS.find(d => d.key === 'review_received');
+    expect(receipt.label).toBe('Review receipt recorded');
+    expect(receipt.label).not.toMatch(/portal|staff|reviewer submitted/i);
   });
 });
 
