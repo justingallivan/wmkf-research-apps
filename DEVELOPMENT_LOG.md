@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 - Reviewer activity history is production-live (Session 419)
+
+**Milestone:** Track Reviewers now shows the chronologically newest derived lifecycle event
+and an accessible per-reviewer History drawer, replacing the old fixed-priority Last Action
+fallback.
+**Sessions:** 418-419 (Phase 1 build, five review rounds, CI repair, production promotion and
+authenticated smoke).
+**Ship state:** PR #120 merged and deployed; eight required checks passed; Request `1002959`
+verified the drawer, evidence caveat, and neutral invitation wording in Production; no schema,
+route, or backfill was added.
+**Why it matters:** staff can inspect the useful lifecycle evidence already present without
+mistaking column precedence for recency, while the UI remains explicit about evidence limits.
+**Pointers:** `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md`;
+`shared/components/reviewers/reviewer-activity-history.js`; commits `ae337125`, `7ebadbfe`,
+`058e45f2`, `2e7af630`.
+
 ## August 2026 — Per-reviewer deadline extensions are production-live (Session 417)
 
 **Milestone:** Program Directors can grant or change an accepted reviewer's deadline from
