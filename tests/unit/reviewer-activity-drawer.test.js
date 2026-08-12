@@ -140,7 +140,26 @@ describe('ReviewerActivityDrawer', () => {
       />,
     );
 
-    expect(screen.getByText(/No activity recorded for this reviewer yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No dated activity recorded for this reviewer yet/i)).toBeInTheDocument();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  it('shows released as an undated current-status header without adding a release event', () => {
+    render(
+      <ReviewerActivityDrawer
+        reviewer={{
+          suggestionId: 'sug-3',
+          name: 'Released Reviewer',
+          reviewStatus: 'released',
+          reminderSentAt: '2026-08-08T10:00:00Z',
+        }}
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Current status: Released')).toBeInTheDocument();
+    expect(screen.getByText(/No lifecycle timestamp is recorded/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.queryByText(/Release recorded/i)).not.toBeInTheDocument();
   });
 });

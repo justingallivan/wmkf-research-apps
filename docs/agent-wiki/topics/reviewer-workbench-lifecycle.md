@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-11
+last_verified: 2026-08-12
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -425,26 +425,39 @@ stamp, so an extension has no position on a timeline at all. The invariant is
 machine-enforced by `tests/unit/reviewer-activity-history.test.js`, which re-derives
 the reset set from the adapter source rather than trusting a copied list.
 
-**Second standing hazard — `wmkf_reviewreceivedat` is not proof of a review.**
-`updateLifecycle` stamps it with the same `now` as `wmkf_completedat`, in one payload,
-on any transition to `reviewStatus=complete` where it is empty
-[VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1662-1670`]. A PD closing
-out a reviewer who never submitted therefore produces a receipt timestamp for a review
-that does not exist — the same false positive the adapter's own
-`aggregateReviewHistory` header (line 341) and its S369 note (1641-1646) already warn
-about. The drawer decides this per row via `isSyntheticReceipt`: identical
-receipt/close-out instants with no `reviewFilename` and no `answers` rows demote the
-event to "Review recorded at close-out" with an explicit unproven note, while
-independent evidence keeps it proven. Found by Codex adversarial review 2026-08-12
-against a first version that classified every receipt as proven; the general lesson is
-that **the actor who owns an event is not a safe guide to whether it happened — only
-the write path is.**
+**Second standing hazard — lifecycle stamp names are not proof of same-named events.**
+`wmkf_responsereceivedat` has three live writers with different meanings:
+external reviewer accept/decline, staff-recorded withdrawal, and the stale-invite cron
+that writes `responseType=no_response` at cycle close. The activity history therefore
+classifies the response event from `responseType` plus `reviewStatus`: accepted and
+ordinary declined rows read as reviewer responses, `no_response` reads as automated
+cycle close, and `declined` + `withdrew` reads as staff-recorded withdrawal. The bare
+timestamp must not be treated as proof that a reviewer responded.
 
-Evidence wording follows the Opus review's claim-vs-send split: staff-side sends
-(invitation, reminders, materials, thank-you) are labeled "recorded" with a
-delivery-not-confirmed caveat because those stamps survive a failed dispatch;
-reviewer-originated events (portal first access, response, review receipt) assert the
-event. Actor identity is absent by construction — the reviewer DTO carries no
+`wmkf_reviewreceivedat` is also not proof of a portal submission. `updateLifecycle`
+stamps it with the same `now` as `wmkf_completedat`, in one payload, on any transition
+to `reviewStatus=complete` where it is empty [VERIFIED via
+`lib/dataverse/adapters/reviewer-suggestion.js:1662-1670`]. A PD closing out a reviewer
+who never submitted therefore produces a receipt timestamp for a review that does not
+exist — the same false positive the adapter's own `aggregateReviewHistory` header (line
+341) and its S369 note (1641-1646) already warn about. The drawer decides this per row
+via `isSyntheticReceipt`: identical receipt/close-out instants with no `reviewFilename`
+and no `answers` rows demote the event to "Review recorded at close-out" with an
+explicit unproven note, while independent evidence keeps it proven. Staff receipt paths
+that set `reviewUploadedByStaff=true` (mark-received-no-file and staff upload) read as
+staff attestations, not portal submissions. Found by Codex adversarial review
+2026-08-12 against a first version that classified every receipt as proven; the general
+lesson is that **the actor who owns an event is not a safe guide to whether it happened
+— only the write path is.**
+
+Evidence wording follows the Opus review's claim-vs-send split plus the later
+write-path review: staff-side sends (invitation, reminders, materials, thank-you) are
+labeled "recorded" with a delivery-not-confirmed caveat because those stamps survive a
+failed dispatch; response and receipt stamps are labeled from their DTO evidence; only
+genuine reviewer-originated portal access/responses/submissions assert reviewer action.
+`reviewStatus=released` has no timestamp writer, so it is surfaced as an undated
+current-status header and as the Last Action summary; it is not inserted into the dated
+timeline. Actor identity is absent by construction — the reviewer DTO carries no
 acting-user field. Full findings and the Phase 2/3 gates:
 `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
 
