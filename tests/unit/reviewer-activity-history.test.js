@@ -389,4 +389,58 @@ describe('undated terminal status summary', () => {
     expect(events.some(e => e.key === 'terminal_released')).toBe(false);
     expect(currentTerminalStatus(reviewer).detail).toMatch(/No lifecycle timestamp/);
   });
+
+  // Codex adversarial review round 4 (2026-08-12): deferring to the undated header for
+  // EVERY terminal status hid the withdrawal date staff triage on. `withdrew` does have
+  // a dated event -- applyStaffReviewerWithdrawal stamps responseReceivedAt in the same
+  // write as the status -- so only `released` may fall back to the undated header.
+  it('keeps the dated withdrawal in Last Action rather than an undated header', () => {
+    const reviewer = {
+      suggestionId: 't2',
+      reviewStatus: 'withdrew',
+      responseType: 'declined',
+      responseReceivedAt: '2026-08-10T14:00:00Z',
+      materialsSentAt: '2026-08-01T10:00:00Z',
+    };
+
+    const summary = latestActivitySummary(reviewer);
+
+    expect(summary.key).toBe('response_received');
+    expect(summary.label).toBe('Withdrawal recorded by staff');
+    expect(summary.at).toBe('2026-08-10T14:00:00Z');
+    expect(summary.dated).not.toBe(false);
+  });
+
+  it('does not let a dated-event preference regress released to a stale reminder', () => {
+    // The rejected remedy -- "use the newest dated event whenever one exists" -- would
+    // return the Aug 8 reminder here, which is the exact defect the header fixed.
+    const reviewer = {
+      suggestionId: 't3',
+      reviewStatus: 'released',
+      reminderSentAt: '2026-08-08T10:00:00Z',
+    };
+
+    const summary = latestActivitySummary(reviewer);
+
+    expect(summary.key).toBe('terminal_released');
+    expect(summary.key).not.toBe('review_reminder');
+  });
+
+  it('falls back to the header when a withdrawn row carries no dated activity', () => {
+    const summary = latestActivitySummary({ suggestionId: 't4', reviewStatus: 'withdrew' });
+
+    expect(summary.key).toBe('terminal_withdrew');
+    expect(summary.dated).toBe(false);
+  });
+
+  it('leaves non-terminal rows on true recency', () => {
+    const summary = latestActivitySummary({
+      suggestionId: 't5',
+      reviewStatus: 'accepted',
+      materialsSentAt: '2026-08-01T10:00:00Z',
+      reminderSentAt: '2026-08-08T10:00:00Z',
+    });
+
+    expect(summary.key).toBe('review_reminder');
+  });
 });

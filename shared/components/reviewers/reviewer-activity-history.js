@@ -170,6 +170,25 @@ const TERMINAL_STATUS_LABELS = Object.freeze({
 });
 
 /**
+ * Does a dated timeline event already represent this terminal transition?
+ *
+ * `withdrew` does: `applyStaffReviewerWithdrawal` stamps `wmkf_responsereceivedat` in
+ * the same write as the status (`reviewer-suggestion.js:1832-1842`), which surfaces as
+ * the dated "Withdrawal recorded by staff" event. `released` does not: its writer sets
+ * only status and token revocation (`terminal-transition-service.js:106-118`), so no
+ * timestamp for it exists anywhere in the schema.
+ *
+ * This distinction is what the Last Action summary turns on. Letting the undated header
+ * win for BOTH hides the withdrawal date staff triage on; letting dated activity win for
+ * both puts a released reviewer's Last Action back on a stale old reminder, which is the
+ * defect the undated header was introduced to fix.
+ */
+const TERMINAL_STATUS_HAS_DATED_EVENT = Object.freeze({
+  withdrew: true,
+  released: false,
+});
+
+/**
  * Did a staff close-out fabricate this row's review receipt?
  *
  * `updateLifecycle` stamps `wmkf_reviewreceivedat` with `now` on any transition to
@@ -348,6 +367,16 @@ export function latestActivity(events) {
   return events[0];
 }
 
+/**
+ * What the Last Action column shows for one row.
+ *
+ * The undated terminal header wins ONLY when no dated event represents the transition
+ * (i.e. `released`). A withdrawn row keeps its dated withdrawal event so staff can scan
+ * WHEN the withdrawal was recorded without opening every drawer. Falls back to the
+ * header if a terminal row somehow carries no dated activity at all.
+ */
 export function latestActivitySummary(reviewer) {
-  return currentTerminalStatus(reviewer) || latestActivity(buildActivityHistory(reviewer));
+  const terminal = currentTerminalStatus(reviewer);
+  if (terminal && !TERMINAL_STATUS_HAS_DATED_EVENT[reviewer?.reviewStatus]) return terminal;
+  return latestActivity(buildActivityHistory(reviewer)) || terminal;
 }
