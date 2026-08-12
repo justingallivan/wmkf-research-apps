@@ -25,11 +25,31 @@ export function minimumExtensionDate(originalDate, today = currentYmdInTimeZone(
   return dayAfterOriginal > today ? dayAfterOriginal : today;
 }
 
+function messageForReason(reason, fallback) {
+  const messages = {
+    ineligible: 'This reviewer is no longer eligible for a deadline change. Reload the reviewer list.',
+    not_found: 'This reviewer is no longer available. Reload the reviewer list.',
+    original_due_date_missing: 'I could not find the original review deadline. Reload the reviewer list, and contact an administrator if the problem continues.',
+    invalid_extension_date: 'Choose a date after the original deadline.',
+    no_extension_to_restore: 'There is no extension to restore. Reload the reviewer list.',
+    no_change: 'Choose a different deadline, or use Resend deadline email.',
+    conflict: 'The reviewer changed while this dialog was open. Reload and try again.',
+    misconfigured: 'I could not prepare the deadline email. No deadline was changed. Try again, and contact an administrator if the problem continues.',
+    notification_unavailable: 'I am missing the reviewer or Program Director information needed for this email. No deadline was changed. Contact an administrator.',
+    read_failed: 'I could not load the reviewer data. No deadline was changed. Try again, and contact an administrator if the problem continues.',
+    save_failed: 'I could not save the extension. Reload the reviewer list and try again.',
+    send_failed: 'I could not send the deadline email. Try the email again, and contact an administrator if the problem continues.',
+    server_error: 'I could not complete the deadline update. Try again, and contact an administrator if the problem continues.',
+  };
+  return messages[reason] || fallback;
+}
+
 /**
  * Track Reviewers action for an accepted reviewer's operational due date.
- * Saving is one server-side workflow: persist first, then automatically send
- * the deadline email and stable-UID calendar update. Partial notification
- * failure stays visible here and can be retried from freshly stored state.
+ * Saving is one server-side workflow: preflight the notice, persist the date,
+ * then dispatch the deadline email and stable-UID calendar update. Only an
+ * actual dispatch failure produces partial success; retry/resend reads fresh
+ * server state and performs no date write.
  */
 export default function ReviewerDueDateEditor({
   suggestionId,
@@ -89,14 +109,15 @@ export default function ReviewerDueDateEditor({
         return;
       }
       if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'The extension could not be saved.');
+        throw new Error(messageForReason(data.reason, data.error || 'The extension could not be saved.'));
       }
       setOpen(false);
       setSavedWithoutNotification(false);
       if (onSaved) onSaved();
     } catch (requestError) {
       if (!mountedRef.current || generation !== generationRef.current) return;
-      setError(requestError.message || 'The extension could not be saved.');
+      const detail = requestError.message || 'I could not complete the deadline update.';
+      setError(savedWithoutNotification ? `The deadline is still saved. ${detail}` : detail);
     } finally {
       if (mountedRef.current && generation === generationRef.current) setWorking(false);
     }
@@ -199,6 +220,16 @@ export default function ReviewerDueDateEditor({
                   className="mr-auto rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
                 >
                   Restore original deadline
+                </button>
+              )}
+              {overrideDate && !savedWithoutNotification && (
+                <button
+                  type="button"
+                  onClick={() => submit({ action: 'retry' })}
+                  disabled={working}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+                >
+                  {working ? 'Sending…' : 'Resend deadline email'}
                 </button>
               )}
               <button

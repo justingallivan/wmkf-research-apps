@@ -38,6 +38,7 @@ const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 const PD_ID = '44444444-4444-4444-8444-444444444444';
 const BODY = 'Dear {{reviewerName}},\n\nWe are happy to receive your review of “{{proposalTitle}}” by {{reviewDueDate}}.\n\n{{signature}}';
+const ORIGINAL_IMPERSONATION_SETTING = process.env.DYNAMICS_IMPERSONATION_ENABLED;
 
 function suggestion(overrides = {}) {
   return {
@@ -60,6 +61,7 @@ function suggestion(overrides = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
   suggestionAdapter.getByIdWithSelect.mockResolvedValue(suggestion());
   suggestionAdapter.updateLifecycle.mockResolvedValue({});
   getRequestById.mockResolvedValue({
@@ -85,6 +87,14 @@ beforeEach(() => {
     customClosing: false,
   });
   DynamicsService.createAndSendEmail.mockResolvedValue({ emailId: 'email-1' });
+});
+
+afterAll(() => {
+  if (ORIGINAL_IMPERSONATION_SETTING === undefined) {
+    delete process.env.DYNAMICS_IMPERSONATION_ENABLED;
+  } else {
+    process.env.DYNAMICS_IMPERSONATION_ENABLED = ORIGINAL_IMPERSONATION_SETTING;
+  }
 });
 
 test('saves first, then automatically sends the confirmed reviewer a fixed-subject calendar update', async () => {
@@ -226,12 +236,44 @@ test('retry re-reads and sends the currently stored effective deadline without a
 
   const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID });
 
-  expect(result).toMatchObject({ ok: true, saved: true, notified: true, effectiveReviewDeadline: '2099-09-20' });
+  expect(result).toMatchObject({ ok: true, saved: false, notified: true, effectiveReviewDeadline: '2099-09-20' });
   expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('September 20, 2099');
 });
 
-test('fails closed when the admin body omits required recipient/date/signature placeholders', async () => {
+test('retry send failure reports no date write and remains retryable', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    wmkf_reviewduedateoverride: '2099-09-20',
+  }));
+  DynamicsService.createAndSendEmail.mockRejectedValueOnce(new Error('mail unavailable'));
+
+  const result = await retryReviewerDueDateNotification({ suggestionId: SUGGESTION_ID });
+
+  expect(result).toMatchObject({
+    ok: false,
+    saved: false,
+    notified: false,
+    retryable: true,
+    reason: 'send_failed',
+    effectiveReviewDeadline: '2099-09-20',
+  });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+});
+
+test('fails before writing when Dynamics impersonation is disabled', async () => {
+  process.env.DYNAMICS_IMPERSONATION_ENABLED = 'false';
+
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+
+  expect(result).toMatchObject({ ok: false, reason: 'misconfigured' });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('fails before writing when the admin body omits required recipient/date/signature placeholders', async () => {
   readRequiredEmailDefaults.mockResolvedValueOnce({
     ok: true,
     values: { 'email.reviewer_extension.body': 'Hello there' },
@@ -243,6 +285,77 @@ test('fails closed when the admin body omits required recipient/date/signature p
     reviewDueDateOverride: '2099-09-15',
   });
 
-  expect(result).toMatchObject({ ok: false, saved: true, notified: false, reason: 'misconfigured' });
+  expect(result).toMatchObject({ ok: false, reason: 'misconfigured' });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('fails before writing when sender or confirmed recipient prerequisites are unavailable', async () => {
+  getSystemUserById.mockResolvedValueOnce(null);
+  const missingPd = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+  expect(missingPd).toMatchObject({ ok: false, reason: 'notification_unavailable' });
+
+  getSystemUserById.mockResolvedValueOnce({
+    systemuserid: PD_ID,
+    internalemailaddress: 'pd@wmkf.org',
+    isdisabled: false,
+  });
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({ wmkf_revieweremail: null }));
+  const missingRecipient = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+  expect(missingRecipient).toMatchObject({ ok: false, reason: 'notification_unavailable' });
+
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('distinguishes structured missing rows, transient reads, and write conflicts', async () => {
+  suggestionAdapter.getByIdWithSelect.mockRejectedValueOnce({
+    serviceName: 'dataverse',
+    status: 404,
+    dataverseCode: '0x80040217',
+  });
+  await expect(saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  })).resolves.toEqual({ ok: false, reason: 'not_found' });
+
+  suggestionAdapter.getByIdWithSelect.mockRejectedValueOnce(new Error('Dataverse unavailable'));
+  await expect(saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  })).resolves.toEqual({ ok: false, reason: 'read_failed' });
+
+  suggestionAdapter.updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('changed'), { status: 412 }));
+  await expect(saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('classifies adapter race rejections without exposing internal error text', async () => {
+  suggestionAdapter.updateLifecycle.mockRejectedValueOnce(
+    new Error(`reviewer-suggestion.updateLifecycle: refusing to mutate an applicant-excluded suggestion (${SUGGESTION_ID})`),
+  );
+  const excluded = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+  expect(excluded).toEqual({ ok: false, reason: 'ineligible' });
+
+  suggestionAdapter.updateLifecycle.mockRejectedValueOnce(
+    new Error('reviewer-suggestion: reviewDueDateOverride must be today or later'),
+  );
+  const crossedMidnight = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+  expect(crossedMidnight).toEqual({ ok: false, reason: 'invalid_extension_date' });
   expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });

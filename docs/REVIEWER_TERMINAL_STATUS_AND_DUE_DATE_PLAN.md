@@ -43,12 +43,16 @@ deferred reliability-evidence design below. Feature branch
 `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; null falls back to the
 request date. The accepted-row Track Reviewers modal permits a non-null date
 only when it is strictly after that request date (and current/future in the
-Foundation-Pacific calendar), with no maximum. Its dedicated writer commits
-the change first, then automatically sends the confirmed reviewer a
-fixed-subject message using the admin-managed body, effective deadline,
-assigned-PD signature, and stable-UID calendar attachment. Notification failure
-leaves the date saved and supports a server-fresh retry; the Invite surface and
-generic candidate PATCH do not write the field. One shared resolver feeds staff
+Foundation-Pacific calendar), with no maximum. Its dedicated writer first
+validates the admin body, Dynamics impersonation setting, assigned sender,
+confirmed recipient, signature, and calendar; it then ETag-commits the change
+and automatically dispatches the
+fixed-subject message. Only an actual Dynamics dispatch failure leaves the date
+saved without the notice. The open modal supports a server-fresh retry, and an
+existing extension always offers Resend deadline email without another date
+write. There is no durable notification-owed marker, so a failed restore send
+still depends on the immediate retry affordance. The Invite surface and generic
+candidate PATCH do not write the field. One shared resolver feeds staff
 display, portal context, email/calendar copy, reminders, and token
 mint/regeneration. Saving the override does not rotate a delivered token; the accepted-reviewer due + 90d window is
 intentional through the Board meeting and exceeds ordinary roughly two-week

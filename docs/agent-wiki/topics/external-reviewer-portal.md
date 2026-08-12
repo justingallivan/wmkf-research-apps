@@ -174,11 +174,15 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   rows, Track Reviewers offers Grant/Change extension; the new date must be
   current/future and strictly after the request's original date, with no
   maximum, and null restores the original. Invite Reviewers has no editor and
-  generic candidate PATCH cannot write the field. The dedicated save commits
-  first, then automatically sends the confirmed reviewer a fixed-subject email
-  using the admin-managed body, effective deadline, assigned-PD signature, and
-  stable-UID calendar attachment. Send failure leaves the date saved and offers
-  a server-fresh retry. [VERIFIED via
+  generic candidate PATCH cannot write the field. The dedicated save first
+  validates the admin body, Dynamics impersonation setting, assigned sender,
+  confirmed recipient, signature, and calendar; it then ETag-commits the date
+  and automatically dispatches the
+  fixed-subject email. Only an actual Dynamics dispatch failure leaves the date
+  saved without the notice. The open modal offers a server-fresh retry, and an
+  existing extension always offers Resend deadline email without another date
+  write; there is no durable notification-owed marker for a failed restore
+  send. [VERIFIED via
   read-only production metadata 2026-08-11] the Wave 18 field is still ABSENT,
   so schema-first provisioning, seeding `email.reviewer_extension.body`, and
   runtime promotion are required before the override behavior is

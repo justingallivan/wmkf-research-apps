@@ -76,10 +76,14 @@ Outreach timestamps:
   `/api/review-manager/review-due-extension` is the sole staff writer. Track
   Reviewers exposes Grant/Change extension for eligible accepted rows; Invite
   Reviewers has no editor and generic `my-candidates` PATCH rejects the field.
-  The writer commits the date first, then automatically sends the confirmed
-  reviewer a fixed-subject email using the admin-managed body, effective date,
-  assigned-PD signature, and stable-UID calendar attachment. A send failure
-  preserves the date and supports a retry that re-reads durable state.
+  The writer first validates the admin body, Dynamics impersonation setting,
+  assigned sender, confirmed recipient, signature, and calendar; it then
+  ETag-commits the date and
+  automatically dispatches the fixed-subject email. Only an actual Dynamics
+  dispatch failure preserves the date without the notice. The open modal
+  supports a retry that re-reads durable state, and an existing extension always
+  offers Resend deadline email without another date write. There is no durable
+  notification-owed marker for a failed restore send.
   A fresh re-add of a removed engagement clears a stale override with the other
   engagement stamps.
 - [VERIFIED via feature-branch source/tests] `resolveEffectiveReviewDueDate()`

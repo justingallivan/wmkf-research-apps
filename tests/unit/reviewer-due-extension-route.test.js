@@ -87,7 +87,7 @@ test('partial notification failure returns 502 while preserving saved=true for r
 });
 
 test('retry sends from freshly stored state and does not accept a client deadline', async () => {
-  retryReviewerDueDateNotification.mockResolvedValue({ ok: true, saved: true, notified: true });
+  retryReviewerDueDateNotification.mockResolvedValue({ ok: true, saved: false, notified: true });
   const res = response();
 
   await handler({
@@ -98,6 +98,7 @@ test('retry sends from freshly stored state and does not accept a client deadlin
   expect(retryReviewerDueDateNotification).toHaveBeenCalledWith({ suggestionId: SUGGESTION_ID });
   expect(saveReviewerDueDateExtension).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
+  expect(res.body).toMatchObject({ saved: false, notified: true });
 });
 
 test('rejects malformed ids and unknown actions before any service call', async () => {

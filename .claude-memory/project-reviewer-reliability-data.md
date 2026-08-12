@@ -78,16 +78,25 @@ whether reviewers are on time and reliable — not just participation counts.
   full staff → portal/email/calendar/reminder/token consumer fan-out are
   implemented. A non-null extension must be strictly after the request's
   original deadline, with no maximum; the PD may restore the original date.
-  Saving or restoring commits the date first and then automatically sends the
-  confirmed reviewer a fixed-subject email with the new effective deadline,
-  assigned-PD signature, and stable-UID calendar update. Notification failure
-  leaves the date saved and exposes a retry that re-reads durable state. The
+  Saving or restoring first validates the admin body, Dynamics impersonation
+  setting, assigned sender, confirmed recipient, signature, and calendar; it
+  then ETag-commits the date
+  and automatically dispatches the fixed-subject email. Only an actual Dynamics
+  dispatch failure leaves the date saved without the notice. The open modal
+  exposes a server-fresh retry, and an existing extension always offers Resend
+  deadline email without another date write. There is no durable
+  notification-owed marker, so a failed restore send still depends on the
+  immediate retry affordance. The
   admin panel owns the body default only; the Invite surface has no editor.
   Invitation response timing remains separate. A fresh re-add clears the stale
   override; past dates fail closed using the Foundation-Pacific calendar date.
   Editing alone does not rotate a live delivered token. The accepted-reviewer
   due + 90d window is intentionally retained through the Board meeting and is
   comfortably longer than ordinary roughly two-week reviewer extensions.
+  Claude Opus's final adversarial verification returned READY after the
+  preflight, retry-state, error-classification, and copy corrections; the final
+  local gates passed at 610 suites / 7,714 tests, 27 focused extension tests,
+  and a successful webpack production build.
 - **Production remains request-only:** [VERIFIED via read-only typed metadata
   2026-08-11] `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is ABSENT
   in production. Required release order is Wave 18 schema apply/publish/exact

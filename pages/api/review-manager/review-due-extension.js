@@ -1,9 +1,9 @@
 /**
  * POST /api/review-manager/review-due-extension
  *
- * Accepted-reviewer extension action. `save` commits the reviewer-specific
- * date first and then sends the automatic update email/calendar attachment;
- * `retry` re-reads the current stored date and retries notification only.
+ * Accepted-reviewer extension action. `save` preflights the automatic notice,
+ * commits the reviewer-specific date, then dispatches the email/calendar;
+ * `retry` re-reads the current stored date and sends notification only.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
@@ -21,7 +21,9 @@ const REASON_STATUS = {
   invalid_extension_date: 400,
   no_extension_to_restore: 409,
   no_change: 409,
-  save_failed: 409,
+  conflict: 409,
+  save_failed: 502,
+  read_failed: 502,
   misconfigured: 502,
   notification_unavailable: 502,
   send_failed: 502,

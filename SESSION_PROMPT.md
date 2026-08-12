@@ -45,13 +45,20 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    suggestion-level DateOnly field, an accepted-row Track Reviewers extension
    modal, dedicated authenticated writer, effective-date projection, portal,
    acceptance-email/calendar, review-due reminder, and token
-   issuance/regeneration fan-out. A saved/restored extension commits first,
-   then automatically sends the confirmed reviewer a fixed-subject message
-   using the admin-managed body, effective deadline, assigned-PD signature,
-   and stable-UID calendar attachment; a send failure preserves the date and
-   exposes a server-fresh retry. Non-null dates must be strictly after the
-   proposal's original deadline, with no maximum. The Opus adversarial
-   follow-up is addressed:
+   issuance/regeneration fan-out. A save/restore first validates the email
+   body, Dynamics impersonation setting, assigned sender, confirmed recipient,
+   signature, and calendar; it then
+   ETag-commits the date and automatically dispatches the fixed-subject message.
+   Only an actual Dynamics dispatch failure can preserve the changed date
+   without the notice. The open modal offers a server-fresh retry, and an
+   existing extension always exposes Resend deadline email without another
+   date write. Non-null dates must be strictly after the
+   proposal's original deadline, with no maximum. Claude Opus's final
+   adversarial verification returned **READY** after the preflight, retry-state,
+   error-classification, and copy corrections. Latest verification is **610
+   suites / 7,714 tests**, with **27/27** focused extension tests and a successful
+   webpack production build. The earlier Opus adversarial follow-up is also
+   addressed:
    past overrides now fail closed using the Foundation-Pacific calendar date,
    request due-date read failure falls back to the established 90-day mint
    window, and discriminating tests cover later-override reminder deferral.
