@@ -12,7 +12,6 @@ related:
   - docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
   - outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md
-  - outputs/s400-institution-checker-probe-findings.md
   - lib/services/institution-affiliation-consistency.js
   - lib/services/ror-institution-identity-resolver.js
 ---
@@ -109,7 +108,8 @@ lib/services/workbench/enrich-recommended-service.js change: the consumer set
 is unchanged on the Stage 1 branch and is now machine-enforced by
 `tests/unit/institution-checker-consumer-scope.test.js`.] It fails on the
 owner's two example classes for mechanical reasons proven live in
-`outputs/s400-institution-checker-probe-findings.md`:
+`outputs/s400-institution-checker-probe-findings.md` (gitignored, machine-local
+evidence - not a tracked repo path):
 
 1. **Subset/decorated strings never resolve.** "Department of X,
    <Institution>, City, ST, USA" returns zero OpenAlex search results; the

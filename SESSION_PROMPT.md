@@ -123,7 +123,7 @@
    probes `STILL_BLOCKED`; begin with a request-scoped information-only hint.
    Direct alert-to-merge additionally depends on owner decision #3 above.
 
-2. **Exact activity ledger and lazy-load API.** Park until Phase 1 is evaluated
+2. **Exact activity ledger and deferred-load API.** Park until Phase 1 is evaluated
    and the product/evidence decision is made. A future route must bind
    `suggestionId` to `requestId` server-side and be added to
    `docs/API_ROUTE_SECURITY_MATRIX.md`.
