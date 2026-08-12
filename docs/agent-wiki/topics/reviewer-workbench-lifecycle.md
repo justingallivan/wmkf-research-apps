@@ -392,6 +392,62 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   treats conversion measurement as remaining work
   (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
 
+## Reviewer activity history — Phase 1 (built S388, branch `feat/reviewer-activity-history-phase1`, NOT merged)
+
+**Behavior change staff will notice:** Track Reviewers' **Last Action** column no
+longer uses the fixed-precedence expression `thankyouSentAt || reviewReceivedAt ||
+reminderSentAt || materialsSentAt`. It now shows the **chronologically newest** event
+plus its label, with a **History** button opening a read-only drawer (owner decision
+2026-08-12). Old behavior surfaced whichever stamp ranked highest, so a months-old
+thank-you masked a reminder sent yesterday.
+
+Derivation is pure and lives in
+`shared/components/reviewers/reviewer-activity-history.js` (`buildActivityHistory` /
+`latestActivity`); the drawer is `ReviewerActivityDrawer.js`. No schema, no route, no
+backfill — every event is computed at read time from stamps already in the reviewer
+DTO, and `reviewers-service.js` was widened to project five stamps that the entity
+registry's `FIELD_SELECT` already fetched [VERIFIED via
+`lib/dataverse/core/entity-registry.js:115-183`] (`wmkf_emailsentat`,
+`wmkf_respondremindersentat`, `wmkf_responsereceivedat`, `wmkf_withdrawnsufficientat`,
+`wmkf_completedat`).
+
+**Standing hazard — the engagement-scope invariant.** The drawer tells staff its
+history covers the CURRENT engagement only. That is true *only* because every field it
+reads is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES`
+(`lib/dataverse/adapters/reviewer-suggestion.js:793-813`), which clears stamps on
+remove/re-add. Three tempting fields are deliberately EXCLUDED and must not be added
+back without resolving the reason: `wmkf_coiackedat` and `wmkf_aiuseackedat` have real
+writers but are **not** reset members, so a value may belong to a prior engagement;
+`wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
+`reviewer-suggestion.js:1957`). Deadline extensions are also absent — 
+`wmkf_reviewduedateoverride` is a DateOnly holding the new deadline, not a granted-at
+stamp, so an extension has no position on a timeline at all. The invariant is
+machine-enforced by `tests/unit/reviewer-activity-history.test.js`, which re-derives
+the reset set from the adapter source rather than trusting a copied list.
+
+**Second standing hazard — `wmkf_reviewreceivedat` is not proof of a review.**
+`updateLifecycle` stamps it with the same `now` as `wmkf_completedat`, in one payload,
+on any transition to `reviewStatus=complete` where it is empty
+[VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1662-1670`]. A PD closing
+out a reviewer who never submitted therefore produces a receipt timestamp for a review
+that does not exist — the same false positive the adapter's own
+`aggregateReviewHistory` header (line 341) and its S369 note (1641-1646) already warn
+about. The drawer decides this per row via `isSyntheticReceipt`: identical
+receipt/close-out instants with no `reviewFilename` and no `answers` rows demote the
+event to "Review recorded at close-out" with an explicit unproven note, while
+independent evidence keeps it proven. Found by Codex adversarial review 2026-08-12
+against a first version that classified every receipt as proven; the general lesson is
+that **the actor who owns an event is not a safe guide to whether it happened — only
+the write path is.**
+
+Evidence wording follows the Opus review's claim-vs-send split: staff-side sends
+(invitation, reminders, materials, thank-you) are labeled "recorded" with a
+delivery-not-confirmed caveat because those stamps survive a failed dispatch;
+reviewer-originated events (portal first access, response, review receipt) assert the
+event. Actor identity is absent by construction — the reviewer DTO carries no
+acting-user field. Full findings and the Phase 2/3 gates:
+`outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
+
 ## Durable Memory
 
 - Workbench and invite workflow: `project-reviewer-apps-redesign-direction`, `project-reviewer-workbench-invite-workflow`.

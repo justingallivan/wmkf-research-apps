@@ -26,6 +26,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
+import ReviewerActivityDrawer from './ReviewerActivityDrawer';
+import { buildActivityHistory, latestActivity } from './reviewer-activity-history';
 import { Card, Button } from '../Layout';
 import {
   STATUS_PIPELINE,
@@ -1459,6 +1461,7 @@ export default function ReviewerManagePanel({
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(null); // { suggestionId, value }
   const [savingNotes, setSavingNotes] = useState(false);
+  const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
 
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
@@ -1469,6 +1472,18 @@ export default function ReviewerManagePanel({
     setSelectedReviewers(new Set());
     setEditingNotes(null);
   }, [proposal?.proposalId, mode]);
+
+  // The open drawer is a pure projection of the CURRENT row, looked up fresh each
+  // render, so a re-fetch after a row mutation flows straight into it — that is the
+  // "refresh" half of the Phase 1 staleness policy. The only case left is the row
+  // vanishing (removed, or filtered out by a mode/status change), which closes it.
+  const activityReviewer = activityDrawerId
+    ? reviewers.find(r => r.suggestionId === activityDrawerId) || null
+    : null;
+
+  useEffect(() => {
+    if (activityDrawerId && !activityReviewer) setActivityDrawerId(null);
+  }, [activityDrawerId, activityReviewer]);
 
   const selectedList = reviewers.filter(r => selectedReviewers.has(r.suggestionId));
   const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
@@ -1790,7 +1805,9 @@ export default function ReviewerManagePanel({
             <tbody className="divide-y divide-gray-100">
               {reviewers.map(r => {
                 const isEditing = editingNotes?.suggestionId === r.suggestionId;
-                const lastAction = r.thankyouSentAt || r.reviewReceivedAt || r.reminderSentAt || r.materialsSentAt;
+                // True recency (owner decision 2026-08-12), replacing the fixed-precedence
+                // fallback this column used to show. See reviewer-activity-history.js.
+                const lastEvent = latestActivity(buildActivityHistory(r));
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1833,7 +1850,22 @@ export default function ReviewerManagePanel({
                       />
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">
-                      {lastAction ? formatDate(lastAction) : '—'}
+                      {lastEvent ? (
+                        <>
+                          <p className="text-gray-700">{lastEvent.label}</p>
+                          <p>{formatDate(lastEvent.at)}</p>
+                        </>
+                      ) : (
+                        <p>—</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActivityDrawerId(r.suggestionId)}
+                        className="mt-1 text-blue-700 hover:text-blue-900 hover:underline"
+                        aria-label={`View activity history for ${r.name || 'reviewer'}`}
+                      >
+                        History
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       {canManage && isEditing ? (
@@ -1904,6 +1936,14 @@ export default function ReviewerManagePanel({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Read-only, so it renders regardless of the canManage UI gate. */}
+      {activityReviewer && (
+        <ReviewerActivityDrawer
+          reviewer={activityReviewer}
+          onClose={() => setActivityDrawerId(null)}
+        />
       )}
 
       {/* Modals */}
