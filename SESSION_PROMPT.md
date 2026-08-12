@@ -1,195 +1,171 @@
-# Session 418 Prompt: reviewer activity history and pending SharePoint decisions
+# Session 419 Prompt: reviewer activity history scope decision
 
-## Session 417 Summary
+## Session 418 Summary
 
 ### What Was Completed
 
-1. **Per-reviewer deadline extensions shipped and passed an owner production test.**
-   Program Directors can grant or change the deadline for an accepted reviewer
-   from Track Reviewers. The date must be after the request's original deadline
-   and has no maximum. Saving first validates the complete notification payload,
-   ETag-commits the override, and automatically sends the fixed-subject email and
-   updated calendar invitation. The modal exposes retry/resend without another
-   date write. Portal display, reminders, acceptance/calendar flows, and future
-   token calculations use the effective reviewer deadline. Existing issued tokens
-   retain the intentional original-deadline-plus-90-days lifetime through the
-   Board meeting.
+1. **Two red CI gates cleared.** `check:docs-catalog` failed because
+   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` listed
+   `outputs/s400-institution-checker-probe-findings.md` under `related:`, but
+   `outputs/` is gitignored (`.gitignore:55`) and that file was never force-added —
+   it holds live reviewer PII and is intentionally machine-local, so the frontmatter
+   entry could never satisfy the existence check in `scripts/lib/docs-catalog.js:169-173`.
+   `check:harness-framing` was a false positive: its `identity insult framing` pattern
+   (`scripts/check-harness-framing.js:27`) matches a deferred-loading adjective that is
+   also standard web terminology, which appeared in a hyphenated technical term in the
+   Session 418 parked list. Reworded the doc rather than loosening the scanner — note
+   the gate will trip again on any handoff that quotes that term, as this one initially
+   did. [VERIFIED via both gates plus a regression sweep over eight doc gates.]
 
-   Wave 18's nullable suggestion-level DateOnly field is live in Production.
-   Request `1002788` exposed a legacy row with blank engagement identity
-   snapshots; the writer now fills only missing snapshot identity from the linked
-   reviewer record. Justin's signed-in retry saved and delivered successfully.
-   The final copy correction reuses the invitation honorific helper, producing
-   `Dear Dr. Homer,` instead of `Dear Test Homer,`. [VERIFIED via main
-   `ed8b7a3d → d4cd8061`, production deployments recorded in the prior handoff,
-   Wave 18 metadata/runtime probes, and owner smoke on 2026-08-11.]
+2. **Reviewer activity history Phase 1 built, and revised through five review rounds.**
+   Track Reviewers' Last Action column no longer uses the fixed-precedence fallback
+   `thankyouSentAt || reviewReceivedAt || reminderSentAt || materialsSentAt`; it shows
+   the chronologically newest event plus a History drawer derived from the reviewer
+   DTO. No schema, no route, no backfill. Owner decisions settled 2026-08-12: true
+   recency, "Portal first accessed", no actor names (the DTO carries no acting-user
+   field), no backfill.
 
-2. **The ambiguous Last Action column was diagnosed and a replacement was scoped.**
-   `ReviewerManagePanel.js` currently displays a fixed-priority fallback —
-   `thankyouSentAt || reviewReceivedAt || reminderSentAt || materialsSentAt` —
-   rather than the chronologically latest action, and it ignores deadline
-   extensions. Justin chose an activity-history drawer to replace the column and
-   confirmed Notes should remain a separate mutable memo.
+   Each review round found a real defect, four of five high severity. The recurring
+   shape: **a lifecycle stamp does not reliably mean the event its name describes** —
+   classify by write path, not by the actor the name implies. Full history, evidence,
+   and the two still-open findings are in
+   `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md`.
 
-3. **Claude Opus completed an adversarial review of the drawer proposal.**
-   The review recommends a phased correction: first ship an accessible drawer
-   derived from current reviewer fields, clearly label legacy/current-record
-   evidence, and avoid a schema, route, or materialized backfill. Before any exact
-   append-only ledger, run the already-required Dynamics email-activity probe and
-   decide whether the feature is operational convenience or evidentiary history.
-   Major findings: no email-open writer exists; engagement generations cannot be
-   reconstructed; several "sent" stamps actually mean claim-before-send; email
-   activity IDs are discarded by most reviewer send paths; dedup and partial
-   failure semantics vary by event. [VERIFIED via the recovered Opus artifact
-   committed at `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.]
+3. **`next dev` was writing into the canonical instruction file.** Next's agent-rules
+   generator upserts a managed block into `AGENTS.md`; because `AGENTS.md` is a tracked
+   symlink to `CLAUDE.md` and Node follows symlinks on write, it appended vendor
+   instruction text to `CLAUDE.md` while logging "Generated AGENTS.md". Removed from
+   history and disabled via `agentRules: false`
+   (`config-schema.js:496`, gated at `start-server.js:419`). [VERIFIED empirically:
+   `npm run dev` now starts clean and leaves `CLAUDE.md` byte-identical.]
 
-4. **Milestone-log governance was repaired.** The obsolete static footer was
-   removed from `DEVELOPMENT_LOG.md`, and `/stop` now requires an explicit
-   milestone determination. This handoff adds the missing production milestone
-   entry for reviewer deadline extensions. `DEVELOPMENT_LOG.md` remains the
-   milestone record, not a routine session log. [VERIFIED via `2bca2dc8` and the
-   new top entry.]
-
-5. **A colleague-facing July 29–August 11 change summary was prepared.** It
-   covers Initial Assessment governance, safer reviewer finding/invitation,
-   decline referrals and deadline extensions, reviewer portal/Reviews changes,
-   Awardee-tab workflow changes, and performance/reliability improvements. This
-   was a conversation deliverable for Justin's 2026-08-12 meeting; no repository
-   artifact or runtime change was required.
+4. **Stale node_modules found and fixed.** A full-suite run reported green while two
+   suites had actually failed to run on `Cannot find module '@vercel/functions'` — the
+   dep landed 2026-07-29 inside the 457 commits pulled at session start. `npm install`
+   fixed it; `package.json`/`package-lock.json` unchanged.
 
 ### Commits
 
-- `ed8b7a3d` — Add per-reviewer due date overrides
-- `637d13b8` — Harden reviewer due date overrides
-- `d6864897` — Add accepted reviewer extension workflow
-- `19982cfd` — Address Opus reviewer extension findings
-- `8647af33` — Record Wave 18 production schema provisioning
-- `ea607fb9` — Record Wave 18 production promotion
-- `ccb7e0c8` — Fix legacy reviewer extension identity fallback
-- `adcc2859` — Record reviewer extension identity fallback
-- `6526a934` — Use honorific greeting for extension emails
-- `d4cd8061` — Record extension honorific production verification
-- `2bca2dc8` — Enforce milestone log handoff decision
+- `f525aa98` — fix(gates): clear docs-catalog and harness-framing reds
+- `c4ea7d42` — docs(memory): carry S387 Vercel plugin findings and de-duplicate CSV schema
+- `ae337125` — feat(workbench): reviewer activity history Phase 1 (derived drawer)
+- `bd8d9279` — test(workbench): pin activity-drawer focus, Escape, and evidence copy
+- `9eb11496` — fix(workbench): stop asserting close-out-fabricated review receipts
+- `7a786c58` — Merge reviewer activity history Phase 1
+- `afc18d28` — chore(config): stop next dev from writing to the instruction file
+- `7ebadbfe` — fix(workbench): classify response and receipt events by write path
+- `058e45f2` — fix(workbench): keep the withdrawal date in Last Action
+- `2e7af630` — docs: status brief for reviewer activity history Phase 1
 
 ## Next Items
 
-### Verified Open
-
-1. **Design and build Phase 1 of reviewer activity history on a feature branch.**
-   Evidence: `outputs/reviewer-activity-history-opus-review-2026-08-11.md` and
-   `shared/components/reviewers/ReviewerManagePanel.js:1783-1836`.
-   The recommended first increment replaces Last Action with an accessible drawer
-   derived from the reviewer DTO, adds only the missing existing lifecycle fields
-   to the projection, uses evidence-safe wording such as "recorded" where delivery
-   is not proven, keeps Notes separate, performs no backfill, and closes or
-   refreshes on row mutation. This is planned, not built.
-
-2. **Board milestone snapshot producer.** Evidence:
-   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:791-794` says no immutable milestone
-   snapshot operation exists; current source only reads the three provisioned
-   `wmkf_milestone*` fields (`request-document.js:38-40`,
-   `artifact-service.js:258-260`). The owner selected copy-the-bytes on 2026-08-10.
-
-3. **Two non-destructive SharePoint checks.** Evidence:
-   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:691-723`. Add "Checked Out To" to the
-   request-library view and read the Members permission level's Delete Items /
-   Delete Versions settings. Do not test permissions by deleting governed data.
-
 ### Owner Decision Needed
 
-1. **Activity-history Phase 1 behavior.** Decide whether replacing Last Action
-   should preserve its fixed-priority semantics or show true recency; whether the
-   existing `proposalFirstAccessed` signal should be labeled "Portal first
-   accessed"; and whether actor names belong in the staff-shared view. The Opus
-   review recommends no materialized legacy backfill.
+1. **Is the activity drawer operational convenience, or evidence?** This is Opus's
+   unanswered Phase 0 question and it now blocks the rest. Evidence:
+   `outputs/reviewer-activity-history-opus-review-2026-08-11.md`;
+   `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md`.
+   If convenience, imperfect labels are tolerable and the current build is close to
+   shippable. If it will ever feed reviewer-reliability or payment decisions, every
+   claim must be provable and the scope question below becomes urgent. Answer this
+   before writing more code on the feature.
 
-2. **Whether an exact ledger is necessary after Phase 1.** If the drawer is only
-   for operational convenience, Phase 1 may be the complete feature. If it will
-   feed reviewer reliability or payment decisions, run the read-only Dynamics
-   email-activity probe first, then choose Dataverse vs Postgres vs extended email
-   activity, add durable engagement generation, and reconcile
-   `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md:189-216` before schema work.
+2. **Whether to reduce Phase 1 scope.** Offered as a hypothesis, not a conclusion, in
+   the status brief — which argues both sides. Removing non-reset fields as receipt
+   proof would leave no engagement-scoped evidence distinguishing a genuine submission
+   from a fabricated close-out. Counter-arguments: the failure needs an unmeasured
+   operational sequence; six of ten events are not in dispute; the prior session's
+   author twice declared this defect class converged and was twice wrong.
 
-3. **`merge-candidates` authorization remains org-open and destructive.**
-   Evidence: `.claude-memory/project-merge-candidates-authorization-gap.md`;
+3. **`merge-candidates` authorization remains org-open and destructive.** Carried,
+   unchanged. Evidence: `.claude-memory/project-merge-candidates-authorization-gap.md`;
    `pages/api/reviewer-finder/merge-candidates.js` takes two GUIDs without a
-   `requestId`, while `reviewer-modes.js:86-96` documents the UI management gate
-   as cosmetic and fail-open. Owner decision remains required on whether this
-   later destructive primitive should stay app-wide.
+   `requestId`, while `reviewer-modes.js:86-96` documents the UI gate as cosmetic and
+   fail-open.
 
-### Parked
+### Verified Open
 
-1. **Invite-tab surfacing of needs-merge alerts.** Re-open only if a new alert
-   probes `STILL_BLOCKED`; begin with a request-scoped information-only hint.
-   Direct alert-to-merge additionally depends on owner decision #3 above.
+1. **Round-5 HIGH: non-reset fields used as receipt evidence.** Evidence:
+   `wmkf_reviewfilename`, `wmkf_reviewuploadedbystaff`, `wmkf_reviewsharepointfolder`
+   are absent from `ENGAGEMENT_STAMP_RESET_ENTRIES`
+   (`lib/dataverse/adapters/reviewer-suggestion.js:793-813`), and `restore` PATCHes
+   only `wmkf_selected` plus the reset payload (`:2006-2008`) without deleting answer
+   child rows. All three evidence inputs to the receipt classifier can therefore carry
+   prior-engagement state. Any fix must also widen
+   `tests/unit/reviewer-activity-history.test.js`, which scans
+   `EVENT_DESCRIPTORS[].rawField` only and so never covered evidence inputs.
+   **Gated on decision #1 — do not fix before the scope question is answered.**
 
-2. **Exact activity ledger and deferred-load API.** Park until Phase 1 is evaluated
-   and the product/evidence decision is made. A future route must bind
-   `suggestionId` to `requestId` server-side and be added to
-   `docs/API_ROUTE_SECURITY_MATRIX.md`.
+2. **Round-5 MEDIUM: accepted-then-withdrew loses the acceptance date.**
+   `applyStaffReviewerWithdrawal` overwrites `wmkf_responsereceivedat`
+   (`reviewer-suggestion.js:1832-1842`). Not recoverable in the UI layer; remedy is
+   Phase 2 persistence or honest framing. **Gated on decision #1.**
+
+3. **Visual verification of the drawer has never happened.** Every behavior claim rests
+   on tests. The Chrome extension would not connect this session and `AUTH_REQUIRED=true`
+   needs a real Azure sign-in. This is the largest unmeasured risk and no code review
+   covers it.
+
+4. **Board milestone snapshot producer.** Carried, untouched this session. Evidence:
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:791-794`; owner selected copy-the-bytes
+   2026-08-10.
+
+5. **Two non-destructive SharePoint checks.** Carried, untouched. Evidence:
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:691-723`. Add "Checked Out To" to the
+   request-library view; read the Members Delete Items / Delete Versions settings.
 
 ### Verify Before Acting
 
-1. **SharePoint policy input.** Connor's outstanding answer was expected
-   2026-08-12 (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:783`). Check for the actual
-   response before treating retention or permission conclusions as settled.
+1. **Connor's SharePoint policy answer was expected 2026-08-12** and was not checked
+   this session. Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:783`. Check for the
+   real response before treating retention or permission conclusions as settled.
 
-2. **Activity timestamps are not uniformly dispatch proof.** Reminder and
-   thank-you timestamps can survive a failed send, extension save can succeed
-   before notification fails, and invitations can be `unconfirmed`. Read the
-   exact source paths cited in the Opus review before choosing labels or ledger
-   outcomes.
+2. **`codex/initial-assessment-pilot` is stale and unmerged.** Branched from `3f56bb7d`
+   (2026-07-29), two commits, now ~460 commits behind. Still on origin. Needs a
+   disposition decision; do not assume it is abandoned.
 
-3. **"No new BILL alerts" remains assumed until tied to a known acceptance.**
-   The prior census showed zero active/new post-redeploy alerts and healthy drain
-   runs, but no real reviewer acceptance was confirmed in that observation
-   window. Re-run only after a known acceptance.
+3. **`feat/reviewer-activity-history-phase1` is merged into main but not deleted.**
+   Local and remote-free. Safe to delete once main is pushed.
+
+### Parked
+
+1. **Invite-tab surfacing of needs-merge alerts.** Unchanged. Re-open only if a new
+   alert probes `STILL_BLOCKED`.
+
+2. **Exact activity ledger and deferred-load API.** Park until the Phase 0 decision
+   above is made. A future route must bind `suggestionId` to `requestId` server-side
+   and be added to `docs/API_ROUTE_SECURITY_MATRIX.md`.
 
 ### Do Not Reopen Without New Decision
 
-1. **Launching a merge from a stored alert (`initialMerge`).** The stored alert
-   is not live proof and can feed a destructive merge; only the current live
-   re-derivation creates a safe conflict pair.
+1. **Launching a merge from a stored alert (`initialMerge`).** Stored alerts are not
+   live proof.
 2. **Changing the accepted-reviewer 90-day token policy for ordinary extensions.**
-   Justin intentionally keeps issued links valid through the Board meeting; the
-   longest normal reviewer extension is roughly two weeks.
-3. **Retiring `DEVELOPMENT_LOG.md`.** Justin confirmed it is the milestone record.
-   `/stop` now requires a milestone determination, not per-session logging.
-4. **Materializing derived reviewer-history backfill.** Re-added rows have lost
-   prior generation stamps and several lifecycle timestamps do not prove sends;
-   a materialized backfill would create false-confidence history.
+3. **Retiring `DEVELOPMENT_LOG.md`.** It is the milestone record.
+4. **Materializing derived reviewer-history backfill.** Re-added rows have lost prior
+   stamps and several timestamps do not prove sends.
+5. **Modifying the reviewer write paths to suit the drawer.** The close-out stamping is
+   deliberate and load-bearing for `aggregateReviewHistory`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `outputs/reviewer-activity-history-opus-review-2026-08-11.md` | Adversarial findings, phased recommendation, and owner decisions for activity history |
-| `shared/components/reviewers/ReviewerManagePanel.js` | Track Reviewers table, current Last Action derivation, notes, and row actions |
-| `shared/components/reviewers/ReviewerDueDateEditor.js` | Production extension modal and retry/resend UI |
-| `lib/services/reviewer-due-extension.js` | Validated date write, notification dispatch, and partial-success contract |
-| `lib/services/review-manager/reviewers-service.js` | Reviewer DTO projection that can support a derived Phase 1 drawer |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | Reviewer lifecycle fields, ETag writes, and engagement reset behavior |
-| `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` | Due-date implementation record and deferred immutable dispatch-evidence gate |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Open milestone snapshot work and SharePoint policy/probe record |
-| `.claude-memory/project-merge-candidates-authorization-gap.md` | Durable record of the pre-existing merge authorization decision |
+| `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md` | **Read first.** Five-round history, open findings, scope hypothesis |
+| `outputs/reviewer-activity-history-opus-review-2026-08-11.md` | Original adversarial review and the Phase 0/1/2/3 scoping |
+| `shared/components/reviewers/reviewer-activity-history.js` | Pure derivation and evidence classifiers |
+| `shared/components/reviewers/ReviewerActivityDrawer.js` | Accessible drawer |
+| `shared/components/reviewers/ReviewerManagePanel.js` | Last Action cell and History affordance |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | `ENGAGEMENT_STAMP_RESET_ENTRIES`, close-out stamping, staff withdrawal |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Both standing hazards and the Last Action precedence rule |
 
-## Testing and Release Evidence
+## Testing
 
 ```bash
-# Reviewer extension release evidence recorded in Session 417:
-npx jest tests/unit                         # 610 suites / 7,717 tests
-npx jest <focused extension set>            # 30/30
-npm run build                               # webpack production build passed
+npx jest tests/unit          # 581 suites / 7,367 tests, exit 0
+npm run build                # exit 0
 
-# Handoff checks:
-npm run check:doc-currency
-npm run test:check-doc-currency             # run sequentially after the gate
-npm run check:fact-consistency
-npm run test:check-fact-consistency         # run sequentially after the gate
-git diff --check
+# Do NOT trust a filtered summary line for suite health. A run this session
+# reported "PASS (7308) FAIL (0)" while 2 suites had failed to RUN, and a
+# `| tail` pipeline masked jest's real exit code. Check the exit code directly.
 ```
-
-The `/stop` claim-evidence report was attempted but returned "local state could
-not be read"; no observation-table row was inferred from an unavailable report.
-`CLAUDE.md` did not require a feature catalogue update: its source-of-truth
-pointers and operating contract remain current.
