@@ -37,6 +37,8 @@ source_files:
   - pages/api/review-manager/regenerate-token.js
   - pages/api/review-manager/revoke-token.js
   - pages/api/review-manager/release-settings.js
+  - pages/api/review-manager/review-due-extension.js
+  - lib/services/reviewer-due-extension.js
   - lib/services/reviewer-release-config.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - lib/utils/reviewer-invite.js
@@ -168,11 +170,19 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   deadline. The accepted-reviewer token's 90-day post-due window is intentional:
   it keeps the materials link usable through the Board meeting, so a normal
   roughly two-week reviewer extension does not require token rotation. Saving
-  an override does not rotate an already-delivered token. Staff may set the
-  override only to today or a future Foundation-Pacific date. [VERIFIED via
+  an override does not rotate an already-delivered token. For eligible accepted
+  rows, Track Reviewers offers Grant/Change extension; the new date must be
+  current/future and strictly after the request's original date, with no
+  maximum, and null restores the original. Invite Reviewers has no editor and
+  generic candidate PATCH cannot write the field. The dedicated save commits
+  first, then automatically sends the confirmed reviewer a fixed-subject email
+  using the admin-managed body, effective deadline, assigned-PD signature, and
+  stable-UID calendar attachment. Send failure leaves the date saved and offers
+  a server-fresh retry. [VERIFIED via
   read-only production metadata 2026-08-11] the Wave 18 field is still ABSENT,
-  so schema-first provisioning and runtime promotion are required before the
-  override behavior is production-live. The dedicated per-engagement override
+  so schema-first provisioning, seeding `email.reviewer_extension.body`, and
+  runtime promotion are required before the override behavior is
+  production-live. The dedicated per-engagement override
   lets staff keep the portal, reminders, calendar, and future token mints aligned
   when they use it; the existing per-send composer date remains ephemeral and
   can still diverge from stored deadline state. Response timing remains separate.

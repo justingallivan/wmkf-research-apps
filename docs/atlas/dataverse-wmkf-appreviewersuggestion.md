@@ -68,12 +68,18 @@ Outreach timestamps:
 - [VERIFIED via feature-branch source/tests] `wmkf_reviewduedateoverride` is a
   nullable DateTime DateOnly column on one reviewer/request engagement. Null
   means use `akoya_request.wmkf_reviewduedate`; it does not copy the request
-  value and existing rows retain proposal-wide behavior. Staff may write only
-  today or a future date, evaluated in the Foundation's Pacific time zone;
-  null remains the supported clear/reset value.
-- [VERIFIED via feature-branch source/tests] The existing
-  `/api/reviewer-finder/my-candidates` PATCH seam writes or clears the field,
-  and both Invite Reviewers and Track Reviewers expose the same shared editor.
+  value and existing rows retain proposal-wide behavior. The dedicated
+  accepted-reviewer writer permits only a current/future date strictly after
+  the request default, evaluated in the Foundation's Pacific time zone, with
+  no maximum; null remains the supported restore value.
+- [VERIFIED via feature-branch source/tests]
+  `/api/review-manager/review-due-extension` is the sole staff writer. Track
+  Reviewers exposes Grant/Change extension for eligible accepted rows; Invite
+  Reviewers has no editor and generic `my-candidates` PATCH rejects the field.
+  The writer commits the date first, then automatically sends the confirmed
+  reviewer a fixed-subject email using the admin-managed body, effective date,
+  assigned-PD signature, and stable-UID calendar attachment. A send failure
+  preserves the date and supports a retry that re-reads durable state.
   A fresh re-add of a removed engagement clears a stale override with the other
   engagement stamps.
 - [VERIFIED via feature-branch source/tests] `resolveEffectiveReviewDueDate()`
@@ -93,7 +99,8 @@ Outreach timestamps:
   communicated; the dispatch-ledger design remains separate.
 - [VERIFIED via read-only production metadata 2026-08-11] Production does not
   yet contain the field. Runtime promotion is blocked on schema-first Wave 18
-  provisioning and exact post-publish verification.
+  provisioning, exact post-publish verification, and seeding the new
+  `email.reviewer_extension.body` setting.
 
 Review status: `wmkf_reviewstatus` (Picklist live in production: `accepted=100000000 | materials_sent=100000001 | under_review=100000002 | review_received=100000003 | complete=100000004 | withdrew=100000005 | released=100000006`; terminal values provisioned and post-publish verified 2026-07-23).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
@@ -190,7 +197,7 @@ Methods:
   value forces a re-plan. Returns `{ id, created, selected }`.
 - `ensureStaffManualCandidate({ potentialReviewerId, requestId, … })` — **Workbench manual reviewer add**. Idempotently materializes/reselects a non-excluded staff-added row, **unions** `staff_manual` into existing `wmkf_sources` (no clobber), preserves applicant recommendation state when an existing row already has it, honors "excluded wins" (`{ skippedExcluded: true }`), and catches a lost alternate-key create race. Unlike lazy applicant ingestion, this is an explicit staff action, so an existing soft-deleted non-excluded row is re-selected. **Re-add fresh start (S343):** when the re-selected row was *removed* (`wmkf_selected===false`), `ENGAGEMENT_STAMP_RESET` clears the stale engagement stamps (`wmkf_invited=false`; `wmkf_emailsentat`, `wmkf_respondremindersentat`, `wmkf_remindersentat`, `wmkf_remindercount`, `wmkf_materialssentat`, `wmkf_reviewreceivedat`, `wmkf_responsereceivedat`, `wmkf_thankyousentat`, `wmkf_completedat`, `wmkf_withdrawnsufficientat`, `wmkf_proposalfirstaccessed`, `wmkf_reviewduedateoverride` = `null`) so the row returns to a clean engagement lifecycle; an already-active row's stamps are left untouched. The re-select PATCHes are ETag-guarded from the fetched row; on 412 they re-fetch, source-union without reset if the row is now active, or retry the reset if it is still removed.
 - `dismissLegacyDeclineReferral({ suggestionId, requestId })` — validates the exact declined source row and rejects structured envelopes, then ETag-conditionally stores a compact resolved prefix before the original legacy text. Request-scoped, idempotent, and retries one 412. Structured closure is derived read-side from exact existing `referred` candidate evidence.
-- `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt` and validates a non-null `reviewDueDateOverride` as today-or-future Foundation-Pacific `YYYY-MM-DD`. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
+- `updateLifecycle(id, updates, { actingUserSystemId, ifMatch })` — partial update with picklist mapping for `responseType`/`reviewStatus`/`applicantDisposition`; supports `completedAt` and applies the sink-level today-or-future Foundation-Pacific validation to non-null `reviewDueDateOverride`. The dedicated extension service adds the stricter accepted-row and after-original-date contract. Reads the row once per write to (a) THROW on an applicant-excluded row, (b) refuse status changes out of `withdrew`/`released`, and (c) stamp `wmkf_completedat`+`wmkf_reviewreceivedat` idempotently only on a `reviewStatus=complete` transition. Status-changing writes bind to the guard read's ETag when the caller does not supply a stricter one.
 - `applyStaffReviewerWithdrawal(id, { ifMatch, actingUserSystemId, deleteHonorariumRequestId })` — PD-recorded post-accept withdrawal. Requires the fresh row ETag; atomically writes `accepted=false`, `declined=true`, declined response metadata, `reviewStatus=withdrew`, and token revocation while deleting the exact server-read linked honorarium `akoya_request` in one changeset. Without an honorarium link, performs the same ETag-guarded row correction as one PATCH.
 - `softDelete(id)` — sets `wmkf_selected = false`
 - `hardDeleteById(id)` — merge-support hard delete for an un-engaged colliding loser row (pre-existing, S289 merge)
@@ -261,7 +268,8 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   results and performs the server-owned roster finalization. An
   applicant-excluded collision is stored as roster `blocked`, not counted as
   saved.
-- `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` (single suggestion lifecycle PATCH), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists. `DELETE {mode:'hard'}` dispatches instead to `removeCandidateEntirely` (see the Permanent removal bullet above) — a hard delete, not a `softDelete` variant.
+- `pages/api/reviewer-finder/my-candidates.js` — adapter `updateLifecycle` for its supported single-suggestion lifecycle fields (not `reviewDueDateOverride`), `bulkUpdateByRequest` (per-proposal cycle/program-area assignment), `softDelete` (`wmkf_selected = false`); when `accepted` flips to `true` calls `ensureToken` from `lib/external/token-lifecycle.js` which is idempotent but may write `wmkf_externaltoken*` fields if no usable token exists. `DELETE {mode:'hard'}` dispatches instead to `removeCandidateEntirely` (see the Permanent removal bullet above) — a hard delete, not a `softDelete` variant.
+- `pages/api/review-manager/review-due-extension.js` — dedicated accepted-row extension save/restore and retry seam. Freshly reads the suggestion/request, enforces after-original/no-maximum date semantics, requires the suggestion ETag, writes before notifying, and returns explicit partial success if the automatic confirmed-recipient email/calendar update fails.
 - `pages/api/review-manager/render-emails.js` — read-only preview. It substitutes `SEND_TIME_TOKEN_PLACEHOLDER_JWT` through `buildSendTimeExternalUrlPlaceholder` and never calls `mintAndStore`; repeated/overlapping previews do not change `wmkf_externaltoken*` authority.
 - `pages/api/review-manager/send-emails.js` — adapter `updateLifecycle`; materials sends retain the existing best-effort `wmkf_materialssentat` / `materials_sent` lifecycle update after dispatch. Thank-you sends do not move a terminal row to `complete`. **Send-time writer/authority (S404 v4):** `send-emails-service.js` extracts the final edited subject/body link, defense-in-depth verifies any real legacy/edited JWT, computes the unchanged per-recipient expiry, calls `mintAndStore`, and substitutes only the JWT path segment immediately before invoking Dynamics dispatch. Mint failures remain per-row `email_failed {code,error}` and do not stop healthy siblings.
 - `pages/api/review-manager/terminal-transition.js` — dedicated fresh-read/ETag service writes only `withdrew` or `released` from accepted/materials-sent/under-review rows with no received/completed stamp. For `withdrew`, it also corrects accepted/declined response state, deletes the exact linked honorarium in the same changeset, and cancels acceptance follow-up; `released` remains status-only. Generic `/reviewers` PATCH explicitly refuses both terminal values.

@@ -41,17 +41,24 @@ The later per-reviewer extension request is intentionally narrower than the
 deferred reliability-evidence design below. Feature branch
 `codex/reviewer-due-date-override` stages one nullable DateOnly
 `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; null falls back to the
-request date, past values fail closed using the Foundation-Pacific calendar
-date, and one shared resolver feeds staff display, portal context,
-email/calendar copy, reminders, and token mint/regeneration. Saving the override
-does not rotate a delivered token; the accepted-reviewer due + 90d window is
+request date. The accepted-row Track Reviewers modal permits a non-null date
+only when it is strictly after that request date (and current/future in the
+Foundation-Pacific calendar), with no maximum. Its dedicated writer commits
+the change first, then automatically sends the confirmed reviewer a
+fixed-subject message using the admin-managed body, effective deadline,
+assigned-PD signature, and stable-UID calendar attachment. Notification failure
+leaves the date saved and supports a server-fresh retry; the Invite surface and
+generic candidate PATCH do not write the field. One shared resolver feeds staff
+display, portal context, email/calendar copy, reminders, and token
+mint/regeneration. Saving the override does not rotate a delivered token; the accepted-reviewer due + 90d window is
 intentional through the Board meeting and exceeds ordinary roughly two-week
 extensions. It is mutable operational state, not proof of the deadline
 communicated in an ordered dispatch.
 
 [VERIFIED via read-only production metadata 2026-08-11] the field is absent in
 production. The Wave 18 schema must be applied, published, and verified exact
-before the runtime branch is promoted. This does not change the deferred
+and the missing `email.reviewer_extension.body` setting must be seeded before
+the runtime branch is promoted. This does not change the deferred
 append-only dispatch-evidence requirement in this plan.
 
 ## Production release — 2026-07-24

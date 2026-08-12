@@ -1821,12 +1821,15 @@ export default function ReviewerManagePanel({
                     <td className="px-4 py-3">
                       <ReviewerDueDateEditor
                         suggestionId={r.suggestionId}
+                        reviewerName={r.name}
                         overrideDate={r.reviewDueDateOverride}
                         effectiveDate={r.effectiveReviewDeadline}
                         defaultDate={proposal.reviewDeadline}
-                        canManage={canManage}
+                        canManage={canManage
+                          && mode === 'track'
+                          && ['accepted', 'materials_sent', 'under_review'].includes(r.reviewStatus)
+                          && !r.reviewReceivedAt}
                         onSaved={onRefresh}
-                        compact
                       />
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500">

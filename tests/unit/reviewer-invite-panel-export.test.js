@@ -30,6 +30,9 @@ const candidates = [
     googleScholarUrl: 'https://scholar.google.com/citations?user=abc',
     hIndex: 33,
     applicantRecommended: true,
+    reviewDueDateOverride: '2099-09-15',
+    effectiveReviewDeadline: '2099-09-15',
+    requestReviewDeadline: '2099-09-01',
   },
 ];
 
@@ -72,6 +75,7 @@ describe('ReviewerInvitePanel export', () => {
       hIndex: 33,
     });
     await waitFor(() => expect(global.URL.createObjectURL).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /grant extension|change extension/i })).toBeNull();
   });
 
   test('no export button when the candidate list is empty', () => {

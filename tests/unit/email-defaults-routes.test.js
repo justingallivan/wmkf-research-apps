@@ -103,6 +103,24 @@ describe('/api/admin/email-defaults', () => {
     expect(r.body).toEqual({ key: subjectKey, value: '' });
   });
 
+  test('deadline-update body requires reviewer, date, and signature placeholders', async () => {
+    const key = 'email.reviewer_extension.body';
+    const rejected = res();
+    await adminHandler({ method: 'PUT', body: { key, value: 'Hello {{reviewerName}}' } }, rejected);
+
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.body.error).toContain('{{reviewDueDate}}');
+    expect(rejected.body.error).toContain('{{signature}}');
+    expect(setSetting).not.toHaveBeenCalled();
+
+    const accepted = res();
+    const value = 'Dear {{reviewerName}}, due {{reviewDueDate}}. {{signature}}';
+    await adminHandler({ method: 'PUT', body: { key, value } }, accepted);
+
+    expect(accepted.statusCode).toBe(200);
+    expect(setSetting).toHaveBeenCalledWith(key, value, 42);
+  });
+
   test('requires the superuser gate', async () => {
     requireSuperuser.mockResolvedValueOnce(null);
 

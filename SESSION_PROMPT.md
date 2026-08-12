@@ -42,10 +42,16 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
 
 1. **Per-reviewer review-due-date override — staged, not deployed (2026-08-11).**
    Feature branch `codex/reviewer-due-date-override` implements the new nullable
-   suggestion-level DateOnly field, shared pre/post-accept staff editor,
-   existing PATCH writer, effective-date projection, portal,
+   suggestion-level DateOnly field, an accepted-row Track Reviewers extension
+   modal, dedicated authenticated writer, effective-date projection, portal,
    acceptance-email/calendar, review-due reminder, and token
-   issuance/regeneration fan-out. The Opus adversarial follow-up is addressed:
+   issuance/regeneration fan-out. A saved/restored extension commits first,
+   then automatically sends the confirmed reviewer a fixed-subject message
+   using the admin-managed body, effective deadline, assigned-PD signature,
+   and stable-UID calendar attachment; a send failure preserves the date and
+   exposes a server-fresh retry. Non-null dates must be strictly after the
+   proposal's original deadline, with no maximum. The Opus adversarial
+   follow-up is addressed:
    past overrides now fail closed using the Foundation-Pacific calendar date,
    request due-date read failure falls back to the established 90-day mint
    window, and discriminating tests cover later-override reminder deferral.
@@ -53,10 +59,12 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    intentionally retained through the Board meeting; ordinary roughly two-week
    extensions do not rotate an issued link. `/contract-reconcile` and `/sweep`
    were run. [VERIFIED via read-only production metadata] the field is ABSENT,
-   so Wave 18 schema apply/publish/exact verification must precede Tier-2
-   runtime promotion. Invitation response timing remains separate; the mutable
+   so Wave 18 schema apply/publish/exact verification and seeding the missing
+   `email.reviewer_extension.body` setting must precede Tier-2 runtime
+   promotion. Invitation response timing remains separate; the mutable
    override is not immutable communicated-deadline evidence for reviewer
-   reliability, and the per-send composer can still diverge from stored state.
+   reliability. The prior pre-accept editor and generic `my-candidates` write
+   seam are removed; the per-send composer can still diverge from stored state.
 
 2. **Milestone snapshot producer** — carried from S413, still open.
    Evidence: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Board milestone freeze",

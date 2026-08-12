@@ -312,46 +312,13 @@ describe('patchMyCandidates', () => {
     });
   });
 
-  test('per-reviewer due-date override accepts YYYY-MM-DD and explicit null clearing', async () => {
-    await patchMyCandidates({
+  test('the generic candidate PATCH cannot bypass the accepted-reviewer extension workflow', async () => {
+    await expect(patchMyCandidates({
       body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15' },
       actingUserSystemId: SYS,
-    });
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenLastCalledWith(
-      SUGGESTION_ID,
-      { reviewDueDateOverride: '2099-09-15' },
-      { actingUserSystemId: SYS },
-    );
-
-    await patchMyCandidates({
-      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: null },
-      actingUserSystemId: SYS,
-    });
-    expect(suggestionAdapter.updateLifecycle).toHaveBeenLastCalledWith(
-      SUGGESTION_ID,
-      { reviewDueDateOverride: null },
-      { actingUserSystemId: SYS },
-    );
-  });
-
-  test('per-reviewer due-date override rejects malformed input before adapter write', async () => {
-    await expect(patchMyCandidates({
-      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: '09/15/2026' },
-      actingUserSystemId: SYS,
     })).rejects.toMatchObject({
       httpStatus: 400,
-      message: 'reviewDueDateOverride must be a YYYY-MM-DD date or null',
-    });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
-  });
-
-  test('per-reviewer due-date override rejects a past date before adapter write', async () => {
-    await expect(patchMyCandidates({
-      body: { suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2000-01-01' },
-      actingUserSystemId: SYS,
-    })).rejects.toMatchObject({
-      httpStatus: 400,
-      message: 'reviewDueDateOverride must be today or later',
+      message: 'No supported fields to update',
     });
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });

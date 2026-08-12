@@ -92,10 +92,13 @@ Schema spec: `lib/dataverse/schema/wave7-reviewer-engagement/akoya_request-revie
 **Wave 18 transition (not yet deployed, 2026-08-11):** this request field
 remains the proposal-wide default. The staged reviewer-due-date feature adds a
 nullable `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; consumers use
-that engagement value first and fall back here. Non-null overrides must be today
-or later in the Foundation-Pacific calendar. Production metadata proves the new
+that engagement value first and fall back here. The dedicated accepted-reviewer
+writer requires a non-null override to be current/future in the
+Foundation-Pacific calendar and strictly after this original date, with no
+maximum; null restores this default. Production metadata proves the new
 suggestion field is still absent, so current production remains request-only
-until schema-first provisioning and runtime promotion. The request campaign
+until schema-first provisioning, extension-body setting seed, and runtime
+promotion. The request campaign
 editor continues to own this default and response timing is unchanged.
 
 **Grantee Deliverables Portal abstract fields (S268/S271).** The request keeps only the abstract text

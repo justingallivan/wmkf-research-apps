@@ -72,7 +72,7 @@ Reviewer lifecycle has 8 stages. Current state: discovery is well-automated (Rev
 
 **Timeline/deadline model:**
 - Grant cycles define default deadlines (live source of truth is Dataverse `wmkf_appgrantcycle.wmkf_reviewreturndeadline` post-W3 cutover 2026-05-12; historical Postgres `grant_cycles.review_deadline` was 0% populated and is drain-only)
-- Per-reviewer extensions needed → `wmkf_appreviewersuggestion` should have its own `review_due_date` (defaults to cycle deadline, overridable)
+- Per-reviewer extensions are staged in Wave 18 as nullable `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; the accepted-row Track Reviewers action writes through a dedicated save-first/automatic-email-and-calendar workflow. Production remains request-only until schema-first promotion.
 - Grant cycle calendar is pre-defined (Science programs + SoCal program)
 
 **Staff roles and access model:**

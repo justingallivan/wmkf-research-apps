@@ -69,6 +69,14 @@ export const EDITABLE_TEXT_DEFAULTS = [
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
   },
   {
+    key: 'email.reviewer_extension.body',
+    label: 'Reviewer deadline update body',
+    description: 'Default body sent automatically when a PD grants, changes, or restores a reviewer deadline. The subject is fixed by the application.',
+    multiline: true,
+    placeholders: ['{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
+    requiredPlaceholders: ['{{reviewerName}}', '{{reviewDueDate}}', '{{signature}}'],
+  },
+  {
     key: 'email.reviewer_withdraw.subject',
     label: 'Reviewer withdraw-sufficient subject',
     description: 'Default subject line for reviewer no-longer-needed withdrawal emails. Mustache {{tokens}}, not [brackets].',

@@ -26,6 +26,7 @@ import {
   REVIEWER_ACCEPTANCE_SEED_SUBJECT,
   REVIEWER_WITHDRAW_SEED_BODY,
   REVIEWER_WITHDRAW_SEED_SUBJECT,
+  REVIEWER_EXTENSION_SEED_BODY,
 } from '../lib/seed/email-defaults/reviewer-actions.js';
 import {
   REVIEWER_INVITATION_SEED_SUBJECT,
@@ -50,6 +51,7 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_reminder_review_due.body': REVIEWER_REMINDER_REVIEW_DUE_SEED_BODY,
   'email.reviewer_acceptance.subject': REVIEWER_ACCEPTANCE_SEED_SUBJECT,
   'email.reviewer_acceptance.body': REVIEWER_ACCEPTANCE_SEED_BODY,
+  'email.reviewer_extension.body': REVIEWER_EXTENSION_SEED_BODY,
   'email.reviewer_withdraw.subject': REVIEWER_WITHDRAW_SEED_SUBJECT,
   'email.reviewer_withdraw.body': REVIEWER_WITHDRAW_SEED_BODY,
   'email.reviewer_invitation.subject': REVIEWER_INVITATION_SEED_SUBJECT,

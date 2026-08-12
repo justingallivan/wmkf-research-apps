@@ -143,13 +143,16 @@ Stage-2a stamps: `wmkf_honorariumoptout`, `wmkf_withdrawnsufficientat`, `wmkf_co
 **Pending, not in production (Wave 18):**
 `wmkf_reviewduedateoverride` (DateTime, DateOnly, nullable) is staged as an
 operational per-engagement override whose null fallback is
-`akoya_request.wmkf_reviewduedate`; the runtime accepts only today or a future
-Foundation-Pacific date. [VERIFIED 2026-08-11 via read-only typed metadata]
+`akoya_request.wmkf_reviewduedate`; the dedicated accepted-reviewer extension
+writer accepts a non-null date only when it is current/future in the
+Foundation-Pacific calendar and strictly after the request default, with no
+maximum. Null restores the request default. [VERIFIED 2026-08-11 via read-only typed metadata]
 production returned ABSENT. Schema manifest:
 `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`.
 Apply/publish/verify the wave before runtime promotion; do not include this
 field in the live-production inventory above until the post-publish probe
-returns EXACT.
+returns EXACT. Seed `email.reviewer_extension.body` before promoting the
+automatic-notification runtime.
 
 **Deployed but not authoritative (Wave 13, 2026-07-12):** structured
 identity-COI currency is specified as `wmkf_identitycoistatus`,

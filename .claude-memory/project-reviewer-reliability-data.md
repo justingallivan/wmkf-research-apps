@@ -73,9 +73,16 @@ whether reviewers are on time and reliable — not just participation counts.
   but it is tracked outside the product.
 - **Implementation staged on `codex/reviewer-due-date-override` (2026-08-11):**
   [VERIFIED via branch source and focused tests] a nullable DateOnly
-  `wmkf_reviewduedateoverride`, shared Invite/Track editor, existing
-  `my-candidates` PATCH writer, override-first resolver, and the full staff →
-  portal/email/calendar/reminder/token consumer fan-out are implemented.
+  `wmkf_reviewduedateoverride`, accepted-row Track Reviewers extension modal,
+  dedicated `review-due-extension` writer, override-first resolver, and the
+  full staff → portal/email/calendar/reminder/token consumer fan-out are
+  implemented. A non-null extension must be strictly after the request's
+  original deadline, with no maximum; the PD may restore the original date.
+  Saving or restoring commits the date first and then automatically sends the
+  confirmed reviewer a fixed-subject email with the new effective deadline,
+  assigned-PD signature, and stable-UID calendar update. Notification failure
+  leaves the date saved and exposes a retry that re-reads durable state. The
+  admin panel owns the body default only; the Invite surface has no editor.
   Invitation response timing remains separate. A fresh re-add clears the stale
   override; past dates fail closed using the Foundation-Pacific calendar date.
   Editing alone does not rotate a live delivered token. The accepted-reviewer
@@ -84,8 +91,9 @@ whether reviewers are on time and reliable — not just participation counts.
 - **Production remains request-only:** [VERIFIED via read-only typed metadata
   2026-08-11] `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is ABSENT
   in production. Required release order is Wave 18 schema apply/publish/exact
-  verification, then deliberate Tier-2 runtime promotion. No schema write or
-  runtime promotion has occurred from this branch.
+  verification, seed the missing `email.reviewer_extension.body` setting, then
+  deliberate Tier-2 runtime promotion. No schema/settings write or runtime
+  promotion has occurred from this branch.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,

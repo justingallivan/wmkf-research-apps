@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { currentYmdInTimeZone } from '../../../lib/utils/date-ymd';
+import { currentYmdInTimeZone, isYmd } from '../../../lib/utils/date-ymd';
 
 function formatDate(value) {
-  if (!value) return 'Not set';
+  if (!isYmd(value)) return 'Not set';
   const parsed = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return 'Not set';
   return new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     month: 'short',
@@ -13,44 +12,44 @@ function formatDate(value) {
   }).format(parsed);
 }
 
+function nextYmd(value) {
+  if (!isYmd(value)) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+export function minimumExtensionDate(originalDate, today = currentYmdInTimeZone()) {
+  const dayAfterOriginal = nextYmd(originalDate);
+  if (!dayAfterOriginal) return today;
+  return dayAfterOriginal > today ? dayAfterOriginal : today;
+}
+
 /**
- * Shared staff editor for the per-engagement review due-date override.
- * The same component is used before acceptance (Invite Reviewers) and after
- * acceptance (Track Reviewers), and both write through the existing
- * my-candidates PATCH seam.
+ * Track Reviewers action for an accepted reviewer's operational due date.
+ * Saving is one server-side workflow: persist first, then automatically send
+ * the deadline email and stable-UID calendar update. Partial notification
+ * failure stays visible here and can be retried from freshly stored state.
  */
 export default function ReviewerDueDateEditor({
   suggestionId,
+  reviewerName,
   overrideDate = null,
   effectiveDate = null,
   defaultDate = null,
   canManage = true,
   onSaved,
-  compact = false,
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(overrideDate || '');
-  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [working, setWorking] = useState(false);
   const [error, setError] = useState(null);
-  const [minimumDate] = useState(() => currentYmdInTimeZone());
+  const [savedWithoutNotification, setSavedWithoutNotification] = useState(false);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
+  const minimumDate = minimumExtensionDate(defaultDate);
 
   useEffect(() => {
-    // A parent refresh can reuse this component instance for a different row,
-    // or replace the saved value while an earlier request is still in flight.
-    // Invalidate that request before resetting the editor so its eventual
-    // response cannot write stale UI state into the new engagement.
-    generationRef.current += 1;
-    setDraft(overrideDate || '');
-    setEditing(false);
-    setSaving(false);
-    setError(null);
-  }, [suggestionId, overrideDate]);
-
-  useEffect(() => {
-    // React Strict Mode replays effect setup/cleanup in development. Restore
-    // the mounted flag on each setup so the replay cannot suppress saves.
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -58,108 +57,172 @@ export default function ReviewerDueDateEditor({
     };
   }, []);
 
-  const save = async (nextDraft = draft) => {
+  const close = ({ refresh = savedWithoutNotification } = {}) => {
+    generationRef.current += 1;
+    setOpen(false);
+    setDraft(overrideDate || '');
+    setWorking(false);
+    setError(null);
+    setSavedWithoutNotification(false);
+    if (refresh && onSaved) onSaved();
+  };
+
+  const submit = async ({ action = 'save', reviewDueDateOverride } = {}) => {
     const generation = ++generationRef.current;
-    setSaving(true);
+    setWorking(true);
     setError(null);
     try {
-      const response = await fetch('/api/reviewer-finder/my-candidates', {
-        method: 'PATCH',
+      const body = action === 'retry'
+        ? { action, suggestionId }
+        : { action, suggestionId, reviewDueDateOverride };
+      const response = await fetch('/api/review-manager/review-due-extension', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          suggestionId,
-          reviewDueDateOverride: nextDraft || null,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || `Could not save review due date (${response.status})`);
+      if (!mountedRef.current || generation !== generationRef.current) return;
+
+      if (data.saved === true && data.notified === false) {
+        setSavedWithoutNotification(true);
+        setError('The deadline was saved, but the reviewer notification was not sent.');
+        return;
       }
-      if (!mountedRef.current || generation !== generationRef.current) return;
-      setDraft(nextDraft || '');
-      setEditing(false);
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'The extension could not be saved.');
+      }
+      setOpen(false);
+      setSavedWithoutNotification(false);
       if (onSaved) onSaved();
-    } catch (saveError) {
+    } catch (requestError) {
       if (!mountedRef.current || generation !== generationRef.current) return;
-      setError(saveError.message);
+      setError(requestError.message || 'The extension could not be saved.');
     } finally {
-      if (mountedRef.current && generation === generationRef.current) setSaving(false);
+      if (mountedRef.current && generation === generationRef.current) setWorking(false);
     }
   };
 
-  if (!canManage) {
-    return (
-      <span className="text-xs text-gray-500">
-        {formatDate(effectiveDate)}{overrideDate ? ' (override)' : ''}
-      </span>
-    );
-  }
+  const openModal = () => {
+    setDraft(overrideDate || minimumDate);
+    setError(null);
+    setSavedWithoutNotification(false);
+    setOpen(true);
+  };
 
-  if (!editing) {
-    return (
-      <span className="inline-flex flex-col items-start gap-0.5">
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-xs text-blue-700 hover:text-blue-900 hover:underline text-left"
-          title={overrideDate
-            ? `Reviewer-specific override. Request default: ${formatDate(defaultDate)}`
-            : `Using request default: ${formatDate(defaultDate)}`}
-        >
-          {compact ? '' : 'Review due: '}{formatDate(effectiveDate)}{overrideDate ? ' (override)' : ''}
-        </button>
-        {error && <span className="text-[11px] text-red-600">{error}</span>}
-      </span>
-    );
-  }
+  const validDraft = isYmd(draft)
+    && draft >= minimumDate
+    && draft > defaultDate
+    && draft !== overrideDate;
 
   return (
-    <span className="inline-flex flex-col items-start gap-1">
-      <span className="inline-flex items-center gap-1">
-        <input
-          type="date"
-          value={draft}
-          min={minimumDate}
-          onChange={(event) => setDraft(event.target.value)}
-          disabled={saving}
-          aria-label="Reviewer-specific review due date"
-          className="w-36 px-1.5 py-1 text-xs border border-gray-300 rounded"
-        />
+    <div className="text-xs">
+      {overrideDate ? (
+        <div className="space-y-0.5">
+          <p className="font-medium text-gray-800">Extended: {formatDate(effectiveDate)}</p>
+          <p className="text-gray-500">Original: {formatDate(defaultDate)}</p>
+        </div>
+      ) : (
+        <p className="text-gray-600">Due: {formatDate(effectiveDate || defaultDate)}</p>
+      )}
+
+      {canManage && isYmd(defaultDate) && (
         <button
           type="button"
-          onClick={() => save()}
-          disabled={saving || !draft}
-          className="text-xs text-blue-700 hover:text-blue-900 disabled:opacity-40"
+          onClick={openModal}
+          className="mt-1 text-blue-700 hover:text-blue-900 hover:underline"
         >
-          {saving ? 'Saving…' : 'Save'}
+          {overrideDate ? 'Change extension' : 'Grant extension'}
         </button>
-        {overrideDate && (
-          <button
-            type="button"
-            onClick={() => save('')}
-            disabled={saving}
-            className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`review-extension-title-${suggestionId}`}
+            className="w-full max-w-md rounded-xl bg-white p-5 text-left shadow-xl"
           >
-            Use default
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            generationRef.current += 1;
-            setDraft(overrideDate || '');
-            setEditing(false);
-            setError(null);
-            setSaving(false);
-          }}
-          disabled={saving}
-          className="text-xs text-gray-400 hover:text-gray-700 disabled:opacity-40"
-        >
-          Cancel
-        </button>
-      </span>
-      <span className="text-[11px] text-gray-400">Request default: {formatDate(defaultDate)}</span>
-      {error && <span className="text-[11px] text-red-600">{error}</span>}
-    </span>
+            <h2 id={`review-extension-title-${suggestionId}`} className="text-lg font-semibold text-gray-900">
+              {overrideDate ? 'Change extension' : 'Grant extension'}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              {reviewerName ? `Reviewer: ${reviewerName}` : 'Reviewer deadline'}
+            </p>
+
+            <div className="mt-4 rounded-lg bg-gray-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Original deadline</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">{formatDate(defaultDate)}</p>
+              {overrideDate && (
+                <p className="mt-1 text-xs text-gray-500">Current extension: {formatDate(overrideDate)}</p>
+              )}
+            </div>
+
+            <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor={`review-extension-date-${suggestionId}`}>
+              New deadline
+            </label>
+            <input
+              id={`review-extension-date-${suggestionId}`}
+              type="date"
+              value={draft}
+              min={minimumDate}
+              onChange={(event) => setDraft(event.target.value)}
+              disabled={working || savedWithoutNotification}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Saving automatically emails the reviewer and attaches the updated calendar date.
+            </p>
+
+            {error && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <p>{error}</p>
+                {savedWithoutNotification && (
+                  <button
+                    type="button"
+                    onClick={() => submit({ action: 'retry' })}
+                    disabled={working}
+                    className="mt-2 font-medium underline disabled:opacity-50"
+                  >
+                    {working ? 'Retrying…' : 'Retry email'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+              {overrideDate && !savedWithoutNotification && (
+                <button
+                  type="button"
+                  onClick={() => submit({ action: 'save', reviewDueDateOverride: null })}
+                  disabled={working}
+                  className="mr-auto rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+                >
+                  Restore original deadline
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => close()}
+                disabled={working}
+                className="rounded-lg px-3 py-2 text-sm text-gray-600 disabled:opacity-50"
+              >
+                Close
+              </button>
+              {!savedWithoutNotification && (
+                <button
+                  type="button"
+                  onClick={() => submit({ action: 'save', reviewDueDateOverride: draft })}
+                  disabled={working || !validDraft}
+                  className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {working ? 'Saving and sending…' : 'Save extension'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

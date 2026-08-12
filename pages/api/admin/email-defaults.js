@@ -54,6 +54,13 @@ export default async function handler(req, res) {
   if (typeof value !== 'string') {
     return res.status(400).json({ error: 'value must be a string' });
   }
+  const entry = EDITABLE_TEXT_DEFAULTS_BY_KEY[key];
+  const missingPlaceholders = (entry.requiredPlaceholders || []).filter((token) => !value.includes(token));
+  if (missingPlaceholders.length > 0) {
+    return res.status(400).json({
+      error: `Required placeholders missing: ${missingPlaceholders.join(', ')}`,
+    });
+  }
 
   const ok = await setSetting(key, value, gate.profileId);
   if (!ok) {
