@@ -293,12 +293,13 @@ decision. The deployed Vercel configuration registers
 route accepts only a valid cron secret, and the service implements the day-12
 selection/day-14 deadline and once-only claim described above.
 
-A dated production probe found three `wmkf_granteedeliverable` rows, all in
-`Drafted`: zero day-12-eligible rows, zero past-day-14 rows, zero claimed
+A dated 2026-07-27 production probe found three `wmkf_granteedeliverable` rows,
+all in `Drafted`: zero day-12-eligible rows, zero past-day-14 rows, zero claimed
 `Reminder Sent` rows with a missing final timestamp, and zero exact-subject
-reminder email activities. This proves the current workload is empty; it does
-not prove a successful live cron delivery. No execution receipt was available
-from the bounded Vercel runtime-log query.
+reminder email activities. That proved the workload was empty at the time, but
+it is not a current workload claim: a 2026-08-12 row-count-only memory-drift
+probe found 14 rows and did not re-check status/date distribution. No execution
+receipt was available from the bounded Vercel runtime-log query.
 
 The production `email.grantee_reminder.subject` and `.body` settings each have
 exactly one row and match `lib/seed/email-defaults/grantee-reminder.js`. On

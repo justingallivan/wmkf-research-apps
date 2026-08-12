@@ -1,8 +1,8 @@
 # Atlas: `wmkf_granteedeliverable` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-07-27 via `scripts/probe-grantee-reminder-state.mjs` (live rows/status/date combinations and reminder settings) plus `scripts/probe-grantee-waiver-slot.mjs` (active waiver version/body); production schema application and service-principal CRUD were previously verified in S271 (`docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md`).
-**Live row count:** 3
-**Live operational state:** all 3 rows are `Drafted`; 0 are day-12 reminder-eligible, past the day-14 deadline, `Reminder Sent` without `wmkf_remindeddate`, or `Reminder Sent` with a final timestamp.
+**Last verified:** row count refreshed 2026-08-12 via `npm run check:memory-drift` live Dataverse probe; reminder state/status/date combinations last probed 2026-07-27 via `scripts/probe-grantee-reminder-state.mjs`; active waiver version/body last probed 2026-07-27 via `scripts/probe-grantee-waiver-slot.mjs`. Production schema application and service-principal CRUD were previously verified in S271 (`docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md`).
+**Live row count:** 14
+**Operational-state snapshot:** on 2026-07-27 the then-existing 3 rows were all `Drafted`; 0 were day-12 reminder-eligible, past the day-14 deadline, `Reminder Sent` without `wmkf_remindeddate`, or `Reminder Sent` with a final timestamp. The 2026-08-12 row-count refresh did not re-probe status/date distribution for the 14 current rows.
 **Entity set:** `wmkf_granteedeliverables`
 **Schema spec:** `lib/dataverse/schema/wave3-grantee-deliverable-table/wmkf_granteedeliverable.json`
 **Lookup `@odata.bind` key:** `wmkf_Request@odata.bind` (→ `akoya_request`) — PascalCase per schema-apply convention and sibling child entities.
@@ -72,7 +72,7 @@ Straight cutover, no backfill. The old flat request fields `wmkf_granteedelivera
 
 ## Open Questions / Gotchas
 
-- **Schema and write privilege are live.** S271 applied the production schema and verified full service-principal CRUD with `scripts/smoke-grantee-deliverable-write.mjs`; the 2026-07-21 reconciliation probe found 3 durable rows.
+- **Schema and write privilege are live.** S271 applied the production schema and verified full service-principal CRUD with `scripts/smoke-grantee-deliverable-write.mjs`; the 2026-08-12 memory-drift live count probe found 14 durable rows.
 - **External paths are fail-closed.** `getDeliverableForRequest()` never creates; missing row means not editable.
 - **No silent impersonation fallback for reminders.** The cron passes `noFallback:true` and reports send failures rather than sending from the service principal.
 - **A claim without a final timestamp is ambiguous by design.** `Reminder Sent`
