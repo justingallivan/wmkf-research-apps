@@ -10,6 +10,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion.js', () => ({
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   getById: jest.fn(),
 }));
+jest.mock('../../lib/dataverse/adapters/potential-reviewer.js', () => ({
+  getById: jest.fn(),
+}));
 jest.mock('../../lib/dataverse/adapters/system-user.js', () => ({
   getById: jest.fn(),
 }));
@@ -29,6 +32,7 @@ import {
 } from '../../lib/services/reviewer-due-extension';
 import * as suggestionAdapter from '../../lib/dataverse/adapters/reviewer-suggestion';
 import { getById as getRequestById } from '../../lib/dataverse/adapters/grant-request';
+import { getById as getPotentialReviewerById } from '../../lib/dataverse/adapters/potential-reviewer';
 import { getById as getSystemUserById } from '../../lib/dataverse/adapters/system-user';
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature';
@@ -36,6 +40,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
 const PD_ID = '44444444-4444-4444-8444-444444444444';
 const BODY = 'Dear {{reviewerName}},\n\nWe are happy to receive your review of “{{proposalTitle}}” by {{reviewDueDate}}.\n\n{{signature}}';
 const ORIGINAL_IMPERSONATION_SETTING = process.env.DYNAMICS_IMPERSONATION_ENABLED;
@@ -70,6 +75,7 @@ beforeEach(() => {
     wmkf_reviewduedate: '2099-09-01',
     _wmkf_programdirector_value: PD_ID,
   });
+  getPotentialReviewerById.mockResolvedValue(null);
   getSystemUserById.mockResolvedValue({
     systemuserid: PD_ID,
     fullname: 'Pat Director',
@@ -131,6 +137,79 @@ test('saves first, then automatically sends the confirmed reviewer a fixed-subje
   expect(email.attachments[0].content.toString('utf8')).toContain('DTSTART;VALUE=DATE:20990915');
   expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0])
     .toBeLessThan(DynamicsService.createAndSendEmail.mock.invocationCallOrder[0]);
+  expect(getPotentialReviewerById).not.toHaveBeenCalled();
+});
+
+test('falls back to the linked reviewer identity when a legacy accepted row has blank snapshots', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    _wmkf_potentialreviewer_value: REVIEWER_ID,
+    wmkf_reviewerfirstname: null,
+    wmkf_reviewerlastname: null,
+    wmkf_reviewernickname: null,
+    wmkf_revieweremail: null,
+  }));
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: REVIEWER_ID,
+    wmkf_name: ' Test Homer ',
+    wmkf_firstname: 'Test',
+    wmkf_lastname: 'Homer',
+    wmkf_emailaddress: 'test.homer@example.org',
+  });
+
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+
+  expect(result).toMatchObject({ ok: true, saved: true, notified: true });
+  expect(getPotentialReviewerById).toHaveBeenCalledWith(REVIEWER_ID);
+  expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+    to: 'test.homer@example.org',
+  }));
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Test Homer');
+});
+
+test('fills only missing identity fields and keeps confirmed engagement snapshots authoritative', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    _wmkf_potentialreviewer_value: REVIEWER_ID,
+    wmkf_revieweremail: null,
+  }));
+  getPotentialReviewerById.mockResolvedValueOnce({
+    wmkf_potentialreviewersid: REVIEWER_ID,
+    wmkf_name: 'Different Directory Name',
+    wmkf_emailaddress: 'directory@example.org',
+  });
+
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+
+  expect(result).toMatchObject({ ok: true, saved: true, notified: true });
+  const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
+  expect(email.to).toBe('directory@example.org');
+  expect(email.body).toContain('Ada Lovelace');
+  expect(email.body).not.toContain('Different Directory Name');
+});
+
+test('still fails before writing when neither the snapshots nor linked reviewer provide identity', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    _wmkf_potentialreviewer_value: REVIEWER_ID,
+    wmkf_reviewerfirstname: null,
+    wmkf_reviewerlastname: null,
+    wmkf_reviewernickname: null,
+    wmkf_revieweremail: null,
+  }));
+  getPotentialReviewerById.mockRejectedValueOnce(new Error('Dataverse unavailable'));
+
+  const result = await saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  });
+
+  expect(result).toEqual({ ok: false, reason: 'notification_unavailable' });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });
 
 test('restoring clears the override and notifies with the original deadline', async () => {
