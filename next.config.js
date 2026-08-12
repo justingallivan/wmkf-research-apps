@@ -46,6 +46,16 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Keep `next dev` out of the canonical instruction file. Next's agent-rules
+  // generator (`node_modules/next/dist/server/lib/generate-agent-files.js`)
+  // upserts a managed block into AGENTS.md, and because AGENTS.md is a tracked
+  // symlink to CLAUDE.md here, that write followed the link and appended vendor
+  // instruction text to CLAUDE.md itself — the file whose authority is owned by
+  // `docs/CLAUDE_INSTRUCTION_AUTHORITY.md`. Disabled so a build tool cannot edit
+  // agent instructions; a Next.js upgrade would otherwise silently rewrite that
+  // block on someone's next dev run. Next 16 guidance still lives in
+  // `node_modules/next/dist/docs/` for anyone who needs it.
+  agentRules: false,
   async redirects() {
     return [
       // Legacy production host page navigations move to the canonical branded host.
