@@ -117,7 +117,7 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
                 <p className="text-xs text-gray-500">{formatStamp(event.at)}</p>
                 {event.detail && <p className="mt-1 text-xs text-gray-500">{event.detail}</p>}
                 {!event.deliveryProven && (
-                  <p className="mt-1 text-xs text-amber-700">{UNPROVEN_DELIVERY_NOTE}</p>
+                  <p className="mt-1 text-xs text-amber-700">{event.unprovenNote || UNPROVEN_DELIVERY_NOTE}</p>
                 )}
               </li>
             ))}

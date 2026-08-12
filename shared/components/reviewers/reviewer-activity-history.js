@@ -14,8 +14,14 @@
  * can finish `unconfirmed` (`send-emails-service.js:747-800`). Those events are
  * therefore labeled "recorded" and carry `deliveryProven: false`; the wording must
  * never assert that mail reached the reviewer. Reviewer-originated events (portal
- * access, response, review receipt) and staff status writes are proof of the thing
- * they name, and carry `deliveryProven: true`.
+ * access, response) and staff status writes are proof of the thing they name, and
+ * carry `deliveryProven: true`.
+ *
+ * Review receipt is the exception and is decided per row — see `isSyntheticReceipt`.
+ * A staff close-out fabricates `wmkf_reviewreceivedat`, so the actor who "owns" an
+ * event is NOT a safe guide to whether it happened; only the write path is. That
+ * mistake is what an initial version of this module made (Codex adversarial review,
+ * 2026-08-12).
  *
  * DELIBERATE EXCLUSIONS — do not add these back without addressing the reason:
  *
@@ -132,6 +138,40 @@ export const EVENT_DESCRIPTORS = [
 /** Timestamps that survive a failed send get this caveat in the drawer. */
 export const UNPROVEN_DELIVERY_NOTE = 'Recorded in the record; delivery not confirmed.';
 
+/** Shown instead when the receipt stamp was fabricated by a close-out. */
+export const SYNTHETIC_RECEIPT_NOTE = 'Recorded by close-out; no submitted review on record.';
+
+/**
+ * Did a staff close-out fabricate this row's review receipt?
+ *
+ * `updateLifecycle` stamps `wmkf_reviewreceivedat` with `now` on any transition to
+ * `reviewStatus=complete` when the field is empty, in the SAME payload that stamps
+ * `wmkf_completedat` with the same `now` (`reviewer-suggestion.js:1662-1670`). So a
+ * PD closing out a reviewer who never submitted produces a receipt timestamp for a
+ * review that does not exist. The adapter itself flags this hazard: its
+ * `aggregateReviewHistory` header (line 341) states the engagement signal is when the
+ * review was RECEIVED, "NOT the PD's closeout", and the S369 note at 1641-1646
+ * records a past bug that re-created exactly this false positive.
+ *
+ * Two signals separate fabricated from genuine:
+ *  - Identical instants. Both stamps come from one `now` in one payload, so a
+ *    fabricated pair matches exactly. A real receipt closed out later differs.
+ *  - Independent evidence. A genuine submission leaves an uploaded `reviewFilename`
+ *    or narrative `answers` rows; a fabricated one leaves neither.
+ *
+ * Evidence wins over the timestamp test: a reviewer who submits and is closed out in
+ * the same instant still has answers or a file, and reads as proven.
+ */
+export function isSyntheticReceipt(reviewer) {
+  if (!reviewer?.reviewReceivedAt || !reviewer?.completedAt) return false;
+  if (reviewer.reviewFilename) return false;
+  if (Array.isArray(reviewer.answers) && reviewer.answers.length > 0) return false;
+
+  const received = parseTime(reviewer.reviewReceivedAt);
+  const completed = parseTime(reviewer.completedAt);
+  return received !== null && received === completed;
+}
+
 function parseTime(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();
@@ -156,12 +196,17 @@ export function buildActivityHistory(reviewer) {
     const timestamp = parseTime(raw);
     if (timestamp === null) continue;
 
+    // A close-out can fabricate the receipt stamp, so this one event's evidence
+    // tier is decided per row rather than by the descriptor alone.
+    const synthetic = descriptor.key === 'review_received' && isSyntheticReceipt(reviewer);
+
     events.push({
       key: descriptor.key,
-      label: descriptor.label,
+      label: synthetic ? 'Review recorded at close-out' : descriptor.label,
       at: raw,
       timestamp,
-      deliveryProven: descriptor.deliveryProven,
+      deliveryProven: synthetic ? false : descriptor.deliveryProven,
+      unprovenNote: synthetic ? SYNTHETIC_RECEIPT_NOTE : UNPROVEN_DELIVERY_NOTE,
       order: descriptor.order,
       detail: buildDetail(descriptor.key, reviewer),
     });

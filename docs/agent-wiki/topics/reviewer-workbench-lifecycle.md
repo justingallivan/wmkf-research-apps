@@ -425,6 +425,21 @@ stamp, so an extension has no position on a timeline at all. The invariant is
 machine-enforced by `tests/unit/reviewer-activity-history.test.js`, which re-derives
 the reset set from the adapter source rather than trusting a copied list.
 
+**Second standing hazard — `wmkf_reviewreceivedat` is not proof of a review.**
+`updateLifecycle` stamps it with the same `now` as `wmkf_completedat`, in one payload,
+on any transition to `reviewStatus=complete` where it is empty
+[VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1662-1670`]. A PD closing
+out a reviewer who never submitted therefore produces a receipt timestamp for a review
+that does not exist — the same false positive the adapter's own
+`aggregateReviewHistory` header (line 341) and its S369 note (1641-1646) already warn
+about. The drawer decides this per row via `isSyntheticReceipt`: identical
+receipt/close-out instants with no `reviewFilename` and no `answers` rows demote the
+event to "Review recorded at close-out" with an explicit unproven note, while
+independent evidence keeps it proven. Found by Codex adversarial review 2026-08-12
+against a first version that classified every receipt as proven; the general lesson is
+that **the actor who owns an event is not a safe guide to whether it happened — only
+the write path is.**
+
 Evidence wording follows the Opus review's claim-vs-send split: staff-side sends
 (invitation, reminders, materials, thank-you) are labeled "recorded" with a
 delivery-not-confirmed caveat because those stamps survive a failed dispatch;
