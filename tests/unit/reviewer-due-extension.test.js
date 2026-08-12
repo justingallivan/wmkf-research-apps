@@ -37,12 +37,13 @@ import { getById as getSystemUserById } from '../../lib/dataverse/adapters/syste
 import { readRequiredEmailDefaults } from '../../lib/services/email-defaults';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { REVIEWER_EXTENSION_SEED_BODY } from '../../lib/seed/email-defaults/reviewer-actions';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
 const PD_ID = '44444444-4444-4444-8444-444444444444';
-const BODY = 'Dear {{reviewerName}},\n\nWe are happy to receive your review of “{{proposalTitle}}” by {{reviewDueDate}}.\n\n{{signature}}';
+const BODY = REVIEWER_EXTENSION_SEED_BODY;
 const ORIGINAL_IMPERSONATION_SETTING = process.env.DYNAMICS_IMPERSONATION_ENABLED;
 
 function suggestion(overrides = {}) {
@@ -129,7 +130,8 @@ test('saves first, then automatically sends the confirmed reviewer a fixed-subje
     noFallback: true,
   }));
   const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
-  expect(email.body).toContain('Ada Lovelace');
+  expect(email.body).toContain('Dear Dr. Lovelace,');
+  expect(email.body).not.toContain('Dear Ada Lovelace');
   expect(email.body).toContain('September 15, 2099');
   expect(email.body).toContain('Pat Director');
   expect(email.attachments).toHaveLength(1);
@@ -166,7 +168,7 @@ test('falls back to the linked reviewer identity when a legacy accepted row has 
   expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
     to: 'test.homer@example.org',
   }));
-  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Test Homer');
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Dear Dr. Homer,');
 });
 
 test('fills only missing identity fields and keeps confirmed engagement snapshots authoritative', async () => {
@@ -188,7 +190,7 @@ test('fills only missing identity fields and keeps confirmed engagement snapshot
   expect(result).toMatchObject({ ok: true, saved: true, notified: true });
   const email = DynamicsService.createAndSendEmail.mock.calls[0][0];
   expect(email.to).toBe('directory@example.org');
-  expect(email.body).toContain('Ada Lovelace');
+  expect(email.body).toContain('Dear Dr. Lovelace,');
   expect(email.body).not.toContain('Different Directory Name');
 });
 

@@ -103,18 +103,27 @@ describe('/api/admin/email-defaults', () => {
     expect(r.body).toEqual({ key: subjectKey, value: '' });
   });
 
-  test('deadline-update body requires reviewer, date, and signature placeholders', async () => {
+  test('deadline-update body requires honorific greeting, date, and signature placeholders', async () => {
     const key = 'email.reviewer_extension.body';
     const rejected = res();
-    await adminHandler({ method: 'PUT', body: { key, value: 'Hello {{reviewerName}}' } }, rejected);
+    await adminHandler({ method: 'PUT', body: { key, value: 'Hello {{greeting}}' } }, rejected);
 
     expect(rejected.statusCode).toBe(400);
     expect(rejected.body.error).toContain('{{reviewDueDate}}');
     expect(rejected.body.error).toContain('{{signature}}');
     expect(setSetting).not.toHaveBeenCalled();
 
+    const legacy = res();
+    await adminHandler({
+      method: 'PUT',
+      body: { key, value: 'Dear {{reviewerName}}, due {{reviewDueDate}}. {{signature}}' },
+    }, legacy);
+    expect(legacy.statusCode).toBe(400);
+    expect(legacy.body.error).toContain('{{greeting}}');
+    expect(setSetting).not.toHaveBeenCalled();
+
     const accepted = res();
-    const value = 'Dear {{reviewerName}}, due {{reviewDueDate}}. {{signature}}';
+    const value = '{{greeting}}, due {{reviewDueDate}}. {{signature}}';
     await adminHandler({ method: 'PUT', body: { key, value } }, accepted);
 
     expect(accepted.statusCode).toBe(200);

@@ -73,8 +73,8 @@ export const EDITABLE_TEXT_DEFAULTS = [
     label: 'Reviewer deadline update body',
     description: 'Default body sent automatically when a PD grants, changes, or restores a reviewer deadline. The subject is fixed by the application.',
     multiline: true,
-    placeholders: ['{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
-    requiredPlaceholders: ['{{reviewerName}}', '{{reviewDueDate}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
+    requiredPlaceholders: ['{{greeting}}', '{{reviewDueDate}}', '{{signature}}'],
   },
   {
     key: 'email.reviewer_withdraw.subject',
