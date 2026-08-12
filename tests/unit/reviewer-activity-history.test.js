@@ -15,6 +15,8 @@ const {
   buildActivityHistory,
   latestActivity,
   EVENT_DESCRIPTORS,
+  isSyntheticReceipt,
+  SYNTHETIC_RECEIPT_NOTE,
 } = require('../../shared/components/reviewers/reviewer-activity-history');
 
 /** The expression Last Action used before the 2026-08-12 true-recency decision. */
@@ -158,6 +160,96 @@ describe('buildActivityHistory', () => {
   it('returns an empty history for an unstamped or missing reviewer', () => {
     expect(buildActivityHistory({ suggestionId: 's9' })).toEqual([]);
     expect(buildActivityHistory(null)).toEqual([]);
+  });
+});
+
+describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', () => {
+  // updateLifecycle stamps wmkf_reviewreceivedat with the SAME `now` as
+  // wmkf_completedat on any transition to complete when the field is empty
+  // (reviewer-suggestion.js:1662-1670). A PD closing out a reviewer who never
+  // submitted therefore produces a receipt for a review that does not exist.
+  const CLOSEOUT_INSTANT = '2026-08-12T15:04:05Z';
+
+  it('demotes a close-out-fabricated receipt instead of asserting it', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c1',
+      materialsSentAt: '2026-07-05T00:00:00Z',
+      reviewReceivedAt: CLOSEOUT_INSTANT,
+      completedAt: CLOSEOUT_INSTANT,
+      answers: [],
+      reviewFilename: null,
+    });
+    const receipt = events.find(e => e.key === 'review_received');
+
+    expect(receipt.deliveryProven).toBe(false);
+    expect(receipt.label).toBe('Review recorded at close-out');
+    expect(receipt.unprovenNote).toBe(SYNTHETIC_RECEIPT_NOTE);
+  });
+
+  it('keeps a genuine portal submission proven when answers exist', () => {
+    // Same instant, but the reviewer left narrative answers -- evidence beats the
+    // timestamp test, so a submit-then-immediately-close-out row stays proven.
+    const events = buildActivityHistory({
+      suggestionId: 'c2',
+      reviewReceivedAt: CLOSEOUT_INSTANT,
+      completedAt: CLOSEOUT_INSTANT,
+      answers: [{ questionKey: 'summary', value: 'Strong proposal' }],
+    });
+    const receipt = events.find(e => e.key === 'review_received');
+
+    expect(receipt.deliveryProven).toBe(true);
+    expect(receipt.label).toBe('Review received');
+  });
+
+  it('keeps a genuine receipt proven when an uploaded review file exists', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c3',
+      reviewReceivedAt: CLOSEOUT_INSTANT,
+      completedAt: CLOSEOUT_INSTANT,
+      answers: [],
+      reviewFilename: 'review-lovelace.pdf',
+    });
+
+    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+  });
+
+  it('keeps a receipt proven when close-out happened later than the receipt', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c4',
+      reviewReceivedAt: '2026-08-01T09:00:00Z',
+      completedAt: '2026-08-12T15:04:05Z',
+      answers: [],
+    });
+
+    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+  });
+
+  it('leaves a receipt with no close-out alone', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c5',
+      reviewReceivedAt: '2026-08-01T09:00:00Z',
+      answers: [],
+    });
+
+    expect(isSyntheticReceipt({ reviewReceivedAt: '2026-08-01T09:00:00Z' })).toBe(false);
+    expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
+  });
+
+  it('does not demote any event other than the receipt', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c6',
+      proposalFirstAccessedAt: CLOSEOUT_INSTANT,
+      responseReceivedAt: CLOSEOUT_INSTANT,
+      reviewReceivedAt: CLOSEOUT_INSTANT,
+      completedAt: CLOSEOUT_INSTANT,
+      answers: [],
+    });
+    const proven = Object.fromEntries(events.map(e => [e.key, e.deliveryProven]));
+
+    expect(proven.review_received).toBe(false);
+    expect(proven.portal_first_accessed).toBe(true);
+    expect(proven.response_received).toBe(true);
+    expect(proven.completed).toBe(true);
   });
 });
 
