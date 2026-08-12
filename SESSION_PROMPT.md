@@ -67,9 +67,10 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    extensions do not rotate an issued link. `/contract-reconcile` and `/sweep`
    were run. [VERIFIED via production create, entity-scoped publish, typed
    metadata, and runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the Wave 18
-   field is live and EXACT. Seeding the missing
-   `email.reviewer_extension.body` setting must still precede Tier-2 runtime
-   promotion. Invitation response timing remains separate; the mutable
+   field is live and EXACT. [VERIFIED via the non-clobbering setting seed, main
+   `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP
+   checks] the admin body and Tier-2 runtime are now production-live.
+   Invitation response timing remains separate; the mutable
    override is not immutable communicated-deadline evidence for reviewer
    reliability. The prior pre-accept editor and generic `my-candidates` write
    seam are removed; the per-send composer can still diverge from stored state.

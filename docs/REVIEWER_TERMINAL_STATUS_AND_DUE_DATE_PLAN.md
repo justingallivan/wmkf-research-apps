@@ -35,11 +35,10 @@ The HMAC materials-repair endpoint, due-date columns, and inline due-date stamp
 are not part of the active slice. Git history preserves the discarded design;
 this document owns the current boundary.
 
-## Separate operational due-date override — schema live, runtime staged 2026-08-11
+## Separate operational due-date override — production-live 2026-08-11
 
 The later per-reviewer extension request is intentionally narrower than the
-deferred reliability-evidence design below. Feature branch
-`codex/reviewer-due-date-override` stages one nullable DateOnly
+deferred reliability-evidence design below. Production Wave 18 implements one nullable DateOnly
 `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; null falls back to the
 request date. The accepted-row Track Reviewers modal permits a non-null date
 only when it is strictly after that request date (and current/future in the
@@ -59,10 +58,11 @@ intentional through the Board meeting and exceeds ordinary roughly two-week
 extensions. It is mutable operational state, not proof of the deadline
 communicated in an ordered dispatch.
 
-[VERIFIED via production create, entity-scoped publish, typed metadata, and
-runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the field is live and EXACT
-in production. The missing `email.reviewer_extension.body` setting must still
-be seeded before the runtime branch is promoted. This does not change the deferred
+[VERIFIED via production create/publish/exact/runtime-select probes, the
+non-clobbering `email.reviewer_extension.body` seed, main `8647af33`, Vercel
+`dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 /
+2026-08-12 UTC] the field, setting, and runtime are production-live. This does
+not change the deferred
 append-only dispatch-evidence requirement in this plan.
 
 ## Production release — 2026-07-24

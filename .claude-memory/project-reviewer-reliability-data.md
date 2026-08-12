@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-reliability-data
-description: "Owner goal (S369) — capture whether a reviewer is on time and reliable; terminal status is live, a mutable per-engagement due-date override is staged, and durable deadline evidence remains a separate dispatch-ledger design."
+description: "Owner goal (S369) — capture whether a reviewer is on time and reliable; terminal status and a mutable per-engagement due-date override are live, while durable deadline evidence remains a separate dispatch-ledger design."
 status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-08-11 via source and read-only production Dataverse for the extension gap; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
+  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select probes, non-clobbering settings seed, Vercel production deployment, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -71,8 +71,8 @@ whether reviewers are on time and reliable — not just participation counts.
   2026-11-04, and final submission enforces token/lifecycle state rather than the
   displayed request due date. The September 14 exception is operationally safe,
   but it is tracked outside the product.
-- **Implementation staged on `codex/reviewer-due-date-override` (2026-08-11):**
-  [VERIFIED via branch source and focused tests] a nullable DateOnly
+- **Implementation production-live (2026-08-11):**
+  [VERIFIED via main source, focused tests, and production deployment] a nullable DateOnly
   `wmkf_reviewduedateoverride`, accepted-row Track Reviewers extension modal,
   dedicated `review-due-extension` writer, override-first resolver, and the
   full staff → portal/email/calendar/reminder/token consumer fan-out are
@@ -97,14 +97,14 @@ whether reviewers are on time and reliable — not just participation counts.
   preflight, retry-state, error-classification, and copy corrections; the final
   local gates passed at 610 suites / 7,714 tests, 27 focused extension tests,
   and a successful webpack production build.
-- **Production remains request-only at runtime:** [VERIFIED via production
-  create, entity-scoped publish, typed metadata, and runtime `$select` on
-  2026-08-11 / 2026-08-12 UTC]
-  `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is now live and EXACT
-  in production. The remaining release order is to seed the missing
-  `email.reviewer_extension.body` setting, then deliberately promote the Tier-2
-  runtime. No settings write or runtime promotion occurred during schema
-  provisioning.
+- **Wave 18 is production-live:** [VERIFIED via production
+  create/publish/exact/runtime-select probes, the non-clobbering settings seed,
+  main commit `8647af33`, Vercel deployment
+  `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 /
+  2026-08-12 UTC] the suggestion override, admin body, and runtime are live.
+  The production route rejects unauthenticated writes before service entry; a
+  signed-in browser smoke remains unrun because the available sessions were
+  signed out.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,

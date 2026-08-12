@@ -2,14 +2,14 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Wave 18 review-due override provisioned 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, and successful entity-set `$select` of `wmkf_reviewduedateoverride`]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
+**Last verified:** Wave 18 review-due override provisioned and runtime promoted 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, successful entity-set `$select` of `wmkf_reviewduedateoverride`, non-clobbering settings seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
 **Live row count:** 724
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
 **Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition) + `lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json` + `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json` (**production run and verified 2026-08-11 / 2026-08-12 UTC**). Existing-picklist extension artifact: `scripts/extend-reviewstatus-picklist-terminal.mjs` (**production run and verified 2026-07-23**). Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
 **Native entity audit:** ENABLED (S143). Field-level before/after on the engagement-scope correction fields below is captured by Dataverse's native audit log; no parallel audit entity built. See `scripts/enable-suggestion-audit.mjs`.
 
-**Deployed extension manifest; runtime still staged:** `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`. The creation-only apply, entity-scoped publish, typed metadata verification (EXACT), and an entity-set `$select` all succeeded in production on 2026-08-11 / 2026-08-12 UTC. Seed `email.reviewer_extension.body` before promoting the runtime that consumes the field.
+**Deployed extension manifest and runtime:** `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`. The creation-only apply, entity-scoped publish, typed metadata verification (EXACT), and an entity-set `$select` all succeeded in production on 2026-08-11 / 2026-08-12 UTC. The non-clobbering `email.reviewer_extension.body` seed and runtime promotion completed in main `8647af33` / Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`.
 
 ## Source of truth
 
@@ -63,16 +63,16 @@ Outreach timestamps:
 - `wmkf_materialssentat`, `wmkf_remindersentat`, `wmkf_remindercount`
 - `wmkf_reviewreceivedat`, `wmkf_thankyousentat`, `wmkf_completedat` (S196 — Workbench closeout stamp)
 
-### Operational review-due override (Wave 18 schema live; runtime staged)
+### Operational review-due override (Wave 18 production-live)
 
-- [VERIFIED via feature-branch source/tests] `wmkf_reviewduedateoverride` is a
+- [VERIFIED via main source/tests] `wmkf_reviewduedateoverride` is a
   nullable DateTime DateOnly column on one reviewer/request engagement. Null
   means use `akoya_request.wmkf_reviewduedate`; it does not copy the request
   value and existing rows retain proposal-wide behavior. The dedicated
   accepted-reviewer writer permits only a current/future date strictly after
   the request default, evaluated in the Foundation's Pacific time zone, with
   no maximum; null remains the supported restore value.
-- [VERIFIED via feature-branch source/tests]
+- [VERIFIED via main source/tests]
   `/api/review-manager/review-due-extension` is the sole staff writer. Track
   Reviewers exposes Grant/Change extension for eligible accepted rows; Invite
   Reviewers has no editor and generic `my-candidates` PATCH rejects the field.
@@ -86,7 +86,7 @@ Outreach timestamps:
   notification-owed marker for a failed restore send.
   A fresh re-add of a removed engagement clears a stale override with the other
   engagement stamps.
-- [VERIFIED via feature-branch source/tests] `resolveEffectiveReviewDueDate()`
+- [VERIFIED via main source/tests] `resolveEffectiveReviewDueDate()`
   supplies one override-first date to staff DTOs, external portal context,
   acceptance email/calendar output, composed email placeholders, review-due
   reminder eligibility/content, and every normal token mint/regeneration path.
@@ -101,10 +101,11 @@ Outreach timestamps:
   established now + 90d window instead of suppressing the token. This
   operational field is not append-only evidence of which deadline was
   communicated; the dispatch-ledger design remains separate.
-- [VERIFIED via production create, entity-scoped publish, typed metadata, and
-  runtime `$select` on 2026-08-11 / 2026-08-12 UTC] Production contains the
-  field with the exact DateOnly contract. Runtime promotion remains blocked on
-  seeding the new `email.reviewer_extension.body` setting.
+- [VERIFIED via production create/publish/exact/runtime-select probes, the
+  non-clobbering settings seed, main `8647af33`, Vercel
+  `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 /
+  2026-08-12 UTC] Production contains the exact DateOnly field, seeded admin
+  body, and live runtime.
 
 Review status: `wmkf_reviewstatus` (Picklist live in production: `accepted=100000000 | materials_sent=100000001 | under_review=100000002 | review_received=100000003 | complete=100000004 | withdrew=100000005 | released=100000006`; terminal values provisioned and post-publish verified 2026-07-23).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
@@ -277,7 +278,7 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/review-manager/render-emails.js` — read-only preview. It substitutes `SEND_TIME_TOKEN_PLACEHOLDER_JWT` through `buildSendTimeExternalUrlPlaceholder` and never calls `mintAndStore`; repeated/overlapping previews do not change `wmkf_externaltoken*` authority.
 - `pages/api/review-manager/send-emails.js` — adapter `updateLifecycle`; materials sends retain the existing best-effort `wmkf_materialssentat` / `materials_sent` lifecycle update after dispatch. Thank-you sends do not move a terminal row to `complete`. **Send-time writer/authority (S404 v4):** `send-emails-service.js` extracts the final edited subject/body link, defense-in-depth verifies any real legacy/edited JWT, computes the unchanged per-recipient expiry, calls `mintAndStore`, and substitutes only the JWT path segment immediately before invoking Dynamics dispatch. Mint failures remain per-row `email_failed {code,error}` and do not stop healthy siblings.
 - `pages/api/review-manager/terminal-transition.js` — dedicated fresh-read/ETag service writes only `withdrew` or `released` from accepted/materials-sent/under-review rows with no received/completed stamp. For `withdrew`, it also corrects accepted/declined response state, deletes the exact linked honorarium in the same changeset, and cancels acceptance follow-up; `released` remains status-only. Generic `/reviewers` PATCH explicitly refuses both terminal values.
-- `pages/api/review-manager/regenerate-token.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; the feature-branch service derives expiry server-side from accepted state plus the effective reviewer due date, then sets `wmkf_externaltoken*` fields
+- `pages/api/review-manager/regenerate-token.js` — `mintAndStore` from `lib/external/token-lifecycle.js`; the production service derives expiry server-side from accepted state plus the effective reviewer due date, then sets `wmkf_externaltoken*` fields
 - `pages/api/review-manager/revoke-token.js` — `revoke` from same; flips `wmkf_externaltokenrevoked`
 - `pages/api/review-manager/manual-review-entry.js` — structured staff receipt sink; shared guard freshly rejects terminal/already-received/non-accepted rows and binds the complete parent/answer snapshot changeset to that authorizing ETag
 - `pages/api/review-manager/mark-received-no-file.js` — partial/no-file staff receipt sink; the same shared guard and ETag protect both the bare parent PATCH and parent-plus-rating changeset
@@ -302,7 +303,7 @@ table on 2026-06-04; this Dataverse entity is the sole live suggestion ledger.
 
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
-- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). In the Wave 18 feature branch, `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; an `ensureToken` request-read failure also degrades to now + 90d. The production column is live, but production remains request-only until the admin body is seeded and the runtime is promoted. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
+- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275; Wave 18 override-first extension live):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets effective review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at effective review-due + 2d; with no sane future due date it falls back to now + 90d. `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; an `ensureToken` request-read failure degrades to now + 90d. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
 - Token expiry is **event-driven**, not absolute — capped vs long at mint by accepted status, extension on submission, revocation on regenerate.
 - `wmkf_reviewbloburl` retains historical Vercel Blob URLs for legacy rows but the active write target is `wmkf_reviewsharepointfolder` (Vercel Blob retired 2026-05-03 via commit `2277d23`).
 

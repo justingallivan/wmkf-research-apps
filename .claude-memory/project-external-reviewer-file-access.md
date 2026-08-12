@@ -47,13 +47,12 @@ promotion and Vercel Blob retirement were observed on 2026-05-03
 keys expiry on accepted status via `computeReviewerTokenExpiry`
 (`lib/external/reviewer-token-ttl.js`): accepted → review-due + 90d,
 invitee/non-responder → review-due + 2d cap, no sane future due date → 90d
-fallback. On feature branch `codex/reviewer-due-date-override`, all normal mint
+fallback. In production Wave 18, all normal mint
 paths (`send-emails`, reminder sends, `regenerate-token`, and `ensureToken`) use
-the suggestion override first and the request date second. Production remains
-request-only because the runtime branch has not been promoted. [VERIFIED via
-production create, entity-scoped publish, typed metadata, and runtime `$select`
-on 2026-08-11 / 2026-08-12 UTC] the Wave 18 suggestion column is now live and
-EXACT; seed `email.reviewer_extension.body` before runtime promotion.
+the suggestion override first and the request date second. [VERIFIED via
+production create/publish/exact probe, the non-clobbering settings seed, main
+commit `8647af33`, Vercel deployment `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`,
+and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] Wave 18 is production-live.
 `extendForPostSubmissionWindow` still supplies the seven-day modify window;
 upload requires `wmkf_reviewstatus >= materials_sent`.
 

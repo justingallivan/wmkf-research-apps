@@ -18,13 +18,13 @@ related:
 
 Last updated: 2026-08-11
 
-> **Wave 18 deployment boundary:** source on
-> `codex/reviewer-due-date-override` stages a nullable per-engagement due-date
-> override and the route behaviors noted below. [VERIFIED via production
+> **Wave 18 production boundary:** main includes a nullable per-engagement
+> due-date override and the route behaviors noted below. [VERIFIED via production
 > create, entity-scoped publish, typed metadata, and runtime `$select` on
-> 2026-08-11 / 2026-08-12 UTC] the Wave 18 column is live and EXACT. These
-> route behaviors are still not production-live; seed
-> `email.reviewer_extension.body` before deliberately promoting the runtime.
+> 2026-08-11 / 2026-08-12 UTC] the Wave 18 column is live and EXACT. The
+> non-clobbering admin-body seed and runtime promotion completed in main
+> `8647af33` / Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`; the route
+> behaviors below are production-live.
 
 > **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
 > the `pages/api` routes now lives in per-domain `lib/services/<domain>/`

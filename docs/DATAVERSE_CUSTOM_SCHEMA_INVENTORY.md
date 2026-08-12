@@ -150,9 +150,10 @@ maximum. Null restores the request default. [VERIFIED via production create,
 entity-scoped publish, typed metadata, and runtime `$select`] production
 returned EXACT and recognized the column in the entity-set query. Schema manifest:
 `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`.
-The schema prerequisite is complete. Seed `email.reviewer_extension.body`
-before promoting the automatic-notification runtime; neither that setting nor
-the runtime was changed by the schema operation.
+The schema prerequisite is complete. The non-clobbering
+`email.reviewer_extension.body` seed and automatic-notification runtime
+promotion completed on 2026-08-11 / 2026-08-12 UTC (main `8647af33`, Vercel
+`dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`).
 
 **Deployed but not authoritative (Wave 13, 2026-07-12):** structured
 identity-COI currency is specified as `wmkf_identitycoistatus`,

@@ -157,8 +157,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
 - **The portal's "Submission deadline" is the operational review due date, not the token expiry (2026-08-11).**
-  Current production exposes the request's `wmkf_reviewduedate`. Wave 18 source
-  on `codex/reviewer-due-date-override` instead resolves
+  Production Wave 18 resolves
   `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` first and falls back
   to the request date; `/context` exposes that value as `reviewDeadline` and
   `MaterialsView` renders it YMD-local (a UTC
@@ -184,9 +183,9 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   write; there is no durable notification-owed marker for a failed restore
   send. [VERIFIED via production create, entity-scoped publish, typed metadata,
   and runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the Wave 18 field is
-  live and EXACT. Seeding `email.reviewer_extension.body` and promoting the
-  runtime are still required before the override behavior is production-live.
-  The dedicated per-engagement override
+  live and EXACT. [VERIFIED via the non-clobbering admin-body seed, main
+  `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP
+  checks] the override behavior is production-live. The dedicated per-engagement override
   lets staff keep the portal, reminders, calendar, and future token mints aligned
   when they use it; the existing per-send composer date remains ephemeral and
   can still diverge from stored deadline state. Response timing remains separate.

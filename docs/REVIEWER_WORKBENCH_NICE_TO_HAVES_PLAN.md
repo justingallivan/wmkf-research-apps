@@ -306,7 +306,7 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
 - [VERIFIED via `pages/api/reviewer-finder/my-candidates.js:199-246`] Saved candidate rows do not include aggregate review counts or last completed/submitted review date.
 - [VERIFIED via `pages/api/review-manager/reviewers.js:208-245`] Track reviewer rows do not include cross-request aggregate history.
 - [ASSUMED] "Completed a review" needs a business definition: reviewer submitted a review (`wmkf_reviewreceivedat`) versus PD closed it out (`wmkf_completedat` / `reviewStatus=complete`).
-- [VERIFIED via feature-branch source/tests 2026-08-11] Wave 18 stages a nullable
+- [VERIFIED via production source/tests 2026-08-11] Wave 18 provides a nullable
   per-engagement `wmkf_reviewduedateoverride`; review-due reminders and other
   operational consumers use it first and fall back to request-level
   `wmkf_reviewduedate`. The dedicated Track Reviewers extension writer permits
@@ -314,8 +314,10 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
   and strictly after the request default, with no maximum; save/restore also
   triggers the reviewer email/calendar update. [VERIFIED via production create,
   entity-scoped publish, typed metadata, and runtime `$select` on 2026-08-11 /
-  2026-08-12 UTC] the new field is live and EXACT in production; the extension
-  runtime remains pending its admin-body seed and deliberate promotion.
+  2026-08-12 UTC] the new field is live and EXACT in production. [VERIFIED via
+  the non-clobbering admin-body seed, main `8647af33`, Vercel
+  `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks] the extension
+  runtime is production-live.
 
 **Proposed Approach**
 
