@@ -27,7 +27,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
-import { buildActivityHistory, latestActivity } from './reviewer-activity-history';
+import { latestActivitySummary } from './reviewer-activity-history';
 import { Card, Button } from '../Layout';
 import {
   STATUS_PIPELINE,
@@ -1805,9 +1805,9 @@ export default function ReviewerManagePanel({
             <tbody className="divide-y divide-gray-100">
               {reviewers.map(r => {
                 const isEditing = editingNotes?.suggestionId === r.suggestionId;
-                // True recency (owner decision 2026-08-12), replacing the fixed-precedence
-                // fallback this column used to show. See reviewer-activity-history.js.
-                const lastEvent = latestActivity(buildActivityHistory(r));
+                // Terminal status has no guaranteed timestamp, so it takes precedence
+                // without being fabricated as a dated timeline event.
+                const lastEvent = latestActivitySummary(r);
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1853,7 +1853,7 @@ export default function ReviewerManagePanel({
                       {lastEvent ? (
                         <>
                           <p className="text-gray-700">{lastEvent.label}</p>
-                          <p>{formatDate(lastEvent.at)}</p>
+                          {lastEvent.dated === false ? null : <p>{formatDate(lastEvent.at)}</p>}
                         </>
                       ) : (
                         <p>—</p>

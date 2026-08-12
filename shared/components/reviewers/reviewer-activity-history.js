@@ -13,9 +13,9 @@
  * and `reviewer-thankyou-sweep.js:86-139` claim-then-send, and invitation dispatch
  * can finish `unconfirmed` (`send-emails-service.js:747-800`). Those events are
  * therefore labeled "recorded" and carry `deliveryProven: false`; the wording must
- * never assert that mail reached the reviewer. Reviewer-originated events (portal
- * access, response) and staff status writes are proof of the thing they name, and
- * carry `deliveryProven: true`.
+ * never assert that mail reached the reviewer. Reviewer-originated portal access is
+ * proof of the thing it names. Response and receipt stamps are classified from the
+ * row's actual write-path evidence, not from the bare timestamp.
  *
  * Review receipt is the exception and is decided per row — see `isSyntheticReceipt`.
  * A staff close-out fabricates `wmkf_reviewreceivedat`, so the actor who "owns" an
@@ -81,7 +81,7 @@ export const EVENT_DESCRIPTORS = [
     key: 'response_received',
     field: 'responseReceivedAt',
     rawField: 'wmkf_responsereceivedat',
-    label: 'Response received',
+    label: 'Reviewer response received',
     deliveryProven: true,
     order: 40,
   },
@@ -105,7 +105,7 @@ export const EVENT_DESCRIPTORS = [
     key: 'review_received',
     field: 'reviewReceivedAt',
     rawField: 'wmkf_reviewreceivedat',
-    label: 'Review received',
+    label: 'Review submitted through portal',
     deliveryProven: true,
     order: 90,
   },
@@ -141,6 +141,34 @@ export const UNPROVEN_DELIVERY_NOTE = 'Recorded in the record; delivery not conf
 /** Shown instead when the receipt stamp was fabricated by a close-out. */
 export const SYNTHETIC_RECEIPT_NOTE = 'Recorded by close-out; no submitted review on record.';
 
+/** Shown when staff attested receipt rather than a reviewer portal submission. */
+export const STAFF_RECEIPT_NOTE = 'Recorded by staff; not a portal submission.';
+
+const RESPONSE_EVENT_BY_TYPE = Object.freeze({
+  accepted: {
+    label: 'Reviewer accepted invitation',
+    deliveryProven: true,
+  },
+  declined: {
+    label: 'Reviewer declined invitation',
+    deliveryProven: true,
+  },
+  no_response: {
+    label: 'No response recorded at cycle close',
+    deliveryProven: false,
+    unprovenNote: 'Recorded by automated cycle close; no reviewer response on record.',
+  },
+  withdrawn_sufficient: {
+    label: 'Withdrawn — sufficient reviews received',
+    deliveryProven: true,
+  },
+});
+
+const TERMINAL_STATUS_LABELS = Object.freeze({
+  withdrew: 'Withdrew',
+  released: 'Released',
+});
+
 /**
  * Did a staff close-out fabricate this row's review receipt?
  *
@@ -172,6 +200,75 @@ export function isSyntheticReceipt(reviewer) {
   return received !== null && received === completed;
 }
 
+export function isStaffAttestedReceipt(reviewer) {
+  return Boolean(reviewer?.reviewReceivedAt && reviewer.reviewUploadedByStaff === true);
+}
+
+export function responseEventEvidence(reviewer) {
+  const responseType = reviewer?.responseType || null;
+  const reviewStatus = reviewer?.reviewStatus || null;
+
+  if (responseType === 'declined' && reviewStatus === 'withdrew') {
+    return {
+      label: 'Withdrawal recorded by staff',
+      deliveryProven: true,
+      // Not "Response: declined". The row's responseType IS `declined`, but that value
+      // was written by applyStaffReviewerWithdrawal, not by the reviewer
+      // (`reviewer-suggestion.js:1832-1842`). Echoing the raw enum under a
+      // staff-recorded label re-introduces the ambiguity the label just removed.
+      detail: 'Recorded as declined by a Program Director, not by the reviewer.',
+    };
+  }
+
+  if (responseType && RESPONSE_EVENT_BY_TYPE[responseType]) {
+    return {
+      ...RESPONSE_EVENT_BY_TYPE[responseType],
+      detail: `Response: ${responseType}`,
+    };
+  }
+
+  return {
+    label: 'Response timestamp recorded',
+    deliveryProven: false,
+    unprovenNote: 'Response type is missing; timestamp alone does not prove a reviewer response.',
+    detail: null,
+  };
+}
+
+export function reviewReceiptEvidence(reviewer) {
+  if (isSyntheticReceipt(reviewer)) {
+    return {
+      label: 'Review recorded at close-out',
+      deliveryProven: false,
+      unprovenNote: SYNTHETIC_RECEIPT_NOTE,
+    };
+  }
+
+  if (isStaffAttestedReceipt(reviewer)) {
+    return {
+      label: 'Review receipt attested by staff',
+      deliveryProven: false,
+      unprovenNote: STAFF_RECEIPT_NOTE,
+    };
+  }
+
+  return null;
+}
+
+export function currentTerminalStatus(reviewer) {
+  const label = TERMINAL_STATUS_LABELS[reviewer?.reviewStatus];
+  if (!label) return null;
+
+  return {
+    key: `terminal_${reviewer.reviewStatus}`,
+    label: `Current status: ${label}`,
+    dated: false,
+    detail: reviewer.reviewStatus === 'released'
+      ? 'No lifecycle timestamp is recorded for this transition.'
+      : null,
+  };
+}
+
 function parseTime(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();
@@ -196,19 +293,23 @@ export function buildActivityHistory(reviewer) {
     const timestamp = parseTime(raw);
     if (timestamp === null) continue;
 
-    // A close-out can fabricate the receipt stamp, so this one event's evidence
-    // tier is decided per row rather than by the descriptor alone.
-    const synthetic = descriptor.key === 'review_received' && isSyntheticReceipt(reviewer);
+    const responseEvidence = descriptor.key === 'response_received'
+      ? responseEventEvidence(reviewer)
+      : null;
+    const receiptEvidence = descriptor.key === 'review_received'
+      ? reviewReceiptEvidence(reviewer)
+      : null;
+    const evidence = responseEvidence || receiptEvidence;
 
     events.push({
       key: descriptor.key,
-      label: synthetic ? 'Review recorded at close-out' : descriptor.label,
+      label: evidence?.label || descriptor.label,
       at: raw,
       timestamp,
-      deliveryProven: synthetic ? false : descriptor.deliveryProven,
-      unprovenNote: synthetic ? SYNTHETIC_RECEIPT_NOTE : UNPROVEN_DELIVERY_NOTE,
+      deliveryProven: evidence ? evidence.deliveryProven : descriptor.deliveryProven,
+      unprovenNote: evidence?.unprovenNote || UNPROVEN_DELIVERY_NOTE,
       order: descriptor.order,
-      detail: buildDetail(descriptor.key, reviewer),
+      detail: evidence?.detail ?? buildDetail(descriptor.key, reviewer),
     });
   }
 
@@ -245,4 +346,8 @@ function buildDetail(key, reviewer) {
 export function latestActivity(events) {
   if (!Array.isArray(events) || events.length === 0) return null;
   return events[0];
+}
+
+export function latestActivitySummary(reviewer) {
+  return currentTerminalStatus(reviewer) || latestActivity(buildActivityHistory(reviewer));
 }

@@ -17,6 +17,9 @@ const {
   EVENT_DESCRIPTORS,
   isSyntheticReceipt,
   SYNTHETIC_RECEIPT_NOTE,
+  STAFF_RECEIPT_NOTE,
+  currentTerminalStatus,
+  latestActivitySummary,
 } = require('../../shared/components/reviewers/reviewer-activity-history');
 
 /** The expression Last Action used before the 2026-08-12 true-recency decision. */
@@ -69,6 +72,7 @@ describe('buildActivityHistory', () => {
       thankyouSentAt: '2026-07-05T00:00:00Z',
       proposalFirstAccessedAt: '2026-07-06T00:00:00Z',
       responseReceivedAt: '2026-07-07T00:00:00Z',
+      responseType: 'accepted',
       reviewReceivedAt: '2026-07-08T00:00:00Z',
     });
     const proven = Object.fromEntries(events.map(e => [e.key, e.deliveryProven]));
@@ -79,7 +83,7 @@ describe('buildActivityHistory', () => {
     expect(proven.materials_sent).toBe(false);
     expect(proven.review_reminder).toBe(false);
     expect(proven.thankyou).toBe(false);
-    // Reviewer-originated: the stamp exists because the reviewer did the thing.
+    // Reviewer-originated portal access/submission: the stamp exists because the reviewer did the thing.
     expect(proven.portal_first_accessed).toBe(true);
     expect(proven.response_received).toBe(true);
     expect(proven.review_received).toBe(true);
@@ -147,6 +151,37 @@ describe('buildActivityHistory', () => {
     expect(detail.response_received).toBe('Response: accepted');
   });
 
+  it('labels a staff-recorded withdrawal separately from a reviewer decline', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's11',
+      responseReceivedAt: '2026-08-02T12:00:00Z',
+      responseType: 'declined',
+      reviewStatus: 'withdrew',
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.label).toBe('Withdrawal recorded by staff');
+    // The detail must not echo the raw `declined` enum: that value came from
+    // applyStaffReviewerWithdrawal, not the reviewer, and reads as a reviewer act.
+    expect(response.detail).toBe('Recorded as declined by a Program Director, not by the reviewer.');
+    expect(response.detail).not.toMatch(/^Response: /);
+    expect(response.label).not.toBe('Reviewer declined invitation');
+  });
+
+  it('labels cron no-response close-out without asserting a reviewer response', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's12',
+      responseReceivedAt: '2026-08-03T12:00:00Z',
+      responseType: 'no_response',
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.label).toBe('No response recorded at cycle close');
+    expect(response.deliveryProven).toBe(false);
+    expect(response.unprovenNote).toMatch(/automated cycle close/);
+    expect(response.label).not.toMatch(/received|accepted|declined/i);
+  });
+
   it('singularizes a single reminder', () => {
     const [event] = buildActivityHistory({
       suggestionId: 's8',
@@ -198,7 +233,7 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
     const receipt = events.find(e => e.key === 'review_received');
 
     expect(receipt.deliveryProven).toBe(true);
-    expect(receipt.label).toBe('Review received');
+    expect(receipt.label).toBe('Review submitted through portal');
   });
 
   it('keeps a genuine receipt proven when an uploaded review file exists', () => {
@@ -235,11 +270,43 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
     expect(events.find(e => e.key === 'review_received').deliveryProven).toBe(true);
   });
 
+  it('labels the mark-received-no-file staff path as a staff attestation', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c7',
+      reviewReceivedAt: '2026-08-04T09:00:00Z',
+      reviewUploadedByStaff: true,
+      reviewFilename: null,
+      answers: [],
+    });
+    const receipt = events.find(e => e.key === 'review_received');
+
+    expect(receipt.label).toBe('Review receipt attested by staff');
+    expect(receipt.deliveryProven).toBe(false);
+    expect(receipt.unprovenNote).toBe(STAFF_RECEIPT_NOTE);
+    expect(receipt.label).not.toBe('Review submitted through portal');
+  });
+
+  it('labels the staff review-upload path as a staff attestation even with a file', () => {
+    const events = buildActivityHistory({
+      suggestionId: 'c8',
+      reviewReceivedAt: '2026-08-04T09:00:00Z',
+      reviewUploadedByStaff: true,
+      reviewFilename: 'staff-upload.pdf',
+      answers: [],
+    });
+    const receipt = events.find(e => e.key === 'review_received');
+
+    expect(receipt.label).toBe('Review receipt attested by staff');
+    expect(receipt.deliveryProven).toBe(false);
+    expect(receipt.unprovenNote).toBe(STAFF_RECEIPT_NOTE);
+  });
+
   it('does not demote any event other than the receipt', () => {
     const events = buildActivityHistory({
       suggestionId: 'c6',
       proposalFirstAccessedAt: CLOSEOUT_INSTANT,
       responseReceivedAt: CLOSEOUT_INSTANT,
+      responseType: 'accepted',
       reviewReceivedAt: CLOSEOUT_INSTANT,
       completedAt: CLOSEOUT_INSTANT,
       answers: [],
@@ -296,5 +363,30 @@ describe('latestActivity', () => {
   it('returns null when there is nothing to show', () => {
     expect(latestActivity([])).toBeNull();
     expect(latestActivity(null)).toBeNull();
+  });
+});
+
+
+describe('undated terminal status summary', () => {
+  it('surfaces released status without fabricating a dated release event', () => {
+    const reviewer = {
+      suggestionId: 't1',
+      reviewStatus: 'released',
+      reminderSentAt: '2026-08-08T10:00:00Z',
+      materialsSentAt: '2026-08-01T10:00:00Z',
+    };
+
+    const events = buildActivityHistory(reviewer);
+    const summary = latestActivitySummary(reviewer);
+
+    expect(summary).toEqual(expect.objectContaining({
+      key: 'terminal_released',
+      label: 'Current status: Released',
+      dated: false,
+    }));
+    expect(summary.at).toBeUndefined();
+    expect(events.map(e => e.key)).toEqual(['review_reminder', 'materials_sent']);
+    expect(events.some(e => e.key === 'terminal_released')).toBe(false);
+    expect(currentTerminalStatus(reviewer).detail).toMatch(/No lifecycle timestamp/);
   });
 });

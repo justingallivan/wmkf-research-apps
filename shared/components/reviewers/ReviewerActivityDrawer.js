@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { buildActivityHistory, UNPROVEN_DELIVERY_NOTE } from './reviewer-activity-history';
+import { buildActivityHistory, currentTerminalStatus, UNPROVEN_DELIVERY_NOTE } from './reviewer-activity-history';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
@@ -70,6 +70,7 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
     }
   };
 
+  const terminalStatus = currentTerminalStatus(reviewer);
   const events = buildActivityHistory(reviewer);
   const titleId = `reviewer-activity-title-${reviewer.suggestionId}`;
   const noteId = `reviewer-activity-note-${reviewer.suggestionId}`;
@@ -107,10 +108,17 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
           not when it was granted.
         </p>
 
+        {terminalStatus && (
+          <div className="mt-5 border-l-2 border-gray-300 pl-3">
+            <p className="text-sm font-medium text-gray-900">{terminalStatus.label}</p>
+            {terminalStatus.detail && <p className="mt-1 text-xs text-gray-500">{terminalStatus.detail}</p>}
+          </div>
+        )}
+
         {events.length === 0 ? (
-          <p className="mt-5 text-sm text-gray-500">No activity recorded for this reviewer yet.</p>
+          <p className={terminalStatus ? 'mt-4 text-sm text-gray-500' : 'mt-5 text-sm text-gray-500'}>No dated activity recorded for this reviewer yet.</p>
         ) : (
-          <ol className="mt-5 space-y-4">
+          <ol className={terminalStatus ? 'mt-4 space-y-4' : 'mt-5 space-y-4'}>
             {events.map(event => (
               <li key={event.key} className="border-l-2 border-gray-200 pl-3">
                 <p className="text-sm font-medium text-gray-900">{event.label}</p>
