@@ -10,6 +10,22 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — Per-reviewer deadline extensions are production-live (Session 417)
+
+**Milestone:** Program Directors can grant or change an accepted reviewer's deadline from
+Track Reviewers; saving automatically sends the reviewer a personalized deadline notice and
+updated calendar invitation, with an explicit retry/resend fallback.
+**Sessions:** 417 (owner design decisions, implementation, two Opus reviews, Wave 18 schema
+provisioning/promotion, signed-in production test, legacy-identity and honorific corrections).
+**Ship state:** main `ed8b7a3d → d4cd8061`; Wave 18 suggestion-level DateOnly field live;
+portal, reminders, acceptance/calendar, and token calculations use the effective reviewer date;
+Request `1002788` owner smoke passed; 610 suites / 7,717 tests and production build passed.
+**Why it matters:** individual reviewer commitments no longer require an inaccurate request-wide
+deadline or manual off-system workaround, and the reviewer is notified in the same save flow.
+**Pointers:** `docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`;
+`shared/components/reviewers/ReviewerDueDateEditor.js`;
+`lib/services/reviewer-due-extension.js`; commits `ed8b7a3d`, `d6864897`, `19982cfd`, `d4cd8061`.
+
 ## August 2026 — Matching roadmap unblocked: owner answers, falsification suite, incumbent baseline (Session 405)
 
 **Milestone:** the reviewer-matching track went from "waiting on owner" to benchmarked in one
