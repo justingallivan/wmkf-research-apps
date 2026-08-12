@@ -89,16 +89,17 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 
 Schema spec: `lib/dataverse/schema/wave7-reviewer-engagement/akoya_request-reviewer-engagement.json` (isolated wave, same drift-avoidance reason as wave2-triagestatus). The matching per-reviewer marker `wmkf_respondremindersentat` lives on `wmkf_appreviewersuggestion` (see that Atlas page).
 
-**Wave 18 transition (not yet deployed, 2026-08-11):** this request field
+**Wave 18 transition (schema live, runtime staged, 2026-08-11):** this request field
 remains the proposal-wide default. The staged reviewer-due-date feature adds a
 nullable `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride`; consumers use
 that engagement value first and fall back here. The dedicated accepted-reviewer
 writer requires a non-null override to be current/future in the
 Foundation-Pacific calendar and strictly after this original date, with no
-maximum; null restores this default. Production metadata proves the new
-suggestion field is still absent, so current production remains request-only
-until schema-first provisioning, extension-body setting seed, and runtime
-promotion. The request campaign
+maximum; null restores this default. [VERIFIED via production create,
+entity-scoped publish, typed metadata, and runtime `$select` on 2026-08-11 /
+2026-08-12 UTC] the suggestion field is live and EXACT. Current production
+runtime remains request-only until the extension-body setting is seeded and
+the runtime is promoted. The request campaign
 editor continues to own this default and response timing is unchanged.
 
 **Grantee Deliverables Portal abstract fields (S268/S271).** The request keeps only the abstract text

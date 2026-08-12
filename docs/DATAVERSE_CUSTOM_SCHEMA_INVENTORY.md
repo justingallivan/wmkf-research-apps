@@ -140,19 +140,19 @@ Stage-2a stamps: `wmkf_honorariumoptout`, `wmkf_withdrawnsufficientat`, `wmkf_co
 `wmkf_aiuseackedat`, `wmkf_coipolicyversion` (→ `wmkf_policyversion`),
 `wmkf_aiusepolicyversion` (→ `wmkf_policyversion`), `wmkf_honorariumrequest` (→ `akoya_request`).
 
-**Pending, not in production (Wave 18):**
-`wmkf_reviewduedateoverride` (DateTime, DateOnly, nullable) is staged as an
+**Deployed in production (Wave 18, 2026-08-11 / 2026-08-12 UTC):**
+`wmkf_reviewduedateoverride` (DateTime, DateOnly, nullable) is an
 operational per-engagement override whose null fallback is
 `akoya_request.wmkf_reviewduedate`; the dedicated accepted-reviewer extension
 writer accepts a non-null date only when it is current/future in the
 Foundation-Pacific calendar and strictly after the request default, with no
-maximum. Null restores the request default. [VERIFIED 2026-08-11 via read-only typed metadata]
-production returned ABSENT. Schema manifest:
+maximum. Null restores the request default. [VERIFIED via production create,
+entity-scoped publish, typed metadata, and runtime `$select`] production
+returned EXACT and recognized the column in the entity-set query. Schema manifest:
 `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`.
-Apply/publish/verify the wave before runtime promotion; do not include this
-field in the live-production inventory above until the post-publish probe
-returns EXACT. Seed `email.reviewer_extension.body` before promoting the
-automatic-notification runtime.
+The schema prerequisite is complete. Seed `email.reviewer_extension.body`
+before promoting the automatic-notification runtime; neither that setting nor
+the runtime was changed by the schema operation.
 
 **Deployed but not authoritative (Wave 13, 2026-07-12):** structured
 identity-COI currency is specified as `wmkf_identitycoistatus`,

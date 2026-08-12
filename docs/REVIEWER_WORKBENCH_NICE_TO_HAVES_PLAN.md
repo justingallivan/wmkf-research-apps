@@ -312,8 +312,10 @@ S-M for free tags; L for controlled taxonomy or multi-select reporting.
   `wmkf_reviewduedate`. The dedicated Track Reviewers extension writer permits
   non-null dates only when current/future in the Foundation-Pacific calendar
   and strictly after the request default, with no maximum; save/restore also
-  triggers the reviewer email/calendar update. [VERIFIED via read-only production metadata] the
-  new field is still absent in production pending schema-first promotion.
+  triggers the reviewer email/calendar update. [VERIFIED via production create,
+  entity-scoped publish, typed metadata, and runtime `$select` on 2026-08-11 /
+  2026-08-12 UTC] the new field is live and EXACT in production; the extension
+  runtime remains pending its admin-body seed and deliberate promotion.
 
 **Proposed Approach**
 

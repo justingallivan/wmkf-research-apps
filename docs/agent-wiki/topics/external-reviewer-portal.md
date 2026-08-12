@@ -182,11 +182,11 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   saved without the notice. The open modal offers a server-fresh retry, and an
   existing extension always offers Resend deadline email without another date
   write; there is no durable notification-owed marker for a failed restore
-  send. [VERIFIED via
-  read-only production metadata 2026-08-11] the Wave 18 field is still ABSENT,
-  so schema-first provisioning, seeding `email.reviewer_extension.body`, and
-  runtime promotion are required before the override behavior is
-  production-live. The dedicated per-engagement override
+  send. [VERIFIED via production create, entity-scoped publish, typed metadata,
+  and runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the Wave 18 field is
+  live and EXACT. Seeding `email.reviewer_extension.body` and promoting the
+  runtime are still required before the override behavior is production-live.
+  The dedicated per-engagement override
   lets staff keep the portal, reminders, calendar, and future token mints aligned
   when they use it; the existing per-send composer date remains ephemeral and
   can still diverge from stored deadline state. Response timing remains separate.

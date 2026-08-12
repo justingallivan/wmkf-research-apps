@@ -97,12 +97,14 @@ whether reviewers are on time and reliable — not just participation counts.
   preflight, retry-state, error-classification, and copy corrections; the final
   local gates passed at 610 suites / 7,714 tests, 27 focused extension tests,
   and a successful webpack production build.
-- **Production remains request-only:** [VERIFIED via read-only typed metadata
-  2026-08-11] `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is ABSENT
-  in production. Required release order is Wave 18 schema apply/publish/exact
-  verification, seed the missing `email.reviewer_extension.body` setting, then
-  deliberate Tier-2 runtime promotion. No schema/settings write or runtime
-  promotion has occurred from this branch.
+- **Production remains request-only at runtime:** [VERIFIED via production
+  create, entity-scoped publish, typed metadata, and runtime `$select` on
+  2026-08-11 / 2026-08-12 UTC]
+  `wmkf_appreviewersuggestion.wmkf_reviewduedateoverride` is now live and EXACT
+  in production. The remaining release order is to seed the missing
+  `email.reviewer_extension.body` setting, then deliberately promote the Tier-2
+  runtime. No settings write or runtime promotion occurred during schema
+  provisioning.
 - Do not conflate that mutable operational override with the append-only
   dispatch/deadline evidence needed for reviewer-reliability measurement. Run
   `/contract-reconcile` before implementation; this crosses Dataverse schema,

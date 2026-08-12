@@ -20,9 +20,11 @@ Last updated: 2026-08-11
 
 > **Wave 18 deployment boundary:** source on
 > `codex/reviewer-due-date-override` stages a nullable per-engagement due-date
-> override and the route behaviors noted below. Production metadata returned
-> ABSENT on 2026-08-11, so these additions are not production-live until the
-> schema wave is applied/published/verified before runtime promotion.
+> override and the route behaviors noted below. [VERIFIED via production
+> create, entity-scoped publish, typed metadata, and runtime `$select` on
+> 2026-08-11 / 2026-08-12 UTC] the Wave 18 column is live and EXACT. These
+> route behaviors are still not production-live; seed
+> `email.reviewer_extension.body` before deliberately promoting the runtime.
 
 > **Route→Service consolidation (Stage 7, 2026-07-05):** the business logic of
 > the `pages/api` routes now lives in per-domain `lib/services/<domain>/`

@@ -65,9 +65,10 @@ promotion: **575 suites / 7,283 tests**; focused review set: **153/153**.
    Owner decision: the accepted-reviewer token's due + 90d expiry is
    intentionally retained through the Board meeting; ordinary roughly two-week
    extensions do not rotate an issued link. `/contract-reconcile` and `/sweep`
-   were run. [VERIFIED via read-only production metadata] the field is ABSENT,
-   so Wave 18 schema apply/publish/exact verification and seeding the missing
-   `email.reviewer_extension.body` setting must precede Tier-2 runtime
+   were run. [VERIFIED via production create, entity-scoped publish, typed
+   metadata, and runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the Wave 18
+   field is live and EXACT. Seeding the missing
+   `email.reviewer_extension.body` setting must still precede Tier-2 runtime
    promotion. Invitation response timing remains separate; the mutable
    override is not immutable communicated-deadline evidence for reviewer
    reliability. The prior pre-accept editor and generic `my-candidates` write

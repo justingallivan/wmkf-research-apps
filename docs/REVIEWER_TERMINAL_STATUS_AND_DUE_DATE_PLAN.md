@@ -35,7 +35,7 @@ The HMAC materials-repair endpoint, due-date columns, and inline due-date stamp
 are not part of the active slice. Git history preserves the discarded design;
 this document owns the current boundary.
 
-## Separate operational due-date override — staged 2026-08-11
+## Separate operational due-date override — schema live, runtime staged 2026-08-11
 
 The later per-reviewer extension request is intentionally narrower than the
 deferred reliability-evidence design below. Feature branch
@@ -59,10 +59,10 @@ intentional through the Board meeting and exceeds ordinary roughly two-week
 extensions. It is mutable operational state, not proof of the deadline
 communicated in an ordered dispatch.
 
-[VERIFIED via read-only production metadata 2026-08-11] the field is absent in
-production. The Wave 18 schema must be applied, published, and verified exact
-and the missing `email.reviewer_extension.body` setting must be seeded before
-the runtime branch is promoted. This does not change the deferred
+[VERIFIED via production create, entity-scoped publish, typed metadata, and
+runtime `$select` on 2026-08-11 / 2026-08-12 UTC] the field is live and EXACT
+in production. The missing `email.reviewer_extension.body` setting must still
+be seeded before the runtime branch is promoted. This does not change the deferred
 append-only dispatch-evidence requirement in this plan.
 
 ## Production release — 2026-07-24

@@ -5,7 +5,7 @@ type: project
 originSessionId: 9ea67012-f70f-47e6-ba56-ded9f73601c4
 status: active
 scope: reviewer
-last_verified: 2026-08-11 via lib/external source, token-lifecycle callers, focused tests, and read-only production metadata for the pending Wave 18 field; external deployment remains date-bounded
+last_verified: 2026-08-11 via lib/external source, token-lifecycle callers, focused tests, and production Wave 18 create/publish/exact/runtime-select verification; external deployment remains date-bounded
 ---
 
 ## Recall Rule
@@ -50,8 +50,10 @@ invitee/non-responder → review-due + 2d cap, no sane future due date → 90d
 fallback. On feature branch `codex/reviewer-due-date-override`, all normal mint
 paths (`send-emails`, reminder sends, `regenerate-token`, and `ensureToken`) use
 the suggestion override first and the request date second. Production remains
-request-only because the Wave 18 suggestion column was [VERIFIED via read-only
-metadata 2026-08-11] ABSENT; schema must precede runtime promotion.
+request-only because the runtime branch has not been promoted. [VERIFIED via
+production create, entity-scoped publish, typed metadata, and runtime `$select`
+on 2026-08-11 / 2026-08-12 UTC] the Wave 18 suggestion column is now live and
+EXACT; seed `email.reviewer_extension.body` before runtime promotion.
 `extendForPostSubmissionWindow` still supplies the seven-day modify window;
 upload requires `wmkf_reviewstatus >= materials_sent`.
 

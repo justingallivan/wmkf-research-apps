@@ -2,14 +2,14 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Wave 18 review-due override preflight 2026-08-11 [VERIFIED via read-only production metadata: `wmkf_reviewduedateoverride` ABSENT]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
+**Last verified:** Wave 18 review-due override provisioned 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, and successful entity-set `$select` of `wmkf_reviewduedateoverride`]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`; row count re-probed 2026-07-26 via `scripts/reconcile-memory-claims.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
 **Live row count:** 724
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
-**Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition) + `lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json`. Existing-picklist extension artifact: `scripts/extend-reviewstatus-picklist-terminal.mjs` (**production run and verified 2026-07-23**). Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
+**Extension manifests:** base entity in `lib/dataverse/schema/wave2/wmkf_app_reviewer_suggestion.json`; extensions in `lib/dataverse/schema/wave2-existing/wmkf_appreviewersuggestion-extensions.json` (S128–S130 additions) + `lib/dataverse/schema/wave3/04_wmkf_appreviewersuggestion_stage2a.json` (S143 Stage 2a slice 1 additions) + `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json` (S196 Workbench prep) + `lib/dataverse/schema/wave6/01_wmkf_appreviewersuggestion_applicant_disposition.json` (S208 applicant disposition) + `lib/dataverse/schema/wave13-reviewer-identity-binding/02_wmkf_appreviewersuggestion_identity_coi.json` + `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json` (**production run and verified 2026-08-11 / 2026-08-12 UTC**). Existing-picklist extension artifact: `scripts/extend-reviewstatus-picklist-terminal.mjs` (**production run and verified 2026-07-23**). Relevance-score range widen artifact: `scripts/widen-relevancescore-max.mjs`.
 **Native entity audit:** ENABLED (S143). Field-level before/after on the engagement-scope correction fields below is captured by Dataverse's native audit log; no parallel audit entity built. See `scripts/enable-suggestion-audit.mjs`.
 
-**Pending extension manifest (NOT deployed):** `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`. Production metadata returned ABSENT on 2026-08-11. Apply and publish this creation-only wave before promoting any runtime that selects the field; then rerun `scripts/preflight-reviewer-due-date-override-field.mjs --target=prod` and require EXACT.
+**Deployed extension manifest; runtime still staged:** `lib/dataverse/schema/wave18-reviewer-due-date-override/01_wmkf_appreviewersuggestion_due_date_override.json`. The creation-only apply, entity-scoped publish, typed metadata verification (EXACT), and an entity-set `$select` all succeeded in production on 2026-08-11 / 2026-08-12 UTC. Seed `email.reviewer_extension.body` before promoting the runtime that consumes the field.
 
 ## Source of truth
 
@@ -63,7 +63,7 @@ Outreach timestamps:
 - `wmkf_materialssentat`, `wmkf_remindersentat`, `wmkf_remindercount`
 - `wmkf_reviewreceivedat`, `wmkf_thankyousentat`, `wmkf_completedat` (S196 — Workbench closeout stamp)
 
-### Pending operational review-due override (Wave 18; schema not live)
+### Operational review-due override (Wave 18 schema live; runtime staged)
 
 - [VERIFIED via feature-branch source/tests] `wmkf_reviewduedateoverride` is a
   nullable DateTime DateOnly column on one reviewer/request engagement. Null
@@ -101,10 +101,10 @@ Outreach timestamps:
   established now + 90d window instead of suppressing the token. This
   operational field is not append-only evidence of which deadline was
   communicated; the dispatch-ledger design remains separate.
-- [VERIFIED via read-only production metadata 2026-08-11] Production does not
-  yet contain the field. Runtime promotion is blocked on schema-first Wave 18
-  provisioning, exact post-publish verification, and seeding the new
-  `email.reviewer_extension.body` setting.
+- [VERIFIED via production create, entity-scoped publish, typed metadata, and
+  runtime `$select` on 2026-08-11 / 2026-08-12 UTC] Production contains the
+  field with the exact DateOnly contract. Runtime promotion remains blocked on
+  seeding the new `email.reviewer_extension.body` setting.
 
 Review status: `wmkf_reviewstatus` (Picklist live in production: `accepted=100000000 | materials_sent=100000001 | under_review=100000002 | review_received=100000003 | complete=100000004 | withdrew=100000005 | released=100000006`; terminal values provisioned and post-publish verified 2026-07-23).
 - `complete` (S196 claim): set by Request Workbench when PD closes out — drops the row off the PD dashboard. Paired with `wmkf_completedat` (DateTime, added 2026-05-28).
@@ -302,7 +302,7 @@ table on 2026-06-04; this Dataverse entity is the sole live suggestion ledger.
 
 ## Token lifecycle (live, per `project_external_reviewer_file_access.md`)
 
-- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). In the Wave 18 feature branch, `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; an `ensureToken` request-read failure also degrades to now + 90d. Production remains request-only until schema-first promotion. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
+- **Mint expiry is per-recipient (reviewer-engagement Phase 2, S275):** production `send-emails-service` sets it via `computeReviewerTokenExpiry` (`lib/external/reviewer-token-ttl.js`), keyed on ACCEPTED status — an accepted reviewer gets review-due + 90d (the intentional Board-meeting cushion, comfortably beyond normal roughly two-week reviewer extensions); an invitee/non-responder gets the early cap at review-due + 2d; with no sane future `wmkf_reviewduedate` it falls back to now + 90d (prior flat behavior). In the Wave 18 feature branch, `send-emails`, reminder sends, `regenerate-token`, and `ensureToken` all use the override-first effective date; an `ensureToken` request-read failure also degrades to now + 90d. The production column is live, but production remains request-only until the admin body is seeded and the runtime is promoted. The 7-day post-submission modify window via `extendForPostSubmissionWindow` remains unchanged.
 - Token expiry is **event-driven**, not absolute — capped vs long at mint by accepted status, extension on submission, revocation on regenerate.
 - `wmkf_reviewbloburl` retains historical Vercel Blob URLs for legacy rows but the active write target is `wmkf_reviewsharepointfolder` (Vercel Blob retired 2026-05-03 via commit `2277d23`).
 
