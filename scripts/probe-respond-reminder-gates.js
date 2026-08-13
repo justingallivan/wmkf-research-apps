@@ -161,7 +161,7 @@ async function main() {
   // The hash is selected for PRESENCE only and never printed (it is a SHA of the
   // JWT, not the link, but there is no reason to emit it).
   const select = 'wmkf_appreviewersuggestionid,_wmkf_request_value,_wmkf_potentialreviewer_value,'
-    + 'wmkf_emailsentat,wmkf_externaltokenexpires,wmkf_externaltokenhash,wmkf_externaltokenrevoked';
+    + 'wmkf_emailsentat,wmkf_externaltokenexpires,wmkf_externaltokenhash,wmkf_externaltokenrevoked,wmkf_selected';
 
   const rows = await queryAll(client,
     `/wmkf_appreviewersuggestions?$select=${select}&$filter=${encodeURIComponent(filter)}`);
@@ -280,6 +280,12 @@ async function main() {
       note: 'Invitation-link state for every scanned row, computed independently of the gate ladder, in the verifier’s own order (hash → revoked → expiry). `live` means that reviewer can still ACCEPT today: verify-suggestion-token.js checks hash/revoked/expiry and asks nothing about whether the campaign is still open.',
       states: Object.fromEntries(TOKEN_STATES.map((s) => [s, rows.filter((r) => auditToken(r, now) === s).length])),
       of: rows.length,
+      // Neither sweep filters on wmkf_selected (grep: no hits in
+      // reviewer-reminder-sweep.js), so a candidate REMOVED from a proposal —
+      // softDelete writes selected=false + tokenRevoked=true in one PATCH
+      // (my-candidates-service.js:880) — still matches the respond-by query.
+      unselectedButStillMatched: rows.filter((r) => r.wmkf_selected === false).length,
+      unselectedAndRevoked: rows.filter((r) => r.wmkf_selected === false && r.wmkf_externaltokenrevoked === true).length,
       caveat: '`no_expiry_recorded` is NOT proof of safety: the verifier skips its expiry check when that column is null (verify-suggestion-token.js:183), leaving the JWT’s own `exp` claim — set at mint (external-token.js:102) and enforced by jwtVerify — as the only bound. This probe cannot read that claim without the token, so those rows are UNRESOLVED here, not clean.',
     },
     gateLegend: Object.fromEntries(GATES.map((g) => [g.key, `${g.why} (sweep${g.at})`])),
