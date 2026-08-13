@@ -12,6 +12,7 @@ const {
   requiresStaffIdentityConfirmation,
   formatReferredByReason,
   parseReferredByReason,
+  splitReferredByReason,
   PROVENANCE_KINDS,
 } = require('../../lib/utils/reviewer-provenance');
 // The client selectability gate is asserted against the server predicate in this file so
@@ -324,5 +325,39 @@ describe('referral clause encode/decode', () => {
     expect(parseReferredByReason('Referred by Dr. Abby Doyle. Synthesis expert.')).toBe('Dr');
     // Legacy rows with a period-free name were, and remain, parsed correctly.
     expect(parseReferredByReason('Referred by Abby Doyle. Synthesis expert.')).toBe('Abby Doyle');
+  });
+});
+
+// Drives the labeled "Referred by:" line on the Invite Reviewers card, which must
+// not also repeat the referrer inside the "Why:" rationale.
+describe('splitReferredByReason (display split)', () => {
+  test('separates the referrer from the rationale that follows it', () => {
+    expect(splitReferredByReason(formatReferredByReason('Dr. Abby Doyle', 'Synthesis expert.')))
+      .toEqual({ referredBy: 'Dr. Abby Doyle', rest: 'Synthesis expert.' });
+  });
+
+  test('a referral with no note leaves no rationale behind', () => {
+    // The prod shape: "Why:" must disappear entirely rather than render empty.
+    expect(splitReferredByReason(formatReferredByReason('Mikhail Shapiro')))
+      .toEqual({ referredBy: 'Mikhail Shapiro', rest: '' });
+  });
+
+  test('a non-referral keeps its whole reason as the rationale', () => {
+    expect(splitReferredByReason('Manually added by staff.'))
+      .toEqual({ referredBy: null, rest: 'Manually added by staff.' });
+    expect(splitReferredByReason('')).toEqual({ referredBy: null, rest: '' });
+  });
+
+  test('downstream annotations stay in the rationale, not the referrer', () => {
+    const reason = `${formatReferredByReason('Dr. Abby Doyle')} [Identity confirmed by PD; contact entered manually]`;
+    expect(splitReferredByReason(reason)).toEqual({
+      referredBy: 'Dr. Abby Doyle',
+      rest: '[Identity confirmed by PD; contact entered manually]',
+    });
+  });
+
+  test('a legacy row still splits, on its legacy (lossy) boundary', () => {
+    expect(splitReferredByReason('Referred by Abby Doyle. Synthesis expert.'))
+      .toEqual({ referredBy: 'Abby Doyle', rest: 'Synthesis expert.' });
   });
 });
