@@ -114,6 +114,18 @@ describe('InviteEmailModal invitation timing contract', () => {
   });
 
   test('warns, without blocking, when reviews fall due on or before the response deadline', () => {
+    const warning = invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-28',
+      reviewDueDate: '2026-07-30',
+    }, today);
+    expect(warning).toMatch(/due on or before the response deadline/i);
+    // Must point at the per-reviewer extension, NOT at editing the due date in
+    // the panel: request campaign config is seeded "set only if unset", so a
+    // late-wave edit changes this email's copy while the portal, reminder sweep,
+    // and token math keep the original date (Codex adversarial review).
+    expect(warning).toMatch(/extension/i);
+    expect(warning).not.toMatch(/edit the dates/i);
     expect(invitationTimelineWarning({
       respondOffsetDays: 7,
       proposalSendDate: '2026-07-28',

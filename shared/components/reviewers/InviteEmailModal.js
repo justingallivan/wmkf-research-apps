@@ -166,16 +166,26 @@ export function validateInvitationTimeline(timing, today = new Date()) {
 // arrives on its own as `respondBy` drifts, so it must not disable Send —
 // that was the original bug in a narrower window (owner decision 2026-08-12).
 //
-// Deliberately advisory-only: the PD edits the dates in the draft below before
-// sending. A bespoke per-invitation due date was considered and declined as not
-// worth the effort for a condition that disappears next cycle, when materials
-// are in hand at invitation time.
+// Deliberately advisory-only. It names the EXTENSION as the remedy, and must not
+// tell the PD to fix this by editing the due date in the panel above: on any wave
+// after the first that silently fails. `send-emails-service.js` seeds request
+// campaign config "set only if unset"
+// (`if (dueDate != null && reqRec.wmkf_reviewduedate == null)`), and skips seeding
+// entirely for `allowResend` — so a late-cycle edit changes THIS email's copy while
+// the request, portal, reminder sweep, and token math keep the original date. The
+// per-reviewer override is the only authoritative remedy; it is what
+// `resolveEffectiveReviewDueDate` reads everywhere. (Codex adversarial review,
+// 2026-08-12, against an earlier version of this string that did exactly that.)
+//
+// A bespoke per-invitation due date was considered and declined as not worth the
+// effort for a condition that disappears next cycle, when materials are in hand at
+// invitation time.
 export function invitationTimelineWarning(timing, today = new Date()) {
   const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
   const reviewDue = timing.reviewDueDate || '';
 
   if (respondBy && reviewDue && reviewDue <= respondBy) {
-    return 'Reviews are due on or before the response deadline. Edit the dates in the draft below before sending, or plan to grant this reviewer an extension.';
+    return 'Reviews are due on or before the response deadline. If this reviewer accepts late, grant them an extension from Track Reviewers.';
   }
   return null;
 }
