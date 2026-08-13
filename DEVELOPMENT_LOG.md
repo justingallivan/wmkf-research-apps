@@ -10,6 +10,25 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 — A grantee saw a stranger listed as co-PI on their award (Session 421)
+
+**Milestone:** Incident. The grantee portal for request `1002132` rendered "Heinrich Jaeger and
+Yvonne Mariajimenez"; Yvonne is unrelated to the proposal. Diagnosed to bad source data, not
+application code.
+**Sessions:** 421 (diagnosis, scoping, remediation script — remediation **not** executed).
+**Ship state:** No application bug — the participant adapter is read-only, nothing in the repo
+writes co-PI/PI fields, and the abstract-request flow touches only the abstract, deliverable
+status, and an email activity. One duplicate contact carrying the placeholder email `_@_._`
+sits in a co-PI slot on **seven** requests (a floor — verified only for that exact literal),
+copied into the `wmkf_apprequestperson` junction by the 2026-05-07 backfill. Exposure: 1 of 14
+generated grantee packages; the awardee replied, so he saw it. `scripts/remediate-placeholder-copi.js`
+is written and rehearsed dry-run only — **zero production writes; all 14 rows still live.**
+**Why it matters:** the grantee portal is the first surface that ever displayed co-PIs to an
+external party, so a decade of unreviewed import data now has an audience. Root cause is the
+akoyaGO import (Connor's), and until it changes new requests keep acquiring the phantom.
+**Pointers:** `outputs/phantom-copi-incident-2026-08-12.md`; `docs/CURRENT_WORK_QUEUE.md` audit
+follow-ups; commits `64dd4bf4`, `f9defa6d`, `e6d5b54e`.
+
 ## August 2026 - Reviewer activity history is production-live (Session 419)
 
 **Milestone:** Track Reviewers now shows the chronologically newest derived lifecycle event

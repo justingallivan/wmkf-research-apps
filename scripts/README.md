@@ -49,6 +49,7 @@ node scripts/manage-preferences.js --delete-keys --profile 2
 | Script | Description |
 |--------|-------------|
 | `assign-orphan-records.js` | **DO NOT RUN:** targets `reviewer_suggestions` and `proposal_searches`, both dropped by migration 018. |
+| `remediate-placeholder-copi.js` | Clears phantom co-PI links left by a placeholder-email contact — both the `akoya_request.wmkf_copi{1..5}` slot and the matching `wmkf_apprequestperson` junction row (the grantee portal reads the junction, so clearing the slot alone does not fix it). `--dry-run` by default; `--execute` needs `DATAVERSE_ALLOW_PROD_READS=yes` plus a same-UTC-day `DATAVERSE_PROD_WRITE_ACK`. Refuses any contact whose email is not punctuation-only, caps at 25 rows, resolves slot nav properties from live metadata. **As of 2026-08-12 it has only ever been dry-run;** see `outputs/phantom-copi-incident-2026-08-12.md`. |
 
 ## Security
 

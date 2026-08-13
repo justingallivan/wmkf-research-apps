@@ -1,205 +1,200 @@
-# Session 421 Prompt: run the SharePoint permission audit with Connor
+# Session 422 Prompt: decide the phantom co-PI remediation, then resume the SharePoint/Connor thread
 
-## Session 420 Summary
+## Session 421 Summary
 
-A short session. Produced the delegation artifact for the first agenda item and
-repaired a host shell misconfiguration that had been silently breaking the
-harness's Bash tool.
+An incident session. A grantee saw an unrelated person's name on their award page;
+the session traced it end-to-end, proved no application bug, wrote and rehearsed
+the remediation, and stopped short of executing it at the owner's direction.
 
 ### What Was Completed
 
-1. **Connor-ready SharePoint audit primer.** `outputs/sharepoint-permission-audit-primer-for-connor-2026-08-12.md`
-   is a self-contained brief Connor can paste into his own Claude Code session to
-   run the read-only permission, recycle-bin, and version-policy diagnosis on
-   `/sites/akoyaGO` and `akoya_request`. It assumes no access to this repository
-   and no prior conversation.
+1. **Diagnosed the phantom co-PI on request 1002132.** The grantee portal rendered
+   the byline "Heinrich Jaeger and Yvonne Mariajimenez". Yvonne is unrelated to the
+   proposal: a duplicate contact carrying the placeholder email `_@_._`
+   (`2a67a272-9eb5-f011-bbd3-6045bd0510d4`), created 2025-10-30T14:41:07Z — two
+   minutes after the request itself and sharing its GUID batch suffix.
 
-   It is derived from the S415 decision-ready brief (`f04d76a7:outputs/sharepoint-storage-policy-question-brief.md`)
-   and deliberately front-loads the four interpretation traps that would otherwise
-   reproduce the answer we already have: "limited control" is a modern-pane caption
-   rather than a role; a level's name does not describe its flags, because built-in
-   levels are editable in place; second-stage recycle-bin invisibility is the
-   documented end-user experience rather than evidence of absence; and classic
-   `_layouts/15/…` deep links have failed twice on this tenant, so a failure there
-   is tooling noise, not a finding.
+   **No application code is at fault** `[VERIFIED via source]`. The
+   `wmkf_apprequestperson` adapter is read-only (`queryCoPIs`/`queryPersons`/
+   `queryAllPersons`); nothing in the repo writes co-PI or PI fields; the Dataverse
+   read path has no result cache; and the abstract-request flow writes only
+   `wmkf_abstractformatted`, the deliverable status, and an email activity. The
+   portal is simply the first surface that ever *displayed* co-PIs.
 
-   Read-only by construction: `Get-*` cmdlets only, no destructive test on a
-   governed artifact, no edit to Versioning settings (that page sets as well as
-   shows), and an explicit instruction not to register an Entra app or grant
-   consent to clear the PnP client-ID prerequisite. Carries a UI-only fallback and
-   a structured report block that keeps Delete Items and Delete Versions as
-   separate answers.
+   Origin chain: the 2025-10-30 import attached a placeholder contact to co-PIs
+   lacking an email → `scripts/backfill-request-person-junction.js` copied the
+   `wmkf_copi1..5` slots into the junction on 2026-05-07T22:37:21Z → the grantee
+   portal read the junction on 2026-08-12.
 
-2. **Host shell PATH repaired (per-machine, not in the repo).** `~/.bashrc` line 9
-   was `export PATH="/Users/gallivan"` — an unconditional overwrite that left the
-   home directory as the only PATH entry, so `git`, `node`, `npm`, `rtk`, and even
-   `sed` failed to resolve. It only ever fired for the harness, because Terminal
-   opens *login* shells (which read `.bash_profile`) while the Bash tool opens
-   *non-login* shells (which read `.bashrc`), and `.bash_profile` did not source
-   `.bashrc`. The two files had drifted.
+2. **Scoped it to seven requests, one awardee exposed.** `1002132`, `1002262`,
+   `1002363`, `1002367`, `1002865`, `1002880`, `1003053`. The slot is **not**
+   always Co-PI 1 (`copi2` on 1002865, `copi4` on 1002367). Only `1002132` reached
+   an awardee (invited 2026-08-12T18:26:49Z; Heinrich Jaeger replied twice). Owner
+   reports the other six were not awarded, so no further abstract requests are
+   expected. Exposure measured at 1 of 14 generated grantee packages.
 
-   Fixed by removing the clobber, collapsing duplicate PATH appends, and having
-   `.bash_profile` source `.bashrc` so they cannot drift again. Verified from a
-   clean environment (`env -i`) that fresh login and non-login shells now produce
-   identical, correctly-ordered PATHs, and that re-sourcing is idempotent.
-   Originals are backed up at `~/.bash_profile.bak-2026-08-12` and
-   `~/.bashrc.bak-2026-08-12`.
+3. **Wrote and rehearsed the remediation — NOT executed.** Dry-run only; **zero
+   production writes this session**. All 7 slots and 7 junction rows are still live.
+
+4. **Recorded it for followup** in three places: the work queue, a tracked incident
+   brief, and a shareable artifact
+   (https://claude.ai/code/artifact/bd6881e6-7fbf-4e1a-8c6c-bb4b6e96ab14).
 
 ### Commits
 
-- `2d2a1054` - docs: read-only SharePoint permission audit primer for Connor
+- `64dd4bf4` - Add remediation script for placeholder-email phantom co-PI links
+- `f9defa6d` - Record the phantom co-PI incident and its seven affected requests
+- `e6d5b54e` - Log the phantom co-PI cleanup as verified-open, nothing executed
+
+### Gotchas Worth Carrying
+
+- **`queryRecords` renames OData annotations to a `_formatted` suffix**
+  (`lib/services/dynamics/annotations.js:33`). Reading the raw
+  `…@OData.Community.Display.V1.FormattedValue` key returns `undefined` for every
+  lookup field. This produced two false findings mid-session ("request has no PI",
+  "co-PI slots are empty") that the owner caught from the CRM UI. Use
+  `row['_x_value_formatted']` in probes.
+- **Production reads from local need `DATAVERSE_ALLOW_PROD_READS=yes`**, and writes
+  need it *plus* a same-UTC-day `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"`.
+  The ack date is **UTC**, which rolls over mid-evening Pacific — a locally-correct
+  date fails closed.
+- Setting `DATAVERSE_ALLOW_PROD_READS=yes` inline was blocked by the auto-mode
+  permission classifier; the owner ran every probe via `!`.
 
 ## Next Items
 
-### Verified Open
-
-1. **[VERIFIED OPEN] Run the read-only PnP.PowerShell audit with Connor.**
-   Evidence: `outputs/sharepoint-permission-audit-primer-for-connor-2026-08-12.md`
-   (this session); `f04d76a7:outputs/sharepoint-storage-policy-question-brief.md`
-   §§1a, 6, 9, 10.
-
-   The primer is written and ready to send. Two things still gate the actual run,
-   neither of which this session could resolve:
-
-   - **A tenant-consented Entra app client ID.** Interactive PnP sign-in requires
-     one; PnP no longer ships a shared multi-tenant app. Unknown whether the
-     tenant has a suitable registration. Do not use an app secret or certificate —
-     delegated interactive sign-in is the point, because the question is what a
-     *human* operator can see.
-   - **Whether Connor is a Site Collection Administrator.** Q2 in the S415 brief
-     is still `[OPEN]`. `Get-PnPRecycleBinItem -SecondStage` requires SCA rights on
-     this specific site; a tenant SharePoint Administrator role is not sufficient.
-     If he is not an SCA, the primer asks him to name who is — that name is the
-     actual unblocking answer for Q1.
-
-   Expect the second-stage recycle-bin step to come back "not runnable by this
-   operator." That is a useful result, not a failure.
-
-2. **SharePoint durability evidence after the Connor audit.** The library is
-   already verified as 500 major versions, no age limit, checkout not required.
-   Purview policy and hold questions belong with the M365 compliance administrator
-   (likely DFT), not Connor; §11 of the S415 brief has that message ready to send
-   and has no dependency on the Connor thread — the two can go in parallel.
-
-3. **Board milestone snapshot producer.** No immutable snapshot operation exists;
-   the owner selected copy-the-bytes on 2026-08-10. Evidence:
-   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the `wmkf_milestone*` source
-   fields. Explicitly not blocked by any SharePoint question above — that is its
-   whole point.
-
-4. **Reviewer drawer visual coverage.** The production smoke covered the drawer on
-   one request, but no visible completed-receipt row was available for direct
-   inspection. Focused tests cover it; a future natural example can close the gap.
-
-5. **Reviewer history persistence limits.** Non-reset receipt inputs can survive a
-   restored engagement, and accepted-then-withdrew overwrites the acceptance
-   timestamp. Both gated on the evidence-versus-convenience decision below.
-
 ### Owner Decision Needed
 
-Unchanged from Session 420 — no work advanced these, and they remain open.
+1. **Execute the phantom co-PI remediation?** Deliberately not run — the owner chose
+   not to delete data. Evidence: `outputs/phantom-copi-incident-2026-08-12.md`;
+   `docs/CURRENT_WORK_QUEUE.md` audit follow-ups; `scripts/remediate-placeholder-copi.js`.
 
-1. **Is reviewer activity history operational convenience or evidence?** If it may
-   feed reviewer-reliability or payment decisions, the remaining derived-field
-   ambiguities require stronger persistence. Evidence:
-   `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md` and
-   `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
+   Trade-off to settle first: deleting removes a demonstrably wrong name but does
+   **not** recover the right one. The placeholder likely stood in for real co-PIs
+   who had no email in the source — the `copi2`/`copi4` occupancies imply genuine
+   co-PIs hold the earlier slots on those two requests. Program staff may want to
+   check the seven proposals against source documents first, so the correct person
+   can be entered rather than the row simply removed.
 
-2. **Should Phase 1's disputed receipt evidence be reduced?** Three non-reset
-   fields can carry prior-engagement state, but removing them leaves no
-   engagement-scoped evidence distinguishing a real submission from staff
-   close-out. Decide only after answering item 1.
+2. **Unchanged from Session 420** — no work advanced these:
+   - Is reviewer activity history operational convenience or evidence?
+   - Should Phase 1's disputed receipt evidence be reduced? (decide after the above)
+   - Should `merge-candidates` remain organization-open?
+     (`.claude-memory/project-merge-candidates-authorization-gap.md`)
 
-3. **Should `merge-candidates` remain organization-open?** The destructive route
-   takes two GUIDs without a request binding; the UI management gate is cosmetic
-   and fail-open. Evidence:
-   `.claude-memory/project-merge-candidates-authorization-gap.md`.
+### Verified Open
 
-### Parked
+1. **[VERIFIED OPEN] Connor owns the phantom co-PI root cause.** The akoyaGO import
+   attaches a placeholder contact to emailless co-PIs. Until that changes, new
+   requests keep acquiring the phantom and any future backfill/sync copies it
+   forward. Also ask whether a Power Automate flow currently syncs
+   `wmkf_copi1..5` → junction on create/update — that determines whether clearing a
+   slot cascades on its own. Shareable brief is written and ready to send.
 
-1. **Invite-tab surfacing of needs-merge alerts.** Re-open only if a new alert
-   probes `STILL_BLOCKED`.
-2. **Exact activity ledger and deferred-load API.** Re-open only after the
-   activity history evidence decision.
+2. **[VERIFIED OPEN] Run the read-only PnP.PowerShell SharePoint audit with Connor.**
+   Unchanged from S420 and independent of the above — the two can go to Connor
+   together. Evidence: `outputs/sharepoint-permission-audit-primer-for-connor-2026-08-12.md`.
+   Still gated on a tenant-consented Entra app client ID and on whether Connor is a
+   Site Collection Administrator.
+
+3. **[VERIFIED OPEN] SharePoint durability evidence — Purview/holds.** Belongs with
+   the M365 compliance administrator, not Connor; §11 of the S415 brief has the
+   message ready and has no dependency on the Connor thread.
+
+4. **[VERIFIED OPEN] Board milestone snapshot producer.** Copy-the-bytes selected
+   2026-08-10. Explicitly not blocked by any SharePoint question.
+
+5. **Reviewer drawer visual coverage** and **reviewer history persistence limits** —
+   unchanged from S420; the latter is gated on the activity-history evidence decision.
 
 ### Verify Before Acting
 
-1. **SharePoint policy branch disposition.**
-   `[VERIFIED this session]` `origin/codex/sharepoint-storage-policy-questions` is
-   genuinely unmerged: 4 commits ahead of `main`, `main` 48 ahead of it, tip
-   `f04d76a7` (2026-08-11). It carries the full S415 brief and corrected durable
-   docs. Review its diff against current `main` before deciding whether to merge;
-   do not assume the whole branch is stale or merge-ready. Note that this
-   session's primer cites `f04d76a7:` paths — if the branch is ever pruned, that
-   citation goes dangling.
+1. **The seven-request count is a floor, not a ceiling.**
+   `[VERIFIED for email exactly `_@_._`; other placeholder shapes UNTESTED]` The
+   sweep matched that one literal. `x@x.com`, blank, or `noemail@…` variants would
+   not have appeared. Widen the pattern (`--email` on the script, or a broader
+   query) before anyone calls this cleanup complete.
 
-   **`[VERIFIED this session]` The branch strands a documented correction, and
-   `main` currently contradicts itself on the version limit.** The S415 brief §12
-   identified two stale present-tense claims and corrected them *in the same
-   commit as the brief* — which is on the unmerged branch, so `main` never got
-   them. On `main` today:
+2. **Re-run the dry-run before acting on the seven rows.** The recorded slot and
+   junction ids are a 2026-08-12 snapshot. If a PA flow or manual edit has since
+   touched them, live state has moved. `deleteRecord` does **not** tolerate 404
+   (unlike `disassociate`, `write-core.js:327`) — cascaded deletes would surface as
+   404 "failures" that are actually successes.
 
-   - `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:616` records the answer:
-     **Keep 500 major versions**, no age expiry.
-   - `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md:147` agrees —
-     "version policy now fully ANSWERED".
-   - But the same file at `:209` still says "**Version limits — still open.**"
-   - And `docs/CURRENT_WORK_QUEUE.md:37` still says "the configured limit
-     unanswered".
+3. **Request `1002788` "To Explore the Universe" looks like test data in
+   production.** Byline "Paige Kelley and UC SB and CU SD and A B and alex dragos
+   and ray meyer", emails `abc@uc.com` / `alex@alex.com` / malformed
+   `river@uc.com.`; marked Submitted with an invite recorded 2026-08-10. Unrelated
+   to the placeholder contact and not acted on. Confirm it is a sandbox record
+   before assuming so — note it is also cited as pilot evidence in
+   `docs/CURRENT_WORK_QUEUE.md` order 1.
 
-   Verified corrected on the branch (zero occurrences of the stale phrasing
-   there). No gate catches this — `check:fact-consistency` passes, because the
-   limit is not a registered scalar. Deliberately **not** fixed on `main` this
-   session: the branch already carries the fix, and patching `main` separately
-   would collide with it. The decision is merge the branch, cherry-pick just the
-   doc correction, or fix `main` directly and drop that part of the branch —
-   owner's call. Only the *version-limit* phrasing is stale; second-stage
-   recovery, Purview retention, and editor least privilege genuinely do remain
-   open in all of those documents.
+4. **SharePoint policy branch disposition.** `[RE-VERIFIED 2026-08-12]`
+   `origin/codex/sharepoint-storage-policy-questions` is still unmerged: 4 commits
+   ahead, `main` now 52 ahead (was 48). It strands a documented correction —
+   `main` still contradicts itself on the version limit
+   (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:616` says 500 major versions, but
+   `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md:209` still says "Version
+   limits — still open" and `docs/CURRENT_WORK_QUEUE.md:37` still says "the
+   configured limit unanswered"). No gate catches it. Merge, cherry-pick the doc
+   correction, or fix `main` directly — owner's call. Only the *version-limit*
+   phrasing is stale.
 
-2. **`codex/initial-assessment-pilot` disposition.**
-   `[VERIFIED this session]` Genuinely unmerged: exactly 2 commits not in `main`
-   (`d5b5747a`, `8e9d9da6`), tip dated 2026-07-29, `main` 500 ahead. Sibling
-   branches `initial-assessment-current-metadata`, `-pilot-recovery`, and
-   `-runtime-fixes` *are* merged — do not let a substring match on the branch name
-   fool a merge check into reporting this one as merged. Verify callers before
-   retaining, rebasing, or retiring it.
+5. **`codex/initial-assessment-pilot` disposition.** `[RE-VERIFIED 2026-08-12]`
+   Still exactly 2 commits not in `main`. Sibling branches with similar names *are*
+   merged — do not let a substring match report this one as merged.
+
+### Parked
+
+1. **Invite-tab surfacing of needs-merge alerts.** Re-open only if a new alert probes
+   `STILL_BLOCKED`.
+2. **Exact activity ledger and deferred-load API.** Re-open only after the activity
+   history evidence decision.
+3. **Staff review step before the grantee portal shows co-PIs.** The portal displays
+   the co-PI list to an external awardee with no staff confirmation, which is why a
+   data error surfaced in front of a grantee rather than internally. A product
+   question, not a bug — re-open only on an owner decision.
 
 ### Do Not Reopen Without New Decision
 
-1. Launching a merge from a stored alert (`initialMerge`); stored alerts are not
-   live proof.
+1. Launching a merge from a stored alert (`initialMerge`).
 2. Changing the accepted-reviewer 90-day token policy for ordinary extensions.
 3. Materializing a derived reviewer-history backfill.
 4. Modifying load-bearing reviewer write paths merely to improve drawer labels.
+5. **Changing application code for the phantom co-PI.** The app read and rendered
+   correctly at every step; this is data remediation plus an upstream import fix.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `outputs/sharepoint-permission-audit-primer-for-connor-2026-08-12.md` | Paste-in primer for Connor's Claude Code (this session) |
-| `f04d76a7:outputs/sharepoint-storage-policy-question-brief.md` | Decision-ready SharePoint brief, PnP route, and the §10/§11 send-ready messages |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Current governed-file evidence and durability model |
-| `outputs/reviewer-activity-history-phase1-status-brief-2026-08-12.md` | Activity-history review record and open findings |
-| `.claude-memory/project-merge-candidates-authorization-gap.md` | Destructive merge-route authorization gap |
+| `outputs/phantom-copi-incident-2026-08-12.md` | Incident record: contact GUIDs, all 7 requests with slot + junction row ids, timeline, open items |
+| `scripts/remediate-placeholder-copi.js` | Dry-run-by-default remediation; resolves slot nav props from live metadata |
+| `lib/services/grantee-document-assembly.js` | Builds the award byline (PI + `fetchCoPIs`) — why the portal shows co-PIs |
+| `lib/dataverse/adapters/app-request-person.js` | Read-only junction adapter (proves the app never wrote these rows) |
+| `lib/services/dynamics/annotations.js` | The `_formatted` annotation rename that produced two false probe findings |
+| `outputs/sharepoint-permission-audit-primer-for-connor-2026-08-12.md` | Paste-in primer for Connor's SharePoint audit |
 
 ## Continuity Notes
 
-- **`outputs/` is gitignored** (`.gitignore:55`) while its briefs are tracked. A
-  new document there needs `git add -f` or it stays invisible and `git status`
-  prints clean. See `.claude-memory/reference-codex-review-needs-a-committed-diff.md`.
-- **The other Mac may carry the same `.bashrc` PATH clobber.** The fix above is
-  per-machine and does not travel with git. If the harness reports
-  `command not found` for `git`/`node`/`rtk` there, check `~/.bashrc` for an
-  unconditional `export PATH=` before anything else.
-- **`git push` was blocked by the auto-mode permission classifier** this session;
-  the user pushed manually. Not a repo problem — either switch permission mode or
-  add a Bash permission rule if it recurs.
+- **`outputs/` is gitignored** (`.gitignore:55`) while its briefs are tracked. A new
+  document there needs `git add -f` or it stays invisible and `git status` prints clean.
+- **The other Mac may carry the `.bashrc` PATH clobber** fixed in S420. This machine
+  was checked in S421 and is clean — it has no `~/.bashrc` at all, and its
+  `~/.bash_profile` appends correctly. The S420 remedy is per-machine and was
+  deliberately not mirrored here (owner: leave it alone).
+- **Scratchpad probes die with the session.** `probe-exposure.js` (which answered
+  "how many packages would render a bad byline") was scratchpad-only. The committed
+  dry-run is the surviving verification path.
 
 ## Testing
 
 ```bash
+npm run check:doc-currency
 npm run check:docs-catalog
 npm run check:doc-symbol-refs
-npm run check:harness-framing
+
+# Read-only; requires the prod-read flag. Expect a 7-slot / 7-junction plan
+# until the owner decides to execute.
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/remediate-placeholder-copi.js --dry-run
 ```
