@@ -392,7 +392,15 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   treats conversion measurement as remaining work
   (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
 
-## Reviewer activity history — Phase 1 (built S388, branch `feat/reviewer-activity-history-phase1`, NOT merged)
+## Reviewer activity history — Phase 1 (merged to `main`, `19bd000a`, 2026-08-12)
+
+**Scope decision — this is operational convenience, not evidence (owner decision
+2026-08-12).** The drawer exists so staff can see what happened recently on a reviewer
+row. It is explicitly **not** an evidence surface and must not be cited to support
+reviewer-reliability scoring, payment, or any decision that needs a provable claim.
+Labels are therefore allowed to be imperfect where the underlying stamps are ambiguous,
+which is what makes the neutral receipt wording below acceptable rather than a gap. If
+anyone proposes feeding this data into a decision, the scope question re-opens first.
 
 **Behavior change staff will notice:** Track Reviewers' **Last Action** column no
 longer uses the fixed-precedence expression `thankyouSentAt || reviewReceivedAt ||
@@ -441,20 +449,37 @@ to `reviewStatus=complete` where it is empty [VERIFIED via
 who never submitted therefore produces a receipt timestamp for a review that does not
 exist — the same false positive the adapter's own `aggregateReviewHistory` header (line
 341) and its S369 note (1641-1646) already warn about. The drawer decides this per row
-via `isSyntheticReceipt`: identical receipt/close-out instants with no `reviewFilename`
-and no `answers` rows demote the event to "Review recorded at close-out" with an
-explicit unproven note, while independent evidence keeps it proven. Staff receipt paths
-that set `reviewUploadedByStaff=true` (mark-received-no-file and staff upload) read as
-staff attestations, not portal submissions. Found by Codex adversarial review
-2026-08-12 against a first version that classified every receipt as proven; the general
-lesson is that **the actor who owns an event is not a safe guide to whether it happened
-— only the write path is.**
+via `isSyntheticReceipt`, whose **only** test is identical receipt/close-out instants:
+both stamps come from one `now` in one payload, so a fabricated pair matches exactly and
+demotes the event to "Review recorded at close-out" with an explicit unproven note.
+
+**`reviewFilename`, `answers`, and `reviewUploadedByStaff` must never be used to
+strengthen an event's provenance** [VERIFIED via
+`shared/components/reviewers/reviewer-activity-history.js:207-213`, 2026-08-12]. An
+earlier version treated a filename or answer rows as independent proof of a genuine
+submission, and had a separate staff-attestation path keyed on
+`reviewUploadedByStaff=true`. Both were removed in `19bd000a`: none of those three
+fields is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES` — the list is 18 entries and
+carries no `wmkf_reviewfilename`, `wmkf_reviewuploadedbystaff`, or
+`wmkf_reviewsharepointfolder`, and clears no answer child rows [VERIFIED by enumerating
+the full list, `lib/dataverse/adapters/reviewer-suggestion.js:793-812`, 2026-08-12]. So
+a remove/re-add carries them forward and a stale file from a prior engagement would
+defeat the guard. The consequence
+is deliberate and accepted under the convenience scope above — there is now **no
+engagement-scoped way to affirmatively prove a genuine portal submission**, only to
+detect a same-instant fabrication, so the proven-receipt label was softened to the
+neutral "Review receipt recorded".
+
+Found by Codex adversarial review 2026-08-12 against a first version that classified
+every receipt as proven; the general lesson is that **the actor who owns an event is not
+a safe guide to whether it happened — only the write path is.**
 
 Evidence wording follows the Opus review's claim-vs-send split plus the later
 write-path review: staff-side sends (invitation, reminders, materials, thank-you) are
 labeled "recorded" with a delivery-not-confirmed caveat because those stamps survive a
-failed dispatch; response and receipt stamps are labeled from their DTO evidence; only
-genuine reviewer-originated portal access/responses/submissions assert reviewer action.
+failed dispatch; response stamps are classified from the current `responseType` plus
+`reviewStatus`; receipt provenance stays deliberately neutral (above). Only genuine
+reviewer-originated portal access and responses assert reviewer action.
 **Last Action precedence — the undated header wins only when nothing dates the
 transition.** `reviewStatus=released` has no timestamp writer anywhere, so it is
 surfaced as an undated current-status header and as the Last Action summary, never

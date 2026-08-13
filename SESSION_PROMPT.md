@@ -76,11 +76,22 @@ the remediation, and stopped short of executing it at the owner's direction.
    check the seven proposals against source documents first, so the correct person
    can be entered rather than the row simply removed.
 
-2. **Unchanged from Session 420** — no work advanced these:
-   - Is reviewer activity history operational convenience or evidence?
-   - Should Phase 1's disputed receipt evidence be reduced? (decide after the above)
-   - Should `merge-candidates` remain organization-open?
-     (`.claude-memory/project-merge-candidates-authorization-gap.md`)
+2. **Carried from Session 420 — two of three now closed (2026-08-12, S422):**
+   - ~~Is reviewer activity history operational convenience or evidence?~~
+     **DECIDED: operational convenience.** It must not feed reviewer-reliability or
+     payment decisions; imperfect labels are acceptable where stamps are ambiguous.
+     Recorded in `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. Re-opens only
+     if someone proposes using this data in a decision.
+   - ~~Should Phase 1's disputed receipt evidence be reduced?~~ **ALREADY DONE** in
+     `19bd000a` (2026-08-12), before this prompt was written — the S421 prompt listed it
+     as open in error. `isSyntheticReceipt` is now same-instant-only; `reviewFilename`,
+     `answers`, and `reviewUploadedByStaff` no longer strengthen provenance; the label is
+     the neutral "Review receipt recorded".
+   - **STILL OPEN — should `merge-candidates` remain organization-open?**
+     (`.claude-memory/project-merge-candidates-authorization-gap.md`) The route takes no
+     `requestId` and never checks membership, so any reviewer-finder user can merge
+     arbitrary GUID pairs; the UI gate is documented fail-open. Deliberate per S289, but
+     the S207 org-open rationale predates this destructive primitive.
 
 ### Verified Open
 
@@ -104,8 +115,16 @@ the remediation, and stopped short of executing it at the owner's direction.
 4. **[VERIFIED OPEN] Board milestone snapshot producer.** Copy-the-bytes selected
    2026-08-10. Explicitly not blocked by any SharePoint question.
 
-5. **Reviewer drawer visual coverage** and **reviewer history persistence limits** —
-   unchanged from S420; the latter is gated on the activity-history evidence decision.
+5. **Reviewer drawer visual coverage** — unchanged from S420, and now the largest
+   remaining risk on this feature: no browser session ever rendered the drawer or the
+   Last Action column, so every behavior claim rests on tests. The convenience decision
+   lowers the stakes of a wrong *label*; it does not cover a broken *layout*.
+
+   **Reviewer history persistence limits** — the gate is resolved, not merely still
+   closed. This was waiting on the convenience-vs-evidence decision; convenience means
+   the mutable-row limits (a staff withdrawal overwriting the original acceptance date,
+   no way to prove a genuine portal submission) are **accepted as-is** rather than
+   remedied. Re-open only if the scope decision changes.
 
 ### Verify Before Acting
 
@@ -148,8 +167,10 @@ the remediation, and stopped short of executing it at the owner's direction.
 
 1. **Invite-tab surfacing of needs-merge alerts.** Re-open only if a new alert probes
    `STILL_BLOCKED`.
-2. **Exact activity ledger and deferred-load API.** Re-open only after the activity
-   history evidence decision.
+2. **Exact activity ledger and deferred-load API (Phase 2).** Stays parked, and the
+   reason is now settled rather than pending: the activity-history scope decision came
+   back **convenience**, so there is no evidentiary requirement to justify building a
+   persisted ledger. Re-open only if that scope decision changes.
 3. **Staff review step before the grantee portal shows co-PIs.** The portal displays
    the co-PI list to an external awardee with no staff confirmation, which is why a
    data error surfaced in front of a grantee rather than internally. A product

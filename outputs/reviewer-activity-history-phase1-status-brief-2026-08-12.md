@@ -1,5 +1,33 @@
 # Reviewer activity history Phase 1 — status brief for the next session
 
+## §0 — SUPERSEDED IN PART (read before the body)
+
+Added 2026-08-12 (Session 422). The body below is a dated S418 snapshot, preserved as
+history. Two of its open questions have since been answered:
+
+1. **The product question in "A hypothesis, offered not asserted" is decided: this is
+   operational convenience, not evidence** (owner decision, 2026-08-12). The drawer must
+   not feed reviewer-reliability or payment decisions. Imperfect labels are acceptable
+   where the stamps are ambiguous.
+2. **Both round-5 open findings are resolved.** Commit `19bd000a` removed
+   `reviewFilename`, `answers`, and `reviewUploadedByStaff` as receipt evidence —
+   `isSyntheticReceipt` is now the same-instant test alone
+   (`shared/components/reviewers/reviewer-activity-history.js:207-213`),
+   `isStaffAttestedReceipt` is deleted, and the label is now the neutral "Review receipt
+   recorded". The MEDIUM finding (staff withdrawal overwriting the acceptance date) took
+   the honest-framing remedy: the module is now described as an operational summary of
+   the current row, not an audit log.
+
+The brief's predicted consequence held — there is no engagement-scoped way to
+affirmatively prove a genuine portal submission — and is accepted under the convenience
+scope. Current durable home for this behavior:
+`docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. The body's branch/commit and
+"unpushed" state is also stale; the work is on `main`.
+
+**Still unverified from the body: the rendered layout.** That risk is unchanged.
+
+---
+
 **Date:** 2026-08-12 (Session 418)
 **Audience:** Codex, or whoever picks this up next
 **State:** built, unpushed, two open findings from the fifth review round
