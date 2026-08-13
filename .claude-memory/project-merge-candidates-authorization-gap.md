@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: security
-  last_verified: 2026-08-11 against route/service source, API route matrix, S207 rationale, and S289 design
+  last_verified: 2026-08-12 (S422) against route/service source, API route matrix, S207 rationale, and S289 design — re-checked, STILL UNADDRESSED
 ---
 
 ## Recall Rule
@@ -30,12 +30,20 @@ OPEN"*, staying permissive for superusers, unresolved viewer ids, and unresolved
 request PDs.
 
 What the endpoint can do is destructive and not transactional: `executeMerge`
-hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:428-437`)
-and deactivates the loser person (`:499-500`), with no compensation for a failure
-after the delete.
+hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:432`) and
+deactivates the loser person (`:501`), with no compensation for a failure after the
+delete.
 
-**So today, any user with reviewer-finder app access can POST two arbitrary GUIDs
-and execute a global merge for records in requests they are not viewing.**
+**So today, any user with reviewer-finder app access can POST two GUIDs and execute a
+global merge for records in requests they are not viewing.**
+
+**Scope the claim precisely — the block predicate does narrow the blast radius**
+(`reviewer-merge.js:227-249`). It refuses a loser that is promoted to a CRM contact
+(`_wmkf_contact_value` set), engaged (invited / responded / review or honorarium
+activity on any request), or holding a `confirmed` identity the keeper lacks. So the
+reachable damage is limited to **pre-engagement, non-promoted, non-confirmed-identity**
+duplicate rows — real, but not "any two records". Do not overstate it as arbitrary; the
+gap is that eligibility is a *data* predicate and no *caller* check exists anywhere.
 
 **Disconfirming check run (S414):** grepped both the route and
 `lib/services/reviewer-merge.js` for any membership/authorization guard. None
