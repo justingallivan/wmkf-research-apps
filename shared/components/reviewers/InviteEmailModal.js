@@ -141,22 +141,41 @@ function applyTiming(body, timing) {
 // materials are in hand at invitation time. Do not reinstate the check as an
 // apparent oversight.
 //
-// Impossible orderings ARE still blocked: reviews due before release, and
-// reviews due on or before the response deadline.
+// Only ONE ordering still blocks: reviews due on or before proposal release.
+// That compares two FIXED dates, so if it trips somebody configured something
+// incoherent and no amount of waiting will fix it.
+//
+// THE DIVIDING LINE: never block on a condition involving `respondBy`. It is
+// computed from TODAY, so any rule that reads it will start failing on its own
+// as the calendar moves, with nothing having changed. Blocking rules compare
+// fixed dates; drifting conditions warn (see invitationTimelineWarning).
 export function validateInvitationTimeline(timing, today = new Date()) {
-  const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
   const proposalDelivery = timing.proposalSendDate || '';
   const reviewDue = timing.reviewDueDate || '';
 
   if (proposalDelivery && reviewDue && reviewDue <= proposalDelivery) {
     return 'The review due date must be after the proposal release date.';
   }
-  // Applies whether or not a release date is set. Previously guarded by
-  // `!proposalDelivery` because the deleted release-vs-respondBy rule covered
-  // the other branch; without that rule, an unguarded version would let
-  // "reviews due before the reviewer has even RSVP'd" through.
+  return null;
+}
+
+// Non-blocking counterpart. Reviews falling due on or before the response
+// deadline is untidy rather than impossible: reviewers usually accept well
+// inside the window, and a late acceptance is handled operationally by granting
+// an extension (`wmkf_reviewduedateoverride`, per-reviewer, S417). It also
+// arrives on its own as `respondBy` drifts, so it must not disable Send —
+// that was the original bug in a narrower window (owner decision 2026-08-12).
+//
+// Deliberately advisory-only: the PD edits the dates in the draft below before
+// sending. A bespoke per-invitation due date was considered and declined as not
+// worth the effort for a condition that disappears next cycle, when materials
+// are in hand at invitation time.
+export function invitationTimelineWarning(timing, today = new Date()) {
+  const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
+  const reviewDue = timing.reviewDueDate || '';
+
   if (respondBy && reviewDue && reviewDue <= respondBy) {
-    return 'The review due date must be after the response deadline.';
+    return 'Reviews are due on or before the response deadline. Edit the dates in the draft below before sending, or plan to grant this reviewer an extension.';
   }
   return null;
 }
@@ -215,6 +234,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [repairState, setRepairState] = useState({});
   const mountedRef = useRef(true);
   const timelineError = validateInvitationTimeline(timing);
+  // Advisory only — deliberately NOT part of the `disabled` condition below.
+  const timelineWarning = invitationTimelineWarning(timing);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -803,6 +824,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     suppress pointer events on disabled controls. */}
                 {timelineError ? (
                   <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
+                ) : null}
+                {!timelineError && timelineWarning ? (
+                  <p role="status" className="text-xs text-amber-800 mt-2">{timelineWarning}</p>
                 ) : null}
               </div>
 
