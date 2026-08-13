@@ -104,9 +104,20 @@ No enum change. In `provenanceLabelForCandidate` (the **display** surface):
 
 **CRITICAL — display label ≠ durable string (Codex risk).** The relabel touches the
 **display** only. The persisted `wmkf_matchreason` prefix **must stay `Referred by …`**:
-`my-candidates.js` reparses `^Referred by …` on reload to reconstruct `referredBy` when
-`wmkf_sources` includes `referred` [Codex: my-candidates.js:199,203]. Do NOT change the
-persisted prefix or the reload parser — only the badge/label the UI renders.
+`my-candidates-service.js` reparses it on reload to reconstruct `referredBy` when
+`wmkf_sources` includes `referred` [VERIFIED via `lib/services/reviewer-finder/my-candidates-service.js:240-242`].
+Do NOT change the persisted prefix or the reload parser — only the badge/label the UI renders.
+
+**S424 — the clause owns line 1.** The note follows after a **newline**, not a space:
+a period cannot terminate the name, because titles and middle initials carry one, so the
+original space-joined form truncated "Dr. Abby Doyle" to "Dr". Encode and decode are the
+canonical trio `formatReferredByReason` / `splitReferredByReason` /
+`parseReferredByReason` [VERIFIED via `lib/utils/reviewer-provenance.js:331-393`] — add
+producers through the helper, never by hand-rolling the string. `splitReferredByReason`
+also returns the rationale remainder, so a surface that labels the referrer separately
+(`ReviewerInvitePanel.js` `CandidateRationale`) does not repeat it in the prose. Rows
+written before S424 are genuinely ambiguous and fall back to the original lossy parse.
+[RECHECKED after lib/utils/reviewer-provenance.js change: lib/utils/reviewer-provenance.js:331-393 — block bounds re-derived from source after `splitReferredByReason` was added; complement grep over lib/pages/shared/scripts found no hand-rolled `Referred by` producer outside the helper.]
 
 **Consumer fan-out to update in the same change (Codex):** these assert/emit the old
 label strings and must move with the relabel —
@@ -150,7 +161,7 @@ ranking.
   `displayCandidates` [Codex: discovery-service.js:478, 2310].
 - Tag each injected seed `provenance.kind = 'referred'` (`seedRole: 'referred_by'`, carry
   `referredBy` if given). Also set a durable save reason string for seeds:
-  `reasoning = "Referred by {referredBy}."` when a referrer is present, otherwise
+  `reasoning = formatReferredByReason(referredBy)` when a referrer is present, otherwise
   `"Externally referred by staff."`. This preserves the `my-candidates` reload parser
   contract for `referredBy` without relabeling `wmkf_matchreason`.
 - **Bulk-dedup / materialization policy (corrected — Codex risk + S319).** The server-side identity lookup
@@ -365,5 +376,5 @@ implementation. Codex read the committed plan against live source and returned:
 - CONFIRMED — Exact viable seam is `/discover` after verification/filtering, before the `ranked` frame: merge seeds into `verifiedWithCOI` before `combinedResults`/`rankAllCandidates` so they reach `data.ranked`, enrichment, `setCandidates`, `save-candidates`. `discover.js:436`, `:491`, `ReviewerSearchSection.js:669`, `:1025`.
 - RISK — The manual-Add lookup exists server-side but is an interactive identity preflight: `lookupReviewerIdentity` can return `candidates` needing staff choice; the manual form stops for confirmation. Bulk seed flow needs an explicit policy for ambiguous/conflict outcomes. `reviewer-identity-lookup.js:242`, `ReviewerFindPanel.js:288`.
 - RISK — Relabel fan-out is broader than `provenanceLabelForCandidate`: exact tests + a UI/export fallback string still assert/display `Referred`/`Applicant-suggested`. `tests/unit/reviewer-provenance.test.js:137`, `tests/unit/reviewer-candidate-export.test.js:63`, `ReviewerSearchSection.js:1260`.
-- RISK — Do not relabel the durable `wmkf_matchreason` prefix without changing reload parsing: `my-candidates` reconstructs `referredBy` by matching `^Referred by …` when `wmkf_sources` includes `referred`. `my-candidates.js:199`, `:203`.
+- RISK — Do not relabel the durable `wmkf_matchreason` prefix without changing reload parsing: `my-candidates` reconstructs `referredBy` by matching `^Referred by …` when `wmkf_sources` includes `referred`. Since S424 both directions live in `lib/utils/reviewer-provenance.js` (`formatReferredByReason` / `parseReferredByReason`); change them together, there. `my-candidates-service.js:240-242`.
 - CONFIRMED — Seed-only is not currently wired into the analyze prompt path: Find sends only `blobUrl`/`excludedNames`/`reviewerCount`/`additionalNotes` to `/analyze`; the composer only interpolates those. `ReviewerSearchSection.js:592`, `analyze.js:87`, `reviewer-prompt-composer.js:25`.

@@ -187,7 +187,9 @@ test('referral: match reason + dual source tokens + provenanceKind in the DTO', 
   const body = await addManualReviewer(args({ referredBy: 'Dr. Abby Doyle', note: 'Synthesis expert.' }));
   expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
     expect.objectContaining({
-      matchReason: 'Referred by Dr. Abby Doyle. Synthesis expert.',
+      // The clause owns line 1 so the period inside "Dr." cannot be mistaken for
+      // the name's terminator on reload.
+      matchReason: 'Referred by Dr. Abby Doyle.\nSynthesis expert.',
       sources: ['staff_manual', 'referred'],
     }),
     { actingUserSystemId: 'u-1' },

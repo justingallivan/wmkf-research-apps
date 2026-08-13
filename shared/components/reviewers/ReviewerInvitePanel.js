@@ -15,7 +15,8 @@
  * Props:
  *   - requestId
  *   - candidates : [{ suggestionId, name, affiliation, email, hIndex, totalCitations,
- *                     relevanceScore, reasoning, keywords, website, googleScholarUrl,
+ *                     relevanceScore, reasoning (referrer-prefixed for referrals — see
+                     CandidateRationale), keywords, website, googleScholarUrl,
  *                     googleScholarId, orcidUrl, applicantRecommended, manualAdded, invited, accepted,
  *                     declined, emailSentAt, responseType }]
  *
@@ -39,6 +40,7 @@ import RemoveEntirelyModal from './RemoveEntirelyModal';
 import ReleaseEmailModal from './ReleaseEmailModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
+import { splitReferredByReason } from '../../../lib/utils/reviewer-provenance';
 
 function StatusChip({ c }) {
   const tones = {
@@ -68,6 +70,33 @@ function StatusChip({ c }) {
 
 function isManualAdded(c) {
   return c.manualAdded === true || (Array.isArray(c.sources) && c.sources.includes('staff_manual'));
+}
+
+// The persisted selection rationale — the key "refresh my memory" content when a PD
+// returns to the list across invite rounds.
+//
+// A referral's referrer has no Dataverse field of its own (S249 D1): it is encoded
+// into the head of that same match reason. Split it back out and label it, rather
+// than leaving the PD to spot "Referred by X." inside a sentence — an attribution
+// they act on shouldn't read as free text. Both halves are optional: a referral
+// captured with no note has only a referrer, an ordinary candidate only a rationale.
+function CandidateRationale({ reasoning }) {
+  const { referredBy, rest } = splitReferredByReason(reasoning);
+  if (!referredBy && !rest) return null;
+  return (
+    <>
+      {referredBy && (
+        <p className="text-xs text-gray-700 mt-1.5">
+          <span className="font-medium">Referred by: </span>{referredBy}
+        </p>
+      )}
+      {rest && (
+        <p className="text-xs text-gray-700 mt-1.5">
+          <span className="font-medium">Why: </span>{rest}
+        </p>
+      )}
+    </>
+  );
 }
 
 function candidateContactPageUrl(c) {
@@ -480,13 +509,7 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     </div>
                   )}
 
-                  {/* Persisted selection rationale — the key "refresh my memory"
-                      content when a PD returns to the list across invite rounds. */}
-                  {c.reasoning && (
-                    <p className="text-xs text-gray-700 mt-1.5">
-                      <span className="font-medium">Why: </span>{c.reasoning}
-                    </p>
-                  )}
+                  <CandidateRationale reasoning={c.reasoning} />
                   {c.keywords && (
                     <p className="text-xs text-gray-500 mt-1 truncate" title={c.keywords}>
                       <span className="font-medium text-gray-600">Expertise: </span>{c.keywords}
