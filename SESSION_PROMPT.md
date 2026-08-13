@@ -1,208 +1,144 @@
-# Session 425 Prompt: Phase A reviewed; promotion pending
+# Session 426 Prompt: Add an Editable Respond-Nudge Email Preview
 
-## Session 424 Summary
+## Session 425 Summary
 
-Two unrelated threads. The first shipped to production: referrer names were being
-truncated on save, and the referrer was invisible on the candidate card. The
-second started as "why aren't reminders sending?" and ended by finding a
-token-resurrection defect, a wrong claim in my own plan, and a broken evidence
-chain in my own probe.
+The manual respond-by nudge was completed, reviewed, promoted to `main`, and
+deployed to Production. Program Directors can now nudge an active invited
+reviewer who has not answered; the send uses a fresh secure response link and
+records when the reviewer was last nudged. The current UI still uses a browser
+confirmation and sends the configured template without showing its contents.
 
 ### What Was Completed
 
-1. **Fixed referrer-name truncation (PRODUCTION).** The referrer captured in "Add
-   or Refer a Reviewer" has no Dataverse field (S249 D1) — it is encoded into the
-   match reason as `Referred by {name}.` and reparsed on reload. The clause and
-   the note were space-joined, so the decoder could not tell the name's
-   terminating period from one inside the name. `Dr. Abby Doyle` round-tripped as
-   `Dr` — and that is the field's own placeholder text. The clause now owns line 1
-   with a newline terminator; encode/decode is one helper trio in
-   `lib/utils/reviewer-provenance.js` and all three producers plus the single
-   consumer route through it. Mutation-tested: reverting either half fails the
-   suite.
+1. **Shipped the manual respond-by nudge (PRODUCTION).** The Invite Reviewers
+   row exposes `Send reminder` only for active unanswered invitations. The route
+   distinguishes `kind: 'respond'` from the existing review-due reminder while
+   preserving the omitted-kind behavior used by the Reviews tab.
 
-2. **Labeled the referrer on the Invite card (PRODUCTION).** `CandidateRationale`
-   splits the stored reason so `Referred by: Mikhail Shapiro` is its own row
-   instead of prose inside "Why:". Both halves optional — the production shape is
-   a referrer with no note, which would otherwise leave a bare "Why:" label.
+2. **Made manual reminder authorization and persistence atomic.** Both manual
+   reminder paths freshly authorize the reviewer lifecycle and persist the
+   marker plus fresh token in one ETag-bound PATCH. Removed/revoked reviewers
+   fail closed, and a concurrent lifecycle change prevents the email send.
 
-3. **Diagnosed why no respond-by reminders have ever sent.** The cron is
-   scheduled daily and has never fired: `wmkf_respondreminderenabled` is `null`
-   on every request and no UI can set it. Built
-   `scripts/probe-respond-reminder-gates.js` (read-only) because the dry-run
-   endpoint collapses six skip reasons into one counter. Probe attributes each row
-   to the first gate that closes, projects the blast radius with
-   `--assume-enabled`, and audits token state independently of the ladder.
+3. **Closed the adversarial review findings.** Claude Opus found no remaining
+   P0/P1/P2 issue after the atomic-claim and UI/error-state corrections. Local
+   verification passed 617 suites / 7,902 tests, type checking, the production
+   build, and the relevant contract/documentation gates.
 
-4. **Found a token-resurrection defect.** Removing a candidate writes
-   `selected=false` + `tokenRevoked=true`; the respond sweep filters on neither,
-   and sending mints first — and minting clears the revoked flag. Worse than first
-   described: removal ALSO writes `accepted=false, declined=false,
-   responsetype=null`, which is exactly the shape the respond sweep selects. It
-   manufactures the matching row.
-
-5. **Codex adversarial review; both `[high]` findings confirmed and applied.**
-   §2's original defect claim was wrong (I read the caller's docblock instead of
-   the `softDelete` implementation — the shipped review-due sender is NOT
-   vulnerable), and the scope missed the other `mintAndStore` callers. Codex
-   rewrote the plan; reviewing that rewrite surfaced a bug of mine: the probe
-   advertised `--output <path>` but parsed only `--output=<path>`, so no artifact
-   was ever written and the plan cited a file that never existed.
-
-6. **Implemented Phase A on `codex/manual-respond-by-nudge` (not production).**
-   Added the active-row respond nudge, route discriminator, last-nudged
-   projection, and selected/revoked guards on both manual reminder paths. A
-   fresh adversarial review found and drove fixes for a token-mint race and
-   A → B → A stale UI state. Claude Opus then found a phantom-marker risk in the
-   intermediate design and raw Reviews-tab refusal codes. Manual sends now
-   freshly authorize and persist marker + token in one ETag-bound PATCH before
-   email; typed read/preparation failures remain retryable, post-persistence
-   email failure retains the marker, and both UIs render actionable copy. Opus
-   re-review found no remaining P0/P1/P2 issue. The automatic sweep and Phase B
-   mint callers remain deliberately unchanged; promotion is still pending.
+4. **Promoted and verified Production.** `main` advanced to `8529d4a5`; the
+   Vercel deployment completed, all five GitHub workflows passed (Tests,
+   Playwright, Security Scan, Dependency Scan, Secret Scanning), and the public
+   application and external-review endpoint returned HTTP 200. No real nudge
+   email was sent during the deployment verification.
 
 ### Commits
 
-- `310aa7a3` - Stop truncating referrer names that contain a period
-- `0f30f370` - Label the referrer on the candidate card instead of burying it in prose
-- `6db259d2` - Reconcile the referral-clause docs with the display split
-- `23ec5d3e` - Record the recheck marker the staleness guard asks for
-- `ddd9755a` - Merge: referrer truncation fix + labeled card
-- `48aea0d5` - Correct the staleness-ack memory's drifted line numbers and failure mode
-- `70160c46` - Add a read-only probe attributing respond-reminder skips to a specific gate
-- `e6b074f7` - Let the reminder probe project the blast radius without arming anything
-- `a2c8a4ad` - Report invitation-link state independently of the gate ladder
-- `39b2097a` - Fix a probe overclaim: distinguish "no token" from "no expiry bound"
-- `2b80a447` - Measure whether revoked reminder targets were removed from their proposals
-- `66f9ef41` - Plan the manual respond-by nudge, gated on a removed-candidate fix
-- `16c3e8ef` - Split the nudge plan into phases and fix the probe flag that broke its evidence
-
-### Gotchas Worth Carrying
-
-- **Read the implementation, not the caller's docblock.** `my-candidates-service.js`
-  describes removal as "wmkf_selected=false + wmkf_externaltokenrevoked=true".
-  `softDelete` actually writes six fields. That summary cost a wrong `[high]`-level
-  claim in a plan doc, caught only by Codex.
-- **A probe that cannot fail closed is not a probe — and neither is one that
-  cannot write its evidence.** Two separate defects in the same script: labeling a
-  null expiry `never_minted` without reading the hash (conflating "no access" with
-  "no expiry bound"), and a `--output` flag that silently never fired.
-- **Minting clears revocation.** `setExternalToken` always writes
-  `wmkf_externaltokenrevoked: false`. Any send path that mints can resurrect a
-  withdrawn reviewer's access.
-- **The staleness guard clears on a marker, not on a fix.** Reconciling the prose
-  does not stop it re-firing; only a single line carrying both the path and
-  `[RECHECKED after … change:` does. Recorded in
-  `.claude-memory/reference-staleness-ack-single-line.md`.
-- **`scope-claim-reminder` has two false positives** — a `## N. Scope` heading
-  parses as a numeric coverage claim, and its own prescribed `TBD count` escape
-  text reads as uncertainty. Both recorded in the pilot directive.
+- `5891c65e` - feat(reviewers): add manual respond-by nudges
+- `8529d4a5` - fix(reviewers): make manual reminder claim atomic
+- Promotion also included the ten prerequisite investigation, probe, plan, and
+  handoff commits from `48aea0d5..2d169c77`.
 
 ## Next Items
 
-### Completed On Current Branch
-
-1. **[VERIFIED ON BRANCH] Phase A of the manual respond-by nudge.** Implementation,
-   evidence matrix, review findings, and verification are recorded in
-   `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` §8. Do not describe this as
-   production until the branch is reviewed and promoted.
-
 ### Verified Open
 
-1. **[VERIFIED OPEN] Phase B — mint-surface hardening.** Separate change, own
-   review. `ensureToken`, `send-emails-service:674`, `regenerate-token-service:93`
-   all mint without a selected/revoked check. Pre-existing exposure; the
-   resurrection invariant is NOT closed until this lands. Evidence: the
-   mint-surface audit table in the plan.
+1. **[OWNER-REQUESTED, VERIFIED OPEN] Replace the respond-nudge confirmation
+   with an editable email preview modal.** Clicking `Send reminder` in Invite
+   Reviewers should launch a modal that shows the nudge email contents and lets
+   the PD edit them before an explicit send. Cancel must perform no marker,
+   token, or email mutation. Evidence: owner direction, 2026-08-13; the current
+   `sendRespondReminder` in `shared/components/reviewers/ReviewerInvitePanel.js`
+   uses `confirm(...)` and immediately POSTs only `requestId`, `suggestionId`,
+   and `kind: 'respond'`.
 
-2. **[VERIFIED OPEN] The respond-by cron is unsafe and must not be armed.**
-   Removal manufactures the exact row shape it selects. Needs `wmkf_selected` and
-   revocation filters before `respondReminderEnabled` is ever exposed or set.
-   Evidence: `lib/services/reviewer-reminder-sweep.js:106-113`, `:146-149`.
+2. **[VERIFIED OPEN] Phase B - mint-surface hardening.** Separate change, own
+   review. `ensureToken`, `send-emails-service`, and `regenerate-token-service`
+   still mint without a selected/revoked check. This is pre-existing exposure;
+   the resurrection invariant is not closed until Phase B lands. Evidence:
+   `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` mint-surface audit.
 
-3. **[VERIFIED OPEN, carried from S423] The merge cascade is still
-   non-transactional.** `hardDeleteById` (`reviewer-merge.js:448`) permanently
+3. **[VERIFIED OPEN] The automatic respond-by cron remains unsafe and must not
+   be armed.** It still needs selected/revoked selection and authorization guards
+   before `respondReminderEnabled` is exposed or set. Evidence:
+   `lib/services/reviewer-reminder-sweep.js:99-168`.
+
+4. **[VERIFIED OPEN, carried from S423] The merge cascade is still
+   non-transactional.** `hardDeleteById` in `reviewer-merge.js` permanently
    deletes colliding loser rows with no compensation.
 
-4. **[VERIFIED OPEN, carried from S423] The slot-binding half of the ETag question
-   is unverified.** Needs a controlled sandbox write.
+5. **[VERIFIED OPEN, carried from S423] The slot-binding half of the ETag
+   question is unverified.** Needs a controlled sandbox write.
 
-5. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
-   rather than delete it.** `shared/components/reviewers/reviewer-modes.js:95-97`.
+6. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
+   rather than delete it.** See `shared/components/reviewers/reviewer-modes.js`.
 
-6. **[VERIFIED OPEN, carried] SharePoint: PnP.PowerShell audit with Connor;
-   Purview/holds evidence with the M365 compliance admin; board milestone snapshot
-   producer.**
+7. **[VERIFIED OPEN, carried] SharePoint:** PnP.PowerShell audit with Connor;
+   Purview/holds evidence with the M365 compliance admin; board milestone
+   snapshot producer. The separate Claude handoff is
+   `outputs/sharepoint-retention-handoff-to-codex-2026-08-13.md`.
 
 ### Owner Decision Needed
 
-1. **Expose the campaign-settings reminder toggles at all?** Deferred this session
-   in favor of the manual nudge. Arming them is unsafe until Phase B and the cron
-   filters land. Evidence: plan §0, §3 "Out".
+1. **Preview scope.** The owner request was made in the context of the new
+   respond-by nudge in Invite Reviewers. Confirm before expanding the same modal
+   to the existing review-due reminder in Track Reviewers.
 
-2. **Execute the phantom co-PI remediation?** Unchanged from S423/S424.
+2. **Expose the campaign-settings reminder toggles at all?** Arming them is
+   unsafe until Phase B and the cron guards land.
 
-3. **Should `merge-candidates` remain organization-open?** Unchanged.
+3. **Execute the phantom co-PI remediation?** Unchanged from S423/S424.
+
+4. **Should `merge-candidates` remain organization-open?** Unchanged.
 
 ### Verify Before Acting
 
-1. **The production scale figures in the nudge plan are `[ASSUMED]`.** The probe
-   never wrote its artifact (`--output` bug, fixed `16c3e8ef`); the numbers came
-   from session stdout. Re-run to re-measure — `outputs/` is gitignored, so the
-   artifact is local-only.
+1. **Trace the preview contract end to end before implementation.** The server
+   currently reads the configured subject/body, mints the fresh token, renders,
+   and sends in one command path. Decide how preview obtains rendered content
+   without minting a live token or claiming the marker, and how edited content
+   reaches the send path without weakening server-side lifecycle authorization,
+   HTML safety, signature/link handling, or the at-most-once contract. Invoke
+   `/contract-reconcile` for this cross-layer change.
 
-2. **`tokenAudit.unselectedButStillMatched` was added but never read.** The probe
-   now measures whether revoked rows are removed candidates vs staff cutoffs; that
-   reading is pending. The Phase A fix does not depend on it.
+2. **The production scale figures in the nudge plan remain `[ASSUMED]`.** The
+   original probe artifact was never written because of the now-fixed output
+   flag parser. Re-run the read-only probe to re-measure before relying on them.
 
-3. **Requests 1002146 / 1002379 are last cycle and must never be nudged.**
-   Currently blocked only incidentally (null offset). Both show `no_token`, so no
-   accept-today hole. Confirmed S424.
-
-4. **The probe's gate ladder is a hand-kept copy** of `sweepRespondReminders`. If
-   that sweep changes, re-verify the annotations or delete the probe.
+3. **Requests 1002146 / 1002379 are last cycle and must never be nudged.** They
+   remain incidentally blocked by null offsets; do not use them for a live smoke.
 
 ### Parked
 
-1. Per-reason `skipped` counters in the cron sweep. Would make the dry-run
-   endpoint self-diagnosing; deferred with the rest of the cron work.
-2. Sticky per-user reminder defaults (`INVITE_TIMING` extension). Superseded by
-   the manual-nudge direction.
+1. Per-reason `skipped` counters in the cron sweep.
+2. Sticky per-user reminder defaults (`INVITE_TIMING` extension).
 3. Excel export still carries the full match-reason blob including the referral
-   clause. No data lost; differs from the card now.
-4. Invite-tab surfacing of needs-merge alerts; exact activity ledger; staff review
-   before grantee co-PI display; bespoke per-invitation due date. All carried.
+   clause. No data is lost; it differs from the candidate card display.
+4. Invite-tab needs-merge alerts; exact activity ledger; staff review before
+   grantee co-PI display; bespoke per-invitation due date.
 
 ### Do Not Reopen Without New Decision
 
-1. **Arming `respondReminderEnabled` before Phase B.** Would email removed
-   reviewers and restore their revoked links.
+1. **Arming `respondReminderEnabled` before Phase B and cron hardening.**
 2. **Deleting `computeCanManage`.** Repair the fail-open branch instead.
 3. **Removing the Step 7 pre-deactivate re-check in the merge.**
 4. **Changing application code for the phantom co-PI.**
 5. **Reinstating a block on any `respondBy` condition in the invitation timeline.**
-6. **Re-encoding the referrer as a space-joined match-reason prefix.** The line-1
-   contract exists because the space form is genuinely ambiguous.
+6. **Re-encoding the referrer as a space-joined match-reason prefix.**
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` | Phase A/B split, mint-surface audit, decision contracts |
-| `scripts/probe-respond-reminder-gates.js` | Read-only gate attribution, blast-radius projection, token audit |
-| `lib/services/reviewer-reminder-sweep.js` | Both sweeps; cron claim-then-mint and manual atomic marker+token persistence |
-| `lib/services/reviewer-manual-reminder.js` | Both manual reminder paths; preflight plus fresh pre-write lifecycle authorization |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | `setExternalToken` `:209-217` (clears revocation); `softDelete` `:1951-1959` |
-| `lib/utils/reviewer-provenance.js` | Referral clause encode/decode/split trio |
-| `shared/components/reviewers/ReviewerInvitePanel.js` | `CandidateRationale`; also renders `removedCandidates` |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Current browser-confirm flow and respond-nudge trigger |
+| `pages/api/review-manager/send-review-reminder.js` | Manual reminder route and `kind` discriminator |
+| `lib/services/reviewer-manual-reminder.js` | Manual preflight and fresh lifecycle authorization |
+| `lib/services/reviewer-reminder-sweep.js` | Template rendering, atomic marker/token persistence, and send |
+| `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` | Phase A production record and Phase B boundaries |
 
 ## Testing
 
 ```bash
-npm test -- --runInBand                              # 617 suites / 7902 tests
+npm test -- --runInBand
 npm run check:types
-
-# Read-only. HAND TO THE USER — do not run it yourself.
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-respond-reminder-gates.js \
-  --target=prod --assume-enabled --output outputs/respond-reminder-gates.json
+npm run build
 ```

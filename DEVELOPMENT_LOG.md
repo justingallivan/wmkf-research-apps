@@ -10,6 +10,20 @@ The pre-Session 84 chronological per-session log (everything after the September
 
 ---
 
+## August 2026 - Manual respond-by reviewer nudges are production-live (Session 425)
+
+**Milestone:** Program Directors can send an on-demand reminder to an active invited
+reviewer who has not answered, with a fresh secure response link and a visible last-nudged date.
+**Sessions:** 424-425 (gate diagnosis, Phase A implementation, adversarial review, promotion).
+**Ship state:** `main` at `8529d4a5`; Vercel deployment and all five GitHub workflows passed.
+Both manual reminder paths freshly authorize lifecycle state and persist marker + token in one
+ETag-bound PATCH; removed/revoked reviewers fail closed. No real-email production smoke was run.
+The automatic respond cron remains disabled and unsafe pending separate hardening.
+**Why it matters:** PDs can follow up with stragglers when needed without enabling a broad
+automatic campaign or restoring access for a reviewer whose invitation was withdrawn.
+**Pointers:** `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md`;
+`shared/components/reviewers/ReviewerInvitePanel.js`; commits `5891c65e`, `8529d4a5`.
+
 ## August 2026 — A grantee saw a stranger listed as co-PI on their award (Session 421)
 
 **Milestone:** Incident. The grantee portal for request `1002132` rendered "Heinrich Jaeger and
