@@ -57,6 +57,7 @@ The production figures quoted in this plan came from probe stdout captured in
 the S424 session transcript, not from a committed artifact. `outputs/` is
 gitignored, so re-running the probe produces a local artifact only. Treat the
 scale figures as `[ASSUMED]` until re-measured.
+[RECHECKED after scripts/probe-respond-reminder-gates.js change: scripts/probe-respond-reminder-gates.js parseCli now accepts both `--flag value` and `--flag=value`, covered by tests/unit/probe-respond-reminder-gates.test.js; the gate ladder this plan cites (classify) and the token states (auditToken) are unchanged by that fix, so every §2 citation still holds.]
 
 ## 1. Why this, and why not the cron
 
