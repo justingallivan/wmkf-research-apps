@@ -117,9 +117,33 @@ chain in my own probe.
 6. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
    rather than delete it.** `shared/components/reviewers/reviewer-modes.js:95-97`.
 
-7. **[VERIFIED OPEN, carried] SharePoint: PnP.PowerShell audit with Connor;
-   Purview/holds evidence with the M365 compliance admin; board milestone snapshot
-   producer.**
+7. **[PARTLY CLOSED 2026-08-13 (S425)] SharePoint retention/permission evidence.**
+   The PnP.PowerShell route is **dead — do not retry it.** It failed twice over:
+   the module would not install (Gallery CDN firewalled) and delegated sign-in was
+   refused at the tenant consent screen for both `AllSites.FullControl` and
+   `AllSites.Read`; a delegated token is capped at the signed-in user's rights
+   regardless, and SPO Management Shell passes the same gate. The questions went
+   to Dragonfly IT instead, which is the working route.
+
+   **Answered:** version limits (major only, no time limit, keep 500 — the
+   platform default); second-stage recycle bin (**exists**, reversing the S413
+   "none"; 93 days from original deletion, `dftadmin`-only restore); ordinary-editor
+   permissions (**Members hold `Edit`** — they CAN delete files and version
+   history, and `Manage Lists` puts the version limit in their reach).
+
+   **[VERIFIED OPEN] Still needed:**
+   - **Purview retention** — the one original question with no answer. Needs an
+     M365 compliance admin; Connor and Dragonfly IT are both the wrong owner.
+   - **Does the `Request` library inherit site permissions?**
+     (`HasUniqueRoleAssignments`). Members contains `Everyone except external
+     users`, so `Edit` reaches every licensed internal account at *site* scope —
+     this answer decides whether that reaches the governed documents. Connor has
+     gone back to IT for it.
+   - **Was the site deliberately created with Public privacy?** One field, and it
+     explains whether the EEEU grant was a decision or the platform default.
+   - **Confirm IT's past tense** — they wrote the group *"had"* Edit and did not
+     confirm nothing changed during the check. Connor has asked.
+   - **Board milestone snapshot producer** — unchanged, still unbuilt.
 
 ### Owner Decision Needed
 

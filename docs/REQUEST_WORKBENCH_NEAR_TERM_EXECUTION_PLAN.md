@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-10
+last_verified: 2026-08-13
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -98,8 +98,13 @@ required before the pilot is complete. A controlled disposable-file audit
 subsequently proved previous-version inspection/restore and signed-in
 first-stage recycle recovery in the production Request library. It did not
 prove the configured version limit, second-stage administrator recovery,
-site/library Purview retention, or ordinary-editor least privilege; Workbench
-history/admin restore and milestone snapshots also remain unbuilt.
+site/library Purview retention, or ordinary-editor least privilege — of which
+the first three were **answered by administrator evidence 2026-08-10 and
+2026-08-13**, with least privilege answered *unfavourably* (ordinary editors
+hold `Edit` and can delete documents and version history). **Site/library
+Purview retention is still unanswered**, and a new question is open: whether the
+`Request` library inherits site permissions. Workbench history/admin restore and
+milestone snapshots also remain unbuilt.
 Passing this draft-functional gate is not a broad production-readiness claim
 and never required the later Pre-Site, Site Visit, or Final slices to be built
 alongside it.
@@ -176,10 +181,31 @@ denied the second-stage administrator recycle-bin view. The app's
 `Sites.Selected` token could read the drive/list but received `403` when
 enumerating site permissions. An item-level retention-label read returned no
 label fields, which does not establish whether a site/library Purview policy
-applies. Library version limits, second-stage recovery, retention, and
-ordinary-editor permission design therefore still require administrator
-evidence. The Workbench current-metadata portion is live; its version-history
+applies. The Workbench current-metadata portion is live; its version-history
 link/admin restore and the Board milestone freeze remain planned.
+
+**Administrator evidence 2026-08-10 and 2026-08-13 — three answers, one of them
+a reversal.** Full record and evidence classes in
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`; the summary that matters to this plan:
+
+- **Version limits ANSWERED** — major only, no time limit, keep 500, check-out
+  not required. 500 is the SharePoint default, so it is untouched configuration.
+- **Second-stage recovery ANSWERED — the bin EXISTS**, reversing an earlier
+  "none". 93 days total from the original deletion, shared across both stages,
+  restore is `dftadmin`-only, and quota purge or a manual empty can end it early.
+  A time-boxed administrator path, not an archive.
+- **Ordinary-editor least privilege ANSWERED, unfavourably.** Members hold
+  `Edit`: Delete Items, Delete Versions, and Manage Lists granted; Manage
+  Permissions not. **The second bullet of this section's contract is therefore
+  not met by the live configuration** — collaborators do hold uncontrolled
+  delete and version-deletion rights, and Manage Lists puts the version limit
+  itself within their reach.
+- **Purview retention still unanswered** — needs an M365 compliance
+  administrator, not the site owner and not Dragonfly IT.
+- **New and open:** the Members group contains `Everyone except external users`,
+  so Edit reaches every licensed internal account at *site* scope. Whether it
+  reaches the `Request` library turns on unread `HasUniqueRoleAssignments`, and
+  that bounds the bullet above — carry the qualifier with the finding.
 
 ### Cycle-wide editing
 
@@ -778,10 +804,11 @@ Explicit non-goals during design freeze:
 > version/last-modified refresh is deployed and live-verified in both consumers
 > on Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`.
 > A controlled production-library probe also passed native previous-version
-> inspection/restore and signed-in first-stage recycle recovery. The remaining
-> pilot acceptance work is the administrator audit of version limits,
-> second-stage recovery, Purview retention, and ordinary-editor permissions,
-> plus Workbench history/admin restore and milestone snapshots.
+> inspection/restore and signed-in first-stage recycle recovery. The
+> administrator audit then closed version limits, second-stage recovery, and
+> ordinary-editor permissions (2026-08-10 / 2026-08-13). The remaining pilot
+> acceptance work is **Purview retention**, **`Request` library permission
+> inheritance**, and Workbench history/admin restore plus milestone snapshots.
 
 The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
 former default. Exercise the now-live
@@ -1005,9 +1032,12 @@ Still required:
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract, implementing the decided deterministic reviewer roster alongside
    the anonymous review narrative;
-3. administrator verification of the target library's configured version
-   limit, second-stage recycle recovery, applicable site/library Purview
-   retention, and ordinary-editor least-privilege policy; stable-identity
+3. administrator verification of the applicable site/library **Purview
+   retention** policy, and of whether the `Request` library **inherits site
+   permissions** (`HasUniqueRoleAssignments`); the target library's configured
+   version limit, second-stage recycle recovery, and ordinary-editor
+   least-privilege policy are **answered** (2026-08-10 / 2026-08-13 — editors
+   hold `Edit` and can delete files and version history), and stable-identity
    metadata read-through, consumer display, native version restore,
    first-stage recycle recovery, and production registry/pointer readback are
    complete;

@@ -266,9 +266,15 @@ document inventory, and individual implementation plans do not establish priorit
   Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`;
   native previous-version inspection/restore and signed-in first-stage
   recycle recovery also passed in the production Request library.
-  Administrator checks for version limits, second-stage recovery, retention,
-  and editor permissions plus Workbench history/admin restore and milestone
-  snapshots remain open. See
+  Administrator checks closed version limits, second-stage recovery, and editor
+  permissions (2026-08-10 / 2026-08-13). The editor answer is unfavourable:
+  Members hold `Edit`, so ordinary editors **can** delete documents and purge
+  version history, and `Manage Lists` puts the version limit itself within their
+  reach — least-privilege editing is a known unmet requirement, not an unaudited
+  unknown. A second-stage recycle bin does exist, but recovery is 93 days from
+  the original deletion and `dftadmin`-only. Still open: **Purview retention**,
+  **whether the `Request` library inherits site permissions**, and Workbench
+  history/admin restore plus milestone snapshots. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;

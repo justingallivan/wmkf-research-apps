@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: sharepoint
-  last_verified: 2026-06-16 via probe-graph-write-access.mjs (request 1002788)
+  last_verified: 2026-08-13 via administrator attestation + operator observation (human permissions / recovery); 2026-06-16 via probe-graph-write-access.mjs (request 1002788) for the app grant
 ---
 
 ## Recall Rule
@@ -37,6 +37,38 @@ Documents attached to requests are stored in **SharePoint**, not Dynamics.
 ## Permissions
 
 `Sites.Selected` granted with both read AND write roles on the akoyaGO site (write granted 2026-04-15, verified end-to-end 2026-05-01 via `scripts/probe-sharepoint-write.js`). Re-verified 2026-06-16 via `scripts/probe-graph-write-access.mjs` (request 1002788 — upload + delete sentinel in `akoya_request` library succeeded). `Sites.Selected` is the singular Graph permission name — read vs. write is set per-site at authorization time via `POST /sites/{id}/permissions`.
+
+## Human permissions and deletion recovery (2026-08-13 / S425)
+
+Distinct from the app's `Sites.Selected` grant above — this is what *people* can
+do to these files. Established by administrator attestation (Dragonfly IT) plus
+signed-in operator observation (Connor), interpreted against Microsoft Learn.
+
+- **Members group = `Edit`.** Grants **Delete Items**, **Delete Versions**, and
+  **Manage Lists**; excludes Manage Permissions. Ordinary editors can delete a
+  document *and* purge its version history, and can reach the Versioning
+  settings page that sets the 500-version limit.
+- **Members contains `Everyone except external users`** alongside the `akoyaGO
+  Members` M365 group, so at *site* scope that reach is every licensed internal
+  account. **OPEN:** whether the `Request` library inherits site permissions
+  (`HasUniqueRoleAssignments` unread) — this bounds the claim, so never restate
+  the tenant-wide reading without it.
+- **Deletion is recoverable for 93 days, then not.** First-stage bin →
+  second-stage (site-collection) bin, which **does exist**; the 93 days run from
+  the *original* deletion and are shared across both stages, not restarted.
+  Only the `dftadmin` account can restore from second stage. Quota purge
+  (oldest-first) or a manual empty can end it sooner. Microsoft's extra 14-day
+  backup restores **whole site collections, not individual items** — not a
+  per-file remedy.
+- **Neither the app nor a delegated sign-in can read these permissions.**
+  `Sites.Selected` gets `403` on `/sites/{id}/permissions` (needs
+  `Sites.FullControl.All`), and PnP/SPO delegated sign-in is refused at this
+  tenant's consent screen — and would be capped at the user's own rights anyway.
+  This question has to go to IT; do not burn time re-attempting the tooling.
+- **Still unknown:** any Microsoft Purview retention policy or label. Needs an
+  M365 compliance administrator.
+
+Full evidence, classes, and caveats: `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
 ## Multiple Document Libraries
 

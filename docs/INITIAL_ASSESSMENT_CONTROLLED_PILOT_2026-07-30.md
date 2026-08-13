@@ -3,10 +3,10 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1003109 proves the core pilot; native version and first-stage recovery pass while administrative controls remain.
+summary: Request 1003109 proves the core pilot; version, recycle-bin, and editor-permission evidence is in, while Purview retention and library inheritance remain.
 canonical: false
 cataloged: 2026-07-30
-last_verified: 2026-07-30
+last_verified: 2026-08-13
 owner: product-engineering
 related:
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
@@ -126,10 +126,14 @@ deletion, Justin's signed-in SharePoint session found the probe in the
 first-stage recycle bin, restored it, and Graph confirmed the same item and
 exact contents were live. The probe was deleted again; both controlled probe
 artifacts were removed from the first-stage bin. Justin was denied access to
-the second-stage administrator recycle-bin view. Library version limits,
-site/library Purview retention, ordinary-editor permissions, Workbench
-history/restore controls, and immutable Board milestone snapshots therefore
-remain open.
+the second-stage administrator recycle-bin view — an access limit, not evidence
+about the bin, as the 2026-08-13 answers went on to show.
+
+Library version limits, second-stage recovery, and ordinary-editor permissions
+were subsequently **answered** (2026-08-10 and 2026-08-13; see item 5 and
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`). Still open: **site/library Purview
+retention**, **whether the `Request` library inherits site permissions**,
+Workbench history/restore controls, and immutable Board milestone snapshots.
 
 ## Evidence matrix
 
@@ -144,7 +148,7 @@ remain open.
 | Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the deployed read model overlays current Graph values in the response only | Both live consumers display the same current/missing/unavailable/unchecked semantics | PASS — Request `1003109` displayed current SharePoint version `2.0` in both consumers on deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` |
 | Native version inspection/restore | Disposable file in the production Request library was uploaded twice, then prior version `1.0` was downloaded and restored | SharePoint retained `2.0` and `1.0`; restore created `3.0` and exact current bytes matched version one | Graph version list/content/restore operations | PASS — controlled probe only; no Request `1003109` mutation |
 | First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
-| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. Second-stage bin still reported absent (unusual, confirm); Purview unanswered and rerouted to a compliance admin; "limited control" is not a built-in permission level, so **editor delete rights remain the one unresolved durability question**. New 2026-08-10 evidence, unresolved: the same user could **edit** a Phase I file but **not delete** it (both attempts returned `0x80060728`, a lock catch-all rather than the permissions message). That asymmetry is impossible under a standard editing level, so it is either a transient self-lock (attempt was 109s after their own edit) or a custom "Contribute minus Delete" level — see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` for the two hypotheses and the non-destructive discriminating check |
+| Administrative library controls | Direct policy/permission probes, signed-in administrator view, Connor's 2026-08-10 replies, and the structured 2026-08-13 audit answered by Connor + Dragonfly IT | Item-level retention-label read returned no label fields; site-permission enumeration returned `403` (app-only `Sites.Selected`) and delegated PnP sign-in was refused at the tenant consent screen, so neither route can read permissions; second-stage admin bin returned Access Denied to an ordinary member | Administrator attestation (IT), operator observation (Connor's signed-in UI), and Microsoft Learn for interpretation — kept as distinct evidence classes | PARTIAL — three of four answered. **Version policy ANSWERED** (signed-in Versioning Settings page 2026-08-10: major only, no time limit, keep 500, drafts unchecked, check-out not required; independently reproduced 2026-08-13 on `Request` + `RequestArchive1`; 500 is the platform default). **Second-stage bin ANSWERED — it EXISTS**, reversing the 2026-08-10 "none"; `dftadmin` can access it, 93-day window shared across both stages, restore is `dftadmin`-only, contents unreported. **Editor least privilege ANSWERED — Members hold `Edit`**, granting Delete Items, Delete Versions, and Manage Lists; ordinary editors can delete documents and purge version history, which refutes H2 and resolves the 2026-08-10 `0x80060728` asymmetry as the transient self-lock (H1). **Purview retention remains unanswered** and is now the only original question outstanding. **NEW open item:** Members includes `Everyone except external users`, so Edit reaches the whole internal directory at site scope — whether it reaches the `Request` library depends on unread `HasUniqueRoleAssignments`. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` |
 | Workbench version-history display | `View version history` disclosure on the Initial Assessment tab, lazy-fetched per staff click | Read-only. Lists native SharePoint versions for the exact displayed artifact via Graph; a replacement race returns 409 rather than another artifact's editors; no Dataverse write and no snapshot row | Workbench shows editor attribution per version, current-first, with honest truncation reporting | PASS — shipped S413 (2026-08-10) at merge `147d3e49` and **live-verified by signed-in smoke** on Request `1003109`. The tab rendered `Version 2.0 · current · Justin Gallivan · Jul 30, 2026 6:33 PM` over `Version 1.0 · SharePoint App · Jul 30, 2026 5:28 PM`, with no truncation note. Two independent cross-checks passed: those timestamps equal the direct-Graph probe's `2.0@2026-07-31T01:33:55Z` / `1.0@2026-07-31T00:28:08Z` converted to Pacific, so the route→service→Graph chain returns the same versions as a direct Graph call; and the `current` badge agrees with the tab header's `2.0`, which is a genuinely separate read — the header resolves `publication.versionId` through `currentMetadata` at page load [VERIFIED via `lib/services/graph-service.js:410`, `lib/services/initial-assessment/artifact-service.js:286`], while the history path issues its own item read on the disclosure click [VERIFIED via `lib/services/graph-service.js:491`], so this is two requests agreeing rather than one value rendered twice. This retires the mock-coverage gap — until this smoke, all three test files stubbed their outbound boundary [VERIFIED via `tests/unit/graph-service-versions.test.js:45`, `tests/unit/workbench-initial-assessment-versions-route.test.js:11`, `tests/unit/initial-assessment-artifact-versions.test.js:5`] and the chain had never executed end to end |
 | Workbench administrator restore and milestone freeze | No current producer/action | No milestone snapshot row/artifact is created; no restore path exists in the app | Workbench has no administrator restore control | PLANNED — restore stays blocked on the outstanding SharePoint permission evidence in the row above; the milestone snapshot producer is blocked on the owner's pointer-vs-copy decision |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
@@ -198,29 +202,47 @@ not an intervening staff edit. Version `2.0` later hashed to
    `1003109`: SharePoint version `2.0` is attributed to Justin Gallivan,
    Foundation Opportunity no longer contains the staff-input marker, and both
    consumers resolve the same stable item.
-5. **Partially completed 2026-07-30; administrator replies received
-   2026-08-10 (S413).** Response-only current SharePoint metadata display,
-   native version inspection/restore, and signed-in first-stage recycle
-   recovery are production-proved. Connor's replies to the four administrator
-   checks, verbatim: **"Major versioning is on" / "No second-stage recycle
-   bin" / "Not familiar with purview" / "Site members have 'limited
-   control'".** Only the second is a clean answer, and it is a negative one.
-   Standing state after those replies:
-   - **Version limits — still open.** Versioning being *on* was already proved
-     empirically (`1.0 → 2.0 → 3.0`); the configured *limit* is the unanswered
-     part and is what governs whether an old version survives.
-   - **Second-stage recovery — reported absent; confirm before relying on it.**
-     A tenant with no site-collection recycle bin is unusual, and the reply may
-     instead reflect the same access denial Justin hit. Needs someone with
-     site-collection administrator rights.
-   - **Purview retention — unanswered, and needs a different owner.** "Not
-     familiar with purview" routes this to an M365 compliance administrator.
-   - **Editor least privilege — ambiguous.** "Limited control" is not a
-     built-in SharePoint permission level. The operative question — whether an
-     ordinary editor can delete the file or its versions — is unresolved.
+5. **Partially completed 2026-07-30; administrator evidence gathered in two
+   rounds, 2026-08-10 (S413) and 2026-08-13 (S425).** Response-only current
+   SharePoint metadata display, native version inspection/restore, and signed-in
+   first-stage recycle recovery are production-proved.
 
-   Two of four therefore remain genuinely open, one is ambiguous, and one is a
-   negative finding pending confirmation. Add Workbench version-history/admin
+   The 2026-08-10 round was Connor's four verbatim replies — **"Major versioning
+   is on" / "No second-stage recycle bin" / "Not familiar with purview" / "Site
+   members have 'limited control'"**. The 2026-08-13 round was a structured
+   six-question audit, with the parts beyond Connor's own rights escalated to
+   Dragonfly IT. **It reversed two of the four 2026-08-10 replies**; the caveats
+   recorded at the time are what stopped both from hardening into fact. Standing
+   state:
+   - **Version limits — ANSWERED, and re-verified.** Major versions only, no
+     time limit, keep 500, drafts unchecked, check-out not required — read from
+     the signed-in Versioning Settings page 2026-08-10 and independently
+     reproduced by Connor 2026-08-13 on `Request` and `RequestArchive1`.
+     500 is the platform default, so this is untouched configuration rather than
+     a deliberate retention decision. `RequestArchive2`/`3` not read (n=2 of 4).
+   - **Second-stage recovery — ANSWERED, and the 2026-08-10 reply was WRONG.**
+     A second-stage bin **exists**; Dragonfly IT: *"Yes, the dftadmin account can
+     access the secondary recycle bin."* The recovery window is 93 days from the
+     original deletion, shared across both stages, `dftadmin`-only to restore,
+     and can end early via quota purge or a manual empty. Contents unreported, so
+     whether anything has already been lost is unknown.
+   - **Purview retention — STILL UNANSWERED, and now the only one.** Dragonfly IT
+     was not asked (the question to them covered permissions and the recycle bin
+     only). Needs an M365 compliance/Purview administrator.
+   - **Editor least privilege — ANSWERED, unfavourably.** "Limited control" was a
+     pane caption, not a permission level. The Members group holds **Edit**,
+     which grants **Delete Items, Delete Versions, and Manage Lists** and
+     excludes Manage Permissions. Ordinary editors **can** delete a document and
+     purge its version history. The 2026-08-10 edit-yes/delete-no asymmetry was
+     the transient self-lock (H1), not a custom level (H2, refuted).
+   - **NEW and open — library inheritance.** Members contains `akoyaGO Members`
+     **and `Everyone except external users`**, so Edit reaches every licensed
+     internal account at *site* scope. Whether that reaches the `Request` library
+     depends on `HasUniqueRoleAssignments`, which nobody has read. This bounds
+     the finding above and must be carried with it.
+
+   Three of the four original checks are therefore answered and one remains, with
+   one new question opened. Add Workbench version-history/admin
    restore and milestone snapshots before calling the artifact system
    production-ready, and settle the milestone pointer-vs-copy question
    (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Board milestone freeze) — these

@@ -106,14 +106,25 @@ proved prior-version inspection/download and restore to a new current version
 with exact expected bytes. Justin then restored the deleted probe from the
 first-stage recycle bin, and Graph confirmed the same item and exact contents
 live. Both probes were removed from the first-stage bin after testing. Justin
-was denied the second-stage administrator view. Connor's 2026-08-10 replies left
-configured version limits, site/library Purview retention, and ordinary-editor
-least privilege still open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
+was denied the second-stage administrator view — an access limit on his account,
+not a fact about the bin.
+
+**Administrator evidence 2026-08-10 and 2026-08-13** settled configured version
+limits (major only, no time limit, keep 500), second-stage recovery (**a bin
+exists**; 93 days from the original deletion, `dftadmin`-only restore), and
+ordinary-editor least privilege (**Members hold `Edit`** — Delete Items, Delete
+Versions, and Manage Lists granted, so ordinary editors can delete documents and
+purge version history). Still open: **site/library Purview retention** and
+**whether the `Request` library inherits site permissions**
+(`HasUniqueRoleAssignments` unread), which bounds how far the `Edit` grant
+reaches. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
+
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
 from the Ready registry row and never from the caller. **Administrator restore and
-immutable milestone snapshots remain open**, restore because it depends on the
-permission evidence above.
+immutable milestone snapshots remain open.** Restore no longer waits on the
+permission evidence, which is now in; it waits on the product decision about
+which role may invoke it.
 
 ## Ownership
 

@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-13
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -65,11 +65,14 @@ hood.
 > signed-in Request `1003109` checks]** response-only current metadata refresh
 > by stable drive/item identity is live in both consumers, which displayed
 > SharePoint version `2.0` and the same stable document link. The pilot is not
-> closed because target-library controls are only partially verified: version
-> inspection/restore and first-stage recycle recovery passed, while library
-> limits, second-stage administrative recovery, retention, editor
-> least-privilege, Workbench history/restore, and milestone snapshots remain
-> open.
+> closed, but the administrator-evidence half of it substantially is. Version
+> inspection/restore and first-stage recycle recovery passed by probe; library
+> version limits, second-stage administrative recovery, and ordinary-editor
+> permissions were **answered 2026-08-10 and 2026-08-13** — see the
+> controlled-audit section below, and note the editor answer is that ordinary
+> editors **can** delete files and version history. Still open: **Purview
+> retention**, **whether the `Request` library inherits site permissions**,
+> Workbench history/restore, and milestone snapshots.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -578,6 +581,15 @@ can download, search, upload, and delete SharePoint files, but it does not yet
 implement Graph version-history, restore, retention, or milestone-snapshot
 operations.
 
+**Status of requirement 3 as of 2026-08-13: the live configuration does not meet
+it.** Ordinary editors hold `Edit`, which grants Delete Items, Delete Versions,
+and Manage Lists — precisely the "unnecessary delete … or version-deletion
+authority" the requirement asks to exclude. This is now a known gap with a named
+cause, not an unaudited unknown; the evidence and its bounds are in the
+controlled-audit section below. Requirement 1 is met and requirement 2 is
+half-met (recycle-bin recovery audited both stages; Purview retention still
+unanswered).
+
 ### Controlled target-library audit — 2026-07-30 local / 2026-07-31 UTC
 
 **[VERIFIED via production Microsoft Graph and signed-in SharePoint probes]**
@@ -597,13 +609,28 @@ or in the first-stage bin.
 
 The remaining controls are deliberately not collapsed into that pass:
 
-> **Administrator response received 2026-08-10 (S413), from Connor, verbatim:**
+> **First administrator response, 2026-08-10 (S413), from Connor, verbatim:**
 > "Major versioning is on" / "No second-stage recycle bin" / "Not familiar with
-> purview" / "Site members have 'limited control'". One of the four questions is
-> cleanly answered; the classifications below record what each reply does and does
-> not settle. Connor's replies are an administrator's report, not a probe — treat
-> the surprising one (no second-stage bin) as needing confirmation before any
-> durability guarantee rests on it.
+> purview" / "Site members have 'limited control'".
+>
+> **Second round, 2026-08-13 (S425) — supersedes the first on every point it
+> touches.** A structured six-question audit went to Connor, who escalated the
+> parts his own rights could not reach to Dragonfly IT. Two of the 2026-08-10
+> replies turned out to be wrong, and the caveats recorded here are what kept
+> them from hardening into platform fact:
+>
+> - **"No second-stage recycle bin" was FALSE.** One exists. The instruction
+>   below not to record its absence until a site-collection administrator
+>   confirmed it is the reason this never became a durability claim.
+> - **"Limited control" was a pane caption, not a permission level.** The
+>   Members group holds **Edit**.
+>
+> **Read the evidence classes separately; they are not interchangeable.**
+> *Administrator attestation* = Dragonfly IT's written reply (primary text read
+> 2026-08-13). *Operator observation* = Connor's own signed-in UI, first-hand but
+> UI-affordance rather than a permission-flag read. *Platform documentation* =
+> Microsoft Learn, used only to interpret the other two and never as evidence
+> about this tenant.
 
 - **[ANSWERED 2026-08-10 (S413)] Library version-limit policy.**
   **[VERIFIED via the signed-in Versioning Settings page for `akoya_request`,
@@ -628,106 +655,143 @@ The remaining controls are deliberately not collapsed into that pass:
   save, evidenced only by Request `1003109`, where one multi-field editing
   session produced exactly one version (`2.0`). No probe has measured this
   across sessions or co-authors, so treat "≈1 version per session" as a
-  working estimate, not a measured rate. Note the residual: 500 is a **setting, not a
-  law** — an administrator can lower it, and lowering prunes immediately. So
-  this removes the *accidental* pruning risk, not the *administrative* one.
-- **[ANSWERED — NEGATIVE, confirm before relying on it] Second-stage recycle
-  recovery.** Connor reports **no second-stage recycle bin**. Taken at face value,
-  an item purged from (or aged out of) the first-stage bin is **unrecoverable**,
-  and there is no administrator safety net behind ordinary deletion.
-  **Confirm this one.** SharePoint Online provisions a site-collection
-  (second-stage) recycle bin by default, and the standard 93-day window is shared
-  across both stages; a tenant with none is unusual. The reply may equally mean
-  "I could not access it" or "it is empty" — the same access denial Justin hit at
-  `AdminRecycleBin.aspx?view=13` on 2026-07-30. Do not record "no second-stage
-  recovery exists" as platform fact until someone with site-collection
-  administrator rights confirms it.
-- **[UNKNOWN — reroute] Retention.** Connor replied "not familiar with purview,"
-  which does not answer the question and tells us he is **not the right owner for
-  it**. The controlled Request `1003109` item's Graph `retentionLabel` response
+  working estimate, not a measured rate.
+
+  **Re-verified independently 2026-08-13 (S425)** by Connor, from the settings
+  page, on `Request` **and** `RequestArchive1`: identical on both. A different
+  operator by a different route reproduced the S413 capture.
+  **[ASSUMED for `RequestArchive2` and `RequestArchive3`]** — Connor reported
+  item counts for all four libraries but version policy for only two, so this is
+  n=2 of 4, not a library-wide finding.
+
+  **500 is the platform default, not a decision.** [Microsoft Learn](https://learn.microsoft.com/en-us/sharepoint/set-default-org-version-limits)
+  gives the organization default as manual limits, 500 major versions, no
+  expiration. So this configuration reads as untouched rather than as a
+  deliberate retention posture — nobody chose 500 for these documents.
+
+  **Residual, and it is worse than previously recorded.** 500 is a **setting,
+  not a law**, and the earlier text said only that *an administrator* could
+  lower it. That understated the exposure by a tier: `Edit` includes **Manage
+  Lists** (see the least-privilege entry below), which is the permission gating
+  list-settings pages. Lowering the limit is therefore within reach of every
+  principal holding Edit, and lowering prunes immediately. This removes the
+  *accidental* pruning risk; it does not remove the *administrative* one, and
+  the population who can trigger it is far larger than "administrators".
+- **[ANSWERED 2026-08-13 (S425) — POSITIVE; reverses the 2026-08-10 answer]
+  Second-stage recycle recovery.** A second-stage bin **exists**.
+  **[VERIFIED via administrator attestation, primary text read]** Dragonfly IT,
+  verbatim: *"Yes, the dftadmin account can access the secondary recycle bin."*
+
+  Establishes: the bin exists, and `dftadmin` can reach it. Access to a
+  site-collection recycle bin requires site-collection administrator rights
+  ([Microsoft Support](https://support.microsoft.com/en-us/office/restore-deleted-items-from-the-site-collection-recycle-bin-5fa924ee-16d7-487b-9a0a-021b9062d14b)),
+  so `dftadmin` holding SCA follows — **[ASSUMED by entailment]**, since IT was
+  asked directly whether the Dragonfly account is an SCA and did not answer in
+  those words.
+
+  Does **not** establish: its **contents**. Nobody has reported what is in it, so
+  we still cannot say whether anything has already been lost. It also gives staff
+  no self-service path — only `dftadmin` can restore.
+
+  **The recovery window is 93 days total, and it is not guaranteed.**
+  **[VERIFIED via Microsoft Support, fetched 2026-08-13]** The 93 days run from
+  the **original** deletion; the second stage holds the *remainder* of that
+  window, not a fresh one. Two ways it ends sooner, both material:
+
+  - the site-collection bin purges **oldest-first** once it exceeds its quota; and
+  - a site-collection administrator can empty it at any time.
+
+  **Do not record Microsoft's 14-day backup as a remedy here.** It exists, but it
+  restores **entire site collections, not individual items**, so it is not a
+  per-document safety net and would be misleading in a durability table.
+
+  Net: there is a real recovery path behind ordinary deletion, which the
+  2026-08-10 answer wrongly denied. It is a **time-boxed, administrator-only,
+  interruptible** path — not an archive.
+- **[UNKNOWN — still open, and IT was not asked] Retention.** Unchanged. Connor's
+  2026-08-10 "not familiar with purview" told us he is **not the right owner**,
+  and the 2026-08-13 round did not close it: the question put to Dragonfly IT
+  covered permissions and the recycle bin only, so their silence on Purview is
+  unremarkable rather than a non-answer. No Preservation Hold Library
+  observation was reported either way — and note that its *absence* would not
+  have settled this, since a retain-only policy with nothing yet deleted or
+  edited leaves no such library behind.
+
+  The controlled Request `1003109` item's Graph `retentionLabel` response
   contained no label fields, which still does not prove that no site- or
-  library-wide Microsoft Purview retention policy applies. Needs a Microsoft 365
-  compliance/Purview administrator, not the SharePoint site owner.
-- **[AMBIGUOUS] Least-privilege human editing.** Connor reports site members have
-  **"limited control"**. That is **not a standard SharePoint permission level** —
-  the built-in levels are Full Control, Design, Edit, Contribute, Read, and the
-  auto-assigned Limited Access — so it is either a paraphrase or a custom level.
-  The operative question is unresolved: **can an ordinary editor delete the file
-  or its version history?** Edit and Contribute both permit item deletion; Read
-  does not.
+  library-wide Microsoft Purview retention policy applies. **This is now the only
+  one of the four original questions with no answer at all.** Needs a Microsoft
+  365 compliance/Purview administrator, not the SharePoint site owner and not
+  Dragonfly IT.
+- **[ANSWERED 2026-08-13 (S425)] Least-privilege human editing — ordinary
+  editors CAN delete files and version history.** The Members group holds
+  **Edit**. "Limited control" was a pane caption, not a permission level, and is
+  retired as a description of anything.
 
-  **The 2026-08-10 delete attempts did NOT settle this — do not cite them as
-  evidence either way.** Two attempts against `Application Cover Page.docx`
-  (`Request Folders - Akoya > Phase I`) both returned
-  `File is checked out to another user` (error `0x80060728`), at 20:00:46 and
-  20:06:54 Pacific. **The observed asymmetry is the finding: the same user could
-  open and edit the file — the library shows it `Modified 8/10/2026 8:05 PM` by
-  that user — but could not delete it.**
+  **Two independent lines of evidence, agreeing on all four flags:**
 
-  Note that `File is checked out to another user` is a **misleading catch-all**.
-  SharePoint emits it for any lock, including one held by the Office
-  co-authoring service on the acting user's own behalf. It is **not** the
-  permissions message; a rights failure surfaces as `Access denied`. So the
-  message alone distinguishes nothing.
+  | Flag | Attested (Dragonfly IT) | Observed (Connor's UI) | Microsoft Learn, unmodified `Edit` |
+  |---|---|---|---|
+  | Delete Items | implied by level | Delete present and enabled on documents | granted |
+  | Delete Versions | implied by level | Delete offered on Version-history entries | granted |
+  | Manage Permissions | implied by level | no permissions entry point renders | **not** granted |
+  | Manage Lists | implied by level | Versioning settings and "Site libraries and lists" reachable | granted |
 
-  **Two hypotheses remain live, with opposite consequences. Neither is
-  established — do not build on either until the check below is run.**
+  IT's reply, verbatim: *"The akoyaGO Members group had Edit permission level."*
+  The list-permission table in
+  [Microsoft Learn](https://learn.microsoft.com/en-us/sharepoint/understanding-permission-levels)
+  supplies the right-hand column.
 
-  - **H1 — transient self-lock.** The 20:06:54 attempt came **109 seconds after
-    that same user's own 20:05 edit**, inside the window where SharePoint still
-    holds the editing lock after a Word session closes. If this is the cause,
-    **ordinary members CAN delete**, and the durability risk this document has
-    been designing around is real.
-  - **H2 — custom permission level without Delete.** Both standard levels that
-    grant editing (Contribute, Edit) **also grant Delete Items**, so
-    edit-yes/delete-no is not possible under a standard level. A custom
-    "Contribute minus Delete" level would produce exactly this asymmetry — and
-    would explain Connor's otherwise unexplained **"limited control"** as a real
-    custom level rather than a paraphrase. If this is the cause, **members
-    CANNOT delete**, member-caused loss drops sharply, and administrator restore
-    is unblocked.
+  **Why the two legs are a genuine cross-check and not one claim twice.** Learn
+  is explicit that every default level *except* Full Control and Limited Access
+  can be edited in place, so a level *named* Edit could have had a flag removed —
+  the name alone proves nothing. Connor's capability observation is independent
+  of the name, and Manage Lists is the discriminator that rules out Contribute
+  and Read. Agreement across four flags from two directions is what carries this.
 
-  **Discriminating check — non-destructive, run both halves:**
-  1. Add the **"Checked Out To"** column to the library view. **Blank** → no
-     check-out exists, favouring H1; then close Word entirely, wait ~15 minutes,
-     and retry the delete — success confirms H1. **A name** → a real check-out,
-     and the holder is named; if it is the akoyaGO app or a service account,
-     that is a systemic finding in its own right (see the orphaned-check-out
-     causes: explicit check-out never checked in, a died Word/upload session, or
-     upload while a required column was empty).
-  2. Read the Members group's permission **level definition** and look for
-     **Delete Items** / **Delete Versions**. This settles H2 directly and is
-     authoritative regardless of what the lock turns out to be.
+  **Residual — this is not a permission-flag read.** IT was asked explicitly for
+  the discrete permissions (*"We're after the discrete permissions, not just the
+  level name"*) and answered with the level name only. Connor could not reach the
+  permissions pages at all. So the flags come from Learn's definition plus UI
+  affordance, and a rendered-and-enabled command is client-side — SharePoint does
+  sometimes offer a command the server then refuses, which is exactly what
+  happened on 2026-08-10. **[VERIFIED via two proxies; the role-definition
+  checkbox read remains unperformed.]**
 
-  **Do not discriminate these by deleting a governed artifact.** With no
-  confirmed second-stage recycle bin (above), a success would leave the
-  first-stage bin as the only remedy — destroying an artifact to test whether
-  artifacts survive destruction. Use a disposable file the tester created, in a
-  non-governed location, that nobody has open; note even that only establishes
-  delete-own, since some configurations permit that while restricting
-  delete-others.
+  **Live thread:** IT wrote the group *"had"* Edit. Most likely tense-of-
+  observation, but they did not confirm nothing changed during the check, and
+  Connor has asked. Do not treat the past tense as settled either way.
 
-  **H2 being true would NOT reopen the milestone copy decision.** Delete rights
-  are one of four reasons recorded there; copy also survives an administrator
-  lowering the version limit, unreadable retention policy, and the missing
-  second-stage bin.
+  **This resolves the H1/H2 pair recorded here through S424, in favour of H1.**
+  The 2026-08-10 delete failures against `Application Cover Page.docx`
+  (`0x80060728`, at 20:00:46 and 20:06:54 Pacific, the second 109 seconds after
+  that same user's own 20:05 edit) were the **transient self-lock**, not a custom
+  "Contribute minus Delete" level — H2 is refuted, because the level is a
+  standard Edit and Edit grants Delete Items. Keep the reasoning that got here:
+  `File is checked out to another user` is a **lock catch-all**, not the
+  permissions message (a rights failure surfaces as `Access denied`), so the
+  error text never distinguished the hypotheses. One alternative survives
+  elimination and should not be dropped — **item-level unique permissions** on
+  that specific file, which would produce the same asymmetry; see the
+  Limited-Access note below.
 
-  **Do not retry this by deleting.** With no confirmed second-stage recycle bin
-  (above), a successful delete would have left the first-stage bin as the only
-  remedy — testing a durability question by destroying the artifact whose
-  durability is in question. **Resolve it by reading the permission definition
-  instead:** Site Settings → Site permissions → the Members group's level →
-  open the level and read its **Delete Items** and **Delete Versions**
-  checkboxes. That is non-destructive, answers *delete versions* as well as
-  *delete file* (a file-delete test cannot), and simultaneously reveals the real
-  level name behind Connor's "limited control". If an empirical check is still
-  wanted, use a disposable file the tester created, in a non-governed location,
-  that nobody has open — and note it only establishes delete-own, since some
-  configurations permit that while restricting delete-others. This compounds with the second-stage finding above — if members can
-  delete and there is genuinely no second-stage bin, first-stage recovery is the
-  only remedy. The app token still holds only `Sites.Selected` and
-  `/sites/{siteId}/permissions` returns `403 accessDenied`, so the app cannot
-  verify this itself.
+  **Do not re-test this by deleting a governed artifact.** The original reason
+  was the missing second-stage bin, which no longer holds — but the rule stands
+  on its own: recovery is now known to be a 93-day, `dftadmin`-only path, and
+  destroying a governed document to confirm it can be destroyed buys nothing that
+  the permission model already tells us. The question is answered; there is
+  nothing left to test.
+
+  **Neither the app nor a delegated sign-in can verify this independently — stop
+  trying both routes.** The app token holds only `Sites.Selected`, and
+  `/sites/{siteId}/permissions` returns `403 accessDenied` (reading permission
+  grants needs `Sites.FullControl.All`). **New 2026-08-13:** the *delegated*
+  route is closed too. `PnP.PowerShell` interactive sign-in was refused at the
+  tenant consent screen for both `AllSites.FullControl` and `AllSites.Read`, and
+  a delegated token is capped at the signed-in user's own rights regardless — so
+  even with consent, an ordinary member could not have read the Members role
+  definition. Moving to Windows / SPO Management Shell does not help; it passes
+  the same consent gate. This is why the question had to go to IT.
 
   **The major-version limit is likewise not readable programmatically — stop
   trying.** [VERIFIED via live Graph probe 2026-08-10 (S413)] `GET
@@ -767,24 +831,58 @@ The remaining controls are deliberately not collapsed into that pass:
   prunes existing versions immediately** — it is a look-and-report, never a
   change-and-report.
 
-  **Do not resolve this to "Limited Access" (considered and rejected 2026-08-10).**
+  **"Limited Access" was considered and rejected 2026-08-10; the 2026-08-13
+  answer (`Edit`) confirms that rejection was right.** Retained for one reason:
   Limited Access is a system-assigned level granting only View Application Pages,
-  Browse User Information, Use Remote Interfaces, Use Client Integration Features,
-  and Open — **no edit, no delete.** If Members held it, ordinary staff could not
-  edit the Word artifacts at all, contradicting the staff-wide Editor Dashboard
-  audience (owner decision 39,
-  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`). The pilot contradicts it
-  empirically too: Justin edited Request `1003109` and produced version `2.0` under
-  his own identity, yet was denied the second-stage admin view — so he has at least
-  Edit/Contribute and is not a site-collection administrator. "Limited Access" in a
-  permissions view is commonly an artifact of unique item-level permissions
-  elsewhere in the site, which would itself be a finding.
+  Browse User Information, Use Remote Interfaces, Use Client Integration
+  Features, and Open — **no edit, no delete** — and when it *does* appear in a
+  permissions view it is commonly an artifact of **unique item-level permissions
+  elsewhere in the site**. That mechanism is the one surviving alternative to the
+  H1 self-lock explanation above, so keep it in mind if the 2026-08-10 asymmetry
+  ever recurs on a specific file.
 
-  **Question outstanding with Connor (asked 2026-08-10, S413):** in Site Settings →
-  Site Permissions, what level is listed next to the Members group (Edit,
-  Contribute, or other), and is Justin in that group or granted directly? The
-  second half matters — if Justin holds an elevated or direct grant, the pilot
-  never exercised the ordinary-editor path.
+  **Both halves of the S413 outstanding question are now answered** (asked
+  2026-08-10, answered 2026-08-13). The level is **Edit**, per the entry above.
+  And Justin is **not** in the Members group individually — his access arrives
+  through `Everyone except external users`. That closes the worry attached to the
+  second half: **the pilot did exercise the ordinary-editor path**, so its
+  evidence stands as ordinary-editor evidence rather than as a possibly-elevated
+  account's.
+- **[ANSWERED 2026-08-13 (S425)] Who is in the Members group.**
+  **[VERIFIED via administrator attestation, primary text read]** Dragonfly IT,
+  verbatim: *"'Members' included akoyaGO Members and Everyone except external
+  users."* Two principals: the `akoyaGO Members` Microsoft 365 group, and
+  **`Everyone except external users` (EEEU)**.
+
+  **Consequence — the Edit grant reaches far past the platform's 16 staff.** EEEU
+  contains every person in the Microsoft 365 directory who is not an explicit
+  external user, so at **site scope** every licensed internal account holds Edit,
+  with Delete Items and Delete Versions. Whether that reaches the `Request`
+  library depends on the open inheritance question below, which bounds this.
+
+  **EEEU's presence is most likely the platform default, not a decision anyone
+  made.** [Microsoft Learn](https://learn.microsoft.com/en-us/sharepoint/understanding-permission-levels)
+  states EEEU *"is added to the Members group automatically on Modern Team sites
+  with **Public** privacy settings"*, and that on **Private** team sites EEEU
+  cannot be granted permissions at all. **[ASSUMED, strong]** So the useful
+  question is not "who granted EEEU Edit" but **"was this site deliberately
+  created with Public privacy"** — that is the thing to ask, and it is a
+  one-field answer.
+- **[OPEN — bounds the two entries above] Does the `Request` library inherit site
+  permissions?** Not answered. Dragonfly IT was not asked (the question sent to
+  them covered permissions and the recycle bin only), and Connor cannot see the
+  library permissions page.
+
+  **Why this is the load-bearing gap.** Connor's delete observation was made as a
+  member of the `akoyaGO Members` M365 group; EEEU is a *separate* principal in
+  the same SharePoint Members group. Both inherit site-scope Edit **unless** the
+  library carries unique role assignments that omit one of them. If
+  `HasUniqueRoleAssignments` is `true` and EEEU is not among the library's own
+  assignments, the exposure shrinks from the whole tenant to the M365 group.
+
+  Accurate statement until answered: **EEEU holds Edit at site scope; whether
+  that reaches the `Request` library is unconfirmed.** Do not restate the
+  tenant-wide reading without this qualifier.
 - **[PARTIAL] Workbench recovery UI.** Current version and last-modified
   metadata are live. Version-history navigation and an administrator-only
   restore action are not implemented.
@@ -804,16 +902,22 @@ The remaining controls are deliberately not collapsed into that pass:
   DOCX and/or PDF snapshot"); the fields were provisioned ahead of the decision,
   not as the decision.
 
-  **Record the reasoning honestly, because one leg of it changed after the
-  choice was made.** Pointer-only durability rested on three things. The
-  Versioning Settings capture above then **answered the first**: the version
-  limit is 500 majors with no age expiry, so accidental pruning is not a
-  material risk, and that argument for copying is now weak. The case rests on
-  the remaining two — **no confirmed second-stage recycle bin**, and
-  **unresolved whether ordinary editors can delete** the file or its versions —
-  plus a fourth that no administrator answer can remove: a version *limit* is a
-  setting an administrator can lower at any time, and lowering it prunes
-  immediately. A retained copy depends on none of them.
+  **Record the reasoning honestly — it has now moved twice, in both directions.**
+  The decision is unchanged; the argument behind it is not what it was, and a
+  reader must not be left subtracting superseded legs. Current state of each:
+
+  | Leg | Status after 2026-08-13 |
+  |---|---|
+  | Accidental version pruning | **Weak as an argument for copying.** 500 majors, no age expiry, and the pilot's ≈1-version-per-session rate put pruning far outside a document's life |
+  | "No confirmed second-stage recycle bin" | **Refuted — one exists.** This leg is gone as stated. What replaces it is weaker but real: recovery is 93 days from original deletion, `dftadmin`-only, and interruptible by quota purge or a manual empty. A time-boxed administrator path is not an archive |
+  | "Unresolved whether ordinary editors can delete" | **Resolved — they can**, files *and* version history. This leg is now the strongest one. `Delete Versions` in particular means the 500-version policy defends nothing against a history purge |
+  | A limit is a setting, not a law | **Stands, and widened.** `Edit` includes `Manage Lists`, so lowering the limit is within reach of every Edit holder — not just administrators — and lowering prunes immediately |
+
+  Net: one leg was refuted and one was confirmed, and the confirmed one is the
+  more load-bearing of the two. For a multi-year Board record, a 93-day
+  administrator-only bin does not substitute for retained bytes. **Do not reopen
+  the decision on the strength of the second-stage bin existing** — that fact
+  alone was never the case for copying.
 
   Anyone reopening this should know the strongest single argument is not
   probability but remedy: under a pointer, `wmkf_milestonecontenthash` can only
@@ -875,6 +979,36 @@ Same folder-naming convention. Older grants often have their full file set in
 one of those archives instead.
 
 The folder name pattern is always `{requestNumber}_{requestGuidNoHyphensUpper}`.
+
+**Naming.** `akoya_request` is the library's **internal** name — what Graph, the
+Dynamics `sharepointdocumentlocation` rows, and our code use, so it is correct
+everywhere in this document and in source. Its **display** name in the SharePoint
+UI is **`Request`**. Use the display name when writing instructions for a human
+administrator, and the internal name everywhere else.
+
+**Scale, reported by Connor 2026-08-13 (S425)** — folder counts, operator-
+observed, not independently probed:
+
+| Library | Folders |
+|---|---|
+| `Request` (`akoya_request`) | 4,886 |
+| `RequestArchive1` | 4,860 |
+| `RequestArchive2` | 4,984 |
+| `RequestArchive3` | 4,749 |
+| **Total** | **19,479** |
+
+Each sits just under 5,000. **[ASSUMED]** that this is why the archives exist —
+it is a plausible reading of the pattern, but SharePoint's 5,000 is a **list-view
+query threshold, not a storage cap**
+([Microsoft Learn](https://learn.microsoft.com/en-us/troubleshoot/sharepoint/lists-and-libraries/items-exceeds-list-view-threshold);
+a library holds up to 30 million items, and indexed-column filtering mitigates).
+So the threshold is consistent with a deliberate split but does not require one.
+
+**Forecast worth tracking:** `Request` is 114 folders below the threshold and
+grows with every new request. **[NOT TRACED]** whether this affects our own
+enumeration — `getRequestSharePointBuckets` resolves by folder path rather than
+listing a library, so it may well be unaffected, but nobody has read the code
+against this question. Check before assuming either way.
 
 ---
 
