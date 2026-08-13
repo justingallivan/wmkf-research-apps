@@ -1,8 +1,39 @@
 # merge-candidates authorization — proposed decision, for adversarial review
 
 **Date:** 2026-08-12 (Session 422)
-**Status:** PROPOSED. Nothing implemented. No code changed.
+**Status:** REVISED after adversarial review. Nothing implemented. No code changed.
 **Reviewer question:** are these the right choices? Refute them if not.
+
+## Revision log — Codex adversarial review, 2026-08-12
+
+Three findings; verdict `needs-attention`. Dispositions:
+
+- **Finding 1 (high), access equivalence — RESOLVED, decision A stands.** Codex correctly
+  established that `requireAppAccess` is **any-of** (`lib/utils/auth.js:344`,
+  `appKeys.some(...)`), so this route admits the legacy `reviewer-finder` grant *or* the
+  modern `reviewers` grant (`shared/config/appRegistry.js:337`). `reviewer-finder` is a
+  retired app consolidated into the Workbench, whose old grants are still honored
+  (`appRegistry.js:170-177`). The live question was whether anyone holds the retired grant
+  *without* `reviewers` — such a user would have no Workbench UI but could still reach this
+  endpoint. **Owner reports that set is empty (2026-08-12)** — every caller is a current
+  Workbench user, which is the population fact 10 describes. `[OWNER-REPORTED, not probed]`
+  If that ever stops being true, A must be re-opened.
+- **Finding 3 (medium), `computeCanManage` — UPHELD. Decision C was wrong and is rewritten
+  below.** The claim that it "guards nothing" was true of merge only and was written as a
+  general claim about the helper. It is false generally: verified consumers are
+  `ReviewerInvitePanel` (invite actions), `ReviewerDueDateEditor`, `ReviewerFindPanel`
+  (manual-creation controls), `ReviewerSearchSection` (candidate-card remedies), and
+  `ReviewerManagePanel`, all fed from `ReviewersTab`. Deleting it would strip affordance
+  gating from many unrelated write controls.
+- **Finding 2 (high), merge race — MECHANISM CONFIRMED, severity reduced to medium, and it
+  refutes D's *justification* rather than D itself.** `executeMerge` enumerates once via
+  `planMerge` (`reviewer-merge.js:333`) and never re-enumerates before deactivating the
+  loser at `:501`, which uses the *loser person* ETag — unchanged by a newly-created
+  suggestion row. So a reference created after planning survives the merge pointing at an
+  inactive reviewer. Real, but pre-existing, not introduced here, and requiring a write
+  inside a seconds-wide window. Keeping the predicate (D) is still correct; the wrong part
+  was claiming it bounds blast radius absolutely — it bounds it *as of plan time*. Folded
+  into E.
 
 ---
 
@@ -96,11 +127,21 @@ The data-minimization rationale for the omission (fact 9) does not survive fact 
 withholding identifiers protects nothing from users who can read them in CRM, while
 denying them the context that would prompt a second look.
 
-### C. Delete or fix `computeCanManage`.
+### C. (REWRITTEN) Keep `computeCanManage`; make its unresolved branch fail closed.
 
-With A declined it guards nothing. A gate that looks like a lock and is not one has
-already caused a concrete error: the S414 scope document cited this route's
-`requireAppAccess` as evidence the merge was safely authorized.
+Do **not** delete it — see Finding 3. It is a live affordance gate for invite actions,
+due-date editing, manual reviewer creation, and candidate-card remedies, and removing it
+would make exactly the mistakes the owner is worried about easier.
+
+The defect is narrower than "cosmetic": it returns
+`Boolean(isSuperuser || !pdId || !myUserId || myUserId === pdId)`
+(`shared/components/reviewers/reviewer-modes.js:95-97`), so it hides controls from
+non-PD staff **when identities resolve** and shows everything **when they don't**. The
+fix is to make the unresolved case fail closed rather than open, and to stop describing
+the helper as cosmetic in its docblock — that wording is what let the S414 scope document
+cite this route's `requireAppAccess` as evidence the merge was safely authorized.
+
+Scope any merge-specific visibility change separately from that change.
 
 ### D. Leave the block predicate alone.
 
@@ -108,10 +149,20 @@ It limits damage by what the record *is*, which holds regardless of who clicks. 
 the mechanism actually providing safety and it should not be traded away for a
 permission check.
 
-### E. Name, do not bundle, the durability gap.
+### E. Name, do not bundle, the durability gap — now the largest open item here.
 
-The non-transactional cascade (fact 5) can leave a half-merged state with no
-compensation. Real, but a separate and larger piece of work.
+Two related defects, neither introduced by this proposal:
+
+1. The non-transactional cascade (fact 5) can leave a half-merged state with no
+   compensation.
+2. The plan-time enumeration race (Finding 2): a suggestion row or request slot created
+   after `planMerge` is never re-scanned, and the loser is deactivated anyway, leaving a
+   live reference to an inactive reviewer.
+
+Adversarial review ranked these above B and C, and that ranking is probably right —
+they are the failure modes that corrupt state rather than merely permit a bad click.
+Suggested minimum: re-enumerate suggestions and slots immediately before deactivation,
+and add a regression test where a new loser reference appears after planning.
 
 ---
 
