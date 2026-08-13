@@ -93,9 +93,12 @@ referrer layer over the existing manual-add path.**
   reads. **S424 correction:** the clause owns **line 1** — the note follows after a
   newline, not a space. A period cannot terminate the name (titles and initials carry
   one), so the original space-joined form truncated "Dr. Abby Doyle" to "Dr" on reload.
-  Encode/decode is now the canonical pair `formatReferredByReason` /
-  `parseReferredByReason` in `lib/utils/reviewer-provenance.js`; every producer and the
-  single consumer route through it. Pre-S424 rows keep the lossy legacy parse. Plus a structured `referredBy` on the in-session candidate DTO + provenance
+  Encode/decode is now the canonical trio `formatReferredByReason` /
+  `splitReferredByReason` / `parseReferredByReason` in `lib/utils/reviewer-provenance.js`
+  [VERIFIED via `lib/utils/reviewer-provenance.js:361`, `:379`, `:390`]; every producer
+  and the single consumer route through it. `splitReferredByReason` also yields the
+  rationale remainder, which is how the card labels the referrer without repeating it in
+  the "Why" prose. Pre-S424 rows keep the lossy legacy parse. Plus a structured `referredBy` on the in-session candidate DTO + provenance
   for ranking/label. Consistent with the project's conservative no-new-Dataverse-field
   posture.
 - Alternative: a new `wmkf_referredby` field on `wmkf_appreviewersuggestion` (queryable

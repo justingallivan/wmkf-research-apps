@@ -111,10 +111,12 @@ Do NOT change the persisted prefix or the reload parser — only the badge/label
 **S424 — the clause owns line 1.** The note follows after a **newline**, not a space:
 a period cannot terminate the name, because titles and middle initials carry one, so the
 original space-joined form truncated "Dr. Abby Doyle" to "Dr". Encode and decode are the
-canonical pair `formatReferredByReason` / `parseReferredByReason`
-[VERIFIED via `lib/utils/reviewer-provenance.js:331-375`] — add producers through the
-helper, never by hand-rolling the string. Rows written before S424 are genuinely
-ambiguous and fall back to the original lossy parse.
+canonical trio `formatReferredByReason` / `splitReferredByReason` /
+`parseReferredByReason` [VERIFIED via `lib/utils/reviewer-provenance.js:331-393`] — add
+producers through the helper, never by hand-rolling the string. `splitReferredByReason`
+also returns the rationale remainder, so a surface that labels the referrer separately
+(`ReviewerInvitePanel.js` `CandidateRationale`) does not repeat it in the prose. Rows
+written before S424 are genuinely ambiguous and fall back to the original lossy parse.
 
 **Consumer fan-out to update in the same change (Codex):** these assert/emit the old
 label strings and must move with the relabel —

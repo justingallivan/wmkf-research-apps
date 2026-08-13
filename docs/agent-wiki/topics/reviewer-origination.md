@@ -226,11 +226,14 @@ bare keyword→author lane is what underperformed.
   because titles and middle initials carry one — the original space-joined encoding
   truncated "Dr. Abby Doyle" to "Dr" on reload. The newline is the terminator, so the
   downstream annotations `save-candidates-service.js:1034`/`:1037` append onto a later
-  line and can never re-enter the name. Encode/decode is the canonical pair
-  `formatReferredByReason` / `parseReferredByReason`
+  line and can never re-enter the name. Encode/decode is the canonical trio
+  `formatReferredByReason` / `splitReferredByReason` / `parseReferredByReason`
   (`lib/utils/reviewer-provenance.js`); route new producers through it rather than
-  hand-rolling `Referred by …`, and change both directions together. Rows written before
-  S424 are genuinely ambiguous and keep the lossy legacy parse.
+  hand-rolling `Referred by …`, and change both directions together. Display surfaces
+  take the referrer AND the rationale remainder from `splitReferredByReason`, so the
+  labeled attribution on the Invite card (`ReviewerInvitePanel.js` `CandidateRationale`)
+  does not repeat it in the "Why" prose. Rows written before S424 are genuinely
+  ambiguous and keep the lossy legacy parse.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.
