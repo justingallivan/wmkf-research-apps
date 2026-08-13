@@ -117,6 +117,7 @@ producers through the helper, never by hand-rolling the string. `splitReferredBy
 also returns the rationale remainder, so a surface that labels the referrer separately
 (`ReviewerInvitePanel.js` `CandidateRationale`) does not repeat it in the prose. Rows
 written before S424 are genuinely ambiguous and fall back to the original lossy parse.
+[RECHECKED after lib/utils/reviewer-provenance.js change: lib/utils/reviewer-provenance.js:331-393 — block bounds re-derived from source after `splitReferredByReason` was added; complement grep over lib/pages/shared/scripts found no hand-rolled `Referred by` producer outside the helper.]
 
 **Consumer fan-out to update in the same change (Codex):** these assert/emit the old
 label strings and must move with the relabel —

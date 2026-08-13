@@ -98,7 +98,8 @@ referrer layer over the existing manual-add path.**
   [VERIFIED via `lib/utils/reviewer-provenance.js:361`, `:379`, `:390`]; every producer
   and the single consumer route through it. `splitReferredByReason` also yields the
   rationale remainder, which is how the card labels the referrer without repeating it in
-  the "Why" prose. Pre-S424 rows keep the lossy legacy parse. Plus a structured `referredBy` on the in-session candidate DTO + provenance
+  the "Why" prose. Pre-S424 rows keep the lossy legacy parse.
+  [RECHECKED after lib/utils/reviewer-provenance.js change: lib/utils/reviewer-provenance.js:361, :379, :390 — the three function definitions re-derived from source after `splitReferredByReason` was added; complement grep over lib/pages/shared/scripts found no hand-rolled `Referred by` producer outside the helper.] Plus a structured `referredBy` on the in-session candidate DTO + provenance
   for ranking/label. Consistent with the project's conservative no-new-Dataverse-field
   posture.
 - Alternative: a new `wmkf_referredby` field on `wmkf_appreviewersuggestion` (queryable
