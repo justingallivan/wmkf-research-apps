@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-const { classify, GATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
+const { classify, auditToken, GATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
 
 const NOW = Date.parse('2026-08-13T12:00:00Z');
 
@@ -150,5 +150,31 @@ describe('assumeEnabled projection', () => {
 
   test('the projection never overrides a missing request', () => {
     expect(project({ request: null })).toBe('request_not_loaded');
+  });
+});
+
+// Token state is deliberately NOT derived from the ladder: a row stopping at an
+// earlier gate never reaches the token check, so its link state would otherwise
+// be unknown — which is exactly the case for the closed-cycle requests.
+describe('auditToken', () => {
+  test.each([
+    ['a future expiry is live', new Date(NOW + DAY_MS).toISOString(), 'live'],
+    ['a past expiry is expired', new Date(NOW - DAY_MS).toISOString(), 'expired'],
+    ['null is never_minted', null, 'never_minted'],
+    ['an unparseable value is never_minted, not live', 'not-a-date', 'never_minted'],
+  ])('%s', (_label, value, expected) => {
+    expect(auditToken({ wmkf_externaltokenexpires: value }, NOW)).toBe(expected);
+  });
+
+  test('expiry exactly now is expired, matching the sweep’s <= comparison', () => {
+    expect(auditToken({ wmkf_externaltokenexpires: new Date(NOW).toISOString() }, NOW)).toBe('expired');
+  });
+
+  test('it reports live even for a row the ladder stops early on', () => {
+    // The closed-cycle shape: no offset, so classify never reaches the token gate.
+    const row = { wmkf_emailsentat: '2026-07-01T00:00:00Z', wmkf_externaltokenexpires: new Date(NOW + 30 * DAY_MS).toISOString() };
+    const request = { wmkf_respondreminderenabled: null, wmkf_respondoffsetdays: null };
+    expect(classify(row, request, okPd(), okReviewer(), NOW)).toBe('reminder_disabled');
+    expect(auditToken(row, NOW)).toBe('live');
   });
 });

@@ -11,9 +11,10 @@
  * The ladder is duplicated here rather than imported: importing the sweep pulls
  * in DynamicsService and the send path, and a diagnostic must not be one refactor
  * away from mailing 75 reviewers. The cost is that this copy can drift from the
- * original — `--verify-ladder` prints both so they can be diffed by eye, and the
- * gate order below is annotated with the source line it mirrors. If the sweep's
- * ladder changes, this probe is stale and must be updated or deleted.
+ * original, so each GATES entry is annotated with the reviewer-reminder-sweep.js
+ * line it mirrors, and `classify` is unit-tested gate by gate including ladder
+ * order. If that sweep's ladder changes, this probe is stale: re-verify the
+ * annotations or delete it. It is a diagnostic, not a second source of truth.
  *
  * Writes nothing: GETs only, no marker, no token mint, no email.
  *
@@ -24,6 +25,10 @@
  *   Add --name="Jane Reviewer" to also dump that one reviewer's raw gate inputs.
  *   Add --assume-enabled to ALSO report where rows would land if the enabled flag
  *     were on — the blast radius of arming the reminder, without arming it.
+ *
+ * Every run also reports `tokenAudit` / per-request `tokens`: invitation-link state
+ * for all scanned rows, computed independently of the ladder. A `live` token on a
+ * closed cycle is its own finding — that reviewer can still accept today.
  */
 
 const fs = require('node:fs');
@@ -72,6 +77,22 @@ async function queryAll(client, url) {
     next = link ? link : null;
   }
   return rows;
+}
+
+/**
+ * Token state for one row, computed INDEPENDENTLY of the gate ladder.
+ *
+ * The ladder reports only the first gate that closes, so a row stopping at
+ * `offset_unset` never reaches the token check and its link state stays unknown.
+ * That matters on its own terms: a live token on a closed cycle means that
+ * reviewer can still accept an invitation today — `token-lifecycle.js:130-132`
+ * validates hash + not-revoked + not-expired and asks nothing about the campaign.
+ */
+function auditToken(row, now) {
+  if (!row.wmkf_externaltokenexpires) return 'never_minted';
+  const expiresAt = new Date(row.wmkf_externaltokenexpires).getTime();
+  if (!Number.isFinite(expiresAt)) return 'never_minted';
+  return expiresAt > now ? 'live' : 'expired';
 }
 
 /**
@@ -180,9 +201,21 @@ async function main() {
       respondReminderLeadDays: request?.wmkf_respondreminderleaddays ?? null,
       reviewDueDate: request?.wmkf_reviewduedate ?? null,
       verdicts: {},
+      tokens: { live: 0, expired: 0, never_minted: 0 },
+      latestLiveTokenExpiry: null,
       ...(assumeEnabled ? { wouldSendIfEnabled: 0 } : {}) };
     perRequest[key].verdicts[verdict] = (perRequest[key].verdicts[verdict] || 0) + 1;
     if (ifEnabled === 'ELIGIBLE') perRequest[key].wouldSendIfEnabled += 1;
+
+    // Independent of the ladder — see auditToken.
+    const tokenState = auditToken(row, now);
+    perRequest[key].tokens[tokenState] += 1;
+    if (tokenState === 'live') {
+      const current = perRequest[key].latestLiveTokenExpiry;
+      if (!current || new Date(row.wmkf_externaltokenexpires) > new Date(current)) {
+        perRequest[key].latestLiveTokenExpiry = row.wmkf_externaltokenexpires;
+      }
+    }
 
     if (name && reviewer?.wmkf_name && reviewer.wmkf_name.toLowerCase().includes(name)) {
       named = {
@@ -229,6 +262,13 @@ async function main() {
         counts: countsIfEnabled,
       },
     } : {}),
+    tokenAudit: {
+      note: 'Invitation-link state for every scanned row, computed independently of the gate ladder. `live` means that reviewer can still ACCEPT today — the accept path checks hash/revoked/expiry only and asks nothing about whether the campaign is still open.',
+      live: rows.filter((r) => auditToken(r, now) === 'live').length,
+      expired: rows.filter((r) => auditToken(r, now) === 'expired').length,
+      never_minted: rows.filter((r) => auditToken(r, now) === 'never_minted').length,
+      of: rows.length,
+    },
     gateLegend: Object.fromEntries(GATES.map((g) => [g.key, `${g.why} (sweep${g.at})`])),
     perRequest,
     namedReviewer: named,
@@ -253,4 +293,4 @@ if (require.main === module) {
 
 // Exported for tests: the attribution is the whole value of this probe, so it is
 // asserted gate-by-gate rather than trusted on first run.
-module.exports = { classify, GATES, DAY_MS };
+module.exports = { classify, auditToken, GATES, DAY_MS };
