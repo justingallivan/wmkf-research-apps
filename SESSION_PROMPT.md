@@ -115,10 +115,14 @@ the remediation, and stopped short of executing it at the owner's direction.
 4. **[VERIFIED OPEN] Board milestone snapshot producer.** Copy-the-bytes selected
    2026-08-10. Explicitly not blocked by any SharePoint question.
 
-5. **Reviewer drawer visual coverage** — unchanged from S420, and now the largest
-   remaining risk on this feature: no browser session ever rendered the drawer or the
-   Last Action column, so every behavior claim rests on tests. The convenience decision
-   lowers the stakes of a wrong *label*; it does not cover a broken *layout*.
+5. **Reviewer drawer visual coverage — CLOSED, the layout was verified.** An
+   authenticated Production smoke on Request `1002959` (S419, PR #120) checked the
+   drawer, the evidence caveat, and the neutral invitation wording; owner confirms it
+   looked fine [VERIFIED via `DEVELOPMENT_LOG.md:32-46`]. The S418 brief's "not
+   verified: the rendered layout" was true when written and has been overtaken —
+   **read `DEVELOPMENT_LOG.md`, not the brief, for ship state.** Any residual item here
+   would be *automated* visual-regression coverage, which nobody has asked for; do not
+   re-raise the manual check as an open risk.
 
    **Reviewer history persistence limits** — the gate is resolved, not merely still
    closed. This was waiting on the convenience-vs-evidence decision; convenience means

@@ -24,7 +24,11 @@ scope. Current durable home for this behavior:
 `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`. The body's branch/commit and
 "unpushed" state is also stale; the work is on `main`.
 
-**Still unverified from the body: the rendered layout.** That risk is unchanged.
+3. **The body's "Not verified: the rendered layout" is OVERTAKEN.** S419 promoted this
+   to Production (PR #120) and ran an authenticated smoke on Request `1002959` covering
+   the drawer, the evidence caveat, and the neutral invitation wording
+   [VERIFIED via `DEVELOPMENT_LOG.md:32-46`]. Do not cite the body's verification
+   section as current ship state.
 
 ---
 

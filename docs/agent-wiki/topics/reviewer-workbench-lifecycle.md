@@ -392,7 +392,11 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   treats conversion measurement as remaining work
   (`docs/REVIEWER_HOLISTIC_REVIEW_IMPLEMENTATION_PLAN.md`).
 
-## Reviewer activity history — Phase 1 (merged to `main`, `19bd000a`, 2026-08-12)
+## Reviewer activity history — Phase 1 (PRODUCTION-LIVE, S419, PR #120)
+
+Shipped and smoke-tested in Production on Request `1002959` — drawer, evidence caveat,
+and neutral invitation wording all checked [VERIFIED via `DEVELOPMENT_LOG.md:32-46`].
+Latest behavior change is `19bd000a` (2026-08-12).
 
 **Scope decision — this is operational convenience, not evidence (owner decision
 2026-08-12).** The drawer exists so staff can see what happened recently on a reviewer
