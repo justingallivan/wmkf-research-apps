@@ -36,7 +36,10 @@ jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nW. M. Keck Foundation' })),
 }));
 
-const { sendManualReviewDueReminder } = require('../../lib/services/reviewer-manual-reminder');
+const {
+  sendManualRespondReminder,
+  sendManualReviewDueReminder,
+} = require('../../lib/services/reviewer-manual-reminder');
 
 const REQ = '11111111-1111-4111-8111-111111111111';
 const SUG = '22222222-2222-4222-8222-222222222222';
@@ -48,6 +51,11 @@ const REVIEW_DUE_BODY_KEY = 'email.reviewer_reminder_review_due.body';
 const REVIEW_DUE_SUBJECT = 'Reminder: your W. M. Keck Foundation review';
 const REVIEW_DUE_BODY =
   'Dear [Reviewer Name],\n\nThis is a friendly reminder about your review of [proposal].\n\nThank you,\n\n[Program Director signature]';
+const RESPOND_SUBJECT_KEY = 'email.reviewer_reminder_respond_by.subject';
+const RESPOND_BODY_KEY = 'email.reviewer_reminder_respond_by.body';
+const RESPOND_SUBJECT = 'Reminder: please respond to your review invitation';
+const RESPOND_BODY =
+  'Dear [Reviewer Name],\n\nPlease use your secure link to respond about [proposal].\n\nThank you,\n\n[Program Director signature]';
 
 const REVIEW_STATUS_MATERIALS_SENT = 100000001;
 const REVIEW_STATUS_UNDER_REVIEW = 100000002;
@@ -58,7 +66,13 @@ function suggestionRow(over = {}) {
     wmkf_appreviewersuggestionid: SUG,
     _wmkf_request_value: REQ,
     _wmkf_potentialreviewer_value: PERSON,
+    wmkf_selected: true,
+    wmkf_externaltokenrevoked: false,
+    wmkf_invited: true,
+    wmkf_emailsentat: '2026-06-01T00:00:00Z',
     wmkf_accepted: true,
+    wmkf_declined: false,
+    wmkf_responsetype: null,
     wmkf_reviewstatus: REVIEW_STATUS_MATERIALS_SENT,
     wmkf_reviewreceivedat: null,
     wmkf_applicantdisposition: null,
@@ -79,9 +93,14 @@ function requestRecord(over = {}) {
   };
 }
 
-function installReads({ suggestion = suggestionRow(), request = requestRecord(), pdDisabled = false, reviewerEmail = 'rev@example.org' } = {}) {
+function installReads({ suggestion = suggestionRow(), suggestionAfterClaim = suggestion, request = requestRecord(), pdDisabled = false, reviewerEmail = 'rev@example.org' } = {}) {
+  let suggestionReads = 0;
   getRecord.mockImplementation(async (set, id) => {
-    if (set === 'wmkf_appreviewersuggestions') return suggestion;
+    if (set === 'wmkf_appreviewersuggestions') {
+      const value = suggestionReads === 0 ? suggestion : suggestionAfterClaim;
+      suggestionReads += 1;
+      return value;
+    }
     if (set === 'akoya_requests') return request;
     if (set === 'systemusers') return { systemuserid: PD, internalemailaddress: 'pd@keck.org', isdisabled: pdDisabled };
     if (set === 'wmkf_potentialreviewerses') return { wmkf_potentialreviewersid: PERSON, wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: reviewerEmail };
@@ -92,6 +111,8 @@ function installReads({ suggestion = suggestionRow(), request = requestRecord(),
 beforeEach(() => {
   jest.clearAllMocks();
   getSettingStrict.mockImplementation(async (key) => {
+    if (key === RESPOND_SUBJECT_KEY) return { found: true, value: RESPOND_SUBJECT };
+    if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
     if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: REVIEW_DUE_SUBJECT };
     if (key === REVIEW_DUE_BODY_KEY) return { found: true, value: REVIEW_DUE_BODY };
     throw new Error(`unexpected setting ${key}`);
@@ -114,6 +135,7 @@ describe('sendManualReviewDueReminder', () => {
       expect.objectContaining({ ifMatch: 'W/"100"', actingUserSystemId: 'u-1' }),
     );
     expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"100"' }));
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     // Claim-before-send: marker write precedes token mint precedes send.
     expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
@@ -145,6 +167,48 @@ describe('sendManualReviewDueReminder', () => {
     updateRecord.mockRejectedValue(Object.assign(new Error('412'), { status: 412 }));
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'conflict' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+  ])('%s reviewer passes every review-due gate but is refused before claim/mint/send', async (_label, state, reason) => {
+    installReads({ suggestion: suggestionRow(state) });
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a review submitted after the claim is refused before mint/send', async () => {
+    installReads({
+      suggestion: suggestionRow(),
+      suggestionAfterClaim: suggestionRow({
+        wmkf_reviewreceivedat: '2026-08-13T12:00:00Z',
+        _etag: 'W/"101"',
+      }),
+    });
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason: 'ineligible' });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+  ])('reviewer becoming %s after the claim is refused before mint/send', async (_label, state, reason) => {
+    installReads({
+      suggestion: suggestionRow(),
+      suggestionAfterClaim: suggestionRow({ ...state, _etag: 'W/"101"' }),
+    });
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
@@ -207,6 +271,111 @@ describe('sendManualReviewDueReminder', () => {
     installReads({ suggestion: noEtag });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'conflict' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendManualRespondReminder', () => {
+  const pendingInvitation = (over = {}) => suggestionRow({
+    wmkf_accepted: false,
+    wmkf_reviewstatus: null,
+    wmkf_reviewreceivedat: null,
+    wmkf_externaltokenexpires: '2020-01-01T00:00:00Z',
+    ...over,
+  });
+
+  test('eligible unanswered invite claims only the respond marker and sends the respond template', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1' });
+
+    expect(result).toEqual({ ok: true });
+    expect(updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions', SUG,
+      { wmkf_respondremindersentat: expect.any(String) },
+      expect.objectContaining({ ifMatch: 'W/"100"', actingUserSystemId: 'u-1' }),
+    );
+    expect(updateRecord.mock.calls[0][2]).not.toHaveProperty('wmkf_remindersentat');
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"100"' }));
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: RESPOND_SUBJECT,
+      to: 'rev@example.org',
+    }));
+  });
+
+  test('re-send remains allowed when the respond marker is already set', async () => {
+    installReads({ suggestion: pendingInvitation({ wmkf_respondremindersentat: '2026-06-02T00:00:00Z' }) });
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG })).resolves.toEqual({ ok: true });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+  ])('%s unanswered invite passes every other gate but is refused before claim/mint/send', async (_label, state, reason) => {
+    installReads({ suggestion: pendingInvitation(state) });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+  ])('unanswered invite becoming %s after the claim is refused before mint/send', async (_label, state, reason) => {
+    installReads({
+      suggestion: pendingInvitation(),
+      suggestionAfterClaim: pendingInvitation({ ...state, _etag: 'W/"101"' }),
+    });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an invitation accepted after the claim is refused before mint/send', async () => {
+    installReads({
+      suggestion: pendingInvitation(),
+      suggestionAfterClaim: pendingInvitation({ wmkf_accepted: true, _etag: 'W/"101"' }),
+    });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason: 'ineligible' });
+    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a concurrent change at the ETag-bound token write returns conflict without sending', async () => {
+    installReads({
+      suggestion: pendingInvitation(),
+      suggestionAfterClaim: pendingInvitation({ _etag: 'W/"101"' }),
+    });
+    mintAndStore.mockRejectedValueOnce(Object.assign(new Error('412'), { status: 412 }));
+
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'conflict' });
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"101"' }));
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['not invited', { wmkf_invited: false }],
+    ['no sent invitation', { wmkf_emailsentat: null }],
+    ['accepted', { wmkf_accepted: true }],
+    ['declined', { wmkf_declined: true }],
+    ['resolved response', { wmkf_responsetype: 100000001 }],
+    ['applicant-excluded', { wmkf_applicantdisposition: 100000001 }],
+    ['different request', { _wmkf_request_value: 'other-request' }],
+  ])('ineligible: %s', async (_label, state) => {
+    installReads({ suggestion: pendingInvitation(state) });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    expect(result).toEqual({ ok: false, reason: 'ineligible' });
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();

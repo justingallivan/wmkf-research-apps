@@ -100,6 +100,7 @@ describe('getMyCandidates', () => {
       _wmkf_potentialreviewer_value: PERSON_ID,
       wmkf_sources: 'literature_retrieved',
       wmkf_responsetype: 100000000,
+      wmkf_respondremindersentat: '2026-08-10T00:00:00Z',
       wmkf_reviewduedateoverride: '2026-09-15',
     }]);
     potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => (
@@ -118,6 +119,7 @@ describe('getMyCandidates', () => {
       name: 'Dr X',
       affiliation: 'MIT',
       responseType: 'accepted', // optionset → string code mapping preserved
+      respondReminderSentAt: '2026-08-10T00:00:00Z',
       reviewDueDateOverride: '2026-09-15',
       requestReviewDeadline: '2026-09-01',
       effectiveReviewDeadline: '2026-09-15',

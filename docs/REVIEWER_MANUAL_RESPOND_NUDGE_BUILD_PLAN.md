@@ -16,7 +16,9 @@ related:
 
 # Manual Respond-By Nudge — Build Plan
 
-**Status:** REVIEWED and split. Ready for implementation. No code written yet.
+**Status:** PHASE A IMPLEMENTED on `codex/manual-respond-by-nudge`; independent
+Codex adversarial review is clean after fixes. Awaiting Claude review and
+promotion; not deployed to production. Phase B remains open.
 **Session:** S424, 2026-08-13.
 **Build owner:** Codex leads implementation; Claude reviews.
 
@@ -334,3 +336,31 @@ Gates: `check:types`, `check:api-routes` (+ self-test), `check:route-lifecycle-a
    operational difference between candidate removal and staff-cutoff/leak
    response while treating both as no-send states unless a separate restore
    action explicitly re-authorizes access.
+
+## 8. Phase A implementation report (2026-08-13)
+
+### Evidence matrix
+
+| Claim | Producer / entry point | Persistence / authority | Consumer | Strongest evidence | Status |
+|---|---|---|---|---|---|
+| Manual respond nudge is available for an active unanswered invite | `ReviewerInvitePanel` → `POST /api/review-manager/send-review-reminder` with `kind:'respond'` | Fresh suggestion lifecycle reads; respond template defaults | Dynamics email send | Component, route, and service tests | **VERIFIED on branch** |
+| Omitted `kind` preserves the existing review-due action; unknown values fail closed | Existing Reviews-tab caller omits `kind`; route allowlist | N/A | `sendManualReviewDueReminder` or HTTP 400 | Route discriminator tests | **VERIFIED on branch** |
+| Removed/revoked rows cannot be resurrected by either manual reminder path | Both manual services check before claim and re-check after claim | Token PATCH is bound to the post-claim row ETag; a concurrent change yields 412 before email send | Typed `removed`, `revoked`, or `conflict` response | Positive-control pre-claim and post-claim tests, token-write 412 test, `mintAndStore` ETag propagation test | **VERIFIED on branch** |
+| Respond marker is visible as “last nudged” | `sendOneReminder(kind:'respond')` | `wmkf_respondremindersentat` | my-candidates DTO → active Invite-panel row | Service, DTO, and component tests | **VERIFIED on branch** |
+| Old async responses cannot affect a newly selected request | Request-keyed inner Invite panel | N/A | Alert, refresh, and spinner state | A → B → A component test | **VERIFIED on branch** |
+| Automatic respond sweep is safe to arm | Cron route | Existing campaign toggle and sweep filters | Scheduled email | No Phase A change to cron selection/authorization | **PLANNED — Phase B / cron hardening required** |
+| Other token-mint callers refuse removed/revoked rows | `ensureToken`, invitation send, token regeneration | `wmkf_appreviewersuggestion` | Reviewer portal links | Mint-surface audit in §0/§3 | **PLANNED — Phase B** |
+
+### Review and sweep result
+
+- First adversarial pass found a post-claim removal/token-mint race and an
+  A → B → A stale UI-state race. Both were fixed and regression-tested.
+- Second pass found only a path-specific post-claim test gap. Respond-accepted
+  and review-submitted transitions now prove both lifecycle callbacks.
+- Durable restatements checked: this plan, `API_ROUTE_SECURITY_MATRIX.md`, the
+  reviewer lifecycle wiki hazard, source, DTO consumers, and tests. The stale
+  “No code written yet” status was structurally replaced above.
+- **Sweep verdict:** `RECONCILED` for Phase A branch state. Remaining live
+  stale statements: 0. Remaining planned work: Claude review/promotion, Phase B
+  mint-surface hardening, and cron guards before enabling
+  `respondReminderEnabled`.

@@ -18,7 +18,7 @@
  *                     relevanceScore, reasoning (referrer-prefixed for referrals — see
                      CandidateRationale), keywords, website, googleScholarUrl,
  *                     googleScholarId, orcidUrl, applicantRecommended, manualAdded, invited, accepted,
- *                     declined, emailSentAt, responseType }]
+ *                     declined, emailSentAt, respondReminderSentAt, responseType }]
  *
  * Each candidate carries the persisted selection rationale (reasoning) + metrics
  * (h-index, citations, relevance) + profile links so a PD returning to the list
@@ -31,8 +31,9 @@
  *     onSent) so the parent refetch can paint those rows invited.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Bell } from 'lucide-react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
@@ -203,7 +204,7 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
   );
 }
 
-export default function ReviewerInvitePanel({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
+function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
@@ -214,7 +215,17 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
   const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
+  const [nudgingId, setNudgingId] = useState(null);
   const exportingRef = useRef(false);
+  const nudgeInFlightRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Export the saved candidate list to Excel (same Request Info + Candidates
   // workbook the Find tab builds, server-side). The persisted rows carry only
@@ -321,6 +332,45 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
       alert(`Network error restoring candidate: ${err.message}`);
     } finally {
       setRestoringId(null);
+    }
+  };
+
+  const sendRespondReminder = async (c) => {
+    if (nudgeInFlightRef.current) return;
+    const confirmed = confirm(
+      `Send a reminder to ${c.name || 'this reviewer'}?\n\n`
+      + 'This sends a real email with a fresh secure response link and cannot be undone.',
+    );
+    if (!confirmed) return;
+
+    const isCurrentRequest = () => mountedRef.current;
+    nudgeInFlightRef.current = c.suggestionId;
+    setNudgingId(c.suggestionId);
+    try {
+      const resp = await fetch('/api/review-manager/send-review-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, suggestionId: c.suggestionId, kind: 'respond' }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!isCurrentRequest()) return;
+      if (!resp.ok || !data.ok) {
+        const messages = {
+          removed: 'This reviewer was removed from the proposal — restore them first.',
+          revoked: "This reviewer's access was withdrawn — reissue their link before nudging.",
+          conflict: 'This reminder was already claimed by another send — refresh to see the latest status.',
+        };
+        alert(messages[data.reason] || 'Could not send the reminder. Refresh and try again.');
+        return;
+      }
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      if (isCurrentRequest()) alert(`Network error sending reminder: ${error.message}`);
+    } finally {
+      if (isCurrentRequest()) {
+        nudgeInFlightRef.current = null;
+        setNudgingId(null);
+      }
     }
   };
 
@@ -459,6 +509,19 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                     </span>
                     <span className="flex items-center gap-1 flex-shrink-0">
                       <StatusChip c={c} />
+                      {canManage && c.invited && !c.responseType && !c.declined && !c.accepted && (
+                        <button
+                          type="button"
+                          onClick={() => sendRespondReminder(c)}
+                          disabled={nudgingId !== null}
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-medium text-blue-700 hover:text-blue-900 hover:bg-blue-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Send a respond-by reminder with a fresh secure link"
+                          aria-label={`Send reminder to ${c.name || 'reviewer'}`}
+                        >
+                          <Bell size={13} aria-hidden="true" />
+                          {nudgingId === c.suggestionId ? 'Sending…' : 'Send reminder'}
+                        </button>
+                      )}
                       {canManage && (
                         <RowRemoveMenu
                           candidate={c}
@@ -501,6 +564,9 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
                       </span>
                     )}
                     {c.emailSentAt && <span>invited {new Date(c.emailSentAt).toLocaleDateString()}</span>}
+                    {c.respondReminderSentAt && (
+                      <span>last nudged {new Date(c.respondReminderSentAt).toLocaleDateString()}</span>
+                    )}
                   </div>
                   {!c.email && !c.invited && (
                     <div className="mt-1.5 p-2 rounded border border-amber-300 bg-amber-50 text-xs text-amber-800">
@@ -696,4 +762,8 @@ export default function ReviewerInvitePanel({ requestId, candidates = [], remove
       )}
     </Card>
   );
+}
+
+export default function ReviewerInvitePanel(props) {
+  return <ReviewerInvitePanelForRequest key={props.requestId} {...props} />;
 }

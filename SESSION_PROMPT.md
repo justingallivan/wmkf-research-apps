@@ -1,4 +1,4 @@
-# Session 425 Prompt: Codex builds Phase A of the manual respond-by nudge
+# Session 425 Prompt: Phase A implemented; Claude review and promotion pending
 
 ## Session 424 Summary
 
@@ -49,6 +49,15 @@ chain in my own probe.
    advertised `--output <path>` but parsed only `--output=<path>`, so no artifact
    was ever written and the plan cited a file that never existed.
 
+6. **Implemented Phase A on `codex/manual-respond-by-nudge` (not production).**
+   Added the active-row respond nudge, route discriminator, last-nudged
+   projection, and selected/revoked guards on both manual reminder paths. A
+   fresh adversarial review found and drove fixes for a post-claim token-mint
+   race and A → B → A stale UI state. Manual token writes now re-authorize after
+   claim and bind minting to the fresh ETag; the automatic sweep and Phase B mint
+   callers remain deliberately unchanged. Claude review and promotion are still
+   pending.
+
 ### Commits
 
 - `310aa7a3` - Stop truncating referrer names that contain a period
@@ -88,36 +97,37 @@ chain in my own probe.
 
 ## Next Items
 
+### Completed On Current Branch
+
+1. **[VERIFIED ON BRANCH] Phase A of the manual respond-by nudge.** Implementation,
+   evidence matrix, review findings, and verification are recorded in
+   `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` §8. Do not describe this as
+   production until the branch is reviewed and promoted.
+
 ### Verified Open
 
-1. **[VERIFIED OPEN] Phase A of the manual respond-by nudge — Codex leads, Claude
-   reviews.** Owner directive S424. Scope, design, and verification table are in
-   `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` §0/§3/§4/§5. Ship the nudge
-   plus selected/revoked guards on both manual paths. Do NOT arm
-   `respondReminderEnabled`.
-
-2. **[VERIFIED OPEN] Phase B — mint-surface hardening.** Separate change, own
+1. **[VERIFIED OPEN] Phase B — mint-surface hardening.** Separate change, own
    review. `ensureToken`, `send-emails-service:674`, `regenerate-token-service:93`
    all mint without a selected/revoked check. Pre-existing exposure; the
    resurrection invariant is NOT closed until this lands. Evidence: the
    mint-surface audit table in the plan.
 
-3. **[VERIFIED OPEN] The respond-by cron is unsafe and must not be armed.**
+2. **[VERIFIED OPEN] The respond-by cron is unsafe and must not be armed.**
    Removal manufactures the exact row shape it selects. Needs `wmkf_selected` and
    revocation filters before `respondReminderEnabled` is ever exposed or set.
    Evidence: `lib/services/reviewer-reminder-sweep.js:106-113`, `:146-149`.
 
-4. **[VERIFIED OPEN, carried from S423] The merge cascade is still
+3. **[VERIFIED OPEN, carried from S423] The merge cascade is still
    non-transactional.** `hardDeleteById` (`reviewer-merge.js:448`) permanently
    deletes colliding loser rows with no compensation.
 
-5. **[VERIFIED OPEN, carried from S423] The slot-binding half of the ETag question
+4. **[VERIFIED OPEN, carried from S423] The slot-binding half of the ETag question
    is unverified.** Needs a controlled sandbox write.
 
-6. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
+5. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
    rather than delete it.** `shared/components/reviewers/reviewer-modes.js:95-97`.
 
-7. **[VERIFIED OPEN, carried] SharePoint: PnP.PowerShell audit with Connor;
+6. **[VERIFIED OPEN, carried] SharePoint: PnP.PowerShell audit with Connor;
    Purview/holds evidence with the M365 compliance admin; board milestone snapshot
    producer.**
 
@@ -178,7 +188,7 @@ chain in my own probe.
 | `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` | Phase A/B split, mint-surface audit, decision contracts |
 | `scripts/probe-respond-reminder-gates.js` | Read-only gate attribution, blast-radius projection, token audit |
 | `lib/services/reviewer-reminder-sweep.js` | Both sweeps; `sendOneReminder` claim-before-send at `:283-294` |
-| `lib/services/reviewer-manual-reminder.js` | Shipped manual review-due sender; eligibility at `:74-89` |
+| `lib/services/reviewer-manual-reminder.js` | Both manual reminder paths; pre-claim and post-claim lifecycle authorization |
 | `lib/dataverse/adapters/reviewer-suggestion.js` | `setExternalToken` `:209-217` (clears revocation); `softDelete` `:1951-1959` |
 | `lib/utils/reviewer-provenance.js` | Referral clause encode/decode/split trio |
 | `shared/components/reviewers/ReviewerInvitePanel.js` | `CandidateRationale`; also renders `removedCandidates` |
@@ -186,7 +196,7 @@ chain in my own probe.
 ## Testing
 
 ```bash
-npx jest tests/unit                                   # 584 suites / 7461 tests
+npx jest tests/unit                                   # 586 suites / 7496 tests
 npm run check:types
 
 # Read-only. HAND TO THE USER — do not run it yourself.

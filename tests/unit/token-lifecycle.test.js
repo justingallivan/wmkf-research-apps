@@ -50,6 +50,7 @@ describe('token-lifecycle', () => {
         suggestionId: SUGGESTION_ID,
         requestId: REQUEST_ID,
         expiresAt,
+        ifMatch: 'W/"42"',
       });
 
       expect(typeof result.jwt).toBe('string');
@@ -58,13 +59,14 @@ describe('token-lifecycle', () => {
       expect(result.url).toBe(`https://reviewer.example.com/external/review/${result.jwt}`);
 
       expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
-      const [entitySet, id, patch] = DynamicsService.updateRecord.mock.calls[0];
+      const [entitySet, id, patch, options] = DynamicsService.updateRecord.mock.calls[0];
       expect(entitySet).toBe('wmkf_appreviewersuggestions');
       expect(id).toBe(SUGGESTION_ID);
       expect(patch.wmkf_externaltokenhash).toBe(result.hash);
       expect(patch.wmkf_externaltokenexpires).toBe(expiresAt.toISOString());
       expect(patch.wmkf_externaltokenrevoked).toBe(false);
       expect(typeof patch.wmkf_externaltokenissued).toBe('string');
+      expect(options).toEqual({ actingUserSystemId: undefined, ifMatch: 'W/"42"' });
     });
 
     test('rejects missing args', async () => {
