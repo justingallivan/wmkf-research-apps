@@ -377,6 +377,23 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **External reviewers get scoped file access.** Confirm the access path and
   expiry model before widening what an external token can read; see memory
   `project-external-reviewer-file-access` and `project-sharepoint-integration`.
+- **HAZARD — minting a token CLEARS revocation, so any send path can resurrect
+  withdrawn access (S424).** `setExternalToken`
+  (`lib/dataverse/adapters/reviewer-suggestion.js:209-217`) always writes
+  `wmkf_externaltokenrevoked: false`, and every `mintAndStore` caller routes
+  through it: `ensureToken`, `send-emails-service.js:674`,
+  `regenerate-token-service.js:93` (which gates only on applicant-excluded and
+  does not even select `wmkf_selected`/`wmkf_externaltokenrevoked`), and
+  `reviewer-reminder-sweep.js:283-294`. Removing a candidate writes
+  `wmkf_selected:false` + `wmkf_externaltokenrevoked:true` — and also
+  `accepted:false, declined:false, responsetype:null`
+  (`reviewer-suggestion.js:1951-1959`), which is exactly the shape
+  `sweepRespondReminders` selects (`:106-113`), so removal MANUFACTURES a
+  reminder-eligible row. That cron is safe today only because
+  `wmkf_respondreminderenabled` is null everywhere; do not arm it before its
+  sweep filters on selected and revoked. Plan and mint-surface audit:
+  `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md`.
+
 - **Accept/decline links are durable, signed surfaces.** Changes to link
   generation or response handling need an in-flight invitation compatibility check;
   see memory `project-reviewer-accept-decline-links`.
