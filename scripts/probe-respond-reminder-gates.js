@@ -22,6 +22,8 @@
  *     --target=prod --output outputs/respond-reminder-gates.json
  *
  *   Add --name="Jane Reviewer" to also dump that one reviewer's raw gate inputs.
+ *   Add --assume-enabled to ALSO report where rows would land if the enabled flag
+ *     were on — the blast radius of arming the reminder, without arming it.
  */
 
 const fs = require('node:fs');
@@ -55,6 +57,7 @@ function parseCli(argv) {
     target,
     outputPath: outArg ? outArg.slice('--output='.length) : null,
     name: nameArg ? nameArg.slice('--name='.length).trim().toLowerCase() : null,
+    assumeEnabled: argv.includes('--assume-enabled'),
   };
 }
 
@@ -71,11 +74,18 @@ async function queryAll(client, url) {
   return rows;
 }
 
-function classify(row, request, pd, reviewer, now) {
+/**
+ * @param {{ assumeEnabled?: boolean }} [opts] - assumeEnabled forces gate 2 open to
+ *   answer "what would actually send if the flag were turned on?". The flag is the
+ *   FIRST gate that closes in production, so it masks every later gate: without
+ *   this, the real blast radius of arming the reminder is unknowable short of
+ *   sending. Hypothetical only — it never changes what the sweep does.
+ */
+function classify(row, request, pd, reviewer, now, { assumeEnabled = false } = {}) {
   if (!request) return 'request_not_loaded';
   // Single site in the sweep (`!enabled || offset == null || !emailSentAt`) —
   // split three ways here, since which of the three fired is the whole question.
-  if (request.wmkf_respondreminderenabled !== true) return 'reminder_disabled';
+  if (!assumeEnabled && request.wmkf_respondreminderenabled !== true) return 'reminder_disabled';
   if (!Number.isInteger(request.wmkf_respondoffsetdays)) return 'offset_unset';
   if (!row.wmkf_emailsentat) return 'no_email_sent_at';
 
@@ -92,7 +102,7 @@ function classify(row, request, pd, reviewer, now) {
 }
 
 async function main() {
-  const { target, outputPath, name } = parseCli(process.argv.slice(2));
+  const { target, outputPath, name, assumeEnabled } = parseCli(process.argv.slice(2));
   loadEnvLocal();
   if (target === 'prod' && process.env.DATAVERSE_ALLOW_PROD_READS !== 'yes') {
     throw new Error('Production reads require DATAVERSE_ALLOW_PROD_READS=yes');
@@ -146,6 +156,7 @@ async function main() {
   }
 
   const counts = Object.fromEntries(GATES.map((g) => [g.key, 0]));
+  const countsIfEnabled = assumeEnabled ? Object.fromEntries(GATES.map((g) => [g.key, 0])) : null;
   const perRequest = {};
   let named = null;
 
@@ -155,13 +166,23 @@ async function main() {
     const reviewer = people[row._wmkf_potentialreviewer_value] || null;
     const verdict = classify(row, request, pd, reviewer, now);
     counts[verdict] += 1;
+    // Real verdict and projection are computed together so the artifact can never
+    // show one without the other — a projection read as current state is exactly
+    // the mistake this flag could otherwise cause.
+    const ifEnabled = assumeEnabled
+      ? classify(row, request, pd, reviewer, now, { assumeEnabled: true })
+      : null;
+    if (ifEnabled) countsIfEnabled[ifEnabled] += 1;
 
     const key = request?.akoya_requestnum || row._wmkf_request_value || 'unknown';
     perRequest[key] = perRequest[key] || { respondReminderEnabled: request?.wmkf_respondreminderenabled ?? null,
       respondOffsetDays: request?.wmkf_respondoffsetdays ?? null,
       respondReminderLeadDays: request?.wmkf_respondreminderleaddays ?? null,
-      reviewDueDate: request?.wmkf_reviewduedate ?? null, verdicts: {} };
+      reviewDueDate: request?.wmkf_reviewduedate ?? null,
+      verdicts: {},
+      ...(assumeEnabled ? { wouldSendIfEnabled: 0 } : {}) };
     perRequest[key].verdicts[verdict] = (perRequest[key].verdicts[verdict] || 0) + 1;
+    if (ifEnabled === 'ELIGIBLE') perRequest[key].wouldSendIfEnabled += 1;
 
     if (name && reviewer?.wmkf_name && reviewer.wmkf_name.toLowerCase().includes(name)) {
       named = {
@@ -200,6 +221,14 @@ async function main() {
     scanned: rows.length,
     counts,
     dominantReason: dominant.length ? { gate: dominant[0][0], rows: dominant[0][1], of: rows.length } : null,
+    ...(assumeEnabled ? {
+      ifEnabled: {
+        note: 'HYPOTHETICAL — where these rows would land if wmkf_respondreminderenabled were true on every request. Nothing was sent or changed. `wouldSendNow` is the number of reminder emails the NEXT cron run would produce.',
+        wouldSendNow: countsIfEnabled.ELIGIBLE,
+        of: rows.length,
+        counts: countsIfEnabled,
+      },
+    } : {}),
     gateLegend: Object.fromEntries(GATES.map((g) => [g.key, `${g.why} (sweep${g.at})`])),
     perRequest,
     namedReviewer: named,

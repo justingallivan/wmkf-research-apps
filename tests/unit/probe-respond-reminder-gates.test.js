@@ -112,3 +112,43 @@ describe('respond-reminder gate attribution', () => {
     }
   });
 });
+
+// --assume-enabled forces gate 2 open to answer "what would actually send?".
+// Because the flag is the FIRST gate to close in production, it masks every later
+// gate — so the projection is only trustworthy if it still honors those.
+describe('assumeEnabled projection', () => {
+  const disabled = () => ({ ...okRequest(), wmkf_respondreminderenabled: null });
+  const project = (over = {}) => classify(
+    over.row || okRow(),
+    'request' in over ? over.request : disabled(),
+    'pd' in over ? over.pd : okPd(),
+    'reviewer' in over ? over.reviewer : okReviewer(),
+    NOW,
+    { assumeEnabled: true },
+  );
+
+  test('a row blocked ONLY by the flag becomes ELIGIBLE', () => {
+    expect(run({ request: disabled() })).toBe('reminder_disabled');
+    expect(project()).toBe('ELIGIBLE');
+  });
+
+  test('later gates still apply — the projection is not a blanket pass', () => {
+    // Each of these is masked by the flag today; arming it must NOT send them.
+    expect(project({ request: { ...disabled(), wmkf_respondoffsetdays: null } })).toBe('offset_unset');
+    expect(project({ row: { ...okRow(), wmkf_emailsentat: new Date(NOW - DAY_MS).toISOString() } }))
+      .toBe('not_yet_due');
+    expect(project({ row: { ...okRow(), wmkf_externaltokenexpires: new Date(NOW - DAY_MS).toISOString() } }))
+      .toBe('token_expired');
+    expect(project({ pd: null })).toBe('no_program_director');
+    expect(project({ reviewer: null })).toBe('no_reviewer_email');
+  });
+
+  test('a genuinely enabled request is unaffected by the projection', () => {
+    expect(classify(okRow(), okRequest(), okPd(), okReviewer(), NOW, { assumeEnabled: true })).toBe('ELIGIBLE');
+    expect(classify(okRow(), okRequest(), okPd(), okReviewer(), NOW)).toBe('ELIGIBLE');
+  });
+
+  test('the projection never overrides a missing request', () => {
+    expect(project({ request: null })).toBe('request_not_loaded');
+  });
+});
