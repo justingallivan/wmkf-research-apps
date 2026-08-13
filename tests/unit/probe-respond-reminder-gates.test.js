@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-const { classify, auditToken, GATES, TOKEN_STATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
+const { classify, auditToken, parseCli, GATES, TOKEN_STATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
 
 const NOW = Date.parse('2026-08-13T12:00:00Z');
 
@@ -216,5 +216,42 @@ describe('auditToken', () => {
     ];
     expect(new Set(seen).size).toBe(5);
     for (const state of seen) expect(TOKEN_STATES).toContain(state);
+  });
+});
+
+// The usage block documented `--output <path>` while the parser accepted only
+// `--output=<path>`, so every documented invocation wrote no artifact and said
+// nothing about it. A plan then cited a file that had never been created.
+describe('parseCli flag forms', () => {
+  test.each([
+    ['equals form', ['--target=prod', '--output=outputs/a.json']],
+    ['space form', ['--target=prod', '--output', 'outputs/a.json']],
+  ])('--output is honored in %s', (_label, argv) => {
+    expect(parseCli(argv).outputPath).toBe('outputs/a.json');
+  });
+
+  test.each([
+    ['equals form', ['--target=prod', '--name=Jane Reviewer']],
+    ['space form', ['--target=prod', '--name', 'Jane Reviewer']],
+  ])('--name is honored in %s', (_label, argv) => {
+    expect(parseCli(argv).name).toBe('jane reviewer');
+  });
+
+  test('a flag with no value does not swallow the next flag', () => {
+    const parsed = parseCli(['--target=prod', '--output', '--assume-enabled']);
+    expect(parsed.outputPath).toBeNull();
+    expect(parsed.assumeEnabled).toBe(true);
+  });
+
+  test('omitted optional flags stay null', () => {
+    const parsed = parseCli(['--target=prod']);
+    expect(parsed.outputPath).toBeNull();
+    expect(parsed.name).toBeNull();
+    expect(parsed.assumeEnabled).toBe(false);
+  });
+
+  test('target is required and validated', () => {
+    expect(() => parseCli([])).toThrow(/--target/);
+    expect(() => parseCli(['--target=staging'])).toThrow(/Unknown target/);
   });
 });

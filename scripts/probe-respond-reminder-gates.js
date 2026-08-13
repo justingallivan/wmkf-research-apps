@@ -57,12 +57,22 @@ function parseCli(argv) {
   if (!targetArg) throw new Error('--target=prod or --target=sandbox is required');
   const target = targetArg.slice('--target='.length);
   if (target !== 'prod' && target !== 'sandbox') throw new Error(`Unknown target: ${target}`);
-  const outArg = argv.find((a) => a.startsWith('--output='));
-  const nameArg = argv.find((a) => a.startsWith('--name='));
+  // Accept BOTH `--flag=value` and `--flag value`. The usage block advertised the
+  // space form while only the `=` form parsed, so every documented invocation
+  // silently produced no artifact — the probe printed its findings and wrote
+  // nothing, and a plan then cited a file that had never existed.
+  const valueOf = (flag) => {
+    const eq = argv.find((a) => a.startsWith(`${flag}=`));
+    if (eq) return eq.slice(flag.length + 1);
+    const i = argv.indexOf(flag);
+    if (i !== -1 && argv[i + 1] && !argv[i + 1].startsWith('--')) return argv[i + 1];
+    return null;
+  };
+  const name = valueOf('--name');
   return {
     target,
-    outputPath: outArg ? outArg.slice('--output='.length) : null,
-    name: nameArg ? nameArg.slice('--name='.length).trim().toLowerCase() : null,
+    outputPath: valueOf('--output'),
+    name: name ? name.trim().toLowerCase() : null,
     assumeEnabled: argv.includes('--assume-enabled'),
   };
 }
@@ -312,4 +322,4 @@ if (require.main === module) {
 
 // Exported for tests: the attribution is the whole value of this probe, so it is
 // asserted gate-by-gate rather than trusted on first run.
-module.exports = { classify, auditToken, GATES, TOKEN_STATES, DAY_MS };
+module.exports = { classify, auditToken, parseCli, GATES, TOKEN_STATES, DAY_MS };
