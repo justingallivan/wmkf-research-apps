@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InviteEmailModal, {
   applySubjectTiming,
   validateInvitationTimeline,
+  invitationTimelineWarning,
 } from '../../shared/components/reviewers/InviteEmailModal';
 import { readSseStream } from '../../shared/components/reviewers/sse';
 
@@ -75,17 +76,80 @@ describe('InviteEmailModal invitation timing contract', () => {
     }, today)).toBeNull();
   });
 
-  test('rejects proposal release before response and review due on/before release', () => {
+  test('allows a late invitation whose response deadline falls after proposal release', () => {
+    // today + 7 = 2026-07-31, which is AFTER the already-fixed 07-30 release
+    // date. This is the late-cycle invite that used to disable Send with no
+    // visible reason (S422 owner decision: release needs a PD action and the
+    // date is email-only copy, so the ordering is odd but permitted).
     expect(validateInvitationTimeline({
       respondOffsetDays: 7,
       proposalSendDate: '2026-07-30',
       reviewDueDate: '2026-09-15',
-    }, today)).toMatch(/release cannot be earlier/i);
+    }, today)).toBeNull();
+  });
+
+  test('still rejects a review due date on or before the proposal release date', () => {
     expect(validateInvitationTimeline({
       respondOffsetDays: 7,
       proposalSendDate: '2026-08-18',
       reviewDueDate: '2026-08-18',
-    }, today)).toMatch(/due date must be after/i);
+    }, today)).toMatch(/due date must be after the proposal release date/i);
+  });
+
+  test('does NOT block when reviews fall due on or before the response deadline', () => {
+    // respondBy is 07-31 and reviews are due 07-30. Untidy, not impossible —
+    // late acceptances are handled with an extension — and the condition
+    // arrives on its own as respondBy drifts, so it must never disable Send.
+    // Making this a blocking rule again fails here.
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-28',
+      reviewDueDate: '2026-07-30',
+    }, today)).toBeNull();
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '',
+      reviewDueDate: '2026-07-30',
+    }, today)).toBeNull();
+  });
+
+  test('warns, without blocking, when reviews fall due on or before the response deadline', () => {
+    const warning = invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-28',
+      reviewDueDate: '2026-07-30',
+    }, today);
+    expect(warning).toMatch(/due on or before the response deadline/i);
+    // Must point at the per-reviewer extension, NOT at editing the due date in
+    // the panel: request campaign config is seeded "set only if unset", so a
+    // late-wave edit changes this email's copy while the portal, reminder sweep,
+    // and token math keep the original date (Codex adversarial review).
+    expect(warning).toMatch(/extension/i);
+    expect(warning).not.toMatch(/edit the dates/i);
+    expect(invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-28',
+      reviewDueDate: '2026-07-30',
+    }, today)).toMatch(/due on or before the response deadline/i);
+    // Applies with no release date set too.
+    expect(invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '',
+      reviewDueDate: '2026-07-30',
+    }, today)).toMatch(/due on or before the response deadline/i);
+  });
+
+  test('does not warn on a chronological timeline or when the due date is unset', () => {
+    expect(invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-08-18',
+      reviewDueDate: '2026-09-15',
+    }, today)).toBeNull();
+    expect(invitationTimelineWarning({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-08-18',
+      reviewDueDate: '',
+    }, today)).toBeNull();
   });
 
   test('renders the campaign response deadline in the subject and degrades cleanly when unset', () => {

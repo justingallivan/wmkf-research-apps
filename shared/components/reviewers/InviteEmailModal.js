@@ -122,19 +122,70 @@ function applyTiming(body, timing) {
 // The existing campaign fields remain authoritative; this only prevents an
 // invitation from presenting the configured dates in an impossible order.
 // Blank dates retain the existing behavior (their copy line is omitted).
+//
+// DELIBERATELY NOT VALIDATED — a response deadline AFTER the proposal release
+// date (owner decision 2026-08-12, S422). It reads oddly but it is not
+// impossible, and blocking it broke a real workflow: invite late in a cycle and
+// `respondBy` (today + offset) drifts past an already-fixed release date purely
+// because time passed, disabling Send with no visible reason. Three facts make
+// the block unjustifiable:
+//   1. Release is never automatic. `wmkf_materialssentat` has exactly one writer
+//      (`lib/services/review-manager/send-emails-service.js`, materials branch),
+//      reachable only through the staff-guarded /api/review-manager/send-emails
+//      route. No cron sends materials. A PD decides when proposals go out.
+//   2. `proposalSendDate` is email-only copy for this invitation, not state the
+//      system acts on — it renders as a template token in email-generator.js.
+//   3. `respondBy` is derived from TODAY, so this condition arrives on its own.
+// The resulting "we will send the proposal by <date>" / "respond by <later
+// date>" wording is accepted for this cycle and disappears next cycle, when
+// materials are in hand at invitation time. Do not reinstate the check as an
+// apparent oversight.
+//
+// Only ONE ordering still blocks: reviews due on or before proposal release.
+// That compares two FIXED dates, so if it trips somebody configured something
+// incoherent and no amount of waiting will fix it.
+//
+// THE DIVIDING LINE: never block on a condition involving `respondBy`. It is
+// computed from TODAY, so any rule that reads it will start failing on its own
+// as the calendar moves, with nothing having changed. Blocking rules compare
+// fixed dates; drifting conditions warn (see invitationTimelineWarning).
 export function validateInvitationTimeline(timing, today = new Date()) {
-  const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
   const proposalDelivery = timing.proposalSendDate || '';
   const reviewDue = timing.reviewDueDate || '';
 
-  if (respondBy && proposalDelivery && proposalDelivery < respondBy) {
-    return 'Proposal release cannot be earlier than the response deadline.';
-  }
   if (proposalDelivery && reviewDue && reviewDue <= proposalDelivery) {
     return 'The review due date must be after the proposal release date.';
   }
-  if (!proposalDelivery && respondBy && reviewDue && reviewDue <= respondBy) {
-    return 'The review due date must be after the response deadline.';
+  return null;
+}
+
+// Non-blocking counterpart. Reviews falling due on or before the response
+// deadline is untidy rather than impossible: reviewers usually accept well
+// inside the window, and a late acceptance is handled operationally by granting
+// an extension (`wmkf_reviewduedateoverride`, per-reviewer, S417). It also
+// arrives on its own as `respondBy` drifts, so it must not disable Send —
+// that was the original bug in a narrower window (owner decision 2026-08-12).
+//
+// Deliberately advisory-only. It names the EXTENSION as the remedy, and must not
+// tell the PD to fix this by editing the due date in the panel above: on any wave
+// after the first that silently fails. `send-emails-service.js` seeds request
+// campaign config "set only if unset"
+// (`if (dueDate != null && reqRec.wmkf_reviewduedate == null)`), and skips seeding
+// entirely for `allowResend` — so a late-cycle edit changes THIS email's copy while
+// the request, portal, reminder sweep, and token math keep the original date. The
+// per-reviewer override is the only authoritative remedy; it is what
+// `resolveEffectiveReviewDueDate` reads everywhere. (Codex adversarial review,
+// 2026-08-12, against an earlier version of this string that did exactly that.)
+//
+// A bespoke per-invitation due date was considered and declined as not worth the
+// effort for a condition that disappears next cycle, when materials are in hand at
+// invitation time.
+export function invitationTimelineWarning(timing, today = new Date()) {
+  const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
+  const reviewDue = timing.reviewDueDate || '';
+
+  if (respondBy && reviewDue && reviewDue <= respondBy) {
+    return 'Reviews are due on or before the response deadline. If this reviewer accepts late, grant them an extension from Track Reviewers.';
   }
   return null;
 }
@@ -193,6 +244,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [repairState, setRepairState] = useState({});
   const mountedRef = useRef(true);
   const timelineError = validateInvitationTimeline(timing);
+  // Advisory only — deliberately NOT part of the `disabled` condition below.
+  const timelineWarning = invitationTimelineWarning(timing);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -770,11 +823,21 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     <p className="text-[11px] text-gray-400 mt-2">
                       Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
-                    {timelineError ? (
-                      <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
-                    ) : null}
                   </div>
                 )}
+                {/* Rendered OUTSIDE the collapsible body on purpose: this message
+                    explains why Send is disabled, and the panel is collapsed by
+                    default. Nested inside, it was absent from the DOM entirely —
+                    invisible, and never announced despite role="alert" — so a PD
+                    saw only a grayed-out button (S422). The button's `title`
+                    carries the same text but cannot be relied on: browsers
+                    suppress pointer events on disabled controls. */}
+                {timelineError ? (
+                  <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
+                ) : null}
+                {!timelineError && timelineWarning ? (
+                  <p role="status" className="text-xs text-amber-800 mt-2">{timelineWarning}</p>
+                ) : null}
               </div>
 
               {flaggedAbstract && !abstractEditorOpen && (
