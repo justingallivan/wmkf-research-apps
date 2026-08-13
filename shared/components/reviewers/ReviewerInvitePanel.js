@@ -359,8 +359,12 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           removed: 'This reviewer was removed from the proposal — restore them first.',
           revoked: "This reviewer's access was withdrawn — reissue their link before nudging.",
           conflict: 'This reminder was already claimed by another send — refresh to see the latest status.',
+          not_found: 'This reviewer is no longer available — refresh to update the list.',
+          read_failed: "I couldn't verify this reviewer's latest status. No reminder was sent; try again.",
+          prepare_failed: 'I could not prepare the reminder. No reminder was sent; try again.',
         };
         alert(messages[data.reason] || 'Could not send the reminder. Refresh and try again.');
+        if (onRefresh && ['removed', 'revoked', 'not_found'].includes(data.reason)) onRefresh();
         return;
       }
       if (onRefresh) onRefresh();
@@ -765,5 +769,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
 }
 
 export default function ReviewerInvitePanel(props) {
+  // Request identity owns all selection, disclosure, modal, and async-send state.
+  // A request switch intentionally starts with a fresh panel instance.
   return <ReviewerInvitePanelForRequest key={props.requestId} {...props} />;
 }

@@ -51,6 +51,13 @@ describe('token-lifecycle', () => {
         requestId: REQUEST_ID,
         expiresAt,
         ifMatch: 'W/"42"',
+        writeFields: {
+          wmkf_respondremindersentat: '2026-08-13T00:00:00.000Z',
+          wmkf_externaltokenhash: 'must-not-win',
+          wmkf_externaltokenissued: '2000-01-01T00:00:00.000Z',
+          wmkf_externaltokenexpires: '2000-01-01T00:00:00.000Z',
+          wmkf_externaltokenrevoked: true,
+        },
       });
 
       expect(typeof result.jwt).toBe('string');
@@ -65,7 +72,8 @@ describe('token-lifecycle', () => {
       expect(patch.wmkf_externaltokenhash).toBe(result.hash);
       expect(patch.wmkf_externaltokenexpires).toBe(expiresAt.toISOString());
       expect(patch.wmkf_externaltokenrevoked).toBe(false);
-      expect(typeof patch.wmkf_externaltokenissued).toBe('string');
+      expect(patch.wmkf_externaltokenissued).not.toBe('2000-01-01T00:00:00.000Z');
+      expect(patch.wmkf_respondremindersentat).toBe('2026-08-13T00:00:00.000Z');
       expect(options).toEqual({ actingUserSystemId: undefined, ifMatch: 'W/"42"' });
     });
 

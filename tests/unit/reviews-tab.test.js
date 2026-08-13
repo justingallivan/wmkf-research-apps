@@ -137,6 +137,44 @@ test('shows an empty state when no reviewer has submitted', async () => {
   expect(screen.queryByText('Export:')).not.toBeInTheDocument();
 });
 
+test.each([
+  ['removed', /removed from the proposal.*restore them first/i],
+  ['revoked', /access was withdrawn.*reissue their link/i],
+  ['not_found', /no longer available.*refresh to update/i],
+  ['conflict', /already claimed.*refresh to see/i],
+  ['read_failed', /couldn't verify.*no reminder was sent/i],
+  ['prepare_failed', /could not prepare.*no reminder was sent/i],
+])('maps the %s reminder refusal to durable actionable copy without erasing the row', async (reason, copy) => {
+  const proposal = {
+    proposalId: 'req1',
+    reviewers: [{
+      suggestionId: 'g2',
+      name: 'Dr. Pending',
+      reviewStatus: 'materials_sent',
+      materialsSentAt: '2026-08-01T00:00:00Z',
+      reminderCount: 0,
+    }],
+  };
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, proposals: [proposal] }),
+    })
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ ok: false, reason }),
+    });
+
+  render(<ReviewsTab requestId="req1" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Send reminder now' }));
+
+  expect(await screen.findByText(copy)).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
+  expect(screen.queryByText(reason, { exact: true })).not.toBeInTheDocument();
+});
+
 test('keeps a stored synthesis visible even when there are no accepted reviewer rows', async () => {
   fetch.mockResolvedValue({
     ok: true,

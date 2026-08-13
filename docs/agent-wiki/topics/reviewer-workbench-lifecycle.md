@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-12
+last_verified: 2026-08-13
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -19,8 +19,12 @@ source_files:
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/ReviewerDueDateEditor.js
+  - shared/components/workbench/ReviewsTab.js
   - pages/api/review-manager/review-due-extension.js
+  - pages/api/review-manager/send-review-reminder.js
   - lib/services/reviewer-due-extension.js
+  - lib/services/reviewer-manual-reminder.js
+  - lib/services/reviewer-reminder-sweep.js
   - lib/services/review-manager/send-emails-service.js
   - lib/services/reviewer-acceptance-drain.js
   - lib/bill/honorarium-onboard-orchestrator.js
@@ -63,6 +67,7 @@ canonical_docs:
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
   - docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md
+  - docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md
   - docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md
   - docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md
 watch_paths:
@@ -862,14 +867,19 @@ materials haven't been sent). The button posts `{ requestId, suggestionId }` to
 (`requireAppAccess('review-manager', 'reviewers')`, both ids GUID-validated
 before any Dataverse selector), which delegates to
 `lib/services/reviewer-manual-reminder.js#sendManualReviewDueReminder`. That
-service re-derives eligibility from a fresh read (accepted, materials sent or
-under review, review not received, not applicant-excluded via `isExcluded`)
-and reuses `reviewer-reminder-sweep.js`'s exported `loadRequestContext` /
-`loadReviewer` / `sendOneReminder` verbatim — same claim-before-send (If-Match
-on `wmkf_remindersentat`+`wmkf_remindercount`) as the review-due cron, so
-manual and cron sends share one fire-once marker and can never double-send.
-Unlike the cron, a manual re-send when the marker is already set IS allowed
-(staff-initiated); a claim conflict (412) returns an error without sending.
+service preflights eligibility, loads delivery inputs, then authorizes again
+from a fresh row immediately before persistence (accepted, materials sent or
+under review, review not received, selected, not token-revoked, and not
+applicant-excluded via `isExcluded`). It reuses
+`reviewer-reminder-sweep.js`'s exported `loadRequestContext` / `loadReviewer` /
+`sendOneReminder` send/token/template machinery, but the manual path writes
+`wmkf_remindersentat` + `wmkf_remindercount` + fresh token authority in one
+PATCH bound to that fresh row's ETag. The email is attempted only after the
+atomic write succeeds; a 412 returns conflict without sending. A read failure
+and a pre-email token-preparation failure remain distinct retryable outcomes,
+while an email failure after persistence retains the marker. Manual and cron
+share the marker, but a deliberate staff manual re-send remains allowed even
+when it is already set.
 
 **Structured staff review rescue:** each accepted, not-yet-submitted reviewer in
 the Reviews tab also offers "Enter review manually" for cases where the external

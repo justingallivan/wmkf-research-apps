@@ -1,8 +1,8 @@
 /**
  * Manual "Send reminder now" action (workbench Reviews tab Phase 1).
  *
- * Verifies eligibility rejection, claim-before-send (412 → conflict, no send),
- * marker+count stamped BEFORE the email goes out, and that a re-send IS
+ * Verifies eligibility rejection, atomic marker+token persistence (412 →
+ * conflict, no send), marker+count stamped BEFORE the email goes out, and that a re-send IS
  * allowed even when `wmkf_remindersentat` is already set (unlike the cron,
  * which is fire-once). All Dataverse/email calls are mocked — no real sends.
  */
@@ -124,21 +124,23 @@ beforeEach(() => {
 });
 
 describe('sendManualReviewDueReminder', () => {
-  test('eligible reviewer: claims marker (If-Match) BEFORE minting/sending, increments count', async () => {
+  test('eligible reviewer atomically claims marker with token persistence before sending', async () => {
     installReads();
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1' });
     expect(result).toEqual({ ok: true });
 
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions', SUG,
-      expect.objectContaining({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: 1 }),
-      expect.objectContaining({ ifMatch: 'W/"100"', actingUserSystemId: 'u-1' }),
-    );
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).toHaveBeenCalledTimes(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"100"' }));
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      ifMatch: 'W/"100"',
+      actingUserSystemId: 'u-1',
+      writeFields: expect.objectContaining({
+        wmkf_remindersentat: expect.any(String),
+        wmkf_remindercount: 1,
+      }),
+    }));
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    // Claim-before-send: marker write precedes token mint precedes send.
-    expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
+    // mintAndStore owns the conditional marker+token PATCH and finishes before send.
     expect(mintAndStore.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
 
     const email = createAndSendEmail.mock.calls[0][0];
@@ -154,21 +156,59 @@ describe('sendManualReviewDueReminder', () => {
     // Marker already set from a prior send — manual send does not filter on it.
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: true });
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions', SUG,
-      expect.objectContaining({ wmkf_remindercount: 3 }),
-      expect.anything(),
-    );
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      writeFields: expect.objectContaining({ wmkf_remindercount: 3 }),
+    }));
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   });
 
-  test('claim conflict (412 / stale etag) → conflict result, no send', async () => {
+  test('review-due atomic claim increments the freshly authorized reminder count', async () => {
+    installReads({
+      suggestion: suggestionRow({ wmkf_remindercount: 1 }),
+      suggestionAfterClaim: suggestionRow({ wmkf_remindercount: 2, _etag: 'W/"101"' }),
+    });
+
+    await expect(sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG })).resolves.toEqual({ ok: true });
+
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      ifMatch: 'W/"101"',
+      writeFields: expect.objectContaining({ wmkf_remindercount: 3 }),
+    }));
+  });
+
+  test('atomic marker+token conflict (412 / stale etag) → conflict result, no send', async () => {
     installReads();
-    updateRecord.mockRejectedValue(Object.assign(new Error('412'), { status: 412 }));
+    mintAndStore.mockRejectedValue(Object.assign(new Error('412'), { status: 412 }));
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'conflict' });
-    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      ifMatch: 'W/"100"',
+      writeFields: expect.objectContaining({ wmkf_remindercount: 1 }),
+    }));
     expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('token preparation failure before persistence attempts no email and is retryable', async () => {
+    installReads();
+    mintAndStore.mockRejectedValueOnce(new Error('token service unavailable'));
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toMatchObject({ ok: false, reason: 'prepare_failed' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('email failure after atomic persistence retains the marker and is not retryable', async () => {
+    installReads();
+    createAndSendEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toMatchObject({ ok: false, reason: 'send_failed' });
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      writeFields: expect.objectContaining({ wmkf_remindersentat: expect.any(String) }),
+    }));
   });
 
   test.each([
@@ -183,7 +223,7 @@ describe('sendManualReviewDueReminder', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('a review submitted after the claim is refused before mint/send', async () => {
+  test('a review submitted after initial eligibility is refused before atomic claim/send', async () => {
     installReads({
       suggestion: suggestionRow(),
       suggestionAfterClaim: suggestionRow({
@@ -193,7 +233,7 @@ describe('sendManualReviewDueReminder', () => {
     });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'ineligible' });
-    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
@@ -201,14 +241,14 @@ describe('sendManualReviewDueReminder', () => {
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
     ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
-  ])('reviewer becoming %s after the claim is refused before mint/send', async (_label, state, reason) => {
+  ])('reviewer becoming %s after initial eligibility is refused before atomic claim/send', async (_label, state, reason) => {
     installReads({
       suggestion: suggestionRow(),
       suggestionAfterClaim: suggestionRow({ ...state, _etag: 'W/"101"' }),
     });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason });
-    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
@@ -257,12 +297,47 @@ describe('sendManualReviewDueReminder', () => {
 
   test('suggestion not found → not_found, no claim/send', async () => {
     getRecord.mockImplementation(async (set) => {
-      if (set === 'wmkf_appreviewersuggestions') throw new Error('Get record failed (404)');
+      if (set === 'wmkf_appreviewersuggestions') {
+        throw Object.assign(new Error('Get record failed (404)'), { status: 404 });
+      }
       return null;
     });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'not_found' });
     expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('initial Dataverse read failure is surfaced as retryable, not not_found', async () => {
+    getRecord.mockRejectedValueOnce(Object.assign(new Error('Dataverse unavailable'), { status: 503 }));
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'read_failed' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('transient authorization re-read failure is retryable and writes nothing', async () => {
+    let suggestionReads = 0;
+    installReads();
+    getRecord.mockImplementation(async (set, id) => {
+      if (set === 'wmkf_appreviewersuggestions') {
+        suggestionReads += 1;
+        if (suggestionReads === 1) return suggestionRow();
+        throw Object.assign(new Error('Dataverse unavailable'), { status: 503 });
+      }
+      if (set === 'akoya_requests') return requestRecord();
+      if (set === 'systemusers') return { systemuserid: PD, internalemailaddress: 'pd@keck.org', isdisabled: false };
+      if (set === 'wmkf_potentialreviewerses') return { wmkf_potentialreviewersid: PERSON, wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'rev@example.org' };
+      return null;
+    });
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'read_failed' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
@@ -291,14 +366,13 @@ describe('sendManualRespondReminder', () => {
     const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1' });
 
     expect(result).toEqual({ ok: true });
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions', SUG,
-      { wmkf_respondremindersentat: expect.any(String) },
-      expect.objectContaining({ ifMatch: 'W/"100"', actingUserSystemId: 'u-1' }),
-    );
-    expect(updateRecord.mock.calls[0][2]).not.toHaveProperty('wmkf_remindersentat');
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).toHaveBeenCalledTimes(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"100"' }));
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      ifMatch: 'W/"100"',
+      actingUserSystemId: 'u-1',
+      writeFields: { wmkf_respondremindersentat: expect.any(String) },
+    }));
     expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       subject: RESPOND_SUBJECT,
       to: 'rev@example.org',
@@ -326,26 +400,26 @@ describe('sendManualRespondReminder', () => {
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
     ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
-  ])('unanswered invite becoming %s after the claim is refused before mint/send', async (_label, state, reason) => {
+  ])('unanswered invite becoming %s after initial eligibility is refused before atomic claim/send', async (_label, state, reason) => {
     installReads({
       suggestion: pendingInvitation(),
       suggestionAfterClaim: pendingInvitation({ ...state, _etag: 'W/"101"' }),
     });
     const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason });
-    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('an invitation accepted after the claim is refused before mint/send', async () => {
+  test('an invitation accepted after initial eligibility is refused before atomic claim/send', async () => {
     installReads({
       suggestion: pendingInvitation(),
       suggestionAfterClaim: pendingInvitation({ wmkf_accepted: true, _etag: 'W/"101"' }),
     });
     const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'ineligible' });
-    expect(updateRecord).toHaveBeenCalledTimes(1);
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
@@ -361,6 +435,30 @@ describe('sendManualRespondReminder', () => {
 
     expect(result).toEqual({ ok: false, reason: 'conflict' });
     expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"101"' }));
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a transient authorization re-read failure is retryable and leaves no reminder marker or token write', async () => {
+    let suggestionReads = 0;
+    getRecord.mockImplementation(async (set) => {
+      if (set === 'wmkf_appreviewersuggestions') {
+        suggestionReads += 1;
+        if (suggestionReads === 1) return pendingInvitation();
+        throw Object.assign(new Error('Dataverse transient'), { status: 503 });
+      }
+      if (set === 'akoya_requests') return requestRecord();
+      if (set === 'systemusers') return { systemuserid: PD, internalemailaddress: 'pd@keck.org', isdisabled: false };
+      if (set === 'wmkf_potentialreviewerses') {
+        return { wmkf_potentialreviewersid: PERSON, wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'rev@example.org' };
+      }
+      return null;
+    });
+
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'read_failed' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 

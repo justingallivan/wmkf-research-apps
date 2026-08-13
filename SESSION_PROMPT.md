@@ -1,4 +1,4 @@
-# Session 425 Prompt: Phase A implemented; Claude review and promotion pending
+# Session 425 Prompt: Phase A reviewed; promotion pending
 
 ## Session 424 Summary
 
@@ -52,11 +52,14 @@ chain in my own probe.
 6. **Implemented Phase A on `codex/manual-respond-by-nudge` (not production).**
    Added the active-row respond nudge, route discriminator, last-nudged
    projection, and selected/revoked guards on both manual reminder paths. A
-   fresh adversarial review found and drove fixes for a post-claim token-mint
-   race and A → B → A stale UI state. Manual token writes now re-authorize after
-   claim and bind minting to the fresh ETag; the automatic sweep and Phase B mint
-   callers remain deliberately unchanged. Claude review and promotion are still
-   pending.
+   fresh adversarial review found and drove fixes for a token-mint race and
+   A → B → A stale UI state. Claude Opus then found a phantom-marker risk in the
+   intermediate design and raw Reviews-tab refusal codes. Manual sends now
+   freshly authorize and persist marker + token in one ETag-bound PATCH before
+   email; typed read/preparation failures remain retryable, post-persistence
+   email failure retains the marker, and both UIs render actionable copy. Opus
+   re-review found no remaining P0/P1/P2 issue. The automatic sweep and Phase B
+   mint callers remain deliberately unchanged; promotion is still pending.
 
 ### Commits
 
@@ -187,8 +190,8 @@ chain in my own probe.
 |------|---------|
 | `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` | Phase A/B split, mint-surface audit, decision contracts |
 | `scripts/probe-respond-reminder-gates.js` | Read-only gate attribution, blast-radius projection, token audit |
-| `lib/services/reviewer-reminder-sweep.js` | Both sweeps; `sendOneReminder` claim-before-send at `:283-294` |
-| `lib/services/reviewer-manual-reminder.js` | Both manual reminder paths; pre-claim and post-claim lifecycle authorization |
+| `lib/services/reviewer-reminder-sweep.js` | Both sweeps; cron claim-then-mint and manual atomic marker+token persistence |
+| `lib/services/reviewer-manual-reminder.js` | Both manual reminder paths; preflight plus fresh pre-write lifecycle authorization |
 | `lib/dataverse/adapters/reviewer-suggestion.js` | `setExternalToken` `:209-217` (clears revocation); `softDelete` `:1951-1959` |
 | `lib/utils/reviewer-provenance.js` | Referral clause encode/decode/split trio |
 | `shared/components/reviewers/ReviewerInvitePanel.js` | `CandidateRationale`; also renders `removedCandidates` |
@@ -196,7 +199,7 @@ chain in my own probe.
 ## Testing
 
 ```bash
-npx jest tests/unit                                   # 586 suites / 7496 tests
+npm test -- --runInBand                              # 617 suites / 7902 tests
 npm run check:types
 
 # Read-only. HAND TO THE USER — do not run it yourself.

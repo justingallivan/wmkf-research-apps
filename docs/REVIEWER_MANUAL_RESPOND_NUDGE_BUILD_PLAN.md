@@ -16,9 +16,9 @@ related:
 
 # Manual Respond-By Nudge — Build Plan
 
-**Status:** PHASE A IMPLEMENTED on `codex/manual-respond-by-nudge`; independent
-Codex adversarial review is clean after fixes. Awaiting Claude review and
-promotion; not deployed to production. Phase B remains open.
+**Status:** PHASE A IMPLEMENTED on `codex/manual-respond-by-nudge`; Claude Opus
+re-review found no remaining P0/P1/P2 issues after fixes. Awaiting promotion;
+not deployed to production. Phase B remains open.
 **Session:** S424, 2026-08-13.
 **Build owner:** Codex leads implementation; Claude reviews.
 
@@ -203,7 +203,8 @@ if (row.wmkf_externaltokenrevoked === true) return { ok: false, reason: 'revoked
 
 `SUGGESTION_SELECT` gains `wmkf_selected`, `wmkf_externaltokenrevoked`, and for
 the respond path `wmkf_invited`, `wmkf_emailsentat`, `wmkf_responsetype`,
-`wmkf_declined`, `wmkf_externaltokenexpires`.
+`wmkf_declined`. Manual send intentionally does not require the current token
+expiry because it mints a fresh link after the lifecycle authorization.
 
 **Fail closed on revocation, deliberately.** Revocation has two sources —
 candidate removal and staff cutoff/leak response, which
@@ -236,8 +237,9 @@ cron sends stay byte-identical in what they send and how they claim.
   schedule. A PD clicking the button has already decided. Matches the shipped
   review-due manual, which also has no date gate.
 - **Re-sends allowed**, as with review-due: the marker is stamped but is not a
-  filter here. Concurrency stays safe — `sendOneReminder` claims via If-Match
-  before sending, so a 412 aborts without sending.
+  filter here. Concurrency stays safe — after a fresh lifecycle authorization,
+  `sendOneReminder` persists marker + token in one If-Match PATCH before
+  sending, so a 412 aborts without leaving a phantom reminder marker.
 
 Owner-accepted side effect: minting extends the reviewer's window. Raised and
 accepted 2026-08-13 — this is the point when chasing an overdue invitee.
@@ -266,12 +268,12 @@ the respond marker and the new refusal reason. `check:api-routes` must pass.
   my-candidates DTO (the column is written at
   `[VERIFIED via my-candidates-service.js:633]` but is not currently emitted).
   Without it a PD cannot see they already nudged, and re-sends are allowed.
-- Map **all three** refusal reasons, not just one (§7.4 makes `removed` and
-  `revoked` distinct, so a staff-cutoff row would otherwise render no
-  explanation): `removed` → "This reviewer was removed from the proposal —
-  restore them first"; `revoked` → "This reviewer's access was withdrawn —
-  reissue their link before nudging"; `conflict` → the existing already-claimed
-  copy.
+- Map every typed outcome to staff-facing copy: lifecycle refusal (`removed`,
+  `revoked`, `not_found`), concurrency (`conflict`), transient authorization
+  (`read_failed`), and pre-email persistence/preparation failure
+  (`prepare_failed`). The Invite panel may refresh after its blocking alert for
+  stale lifecycle rows; the Reviews tab keeps its row mounted so inline error
+  copy is not erased by the selected-only roster reload.
 
 ## 5. Verification
 
@@ -345,7 +347,7 @@ Gates: `check:types`, `check:api-routes` (+ self-test), `check:route-lifecycle-a
 |---|---|---|---|---|---|
 | Manual respond nudge is available for an active unanswered invite | `ReviewerInvitePanel` → `POST /api/review-manager/send-review-reminder` with `kind:'respond'` | Fresh suggestion lifecycle reads; respond template defaults | Dynamics email send | Component, route, and service tests | **VERIFIED on branch** |
 | Omitted `kind` preserves the existing review-due action; unknown values fail closed | Existing Reviews-tab caller omits `kind`; route allowlist | N/A | `sendManualReviewDueReminder` or HTTP 400 | Route discriminator tests | **VERIFIED on branch** |
-| Removed/revoked rows cannot be resurrected by either manual reminder path | Both manual services check before claim and re-check after claim | Token PATCH is bound to the post-claim row ETag; a concurrent change yields 412 before email send | Typed `removed`, `revoked`, or `conflict` response | Positive-control pre-claim and post-claim tests, token-write 412 test, `mintAndStore` ETag propagation test | **VERIFIED on branch** |
+| Removed/revoked rows cannot be resurrected by either manual reminder path | Both manual services preflight, then authorize again immediately before the write | Marker + token fields share one PATCH bound to the fresh row ETag; a refusal writes neither, and a concurrent change yields 412 before email send | Typed `removed`, `revoked`, or `conflict` response | Positive-control lifecycle-transition tests on both paths, read-failure tests, atomic-write 412 test, and adversarial `mintAndStore` merge-order test | **VERIFIED on branch** |
 | Respond marker is visible as “last nudged” | `sendOneReminder(kind:'respond')` | `wmkf_respondremindersentat` | my-candidates DTO → active Invite-panel row | Service, DTO, and component tests | **VERIFIED on branch** |
 | Old async responses cannot affect a newly selected request | Request-keyed inner Invite panel | N/A | Alert, refresh, and spinner state | A → B → A component test | **VERIFIED on branch** |
 | Automatic respond sweep is safe to arm | Cron route | Existing campaign toggle and sweep filters | Scheduled email | No Phase A change to cron selection/authorization | **PLANNED — Phase B / cron hardening required** |
@@ -353,14 +355,23 @@ Gates: `check:types`, `check:api-routes` (+ self-test), `check:route-lifecycle-a
 
 ### Review and sweep result
 
-- First adversarial pass found a post-claim removal/token-mint race and an
-  A → B → A stale UI-state race. Both were fixed and regression-tested.
-- Second pass found only a path-specific post-claim test gap. Respond-accepted
+- First adversarial pass found a removal/token-mint race and an A → B → A stale
+  UI-state race. Both were fixed and regression-tested.
+- Second pass found only a path-specific transition test gap. Respond-accepted
   and review-submitted transitions now prove both lifecycle callbacks.
+- Claude Opus review found that the intermediate authorization design could leave
+  a reminder marker when no email was sent, and that the Reviews-tab consumer
+  rendered new refusal codes raw. Manual marker + token persistence is now one
+  fresh-ETag-bound write, and both UI consumers map every typed outcome.
+- Opus re-review found no remaining P0/P1/P2 issue and identified five P3
+  cleanup gaps. The stale lifecycle wiki was corrected; pre-email failures now
+  remain distinct from post-persistence send failures; Reviews-tab refusal copy
+  remains mounted; transient reads are no longer mislabeled `not_found`; and
+  tests pin token-field precedence plus both reminder paths.
 - Durable restatements checked: this plan, `API_ROUTE_SECURITY_MATRIX.md`, the
   reviewer lifecycle wiki hazard, source, DTO consumers, and tests. The stale
   “No code written yet” status was structurally replaced above.
 - **Sweep verdict:** `RECONCILED` for Phase A branch state. Remaining live
-  stale statements: 0. Remaining planned work: Claude review/promotion, Phase B
+  stale statements: 0. Remaining planned work: promotion, Phase B
   mint-surface hardening, and cron guards before enabling
   `respondReminderEnabled`.

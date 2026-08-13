@@ -81,16 +81,21 @@ test('confirms the real email, sends kind=respond, and refreshes the current req
 });
 
 test.each([
-  ['removed', /restore them first/i],
-  ['revoked', /access was withdrawn/i],
-  ['conflict', /already claimed by another send/i],
-])('maps the %s refusal to actionable copy', async (reason, copy) => {
+  ['removed', /restore them first/i, true],
+  ['revoked', /access was withdrawn/i, true],
+  ['not_found', /no longer available/i, true],
+  ['conflict', /already claimed by another send/i, false],
+  ['read_failed', /couldn't verify.*no reminder was sent/i, false],
+  ['prepare_failed', /could not prepare.*no reminder was sent/i, false],
+])('maps the %s refusal to actionable copy and refreshes only stale lifecycle rows', async (reason, copy, shouldRefresh) => {
   global.fetch.mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ ok: false, reason }) });
-  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} />);
+  const onRefresh = jest.fn();
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} onRefresh={onRefresh} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Dr. Pending' }));
 
   await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringMatching(copy)));
+  expect(onRefresh).toHaveBeenCalledTimes(shouldRefresh ? 1 : 0);
 });
 
 test('a late response cannot revive state or affect an A → B → A navigation', async () => {

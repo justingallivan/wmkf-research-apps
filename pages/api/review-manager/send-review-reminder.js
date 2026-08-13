@@ -13,10 +13,11 @@
  *
  * Delegates all claim/eligibility/send logic to
  * `lib/services/reviewer-manual-reminder.js`, which reuses the review-due
- * cron's claim-before-send machinery (`reviewer-reminder-sweep.js`) so each
- * reminder kind writes the same marker as its cron counterpart. Unlike the
- * cron, a manual re-send when the relevant marker is already set IS allowed —
- * see that module's header for the full semantics.
+ * cron's send/token/template machinery (`reviewer-reminder-sweep.js`). The
+ * manual service freshly authorizes the row, then persists its marker + token
+ * in one ETag-bound PATCH before sending. Unlike the cron, a manual re-send
+ * when the relevant marker is already set IS allowed — see that module's
+ * header for the full semantics.
  *
  * Data boundary: staff-shared, matching every other `/api/review-manager/*`
  * route — any `review-manager` user can nudge any suggestion's reviewer.
@@ -33,10 +34,12 @@ import {
 const REASON_STATUS = {
   misconfigured: 502,
   not_found: 404,
+  read_failed: 502,
   removed: 409,
   revoked: 409,
   ineligible: 409,
   conflict: 409,
+  prepare_failed: 502,
   send_failed: 502,
 };
 

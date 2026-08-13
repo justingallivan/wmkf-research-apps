@@ -630,9 +630,15 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        setFeedback({ ok: false, message: data.reason === 'conflict'
-          ? 'Already claimed by another send — refresh to see the latest status.'
-          : (data.reason || 'Failed to send reminder.') });
+        const messages = {
+          conflict: 'Already claimed by another send — refresh to see the latest status.',
+          removed: 'This reviewer was removed from the proposal — restore them first.',
+          revoked: "This reviewer's access was withdrawn — reissue their link before sending a reminder.",
+          not_found: 'This reviewer is no longer available — refresh to update the list.',
+          read_failed: "Couldn't verify this reviewer's latest status. No reminder was sent; try again.",
+          prepare_failed: 'Could not prepare the reminder. No reminder was sent; try again.',
+        };
+        setFeedback({ ok: false, message: messages[data.reason] || 'Failed to send reminder.' });
         return;
       }
       setFeedback({ ok: true, message: 'Reminder sent.' });
