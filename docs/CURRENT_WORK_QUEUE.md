@@ -47,6 +47,22 @@ sequence.
   automation, and genuine external-reviewer use remain probe-required. The
   repository-wide material-claim audit is partial reconciliation, not a clean
   bill of health.
+- **Phantom co-PI on seven requests — NOT REMEDIATED (S422, 2026-08-12).** One
+  duplicate contact carrying the placeholder email `_@_._`
+  (`2a67a272-9eb5-f011-bbd3-6045bd0510d4`) sits in a co-PI slot on requests
+  `1002132`, `1002262`, `1002363`, `1002367`, `1002865`, `1002880`, `1003053`,
+  and in the matching `wmkf_apprequestperson` junction rows. **Nothing has been
+  executed** — `scripts/remediate-placeholder-copi.js` has only ever been run
+  `--dry-run`; all 14 rows are still live in production. No application code is
+  at fault. Only `1002132` reached an awardee (grantee portal, 2026-08-12); the
+  owner reports the other six were not awarded, so no further abstract requests
+  are expected and the exposure risk is contained but the CRM data stays wrong.
+  Root cause is the akoyaGO import and is **Connor's to fix** — until then new
+  requests keep acquiring the phantom. **Seven is a floor, not a ceiling**
+  `[VERIFIED for email exactly `_@_._`; other placeholder shapes UNTESTED]` — the
+  sweep matched that one literal, so `x@x.com`/blank/`noemail@…` variants would
+  not have appeared. Widen the pattern before anyone calls this cleanup complete.
+  Full record with slot/junction ids: `outputs/phantom-copi-incident-2026-08-12.md`.
 
 ## Completed in this execution
 

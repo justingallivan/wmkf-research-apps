@@ -1,5 +1,16 @@
 # Phantom co-PI on seven grant requests — incident record (2026-08-12)
 
+> **STATUS: OPEN — nothing has been remediated.** As of 2026-08-12 the owner has
+> run `scripts/remediate-placeholder-copi.js` in `--dry-run` only. **No write of
+> any kind has been made to production.** All 7 slots and all 7 junction rows
+> listed below are still live. Deliberate: the owner chose not to delete data
+> tonight. Re-verify with a dry-run before acting — do not assume this record
+> still matches live state.
+>
+> Exposure is contained: only `1002132` reached an awardee, and the owner reports
+> the other six requests were **not awarded**, so no further abstract requests are
+> expected. The CRM data remains wrong regardless.
+
 Shareable brief: https://claude.ai/code/artifact/bd6881e6-7fbf-4e1a-8c6c-bb4b6e96ab14
 
 **Summary.** One duplicate contact carrying the placeholder email `_@_._` is
