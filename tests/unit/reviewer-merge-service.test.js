@@ -22,24 +22,63 @@ function slotRow(requestId, slotMap, etag = 'W/"req1"') {
   return row;
 }
 
+// The loser's suggestion rows and applicant slots are STATEFUL here on purpose.
+// executeMerge re-reads both immediately before deactivating (Step 7), so a mock
+// that replayed the plan's snapshot would report the loser as still-referenced
+// after its own repoints/deletes and fail every green merge. Repointing or
+// deleting a row removes it from the live set, and a slot repoint/clear moves the
+// loser out of that slot — which is what Dataverse actually does. Tests simulate a
+// concurrent writer by pushing onto the live set mid-merge (see `_addLoserSug`).
 function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = [], slotsCapped = false } = {}) {
   const withEtags = (rows, prefix) => rows.map((row, index) => ({
     _etag: `W/"${prefix}-${index}"`,
     ...row,
   }));
-  return {
+  // Stamped once, so a row's ETag stays stable as the set shrinks.
+  let liveLoserSug = withEtags(loserSug, 'loser-suggestion');
+  const liveSlots = slots.map((row) => ({ ...row }));
+  const dropLoserSug = (id) => { liveLoserSug = liveLoserSug.filter((r) => r.wmkf_appreviewersuggestionid !== id); };
+  const slotNumberOf = (navProp) => Number(String(navProp).replace(/^wmkf_PotentialReviewer/, ''));
+
+  // Person rows are stateful too, so a merge can be re-executed after a Step 7
+  // replan and the second plan sees the first attempt's writes (notably the email
+  // move) rather than the original snapshot. Without this a convergence test
+  // cannot tell a preserved address from a re-derived one.
+  const liveKeeper = keeperRow ? { ...keeperRow } : keeperRow;
+  const liveLoser = loserRow ? { ...loserRow } : loserRow;
+  const PERSON_FIELD = {
+    name: 'wmkf_name', affiliation: 'wmkf_primaryaffiliation',
+    email: 'wmkf_emailaddress', website: 'wmkf_website', hIndex: 'wmkf_hindex',
+  };
+
+  const deps = {
     potentialReviewer: {
-      getByIdForMerge: jest.fn(async (id) => (id === KEEPER ? keeperRow : loserRow)),
-      update: jest.fn(async () => {}),
-      clearEmail: jest.fn(async () => {}),
-      deactivate: jest.fn(async () => {}),
+      getByIdForMerge: jest.fn(async (id) => {
+        const row = id === KEEPER ? liveKeeper : liveLoser;
+        return row ? { ...row } : row;
+      }),
+      update: jest.fn(async (id, updates) => {
+        const row = id === KEEPER ? liveKeeper : liveLoser;
+        if (!row) return;
+        for (const [k, v] of Object.entries(updates || {})) {
+          if (PERSON_FIELD[k]) row[PERSON_FIELD[k]] = v;
+        }
+      }),
+      clearEmail: jest.fn(async (id) => {
+        const row = id === KEEPER ? liveKeeper : liveLoser;
+        if (row) row.wmkf_emailaddress = null;
+      }),
+      deactivate: jest.fn(async (id) => {
+        const row = id === KEEPER ? liveKeeper : liveLoser;
+        if (row) row.statecode = 1;
+      }),
     },
     suggestions: {
       findAllByPotentialReviewer: jest.fn(async (id) => (
-        id === LOSER ? withEtags(loserSug, 'loser-suggestion') : withEtags(keeperSug, 'keeper-suggestion')
+        id === LOSER ? [...liveLoserSug] : withEtags(keeperSug, 'keeper-suggestion')
       )),
-      repointToPotentialReviewer: jest.fn(async () => {}),
-      hardDeleteById: jest.fn(async () => {}),
+      repointToPotentialReviewer: jest.fn(async (id) => { dropLoserSug(id); }),
+      hardDeleteById: jest.fn(async (id) => { dropLoserSug(id); }),
       isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 'EXCLUDED'),
       // Sentinel-based mock (matches this file's string-disposition convention):
       // applicant provenance = 'RECOMMENDED' disposition OR an 'applicant' source token.
@@ -49,13 +88,33 @@ function makeDeps({ keeperRow, loserRow, loserSug = [], keeperSug = [], slots = 
       ensureApplicantRecommended: jest.fn(async () => ({ id: 'keeper-sug', created: false, selected: true })),
     },
     requests: {
-      queryAllRequests: jest.fn(async () => ({ records: slots, capped: slotsCapped })),
+      queryAllRequests: jest.fn(async () => ({ records: liveSlots.map((r) => ({ ...r })), capped: slotsCapped })),
       getById: jest.fn(async (id) => ({ akoya_requestid: id, _etag: 'W/"request-refresh"' })),
-      updateById: jest.fn(async () => {}),
-      disassociate: jest.fn(async () => {}),
+      updateById: jest.fn(async (requestId, body) => {
+        const bind = Object.keys(body || {}).find((k) => k.endsWith('@odata.bind'));
+        if (!bind) return;
+        const n = slotNumberOf(bind.replace('@odata.bind', ''));
+        const row = liveSlots.find((r) => r.akoya_requestid === requestId);
+        if (row) row[`_wmkf_potentialreviewer${n}_value`] = KEEPER;
+      }),
+      disassociate: jest.fn(async (requestId, navProp) => {
+        const n = slotNumberOf(navProp);
+        const row = liveSlots.find((r) => r.akoya_requestid === requestId);
+        if (row) row[`_wmkf_potentialreviewer${n}_value`] = null;
+      }),
     },
     researcher: { updateById: jest.fn(async () => {}) },
   };
+
+  // Concurrency hooks for the Step 7 re-check tests: mimic a second staff member
+  // referencing the loser while this merge is mid-flight.
+  deps._addLoserSug = (row) => { liveLoserSug = [...liveLoserSug, { _etag: 'W/"late-suggestion"', ...row }]; };
+  deps._addLoserSlot = (requestId, slot) => {
+    const existing = liveSlots.find((r) => r.akoya_requestid === requestId);
+    if (existing) existing[`_wmkf_potentialreviewer${slot}_value`] = LOSER;
+    else liveSlots.push(slotRow(requestId, { [slot]: LOSER }, 'W/"late-req"'));
+  };
+  return deps;
 }
 
 const bareKeeper = { wmkf_potentialreviewersid: KEEPER, wmkf_name: 'Avery Quinn', wmkf_emailaddress: 'avery.quinn@example.org', _etag: 'W/"keeper"' };
@@ -412,7 +471,10 @@ describe('executeMerge — applicant-slot repoint (v1 block lifted)', () => {
       loserSug: [],
       slots: [slotRow(REQ1, { 2: LOSER })],
     });
-    deps.requests.updateById = jest.fn(async () => { order.push('slot'); });
+    // Wrap rather than replace: the underlying mock moves the loser out of the
+    // slot, which the Step 7 pre-deactivate re-check depends on.
+    const repointSlot = deps.requests.updateById;
+    deps.requests.updateById = jest.fn(async (...args) => { order.push('slot'); return repointSlot(...args); });
     deps.potentialReviewer.clearEmail = jest.fn(async () => { order.push('email'); });
     deps.potentialReviewer.deactivate = jest.fn(async () => { order.push('deactivate'); });
     await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps);
@@ -458,7 +520,10 @@ describe('executeMerge — collision-row applicant-provenance union', () => {
       keeperSug: [{ wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ1 }],
     });
     deps.suggestions.ensureApplicantRecommended = jest.fn(async () => { order.push('union'); return { skippedExcluded: false }; });
-    deps.suggestions.hardDeleteById = jest.fn(async () => { order.push('delete'); });
+    // Wrap rather than replace: the underlying mock drops the deleted row, which
+    // the Step 7 pre-deactivate re-check depends on.
+    const hardDelete = deps.suggestions.hardDeleteById;
+    deps.suggestions.hardDeleteById = jest.fn(async (...args) => { order.push('delete'); return hardDelete(...args); });
     const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, actingUserSystemId: 'sys' }, deps);
     expect(deps.suggestions.ensureApplicantRecommended).toHaveBeenCalledWith(
       { potentialReviewerId: KEEPER, requestId: REQ1 },
@@ -491,6 +556,170 @@ describe('executeMerge — collision-row applicant-provenance union', () => {
       .rejects.toMatchObject({ code: 'merge_applicant_provenance_conflict', status: 409, requestId: REQ1 });
     expect(deps.suggestions.hardDeleteById).not.toHaveBeenCalled();
     expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+});
+
+// The plan enumerates the loser's references once, then Steps 3-6 run as many
+// sequential Dataverse round-trips. A reference created inside that window is
+// absent from the plan and so is never repointed. The loser person's ETag cannot
+// catch it: a new suggestion row / slot binding writes a DIFFERENT record and
+// leaves the person row untouched, so the Step 7 If-Match still matches. Without
+// the pre-deactivate re-read the merge returns success while a live reference
+// points at an inactive reviewer.
+describe('executeMerge — Step 7 pre-deactivate reference re-check', () => {
+  const SUG_LATE = 'c9999999-9999-9999-9999-999999999999';
+  const REQ2 = 'd2222222-2222-2222-2222-222222222222';
+  // Force a Step 3 write, giving the concurrent writer a hook to fire from.
+  const nameChoice = { fieldChoices: { name: 'loser' } };
+
+  test('suggestion row created mid-merge: replan instead of deactivating', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    deps.potentialReviewer.update = jest.fn(async () => {
+      deps._addLoserSug({ wmkf_appreviewersuggestionid: SUG_LATE, _wmkf_request_value: REQ2 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, ...nameChoice }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        status: 409,
+        step: 7,
+        operation: 'predeactivate_reference_recheck',
+        reason: 'new_reference_created',
+      });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('applicant slot bound mid-merge: replan instead of deactivating', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    deps.potentialReviewer.update = jest.fn(async () => { deps._addLoserSlot(REQ2, 3); });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, ...nameChoice }, deps))
+      .rejects.toMatchObject({ code: 'merge_retryable_replan', step: 7 });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  // Codex S423: injecting from Step 3 is the CHEAPEST window, not the riskiest.
+  // The costly interleavings are after Step 4/5 (rows already hard-deleted, slots
+  // already rewritten) and after Step 6 (email already moved, and that step is
+  // non-retryable by construction). Those are the ones that have to converge.
+  test('suggestion created after the Step 4 delete: replan, and the retry converges', async () => {
+    const COLLIDE = 'e0000000-0000-0000-0000-000000000000';
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{ wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1 }],
+      keeperSug: [{ wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ1 }],
+    });
+    const hardDelete = deps.suggestions.hardDeleteById;
+    deps.suggestions.hardDeleteById = jest.fn(async (...args) => {
+      await hardDelete(...args);
+      deps._addLoserSug({ wmkf_appreviewersuggestionid: SUG_LATE, _wmkf_request_value: REQ2 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({ code: 'merge_retryable_replan', step: 7 });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+
+    // Retry: the late row is now in the plan, gets repointed, and the merge lands.
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(summary).toMatchObject({ repointed: 1 });
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledTimes(1);
+  });
+
+  test('slot bound after the Step 5 repoint: replan, and the retry converges', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
+    // Fire once: one concurrent writer, not a writer racing every retry.
+    let injected = false;
+    const repointSlot = deps.requests.updateById;
+    deps.requests.updateById = jest.fn(async (...args) => {
+      await repointSlot(...args);
+      if (!injected) { injected = true; deps._addLoserSlot(REQ2, 3); }
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({ code: 'merge_retryable_replan', step: 7 });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(summary).toMatchObject({ slotsRepointed: 1 });
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledTimes(1);
+  });
+
+  // The highest-cost window: Step 6 already moved the address, and it is
+  // non-retryable by construction. The retry must NOT re-derive an email move
+  // against the keeper's now-updated value and must not null the address on
+  // either record.
+  test('reference created after the Step 6 email move: retry preserves the moved address', async () => {
+    const deps = makeDeps({
+      keeperRow: { ...bareKeeper, wmkf_emailaddress: 'old@example.org' },
+      loserRow: { ...bareLoser, wmkf_emailaddress: 'avery.quinn@example.org' },
+    });
+    const clearEmail = deps.potentialReviewer.clearEmail;
+    deps.potentialReviewer.clearEmail = jest.fn(async (...args) => {
+      await clearEmail(...args);
+      deps._addLoserSug({ wmkf_appreviewersuggestionid: SUG_LATE, _wmkf_request_value: REQ2 });
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps))
+      .rejects.toMatchObject({ code: 'merge_retryable_replan', step: 7 });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+
+    // Second attempt: the address already lives on the keeper and is gone from
+    // the loser, so there is nothing left to move — no second clearEmail.
+    const clearCalls = deps.potentialReviewer.clearEmail.mock.calls.length;
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER, fieldChoices: { email: 'loser' } }, deps);
+    expect(summary.emailMoved).toBe(false);
+    expect(deps.potentialReviewer.clearEmail).toHaveBeenCalledTimes(clearCalls);
+    expect((await deps.potentialReviewer.getByIdForMerge(KEEPER)).wmkf_emailaddress).toBe('avery.quinn@example.org');
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledTimes(1);
+  });
+
+  test('capped slot re-read at Step 7 is a replan, not a dead-end 400', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser });
+    // Plan-time read is clean; the re-read comes back capped.
+    let call = 0;
+    deps.requests.queryAllRequests = jest.fn(async () => {
+      call += 1;
+      return { records: [], capped: call > 1 };
+    });
+
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toMatchObject({
+        code: 'merge_retryable_replan',
+        status: 409,
+        step: 7,
+        reason: 'slot_query_capped',
+      });
+    expect(deps.potentialReviewer.deactivate).not.toHaveBeenCalled();
+  });
+
+  test('capped slot read at PLAN time stays a terminal validation error', async () => {
+    const deps = makeDeps({ keeperRow: bareKeeper, loserRow: bareLoser, slotsCapped: true });
+    await expect(executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps))
+      .rejects.toThrow(/Too many applicant-slot references/);
+  });
+
+  // Discriminating case: the re-check must clear on rows the merge ITSELF
+  // handled. If it compared against the plan's snapshot rather than live state,
+  // this repoint + delete would look like two surviving references and every
+  // real merge would fail.
+  test('rows the merge repointed/deleted do not trip the re-check', async () => {
+    const COLLIDE = 'e0000000-0000-0000-0000-000000000000';
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [
+        { wmkf_appreviewersuggestionid: SUG_L, _wmkf_request_value: REQ1 },
+        { wmkf_appreviewersuggestionid: COLLIDE, _wmkf_request_value: REQ2 },
+      ],
+      keeperSug: [{ wmkf_appreviewersuggestionid: 'e1111111-1111-1111-1111-111111111111', _wmkf_request_value: REQ2 }],
+      slots: [slotRow(REQ1, { 2: LOSER })],
+    });
+
+    const summary = await executeMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(summary).toMatchObject({ repointed: 1, deleted: 1, slotsRepointed: 1 });
+    expect(deps.potentialReviewer.deactivate).toHaveBeenCalledWith(LOSER, expect.objectContaining({ ifMatch: 'W/"loser"' }));
   });
 });
 
