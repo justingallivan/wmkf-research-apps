@@ -75,17 +75,44 @@ describe('InviteEmailModal invitation timing contract', () => {
     }, today)).toBeNull();
   });
 
-  test('rejects proposal release before response and review due on/before release', () => {
+  test('allows a late invitation whose response deadline falls after proposal release', () => {
+    // today + 7 = 2026-07-31, which is AFTER the already-fixed 07-30 release
+    // date. This is the late-cycle invite that used to disable Send with no
+    // visible reason (S422 owner decision: release needs a PD action and the
+    // date is email-only copy, so the ordering is odd but permitted).
     expect(validateInvitationTimeline({
       respondOffsetDays: 7,
       proposalSendDate: '2026-07-30',
       reviewDueDate: '2026-09-15',
-    }, today)).toMatch(/release cannot be earlier/i);
+    }, today)).toBeNull();
+  });
+
+  test('still rejects a review due date on or before the proposal release date', () => {
     expect(validateInvitationTimeline({
       respondOffsetDays: 7,
       proposalSendDate: '2026-08-18',
       reviewDueDate: '2026-08-18',
-    }, today)).toMatch(/due date must be after/i);
+    }, today)).toMatch(/due date must be after the proposal release date/i);
+  });
+
+  test('rejects a review due date on or before the response deadline even when a release date is set', () => {
+    // Discriminating fixture for the widened rule: release 07-28 < due 07-30,
+    // so the release-date rule does NOT fire, and respondBy is 07-31, so the
+    // review would be due before the reviewer has even RSVP'd. Restoring the
+    // old `!proposalSendDate` guard makes this return null and fails here.
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '2026-07-28',
+      reviewDueDate: '2026-07-30',
+    }, today)).toMatch(/due date must be after the response deadline/i);
+  });
+
+  test('rejects a review due date on or before the response deadline with no release date', () => {
+    expect(validateInvitationTimeline({
+      respondOffsetDays: 7,
+      proposalSendDate: '',
+      reviewDueDate: '2026-07-30',
+    }, today)).toMatch(/due date must be after the response deadline/i);
   });
 
   test('renders the campaign response deadline in the subject and degrades cleanly when unset', () => {

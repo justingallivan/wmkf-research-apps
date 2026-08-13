@@ -122,18 +122,40 @@ function applyTiming(body, timing) {
 // The existing campaign fields remain authoritative; this only prevents an
 // invitation from presenting the configured dates in an impossible order.
 // Blank dates retain the existing behavior (their copy line is omitted).
+//
+// DELIBERATELY NOT VALIDATED — a response deadline AFTER the proposal release
+// date (owner decision 2026-08-12, S422). It reads oddly but it is not
+// impossible, and blocking it broke a real workflow: invite late in a cycle and
+// `respondBy` (today + offset) drifts past an already-fixed release date purely
+// because time passed, disabling Send with no visible reason. Three facts make
+// the block unjustifiable:
+//   1. Release is never automatic. `wmkf_materialssentat` has exactly one writer
+//      (`lib/services/review-manager/send-emails-service.js`, materials branch),
+//      reachable only through the staff-guarded /api/review-manager/send-emails
+//      route. No cron sends materials. A PD decides when proposals go out.
+//   2. `proposalSendDate` is email-only copy for this invitation, not state the
+//      system acts on — it renders as a template token in email-generator.js.
+//   3. `respondBy` is derived from TODAY, so this condition arrives on its own.
+// The resulting "we will send the proposal by <date>" / "respond by <later
+// date>" wording is accepted for this cycle and disappears next cycle, when
+// materials are in hand at invitation time. Do not reinstate the check as an
+// apparent oversight.
+//
+// Impossible orderings ARE still blocked: reviews due before release, and
+// reviews due on or before the response deadline.
 export function validateInvitationTimeline(timing, today = new Date()) {
   const respondBy = addDaysToTodayYmd(timing.respondOffsetDays, today);
   const proposalDelivery = timing.proposalSendDate || '';
   const reviewDue = timing.reviewDueDate || '';
 
-  if (respondBy && proposalDelivery && proposalDelivery < respondBy) {
-    return 'Proposal release cannot be earlier than the response deadline.';
-  }
   if (proposalDelivery && reviewDue && reviewDue <= proposalDelivery) {
     return 'The review due date must be after the proposal release date.';
   }
-  if (!proposalDelivery && respondBy && reviewDue && reviewDue <= respondBy) {
+  // Applies whether or not a release date is set. Previously guarded by
+  // `!proposalDelivery` because the deleted release-vs-respondBy rule covered
+  // the other branch; without that rule, an unguarded version would let
+  // "reviews due before the reviewer has even RSVP'd" through.
+  if (respondBy && reviewDue && reviewDue <= respondBy) {
     return 'The review due date must be after the response deadline.';
   }
   return null;
@@ -770,11 +792,18 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                     <p className="text-[11px] text-gray-400 mt-2">
                       Days to respond and reviews due are request-level campaign settings when saved. Proposal release is email-only copy for this invitation. A blank field omits its line.
                     </p>
-                    {timelineError ? (
-                      <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
-                    ) : null}
                   </div>
                 )}
+                {/* Rendered OUTSIDE the collapsible body on purpose: this message
+                    explains why Send is disabled, and the panel is collapsed by
+                    default. Nested inside, it was absent from the DOM entirely —
+                    invisible, and never announced despite role="alert" — so a PD
+                    saw only a grayed-out button (S422). The button's `title`
+                    carries the same text but cannot be relied on: browsers
+                    suppress pointer events on disabled controls. */}
+                {timelineError ? (
+                  <p role="alert" className="text-xs text-red-700 mt-2">{timelineError}</p>
+                ) : null}
               </div>
 
               {flaggedAbstract && !abstractEditorOpen && (
