@@ -497,6 +497,47 @@ back on a stale old reminder (Codex round 3). Actor identity is absent by constr
 the reviewer DTO carries no acting-user field. Full findings and the Phase 2/3 gates:
 `outputs/reviewer-activity-history-opus-review-2026-08-11.md`.
 
+## Invitation timeline validation (S422, production-live `4dd4a31d`)
+
+**The rule that governs this surface: never block Send on a condition involving
+`respondBy`.** `respondBy` is computed as today + `respondOffsetDays`
+(`InviteEmailModal.js` `addDaysToTodayYmd`), so any rule reading it starts failing on
+its own as the calendar moves, with nothing having changed. Blocking rules compare
+FIXED dates; drifting conditions warn.
+
+| Condition | Behavior |
+|---|---|
+| `reviewDue <= proposalSendDate` | **Blocks** (`validateInvitationTimeline`) — two fixed dates, genuinely misconfigured |
+| `reviewDue <= respondBy` | **Warns only** (`invitationTimelineWarning`), Send stays enabled |
+| `proposalSendDate < respondBy` | Not checked at all |
+
+The third row was a block until S422 and broke late-cycle invites: `respondBy` drifted
+past an already-fixed release date purely because time passed, disabling Send with the
+explanation hidden inside a default-collapsed panel (absent from the DOM, so
+`role="alert"` never announced either). Owner decision 2026-08-12, on three verified
+grounds: proposal release is never automatic (`wmkf_materialssentat` has exactly one
+writer, in `send-emails-service.js`'s materials branch, reachable only via the
+staff-guarded `/api/review-manager/send-emails`; no cron sends materials);
+`proposalSendDate` is email-only copy, rendering as a template token in
+`email-generator.js:496`; and no server-side mirror of this validation exists.
+
+**Standing hazard — the warning must name the EXTENSION, never "edit the due date".**
+Request campaign config is seeded *set only if unset*
+(`send-emails-service.js`: `if (dueDate != null && reqRec.wmkf_reviewduedate == null)`),
+and seeding is skipped entirely for `allowResend`. So on any wave after the first, a
+due-date edit in the invite modal changes only THAT email's copy while the request,
+portal, reminder sweep, and token math keep the original date. The per-reviewer
+override (`wmkf_reviewduedateoverride`) is the only authoritative remedy — it is what
+`resolveEffectiveReviewDueDate` (`lib/external/reviewer-due-date.js`) reads everywhere.
+Codex adversarial review caught an earlier version of the warning string walking a PD
+straight into that mismatch.
+
+**Related open asymmetry (found, not fixed).** The modal interpolates timeline tokens
+CLIENT-side by design (module docblock), substituting one campaign date for the whole
+batch, while `render-emails-service.js:272-274` resolves the effective per-reviewer due
+date server-side. A reviewer already carrying an override can therefore receive an
+invitation stating a different date than the portal and reminders use.
+
 ## Durable Memory
 
 - Workbench and invite workflow: `project-reviewer-apps-redesign-direction`, `project-reviewer-workbench-invite-workflow`.
