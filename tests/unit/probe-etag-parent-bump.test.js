@@ -29,11 +29,14 @@ const parent = (id, version, modifiedon) => ({
   createdon: '2026-01-01T00:00:00Z',
   modifiedon,
 });
-const child = (id, parentId, version, createdon) => ({
+// Pristine by default: createdon == modifiedon, so the row's current version IS
+// its creation version. Pass a distinct modifiedon to model an edited child.
+const child = (id, parentId, version, createdon, modifiedon = createdon) => ({
   wmkf_appreviewersuggestionid: id,
   _wmkf_potentialreviewer_value: parentId,
   '@odata.etag': `W/"${version}"`,
   createdon,
+  modifiedon,
 });
 
 const healthyMonotonicity = { checked: 500, agreed: 500, agreementRate: 1 };
@@ -74,6 +77,39 @@ describe('analyze — classification', () => {
     );
     expect(counts.coincident).toBe(1);
     expect(counts['parent-behind-child']).toBe(0);
+  });
+
+  // The unsoundness this rule exists to prevent: an EDITED child's version
+  // reflects the edit, not the creation, so it can exceed the parent's for
+  // reasons unrelated to child creation. Counting it would manufacture a
+  // decisive case out of nothing and wrongly justify the guard.
+  test('a child edited after creation is unusable evidence', () => {
+    const { counts, cases } = analyze(
+      [parent(PARENT_A, 400, '2026-02-01T00:00:00Z')],
+      [child('c1', PARENT_A, 900, '2026-01-01T00:00:00Z', '2026-05-01T00:00:00Z')],
+    );
+    expect(cases).toHaveLength(0);
+    expect(counts['parent-behind-child']).toBe(0);
+  });
+
+  test('createdon/modifiedon within the insert-clock tolerance still counts as pristine', () => {
+    const { counts } = analyze(
+      [parent(PARENT_A, 100, '2026-01-01T00:00:00Z')],
+      [child('c1', PARENT_A, 500, '2026-03-01T00:00:00.000Z', '2026-03-01T00:00:00.400Z')],
+    );
+    expect(counts['parent-behind-child']).toBe(1);
+  });
+
+  test('an edited child does not mask a pristine one on the same parent', () => {
+    const { cases } = analyze(
+      [parent(PARENT_A, 400, '2026-02-01T00:00:00Z')],
+      [
+        child('c-edited', PARENT_A, 9000, '2026-01-01T00:00:00Z', '2026-07-01T00:00:00Z'),
+        child('c-pristine', PARENT_A, 800, '2026-05-01T00:00:00Z'),
+      ],
+    );
+    expect(cases[0].newestChildVersion).toBe(800);
+    expect(cases[0].verdict).toBe('parent-behind-child');
   });
 
   test('compares against the NEWEST child, not an arbitrary one', () => {

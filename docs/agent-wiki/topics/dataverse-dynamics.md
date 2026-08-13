@@ -114,6 +114,26 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **An `ifMatch` ETag on a PARENT record does not detect a new CHILD row (S423).**
+  Creating a row that carries a lookup to a record does not bump that record's
+  `versionnumber`, so optimistic concurrency on the parent is blind to child
+  creation. Any guard of the shape "hold the parent's ETag, then act on the
+  assumption that its references are unchanged" is unsound — re-read the
+  references instead. Live cost: `executeMerge` enumerated a loser's suggestion
+  rows once and deactivated under the loser PERSON's ETag, so a suggestion row
+  created mid-merge survived pointing at an inactive reviewer, and the merge
+  still reported success. `[VERIFIED 2026-08-13 via
+  scripts/probe-etag-parent-bump.js against production — 4 of 99 parents sit at a
+  lower version than a never-updated child of their own]`
+  Two facts that probe established and any future ETag reasoning should reuse:
+  `@odata.etag` is exactly `W/"<versionnumber>"`, and versionnumber is org-wide
+  monotonic **in write order** — it agrees 100% with `modifiedon` ordering across
+  entities but only ~50% with `createdon`, because a rowversion tracks writes,
+  not creations. A row's current version equals its creation version only when
+  `createdon == modifiedon`. Slot binding
+  (`wmkf_PotentialReviewerN@odata.bind` on `akoya_request`) is NOT covered — no
+  binding timestamp exists, so it needs a controlled sandbox write.
+
 - **`queryRecords` returns ONE PAGE (25 rows) plus `hasMore` — a sweep that ignores it
   reports a vacuous clean result (S387).** `DynamicsService.queryRecords` (and every
   adapter passthrough over it, e.g. `potential-reviewer.queryReviewers`) is page-at-a-time;

@@ -10,14 +10,23 @@
  * the re-check is necessary.
  *
  * Method — no writes, no sandbox, no test data. Dataverse `@odata.etag` is
- * `W/"<versionnumber>"`, and versionnumber is an org-wide monotonic rowversion,
- * so ETags from different tables are comparable as one sequence. For each
- * potential reviewer that owns suggestion rows, compare the parent's version
- * against its NEWEST child's version:
+ * `W/"<versionnumber>"` (verified exactly against a `versionnumber` select), and
+ * versionnumber is an org-wide monotonic rowversion, so ETags from different
+ * tables are comparable as one sequence.
  *
- *   parentVersion < newestChildVersion
- *     ⇒ the parent has not been written since before that child existed
- *     ⇒ creating the child did NOT touch the parent. DISPROVES the bump.
+ * A rowversion tracks the row's LAST WRITE, not its creation. A row created in
+ * 2024 and edited last week carries a recent version. So a child's CURRENT
+ * version is only its creation version if the child has never been updated —
+ * `createdon == modifiedon`. Those pristine children are the only usable
+ * evidence, and the comparison is:
+ *
+ *   parentVersion < pristineChildVersion
+ *     ⇒ the parent's last write precedes that child's creation
+ *     ⇒ creating the child did NOT write the parent. DISPROVES the bump.
+ *
+ * Using a modified child here would be unsound: its version reflects the later
+ * edit, so it could exceed the parent's for reasons having nothing to do with
+ * creation.
  *
  * A single clean case is proof. Zero cases across a large population is strong
  * evidence the opposite way. Parents that are NEWER than their children prove
@@ -27,8 +36,11 @@
  *
  * The org-wide monotonicity premise is itself checked, not assumed: the probe
  * samples cross-entity row pairs and reports how often version ordering agrees
- * with createdon ordering. Low agreement invalidates the whole method, and the
- * probe says so instead of reporting a verdict.
+ * with MODIFIEDON ordering. (Checking it against createdon is a mistake — it
+ * scores ~50% on real data purely because rowversion tracks writes, not
+ * creation, and would invalidate a perfectly sound method.) Low agreement
+ * invalidates the comparison, and the probe says so instead of reporting a
+ * verdict.
  *
  * Does NOT answer the slot-binding half of the question (binding
  * `wmkf_PotentialReviewerN@odata.bind` on akoya_request). Dataverse records no
@@ -56,7 +68,14 @@ const CHILD_SELECT = [
   'wmkf_appreviewersuggestionid',
   '_wmkf_potentialreviewer_value',
   'createdon',
+  // Required: only a never-updated child's version is its creation version.
+  'modifiedon',
 ].join(',');
+
+// Dataverse stamps createdon and modifiedon from the same transaction clock on
+// insert, but they are stored to millisecond precision — allow a small tolerance
+// rather than requiring bit-exact equality.
+const PRISTINE_TOLERANCE_MS = 1000;
 
 // Parents whose modifiedon sits within this window of the child's createdon are
 // "coincident": consistent with a bump, but also with a staff edit that happened
@@ -135,13 +154,22 @@ function checkMonotonicity(rows) {
 }
 
 function analyze(parents, children) {
+  // Only PRISTINE children (never updated) carry their creation version. Among
+  // those, keep the highest-versioned one per parent: it is the best chance of
+  // exceeding the parent, and so the strongest available evidence.
   const byParent = new Map();
+  let skippedModifiedChildren = 0;
   for (const child of children) {
     const parentId = child._wmkf_potentialreviewer_value;
     if (!parentId) continue;
     const version = etagVersion(child);
     const createdOnMs = ms(child.createdon);
-    if (version === null || createdOnMs === null) continue;
+    const modifiedOnMs = ms(child.modifiedon);
+    if (version === null || createdOnMs === null || modifiedOnMs === null) continue;
+    if (Math.abs(modifiedOnMs - createdOnMs) > PRISTINE_TOLERANCE_MS) {
+      skippedModifiedChildren += 1;
+      continue;
+    }
     const current = byParent.get(parentId.toLowerCase());
     if (!current || version > current.version) {
       byParent.set(parentId.toLowerCase(), {
@@ -187,23 +215,23 @@ function analyze(parents, children) {
 
   const counts = { 'parent-behind-child': 0, coincident: 0, 'parent-ahead-of-child': 0 };
   for (const c of cases) counts[c.verdict] += 1;
-  return { cases, counts, missingVersion };
+  return { cases, counts, missingVersion, skippedModifiedChildren };
 }
 
 function conclude(counts, monotonicity, denominator) {
   if (monotonicity.agreementRate !== null && monotonicity.agreementRate < 0.95) {
     return {
       verdict: 'METHOD-INVALID',
-      detail: `Version ordering agreed with createdon ordering in only ${(monotonicity.agreementRate * 100).toFixed(1)}% of ${monotonicity.checked} sampled cross-entity pairs. Versionnumber is not behaving as an org-wide monotonic counter here, so version comparison cannot answer the question. Do not read the counts below as evidence.`,
+      detail: `Version ordering agreed with modifiedon ordering in only ${(monotonicity.agreementRate * 100).toFixed(1)}% of ${monotonicity.checked} sampled cross-entity pairs. Versionnumber is not behaving as an org-wide monotonic write counter here, so version comparison cannot answer the question. Do not read the counts below as evidence.`,
     };
   }
   if (denominator === 0) {
-    return { verdict: 'NO-DATA', detail: 'No potential reviewer with at least one suggestion row and a readable ETag was found.' };
+    return { verdict: 'NO-DATA', detail: 'No potential reviewer with at least one never-updated suggestion row and a readable ETag was found.' };
   }
   if (counts['parent-behind-child'] > 0) {
     return {
       verdict: 'CREATION-DOES-NOT-BUMP-PARENT',
-      detail: `${counts['parent-behind-child']} of ${denominator} parents sit at a LOWER version than their newest child, meaning the parent was not written at or after that child's creation. Creating a child row does not bump the parent's ETag, so an ifMatch on the parent cannot detect a new child. The merge pre-deactivate re-check is NECESSARY.`,
+      detail: `${counts['parent-behind-child']} of ${denominator} parents sit at a LOWER version than a never-updated child of theirs, meaning the parent's last write precedes that child's creation. Creating a child row does not bump the parent's ETag, so an ifMatch on the parent cannot detect a new child. The merge pre-deactivate re-check is NECESSARY.`,
     };
   }
   return {
@@ -231,12 +259,13 @@ async function main() {
     queryAll(client, CHILD_SET, CHILD_SELECT),
   ]);
 
+  // Against MODIFIEDON, not createdon: a rowversion orders writes, not creations.
   const monotonicity = checkMonotonicity([
-    ...parents.map((r) => ({ version: etagVersion(r), createdOnMs: ms(r.createdon) })),
-    ...children.map((r) => ({ version: etagVersion(r), createdOnMs: ms(r.createdon) })),
+    ...parents.map((r) => ({ version: etagVersion(r), createdOnMs: ms(r.modifiedon) })),
+    ...children.map((r) => ({ version: etagVersion(r), createdOnMs: ms(r.modifiedon) })),
   ]);
 
-  const { cases, counts, missingVersion } = analyze(parents, children);
+  const { cases, counts, missingVersion, skippedModifiedChildren } = analyze(parents, children);
   const conclusion = conclude(counts, monotonicity, cases.length);
 
   // Decisive cases first, then the widest coincident/ahead gaps, for spot-checking.
@@ -253,21 +282,22 @@ async function main() {
     target: target === 'prod' ? 'production' : 'sandbox',
     targetHostname: targetUrl.hostname.toLowerCase(),
     question: 'Does creating a child row bump the parent record ETag (versionnumber)?',
-    method: 'Compare each parent potential-reviewer version against its newest suggestion-row version. parentVersion < newestChildVersion proves the parent was not written at or after that child was created.',
+    method: 'Compare each parent potential-reviewer version against the highest-versioned NEVER-UPDATED (createdon == modifiedon) suggestion row of that parent. parentVersion < pristineChildVersion proves the parent was not written at or after that child was created. Modified children are unusable: their version reflects a later edit, not creation.',
     conclusion,
     monotonicityCheck: {
       ...monotonicity,
-      note: 'Cross-entity pairs where version ordering agrees with createdon ordering. The version-comparison method depends on this; below 95% the probe reports METHOD-INVALID.',
+      note: 'Cross-entity pairs where version ordering agrees with MODIFIEDON ordering. A rowversion orders writes, not creations — checking against createdon scores ~50% on migrated data and would falsely invalidate a sound method. Below 95% the probe reports METHOD-INVALID.',
     },
     population: {
       parentRows: parents.length,
       childRows: children.length,
-      parentsWithChildren: cases.length,
+      childrenSkippedAsModified: skippedModifiedChildren,
+      parentsWithPristineChild: cases.length,
       parentsSkippedNoVersionOrModifiedOn: missingVersion,
     },
     counts,
     countsLegend: {
-      'parent-behind-child': 'DECISIVE — parent version below its newest child; creation did not touch the parent.',
+      'parent-behind-child': 'DECISIVE — parent version below a never-updated child of its own; creation did not touch the parent.',
       coincident: `Parent modifiedon within ${COINCIDENT_WINDOW_MS / 1000}s of the child createdon. Consistent with a bump AND with an unrelated simultaneous edit. Proves nothing.`,
       'parent-ahead-of-child': 'Parent written after the child. Expected from ordinary later edits; not evidence of a bump.',
     },
