@@ -272,9 +272,12 @@ document inventory, and individual implementation plans do not establish priorit
   version history, and `Manage Lists` puts the version limit itself within their
   reach — least-privilege editing is a known unmet requirement, not an unaudited
   unknown. A second-stage recycle bin does exist, but recovery is 93 days from
-  the original deletion and `dftadmin`-only. Still open: **Purview retention**,
-  **whether the `Request` library inherits site permissions**, and Workbench
-  history/admin restore plus milestone snapshots. See
+  the original deletion and `dftadmin`-only. Still open, in priority order:
+  **whether the `Request` library inherits site permissions**, Workbench
+  history/admin restore, and milestone snapshots (**scope reduced** — Board-bound
+  documents are captured in Diligent, which timestamps them and exports Board
+  Books, so the institutional-record case is covered outside SharePoint).
+  **Purview retention** is low priority — no regulatory obligation applies. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28): draft factual material
   from the full proposal through an iterated governed `phase-ii.summarize`;

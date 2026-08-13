@@ -114,8 +114,9 @@ limits (major only, no time limit, keep 500), second-stage recovery (**a bin
 exists**; 93 days from the original deletion, `dftadmin`-only restore), and
 ordinary-editor least privilege (**Members hold `Edit`** — Delete Items, Delete
 Versions, and Manage Lists granted, so ordinary editors can delete documents and
-purge version history). Still open: **site/library Purview retention** and
-**whether the `Request` library inherits site permissions**
+purge version history). Still open: **whether the `Request` library inherits site permissions**, and at
+low priority **site/library Purview retention** (no regulatory obligation
+applies)
 (`HasUniqueRoleAssignments` unread), which bounds how far the `Edit` grant
 reaches. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

@@ -159,10 +159,12 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    and signed-in first-stage recycle recovery. Administrator evidence
    (2026-08-10 / 2026-08-13) closed version limits, second-stage recovery, and
    editor least privilege — the last unfavourably, since ordinary editors hold
-   `Edit` and can delete documents and version history. Next obtain **Purview
-   retention** evidence from an M365 compliance administrator, determine whether
-   the `Request` library **inherits site permissions**, and build Workbench
-   history/admin restore plus milestone snapshots;
+   `Edit` and can delete documents and version history. Next determine whether the
+   `Request` library **inherits site permissions**, which bounds how many people
+   that reaches, and build Workbench history/admin restore. Milestone snapshots
+   are reduced in scope — Diligent already timestamps Board-bound documents and
+   exports Board Books, so confirm with the owner before scheduling them.
+   **Purview retention** is low priority; no regulatory obligation applies;
 2. finish the user/input/storage/access/deadline contract for the remaining
    Workbench lifecycle tabs, including the three-document writeup lineage,
    Site Visit dossier, narrow request-scoped applicant-material upload, and

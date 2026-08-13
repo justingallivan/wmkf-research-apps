@@ -91,8 +91,12 @@ closed configured version limits, second-stage recovery, and editor least
 privilege — the last unfavourably: Members hold `Edit`, so ordinary editors can
 delete documents and purge version history. A second-stage recycle bin does
 exist (the earlier "none" was wrong), but recovery is 93 days from the original
-deletion and `dftadmin`-only. **Purview retention** and **whether the `Request`
-library inherits site permissions** remain open, as do Workbench history/admin
+deletion and `dftadmin`-only. **Whether the `Request` library inherits site
+permissions** remains open and bounds how many people that reaches; **Purview
+retention** is unanswered but low priority (no regulatory obligation applies).
+Board-bound documents live in **Diligent**, which timestamps them and exports
+Board Books, so the institutional-record case is covered outside SharePoint and
+the milestone-snapshot scope is reduced accordingly. Also open as do Workbench history/admin
 restore and immutable milestone snapshots. Detail in
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 

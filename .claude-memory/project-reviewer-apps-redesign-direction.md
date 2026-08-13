@@ -69,9 +69,10 @@ SharePoint version `2.0`. A disposable production-library audit then proved
 native previous-version inspection/restore and signed-in first-stage recycle
 recovery. Administrator checks closed version limits, second-stage recovery, and
 editor permissions (2026-08-10 / 2026-08-13; editors hold `Edit` and CAN delete
-files and version history). **Purview retention**, **`Request` library permission
-inheritance**, Workbench history/admin restore, and milestone snapshots remain
-open.
+files and version history). **`Request` library permission inheritance**,
+Workbench history/admin restore, and milestone snapshots (**scope reduced** —
+Diligent holds the Board record) remain open. **Purview retention** is low
+priority; no regulatory obligation applies.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 

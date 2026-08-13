@@ -70,9 +70,12 @@ hood.
 > version limits, second-stage administrative recovery, and ordinary-editor
 > permissions were **answered 2026-08-10 and 2026-08-13** — see the
 > controlled-audit section below, and note the editor answer is that ordinary
-> editors **can** delete files and version history. Still open: **Purview
-> retention**, **whether the `Request` library inherits site permissions**,
-> Workbench history/restore, and milestone snapshots.
+> editors **can** delete files and version history. Still open, in priority
+> order: **whether the `Request` library inherits site permissions** (bounds how
+> many people that reaches), Workbench history/restore, milestone snapshots
+> (**scope reduced** — Diligent already holds the Board record; see the milestone
+> entry), and **Purview retention** (low priority — no regulatory obligation
+> applies, so this is only a safety net nobody is counting on).
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -586,9 +589,13 @@ it.** Ordinary editors hold `Edit`, which grants Delete Items, Delete Versions,
 and Manage Lists — precisely the "unnecessary delete … or version-deletion
 authority" the requirement asks to exclude. This is now a known gap with a named
 cause, not an unaudited unknown; the evidence and its bounds are in the
-controlled-audit section below. Requirement 1 is met and requirement 2 is
-half-met (recycle-bin recovery audited both stages; Purview retention still
-unanswered).
+controlled-audit section below. Requirement 1 is met. Requirement 2's
+recycle-bin half is audited across both stages; its Purview half is unanswered
+but **carries no regulatory obligation** (owner, 2026-08-13) and is not a gate.
+**Requirement 5 is substantially met outside this system** — Diligent timestamps
+Board-bound documents and generates exportable Board Books, so the
+what-did-the-Board-see problem is already solved; see the milestone entry below
+for what that leaves.
 
 ### Controlled target-library audit — 2026-07-30 local / 2026-07-31 UTC
 
@@ -708,21 +715,34 @@ The remaining controls are deliberately not collapsed into that pass:
   Net: there is a real recovery path behind ordinary deletion, which the
   2026-08-10 answer wrongly denied. It is a **time-boxed, administrator-only,
   interruptible** path — not an archive.
-- **[UNKNOWN — still open, and IT was not asked] Retention.** Unchanged. Connor's
-  2026-08-10 "not familiar with purview" told us he is **not the right owner**,
-  and the 2026-08-13 round did not close it: the question put to Dragonfly IT
-  covered permissions and the recycle bin only, so their silence on Purview is
-  unremarkable rather than a non-answer. No Preservation Hold Library
-  observation was reported either way — and note that its *absence* would not
-  have settled this, since a retain-only policy with nothing yet deleted or
-  edited leaves no such library behind.
+- **[UNKNOWN — LOW PRIORITY, and not a gate on anything] Retention.**
+  **Reframed 2026-08-13 (S425) on owner correction.** Earlier revisions treated
+  this as an open *compliance* question. It is not one: **these documents carry no
+  regulatory retention obligation** — the Foundation is not a regulated filer, and
+  nothing here is subject to a statutory retention schedule (owner, 2026-08-13).
+  Do not reintroduce compliance framing.
 
-  The controlled Request `1003109` item's Graph `retentionLabel` response
-  contained no label fields, which still does not prove that no site- or
-  library-wide Microsoft Purview retention policy applies. **This is now the only
-  one of the four original questions with no answer at all.** Needs a Microsoft
-  365 compliance/Purview administrator, not the SharePoint site owner and not
-  Dragonfly IT.
+  What a Purview policy would actually be here is a **protective mechanism nobody
+  has assumed exists** — retention policies block deletion and route copies to a
+  Preservation Hold Library. So the cost of not knowing is only that we cannot
+  count on a safety net we never counted on. Nothing in the durability picture
+  depends on the answer.
+
+  Evidence such as it is: Connor's "not familiar with purview" (2026-08-10);
+  Dragonfly IT not asked in the 2026-08-13 round, so their silence is unremarkable
+  rather than a non-answer; and the controlled Request `1003109` item's Graph
+  `retentionLabel` response contained no label fields, which does not prove no
+  site- or library-wide policy applies. No Preservation Hold Library observation
+  was reported either way, and its *absence* would not settle it — a retain-only
+  policy with nothing yet deleted or edited leaves no such library behind.
+
+  **The unfamiliarity is itself weak evidence toward "no policy."** Purview
+  policies are configured by someone; if the shop that administers the tenant does
+  not know the tool, the prior on one silently being in force is low.
+
+  If it is ever wanted, it needs a Microsoft 365 compliance/Purview administrator
+  — not the SharePoint site owner and not Dragonfly IT. **Do not spend another
+  round-trip on it ahead of the library-inheritance question.**
 - **[ANSWERED 2026-08-13 (S425)] Least-privilege human editing — ordinary
   editors CAN delete files and version history.** The Members group holds
   **Edit**. "Limited control" was a pane caption, not a permission level, and is
@@ -875,10 +895,38 @@ The remaining controls are deliberately not collapsed into that pass:
 
   **Why this is the load-bearing gap.** Connor's delete observation was made as a
   member of the `akoyaGO Members` M365 group; EEEU is a *separate* principal in
-  the same SharePoint Members group. Both inherit site-scope Edit **unless** the
-  library carries unique role assignments that omit one of them. If
-  `HasUniqueRoleAssignments` is `true` and EEEU is not among the library's own
-  assignments, the exposure shrinks from the whole tenant to the M365 group.
+  the same SharePoint Members group. His observation proves *someone* can delete
+  in that library — it does not establish the population.
+
+  **`true` is not by itself good news, and the odds are worse than they look.**
+  Group membership is a property of the site collection, not of a library, so
+  there is no configuration in which EEEU sits inside the Members group at site
+  scope but outside it at library scope. Unique role assignments assign
+  *permission levels to principals*, and the principal here is the SharePoint
+  group that carries both. Four outcomes:
+
+  | Outcome | Effect |
+  |---|---|
+  | `HasUniqueRoleAssignments = false` | Inherits; Members → Edit applies. **Organization-wide** |
+  | `true`, Members group among the library's assignments | Group carries both principals. **Organization-wide** |
+  | `true`, library grants the M365 group directly, no Members group | Exposure shrinks to the M365 group. The good case |
+  | `true`, some other arrangement | Must be read |
+
+  Only the third outcome narrows anything, and it takes deliberate
+  restructuring — **SharePoint's default on breaking inheritance is to copy the
+  parent's assignments**, which produces outcome 2. So among the `true` branches,
+  the unhelpful one is the default path. When the answer arrives, the operative
+  detail is whether the **Members SharePoint group** appears in the library's
+  assignments or only the **`akoyaGO Members` M365 group**; the two look nearly
+  identical in the UI and mean opposite things here.
+
+  **Related trap: Dynamics record security does not gate these files.** The
+  Dynamics document tab is a view onto SharePoint, not a boundary in front of it.
+  [Microsoft's guidance](https://learn.microsoft.com/en-us/power-platform/admin/permissions-required-document-management-tasks)
+  is that users need permissions on the SharePoint site collection itself, and
+  there is no out-of-the-box synchronization between Dynamics security roles and
+  SharePoint permissions. Do not let "they can't see the request record" stand in
+  for "they can't reach the document."
 
   Accurate statement until answered: **EEEU holds Edit at site scope; whether
   that reaches the `Request` library is unconfirmed.** Do not restate the
@@ -893,6 +941,28 @@ The remaining controls are deliberately not collapsed into that pass:
   `lib/services/initial-assessment/artifact-service.js:257-259`, written
   nowhere) describe a **pointer to a SharePoint version plus a drift hash, not a
   copy of the bytes.**
+
+  **CONTEXT THAT ARRIVED AFTER THE DECISION — read this first (owner, 2026-08-13
+  / S425).** Board-bound documents are captured in **Diligent**, which timestamps
+  them and generates Board Books exportable to PDF. **Diligent, not SharePoint, is
+  the system of record for what the Board received and when.** It is outside
+  SharePoint's failure modes entirely: an `Edit` holder deleting a Word file in
+  the Request library cannot touch it, and if the SharePoint document is lost the
+  Board version survives as a PDF from which the content can be recovered.
+
+  This narrows what a milestone snapshot would be *for*. The institutional
+  question — prove what the Board saw on a given date, years later — is already
+  answered elsewhere. What Diligent does **not** cover:
+
+  - a working document lost **mid-cycle**, before it ever reaches the Board;
+  - **version history and editorial provenance** — a Board Book PDF is a
+    flattened final state carrying no tracked changes, comments, or edit
+    sequence, and `Delete Versions` can strip those from a file that otherwise
+    stays in place.
+
+  So the residual risk is **work loss and provenance**, not institutional record.
+  A 93-day recycle bin is a reasonable answer to "someone deleted a draft" and a
+  poor one to "prove what the Board saw" — and only the first case is still ours.
 
   **DECIDED 2026-08-10 (S413): copy the bytes.** The owner chose copy; the three
   provisioned fields are kept as identity/provenance **beside** a retained
@@ -919,11 +989,22 @@ The remaining controls are deliberately not collapsed into that pass:
   the decision on the strength of the second-stage bin existing** — that fact
   alone was never the case for copying.
 
-  Anyone reopening this should know the strongest single argument is not
+  Anyone reopening this should know the strongest single argument was not
   probability but remedy: under a pointer, `wmkf_milestonecontenthash` can only
   detect that the milestone is gone; under a copy, it proves the retained bytes
-  are intact. For a Board record, detection without recovery is a different
-  product, not a cheaper one.
+  are intact. **That argument was written on the premise that nothing outside
+  SharePoint held the Board record — and Diligent does.** The remedy exists; it
+  simply is not ours.
+
+  **[OWNER DECISION PENDING — flagged 2026-08-13 / S425, decision NOT changed.]**
+  The copy-vs-pointer choice stands as decided. But its justification is now
+  materially smaller than when it was made: the institutional-record case is
+  covered by Diligent, and what remains is mid-cycle work loss and version
+  provenance — real, but a different and lesser problem. Whether that reduced
+  justification still warrants building snapshot machinery at all is the owner's
+  call, not a reconciliation this document should make for them. Do not treat
+  this note as a reversal, and do not act on it as one; raise it before the
+  milestone work is scheduled.
 
 ### Version-listing behaviour — probed live 2026-08-10 (S413)
 

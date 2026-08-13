@@ -131,9 +131,16 @@ chain in my own probe.
    permissions (**Members hold `Edit`** — they CAN delete files and version
    history, and `Manage Lists` puts the version limit in their reach).
 
-   **[VERIFIED OPEN] Still needed:**
-   - **Purview retention** — the one original question with no answer. Needs an
-     M365 compliance admin; Connor and Dragonfly IT are both the wrong owner.
+   **Owner context 2026-08-13 that re-scopes two things — read before acting.**
+   Board-bound documents are captured in **Diligent**, which timestamps them and
+   generates exportable Board Books, so **Diligent is the system of record for
+   what the Board received** and the milestone-snapshot work is narrower than the
+   docs assumed. And these documents carry **no regulatory retention
+   obligation** — Purview was never a compliance gate. What the SharePoint
+   deletion exposure still threatens is **mid-cycle work loss and version
+   provenance**, not the institutional record.
+
+   **[VERIFIED OPEN] Still needed, in priority order:**
    - **Does the `Request` library inherit site permissions?**
      (`HasUniqueRoleAssignments`). Members contains `Everyone except external
      users`, so `Edit` reaches every licensed internal account at *site* scope —
@@ -143,7 +150,21 @@ chain in my own probe.
      explains whether the EEEU grant was a decision or the platform default.
    - **Confirm IT's past tense** — they wrote the group *"had"* Edit and did not
      confirm nothing changed during the check. Connor has asked.
-   - **Board milestone snapshot producer** — unchanged, still unbuilt.
+   - **Version policy on `RequestArchive2` / `RequestArchive3`** — only `Request`
+     and `RequestArchive1` were read (n=2 of 4), and a proposal can live in any
+     of the four.
+   - **Purview retention — LOW priority, not a gate.** No regulatory obligation
+     applies, so a policy would be a protective mechanism nobody is counting on.
+     Needs an M365 compliance admin if ever wanted; Connor and Dragonfly IT are
+     both the wrong owner. Do not spend a round-trip on it ahead of inheritance.
+   - **Board milestone snapshot producer** — still unbuilt, and now an **owner
+     decision, not a build task**: the copy-the-bytes choice stands, but Diligent
+     covers the institutional-record case that justified it, so confirm it is
+     still worth building before scheduling. Do not treat this as a reversal.
+
+   Draft follow-up questions for Dragonfly are in
+   `outputs/sharepoint-followup-questions-for-dragonfly-2026-08-13.md`
+   (gitignored, local only).
 
 ### Owner Decision Needed
 

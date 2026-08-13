@@ -102,7 +102,8 @@ site/library Purview retention, or ordinary-editor least privilege — of which
 the first three were **answered by administrator evidence 2026-08-10 and
 2026-08-13**, with least privilege answered *unfavourably* (ordinary editors
 hold `Edit` and can delete documents and version history). **Site/library
-Purview retention is still unanswered**, and a new question is open: whether the
+Purview retention is still unanswered but low priority** (no regulatory
+obligation applies), and a new question is open: whether the
 `Request` library inherits site permissions. Workbench history/admin restore and
 milestone snapshots also remain unbuilt.
 Passing this draft-functional gate is not a broad production-readiness claim
@@ -200,8 +201,18 @@ a reversal.** Full record and evidence classes in
   not met by the live configuration** — collaborators do hold uncontrolled
   delete and version-deletion rights, and Manage Lists puts the version limit
   itself within their reach.
-- **Purview retention still unanswered** — needs an M365 compliance
-  administrator, not the site owner and not Dragonfly IT.
+- **Purview retention still unanswered, and LOW PRIORITY.** No regulatory
+  retention obligation applies to these documents (owner, 2026-08-13), so a
+  Purview policy would be a protective mechanism nobody is counting on rather
+  than a compliance gate. Needs an M365 compliance administrator if ever wanted —
+  not the site owner and not Dragonfly IT.
+- **Board record: Diligent, not SharePoint** (owner, 2026-08-13). Board-bound
+  documents are captured in Diligent, which timestamps them and generates
+  exportable Board Books. That covers the institutional-record case in the fifth
+  contract bullet above, outside SharePoint's failure modes. What the deletion
+  exposure still threatens is **mid-cycle work loss and version provenance** — a
+  Board Book PDF carries no tracked changes, comments, or edit sequence. Size the
+  milestone-snapshot work against that residual, not against the Board record.
 - **New and open:** the Members group contains `Everyone except external users`,
   so Edit reaches every licensed internal account at *site* scope. Whether it
   reaches the `Request` library turns on unread `HasUniqueRoleAssignments`, and
@@ -807,8 +818,10 @@ Explicit non-goals during design freeze:
 > inspection/restore and signed-in first-stage recycle recovery. The
 > administrator audit then closed version limits, second-stage recovery, and
 > ordinary-editor permissions (2026-08-10 / 2026-08-13). The remaining pilot
-> acceptance work is **Purview retention**, **`Request` library permission
-> inheritance**, and Workbench history/admin restore plus milestone snapshots.
+> acceptance work is **`Request` library permission inheritance**, Workbench
+> history/admin restore, and milestone snapshots (**scope reduced** — Diligent
+> holds the Board record). **Purview retention** is low priority; no regulatory
+> obligation applies.
 
 The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
 former default. Exercise the now-live
@@ -1032,9 +1045,10 @@ Still required:
 2. first approved Pre-Site Word template and prompt/template compatibility
    contract, implementing the decided deterministic reviewer roster alongside
    the anonymous review narrative;
-3. administrator verification of the applicable site/library **Purview
-   retention** policy, and of whether the `Request` library **inherits site
-   permissions** (`HasUniqueRoleAssignments`); the target library's configured
+3. administrator verification of whether the `Request` library **inherits site
+   permissions** (`HasUniqueRoleAssignments`) — and, at low priority, the
+   applicable site/library **Purview retention** policy, which carries no
+   regulatory obligation; the target library's configured
    version limit, second-stage recycle recovery, and ordinary-editor
    least-privilege policy are **answered** (2026-08-10 / 2026-08-13 — editors
    hold `Edit` and can delete files and version history), and stable-identity
