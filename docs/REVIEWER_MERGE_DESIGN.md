@@ -162,8 +162,23 @@ Resolve ALL chosen literal values BEFORE any clear/mutate (O6), then:
    With keeper defaulting to the edited record (§Keeper selection), this email move
    is the COMMON path in the trigger case; only the tear itself is rare (needs a 500
    in the clear→set window).
-7. **Deactivate the loser** (statecode=1; email already blanked if it moved). Hard
-   delete only if proven reference-free.
+7. **Re-verify the loser is dereferenced, THEN deactivate** (statecode=1; email
+   already blanked if it moved). Hard delete only if proven reference-free.
+   The re-read (S423) is load-bearing, not belt-and-braces: the plan's enumeration
+   is a snapshot from Step 1 and Steps 3-6 are many sequential round-trips, so a
+   reference created in that window is never repointed — and the `If-Match` here
+   CANNOT catch it, because it carries the loser PERSON's ETag while a new
+   suggestion row or slot binding writes a different record. Verified against
+   production: creating a child row does not bump the parent's `versionnumber`
+   (`scripts/probe-etag-parent-bump.js`, 2026-08-13). Steps 4-5 repoint or delete
+   every enumerated row, so both reference reads must now come back empty;
+   anything present is new and fails closed to a retryable replan. A capped slot
+   read is a terminal 400 at plan time but a replan here, since Steps 3-6 have
+   already written and the modal treats 400 as non-retryable.
+   Still open: the slot-binding half of the ETag question is unverified (Dataverse
+   records no binding timestamp), and the cascade remains non-transactional — a
+   failure after the Step 4 hard delete leaves a half-merged state with no
+   compensation.
 
 No contact step: a loser WITH a contact is blocked (§block predicate), so there is
 never a contact to move and no BILL `reviewer_contact_id` to reconcile (O4 — that
