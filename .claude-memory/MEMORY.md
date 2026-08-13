@@ -19,7 +19,7 @@
 - Carryover / destructive work: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md; feedback-verify-additive-carryover-not-just-destructive.md
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md
-- External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md
+- External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md; feedback-caveat-the-surprising-negative.md (a non-expert's "there is no X" is also a fact about their access — apply the platform-default test, caveat it, name who could confirm)
 - Delegated work: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md; ../docs/AGENT_COLLABORATION_PLAN.md
 - Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; reference-vercel-sensitive-env-unreadable.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md (never set DATAVERSE_ALLOW_PROD_READS yourself — hand over the command or ask and wait; applies to read-only probes and scratch diagnostics too)
