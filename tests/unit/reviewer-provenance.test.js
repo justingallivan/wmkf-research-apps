@@ -10,6 +10,8 @@ const {
   hasGroundedProvenanceRankingBonus,
   isIdentityReviewExemptProvenance,
   requiresStaffIdentityConfirmation,
+  formatReferredByReason,
+  parseReferredByReason,
   PROVENANCE_KINDS,
 } = require('../../lib/utils/reviewer-provenance');
 // The client selectability gate is asserted against the server predicate in this file so
@@ -263,5 +265,64 @@ describe('applicant identity gate parity with promote-applicant-reviewer', () =>
       identityStatus: 'confirmed', institutionMismatch: true,
     };
     expect(provenanceGroupOf(candidate)).toBe('literature_retrieved');
+  });
+});
+
+// The referrer has no dedicated Dataverse field — it survives only inside the
+// match-reason text. These fixtures are the discriminating ones: every name here
+// carries a period, which is exactly what the pre-S424 non-greedy parse truncated.
+describe('referral clause encode/decode', () => {
+  test.each([
+    ['Dr. Abby Doyle', 'Synthesis expert.'],
+    ['Dr. Abby Doyle', ''],
+    ['A. B. Doyle', 'Met at Gordon conf. Follow up.'],
+    ['Abby Doyle', 'Plain name, plain note.'],
+    ['Prof. J. Smith-O’Neill', ''],
+  ])('round-trips %j alongside note %j', (name, note) => {
+    expect(parseReferredByReason(formatReferredByReason(name, note))).toBe(name);
+  });
+
+  test('a name ending in a period keeps one, not two, and re-encodes stably', () => {
+    const reason = formatReferredByReason('Abby Doyle Jr.', 'Suffix carries the period.');
+    expect(reason).toBe('Referred by Abby Doyle Jr.\nSuffix carries the period.');
+    const parsed = parseReferredByReason(reason);
+    expect(parsed).toBe('Abby Doyle Jr');
+    // Idempotent: re-encoding what we parsed reproduces the same stored string.
+    expect(formatReferredByReason(parsed, 'Suffix carries the period.')).toBe(reason);
+  });
+
+  test('the referral clause owns line 1, so later annotations cannot re-enter the name', () => {
+    // save-candidates appends its PD-confirmation and coauthor-COI suffixes with a
+    // leading space; the trailing newline keeps them off line 1.
+    let reason = formatReferredByReason('Dr. Abby Doyle');
+    reason += ' [Identity confirmed by PD; contact entered manually]';
+    reason += ' [Coauthor COI: Has co-authored with proposal authors]';
+    expect(parseReferredByReason(reason)).toBe('Dr. Abby Doyle');
+  });
+
+  test('the clause terminator is a newline, not a period', () => {
+    // Guards the parse contract: if this newline is ever trimmed in transit, the
+    // decode silently falls back to the lossy legacy branch below.
+    expect(formatReferredByReason('Dr. Abby Doyle', 'note')).toBe('Referred by Dr. Abby Doyle.\nnote');
+    expect(formatReferredByReason('Dr. Abby Doyle')).toBe('Referred by Dr. Abby Doyle.\n');
+  });
+
+  test('a name with internal whitespace or newlines is collapsed before encoding', () => {
+    expect(parseReferredByReason(formatReferredByReason('Dr.  Abby\nDoyle'))).toBe('Dr. Abby Doyle');
+  });
+
+  test('no referrer means no clause', () => {
+    expect(formatReferredByReason('', 'Just a note.')).toBe('Just a note.');
+    expect(formatReferredByReason(null)).toBe('');
+    expect(parseReferredByReason('Manually added by staff.')).toBeNull();
+    expect(parseReferredByReason(null)).toBeNull();
+  });
+
+  test('legacy space-joined rows keep their original (lossy) parse — no regression', () => {
+    // Written before the line-1 contract. Genuinely ambiguous: the note and the
+    // name are separated by the same ". " that appears inside the title.
+    expect(parseReferredByReason('Referred by Dr. Abby Doyle. Synthesis expert.')).toBe('Dr');
+    // Legacy rows with a period-free name were, and remain, parsed correctly.
+    expect(parseReferredByReason('Referred by Abby Doyle. Synthesis expert.')).toBe('Abby Doyle');
   });
 });

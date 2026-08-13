@@ -322,13 +322,13 @@ describe('referral capture (S249)', () => {
     // `referred` source token, so the provenance kind survives a my-candidates reload.
     expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
       expect.objectContaining({
-        matchReason: 'Referred by Dr. Abby Doyle. Synthesis expert.',
+        matchReason: 'Referred by Dr. Abby Doyle.\nSynthesis expert.',
         sources: ['staff_manual', 'referred'],
       }),
       { actingUserSystemId: 'u-1' },
     );
     expect(createReviewer).toHaveBeenCalledWith(
-      expect.objectContaining({ whyChosen: 'Referred by Dr. Abby Doyle. Synthesis expert.' }),
+      expect.objectContaining({ whyChosen: 'Referred by Dr. Abby Doyle.\nSynthesis expert.' }),
       { actingUserSystemId: 'u-1' },
     );
     // DTO drives the client provenance (kind referred + label).
@@ -343,7 +343,7 @@ describe('referral capture (S249)', () => {
     let r = res();
     await handler(post({ requestId: REQ, name: 'Tim Newhouse', referredBy: 'Dr. Abby Doyle' }), r);
     expect(ensureStaffManualCandidate).toHaveBeenCalledWith(
-      expect.objectContaining({ matchReason: 'Referred by Dr. Abby Doyle.' }),
+      expect.objectContaining({ matchReason: 'Referred by Dr. Abby Doyle.\n' }),
       { actingUserSystemId: 'u-1' },
     );
     expect(r.body.candidate.provenanceKind).toBe('referred');

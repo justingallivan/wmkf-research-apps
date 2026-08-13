@@ -8,7 +8,7 @@
 // implementation. Re-exported below so existing client imports keep working.
 import { normalizeReviewerName as _normalizeReviewerName, partitionByExcluded } from '../../../lib/utils/reviewer-name-match';
 import { mayPersistIdentity } from '../../../lib/services/reviewer-identity-resolver';
-import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
+import { buildReviewerProvenance, PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, formatReferredByReason, sanitizeInstitutionCOIDetails as _sanitizeInstitutionCOIDetails } from '../../../lib/utils/reviewer-provenance';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { parseReferredSeeds as _parseReferredSeeds } from '../../../lib/utils/reviewer-referral-seeds';
 import { reviewerSaveKey } from '../../../lib/utils/reviewer-save-key';
@@ -385,11 +385,11 @@ export function mergeReferredProvenance(keep, incoming) {
     'referred',
   ]));
   let reasoning = keep.reasoning || keep.generatedReasoning || '';
-  // Durable-string contract: my-candidates reload reconstructs `referredBy` from a
-  // leading "Referred by {name}." in wmkf_matchreason. Prepend it (once) so a
+  // Durable-string contract: my-candidates reload reconstructs `referredBy` from the
+  // leading "Referred by {name}." line in wmkf_matchreason. Prepend it (once) so a
   // grafted survivor round-trips the referrer, matching a native referred seed.
   if (referredBy && !/^Referred by /i.test(reasoning)) {
-    reasoning = `Referred by ${referredBy}. ${reasoning}`.trim();
+    reasoning = formatReferredByReason(referredBy, reasoning);
   }
   const upgraded = {
     ...keep,

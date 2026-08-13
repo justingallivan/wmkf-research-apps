@@ -221,6 +221,16 @@ bare keyword→author lane is what underperformed.
   "Applicant-Referred", no new enum. S320 also preserves referred provenance/referrer on
   same-normalized-name seed⇄discovery collisions before display and roster persistence:
   `docs/REVIEWER_REFERRAL_SEEDING_DESIGN.md`.
+- **HAZARD — the referrer has no Dataverse field; it lives in the match-reason text
+  (S249 D1), and the clause owns LINE 1 (S424).** A period cannot terminate the name,
+  because titles and middle initials carry one — the original space-joined encoding
+  truncated "Dr. Abby Doyle" to "Dr" on reload. The newline is the terminator, so the
+  downstream annotations `save-candidates-service.js:1034`/`:1037` append onto a later
+  line and can never re-enter the name. Encode/decode is the canonical pair
+  `formatReferredByReason` / `parseReferredByReason`
+  (`lib/utils/reviewer-provenance.js`); route new producers through it rather than
+  hand-rolling `Referred by …`, and change both directions together. Rows written before
+  S424 are genuinely ambiguous and keep the lossy legacy parse.
 - **Results list has a Rank⇄A–Z sort toggle (S318, shipped).** Default is
   confidence/relevance rank; A–Z sorts by name *within* each provenance group (grouping
   preserved). `ReviewerSearchSection.js` `sortMode`.

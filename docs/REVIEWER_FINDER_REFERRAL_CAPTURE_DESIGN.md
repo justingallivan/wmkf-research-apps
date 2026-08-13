@@ -80,7 +80,7 @@ referrer layer over the existing manual-add path.**
 ### 4b. Endpoint: extend `manual-reviewer.js` (reuse, don't rebuild)
 - Accept an optional `referredBy` (cleanString, ≤180). When present:
   - set the candidate's `provenanceKind = 'referred'` + `referredBy`;
-  - prepend `Referred by {referredBy}. ` to `matchReason` (the **durable** home — see D1);
+  - prepend `Referred by {referredBy}.` to `matchReason` (the **durable** home — see D1);
   - return `sources: ['referred']`, `referredBy`, `manualAdded: true` on the DTO.
 - Everything else (lookup → resolution → 409-confirm → create person → ensure
   candidate row → fill-only contact/ORCID → applicant-exclusion gate) is unchanged.
@@ -90,7 +90,12 @@ referrer layer over the existing manual-add path.**
 ### 4c. referredBy storage (D1)
 - **Recommended: encode in the match-reason text** (`Referred by {referredBy}.`) — no
   new Dataverse field, durable, human-legible in the why-chosen the staffer already
-  reads. Plus a structured `referredBy` on the in-session candidate DTO + provenance
+  reads. **S424 correction:** the clause owns **line 1** — the note follows after a
+  newline, not a space. A period cannot terminate the name (titles and initials carry
+  one), so the original space-joined form truncated "Dr. Abby Doyle" to "Dr" on reload.
+  Encode/decode is now the canonical pair `formatReferredByReason` /
+  `parseReferredByReason` in `lib/utils/reviewer-provenance.js`; every producer and the
+  single consumer route through it. Pre-S424 rows keep the lossy legacy parse. Plus a structured `referredBy` on the in-session candidate DTO + provenance
   for ranking/label. Consistent with the project's conservative no-new-Dataverse-field
   posture.
 - Alternative: a new `wmkf_referredby` field on `wmkf_appreviewersuggestion` (queryable
