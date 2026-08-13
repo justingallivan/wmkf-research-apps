@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-const { classify, auditToken, GATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
+const { classify, auditToken, GATES, TOKEN_STATES, DAY_MS } = require('../../scripts/probe-respond-reminder-gates.js');
 
 const NOW = Date.parse('2026-08-13T12:00:00Z');
 
@@ -157,24 +157,64 @@ describe('assumeEnabled projection', () => {
 // earlier gate never reaches the token check, so its link state would otherwise
 // be unknown — which is exactly the case for the closed-cycle requests.
 describe('auditToken', () => {
+  const tok = (over = {}) => ({ wmkf_externaltokenhash: 'h', wmkf_externaltokenrevoked: false, ...over });
+
   test.each([
     ['a future expiry is live', new Date(NOW + DAY_MS).toISOString(), 'live'],
     ['a past expiry is expired', new Date(NOW - DAY_MS).toISOString(), 'expired'],
-    ['null is never_minted', null, 'never_minted'],
-    ['an unparseable value is never_minted, not live', 'not-a-date', 'never_minted'],
   ])('%s', (_label, value, expected) => {
-    expect(auditToken({ wmkf_externaltokenexpires: value }, NOW)).toBe(expected);
+    expect(auditToken(tok({ wmkf_externaltokenexpires: value }), NOW)).toBe(expected);
   });
 
-  test('expiry exactly now is expired, matching the sweep’s <= comparison', () => {
-    expect(auditToken({ wmkf_externaltokenexpires: new Date(NOW).toISOString() }, NOW)).toBe('expired');
+  test('expiry exactly now is expired, matching the verifier’s <= comparison', () => {
+    expect(auditToken(tok({ wmkf_externaltokenexpires: new Date(NOW).toISOString() }), NOW)).toBe('expired');
   });
 
-  test('it reports live even for a row the ladder stops early on', () => {
+  // Hash first, exactly as verify-suggestion-token.js:163 does. An earlier version
+  // of this probe read only the expiry column and reported "never_minted" for a
+  // null expiry — which conflated "no access at all" with "no expiry bound", the
+  // two states that matter most for a closed cycle.
+  test('no hash is no_token, whatever the expiry says', () => {
+    expect(auditToken({ wmkf_externaltokenhash: null, wmkf_externaltokenexpires: new Date(NOW + DAY_MS).toISOString() }, NOW))
+      .toBe('no_token');
+    expect(auditToken({}, NOW)).toBe('no_token');
+  });
+
+  test('a revoked token is revoked even with a live expiry', () => {
+    expect(auditToken(tok({ wmkf_externaltokenrevoked: true, wmkf_externaltokenexpires: new Date(NOW + DAY_MS).toISOString() }), NOW))
+      .toBe('revoked');
+  });
+
+  // The dangerous shape: the verifier skips its expiry check when the column is
+  // null (:183), so this is NOT expired — it is unbounded as far as Dataverse is
+  // concerned, and must never be reported as safe.
+  test.each([[null], [undefined], ['not-a-date']])(
+    'a hash with expiry=%p is no_expiry_recorded — never "expired"',
+    (value) => {
+      const state = auditToken(tok({ wmkf_externaltokenexpires: value }), NOW);
+      expect(state).toBe('no_expiry_recorded');
+      expect(state).not.toBe('expired');
+      expect(state).not.toBe('no_token');
+    },
+  );
+
+  test('it reports state even for a row the ladder stops early on', () => {
     // The closed-cycle shape: no offset, so classify never reaches the token gate.
-    const row = { wmkf_emailsentat: '2026-07-01T00:00:00Z', wmkf_externaltokenexpires: new Date(NOW + 30 * DAY_MS).toISOString() };
+    const row = tok({ wmkf_emailsentat: '2026-07-01T00:00:00Z', wmkf_externaltokenexpires: new Date(NOW + 30 * DAY_MS).toISOString() });
     const request = { wmkf_respondreminderenabled: null, wmkf_respondoffsetdays: null };
     expect(classify(row, request, okPd(), okReviewer(), NOW)).toBe('reminder_disabled');
     expect(auditToken(row, NOW)).toBe('live');
+  });
+
+  test('every state auditToken returns is in TOKEN_STATES', () => {
+    const seen = [
+      auditToken({}, NOW),
+      auditToken(tok({ wmkf_externaltokenrevoked: true }), NOW),
+      auditToken(tok({ wmkf_externaltokenexpires: null }), NOW),
+      auditToken(tok({ wmkf_externaltokenexpires: new Date(NOW + DAY_MS).toISOString() }), NOW),
+      auditToken(tok({ wmkf_externaltokenexpires: new Date(NOW - DAY_MS).toISOString() }), NOW),
+    ];
+    expect(new Set(seen).size).toBe(5);
+    for (const state of seen) expect(TOKEN_STATES).toContain(state);
   });
 });

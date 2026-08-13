@@ -27,8 +27,9 @@
  *     were on — the blast radius of arming the reminder, without arming it.
  *
  * Every run also reports `tokenAudit` / per-request `tokens`: invitation-link state
- * for all scanned rows, computed independently of the ladder. A `live` token on a
- * closed cycle is its own finding — that reviewer can still accept today.
+ * for all scanned rows, computed independently of the ladder, in the verifier's own
+ * order. A `live` token on a closed cycle is its own finding — that reviewer can
+ * still accept today. `no_expiry_recorded` is UNRESOLVED, not safe: see auditToken.
  */
 
 const fs = require('node:fs');
@@ -89,11 +90,22 @@ async function queryAll(client, url) {
  * validates hash + not-revoked + not-expired and asks nothing about the campaign.
  */
 function auditToken(row, now) {
-  if (!row.wmkf_externaltokenexpires) return 'never_minted';
+  // Hash first, exactly as the verifier does: no hash means no access at all,
+  // whatever the expiry column says.
+  if (!row.wmkf_externaltokenhash) return 'no_token';
+  if (row.wmkf_externaltokenrevoked === true) return 'revoked';
+  // The verifier's expiry check is guarded by `if (wmkf_externaltokenexpires)`
+  // (:183) — a null column SKIPS it, so the row is bounded only by the JWT's own
+  // `exp` claim, which this probe cannot see without the token itself. Reported
+  // as its own state rather than folded into live/expired: calling it either
+  // would assert something unmeasured.
+  if (!row.wmkf_externaltokenexpires) return 'no_expiry_recorded';
   const expiresAt = new Date(row.wmkf_externaltokenexpires).getTime();
-  if (!Number.isFinite(expiresAt)) return 'never_minted';
+  if (!Number.isFinite(expiresAt)) return 'no_expiry_recorded';
   return expiresAt > now ? 'live' : 'expired';
 }
+
+const TOKEN_STATES = ['live', 'expired', 'no_token', 'revoked', 'no_expiry_recorded'];
 
 /**
  * @param {{ assumeEnabled?: boolean }} [opts] - assumeEnabled forces gate 2 open to
@@ -146,8 +158,10 @@ async function main() {
     + `and (wmkf_declined eq false or wmkf_declined eq null) `
     + `and wmkf_responsetype eq null and wmkf_respondremindersentat eq null `
     + `and (wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne ${APPLICANT_DISPOSITION_EXCLUDED})`;
+  // The hash is selected for PRESENCE only and never printed (it is a SHA of the
+  // JWT, not the link, but there is no reason to emit it).
   const select = 'wmkf_appreviewersuggestionid,_wmkf_request_value,_wmkf_potentialreviewer_value,'
-    + 'wmkf_emailsentat,wmkf_externaltokenexpires';
+    + 'wmkf_emailsentat,wmkf_externaltokenexpires,wmkf_externaltokenhash,wmkf_externaltokenrevoked';
 
   const rows = await queryAll(client,
     `/wmkf_appreviewersuggestions?$select=${select}&$filter=${encodeURIComponent(filter)}`);
@@ -201,7 +215,7 @@ async function main() {
       respondReminderLeadDays: request?.wmkf_respondreminderleaddays ?? null,
       reviewDueDate: request?.wmkf_reviewduedate ?? null,
       verdicts: {},
-      tokens: { live: 0, expired: 0, never_minted: 0 },
+      tokens: Object.fromEntries(TOKEN_STATES.map((s) => [s, 0])),
       latestLiveTokenExpiry: null,
       ...(assumeEnabled ? { wouldSendIfEnabled: 0 } : {}) };
     perRequest[key].verdicts[verdict] = (perRequest[key].verdicts[verdict] || 0) + 1;
@@ -263,11 +277,10 @@ async function main() {
       },
     } : {}),
     tokenAudit: {
-      note: 'Invitation-link state for every scanned row, computed independently of the gate ladder. `live` means that reviewer can still ACCEPT today — the accept path checks hash/revoked/expiry only and asks nothing about whether the campaign is still open.',
-      live: rows.filter((r) => auditToken(r, now) === 'live').length,
-      expired: rows.filter((r) => auditToken(r, now) === 'expired').length,
-      never_minted: rows.filter((r) => auditToken(r, now) === 'never_minted').length,
+      note: 'Invitation-link state for every scanned row, computed independently of the gate ladder, in the verifier’s own order (hash → revoked → expiry). `live` means that reviewer can still ACCEPT today: verify-suggestion-token.js checks hash/revoked/expiry and asks nothing about whether the campaign is still open.',
+      states: Object.fromEntries(TOKEN_STATES.map((s) => [s, rows.filter((r) => auditToken(r, now) === s).length])),
       of: rows.length,
+      caveat: '`no_expiry_recorded` is NOT proof of safety: the verifier skips its expiry check when that column is null (verify-suggestion-token.js:183), leaving the JWT’s own `exp` claim — set at mint (external-token.js:102) and enforced by jwtVerify — as the only bound. This probe cannot read that claim without the token, so those rows are UNRESOLVED here, not clean.',
     },
     gateLegend: Object.fromEntries(GATES.map((g) => [g.key, `${g.why} (sweep${g.at})`])),
     perRequest,
@@ -293,4 +306,4 @@ if (require.main === module) {
 
 // Exported for tests: the attribution is the whole value of this probe, so it is
 // asserted gate-by-gate rather than trusted on first run.
-module.exports = { classify, auditToken, GATES, DAY_MS };
+module.exports = { classify, auditToken, GATES, TOKEN_STATES, DAY_MS };
