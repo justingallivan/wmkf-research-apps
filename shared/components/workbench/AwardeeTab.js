@@ -252,6 +252,12 @@ export default function AwardeeTab({ requestId, context }) {
     const loadRequestId = requestId;
     const seq = abstractLoadSeqRef.current + 1;
     abstractLoadSeqRef.current = seq;
+    // Drop the previous byline BEFORE the fetch. The load only writes state on
+    // success, so without this a failed load after a request switch would leave
+    // the prior grant's PI/Co-PIs on screen — and this panel exists to be read
+    // as "these are the names for THIS award". Showing nothing is recoverable;
+    // showing another grant's names is the false clear the panel must not make.
+    setByline(null);
     try {
       const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
       const data = await res.json();

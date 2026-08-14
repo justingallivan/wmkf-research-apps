@@ -1382,6 +1382,24 @@ test('an empty Co-PI list is stated, not hidden', async () => {
   expect(screen.getByText('none listed')).toBeInTheDocument();
 });
 
+test('switching requests never leaves the previous award\'s names on screen', async () => {
+  // The load only writes state on success, so a failed load after a switch
+  // would otherwise strand request A's byline under request B's abstract.
+  wireFetch({ abstract: {
+    effective: 'Draft text.', effectiveField: 'formatted', status: 100000000, editable: true,
+    pi: 'Kristen Buck', coPIs: ['Mya Breitbart'], bylineNames: 'Kristen Buck and Mya Breitbart',
+  } });
+  const { rerender } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Kristen Buck')).toBeInTheDocument());
+
+  const OTHER = '99999999-9999-9999-9999-999999999999';
+  global.fetch = jest.fn(async () => { throw new Error('load failed'); });
+  await act(async () => { rerender(<AwardeeTab requestId={OTHER} context={CYCLE_CTX} />); });
+
+  expect(screen.queryByText('Kristen Buck')).not.toBeInTheDocument();
+  expect(screen.queryByText('Mya Breitbart')).not.toBeInTheDocument();
+});
+
 test('a failed byline lookup reads as unverified, never as an empty roster', async () => {
   wireFetch({ abstract: {
     effective: 'Draft text.', effectiveField: 'formatted', status: 100000000, editable: true,
