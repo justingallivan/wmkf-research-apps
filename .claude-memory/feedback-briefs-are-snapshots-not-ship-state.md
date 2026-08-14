@@ -1,19 +1,20 @@
 ---
 name: feedback-briefs-are-snapshots-not-ship-state
-description: "A dated brief in outputs/ states what was true on its date, not what is true now. Before repeating one of its open risks or unverified claims, check DEVELOPMENT_LOG.md and git log for a later session that overtook it."
+description: "A document's status claim — a dated brief's open risk, or a plan's 'implementation has not started' — states what was true when written, not what is true now. Before repeating one, check DEVELOPMENT_LOG.md and git log; when the claim is about another agent's work, enumerate branches rather than worktrees."
 metadata:
   type: feedback
   status: active
   scope: global
-  last_verified: 2026-08-12 (S422) — the same brief misled twice in one session
+  last_verified: 2026-08-13 (S425) — second instance, a plan's Status line and an unenumerated branch
 ---
 
 ## Recall Rule
 
-Read this before restating any "not verified", "still open", "unpushed", or "NOT
-merged" claim that came from a document rather than from source or a probe.
-Especially when the claim is about to be reported to the user as a risk, a
-blocker, or the reason something cannot ship.
+Read this before restating any "not verified", "still open", "unpushed", "NOT
+merged", or "not started" claim that came from a document rather than from source
+or a probe. Especially when the claim is about to be reported to the user as a
+risk, a blocker, or the reason something cannot ship — or as an assurance that two
+agents' work does not overlap.
 
 ## The rule
 
@@ -43,10 +44,33 @@ brief was the only thing left to interpret it against.
 session around work that is already done, and it tells the owner their shipped work
 is unverified.
 
+## Second instance — a plan's status line, and a branch never enumerated (2026-08-13, S425)
+
+Same root cause, opposite direction: in S422 a stale doc claimed shipped work was
+open; here `docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md` said "Implementation has
+not started" and it had — on `codex/grantee-abstract-rich-text`, three commits deep,
+in the same two files the session had just edited.
+
+The multi-agent overlap assessment was reported to the owner as "zero file overlap,
+clean merge, no brief needed" — backed by a real `git merge-tree` run, but against
+**one** Codex branch, the one that happened to appear in `git worktree list`. The
+implementing branch had no worktree, so it was never enumerated. The owner supplied
+it. True state: six shared files and two conflicts.
+
+**Why:** a merge result is only as good as the branch set it was computed over.
+Verifying hard against the wrong denominator reads as *more* trustworthy than not
+checking, because the evidence is genuine — it just answers a question nobody asked.
+This is the [[feedback-vacuous-clean-results-print-the-denominator]] failure applied
+to branches.
+
 ## How to apply
 
 - Before repeating a document's open risk: read `DEVELOPMENT_LOG.md`, then
   `git log --oneline -- <the cited paths>`.
+- Before any claim about what another agent has or has not built: enumerate branches
+  (`git branch --list 'codex/*'`), not worktrees. `git worktree list` shows only
+  branches someone happens to have checked out, which is a subset. A plan doc's
+  Status line is never the answer.
 - When a carryover item is a bare phrase with no definition, treat that as a signal
   to go find ground truth, not a licence to fill it in from the nearest document.
 - When you find a brief was overtaken, add a supersession header (§0) to it in the
