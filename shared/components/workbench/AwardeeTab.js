@@ -97,6 +97,7 @@ export default function AwardeeTab({ requestId, context }) {
   const [abstractEditable, setAbstractEditable] = useState(false);
   const [savingAbstract, setSavingAbstract] = useState(false);
   const [abstractMsg, setAbstractMsg] = useState(null);
+  const [abstractError, setAbstractError] = useState(null);
   // PI + Co-PI byline as the published document will render it. Loaded with the
   // abstract (same request, same stale-response guard) so the PD can eyeball the
   // names before sending — these come from Dataverse and nothing else in this
@@ -333,7 +334,7 @@ export default function AwardeeTab({ requestId, context }) {
       const data = await res.json().catch(() => ({}));
       if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
       if (!res.ok) {
-        setError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
+        setAbstractError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
         return;
       }
       setAbstractConflict({
@@ -345,10 +346,10 @@ export default function AwardeeTab({ requestId, context }) {
         editable: Boolean(data.editable),
         status: data.status,
       });
-      setError(null);
+      setAbstractError(null);
     } catch {
       if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
-      setError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
+      setAbstractError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
     }
   }, [requestId]);
 
@@ -358,6 +359,7 @@ export default function AwardeeTab({ requestId, context }) {
     setSavingAbstract(false);
     setAbstractConflict(null);
     setAbstractMsg(null);
+    setAbstractError(null);
   }, [requestId]);
 
   useEffect(() => {
@@ -422,7 +424,7 @@ export default function AwardeeTab({ requestId, context }) {
     const saveEtag = abstractEtag;
     const saveField = abstractField;
     abstractSaveSeqRef.current = saveSeq;
-    setSavingAbstract(true); setError(null); setAbstractMsg(null);
+    setSavingAbstract(true); setError(null); setAbstractError(null); setAbstractMsg(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/abstract', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -431,7 +433,7 @@ export default function AwardeeTab({ requestId, context }) {
       const data = await res.json().catch(() => ({}));
       if (abstractSaveSeqRef.current !== saveSeq || currentRequestIdRef.current !== saveRequestId) return;
       if (!res.ok) {
-        setError(data.error || 'Could not save the abstract.');
+        setAbstractError(data.error || 'Could not save the abstract.');
         if (data.code === 'stale') await loadAbstractConflict();
       } else {
         setSavedAbstractText(saveText);
@@ -439,11 +441,12 @@ export default function AwardeeTab({ requestId, context }) {
         if (data.etag) setAbstractEtag(data.etag);
         if (data.status !== undefined) setStatus(data.status);
         setAbstractConflict(null);
+        setAbstractError(null);
         setAbstractMsg('Abstract saved.');
       }
     } catch {
       if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
-        setError('Could not save the abstract.');
+        setAbstractError('Could not save the abstract.');
       }
     } finally {
       if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
@@ -461,7 +464,7 @@ export default function AwardeeTab({ requestId, context }) {
     if (abstractConflict.status !== undefined) setStatus(abstractConflict.status);
     if (abstractConflict.field) setSubTab(abstractConflict.field === 'approved' ? 'submission' : 'invitation');
     setAbstractConflict(null);
-    setError(null);
+    setAbstractError(null);
     setAbstractMsg('Your unsaved version is still in the editor. Review it, then save again.');
   }
 
@@ -476,7 +479,7 @@ export default function AwardeeTab({ requestId, context }) {
     if (abstractConflict.status !== undefined) setStatus(abstractConflict.status);
     if (abstractConflict.field) setSubTab(abstractConflict.field === 'approved' ? 'submission' : 'invitation');
     setAbstractConflict(null);
-    setError(null);
+    setAbstractError(null);
     setAbstractMsg('Loaded the current server version.');
   }
 
@@ -841,7 +844,7 @@ export default function AwardeeTab({ requestId, context }) {
                 </div>
               </div>
             )}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={saveAbstract}
@@ -852,6 +855,7 @@ export default function AwardeeTab({ requestId, context }) {
               </button>
               {abstractDirty && <span className="text-xs text-amber-700">Unsaved changes</span>}
               {abstractMsg && <span className="text-xs text-green-700">{abstractMsg}</span>}
+              {abstractError && <span role="alert" className="text-xs text-red-700">{abstractError}</span>}
               {!abstractEditable && (
                 <span className="text-xs text-gray-500">Read-only in the current status.</span>
               )}

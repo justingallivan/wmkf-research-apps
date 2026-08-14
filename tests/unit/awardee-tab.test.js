@@ -359,6 +359,26 @@ test('loads a grantee-approved abstract on mount, labeled as the published versi
   expect(screen.getByText(/this is what publishes to the website/i)).toBeInTheDocument();
 });
 
+test('an abstract save failure appears beside the save controls', async () => {
+  wireFetch({
+    saveOk: false,
+    abstract: {
+      effective: 'Original abstract.', effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true,
+    },
+  });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Original abstract.'));
+
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'Edited abstract.' } });
+  const saveButton = screen.getByRole('button', { name: /save edits/i });
+  fireEvent.click(saveButton);
+
+  await waitFor(() => {
+    expect(within(saveButton.parentElement).getByRole('alert')).toHaveTextContent('Could not save the abstract.');
+  });
+  expect(screen.getAllByRole('alert')).toHaveLength(1);
+});
+
 test('a read-only (status-gated) abstract cannot be saved', async () => {
   wireFetch({ abstract: { effective: 'Locked approved abstract.', effectiveField: 'approved', etag: 'W/"9"', status: 100000006, editable: false } });
   render(<AwardeeTab requestId={REQ} />);

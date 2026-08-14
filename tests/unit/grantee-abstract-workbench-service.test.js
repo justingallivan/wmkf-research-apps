@@ -4,8 +4,8 @@
  * lib/services/workbench/grantee-deliverables/abstract-service — logic-level
  * tests (adapter mocked), Stage 4 series C extraction. The route suite pins
  * the full envelopes; this pins the service branches: target resolution,
- * provenance/stale/status typed 409 bodies, 412 translation, non-412 → 500,
- * and the non-fatal etag re-read.
+ * provenance/stale/status typed 409 bodies, 412 translation, ambiguous-write
+ * reconciliation, and the non-fatal happy-path etag re-read.
  */
 
 const getById = jest.fn();
@@ -34,9 +34,12 @@ const row = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getById.mockResolvedValue(row());
-  updateById.mockResolvedValue(undefined);
-  getDeliverableForRequest.mockResolvedValue({ wmkf_granteedeliverableid: 'd1', wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED });
+  getById.mockReset().mockResolvedValue(row());
+  updateById.mockReset().mockResolvedValue(undefined);
+  getDeliverableForRequest.mockReset().mockResolvedValue({
+    wmkf_granteedeliverableid: 'd1',
+    wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+  });
 });
 
 const saveArgs = (over = {}) => ({
@@ -194,17 +197,59 @@ test('save: status gate → 409 not_editable with status/statusLabel body', asyn
   expect(err.body.status).toBe(GRANTEE_DELIVERABLE_STATUS.COMPLETE);
 });
 
-test('save: 412 from the conditional write → 409 stale; non-412 → 500 sanitized', async () => {
+test('save: 412 from the conditional write → 409 stale', async () => {
   updateById.mockRejectedValueOnce(Object.assign(new Error('precondition'), { status: 412 }));
-  let err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
+  const err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
   expect(err.httpStatus).toBe(409);
   expect(err.body.code).toBe('stale');
+});
 
+test('save: a no-response that committed is reconciled to success with the fresh etag', async () => {
   updateById.mockRejectedValueOnce(new Error('server blew up'));
-  err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
-  expect(err.httpStatus).toBe(500);
-  expect(err.message).toBe('Failed to save the abstract.');
-  expect(err.body).toBeUndefined();
+  getById
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce(row({ wmkf_abstractformatted: 'edited text long enough', _etag: 'W/"2"' }));
+
+  await expect(saveGranteeAbstract(saveArgs())).resolves.toEqual({
+    ok: true,
+    field: 'formatted',
+    etag: 'W/"2"',
+    status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,
+    statusLabel: 'Drafted',
+  });
+});
+
+test('save: a no-response with a different stored value remains retryable', async () => {
+  updateById.mockRejectedValueOnce(new Error('server blew up'));
+  getById
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce(row({ wmkf_abstractformatted: 'unchanged server value' }));
+
+  const err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body.code).toBe('save_retryable');
+});
+
+test('save: a failed reconciliation read reports an unconfirmed save', async () => {
+  updateById.mockRejectedValueOnce(new Error('server blew up'));
+  getById
+    .mockResolvedValueOnce(row())
+    .mockRejectedValueOnce(new Error('re-read down'));
+
+  const err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
+  expect(err.httpStatus).toBe(503);
+  expect(err.body.code).toBe('save_unconfirmed');
+});
+
+test('save: a target flip observed during reconciliation remains a stale conflict', async () => {
+  updateById.mockRejectedValueOnce(new Error('server blew up'));
+  getById
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce(row({ wmkf_abstractapproved: APPROVED, _etag: 'W/"2"' }));
+
+  const err = await saveGranteeAbstract(saveArgs()).catch((e) => e);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toMatchObject({ code: 'stale', currentField: 'approved' });
 });
 
 test('save: happy path writes the effective field conditionally and re-reads the etag (re-read failure non-fatal)', async () => {

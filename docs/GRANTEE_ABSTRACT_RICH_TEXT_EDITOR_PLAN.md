@@ -15,7 +15,7 @@ related:
 
 # Grantee Abstract Rich-Text Editor Build Plan
 
-**Status:** Abstract and image-caption editors merged and deployed to production; staff abstract formatting and persistence observed in production on 2026-08-14. The slow-save ambiguous-write reconciliation is implemented on `codex/fix-abstract-save-timeout` but is not yet promoted to `main`.
+**Status:** Abstract and image-caption editors merged and deployed to production; staff abstract formatting and persistence observed in production on 2026-08-14. The slow-save ambiguous-write reconciliation (§4.5) is implemented and tested.
 **Change surface:** Abstract and image-caption editing in the external grantee portal and the staff Workbench Awardee tab.\
 **Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted`, `akoya_request.wmkf_abstractapproved`, and `wmkf_granteedeliverable.wmkf_imagecaption`.\
 **Review owner:** Claude Opus, read-only adversarial plan review.\
@@ -80,6 +80,7 @@ Tests:       29 passed, 29 total
 | Abstract length is enforced against serialized Markdown with the same 20000-character cap in both clients and both server write paths. | Shared limit; both callers; both routes/services | Boundary tests with heavily marked-up and multi-byte content |
 | Unsupported pasted structure loses formatting but preserves all text in source order. | Editor paste transform; serializer | Word/Google Docs HTML and drag/drop fixtures with word-for-word assertions |
 | A stale staff save never overwrites the unsaved editor document; current server text and the attempted text remain separately available until the user chooses how to reconcile them. | Awardee tab conflict state; staff GET | 409/412 component tests with two distinct values present |
+| A Dataverse timeout after an abstract PATCH cannot turn a committed edit into a false failure. | Staff abstract service; Awardee tab | Non-412 throw + exact re-read returns success/fresh ETag; mismatch/read failure stays non-success; error renders beside Save |
 
 ## 4. Selected design
 
@@ -195,6 +196,8 @@ The route and service keep their current validation, fresh-row target resolution
 
 The former stale path reloaded immediately and overwrote the working textarea. [VERIFIED via component tests] On `code:'stale'`, the rich editor fetches the current server abstract into separate conflict state without reseeding the editor. It displays the current server value while the user's unsaved value remains in the editor, with explicit actions to keep the user's version or replace it with the server version. A successful save updates the ETag, effective field, and dirty baseline without reseeding editor content. Every conflict fetch and resolution remains guarded by the existing request id and abstract load generation.
 
+[VERIFIED via production logs/source/tests, 2026-08-14] A Dataverse PATCH can commit but exceed the 30-second response timeout. The staff save service now re-reads both abstract fields after any non-412 write error. It returns success only when the fresh effective field is unchanged and its exact Markdown equals the attempted value; a target flip remains stale, and a mismatch or unavailable confirmation remains a typed failure. The save-specific message is rendered in the Save-button control row rather than the tab-level error area.
+
 ## 5. Implementation sequence and file surface
 
 ### Phase 1 — Conversion contract and editor ✅
@@ -308,7 +311,7 @@ Before implementation completion, inspect `docs/CI_GATES_REFERENCE.md` and `pack
 - `npm run check:types`: passed.
 - `npm run check:api-routes` followed by `npm run check:api-routes:self-test`: passed.
 - Canonical Turbopack `npm run build`: not proven in this host because Turbopack failed twice while attempting to create a process/bind a port (`Operation not permitted`), including the approved out-of-sandbox retry. The documented `next build --webpack` fallback passed against the final file set; only the repository's existing dynamic-dependency warnings were emitted.
-- Signed-in production observation: the owner confirmed staff rich-text formatting and persistence on 2026-08-14. The observed save exceeded the client timeout but committed; the reconciliation fix remains on `codex/fix-abstract-save-timeout` pending promotion.
+- Signed-in production observation: the owner confirmed staff rich-text formatting and persistence on 2026-08-14. The observed save exceeded the client timeout but committed, which led to the ambiguous-write reconciliation follow-up documented in §4.5.
 
 ## 7. Compatibility, rollout, and rollback
 

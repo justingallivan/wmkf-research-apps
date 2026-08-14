@@ -245,6 +245,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 - `/api/external/grantee/[token]/context` keeps `abstractFormatted`, `abstractApproved`, and `caption` as exact Markdown and adds response-only `deliverable.abstractHtml` / `deliverable.captionHtml`, rendered through the shared server-side body/inline sanitizers. No HTML is persisted and the token scope is unchanged.
 - `/api/workbench/grantee-deliverables/abstract` GET keeps exact Markdown in `effective` and `caption`, and adds response-only sanitized `effectiveHtml` / `captionHtml` for the staff editor seeds and caption display. PUT still accepts and persists only abstract Markdown, with the existing ETag and effective-field guards; caption writes remain on the separate ETag-conditional `replace-submission` route.
+- The abstract PUT reconciles an ambiguous non-412 Dataverse write by re-reading both abstract fields. An exact value on the same effective field returns 200 with the fresh ETag; a field flip remains a 409 stale conflict; a mismatched or unavailable confirmation returns a typed 503. The Awardee tab preserves the working copy and renders that save-specific failure beside the Save button.
 
 ## Regular Maintenance Process
 
