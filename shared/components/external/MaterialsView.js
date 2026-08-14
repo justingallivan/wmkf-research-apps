@@ -86,7 +86,7 @@ function FilesCard({ data, token, submitted }) {
       <h3 className="text-base font-semibold text-gray-900">Proposal materials</h3>
       <ul className="mt-3 divide-y divide-gray-100">
         {data.files.map((f) => {
-          const downloadUrl = `/api/external/review/${encodeURIComponent(token)}/proposal?fileId=${encodeURIComponent(f.id)}&library=${encodeURIComponent(f.library)}`;
+          const proposalUrl = `/api/external/review/${encodeURIComponent(token)}/proposal?fileId=${encodeURIComponent(f.id)}&library=${encodeURIComponent(f.library)}`;
           return (
             <li key={`${f.library}::${f.id}`} className="py-3 flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -94,10 +94,12 @@ function FilesCard({ data, token, submitted }) {
                 <p className="text-xs text-gray-500">{formatBytes(f.size)}</p>
               </div>
               <a
-                href={downloadUrl}
+                href={proposalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
               >
-                Download
+                View
               </a>
             </li>
           );

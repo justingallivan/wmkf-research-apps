@@ -71,10 +71,20 @@ export default async function handler(req, res) {
     const driveId = await GraphService.getDriveId(library);
     const file = await GraphService.downloadFile(driveId, fileId);
 
-    res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
+    // Serve the proposal PDF `inline` so the reviewer can open it in a second
+    // browser window and keep the review questions visible in the first. The
+    // allow-set above admits exactly one file (`Proposal_{requestNum}.pdf`, a
+    // filename equality check in isReviewerProposalFile), so an inline-rendered
+    // response can't be an attacker-chosen HTML/SVG document. Anything whose
+    // reported type isn't a PDF still downloads, and `nosniff` stops the
+    // browser from re-deciding the type for us.
+    const contentType = file.mimeType || 'application/octet-stream';
+    const disposition = contentType === 'application/pdf' ? 'inline' : 'attachment';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${encodeFilename(file.filename)}"`,
+      `${disposition}; filename="${encodeFilename(file.filename)}"`,
     );
     res.setHeader('Content-Length', file.size);
     res.setHeader('Cache-Control', 'private, no-store');

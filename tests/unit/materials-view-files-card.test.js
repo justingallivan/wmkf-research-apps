@@ -108,6 +108,25 @@ describe('MaterialsView FilesCard', () => {
     expect(screen.getByText(/review received/i)).toBeInTheDocument();
   });
 
+  test('the proposal link opens in a new window so the questions stay visible', () => {
+    render(
+      <MaterialsView
+        data={baseData({ files: [{ id: 'f1', library: 'lib1', name: 'proposal.pdf' }] })}
+        token={TOKEN}
+      />,
+    );
+    // The reviewer reads the proposal alongside the form, so this must be a
+    // second window — a same-tab navigation would drop the in-progress answers
+    // out of sight (and the authoring form is right below this card).
+    const link = screen.getByRole('link', { name: 'View' });
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(link).toHaveAttribute(
+      'href',
+      `/api/external/review/${TOKEN}/proposal?fileId=f1&library=lib1`,
+    );
+  });
+
   test('submitting in-page hides the materials card without a refetch', () => {
     render(
       <MaterialsView

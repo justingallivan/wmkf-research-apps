@@ -623,6 +623,49 @@ describe('/api/external/review/[token]/proposal', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(Buffer.from('test-file'));
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
+    // Served inline so the reviewer can open the proposal in a second window
+    // and keep the review questions visible in the first.
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'inline; filename="Proposal_REQ-001.pdf"',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+  });
+
+  it('falls back to attachment when the stored file does not report a PDF type', async () => {
+    verifySuggestionToken.mockResolvedValue(verifiedSuggestion);
+    getRequestSharePointBuckets.mockResolvedValue([
+      { library: 'akoya_request', folder: 'REQ-001_request', source: 'active' },
+    ]);
+    GraphService.listFiles.mockResolvedValue([
+      {
+        id: 'allowed-file',
+        name: 'Proposal_REQ-001.pdf',
+        folder: 'REQ-001_request/Reviewer Materials',
+      },
+    ]);
+    GraphService.getDriveId.mockResolvedValue('drive-1');
+    GraphService.downloadFile.mockResolvedValue({
+      filename: 'Proposal_REQ-001.pdf',
+      mimeType: 'text/html',
+      size: 10,
+      buffer: Buffer.from('test-file'),
+    });
+
+    const req = createMockReq({
+      method: 'GET',
+      query: { token: 'good-token', fileId: 'allowed-file', library: 'akoya_request' },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="Proposal_REQ-001.pdf"',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
   });
 
   it('rejects the timestamped internal application even when it is in Reviewer Materials', async () => {

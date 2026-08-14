@@ -189,6 +189,28 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   lets staff keep the portal, reminders, calendar, and future token mints aligned
   when they use it; the existing per-send composer date remains ephemeral and
   can still diverge from stored deadline state. Response timing remains separate.
+- **The proposal opens inline in a second window, not as a download (2026-08-13).**
+  `MaterialsView`'s FilesCard button is labeled **View** and carries
+  `target="_blank" rel="noopener noreferrer"`, and
+  `pages/api/external/review/[token]/proposal.js` sends
+  `Content-Disposition: inline` (plus `X-Content-Type-Options: nosniff`) when the
+  stored file reports `application/pdf`, falling back to `attachment` otherwise.
+  Both halves are load-bearing: `target="_blank"` against an `attachment`
+  response just opens a tab that downloads and closes. The reviewer reads the
+  proposal beside the authoring form, which sits directly below this card, so a
+  same-tab navigation would hide in-progress answers. Serving inline is safe
+  because the only servable filename is `Proposal_{requestNum}.pdf`
+  (`isReviewerProposalFile` is a folder matcher plus a filename equality check),
+  so no attacker-chosen HTML/SVG can reach this response [VERIFIED — this route
+  is the sole `GraphService.downloadFile` caller under `pages/api/external/`,
+  and its success path is unreachable without that check]. **This changed presentation
+  only:** token verification, the `download_proposal` ops claim, rate limiting,
+  the request-set allow check, and `private, no-store` are untouched, and the
+  route still streams exactly the same one file. Reviewers save from the
+  browser's PDF viewer instead of a forced download; there is no separate
+  Download button and no `?disposition=` override. Pinned by
+  `tests/unit/materials-view-files-card.test.js` and the two disposition cases in
+  `tests/integration/external-review-routes.test.js`.
 - **Post-accept and post-submit notices name the assigned Program Director (2026-08-09).**
   `/context` looks up the request's `_wmkf_programdirector_value` system user
   (best-effort; requires active + name + email) for the `accepted-pre-materials`,
