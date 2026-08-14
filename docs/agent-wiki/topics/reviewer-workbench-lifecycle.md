@@ -21,6 +21,7 @@ source_files:
   - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/ReviewerDueDateEditor.js
   - shared/components/workbench/ReviewsTab.js
+  - lib/services/graph-service.js
   - pages/api/review-manager/review-due-extension.js
   - pages/api/review-manager/send-review-reminder.js
   - lib/services/reviewer-due-extension.js
@@ -964,7 +965,7 @@ stacked with attribution, rendered the same way the Cards view's
 text wins (documented in the module header) when the key isn't live; live text
 always wins when it is.
 
-**Phase 3 DEPLOYED (S326; unit-tested; same verification boundary as Phase 2 — export unverifiable against real data until the first portal submission; correct absence drive-verified):** panel-prep
+**Phase 3 DEPLOYED (S326; current export decision updated 2026-08-13):** panel-prep
 roll-up/export. `shared/utils/review-report.js#composeReviewReport(...)` is a
 pure, DOM/React/Dataverse-free composition over a `deriveReviewMatrix` result
 (consumed, not re-derived) plus proposal identity — header, summary
@@ -978,19 +979,24 @@ em/i, ul/ol/li, h2/h3, blockquote, a — no tables/images/spans/divs), producing
 typed blocks with inline runs; an unknown/malformed tag degrades to plain text
 (tag stripped, text kept) rather than throwing or dropping content.
 `shared/utils/review-report-docx.js` (docx, dynamic `import('docx')` per
-`word-export.js` convention) and `shared/utils/review-report-pdf.js` (pdf-lib,
-built on `PDFReportBuilder` from `pdf-export.js`) render that report object;
-PDF FLATTENS inline bold/italic runs to plain text (pdf-lib/`PDFReportBuilder`
-has no mixed-run text primitive) — documented degradation, DOCX is the
-full-fidelity artifact. `ReviewsTab`'s submitted-reviews toolbar gets an
-"Export: Word (.docx) / PDF" affordance (visible only once ≥1 review is
-submitted) that composes client-side from already-loaded `submitted`/
+`word-export.js` convention) renders the current export. As of the owner
+decision on 2026-08-13, `ReviewsTab` exposes only "Export: Word (.docx)"
+(visible only once ≥1 review is submitted), because the earlier independent
+`pdf-lib` rendition flattened reviewer-authored formatting. It composes
+client-side from already-loaded `submitted`/
 `liveQuestions` — no new fetch, no new route, no Dataverse roll-up column
 (governing decision 4). Proposal identity on the export (request
 number/title/institution/PI) uses whatever `proposals[0]` already carries
 (`requestNumber`/`proposalTitle`/`proposalInstitution`/`proposalAuthors`) — the
 DTO has no dedicated `piName` field, so `proposalAuthors` (project
-leader/applicant) stands in as the best-available PI identity.
+leader/applicant) stands in as the best-available PI identity. The legacy
+`shared/utils/review-report-pdf.js` module remains in source/tests but has no
+Reviews-tab UI consumer. Staff currently convert the downloaded Word document
+externally when they need PDF. A server-side canonical-DOCX → temporary
+SharePoint drive item → Microsoft Graph `content?format=pdf` workflow is
+`[PLANNED]`, not built; its permissions, temporary-file retention/cleanup, and
+tenant conversion behavior must be verified before implementation. Full
+future contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1
@@ -1019,9 +1025,10 @@ participants remain unresolved and records each generation in
 card even at zero accepted/submitted reviews, with Current/Stale, readiness,
 and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
-`synthesis` param rendered additively in both export formats. Same
+`synthesis` param rendered in the current Word export. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
-submitted DTO, categorical matrix, and both export renderers on 2026-07-26.
+submitted DTO, categorical matrix, and both then-present export renderers on
+2026-07-26; that historical smoke does not make PDF a current UI feature.
 Three real v2 synthesis executions failed before writeback with
 `Claude output not valid JSON: Unexpected end of JSON input`, producing failed
 append-only audit runs `f5aa3712-4789-f111-ab0f-6045bd018a07` and
