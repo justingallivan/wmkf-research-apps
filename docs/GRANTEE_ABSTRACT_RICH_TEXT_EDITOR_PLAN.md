@@ -16,9 +16,9 @@ related:
 # Grantee Abstract Rich-Text Editor Build Plan
 
 **Status:** Implemented and locally verified on `codex/grantee-abstract-rich-text`; Preview smoke and production promotion remain.
-**Change surface:** Abstract editing in the external grantee portal and the staff Workbench Awardee tab.  
-**Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted` and `akoya_request.wmkf_abstractapproved`.  
-**Review owner:** Claude Opus, read-only adversarial plan review.  
+**Change surface:** Abstract editing in the external grantee portal and the staff Workbench Awardee tab.\
+**Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted` and `akoya_request.wmkf_abstractapproved`.\
+**Review owner:** Claude Opus, read-only adversarial plan review.\
 **Implementation owner:** Codex, following the Claude Opus-reviewed contract below.
 
 ## 1. Outcome and decision

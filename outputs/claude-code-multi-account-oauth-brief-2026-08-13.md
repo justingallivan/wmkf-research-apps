@@ -1,7 +1,7 @@
 # Claude Code Multi-Account OAuth Profile Brief
 
-**Status:** Planned; not implemented  
-**Prepared:** 2026-08-13  
+**Status:** Planned; not implemented\
+**Prepared:** 2026-08-13\
 **Intended executor:** A future Claude Code session
 
 ## Objective

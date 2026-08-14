@@ -6,4 +6,3 @@
  * ceiling and applies it to every writer so clients and servers cannot drift.
  */
 export const MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH = 20000;
-
