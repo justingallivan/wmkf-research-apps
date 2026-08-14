@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-14
+last_verified: 2026-08-13
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -9,20 +9,27 @@ source_files:
   - pages/api/intake/draft.js
   - pages/api/intake/draft/attach.js
   - pages/api/intake/draft/upload-token.js
+  - pages/api/cron/drain-submissions.js
   - lib/services/intake-draft-service.js
   - lib/services/intake-audit-service.js
+  - lib/services/cron/drain-submissions-service.js
+  - lib/services/contact-bridge-service.js
+  - lib/services/membership-service.js
   - lib/intake/rate-limit.js
   - lib/utils/intake-blob.js
 canonical_docs:
   - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
   - docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md
-  - docs/INTAKE_PORTAL_SCHEMA_CHANGES.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/dataverse-akoya-request.md
 watch_paths:
   - pages/api/intake/**
+  - pages/api/cron/drain-submissions.js
   - lib/services/intake-draft-service.js
   - lib/services/intake-audit-service.js
+  - lib/services/cron/drain-submissions-service.js
+  - lib/services/contact-bridge-service.js
+  - lib/services/membership-service.js
   - lib/intake/**
   - lib/utils/intake-blob.js
 update_triggers:
@@ -39,8 +46,10 @@ update_triggers:
 > so our portal effort is paused pending whether WMKF adopts it. Do NOT spin up
 > intake-portal build/planning as active work; the admin UI and institution-typeahead
 > are intentionally unbuilt. The design memories are retained for revival, not stale.
-> See `.claude-memory/project-intake-portal-parked.md`. (The intake Blob/draft/submit
-> infrastructure below already exists and remains live.)
+> See `.claude-memory/project-intake-portal-parked.md`. The intake Blob/draft/submit
+> routes and the submission-drain cron are implemented and deployment-configured;
+> that does **not** mean the parked applicant product is open or operational for
+> applicants.
 > `docs/INTAKE_PORTAL_DESIGN.md` is the historical cancelled-pilot design, not
 > an active plan.
 
@@ -68,6 +77,10 @@ intake-to-Dataverse mapping.
 
 ## Operating Notes
 
+- Source trace refreshed 2026-08-13: applicant identity comes from the server
+  session, the contact bridge resolves its Dataverse contact, membership guards
+  authorize the selected account, Postgres holds drafts/jobs/audit, the private
+  intake Blob store holds uploads, and the configured drain consumes queued jobs.
 - Virus-scan E2E was deferred and must run before the next cycle.
 - Budget/roster drain reconciliation deactivates obsolete child rows (`statecode`), never hard-deletes removed lines; recompute over active children only. Current pointers: `docs/INTAKE_PORTAL_BUDGET_ROSTER_RECONCILE_STATUS.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`.
 - Pilot decisions and UI TODOs should be read before re-deciding settled questions.
