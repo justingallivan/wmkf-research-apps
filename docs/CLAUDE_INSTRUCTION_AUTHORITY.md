@@ -3,7 +3,7 @@ title: Claude Instruction Authority Registry
 domain: agent-harness
 kind: source-of-truth
 status: canonical
-summary: Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions.
+summary: Status: Active Last verified: 2026-08-13 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions.
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -14,7 +14,7 @@ related:
 # Claude Instruction Authority Registry
 
 **Status:** Active  
-**Last verified:** 2026-06-05  
+**Last verified:** 2026-08-13
 **Purpose:** Identify the authoritative definition and enforcement mirror for must-follow agent instructions.
 
 An instruction has one authoritative definition. Concise pointers and mechanical enforcement mirrors are allowed, but they must point back to that authority and must not independently restate mutable facts.
@@ -26,6 +26,7 @@ An instruction has one authoritative definition. Concise pointers and mechanical
 | `GLOBAL-DESTRUCTIVE-CARRYOVER` | Verify live callers before destructive carryover | root `CLAUDE.md` | `/contract-reconcile`; `/start` | live-caller fixture |
 | `GLOBAL-SYMLINK-INVARIANTS` | Preserve shared instruction/skill/memory symlinks | this registry | `check:agent-invariants`; lifecycle hook; `/start` | `check:instruction-architecture` |
 | `GLOBAL-RED-GATES` | Relevant red gates block completion | root `CLAUDE.md` | session-owned changed-surface Stop hook; CI | `check:instruction-architecture` |
+| `GLOBAL-AGENT-OAUTH` | Use interactive OAuth/subscription auth for Claude Code and Codex sessions; never substitute provider API keys | root `CLAUDE.md` | session startup/auth failure stop condition | logged-out delegated-review task |
 | `DOC-RECONCILE` | Reconcile the whole durable document and repeated claim | `.claude/rules/durable-docs.md` | reminder hook; `/sweep`; drift gates | contradictory-doc task |
 | `API-AUTH-AND-MATRIX` | Use the correct auth class and register new routes | `.claude/rules/api-routes.md` | `check:api-routes`; changed-surface hook | uncovered-route task |
 | `DB-MIGRATION-CONTRACT` | Existing databases use numbered migrations, never bootstrap | `scripts/setup-database.js` and `.claude/rules/database.md` | source-level refusal; migration gates | populated-database refusal |
