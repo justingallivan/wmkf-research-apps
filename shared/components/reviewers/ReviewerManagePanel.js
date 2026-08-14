@@ -1717,7 +1717,7 @@ export default function ReviewerManagePanel({
                       )}
                       {r.legacy && !r.dismissible && (
                         <p className="text-[11px] text-red-700 mt-1">
-                          This saved referral could not be read safely. Ask an administrator to repair it.
+                          This saved referral cannot be dismissed safely. Ask an administrator to repair it.
                         </p>
                       )}
                     </div>

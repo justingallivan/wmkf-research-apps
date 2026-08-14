@@ -338,6 +338,28 @@ test('keeps an unreadable reserved envelope visible but non-dismissible', async 
   });
 });
 
+test('keeps an overlength legacy note visible but does not offer an impossible dismissal', async () => {
+  const referralText = 'x'.repeat(1975);
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-long-legacy',
+      wmkf_declined: true,
+      wmkf_declinereferral: referralText,
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-long-legacy',
+    legacy: true,
+    dismissible: false,
+    referralVersion: `legacy:${referralText}`,
+    referralText,
+  });
+});
+
 test('excludes accepted rows, declined rows without a referral, and whitespace-only referrals', async () => {
   findByRequest.mockResolvedValue([
     suggestion({ wmkf_accepted: true, wmkf_declinereferral: 'ignored — accepted, not declined' }),

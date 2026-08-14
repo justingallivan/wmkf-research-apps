@@ -959,7 +959,9 @@ the suggestion was already considered, using a memo-prefix bitmask that preserve
 the submitted JSON. Failed identity work and promotion/restore remedies stay
 visible until either closure occurs. Legacy prose remains readable, is never
 submitted as a person name, and can be dismissed only after staff resolves its
-people separately. No operational marker is written into the provenance field.
+people separately and the preserved marker fits the Dataverse memo. Overlength
+legacy values remain visible but non-dismissible for administrator repair. No
+operational marker is written into the provenance field.
 Do not rebuild this loop. M1.3 now provides the first observational
 source/referral baseline; future refreshes and any interpretation remain
 observational. Separately, an **[OWNER-GATE]** remains on whether an external

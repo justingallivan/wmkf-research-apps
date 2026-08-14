@@ -137,6 +137,20 @@ test('resolves one structured row without changing the submitted payload or memo
     .toEqual([true, true]);
 });
 
+test('keeps the configured maximum within the one-hex-digit persisted mask', () => {
+  const stored = normalizeDeclineReferrals(
+    Array.from({ length: MAX_DECLINE_REFERRALS }, (_, index) => ({ name: `Person ${index}` })),
+  ).storedValue;
+
+  const resolved = resolveStructuredDeclineReferral(stored, MAX_DECLINE_REFERRALS - 1);
+
+  expect(resolved.ok).toBe(true);
+  expect(resolved.storedValue).toMatch(/^wmkf-referrals:r[0-9a-f]:/);
+  expect(resolved.storedValue).toHaveLength(stored.length);
+  expect(parseStoredDeclineReferral(resolved.storedValue).map((row) => row.resolved))
+    .toEqual([false, false, false, true]);
+});
+
 test('rejects a structured dismissal index outside the stored rows', () => {
   const stored = normalizeDeclineReferrals([{ name: 'Sarah Chen' }]).storedValue;
   expect(resolveStructuredDeclineReferral(stored, 1)).toEqual({
@@ -146,6 +160,11 @@ test('rejects a structured dismissal index outside the stored rows', () => {
 });
 
 test('rejects legacy resolution when the preserved value would exceed the memo limit', () => {
+  expect(resolveLegacyDeclineReferral('x'.repeat(1974))).toMatchObject({ ok: true });
+  expect(resolveLegacyDeclineReferral('x'.repeat(1975))).toEqual({
+    ok: false,
+    reason: 'resolved_legacy_decline_referral_too_long',
+  });
   expect(resolveLegacyDeclineReferral('x'.repeat(2000))).toEqual({
     ok: false,
     reason: 'resolved_legacy_decline_referral_too_long',

@@ -279,10 +279,12 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   with 409, preventing a stale array index from dismissing another person.
   Failed/ambiguous adds remain visible, as do remedy outcomes that still require
   promotion or restore. Legacy prose is never submitted wholesale as a reviewer
-  name; staff add its people separately and then use **Dismiss resolved note**.
+  name; staff add its people separately and then use **Dismiss resolved note**
+  when the preserved marker fits the 2,000-character memo.
   The no-index PATCH preserves the original note after its compact resolved
-  prefix in `wmkf_declinereferral`. Malformed or future `wmkf-referrals:*`
-  envelopes remain visible but non-dismissible for administrator repair. Before S354 the button
+  prefix in `wmkf_declinereferral`. Overlength legacy values and malformed or
+  future `wmkf-referrals:*` envelopes remain visible but non-dismissible for
+  administrator repair. Before S354 the button
   pre-filled the Find-tab Add-or-Refer form and routed there via
   `router.push({sub:'find'})` (the `ReviewerFindPanel` `prefill` prop, now
   unused) — a colleague reported it "did nothing" (the tab hop was unreliable /

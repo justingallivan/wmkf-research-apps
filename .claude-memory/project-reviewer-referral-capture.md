@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-referral-capture
-description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01, with exact per-row structured dismissal added 2026-08-14. The external decline form collects up to four Name/Institution/Email rows; structured closure derives from referred-candidate provenance or a persisted dismissal mask, while legacy free-text records remain readable and dismissible only after staff resolves them. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
+description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01, with exact per-row structured dismissal added 2026-08-14. The external decline form collects up to four Name/Institution/Email rows; structured closure derives from referred-candidate provenance or a persisted dismissal mask, while legacy free-text records remain readable and are dismissible after staff resolves them only when the preserved marker fits the Dataverse memo. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
 metadata:
   node_type: memory
   type: project
@@ -43,7 +43,7 @@ The external decline form now captures up to four structured rows with a
 required published name and optional institution/email. Existing records may
 still contain legacy free text. The Workbench never submits a legacy prose
 block as one person's name: staff add its people separately, then dismiss the
-resolved legacy note. Structured rows disappear when the request already has
+resolved legacy note when its preserved marker fits the memo. Structured rows disappear when the request already has
 an exact-name referred candidate (and exact email too when the referral supplied
 one) that is selected or engaged, or when staff dismisses that exact row after
 recognizing it as already considered. Structured dismissal stores a four-bit
@@ -55,7 +55,9 @@ but non-dismissible. Both closure paths avoid operational tokens in `wmkf_source
 failed/ambiguous adds and promotion/restore remedies remain visible until staff
 acts.
 Legacy dismissal preserves the original text behind a versioned prefix in
-`wmkf_declinereferral`. Staff can still enter a sparse referral.
+`wmkf_declinereferral`. A legacy value longer than 1,974 trimmed characters
+remains visible but non-dismissible for administrator repair because the marker
+would exceed the field's 2,000-character limit. Staff can still enter a sparse referral.
 Resolving any referral to a canonical person is the **same name→identity problem
 the pipeline already solves** — apply the same
 posture as [[project-reviewer-verify-fail-dangerous]]: resolve confidently OR

@@ -8,6 +8,12 @@
  */
 
 export const MAX_DECLINE_REFERRALS = 4;
+const RESOLVED_STRUCTURED_MASK_BITS = 4;
+if (MAX_DECLINE_REFERRALS > RESOLVED_STRUCTURED_MASK_BITS) {
+  throw new Error(
+    `MAX_DECLINE_REFERRALS cannot exceed the ${RESOLVED_STRUCTURED_MASK_BITS}-bit persisted resolution mask`,
+  );
+}
 export const DECLINE_REFERRAL_LIMITS = Object.freeze({
   name: 150,
   institution: 250,

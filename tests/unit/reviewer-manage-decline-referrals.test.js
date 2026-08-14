@@ -114,7 +114,7 @@ test('an unreadable reserved referral remains visible but cannot be dismissed', 
     await Promise.resolve();
   });
 
-  expect(screen.getByText(/could not be read safely/i)).toBeInTheDocument();
+  expect(screen.getByText(/cannot be dismissed safely/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
   expect(onDismissDeclineReferral).not.toHaveBeenCalled();
 });
