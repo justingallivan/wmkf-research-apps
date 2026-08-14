@@ -28,6 +28,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../shared/config/granteeAbstract';
+import { renderGranteeBody } from '../../shared/utils/grantee-markdown';
 import handler from '../../pages/api/workbench/grantee-deliverables/abstract';
 
 const GUID = '22222222-2222-2222-2222-222222222222';
@@ -100,6 +101,7 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     abstractFormatted: DRAFT,
     abstractApproved: '',
     effective: DRAFT,
+    effectiveHtml: renderGranteeBody(DRAFT),
     effectiveField: 'formatted',
     etag: 'W/"1"',
     status: GRANTEE_DELIVERABLE_STATUS.DRAFTED,

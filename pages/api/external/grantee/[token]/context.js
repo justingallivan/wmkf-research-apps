@@ -24,6 +24,7 @@ import { resolveActiveWaiverPolicy } from '../../../../../lib/external/grantee-w
 import { mintWaiverRenderToken } from '../../../../../lib/services/external-token';
 import { assembleGranteeDocument } from '../../../../../lib/services/grantee-document-assembly';
 import { renderAwardBlock } from '../../../../../lib/services/grantee-document-html';
+import { renderGranteeBody } from '../../../../../shared/utils/grantee-markdown';
 import {
   GRANTEE_DELIVERABLE_STATUS,
   GRANTEE_DELIVERABLE_LABEL,
@@ -149,6 +150,8 @@ export default async function handler(req, res) {
       });
     }
 
+    const effectiveAbstract = request.wmkf_abstractapproved || request.wmkf_abstractformatted || '';
+
     return res.status(200).json({
       ok: true,
       request: {
@@ -161,6 +164,9 @@ export default async function handler(req, res) {
         // only whether an image is already on file.
         abstractFormatted: request.wmkf_abstractformatted || null,
         abstractApproved: request.wmkf_abstractapproved || null,
+        // Response-only safe HTML for the editor seed. Markdown remains the
+        // persisted/submitted value and the two source fields remain unchanged.
+        abstractHtml: renderGranteeBody(effectiveAbstract),
         caption: deliverable?.wmkf_imagecaption || null,
         hasImage: Boolean(deliverable?.wmkf_imagefileref),
         status,

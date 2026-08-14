@@ -128,12 +128,28 @@ test('editable status (Invited) → editable:true, view:edit', async () => {
   expect(res.body.view).toBe('edit');
   expect(res.body.request.requestNumber).toBeUndefined();
   expect(res.body.deliverable.hasImage).toBe(false);
+  expect(res.body.deliverable.abstractHtml.trim()).toBe('<p>formatted</p>');
   // raw SharePoint ref must NOT leak to the external client
   expect(res.body.deliverable.imageFileRef).toBeUndefined();
   // edit view carries the versioned waiver + a signed render token
   expect(res.body.waiverPolicy).toEqual({ title: 'Publication Consent Waiver', body: 'Consent body text.', versionId: 'ver-1' });
   expect(res.body.waiverToken).toBe('render.token');
   expect(mintWaiverRenderToken).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-1', versionId: 'ver-1', body: 'Consent body text.' }));
+});
+
+test('abstractHtml uses approved precedence and renders only the allowed safe subset', async () => {
+  const verified = okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED);
+  verified.request.wmkf_abstractformatted = 'Draft *Escherichia coli*';
+  verified.request.wmkf_abstractapproved = 'Approved **result** <script>alert(1)</script>';
+  verifyGranteeToken.mockResolvedValue(verified);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+
+  expect(res.body.deliverable.abstractHtml).toContain('<strong>result</strong>');
+  expect(res.body.deliverable.abstractHtml).not.toContain('<em>Escherichia coli</em>');
+  expect(res.body.deliverable.abstractHtml).not.toContain('<script>');
+  expect(res.body.deliverable.abstractHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  expect(res.body.deliverable.abstractApproved).toBe(verified.request.wmkf_abstractapproved);
 });
 
 test('FAIL-CLOSED: waiver policy unavailable (transient) on edit view → 503 policy_unavailable, no token', async () => {

@@ -4,7 +4,7 @@
  * Lets a Program Director review + EDIT + SAVE the grantee award abstract that
  * will be PUBLISHED, from the Workbench Awardee tab (S278).
  *
- *   GET ?requestId=  -> { abstractFormatted, abstractApproved, effective,
+ *   GET ?requestId=  -> { abstractFormatted, abstractApproved, effective, effectiveHtml,
  *                         effectiveField, etag, status, statusLabel, editable,
  *                         caption, imageRef, imageUrl, hasImage, submittedAt,
  *                         invitedAt, remindedAt }

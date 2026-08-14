@@ -51,11 +51,23 @@ test('load: 404 typed error when the request is missing', async () => {
 });
 
 test('load: effective flips to approved once present; editability follows the status allowlist', async () => {
-  getById.mockResolvedValue(row({ wmkf_abstractapproved: APPROVED }));
+  getById.mockResolvedValue(row({ wmkf_abstractapproved: `${APPROVED} with *Escherichia coli*` }));
   getDeliverableForRequest.mockResolvedValue({ wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.REVISION_REQUESTED });
   const body = await loadGranteeAbstract({ requestId: GUID });
   expect(body.effectiveField).toBe('approved');
   expect(body.editable).toBe(false);
+  expect(body.effectiveHtml).toContain('<em>Escherichia coli</em>');
+  expect(body.effective).toContain('*Escherichia coli*');
+});
+
+test('load: effectiveHtml escapes raw HTML and never changes the effective Markdown', async () => {
+  const markdown = 'Safe <script>alert(1)</script> and **bold**';
+  getById.mockResolvedValue(row({ wmkf_abstractformatted: markdown }));
+  const body = await loadGranteeAbstract({ requestId: GUID });
+  expect(body.effective).toBe(markdown);
+  expect(body.effectiveHtml).toContain('<strong>bold</strong>');
+  expect(body.effectiveHtml).not.toContain('<script>');
+  expect(body.effectiveHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
 });
 
 describe('load: grantee submission fields (caption / image / waiver time)', () => {
