@@ -29,12 +29,11 @@ import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { loadGranteeAbstract, saveGranteeAbstract } from '../../../../lib/services/workbench/grantee-deliverables/abstract-service';
+import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../../../shared/config/granteeAbstract';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '32kb' } },
 };
-
-const MAX_TEXT = 20000;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'PUT') {
@@ -86,8 +85,8 @@ export default async function handler(req, res) {
     // Never blank the published abstract through this path.
     return res.status(400).json({ error: 'The abstract cannot be empty.' });
   }
-  if (text.length > MAX_TEXT) {
-    return res.status(400).json({ error: `The abstract is too long (max ${MAX_TEXT} characters).` });
+  if (text.length > MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH) {
+    return res.status(400).json({ error: `The abstract is too long (max ${MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH} characters).` });
   }
   // Fail closed: without the loaded etag the write can't be conditional, so we
   // refuse rather than risk a bare last-write PATCH.

@@ -50,6 +50,35 @@ describe('renderGranteeBody', () => {
     expect(html).not.toContain('<sub>');
   });
 
+  test('blank lines create paragraphs, two-space newlines create hard breaks, and soft breaks remain inline', () => {
+    expect(renderGranteeBody('First\n\nSecond').trim()).toBe('<p>First</p>\n<p>Second</p>');
+    expect(renderGranteeBody('First  \nSecond').trim()).toBe('<p>First<br />Second</p>');
+    expect(renderGranteeBody('First\nSecond').trim()).toBe('<p>First\nSecond</p>');
+  });
+
+  test('backslash escapes preserve every active inline delimiter as literal text', () => {
+    const html = renderGranteeBody(String.raw`\*literal\* \_under\_ \~near\~ \^caret\^ \\slash`);
+    expect(html).toContain('*literal* _under_ ~near~ ^caret^ \\slash');
+    expect(html).not.toMatch(/<(?:strong|em|sub|sup)>/);
+  });
+
+  test('combined and nested allowed marks render deterministically', () => {
+    expect(renderGranteeBody('***both***')).toContain('<em><strong>both</strong></em>');
+    expect(renderGranteeBody('~***nested***~')).toContain('<sub><em><strong>nested</strong></em></sub>');
+    expect(renderGranteeBody('***H~2~O***')).toContain('<em><strong>H<sub>2</sub>O</strong></em>');
+  });
+
+  test('two approximation delimiters on one line can pair, pinning the serializer escape requirement', () => {
+    expect(renderGranteeBody('~5 ms rise, ~8 ms fall')).toContain('<sub>5 ms rise, </sub>');
+    expect(renderGranteeBody('^5 ms rise, ^8 ms fall')).toContain('<sup>5 ms rise, </sup>');
+  });
+
+  test('trailing whitespace inside emphasis prevents the mark', () => {
+    const html = renderGranteeBody('*E. coli *');
+    expect(html).toContain('*E. coli *');
+    expect(html).not.toContain('<em>');
+  });
+
   test('links are dropped but their text is kept', () => {
     const html = renderGranteeBody('see [the site](https://example.com) now');
     expect(html).not.toContain('<a');

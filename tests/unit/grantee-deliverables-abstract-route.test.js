@@ -27,6 +27,7 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
+import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../shared/config/granteeAbstract';
 import handler from '../../pages/api/workbench/grantee-deliverables/abstract';
 
 const GUID = '22222222-2222-2222-2222-222222222222';
@@ -163,9 +164,27 @@ test('PUT missing etag → 400 fail-closed, no write', async () => {
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
 });
 
-test('PUT over-long text → 400', async () => {
+test('PUT accepts 20000 serialized characters and rejects 20001', async () => {
+  DynamicsService.getRecord
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce({ _etag: 'W/"2"' });
+  const accepted = mockRes();
+  await handler(putReq({
+    requestId: GUID,
+    text: 'é'.repeat(MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH),
+    etag: 'W/"1"',
+    baseField: 'formatted',
+  }), accepted);
+  expect(accepted.statusCode).toBe(200);
+  expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+
+  DynamicsService.updateRecord.mockClear();
   const res = mockRes();
-  await handler(putReq({ requestId: GUID, text: 'x'.repeat(20001), etag: 'W/"1"' }), res);
+  await handler(putReq({
+    requestId: GUID,
+    text: 'é'.repeat(MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH + 1),
+    etag: 'W/"1"',
+  }), res);
   expect(res.statusCode).toBe(400);
   expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
 });
