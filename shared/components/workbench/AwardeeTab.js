@@ -32,6 +32,8 @@ import { GRANTEE_DELIVERABLE_LABEL, GRANTEE_DELIVERABLE_STATUS } from '../../con
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { fillInviteBody, fillInviteSubject, formatCobDate } from '../../config/granteeInviteEmail';
+import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../config/granteeAbstract';
+import GranteeAbstractEditor from '../external/GranteeAbstractEditor';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
@@ -85,12 +87,17 @@ export default function AwardeeTab({ requestId, context }) {
   // text (sent back as If-Match so a concurrent change 409s); `abstractEditable`
   // reflects the server's status gate.
   const [abstractText, setAbstractText] = useState('');
+  const [abstractHtml, setAbstractHtml] = useState('');
   const [savedAbstractText, setSavedAbstractText] = useState('');
   const [abstractField, setAbstractField] = useState(null);
   const [abstractEtag, setAbstractEtag] = useState('');
   const [abstractEditable, setAbstractEditable] = useState(false);
   const [savingAbstract, setSavingAbstract] = useState(false);
   const [abstractMsg, setAbstractMsg] = useState(null);
+  // A stale save never replaces the working copy. The current server snapshot is
+  // held separately until the PD explicitly keeps their text or adopts the
+  // server version.
+  const [abstractConflict, setAbstractConflict] = useState(null);
   // What the grantee returned, read-only. `imageUrl` is server-derived and is
   // non-null ONLY for an absolute http(s) ref, so it is the sole value allowed
   // into an href; `imageRef` may be a relative SharePoint library path.
@@ -163,6 +170,7 @@ export default function AwardeeTab({ requestId, context }) {
   const subjectDirtyRef = useRef(false);
   const defaultLoadSeqRef = useRef(0);
   const abstractLoadSeqRef = useRef(0);
+  const abstractSaveSeqRef = useRef(0);
 
   const { preferences, currentProfile } = useProfile();
   // The logged-in PD's saved custom body (Option A: sender's pref, client-side).
@@ -253,10 +261,12 @@ export default function AwardeeTab({ requestId, context }) {
       if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
       if (res.ok) {
         setAbstractText(data.effective || '');
+        setAbstractHtml(data.effectiveHtml || '');
         setSavedAbstractText(data.effective || '');
         setAbstractField(data.effectiveField || null);
         setAbstractEtag(data.etag || '');
         setAbstractEditable(Boolean(data.editable));
+        setAbstractConflict(null);
         // Mirrors `granteeResponded` in the render — an approved abstract counts
         // as a response, and it is where the editor for that abstract lives, so
         // landing on the other pane would hide it behind a click.
@@ -287,8 +297,44 @@ export default function AwardeeTab({ requestId, context }) {
     } catch { /* abstract load is best-effort; "Generate abstract" still works */ }
   }, [requestId]);
 
+  // Fetch the winning server value after a stale PUT without touching the PD's
+  // working text. This uses the same request/generation guards as the normal load
+  // so a late conflict response cannot cross request boundaries.
+  const loadAbstractConflict = useCallback(async () => {
+    if (!requestId) return;
+    const loadRequestId = requestId;
+    const seq = abstractLoadSeqRef.current + 1;
+    abstractLoadSeqRef.current = seq;
+    try {
+      const res = await fetch(`/api/workbench/grantee-deliverables/abstract?requestId=${encodeURIComponent(loadRequestId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
+      if (!res.ok) {
+        setError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
+        return;
+      }
+      setAbstractConflict({
+        requestId: loadRequestId,
+        text: data.effective || '',
+        html: data.effectiveHtml || '',
+        field: data.effectiveField || null,
+        etag: data.etag || '',
+        editable: Boolean(data.editable),
+        status: data.status,
+      });
+      setError(null);
+    } catch {
+      if (abstractLoadSeqRef.current !== seq || currentRequestIdRef.current !== loadRequestId) return;
+      setError('The abstract changed, but the current server version could not be loaded. Your unsaved text remains in the editor.');
+    }
+  }, [requestId]);
+
   useEffect(() => {
     currentRequestIdRef.current = requestId;
+    abstractSaveSeqRef.current += 1;
+    setSavingAbstract(false);
+    setAbstractConflict(null);
+    setAbstractMsg(null);
   }, [requestId]);
 
   useEffect(() => {
@@ -347,26 +393,68 @@ export default function AwardeeTab({ requestId, context }) {
   }
 
   async function saveAbstract() {
+    const saveRequestId = requestId;
+    const saveSeq = abstractSaveSeqRef.current + 1;
+    const saveText = abstractText;
+    const saveEtag = abstractEtag;
+    const saveField = abstractField;
+    abstractSaveSeqRef.current = saveSeq;
     setSavingAbstract(true); setError(null); setAbstractMsg(null);
     try {
       const res = await fetch('/api/workbench/grantee-deliverables/abstract', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, text: abstractText, etag: abstractEtag, baseField: abstractField }),
+        body: JSON.stringify({ requestId: saveRequestId, text: saveText, etag: saveEtag, baseField: saveField }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (abstractSaveSeqRef.current !== saveSeq || currentRequestIdRef.current !== saveRequestId) return;
       if (!res.ok) {
         setError(data.error || 'Could not save the abstract.');
-        // On a stale/changed conflict, reload so the PD sees the current version.
-        if (data.code === 'stale') await loadAbstract();
+        if (data.code === 'stale') await loadAbstractConflict();
       } else {
-        setSavedAbstractText(abstractText);
+        setSavedAbstractText(saveText);
         if (data.field) setAbstractField(data.field);
         if (data.etag) setAbstractEtag(data.etag);
         if (data.status !== undefined) setStatus(data.status);
+        setAbstractConflict(null);
         setAbstractMsg('Abstract saved.');
       }
-    } catch { setError('Could not save the abstract.'); }
-    setSavingAbstract(false);
+    } catch {
+      if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
+        setError('Could not save the abstract.');
+      }
+    } finally {
+      if (abstractSaveSeqRef.current === saveSeq && currentRequestIdRef.current === saveRequestId) {
+        setSavingAbstract(false);
+      }
+    }
+  }
+
+  function keepUnsavedAbstract() {
+    if (!abstractConflict || abstractConflict.requestId !== requestId) return;
+    setSavedAbstractText(abstractConflict.text);
+    setAbstractField(abstractConflict.field);
+    setAbstractEtag(abstractConflict.etag);
+    setAbstractEditable(abstractConflict.editable);
+    if (abstractConflict.status !== undefined) setStatus(abstractConflict.status);
+    if (abstractConflict.field) setSubTab(abstractConflict.field === 'approved' ? 'submission' : 'invitation');
+    setAbstractConflict(null);
+    setError(null);
+    setAbstractMsg('Your unsaved version is still in the editor. Review it, then save again.');
+  }
+
+  function replaceWithServerAbstract() {
+    if (!abstractConflict || abstractConflict.requestId !== requestId) return;
+    setAbstractText(abstractConflict.text);
+    setAbstractHtml(abstractConflict.html);
+    setSavedAbstractText(abstractConflict.text);
+    setAbstractField(abstractConflict.field);
+    setAbstractEtag(abstractConflict.etag);
+    setAbstractEditable(abstractConflict.editable);
+    if (abstractConflict.status !== undefined) setStatus(abstractConflict.status);
+    if (abstractConflict.field) setSubTab(abstractConflict.field === 'approved' ? 'submission' : 'invitation');
+    setAbstractConflict(null);
+    setError(null);
+    setAbstractMsg('Loaded the current server version.');
   }
 
   async function send() {
@@ -532,6 +620,7 @@ export default function AwardeeTab({ requestId, context }) {
   const waiverAckedLabel = formatSubmissionDate(submission.submittedAt);
   const hasAbstract = abstractText.trim().length > 0;
   const abstractDirty = abstractText !== savedAbstractText;
+  const abstractOverLimit = abstractText.length > MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH;
   // A replacement needs something to replace. Trimmed compare so re-saving the
   // same caption with stray whitespace is not treated as a change (the server
   // trims too, so it would be a no-op write).
@@ -632,12 +721,11 @@ export default function AwardeeTab({ requestId, context }) {
 
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
-      {/* Abstract editor — rendered in whichever pane matches its current mode
-          (see abstractPane). Unmounting on a pane switch is safe: the working
-          copy, dirty flag, and etag all live in this component's state, so only
-          cursor position is lost, never an edit. */}
-      {subTab === abstractPane && (
-      <section className="space-y-2">
+      {/* Abstract editor — visible in whichever pane matches its current mode
+          (see abstractPane), but deliberately kept mounted while another pane is
+          open. Tiptap owns the live document/caret; unmounting would reseed it
+          from the last server HTML and could visually discard an unsaved edit. */}
+      <section className={`${subTab === abstractPane ? '' : 'hidden'} space-y-2`} aria-hidden={subTab !== abstractPane}>
         {/* Generating is an OUTBOUND-phase action: it drafts the text that gets
             sent to the grantee. Once they have returned the package it is both
             pointless and destructive — it would burn a paid LLM call and
@@ -662,19 +750,48 @@ export default function AwardeeTab({ requestId, context }) {
                 ? 'Editing the grantee-approved version — this is what publishes to the website.'
                 : 'Editing the draft — review and refine before sending it to the grantee.'}
             </p>
-            <textarea
-              aria-label="Formatted abstract"
+            <GranteeAbstractEditor
+              ariaLabel="Formatted abstract"
               value={abstractText}
-              onChange={(e) => setAbstractText(e.target.value)}
-              readOnly={!abstractEditable}
-              rows={10}
-              className="w-full text-sm border rounded p-2"
+              htmlValue={abstractHtml}
+              onChange={setAbstractText}
+              disabled={!abstractEditable}
+              invalid={abstractOverLimit}
+              maxLength={MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH}
             />
+            {abstractConflict && (
+              <div role="alert" className="space-y-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <p><strong>The abstract changed after you loaded it.</strong> Your unsaved version remains in the editor.</p>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide">Current server version</p>
+                  {/* `html` is response-only output from the server's shared
+                      renderGranteeBody sanitizer; raw Markdown/HTML is never
+                      installed at this sink. The text fallback remains escaped
+                      by React if an older server omits the additive HTML field. */}
+                  {abstractConflict.html ? (
+                    <div
+                      className="prose prose-sm mt-1 max-w-none rounded border border-amber-200 bg-white p-3"
+                      dangerouslySetInnerHTML={{ __html: abstractConflict.html }}
+                    />
+                  ) : (
+                    <p className="mt-1 whitespace-pre-wrap rounded border border-amber-200 bg-white p-3">{abstractConflict.text}</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={keepUnsavedAbstract} className="rounded bg-amber-900 px-3 py-2 text-white">
+                    Keep my version
+                  </button>
+                  <button type="button" onClick={replaceWithServerAbstract} className="rounded border border-amber-700 bg-white px-3 py-2">
+                    Replace with server version
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={saveAbstract}
-                disabled={savingAbstract || !abstractEditable || !hasAbstract || !abstractDirty}
+                disabled={savingAbstract || !abstractEditable || !hasAbstract || !abstractDirty || abstractOverLimit || Boolean(abstractConflict)}
                 className="px-3 py-2 text-sm rounded bg-green-700 text-white disabled:opacity-50"
               >
                 {savingAbstract ? 'Saving…' : 'Save edits'}
@@ -688,7 +805,6 @@ export default function AwardeeTab({ requestId, context }) {
           </div>
         )}
       </section>
-      )}
 
       {/* Empty state. Pre-submit this pane used to render nothing at all, which
           made "the grantee has not responded" and "this feature does not exist"

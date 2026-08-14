@@ -17,6 +17,8 @@
 
 import { useState } from 'react';
 import PolicyAckModal from './PolicyAckModal';
+import GranteeAbstractEditor from './GranteeAbstractEditor';
+import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../config/granteeAbstract';
 
 // Publication-consent waiver wording. As of 2026-07-09 the LIVE text comes from
 // the versioned `grantee-waiver` policy (shown in the acknowledgment modal from
@@ -61,6 +63,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
 
   // An image is satisfied by a new upload OR one already on file (replacing is optional).
   const hasImage = imageFile != null || Boolean(init.hasImage);
+  const abstractOverLimit = abstract.length > MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH;
   // The versioned waiver text + its binding token must be present to submit. The
   // context route fails closed, so on the edit view these are normally set; this
   // is a defensive gate against a partial payload.
@@ -76,6 +79,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     waiverAcknowledged &&
     Boolean(waiverToken) &&
     abstract.trim().length > 0 &&
+    !abstractOverLimit &&
     caption.trim().length > 0 &&
     hasImage &&
     !submitting;
@@ -131,17 +135,18 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
       <p>Please review and edit the abstract below, upload a graphical image with a caption, and
         confirm the publication waiver to submit.</p>
 
-      <label style={{ display: 'block', marginTop: '1rem' }}>
-        <strong>Abstract</strong>
-        <textarea
-          aria-label="Abstract"
+      <div style={{ marginTop: '1rem' }}>
+        <strong id="grantee-abstract-label">Abstract</strong>
+        <GranteeAbstractEditor
+          ariaLabelledBy="grantee-abstract-label"
           value={abstract}
-          onChange={(e) => setAbstract(e.target.value)}
-          rows={12}
-          placeholder="Review and edit your award abstract here."
-          style={FIELD_STYLE}
+          htmlValue={init.abstractHtml || ''}
+          onChange={setAbstract}
+          required
+          invalid={abstractOverLimit}
+          maxLength={MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH}
         />
-      </label>
+      </div>
 
       <label style={{ display: 'block', marginTop: '1rem' }}>
         <strong>Graphical image</strong>

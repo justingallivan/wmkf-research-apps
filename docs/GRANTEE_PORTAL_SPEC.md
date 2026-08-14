@@ -40,8 +40,9 @@ hash. Reuses the external **reviewer-portal** primitives
 Per grantee, exactly:
 
 1. **One edited/approved abstract** — we generate a style-guide version from the applicant's own
-   submitted abstract; the grantee reviews, **edits in-portal (text, not a file upload)**, and
-   **approves**. (NOT two documents.)
+   submitted abstract; the grantee reviews, **edits in-portal (text, not a file upload)** with the
+   restricted bold/italic/subscript/superscript toolbar, and **approves**. Canonical Markdown remains
+   the stored value; sanitized HTML is response-only editor/display material. (NOT two documents.)
 2. **One image file** — a graphical/visual upload (graphical abstract). JPEG/PNG/WEBP, ≤10 MB (S278;
    client-side check + server magic-byte/size enforcement).
 3. **One image caption** — free text.
@@ -98,7 +99,7 @@ Per grantee, exactly:
    `/external/grantee/...` (one link per request — both share it), asking them to edit & approve the abstract and upload image +
    caption, and check the publish-image box (which enables submit). Reuse the "Start …" button +
    copy-paste fallback link (`19bd446e`).
-4. **Collect:** in the portal the grantee returns the **edited abstract (in-portal text)**, one
+4. **Collect:** in the portal the grantee returns the **edited abstract (Markdown-backed rich text)**, one
    **graphical image** (upload), and an **image caption** (free text), with the **publish-image box
    checked** (the box gates the submit button). The client echoes the signed waiver render token so
    the server can record the acknowledged version (2026-07-09).
@@ -256,6 +257,15 @@ formatting** in the example.
   risk is small — but if any inline HTML is ever accepted, sanitize server-side with a tight allowlist
   (`em/strong/sub/sup/p/br`) as cheap defense-in-depth. Markdown-convention storage avoids the HTML
   sink entirely.
+
+**Abstract editor build (2026-08-13):** the external grantee form and staff Awardee tab now share an
+abstract-specific Tiptap editor exposing bold, italic, subscript, superscript, undo, and redo. Parent
+state and both write payloads remain canonical Markdown; the context/load routes add only sanitized,
+response-only HTML seeds from `renderGranteeBody`. Both clients and both server write boundaries use
+the shared 20,000-character serialized-Markdown cap. A stale staff save preserves the unsaved editor
+document and shows the current server version until staff explicitly chooses which version to keep.
+No Dataverse schema or field-format change was made. Preview smoke and production promotion are
+tracked in `docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md`.
 
 ### D9 — Server-side assembly replaces the manual DOCX + manual web HTML. `[RESOLVED direction, owner S269]`
 

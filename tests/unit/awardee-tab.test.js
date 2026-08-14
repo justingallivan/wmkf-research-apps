@@ -20,6 +20,18 @@ let mockProfileId = 'p1';
 jest.mock('../../shared/context/ProfileContext', () => ({
   useProfile: () => ({ preferences: mockPreferences, currentProfile: { id: mockProfileId } }),
 }));
+jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
+  __esModule: true,
+  default: ({ value, onChange, disabled, invalid, ariaLabel }) => (
+    <textarea
+      aria-label={ariaLabel}
+      aria-invalid={invalid ? 'true' : 'false'}
+      value={value}
+      readOnly={disabled}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
 beforeEach(() => { mockPreferences = {}; mockProfileId = 'p1'; });
 
 const REQ = '11111111-1111-1111-1111-111111111111';
@@ -45,6 +57,7 @@ function wireFetch({
   abstract = null,
   saveOk = true,
   staleSave = false,
+  staleServerAbstract = null,
   emailDefaults = defaultEmailDefaults(),
   sentInvitedAt = '2026-08-09T16:00:00Z',
   failAbstractReloadAfterSend = false,
@@ -56,6 +69,7 @@ function wireFetch({
   // round-trips like the real route.
   const state = {
     effective: abstract?.effective ?? '',
+    effectiveHtml: abstract?.effectiveHtml ?? (abstract?.effective ? `<p>${abstract.effective}</p>` : ''),
     effectiveField: abstract?.effectiveField ?? null,
     etag: abstract?.etag ?? 'W/"1"',
     status: abstract?.status ?? null,
@@ -73,6 +87,7 @@ function wireFetch({
     canReplace: abstract?.canReplace ?? false,
     deliverableEtag: abstract?.deliverableEtag ?? 'W/"d1"',
   };
+  let staleSavePending = staleSave;
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
     if (u.includes('/api/email-defaults/grantee-invite')) {
@@ -86,13 +101,24 @@ function wireFetch({
     }
     if (u.includes('/grantee-deliverables/abstract')) {
       if ((opts.method || 'GET') === 'PUT') {
-        if (staleSave) {
-          // Mirrors the route's 409 stale body, which drives saveAbstract's reload.
+        if (staleSavePending) {
+          staleSavePending = false;
+          if (staleServerAbstract) {
+            state.effective = staleServerAbstract.effective;
+            state.effectiveHtml = staleServerAbstract.effectiveHtml;
+            state.effectiveField = staleServerAbstract.effectiveField;
+            state.etag = staleServerAbstract.etag;
+            state.status = staleServerAbstract.status;
+            state.editable = staleServerAbstract.editable;
+          }
+          // Mirrors the route's 409 stale body, which drives the separate
+          // conflict-snapshot load without replacing the working editor value.
           return { ok: false, json: async () => ({ error: 'The abstract changed since you loaded it.', code: 'stale' }) };
         }
         if (!saveOk) return { ok: false, json: async () => ({ error: 'Could not save the abstract.' }) };
         const b = JSON.parse(opts.body);
         state.effective = b.text;
+        state.effectiveHtml = `<p>${b.text}</p>`;
         state.etag = 'W/"saved"';
         return { ok: true, json: async () => ({ ok: true, field: state.effectiveField || 'formatted', etag: state.etag, status: state.status }) };
       }
@@ -100,7 +126,7 @@ function wireFetch({
         throw new Error('reload failed');
       }
       return { ok: true, json: async () => ({
-        effective: state.effective, effectiveField: state.effectiveField,
+        effective: state.effective, effectiveHtml: state.effectiveHtml, effectiveField: state.effectiveField,
         etag: state.etag, status: state.status, editable: state.editable,
         caption: state.caption, imageRef: state.imageRef,
         imageUrl: state.imageUrl, hasImage: state.hasImage,
@@ -130,6 +156,7 @@ function wireFetch({
     if (u.includes('/grantee-deliverables/generate')) {
       if (generateOk) {
         state.effective = 'The team will study the thing in a long enough abstract.';
+        state.effectiveHtml = '<p>The team will study the thing in a long enough abstract.</p>';
         state.effectiveField = 'formatted';
         state.status = 100000000;
       }
@@ -322,6 +349,132 @@ test('a read-only (status-gated) abstract cannot be saved', async () => {
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Locked approved abstract.'));
   expect(screen.getByLabelText('Formatted abstract')).toHaveAttribute('readonly');
   expect(screen.getByText(/read-only in the current status/i)).toBeInTheDocument();
+});
+
+test('a stale save preserves the unsaved version and can retry against the winning server metadata', async () => {
+  wireFetch({
+    staleSave: true,
+    abstract: {
+      effective: 'Original draft.', effectiveHtml: '<p>Original draft.</p>',
+      effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true,
+    },
+    staleServerAbstract: {
+      effective: 'Concurrent approved version.',
+      effectiveHtml: '<p>Concurrent <em>approved</em> version.</p>',
+      effectiveField: 'approved', etag: 'W/"server"', status: 100000003, editable: true,
+    },
+  });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Original draft.'));
+
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'My unsaved formatted version.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+
+  await waitFor(() => expect(screen.getByText(/changed after you loaded it/i)).toBeInTheDocument());
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('My unsaved formatted version.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Concurrent approved version.');
+  expect(screen.getByRole('button', { name: /save edits/i })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('button', { name: /keep my version/i }));
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('My unsaved formatted version.');
+  expect(screen.getByRole('tab', { name: /Submission/ })).toHaveAttribute('aria-selected', 'true');
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+
+  await waitFor(() => expect(screen.getByText('Abstract saved.')).toBeInTheDocument());
+  const putCalls = global.fetch.mock.calls.filter(
+    ([u, o]) => String(u).includes('/grantee-deliverables/abstract') && o?.method === 'PUT',
+  );
+  expect(putCalls).toHaveLength(2);
+  expect(JSON.parse(putCalls[1][1].body)).toMatchObject({
+    text: 'My unsaved formatted version.', etag: 'W/"server"', baseField: 'approved',
+  });
+});
+
+test('a stale save replaces the editor only after the PD chooses the server version', async () => {
+  wireFetch({
+    staleSave: true,
+    abstract: {
+      effective: 'Original draft.', effectiveHtml: '<p>Original draft.</p>',
+      effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true,
+    },
+    staleServerAbstract: {
+      effective: 'Concurrent server version.', effectiveHtml: '<p>Concurrent server version.</p>',
+      effectiveField: 'formatted', etag: 'W/"server"', status: 100000000, editable: true,
+    },
+  });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Original draft.'));
+
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'My unsaved version.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /replace with server version/i })).toBeInTheDocument());
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('My unsaved version.');
+
+  fireEvent.click(screen.getByRole('button', { name: /replace with server version/i }));
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Concurrent server version.');
+  expect(screen.getByRole('button', { name: /save edits/i })).toBeDisabled();
+  expect(screen.queryByText(/changed after you loaded it/i)).not.toBeInTheDocument();
+});
+
+test('a late stale-save response from a previous request cannot install conflict state', async () => {
+  const requestA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const requestB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  let resolveSaveA;
+  const saveA = new Promise((resolve) => { resolveSaveA = resolve; });
+
+  global.fetch = jest.fn(async (url, opts = {}) => {
+    const u = String(url);
+    if (u.includes('/api/email-defaults/grantee-invite')) {
+      return { ok: true, json: async () => defaultEmailDefaults() };
+    }
+    if (u.includes('/grantee-deliverables/recipients')) {
+      return { ok: true, json: async () => ({ pi: {}, liaison: {} }) };
+    }
+    if (u.includes('/grantee-deliverables/abstract') && opts.method === 'PUT') {
+      return saveA;
+    }
+    if (u.includes('/grantee-deliverables/abstract')) {
+      const isA = u.includes(requestA);
+      const text = isA ? 'Request A draft.' : 'Request B draft.';
+      return { ok: true, json: async () => ({
+        effective: text,
+        effectiveHtml: `<p>${text}</p>`,
+        effectiveField: 'formatted', etag: isA ? 'W/"a"' : 'W/"b"',
+        status: 100000000, editable: true,
+      }) };
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  });
+
+  const { rerender } = render(<AwardeeTab requestId={requestA} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Request A draft.'));
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: 'Unsaved A edit.' } });
+  fireEvent.click(screen.getByRole('button', { name: /save edits/i }));
+
+  rerender(<AwardeeTab requestId={requestB} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Request B draft.'));
+  await act(async () => {
+    resolveSaveA({ ok: false, json: async () => ({ code: 'stale', error: 'stale A' }) });
+    await saveA;
+  });
+
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Request B draft.');
+  expect(screen.queryByText(/changed after you loaded it/i)).not.toBeInTheDocument();
+});
+
+test('staff save blocks Markdown over the shared limit without truncating it', async () => {
+  wireFetch({ abstract: {
+    effective: 'Original draft.', effectiveHtml: '<p>Original draft.</p>',
+    effectiveField: 'formatted', etag: 'W/"1"', status: 100000000, editable: true,
+  } });
+  render(<AwardeeTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Original draft.'));
+  const overLimit = 'x'.repeat(20001);
+  fireEvent.change(screen.getByLabelText('Formatted abstract'), { target: { value: overLimit } });
+
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue(overLimit);
+  expect(screen.getByLabelText('Formatted abstract')).toHaveAttribute('aria-invalid', 'true');
+  expect(screen.getByRole('button', { name: /save edits/i })).toBeDisabled();
 });
 
 test('default invitation copy is the PD-voice template (subject + body)', async () => {
@@ -881,7 +1034,9 @@ test('the draft abstract editor lives with the invitation', async () => {
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.'));
   expect(screen.getByRole('tab', { name: /Invitation/ })).toHaveAttribute('aria-selected', 'true');
   fireEvent.click(screen.getByRole('tab', { name: /Submission/ }));
-  expect(screen.queryByLabelText('Formatted abstract')).not.toBeInTheDocument();
+  // The editor remains mounted so switching panes cannot discard its Tiptap
+  // document/caret state, but the non-owning pane hides it from the UI.
+  expect(screen.getByLabelText('Formatted abstract').closest('section')).toHaveClass('hidden');
 });
 
 test('a manual pane choice survives a later refetch', async () => {

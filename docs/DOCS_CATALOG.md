@@ -160,7 +160,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md](GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md) | plan | draft |  | Planned Markdown-backed WYSIWYG editing for grantee abstracts in the external portal and staff Awardee tab, without a Dataverse schema change. | 2026-08-13 |
+| [GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md](GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md) | plan | active |  | Implemented Markdown-backed rich-text editing for grantee abstracts on the feature branch; Preview smoke and production promotion remain. | 2026-08-13 |
 | [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | historical |  | Historical design and rollout record for the shipped, versioned grantee publication waiver. |  |
 
 ## grantee-portal

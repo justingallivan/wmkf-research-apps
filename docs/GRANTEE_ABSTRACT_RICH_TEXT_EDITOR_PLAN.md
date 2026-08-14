@@ -2,8 +2,8 @@
 title: Grantee Abstract Rich-Text Editor Build Plan
 domain: grantee-deliverables
 kind: plan
-status: draft
-summary: "Planned Markdown-backed WYSIWYG editing for grantee abstracts in the external portal and staff Awardee tab, without a Dataverse schema change."
+status: active
+summary: "Implemented Markdown-backed rich-text editing for grantee abstracts on the feature branch; Preview smoke and production promotion remain."
 canonical: false
 cataloged: 2026-08-13
 owner: product-engineering
@@ -15,17 +15,17 @@ related:
 
 # Grantee Abstract Rich-Text Editor Build Plan
 
-**Status:** Reviewed; Claude Opus returned `READY WITH NAMED CHANGES`, and the accepted changes are incorporated below. Implementation has not started.
+**Status:** Implemented and locally verified on `codex/grantee-abstract-rich-text`; Preview smoke and production promotion remain.
 **Change surface:** Abstract editing in the external grantee portal and the staff Workbench Awardee tab.  
 **Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted` and `akoya_request.wmkf_abstractapproved`.  
 **Review owner:** Claude Opus, read-only adversarial plan review.  
-**Implementation owner:** Unassigned until this plan is accepted.
+**Implementation owner:** Codex, following the Claude Opus-reviewed contract below.
 
 ## 1. Outcome and decision
 
-[PLANNED] Give grantees and staff a familiar formatting toolbar so scientific names such as *Escherichia coli* can be italicized without typing Markdown syntax.
+[VERIFIED via source/tests] Grantees and staff now have a familiar formatting toolbar so scientific names such as *Escherichia coli* can be italicized without typing Markdown syntax.
 
-[PLANNED] Use Tiptap, the same editor framework used by reviewer answers, but give abstracts a narrower formatting profile and keep the existing Markdown persistence contract. The editor will display formatted content and emit canonical Markdown:
+[VERIFIED via source/tests] The implementation uses Tiptap, the same editor framework used by reviewer answers, with a narrower formatting profile and the existing Markdown persistence contract. The editor displays formatted content and emits canonical Markdown:
 
 | Visible formatting | Persisted Markdown |
 |---|---|
@@ -34,7 +34,7 @@ related:
 | H₂O | `H~2~O` |
 | x² | `x^2^` |
 
-[PLANNED] Do not add or convert Dataverse fields, do not store raw HTML in the existing fields, and do not copy the reviewer answer dual-HTML/plain-text persistence model.
+[VERIFIED via source/search] No Dataverse field was added or converted, raw HTML is not stored in the existing fields, and the reviewer answer dual-HTML/plain-text persistence model was not copied.
 
 ## 2. Current-state evidence
 
@@ -47,10 +47,10 @@ related:
 | The renderer recognizes blank-line paragraphs, two-space hard breaks, backslash-escaped Markdown punctuation, and deterministic nested bold/italic/sub/sup; an ordinary newline is only a soft break. | `renderGranteeBody` | N/A | Editor serializer grammar | `shared/utils/grantee-markdown.js:43-107`; read-only renderer probe on 2026-08-13 | VERIFIED |
 | Two unescaped `~` or `^` characters on one line can pair into subscript/superscript even when the user intended approximation text; trailing whitespace inside `*...*` prevents emphasis. | `renderGranteeBody` | N/A | Editor serializer grammar | Read-only renderer probe on 2026-08-13 (`~5 ms rise, ~8 ms fall`; `^5 ms rise, ^8 ms fall`; `*E. coli *`) | VERIFIED |
 | Publication assembly prefers approved text, falls back to formatted text, and renders Markdown to HTML. | `assembleGranteeDocument` | Both abstract fields | Preview, website, and cycle export consumers | `lib/services/grantee-document-assembly.js:124-154` | VERIFIED |
-| Both current abstract editors are plain textareas. | External grantee form; staff Awardee tab | Client string state | Submit/save payload | `shared/components/external/GranteeDeliverableForm.js:51-54,134-143`; `shared/components/workbench/AwardeeTab.js:658-672` | VERIFIED |
+| Both abstract authoring surfaces use the restricted Markdown-backed Tiptap editor. | External grantee form; staff Awardee tab | Parent canonical-Markdown state | Existing submit/save payloads | `shared/components/external/GranteeDeliverableForm.js`; `shared/components/workbench/AwardeeTab.js`; `shared/components/external/GranteeAbstractEditor.js` | VERIFIED |
 | The portal specification called for a lightweight WYSIWYG for occasional scientific formatting. | Product specification | N/A | Planned portal editor | `docs/GRANTEE_PORTAL_SPEC.md:233-258` | VERIFIED |
 | Reviewer answers already use a controlled Tiptap editor. | `RichReviewEditor` | Sanitized HTML plus a text mirror | Reviewer and staff review flows | `shared/components/external/RichReviewEditor.js:1-20,59-124`; `lib/external/sanitize-review-html.js:1-24,82-141` | VERIFIED |
-| Both Dataverse Memo attributes have `MaxLength=32000`; staff PUT currently caps `text` at 20000 characters; the external route caps each multipart text field at 64 KiB but has no abstract character-limit validation. Neither current textarea has `maxLength`. | Dataverse metadata; staff and external routes | Both abstract fields | New shared editor limit | Live preflight on 2026-08-13; `pages/api/workbench/grantee-deliverables/abstract.js:37,89-91`; `pages/api/external/grantee/[token]/submit.js:104,175-203`; `shared/components/external/GranteeDeliverableForm.js:134-143` | VERIFIED |
+| Both Dataverse Memo attributes have `MaxLength=32000`; both clients and both server write paths now enforce the shared 20000-character serialized-Markdown limit. Busboy's 64 KiB field cap remains a transport backstop. | Shared contract; staff and external clients/routes/services | Both abstract fields | Editor counters and pre-write rejection | `shared/config/granteeAbstract.js`; `lib/services/grantee-upload.js`; `pages/api/workbench/grantee-deliverables/abstract.js`; focused boundary tests | VERIFIED |
 | `@tiptap/pm/markdown` is a direct installed dependency surface and exports `MarkdownSerializer`; its default serializer targets CommonMark and does not define the custom sub/sup grammar. | Package runtime | N/A | New serializer | `package.json:98-101`; `node -e` export probe on 2026-08-13 | VERIFIED |
 
 Focused verification on 2026-08-13:
@@ -84,7 +84,7 @@ Tests:       29 passed, 29 total
 
 ### 4.1 Abstract-specific editor
 
-[PLANNED] Add `shared/components/external/GranteeAbstractEditor.js` as a controlled Tiptap editor. It may reuse small presentation primitives from `RichReviewEditor` only if doing so does not merge the two persistence contracts.
+[VERIFIED via source/tests] `shared/components/external/GranteeAbstractEditor.js` is a controlled, abstract-specific Tiptap editor; its persistence contract remains separate from reviewer answers.
 
 The abstract toolbar will contain:
 
@@ -96,17 +96,17 @@ The abstract toolbar will contain:
 
 StarterKit features outside that list will be disabled. Links, headings, lists, blockquotes, images, code, tables, text color, font choice, and raw HTML will not be offered.
 
-[PLANNED] Configure subscript and superscript as mutually exclusive marks. Add direct dependencies for their Tiptap extensions, pinned to the repository's existing Tiptap major, and confirm `package-lock.json` resolves no second Tiptap major.
+[VERIFIED via source/package tree] Subscript and superscript are mutually exclusive marks. Their direct extensions are pinned at `2.27.2`, and the resolved Tiptap runtime remains on one version.
 
 [VERIFIED] The direct `@tiptap/pm` dependency exports `MarkdownSerializer`. The implementation may use that class as a traversal primitive, but it must supply the complete node, mark, and escape rules below. It must not inherit `defaultMarkdownSerializer` behavior: that default targets CommonMark and has no contract for this renderer's Pandoc-style subscript/superscript extensions.
 
-[PLANNED] Paste and drag/drop use an explicit transform rather than relying on disabled extensions. Pasted HTML is reduced to paragraphs plus the four allowed marks. Headings, lists, tables, blockquotes, and code are flattened to paragraphs with their text preserved in source order; links become link text. Unsupported content is never silently dropped.
+[VERIFIED via source/tests] Paste and drag/drop use an explicit transform rather than relying on disabled extensions. Pasted HTML is reduced to paragraphs plus the four allowed marks. Headings, lists, tables, blockquotes, and code are flattened to paragraphs with their text preserved in source order; links become link text. Unsupported content is never silently dropped.
 
-[PLANNED] Match `RichReviewEditor`'s client-only/deferred first-render behavior to avoid a Next.js hydration mismatch. The editable region receives an accessible name through `aria-labelledby` or `aria-label`, required/invalid state, and read-only semantics. The toolbar uses `role="toolbar"`; every button has `aria-label` and `aria-pressed`, works by keyboard, preserves selection, and has visible focus. The toolbar must wrap without obscuring the editor on a narrow mobile viewport.
+[VERIFIED via source/tests] The editor uses deferred first rendering to avoid a Next.js hydration mismatch. The editable region receives an accessible name through `aria-labelledby` or `aria-label`, required/invalid state, and read-only semantics. The toolbar uses `role="toolbar"`; every button has `aria-label` and `aria-pressed`, works by keyboard, preserves selection, and has visible focus. The toolbar wraps on narrow viewports.
 
 ### 4.2 Canonical conversion boundary
 
-[PLANNED] Keep Markdown as the only editable value held by parent forms and sent over APIs.
+[VERIFIED via source/tests] Markdown remains the only editable value held by parent forms and sent over APIs.
 
 #### 4.2.1 Verified renderer capability preflight
 
@@ -133,7 +133,7 @@ Dataverse Markdown
   -> existing Dataverse Memo field
 ```
 
-[PLANNED] Add a client-safe serializer helper with an explicit node/mark map for paragraphs, hard breaks, bold, italic, subscript, and superscript. Unknown nodes and marks fail closed by reducing to escaped text content. Serialization never rejects, never throws to the caller, never retains the prior parent value, and never emits raw HTML. Every editor transaction produces exactly one `onChange` value describing the visible document.
+[VERIFIED via serializer tests] The client-safe serializer helper has an explicit node/mark map for paragraphs, hard breaks, bold, italic, subscript, and superscript. Unknown nodes and marks fail closed by reducing to escaped text content. Serialization never rejects, never throws to the caller, never retains the prior parent value, and never emits raw HTML. Every editor transaction produces exactly one `onChange` value describing the visible document.
 
 #### 4.2.2 Canonical serialization grammar
 
@@ -151,13 +151,13 @@ Plain-text Markdown punctuation is escaped before mark delimiters are added. The
 
 Adjacent runs carrying the same mark set are merged. Leading and trailing whitespace in a marked range moves outside the delimiters; an all-whitespace or empty range drops its marks. Mark nesting uses a single deterministic order, and the editor prevents simultaneous subscript and superscript on the same range.
 
-[PLANNED] The serializer must be a semantic fixed point: after the first intentional edit, render → parse → serialize produces the same canonical Markdown for every supported fixture. Existing Markdown is not normalized merely by loading it.
+[VERIFIED via serializer fixtures] The serializer is a semantic fixed point: after the first intentional edit, render → parse → serialize produces the same canonical Markdown for every supported fixture. Existing Markdown is not normalized merely by loading it.
 
 The initial Tiptap seed and any server-driven `setContent` call must suppress update emission. Parent state begins with the exact loaded Markdown string, and dirty state compares against that original string. Only an intentional editor transaction may replace it with canonical serialized Markdown; normalization caused by that edit is accepted and tested.
 
 ### 4.3 Safe load values
 
-[PLANNED] Derive editor HTML on the server by calling the existing `renderGranteeBody` renderer:
+[VERIFIED via route/service tests] Editor HTML is derived on the server by calling the existing `renderGranteeBody` renderer:
 
 - External context response: add a derived `abstractHtml` for `abstractApproved || abstractFormatted` while retaining the existing source strings for compatibility.
 - Staff abstract GET response: add a derived `effectiveHtml` beside the existing `effective` Markdown value.
@@ -168,17 +168,17 @@ Initial seeding must not emit `onChange`. A later server-driven reseed is allowe
 
 ### 4.4 External grantee flow
 
-[PLANNED] Replace only the Abstract textarea in `GranteeDeliverableForm` with the new editor. Keep caption, image, waiver, token handling, validation, and the multipart submit boundary unchanged.
+[VERIFIED via component tests] Only the Abstract textarea in `GranteeDeliverableForm` was replaced with the new editor. Caption, image, waiver, token handling, validation, and the multipart submit boundary remain unchanged.
 
 The editor's `onChange(markdown)` updates the existing `abstract` state. Submission continues to append that state as `editedAbstract`. `writeGranteeDeliverables` continues trimming and writing it to `wmkf_abstractapproved` inside the existing request-and-package changeset.
 
-[PLANNED] Introduce one shared `MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH = 20000` contract, preserving the staff route's current limit and staying below the live 32000-character Dataverse ceiling. The external editor displays remaining/over-limit state, disables submission while over the cap, and the external route/service rejects an over-limit serialized value before image scanning, upload, or any Dataverse write. Busboy's existing 64 KiB field-size cap remains a transport backstop, not the semantic limit.
+[VERIFIED via source/boundary tests] One shared `MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH = 20000` contract governs both flows, preserving the staff route's prior limit and staying below the live 32000-character Dataverse ceiling. The external editor displays remaining/over-limit state, disables submission while over the cap, and the external service rejects an over-limit serialized value before image scanning, upload, or any Dataverse write. Busboy's existing 64 KiB field-size cap remains a transport backstop, not the semantic limit.
 
 No draft autosave will be added. Reviewer autosave depends on a distinct durable draft contract; adding one to the grantee's bundled abstract/image/caption/waiver workflow is outside this formatting change.
 
 ### 4.5 Staff Awardee-tab flow
 
-[PLANNED] Replace the effective-abstract textarea in `AwardeeTab` with the new editor. Preserve the existing client capability response, dirty-state behavior, save button, `baseField`, and ETag.
+[VERIFIED via component tests] The effective-abstract textarea in `AwardeeTab` is replaced by the new editor. The existing client capability response, dirty-state behavior, save button, `baseField`, and ETag remain.
 
 The staff PUT payload remains:
 
@@ -188,11 +188,11 @@ The staff PUT payload remains:
 
 The route and service keep their current validation, fresh-row target resolution, status allowlists, conditional Dataverse update, stale response, and post-save ETag refresh. No formatting authorization will be inferred solely in the client.
 
-The current stale path reloads immediately and overwrites the working textarea (`AwardeeTab.js:349-360`). [PLANNED] Replace that behavior for the rich editor: on `code:'stale'`, fetch the current server abstract into separate conflict state without reseeding the editor. Display the current server value and the user's unsaved value distinctly, with explicit actions to keep/copy the user's version or replace the editor with the server version. A successful save updates only the ETag, effective field, and dirty baseline; it does not reseed editor content. Every conflict fetch and resolution remains guarded by the existing request id and abstract load generation.
+The former stale path reloaded immediately and overwrote the working textarea. [VERIFIED via component tests] On `code:'stale'`, the rich editor fetches the current server abstract into separate conflict state without reseeding the editor. It displays the current server value while the user's unsaved value remains in the editor, with explicit actions to keep the user's version or replace it with the server version. A successful save updates the ETag, effective field, and dirty baseline without reseeding editor content. Every conflict fetch and resolution remains guarded by the existing request id and abstract load generation.
 
 ## 5. Implementation sequence and file surface
 
-### Phase 1 — Conversion contract and editor
+### Phase 1 — Conversion contract and editor ✅
 
 1. Convert the §4.2.1 probe results into renderer characterization tests before writing the serializer.
 2. Add the direct subscript/superscript Tiptap dependencies and verify one resolved Tiptap major.
@@ -210,7 +210,7 @@ Likely files:
 - `shared/components/external/GranteeAbstractEditor.js` (new)
 - focused unit/component tests
 
-### Phase 2 — Server-derived load HTML
+### Phase 2 — Server-derived load HTML ✅
 
 1. Add `abstractHtml` to the external grantee context response using the effective stored Markdown.
 2. Add `effectiveHtml` to the staff abstract load response using the same renderer.
@@ -225,7 +225,7 @@ Likely files:
 - relevant context and abstract service tests
 - `docs/API_ROUTE_SECURITY_MATRIX.md`
 
-### Phase 3 — Wire both callers
+### Phase 3 — Wire both callers ✅
 
 1. Replace the external Abstract textarea and keep `editedAbstract` unchanged.
 2. Replace the staff effective-abstract textarea and keep `text`, ETag, `baseField`, error handling, and capability gates unchanged.
@@ -239,12 +239,12 @@ Likely files:
 - `shared/components/workbench/AwardeeTab.js`
 - focused component/integration tests
 
-### Phase 4 — Downstream regression and documentation
+### Phase 4 — Downstream regression and documentation (local verification complete; Preview smoke remains)
 
 1. Extend renderer and assembly tests with scientific-name italics and combined bold/sub/sup examples.
 2. Prove the same formatting reaches portal preview, website HTML, and cycle export through canonical document assembly.
-3. Update `GRANTEE_PORTAL_SPEC.md` and `GRANTEE_PORTAL_BUILD_PLAN.md` from planned to implemented only after the UI ships.
-4. Reconcile the relevant Atlas/API/wiki restatements with `/sweep`; do not claim a schema change because none is planned.
+3. `GRANTEE_PORTAL_SPEC.md` now records the as-built contract. `GRANTEE_PORTAL_BUILD_PLAN.md` remains an explicitly historical implementation chronology and was not rewritten as current guidance.
+4. The API matrix, plan, canonical portal spec, and catalog were reconciled with `/sweep`; no schema change is claimed because none occurred.
 5. Run a Preview smoke with one test grantee edit and one staff edit before deliberate production promotion; verify Dataverse stores Markdown while rendered output shows formatting.
 
 ## 6. Tests and gates
@@ -286,14 +286,25 @@ npm run build
 
 Before implementation completion, inspect `docs/CI_GATES_REFERENCE.md` and `package.json` for any additional current gates triggered by the exact file set. A green gate is evidence only for its documented scan surface.
 
+### Local verification record (2026-08-13)
+
+- Serializer/editor/server-boundary suite: 70 tests passed across five suites.
+- Response-contract suite: 57 tests passed across three suites.
+- Caller/editor/stale-conflict suite: 102 tests passed across three suites.
+- Final combined serializer → callers → persistence-boundary → document-assembly run: 230 tests passed across 11 suites.
+- `npm run check:types`: passed.
+- `npm run check:api-routes` followed by `npm run check:api-routes:self-test`: passed.
+- Canonical Turbopack `npm run build`: not proven in this host because Turbopack failed twice while attempting to create a process/bind a port (`Operation not permitted`), including the approved out-of-sandbox retry. The documented `next build --webpack` fallback passed against the final file set; only the repository's existing dynamic-dependency warnings were emitted.
+- Signed-in Preview and production smoke: not run; remains a rollout requirement rather than an implementation claim.
+
 ## 7. Compatibility, rollout, and rollback
 
 - [VERIFIED] No bulk migration is required: plain text is valid Markdown, and existing allowed Markdown already renders through the canonical helper.
-- [PLANNED] The API response additions are backward-compatible; existing fields and write payloads remain.
+- [VERIFIED via route/service tests] The API response additions are backward-compatible; existing fields and write payloads remain.
 - [ASSUMED] External Power Automate or direct Dataverse readers may exist outside this repository. Keeping the exact persisted field meanings and syntax minimizes that risk; no external-consumer claim is treated as proven.
-- [PLANNED] This is runtime UI work and therefore follows the repository's deliberate feature-branch promotion process rather than landing directly on auto-deploying `main`.
-- [PLANNED] Rollback reverts the editor and derived response fields. Stored values remain readable Markdown, so rollback does not require data repair.
-- [PLANNED] After rollback, allowed formatting markers may again appear visibly in the plain textarea, but publication output remains formatted because the canonical renderer is unchanged.
+- [VERIFIED via git] Runtime UI work is isolated on `codex/grantee-abstract-rich-text` for deliberate promotion rather than landing directly on auto-deploying `main`.
+- [VERIFIED by unchanged persistence contract] Rollback can revert the editor and derived response fields without data repair because stored values remain readable Markdown.
+- [VERIFIED by unchanged renderer] After rollback, allowed formatting markers may again appear visibly in a plain textarea, but publication output remains formatted because the canonical renderer is unchanged.
 
 ## 8. Explicit non-goals
 
