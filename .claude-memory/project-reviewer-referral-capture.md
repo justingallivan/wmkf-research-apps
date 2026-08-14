@@ -1,12 +1,12 @@
 ---
 name: project-reviewer-referral-capture
-description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01 on the review branch. The external decline form collects up to four Name/Institution/Email rows; structured closure derives from existing referred-candidate provenance, while legacy free-text records remain readable and dismissible only after staff resolves them. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
+description: "SHIPPED S249; structured portal capture and durable referral closure added 2026-08-01, with exact per-row structured dismissal added 2026-08-14. The external decline form collects up to four Name/Institution/Email rows; structured closure derives from referred-candidate provenance or a persisted dismissal mask, while legacy free-text records remain readable and dismissible only after staff resolves them. Identity resolution still uses manual-reviewer-add plus the hardened abstain-or-confirm spine."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-01
+  last_verified: 2026-08-14
 ---
 
 ## Recall Rule
@@ -43,11 +43,17 @@ The external decline form now captures up to four structured rows with a
 required published name and optional institution/email. Existing records may
 still contain legacy free text. The Workbench never submits a legacy prose
 block as one person's name: staff add its people separately, then dismiss the
-resolved legacy note. Structured rows disappear only when the request already
-has an exact-name referred candidate (and exact email too when the referral
-supplied one) that is selected or engaged. This reuses the existing `referred`
-`wmkf_sources` provenance instead of adding operational tokens to that field;
-failed/ambiguous adds and promotion/restore remedies therefore remain visible.
+resolved legacy note. Structured rows disappear when the request already has
+an exact-name referred candidate (and exact email too when the referral supplied
+one) that is selected or engaged, or when staff dismisses that exact row after
+recognizing it as already considered. Structured dismissal stores a four-bit
+mask in a same-width memo prefix and leaves the reviewer-submitted JSON payload
+unchanged. The PATCH is bound to the exact GET-issued payload identity, so a
+mask-only ETag race can merge but reordered/replaced content returns 409 rather
+than applying a stale index. Malformed/future reserved envelopes remain visible
+but non-dismissible. Both closure paths avoid operational tokens in `wmkf_sources`;
+failed/ambiguous adds and promotion/restore remedies remain visible until staff
+acts.
 Legacy dismissal preserves the original text behind a versioned prefix in
 `wmkf_declinereferral`. Staff can still enter a sparse referral.
 Resolving any referral to a canonical person is the **same name→identity problem

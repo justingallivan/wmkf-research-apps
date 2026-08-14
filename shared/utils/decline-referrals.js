@@ -15,6 +15,8 @@ export const DECLINE_REFERRAL_LIMITS = Object.freeze({
 });
 
 const STORED_PREFIX = 'wmkf-referrals:v1:';
+const RESERVED_STRUCTURED_PREFIX = 'wmkf-referrals:';
+const RESOLVED_STRUCTURED_PREFIX_RE = /^wmkf-referrals:r([0-9a-f]):/;
 const RESOLVED_LEGACY_PREFIX = 'wmkf-referral-resolved:v1:';
 const MAX_STORED_LENGTH = 2000;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+$/;
@@ -97,10 +99,18 @@ export function parseStoredDeclineReferral(value) {
     }];
   }
 
-  if (text.startsWith(STORED_PREFIX)) {
+  const resolvedStructuredMatch = text.match(RESOLVED_STRUCTURED_PREFIX_RE);
+  const structuredPrefix = text.startsWith(STORED_PREFIX)
+    ? STORED_PREFIX
+    : resolvedStructuredMatch?.[0];
+  if (structuredPrefix) {
     try {
-      const compact = JSON.parse(text.slice(STORED_PREFIX.length));
+      const compact = JSON.parse(text.slice(structuredPrefix.length));
       if (!Array.isArray(compact)) throw new Error('not an array');
+      const resolvedMask = resolvedStructuredMatch
+        ? Number.parseInt(resolvedStructuredMatch[1], 16)
+        : 0;
+      if (resolvedMask >= (1 << compact.length)) throw new Error('invalid resolved mask');
       const expanded = compact.map((row) => ({
         name: row?.n ?? '',
         institution: row?.i ?? '',
@@ -110,7 +120,11 @@ export function parseStoredDeclineReferral(value) {
       if (!normalized.ok || normalized.referrals.length !== compact.length) {
         throw new Error('invalid structured referral');
       }
-      return normalized.referrals.map((row) => ({ ...row, structured: true }));
+      return normalized.referrals.map((row, index) => ({
+        ...row,
+        structured: true,
+        resolved: (resolvedMask & (1 << index)) !== 0,
+      }));
     } catch {
       // A corrupt or future envelope remains visible rather than disappearing.
     }
@@ -132,12 +146,81 @@ export function referralDisplayText(referral) {
 }
 
 /**
+ * Exact content identity for optimistic referral actions. Resolution markers
+ * are deliberately excluded, so a retry may merge new mask bits only while
+ * the underlying reviewer-submitted JSON/prose remains byte-identical.
+ * Reserved envelopes that this version cannot parse return null and therefore
+ * stay visible but non-dismissible.
+ */
+export function declineReferralContentVersion(value) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return null;
+  if (text.startsWith(RESOLVED_LEGACY_PREFIX)) {
+    return `legacy:${text.slice(RESOLVED_LEGACY_PREFIX.length)}`;
+  }
+  const resolvedStructuredMatch = text.match(RESOLVED_STRUCTURED_PREFIX_RE);
+  const structuredPrefix = text.startsWith(STORED_PREFIX)
+    ? STORED_PREFIX
+    : resolvedStructuredMatch?.[0];
+  if (structuredPrefix) {
+    const parsed = parseStoredDeclineReferral(text);
+    if (!parsed.length || parsed.some((row) => !row.structured)) return null;
+    return `structured:${text.slice(structuredPrefix.length)}`;
+  }
+  if (text.startsWith(RESERVED_STRUCTURED_PREFIX)) return null;
+  return `legacy:${text}`;
+}
+
+/**
+ * Mark one structured referral row resolved without removing or rewriting the
+ * reviewer-submitted JSON payload. `r<hex>` replaces the same-width `v1`
+ * prefix and stores a four-bit row mask, so even a memo already at Dataverse's
+ * 2,000-character limit remains dismissible.
+ */
+export function resolveStructuredDeclineReferral(value, referralIndex) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!Number.isInteger(referralIndex) || referralIndex < 0 || referralIndex >= MAX_DECLINE_REFERRALS) {
+    return { ok: false, reason: 'invalid_decline_referral_index' };
+  }
+
+  const resolvedStructuredMatch = text.match(RESOLVED_STRUCTURED_PREFIX_RE);
+  const structuredPrefix = text.startsWith(STORED_PREFIX)
+    ? STORED_PREFIX
+    : resolvedStructuredMatch?.[0];
+  if (!structuredPrefix) {
+    return { ok: false, reason: 'structured_decline_referral_required' };
+  }
+
+  const parsed = parseStoredDeclineReferral(text);
+  if (!parsed.length || parsed.some((row) => !row.structured)) {
+    return { ok: false, reason: 'invalid_structured_decline_referral' };
+  }
+  if (referralIndex >= parsed.length) {
+    return { ok: false, reason: 'decline_referral_index_out_of_range' };
+  }
+  if (parsed[referralIndex].resolved) {
+    return { ok: true, storedValue: text, alreadyResolved: true };
+  }
+
+  const previousMask = resolvedStructuredMatch
+    ? Number.parseInt(resolvedStructuredMatch[1], 16)
+    : 0;
+  const nextMask = previousMask | (1 << referralIndex);
+  const payload = text.slice(structuredPrefix.length);
+  return {
+    ok: true,
+    storedValue: `wmkf-referrals:r${nextMask.toString(16)}:${payload}`,
+    alreadyResolved: false,
+  };
+}
+
+/**
  * Archive a legacy prose note in place after staff confirms that its people
  * were handled outside the structured one-click flow. The original trimmed
  * text remains byte-for-byte after the version marker, and the referral field
  * remains the sole owner of referral content/state. Structured rows are never
- * accepted here: their resolved state is derived from the existing durable
- * `referred` candidate provenance instead.
+ * accepted here; structured rows use resolveStructuredDeclineReferral so one
+ * person can be dismissed without hiding the rest of the memo.
  */
 export function resolveLegacyDeclineReferral(value) {
   const text = typeof value === 'string' ? value.trim() : '';
@@ -145,7 +228,7 @@ export function resolveLegacyDeclineReferral(value) {
   if (text.startsWith(RESOLVED_LEGACY_PREFIX)) {
     return { ok: true, storedValue: text, alreadyResolved: true };
   }
-  if (parseStoredDeclineReferral(text).some((row) => row.structured)) {
+  if (text.startsWith(RESERVED_STRUCTURED_PREFIX)) {
     return { ok: false, reason: 'structured_decline_referral_not_dismissible' };
   }
   const storedValue = `${RESOLVED_LEGACY_PREFIX}${text}`;

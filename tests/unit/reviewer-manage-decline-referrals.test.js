@@ -20,7 +20,7 @@ afterEach(() => {
 
 test('legacy prose cannot be submitted wholesale as a reviewer name', async () => {
   const onAddReferral = jest.fn();
-  const onResolveLegacyReferral = jest.fn();
+  const onDismissDeclineReferral = jest.fn();
   const legacy = {
     referralId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     suggestionId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -28,6 +28,8 @@ test('legacy prose cannot be submitted wholesale as a reviewer name', async () =
     referralText: 'Chris Lima, MSK\nKylie Walters, NCI',
     reviewerName: 'Cynthia Wolberger',
     legacy: true,
+    dismissible: true,
+    referralVersion: 'legacy:Chris Lima, MSK\nKylie Walters, NCI',
   };
 
   await act(async () => {
@@ -38,7 +40,7 @@ test('legacy prose cannot be submitted wholesale as a reviewer name', async () =
         mode="track"
         declineReferrals={[legacy]}
         onAddReferral={onAddReferral}
-        onResolveLegacyReferral={onResolveLegacyReferral}
+        onDismissDeclineReferral={onDismissDeclineReferral}
       />,
     );
     await Promise.resolve();
@@ -46,13 +48,13 @@ test('legacy prose cannot be submitted wholesale as a reviewer name', async () =
 
   expect(screen.queryByRole('button', { name: /add as candidate/i })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /dismiss resolved note/i }));
-  expect(onResolveLegacyReferral).toHaveBeenCalledWith(legacy);
+  expect(onDismissDeclineReferral).toHaveBeenCalledWith(legacy);
   expect(onAddReferral).not.toHaveBeenCalled();
 });
 
-test('a structured person can only use the normal candidate-add action', async () => {
+test('a structured person can be added or dismissed independently', async () => {
   const onAddReferral = jest.fn();
-  const onResolveLegacyReferral = jest.fn();
+  const onDismissDeclineReferral = jest.fn();
   const referral = {
     referralId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb:1',
     suggestionId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -62,6 +64,8 @@ test('a structured person can only use the normal candidate-add action', async (
     institution: 'NCI',
     reviewerName: 'Cynthia Wolberger',
     legacy: false,
+    dismissible: true,
+    referralVersion: 'structured:[{"n":"Kylie Walters","i":"NCI"}]',
   };
 
   await act(async () => {
@@ -72,7 +76,7 @@ test('a structured person can only use the normal candidate-add action', async (
         mode="track"
         declineReferrals={[referral]}
         onAddReferral={onAddReferral}
-        onResolveLegacyReferral={onResolveLegacyReferral}
+        onDismissDeclineReferral={onDismissDeclineReferral}
       />,
     );
     await Promise.resolve();
@@ -80,6 +84,37 @@ test('a structured person can only use the normal candidate-add action', async (
 
   fireEvent.click(screen.getByRole('button', { name: /add as candidate/i }));
   expect(onAddReferral).toHaveBeenCalledWith(referral);
-  expect(screen.queryByRole('button', { name: /dismiss resolved note/i })).not.toBeInTheDocument();
-  expect(onResolveLegacyReferral).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: /^dismiss$/i }));
+  expect(onDismissDeclineReferral).toHaveBeenCalledWith(referral);
+});
+
+test('an unreadable reserved referral remains visible but cannot be dismissed', async () => {
+  const onDismissDeclineReferral = jest.fn();
+  const corrupt = {
+    referralId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    suggestionId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    referralIndex: 0,
+    referralText: 'wmkf-referrals:v2:[{"n":"Future Person"}]',
+    reviewerName: 'Cynthia Wolberger',
+    legacy: true,
+    dismissible: false,
+    referralVersion: null,
+  };
+
+  await act(async () => {
+    render(
+      <ReviewerManagePanel
+        proposal={proposal}
+        reviewers={[]}
+        mode="track"
+        declineReferrals={[corrupt]}
+        onDismissDeclineReferral={onDismissDeclineReferral}
+      />,
+    );
+    await Promise.resolve();
+  });
+
+  expect(screen.getByText(/could not be read safely/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  expect(onDismissDeclineReferral).not.toHaveBeenCalled();
 });

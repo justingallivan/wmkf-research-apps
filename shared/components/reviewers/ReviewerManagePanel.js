@@ -1284,10 +1284,11 @@ function referralContextLine(context) {
   return [context.email, context.affiliation, context.hasOrcid ? 'ORCID' : null].filter(Boolean).join(' · ');
 }
 
-// The compact right-side action for one referral row (structured add or legacy
-// dismissal). The 'confirm' state renders a full-width picker below instead —
+// The compact right-side action for one referral row (structured add/dismiss or
+// legacy dismissal). The 'confirm' state renders a full-width picker below —
 // see ReferralConfirm — so it is not handled here.
-function ReferralAction({ referral, state, canManage, onAdd, onResolveLegacy, onGoToInvite, onNavigate }) {
+function ReferralAction({ referral, state, canManage, onAdd, onDismiss, onGoToInvite, onNavigate }) {
+  const dismiss = referral?.dismissible ? onDismiss : null;
   const status = state?.status;
   if (status === 'adding') {
     return <span className="shrink-0 text-xs text-amber-800">Adding…</span>;
@@ -1317,10 +1318,10 @@ function ReferralAction({ referral, state, canManage, onAdd, onResolveLegacy, on
     return (
       <div className="shrink-0 text-right max-w-[16rem]">
         <p className="text-xs text-red-700">{state.error}</p>
-        {canManage && (state.operation === 'dismiss' ? onResolveLegacy : onAdd) && (
+        {canManage && (state.operation === 'dismiss' ? dismiss : onAdd) && (
           <button
             type="button"
-            onClick={() => (state.operation === 'dismiss' ? onResolveLegacy(referral) : onAdd(referral))}
+            onClick={() => (state.operation === 'dismiss' ? dismiss(referral) : onAdd(referral))}
             className="text-xs text-amber-900 underline"
           >
             Try again
@@ -1356,25 +1357,38 @@ function ReferralAction({ referral, state, canManage, onAdd, onResolveLegacy, on
   }
   if (!canManage) return null;
   if (referral.legacy) {
-    return onResolveLegacy ? (
+    return dismiss ? (
       <button
         type="button"
-        onClick={() => onResolveLegacy(referral)}
+        onClick={() => dismiss(referral)}
         className="shrink-0 text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
       >
         Dismiss resolved note
       </button>
     ) : null;
   }
-  if (!onAdd) return null;
+  if (!onAdd && !dismiss) return null;
   return (
-    <button
-      type="button"
-      onClick={() => onAdd(referral)}
-      className="shrink-0 text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
-    >
-      Add as candidate
-    </button>
+    <div className="shrink-0 flex flex-wrap items-center justify-end gap-2">
+      {dismiss && (
+        <button
+          type="button"
+          onClick={() => dismiss(referral)}
+          className="text-xs font-medium text-gray-600 border border-gray-300 rounded-md px-2 py-1 hover:bg-gray-50"
+        >
+          Dismiss
+        </button>
+      )}
+      {onAdd && (
+        <button
+          type="button"
+          onClick={() => onAdd(referral)}
+          className="text-xs font-medium text-amber-900 border border-amber-300 rounded-md px-2 py-1 hover:bg-amber-100"
+        >
+          Add as candidate
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -1452,7 +1466,7 @@ export default function ReviewerManagePanel({
   declineReferrals = [],
   referralActions = {},
   onAddReferral,
-  onResolveLegacyReferral,
+  onDismissDeclineReferral,
   onGoToInvite,
   onNavigate,
   onDismissReferral,
@@ -1674,7 +1688,7 @@ export default function ReviewerManagePanel({
             {declineReferrals.length} referral{declineReferrals.length !== 1 ? 's' : ''} from reviewers who declined
           </p>
           <p className="text-xs text-amber-800 mb-3">
-            Add each structured person as a candidate. Resolve older free-text notes person-by-person before dismissing them.
+            Add useful referrals as candidates, or dismiss suggestions that have already been considered.
           </p>
           <ul className="space-y-2">
             {declineReferrals.map((r) => {
@@ -1696,9 +1710,14 @@ export default function ReviewerManagePanel({
                       <p className="text-xs text-gray-500">
                         suggested by {r.reviewerName || 'a declining reviewer'}
                       </p>
-                      {r.legacy && (
+                      {r.legacy && r.dismissible && (
                         <p className="text-[11px] text-amber-700 mt-1">
                           Older free-text note. If everyone listed has already been handled, dismiss the resolved note.
+                        </p>
+                      )}
+                      {r.legacy && !r.dismissible && (
+                        <p className="text-[11px] text-red-700 mt-1">
+                          This saved referral could not be read safely. Ask an administrator to repair it.
                         </p>
                       )}
                     </div>
@@ -1708,7 +1727,7 @@ export default function ReviewerManagePanel({
                         state={state}
                         canManage={canManage}
                         onAdd={onAddReferral}
-                        onResolveLegacy={onResolveLegacyReferral}
+                        onDismiss={onDismissDeclineReferral}
                         onGoToInvite={onGoToInvite}
                         onNavigate={onNavigate}
                       />

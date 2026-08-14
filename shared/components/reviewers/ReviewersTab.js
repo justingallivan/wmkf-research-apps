@@ -88,8 +88,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   useEffect(() => () => clearTimeout(reconcileTimerRef.current), []);
   // Per-referral inline action state for the Track Reviewers decline-referral
   // callout, keyed by the per-item referralId (with suggestionId as a legacy
-  // fallback). Drives structured add/identity confirmation and legacy-note
-  // dismissal without conflating those two workflows.
+  // fallback). Drives structured add/identity confirmation and per-referral
+  // dismissal without conflating those workflows.
   const [referralActions, setReferralActions] = useState({});
 
   const reviewers = proposal?.reviewers || [];
@@ -264,9 +264,9 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // resolves identity itself — a confident match or a clearly-new person is
   // added immediately; an ambiguous/conflicting identity returns 409 + `lookup`,
   // which we surface as an inline picker on the referral row (staff confirm → we
-  // re-POST with the chosen resolution). Legacy free-text suggestions are never
-  // submitted as one person's name; an already-resolved legacy note has its own
-  // narrow dismissal action.
+  // re-POST with the chosen resolution). Every structured row also has an exact
+  // dismissal action. Legacy free-text suggestions are never submitted as one
+  // person's name and retain their note-level dismissal action.
   // On success we refresh both lists and land on
   // the Invite Reviewers sub-tab where the new candidate now appears.
   const addReferralCandidate = async (referral, resolution) => {
@@ -336,10 +336,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
     }
   };
 
-  const dismissLegacyReferral = async (referral) => {
+  const dismissDeclineReferral = async (referral) => {
     const sid = referral?.suggestionId;
     const actionKey = referral?.referralId || sid;
-    if (!referral?.legacy || !sid || !requestId) return;
+    if (!sid || !requestId) return;
+    if (!referral?.dismissible || !referral?.referralVersion) return;
+    if (!referral?.legacy && !Number.isInteger(referral?.referralIndex)) return;
     const rid = requestId;
     setReferralActions((prev) => ({ ...prev, [actionKey]: { status: 'dismissing' } }));
     try {
@@ -349,6 +351,8 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         body: JSON.stringify({
           requestId: rid,
           suggestionId: sid,
+          referralVersion: referral.referralVersion,
+          ...(!referral?.legacy ? { referralIndex: referral.referralIndex } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -359,7 +363,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           [actionKey]: {
             status: 'error',
             operation: 'dismiss',
-            error: data.error || `Couldn’t dismiss the resolved note (${res.status}).`,
+            error: data.error || `Couldn’t dismiss the referral (${res.status}).`,
           },
         }));
         return;
@@ -510,7 +514,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}
-          onResolveLegacyReferral={dismissLegacyReferral}
+          onDismissDeclineReferral={dismissDeclineReferral}
           onGoToInvite={() => selectSub('candidates')}
           onNavigate={selectSub}
           onDismissReferral={dismissReferralAction}
