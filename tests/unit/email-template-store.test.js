@@ -73,7 +73,7 @@ describe('email-template-store', () => {
   test('materials seed is concise and keeps the deadline, link, and signature placeholders', () => {
     expect(REVIEWER_MATERIALS_SEED_BODY).toBe(
       '{{greeting}},\n\n'
-      + 'Please use the link to download the proposal materials and submit your completed review by {{reviewDueDate}}.\n\n'
+      + 'Please use the link to access the proposal materials and submit your completed review by {{reviewDueDate}}.\n\n'
       + '{{externalLink}}\n\n'
       + '{{signature}}',
     );
