@@ -139,6 +139,19 @@ describe('assembleGranteeDocument', () => {
     expect(m.bodyHtml).toContain('AI formatted abstract body.');
   });
 
+  test('approved Markdown formatting reaches canonical document assembly', async () => {
+    wireReads({ request: {
+      ...REQUEST,
+      wmkf_abstractapproved: '*Escherichia coli* produced **strong results** in H~2~O at x^2^ scale.',
+    } });
+    const m = await assembleGranteeDocument('req-guid');
+    expect(m.bodySource).toBe('approved');
+    expect(m.bodyHtml).toContain('<em>Escherichia coli</em>');
+    expect(m.bodyHtml).toContain('<strong>strong results</strong>');
+    expect(m.bodyHtml).toContain('H<sub>2</sub>O');
+    expect(m.bodyHtml).toContain('x<sup>2</sup>');
+  });
+
   test('imageFileRef is withheld by default, exposed only with includeImageRef', async () => {
     wireReads();
     const ext = await assembleGranteeDocument('req-guid');

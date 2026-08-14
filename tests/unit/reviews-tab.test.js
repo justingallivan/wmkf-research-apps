@@ -377,7 +377,7 @@ test('terminal reviewers are excluded from Outstanding even without reviewReceiv
   expect(screen.queryByText('Dr. Released')).not.toBeInTheDocument();
 });
 
-test('Phase 3: the Export affordance appears once a review is submitted', async () => {
+test('Phase 3: only the Word export affordance appears once a review is submitted', async () => {
   fetch.mockResolvedValue({
     ok: true,
     json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: REVIEWERS }] }),
@@ -387,7 +387,7 @@ test('Phase 3: the Export affordance appears once a review is submitted', async 
 
   expect(await screen.findByText('Export:')).toBeInTheDocument();
   expect(screen.getByText('Word (.docx)')).toBeInTheDocument();
-  expect(screen.getByText('PDF')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'PDF' })).not.toBeInTheDocument();
 });
 
 test('opens the dedicated full manual-entry rescue from Outstanding and refreshes after success', async () => {

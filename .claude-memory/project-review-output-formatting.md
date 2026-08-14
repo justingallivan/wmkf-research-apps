@@ -1,27 +1,32 @@
 ---
 name: project-review-output-formatting
-description: "Owner note (S328): reformat the review renditions — the reviewer courtesy-copy attachment (thank-you sweep) ships with a placeholder format, and the staff DOCX/PDF exports (review-report.js) are staff-oriented and also need a formatting pass"
+description: "Reviewer output formatting: courtesy-copy and staff Word renditions need a deliberate formatting pass; Reviews-tab PDF is removed, with Graph conversion deferred"
 status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-07-27 via review-report composition and ReviewsTab consumers; formatting work remains planned
+  last_verified: 2026-08-13 via review-report composition and ReviewsTab export consumer; formatting and Graph conversion remain planned
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
 ## Recall Rule
 
 Read this when: changing a reviewer courtesy-copy attachment or the staff
-DOCX/PDF review export.
+Word review export, or considering a restored PDF workflow.
 
 Do:
 - Keep `composeReviewReport` as the shared semantic composition seam.
 - Apply separate reviewer-facing and staff-facing presentation styles over the
   same answer snapshot.
+- Treat a future PDF as a conversion of the canonical DOCX through Microsoft
+  Graph, not as a second independent layout implementation. The planned
+  contract lives in `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 Do not:
 - Fork answer interpretation between courtesy and staff exports.
 - Treat the requested formatting pass as already implemented.
+- Describe PDF as a current Reviews-tab affordance; the UI is Word-only as of
+  the owner decision on 2026-08-13.
 
 Ground truth: owner note S328 and current composition/consumers in
 `shared/utils/review-report.js` and
@@ -33,10 +38,10 @@ thank-you sweep with courtesy-copy attachment:
 1. **Reviewer courtesy copy** — the attachment of the reviewer's own review
    sent by the thank-you sweep uses a first-pass format. The owner wants a
    deliberate formatting pass on it (reviewer-facing tone/layout).
-2. **Staff exports too** — the existing DOCX/PDF export renditions
-   (`shared/utils/review-report.js` composition + renderers, Reviews tab
-   Export) are "more appropriate for staff" and should also be reformatted
-   in the same effort.
+2. **Staff exports too** — the staff rendition was built as DOCX/PDF. The
+   current Reviews-tab export is Word-only; its formatting still needs the
+   deliberate pass. The legacy PDF renderer remains source-only, and any future
+   one-click PDF should convert the canonical DOCX through Graph.
 
 **Why:** both renditions derive from the same `wmkf_appreviewanswer`
 snapshot data; a single formatting effort should restyle the shared

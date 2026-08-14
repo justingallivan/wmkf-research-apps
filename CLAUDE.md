@@ -16,6 +16,7 @@ This is a Next.js multi-application system for grant and document workflows, dep
 8. **Simplest solution first.** Always implement the simplest thing that could work. Do not add abstractions or flexibility that weren't explicitly requested.
 9. **Don't touch unrelated code.** If a file or function is not directly part of the current task, do not modify it, even if you think it could be improved.
 10. **Flag uncertainty explicitly.** If you are not confident about an approach or technical detail, say so before proceeding. Confidence without certainty causes more damage than admitting a gap.
+11. **Use OAuth for agent sessions.** Run Claude Code and Codex sessions, including delegated or subprocess review sessions, only through their interactive OAuth/subscription authentication. Never use, remap, export, or pass project/provider API keys (for example `CLAUDE_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`) to authenticate an agent CLI or simulate an agent review. If the required OAuth session is unavailable or logged out, stop and ask the user to authenticate; do not fall back to a direct model API. This governs development-agent sessions only and does not change the application's server-side provider credential contracts.
 
 ## Universal Safety Invariants
 

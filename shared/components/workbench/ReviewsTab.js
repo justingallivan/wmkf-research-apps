@@ -19,10 +19,9 @@
  * route's `liveQuestions` (the live admin-panel question set, or null on a
  * fetch failure). "Cards" stays byte-identical to the pre-Phase-2 rendering.
  *
- * Phase 3 (panel-prep export) adds an "Export" affordance to the submitted-
- * reviews toolbar: DOCX (via `composeReviewReport` +
- * `shared/utils/review-report-docx.js`) and PDF (+
- * `shared/utils/review-report-pdf.js`), composed client-side from the same
+ * Phase 3 (panel-prep export) adds a Word export affordance to the submitted-
+ * reviews toolbar via `composeReviewReport` +
+ * `shared/utils/review-report-docx.js`, composed client-side from the same
  * already-loaded `submitted`/`liveQuestions` data — no new fetch, no new
  * route, no Dataverse roll-up column (governing decision 4 in the plan doc).
  */
@@ -33,8 +32,6 @@ import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/exte
 import { deriveReviewMatrix } from '../../utils/review-matrix';
 import { composeReviewReport } from '../../utils/review-report';
 import { generateReviewReportDocx } from '../../utils/review-report-docx';
-import { generateReviewReportPdf } from '../../utils/review-report-pdf';
-import { downloadPdf } from '../../utils/pdf-export';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
 import { isTerminalReviewStatus } from '../../config/reviewerStatus';
 
@@ -308,8 +305,8 @@ function CompareNarrativeBrowser({ matrix }) {
 }
 
 // Panel-prep export (Phase 3): composes the same matrix Compare renders into
-// a plain report object (`composeReviewReport`), then hands it to the DOCX or
-// PDF renderer. Proposal identity fields come from whatever `proposals[0]`
+// a plain report object (`composeReviewReport`), then hands it to the Word
+// renderer. Proposal identity fields come from whatever `proposals[0]`
 // already carries on the reviewers DTO (proposalTitle/requestNumber/
 // proposalAuthors/proposalInstitution) — there is no dedicated `piName`
 // field, so `proposalAuthors` (project leader/applicant) is used as the best
@@ -323,7 +320,7 @@ function yyyymmdd(date) {
 }
 
 function ExportMenu({ proposal, submitted, liveQuestions }) {
-  const [busy, setBusy] = useState(null); // 'docx' | 'pdf' | null
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const synthesisCurrent = proposal?.reviewSynthesisState?.current ?? null;
 
@@ -345,29 +342,24 @@ function ExportMenu({ proposal, submitted, liveQuestions }) {
 
   const filenameBase = `reviews-${proposal?.requestNumber || proposal?.proposalId || 'export'}-${yyyymmdd(new Date())}`;
 
-  const handleExport = useCallback(async (format) => {
-    setBusy(format);
+  const handleWordExport = useCallback(async () => {
+    setBusy(true);
     setError(null);
     try {
       const report = buildReport();
-      if (format === 'docx') {
-        const blob = await generateReviewReportDocx(report);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${filenameBase}.docx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        const pdfBytes = await generateReviewReportPdf(report);
-        downloadPdf(pdfBytes, `${filenameBase}.pdf`);
-      }
+      const blob = await generateReviewReportDocx(report);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${filenameBase}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (e) {
-      setError(e.message || `Failed to generate ${format.toUpperCase()}.`);
+      setError(e.message || 'Failed to generate Word document.');
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }, [buildReport, filenameBase]);
 
@@ -376,19 +368,11 @@ function ExportMenu({ proposal, submitted, liveQuestions }) {
       <span className="text-xs text-gray-500">Export:</span>
       <button
         type="button"
-        onClick={() => handleExport('docx')}
-        disabled={busy !== null}
+        onClick={handleWordExport}
+        disabled={busy}
         className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {busy === 'docx' ? 'Generating…' : 'Word (.docx)'}
-      </button>
-      <button
-        type="button"
-        onClick={() => handleExport('pdf')}
-        disabled={busy !== null}
-        className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {busy === 'pdf' ? 'Generating…' : 'PDF'}
+        {busy ? 'Generating…' : 'Word (.docx)'}
       </button>
       {error && <span className="text-xs text-amber-600">{error}</span>}
     </div>

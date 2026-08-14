@@ -3,10 +3,10 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are production-proven; deterministic reviewer-affiliation rosters are live in the current UI and exports since 2026-08-10."
+summary: "Reviews and synthesis are production-proven; the current Reviews-tab export is Word-only, with Graph-backed PDF conversion deferred."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-07-28
+last_verified: 2026-08-13
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -14,6 +14,7 @@ related:
   - docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md
   - docs/STAFF_EDITABLE_REVIEW_QUESTIONS_BUILD_PLAN.md
   - shared/components/workbench/ReviewsTab.js
+  - lib/services/graph-service.js
   - lib/external/review-answer-snapshot.js
 ---
 
@@ -62,11 +63,20 @@ through PR #92 (`ab1d2943`), and reached a Ready production deployment on
 the same day; the 11 synthetic answers and four staged parent fields were
 restored exactly while the new synthesis and audit remained.
 
+**Current export decision (owner-confirmed 2026-08-13):** the Reviews-tab UI
+offers only **Word (.docx)**. The earlier client-side PDF button was removed
+because its `pdf-lib` renderer flattened reviewer-authored rich-text formatting.
+Staff who need a PDF can download the Word document and convert it externally.
+The former PDF renderer remains in source and focused tests, but has no
+Reviews-tab UI consumer. A possible Microsoft Graph DOCX-to-PDF conversion is
+documented below as `[PLANNED]`; no route, conversion service, temporary-file
+workflow, or new permission is built by this decision.
+
 ## Context
 
 > The first two paragraphs below describe the pre-build S326 baseline. They are
 > retained as implementation history, not current Workbench behavior. Phases
-> 1–3 now provide Outstanding tracking, comparison/matrix, and DOCX/PDF export.
+> 1–3 now provide Outstanding tracking, comparison/matrix, and Word export.
 > Phase-4 synthesis lifecycle/readiness is now deployed and production-proven.
 > The 2026-08-10 reviewer-affiliation roster addition is built and tested in
 > source but is not production-verified until its branch is promoted.
@@ -88,7 +98,7 @@ atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 
 At the S326 starting point, the staff-facing consumption side was a read-only
 card list. That gap is now closed: `ReviewsTab` includes Outstanding tracking,
-comparison, a categorical matrix, manual review entry, and DOCX/PDF export.
+comparison, a categorical matrix, manual review entry, and Word export.
 
 Primary consumers: BOTH program staff pre-panel (compilation/export) and PDs
 monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S326).
@@ -113,11 +123,12 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 3. **Question-set drift across reviewers** (same proposal): matrix takes the union
    of question keys; averages/spread compute per key only across reviewers who
    answered it; unasked renders as "not asked", distinct from missing.
-4. **Export renders client-side; content stays in Dataverse for Power Automate.**
-   File generation reuses the existing client-side utils — `.docx` via the `docx`
-   package [VERIFIED via `shared/utils/word-export.js`], PDF via `pdf-lib`
-   [VERIFIED via `shared/utils/pdf-export.js`]; no server code imports either
-   util (disconfirming grep over pages/api/ and lib/ returned nothing, S326).
+4. **Current export renders Word client-side; content stays in Dataverse for
+   Power Automate.** File generation reuses the existing client-side `.docx`
+   package [VERIFIED via `shared/utils/review-report-docx.js`]. The historical
+   `pdf-lib` renderer remains available as a source module, but the Reviews tab
+   no longer imports or exposes it [VERIFIED via `ReviewsTab.ExportMenu`,
+   2026-08-13]. No server export route exists.
    The Power Automate option is preserved by DATA, not by a server route: raw
    answers are already in Dataverse, and Phase 4 synthesis persists to an
    `akoya_request` output column via the Executor
@@ -220,19 +231,20 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   blockquote, a — no tables/images/spans/divs), so the naive tag-mapping
   approach anticipated above was sufficient; no deep-review escalation was
   needed. The same module's `htmlToBlocks(html)` tokenizes that allowlisted
-  grammar into typed blocks/inline runs consumed by both renderers; an
+  grammar into typed blocks/inline runs consumed by the Word renderer and the
+  retained legacy PDF renderer; an
   unknown/malformed tag degrades to plain text rather than throwing or
   dropping content.
-- `shared/utils/review-report-docx.js` (dynamic `import('docx')`, full-
-  fidelity: bold/italic/links/lists/headings) and
-  `shared/utils/review-report-pdf.js` (pdf-lib via `PDFReportBuilder`) render
-  the report object; PDF FLATTENS inline bold/italic runs to plain text
-  (`PDFReportBuilder` has no mixed-run text primitive) — documented
-  degradation in that module's header, DOCX is the full-fidelity artifact.
-- "Export: Word (.docx) / PDF" affordance on `ReviewsTab`'s submitted-reviews
+- `shared/utils/review-report-docx.js` (dynamic `import('docx')`) preserves
+  bold/italic runs, lists, headings, blockquotes, and line breaks. Link runs
+  receive Word's `Hyperlink` style, but the current renderer does not embed the
+  actual href as an external hyperlink relationship. The retained
+  `shared/utils/review-report-pdf.js` flattens rich-text runs to plain text and
+  is not exposed by the current Reviews-tab UI.
+- "Export: Word (.docx)" affordance on `ReviewsTab`'s submitted-reviews
   toolbar (visible once ≥1 review is submitted); composes client-side from
   already-loaded `submitted`/`liveQuestions` — no new fetch, no new route, no
-  Dataverse roll-up column. Filename: `reviews-<requestNumber>-<yyyymmdd>.ext`.
+  Dataverse roll-up column. Filename: `reviews-<requestNumber>-<yyyymmdd>.docx`.
 - Proposal identity on the export uses whatever `proposals[0]` already
   carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
   `proposalTitle`, `proposalInstitution`, `proposalAuthors`
@@ -242,13 +254,59 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   stands in as the best-available PI identity rather than extending the
   route.
 - **[VERIFIED via source and focused tests 2026-08-10; deployment pending.]**
-  The report model and both renderers add a named `Reviewers` roster for the
+  The report model and Word renderer add a named `Reviewers` roster for the
   submitted-review population. Each row renders name plus accepted
   self-reported affiliation, falling back to the person affiliation and then
   the explicit `Not reported` state. The roster is separate from the existing
   per-question material and AI synthesis. When synthesis currentness is false,
   the export labels it stale and states that the roster/answers reflect current
   submissions while synthesis may reflect an earlier reviewer set.
+
+### Deferred future option — Graph-backed PDF conversion `[PLANNED]`
+
+**Purpose decided:** if staff later need one-click PDF again, derive it from the
+canonical formatted DOCX instead of maintaining an independent rich-text PDF
+layout engine. [Microsoft Graph v1.0](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content-format?view=graph-rest-1.0)
+supports downloading a SharePoint/OneDrive DOCX drive item as PDF with
+`GET /drives/{drive-id}/items/{item-id}/content?format=pdf`.
+
+**Not built:** there is no conversion route, Graph format-aware download method,
+temporary review-export folder, cleanup record, permission proof, or production
+probe. The current `GraphService.downloadFile` retrieves original bytes only.
+
+Proposed contract:
+
+1. Move the staff report's canonical DOCX production behind a guarded server
+   service that reads request/review data authoritatively and returns a Buffer.
+   Do not trust a browser-supplied report DTO as the source of review content.
+2. Upload that DOCX as a uniquely named temporary drive item in the request's
+   governed SharePoint location (exact folder/retention policy still requires an
+   owner decision).
+3. Add a narrow Graph helper that requests `content?format=pdf`, handles the
+   authenticated 302 response, then follows the short-lived `Location` URL
+   without forwarding the Authorization header, matching the existing original-
+   content redirect discipline in `GraphService.downloadFile`.
+4. Stream the converted bytes from a `requireAppAccess('review-manager',
+   'reviewers')` route with a bounded timeout and response size. Return no PDF
+   bytes unless the full conversion succeeds.
+5. Clean up the temporary DOCX after success or failure. If deletion cannot be
+   guaranteed synchronously, record bounded durable cleanup work rather than
+   silently accumulating temporary artifacts.
+6. Before claiming formatting fidelity, replace the DOCX renderer's styled-only
+   link runs with real external hyperlink relationships so Word and the converted
+   PDF preserve the target as well as its appearance.
+
+Required pre-build verification:
+
+- `[ASSUMED]` Current Graph application permissions are sufficient; verify the
+  production app registration and run a read-only/throwaway tenant conversion
+  probe before implementation.
+- Decide the governed temporary-file location, retention, collision naming,
+  cleanup/retry behavior, and whether the DOCX should be retained as an artifact.
+- Add route-security/lifecycle documentation, unit tests for redirect/auth-header
+  handling and cleanup fall-through, and an authenticated conversion smoke using
+  representative headings, lists, quotes, mixed bold/italic runs, page breaks,
+  and links.
 
 ### Phase 4 — AI synthesis (BUILT; provisioned; prompt current in production)
 - Tier-1 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,
@@ -314,8 +372,9 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready with automation enabled.
 - `shared/utils/review-report.js#composeReviewReport` accepts an optional
   `synthesis` param → `synthesisSection` on the composed report, additive in
-  both the DOCX and PDF renderers; `ExportMenu` passes
-  `proposal.reviewSynthesis` through.
+  the current DOCX export; `ExportMenu` passes `proposal.reviewSynthesis`
+  through. The retained legacy PDF renderer also understands the section but
+  is not reachable from the Reviews-tab UI.
 - **Production execution results (2026-07-26 and 2026-07-27):** Request
   #1002788 produced the exact categorical digest input, but three controlled
   current-v2/8000-max-token Executor runs failed parsing incomplete JSON

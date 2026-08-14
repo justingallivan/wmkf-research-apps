@@ -28,7 +28,7 @@ related:
 | [AGENT_INSTRUCTION_AUDIT_S322.md](AGENT_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 instruction audit; the approved consolidation shipped and the rejected path-glob change remains closed. | 2026-07-26 |
 | [AGENT_SELF_VERIFICATION_ENFORCEMENT.md](AGENT_SELF_VERIFICATION_ENFORCEMENT.md) | spec | active |  | Narrow blockers and fingerprinted review receipts enforce evidence where advisory reminders repeatedly failed. | 2026-07-18 |
 | [CLAUDE_COVERAGE_LESSONS.md](CLAUDE_COVERAGE_LESSONS.md) | plan | historical |  | Created: 2026-05-07 (S137) after a Codex stress-test cycle where each round caught a slightly different syntactic pattern the previous round... | 2026-07-02 |
-| [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-06-05 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
+| [CLAUDE_INSTRUCTION_AUTHORITY.md](CLAUDE_INSTRUCTION_AUTHORITY.md) | source-of-truth | canonical | yes | Status: Active Last verified: 2026-08-13 Purpose: Identify the authoritative definition and enforcement mirror for must-follow agent instructions. | 2026-07-02 |
 | [CLAUDE_MEMORY_REORGANIZATION_PLAN.md](CLAUDE_MEMORY_REORGANIZATION_PLAN.md) | plan | historical |  | Historical implementation plan for the memory-router reorganization and its drift controls. | 2026-07-02 |
 | [CLAUDE_REMEDIATION_PLAN.md](CLAUDE_REMEDIATION_PLAN.md) | source-of-truth | canonical | yes | Audience: future-Claude (and current-Claude when this drifts). Justin can read it, but it is written for the agent to consult before data-layer,... | 2026-07-02 |
 | [CLAUDE_SKILL_REMEDIATION_PLAN.md](CLAUDE_SKILL_REMEDIATION_PLAN.md) | plan | historical |  | Historical rationale for whole-flow skill remediation; the core contract-reconcile deliverable shipped. | 2026-07-02 |
@@ -160,6 +160,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md](GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md) | plan | active |  | Implemented Markdown-backed rich-text editing for grantee abstracts on the feature branch; Preview smoke and production promotion remain. | 2026-08-13 |
 | [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | historical |  | Historical design and rollout record for the shipped, versioned grantee publication waiver. |  |
 
 ## grantee-portal
@@ -356,7 +357,7 @@ related:
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | historical |  | Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record. | 2026-07-02 |
 | [REVIEWER_WARM_STAGE_PRODUCER_SPEC.md](REVIEWER_WARM_STAGE_PRODUCER_SPEC.md) | spec | superseded |  | Historical: warm-stage evidence/receipt contracts removed by the 2026-08-03 baseline revert. Do not implement against this spec. | 2026-08-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
-| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis are production-proven; deterministic reviewer-affiliation rosters are live in the current UI and exports since 2026-08-10. | 2026-07-03 |
+| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis are production-proven; the current Reviews-tab export is Word-only, with Graph-backed PDF conversion deferred. | 2026-07-03 |
 
 ## reviewers
 

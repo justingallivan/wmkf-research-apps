@@ -31,6 +31,22 @@ jest.mock('../../shared/components/external/PolicyAckModal', () => ({
   ),
 }));
 
+// The editor's serializer/toolbar behavior is covered at its own boundary. These
+// form tests keep a textarea-shaped stand-in so they can focus on submit gating
+// and the exact Markdown passed into FormData.
+jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
+  __esModule: true,
+  default: ({ value, onChange, disabled, invalid }) => (
+    <textarea
+      aria-label="Abstract"
+      aria-invalid={invalid ? 'true' : 'false'}
+      value={value}
+      readOnly={disabled}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
+
 const deliverable = {
   abstractFormatted: 'The team will measure the thing across a long enough sentence to be valid.',
   abstractApproved: null,
@@ -91,6 +107,19 @@ test('a missing render token keeps submit disabled even when everything else is 
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
   fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
   acknowledgeWaiver();
+  expect(submitBtn()).toBeDisabled();
+});
+
+test('serialized Markdown over the shared limit blocks submit without truncating the edit', () => {
+  renderForm();
+  const overLimit = 'x'.repeat(20001);
+  fireEvent.change(screen.getByLabelText('Abstract'), { target: { value: overLimit } });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+
+  expect(screen.getByLabelText('Abstract')).toHaveValue(overLimit);
+  expect(screen.getByLabelText('Abstract')).toHaveAttribute('aria-invalid', 'true');
   expect(submitBtn()).toBeDisabled();
 });
 
