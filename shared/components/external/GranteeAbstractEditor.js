@@ -1,7 +1,7 @@
 /**
- * GranteeAbstractEditor — restricted Markdown-backed Tiptap editor for award
- * abstracts. Parent forms keep canonical Markdown; `htmlValue` is a derived,
- * sanitized load value and is never persisted.
+ * GranteeAbstractEditor — restricted Markdown-backed Tiptap editor shared by
+ * award abstracts and image captions. Parent forms keep canonical Markdown;
+ * `htmlValue` is a derived, sanitized load value and is never persisted.
  */
 
 import { useEffect, useRef } from 'react';
@@ -93,6 +93,8 @@ export default function GranteeAbstractEditor({
   invalid = false,
   describedBy,
   maxLength = MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH,
+  toolbarLabel = 'Abstract formatting',
+  compact = false,
 }) {
   const lastExternalValue = useRef(value);
   const lastEmittedValue = useRef(null);
@@ -104,7 +106,7 @@ export default function GranteeAbstractEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none min-h-[10rem] px-3 py-2 focus:outline-none',
+        class: `prose prose-sm max-w-none ${compact ? 'min-h-[6rem]' : 'min-h-[10rem]'} px-3 py-2 focus:outline-none`,
         role: 'textbox',
         'aria-multiline': 'true',
         ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
@@ -144,7 +146,7 @@ export default function GranteeAbstractEditor({
   if (!editor) {
     return (
       <div className="border border-gray-300 rounded-lg">
-        <div className="min-h-[10rem] px-3 py-2 text-sm text-gray-400">Loading editor…</div>
+        <div className={`${compact ? 'min-h-[6rem]' : 'min-h-[10rem]'} px-3 py-2 text-sm text-gray-400`}>Loading editor…</div>
       </div>
     );
   }
@@ -157,7 +159,7 @@ export default function GranteeAbstractEditor({
   return (
     <div>
       <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-gray-900">
-        <div role="toolbar" aria-label="Abstract formatting" className="flex flex-wrap gap-1 border-b border-gray-200 p-2 bg-gray-50 rounded-t-lg">
+        <div role="toolbar" aria-label={toolbarLabel} className="flex flex-wrap gap-1 border-b border-gray-200 p-2 bg-gray-50 rounded-t-lg">
           <ToolbarButton label="Bold" active={editor.isActive('bold')} disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()}><strong>B</strong></ToolbarButton>
           <ToolbarButton label="Italic" active={editor.isActive('italic')} disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()}><em>I</em></ToolbarButton>
           <ToolbarButton label="Subscript" active={editor.isActive('subscript')} disabled={disabled} onClick={toggleSubscript}>X₂</ToolbarButton>

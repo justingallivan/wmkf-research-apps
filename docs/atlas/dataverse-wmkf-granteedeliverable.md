@@ -30,7 +30,7 @@ Lookup:
 Data:
 - `wmkf_deliverablestatus` (Picklist) — values mirror `shared/config/granteeDeliverableStatus.js`: Drafted=100000000, Invited=100000001, Reminder Sent=100000002, Submitted=100000003, Staff Review=100000004, Revision Requested=100000005, Complete=100000006, Closed No Response=100000007. Null/missing row = not started.
 - `wmkf_imagefileref` (String, Url, 1000) — private SharePoint URL/path/item reference.
-- `wmkf_imagecaption` (Memo, 4000) — grantee-provided image caption.
+- `wmkf_imagecaption` (Memo, 4000) — image caption stored as the controlled Markdown subset (bold, italic, subscript, superscript). Both application writers enforce a 2000-character Markdown ceiling; HTML is derived only for display/export and is never stored here.
 - `wmkf_inviteddate` (DateTime) — first Drafted→Invited transition only; re-sends do not reset it.
 - `wmkf_remindeddate` (DateTime) — automatic reminder send timestamp.
 - `wmkf_waiverackedat` (DateTime) — timestamp the grantee acknowledged the publication waiver at submit; companion to the `wmkf_WaiverPolicyVersion` lookup. Added 2026-07-09.
@@ -40,10 +40,10 @@ Data:
 
 - `lib/services/grantee-deliverable-record.js` — canonical helper; `getDeliverableForRequest()` is read-only and never creates.
 - `lib/external/verify-grantee-token.js` — external token verifier reads request + package row. Missing package row is not started.
-- `pages/api/external/grantee/[token]/context.js` — fail-closed editable/view derivation from package status; external surface never exposes raw image ref.
+- `pages/api/external/grantee/[token]/context.js` — fail-closed editable/view derivation from package status; external surface never exposes raw image ref. Returns exact caption Markdown plus response-only sanitized `captionHtml` for the shared editor.
 - `pages/api/external/grantee/[token]/submit.js` — fail-closed editable guard from package status.
 - `pages/api/workbench/grantee-deliverables/awardees.js` — per-awardee status label.
-- `pages/api/workbench/grantee-deliverables/abstract.js` (GET) — staff Awardee-tab read of `wmkf_imagecaption`, `wmkf_imagefileref`, and `wmkf_waiverackedat` alongside status. The image ref is exposed to STAFF only, and only as a link when it is an absolute http(s) URL (the writer's fallback is a relative library path). `wmkf_waiverackedat` is surfaced as the de-facto submission time and labeled as the waiver acknowledgment, since no submitted-date field exists. Added 2026-07-29. Also returns (2026-08-10, S412) the server-computed `canReplace` capability flag and the package row's `deliverableEtag`, which the staff replace path sends back as its If-Match — the flag exists so the client never re-derives the status rule.
+- `pages/api/workbench/grantee-deliverables/abstract.js` (GET) — staff Awardee-tab read of `wmkf_imagecaption`, `wmkf_imagefileref`, and `wmkf_waiverackedat` alongside status. Returns exact caption Markdown plus response-only sanitized `captionHtml` for formatted display and the shared replacement editor. The image ref is exposed to STAFF only, and only as a link when it is an absolute http(s) URL (the writer's fallback is a relative library path). `wmkf_waiverackedat` is surfaced as the de-facto submission time and labeled as the waiver acknowledgment, since no submitted-date field exists. Added 2026-07-29. Also returns (2026-08-10, S412) the server-computed `canReplace` capability flag and the package row's `deliverableEtag`, which the staff replace path sends back as its If-Match — the flag exists so the client never re-derives the status rule.
 - `lib/services/grantee-document-assembly.js` — reads image ref/caption for staff website/cycle export and image presence for previews.
 - `pages/api/cron/grantee-deliverable-reminders.js` — paged query of Invited packages where `wmkf_inviteddate` is 12+ days old; no `$expand`.
 

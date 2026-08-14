@@ -32,7 +32,10 @@ import { GRANTEE_DELIVERABLE_LABEL, GRANTEE_DELIVERABLE_STATUS } from '../../con
 import { useProfile } from '../../context/ProfileContext';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { fillInviteBody, fillInviteSubject, formatCobDate } from '../../config/granteeInviteEmail';
-import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../config/granteeAbstract';
+import {
+  MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH,
+  MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH,
+} from '../../config/granteeAbstract';
 import GranteeAbstractEditor from '../external/GranteeAbstractEditor';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
@@ -107,7 +110,7 @@ export default function AwardeeTab({ requestId, context }) {
   // non-null ONLY for an absolute http(s) ref, so it is the sole value allowed
   // into an href; `imageRef` may be a relative SharePoint library path.
   const [submission, setSubmission] = useState({
-    caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
+    caption: null, captionHtml: '', imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
     invitedAt: null, remindedAt: null, daysOverdue: 0,
     // Server-computed (S412). `canReplace` is the status rule for the staff
     // replace path — never re-derived here, because a client copy of a server
@@ -295,6 +298,7 @@ export default function AwardeeTab({ requestId, context }) {
         setImageBroken(false);
         setSubmission({
           caption: data.caption || null,
+          captionHtml: data.captionHtml || '',
           imageRef: data.imageRef || null,
           imageUrl: data.imageUrl || null,
           hasImage: Boolean(data.hasImage),
@@ -644,6 +648,7 @@ export default function AwardeeTab({ requestId, context }) {
   // same caption with stray whitespace is not treated as a change (the server
   // trims too, so it would be a no-op write).
   const replaceCaptionChanged = replaceCaption.trim() !== (submission.caption || '').trim();
+  const replaceCaptionOverLimit = replaceCaption.length > MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH;
   const replaceHasChange = Boolean(replaceFile) || (replaceCaptionChanged && replaceCaption.trim() !== '');
   const effectiveBaseBody = hasSavedBody ? savedBodyRaw : adminDefaultBody;
   const emailDefaultsUnavailable = emailDefaults.loaded && emailDefaults.unavailable;
@@ -886,9 +891,14 @@ export default function AwardeeTab({ requestId, context }) {
           <div>
             <p className="text-xs font-medium text-gray-700">Caption</p>
             {submission.caption
-              // Grantee-authored text. Rendered as a text child so React escapes it —
-              // never dangerouslySetInnerHTML here.
-              ? <p className="text-sm text-gray-900 whitespace-pre-wrap">{submission.caption}</p>
+              ? (submission.captionHtml ? (
+                // Response-only output from the shared caption sanitizer. Raw
+                // Markdown/HTML is never installed at this sink.
+                <p
+                  className="text-sm text-gray-900 whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ __html: submission.captionHtml }}
+                />
+              ) : <p className="text-sm text-gray-900 whitespace-pre-wrap">{submission.caption}</p>)
               : <p className="text-sm text-gray-500">No caption provided.</p>}
           </div>
 
@@ -958,15 +968,19 @@ export default function AwardeeTab({ requestId, context }) {
                     For a revision agreed with the grantee by email. This updates what
                     publishes; it does not change the package status or notify them.
                   </p>
-                  <label className="block text-sm">Caption
-                    <textarea
-                      aria-label="Replacement caption"
+                  <div className="space-y-1 text-sm">
+                    <span>Caption</span>
+                    <GranteeAbstractEditor
+                      ariaLabel="Replacement caption"
                       value={replaceCaption}
-                      onChange={(e) => setReplaceCaption(e.target.value)}
-                      rows={3}
-                      className="w-full text-sm border rounded p-2"
+                      htmlValue={submission.captionHtml || ''}
+                      onChange={setReplaceCaption}
+                      invalid={replaceCaptionOverLimit}
+                      maxLength={MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH}
+                      toolbarLabel="Caption formatting"
+                      compact
                     />
-                  </label>
+                  </div>
                   <label className="block text-sm">New image (optional)
                     <input
                       ref={replaceFileInputRef}
@@ -987,7 +1001,7 @@ export default function AwardeeTab({ requestId, context }) {
                     <button
                       type="button"
                       onClick={replaceSubmission}
-                      disabled={replacing || !replaceHasChange}
+                      disabled={replacing || !replaceHasChange || replaceCaptionOverLimit}
                       className="px-3 py-2 text-sm rounded bg-green-700 text-white disabled:opacity-50"
                     >
                       {replacing ? 'Saving…' : 'Save replacement'}

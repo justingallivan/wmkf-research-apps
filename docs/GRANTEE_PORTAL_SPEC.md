@@ -45,7 +45,8 @@ Per grantee, exactly:
    the stored value; sanitized HTML is response-only editor/display material. (NOT two documents.)
 2. **One image file** — a graphical/visual upload (graphical abstract). JPEG/PNG/WEBP, ≤10 MB (S278;
    client-side check + server magic-byte/size enforcement).
-3. **One image caption** — free text.
+3. **One image caption** — Markdown-backed rich text with the same restricted
+   bold/italic/subscript/superscript toolbar as the abstract; stored in the existing package Memo.
 4. **Publication-consent waiver** — a single checkbox granting permission to publish the abstract,
    project title, grantee name + institution, and the image + caption in award-announcement materials
    (print + online), and confirming the grantee has the right to share the image. The checkbox remains
@@ -100,7 +101,7 @@ Per grantee, exactly:
    caption, and check the publish-image box (which enables submit). Reuse the "Start …" button +
    copy-paste fallback link (`19bd446e`).
 4. **Collect:** in the portal the grantee returns the **edited abstract (Markdown-backed rich text)**, one
-   **graphical image** (upload), and an **image caption** (free text), with the **publish-image box
+   **graphical image** (upload), and an **image caption (Markdown-backed rich text)**, with the **publish-image box
    checked** (the box gates the submit button). The client echoes the signed waiver render token so
    the server can record the acknowledged version (2026-07-09).
 5. **Store (atomic):** upload the image to SharePoint, then commit BOTH Dataverse rows — the
@@ -115,11 +116,11 @@ Per grantee, exactly:
    tab. It is post-commit and fully swallowed: it cannot fail a submission the grantee completed. The
    PD/PI lookup values are re-read from the request, because the token verifier's projection does not
    carry them. See `docs/GRANTEE_SUBMIT_VISIBILITY_SPEC.md`.
-7. **Staff review surface (2026-07-29):** the Awardee tab shows what came back — the approved abstract
-   (editable), the caption (read-only), and a SharePoint link to the image, plus the waiver
-   acknowledgment time. Only an absolute http(s) `wmkf_imagefileref` becomes a link; the relative-path
-   fallback renders as text. Served by the existing staff-guarded
-   `GET /api/workbench/grantee-deliverables/abstract`, not a new route.
+7. **Staff review surface (2026-07-29; caption editing added 2026-08-13):** the Awardee tab shows what
+   came back — the approved abstract, the formatted caption, the inline image with SharePoint fallback,
+   and the waiver acknowledgment time. Staff can correct the approved abstract and, in Submitted / Staff
+   Review, replace the image or caption through the package's separate ETag-conditional path. The GET
+   returns response-only sanitized HTML for both Markdown-backed editors/displays; no HTML is persisted.
 8. **Cadence:** a daily cron selects packages still in `Invited` whose first
    `wmkf_inviteddate` is at least 12 days old. It sends one reminder from the
    assigned Program Director to the PI, Cc'ing the liaison, with a day-14 COB
@@ -268,14 +269,15 @@ formatting** in the example.
   (`em/strong/sub/sup/p/br`) as cheap defense-in-depth. Markdown-convention storage avoids the HTML
   sink entirely.
 
-**Abstract editor build (2026-08-13):** the external grantee form and staff Awardee tab now share an
-abstract-specific Tiptap editor exposing bold, italic, subscript, superscript, undo, and redo. Parent
-state and both write payloads remain canonical Markdown; the context/load routes add only sanitized,
-response-only HTML seeds from `renderGranteeBody`. Both clients and both server write boundaries use
-the shared 20,000-character serialized-Markdown cap. A stale staff save preserves the unsaved editor
-document and shows the current server version until staff explicitly chooses which version to keep.
-No Dataverse schema or field-format change was made. Preview smoke and production promotion are
-tracked in `docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md`.
+**Abstract and caption editor build (2026-08-13):** the external grantee form and staff Awardee tab now
+share one restricted Tiptap editor exposing bold, italic, subscript, superscript, undo, and redo. Parent
+state and all write payloads remain canonical Markdown; the context/load routes add only sanitized,
+response-only HTML seeds from `renderGranteeBody` / `renderGranteeCaption`. Abstract writers share the
+20,000-character serialized-Markdown cap; caption writers share the 2,000-character cap. A stale staff
+abstract save preserves the unsaved editor document and shows the current server version until staff
+explicitly chooses which version to keep; caption replacement retains its package ETag/status guard.
+No Dataverse schema or field-format change was made. Rollout state is tracked in
+`docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md`.
 
 ### D9 — Server-side assembly replaces the manual DOCX + manual web HTML. `[RESOLVED direction, owner S269]`
 

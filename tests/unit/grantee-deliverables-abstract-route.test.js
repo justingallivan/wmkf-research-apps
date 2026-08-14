@@ -28,7 +28,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../shared/config/granteeAbstract';
-import { renderGranteeBody } from '../../shared/utils/grantee-markdown';
+import { renderGranteeBody, renderGranteeCaption } from '../../shared/utils/grantee-markdown';
 import handler from '../../pages/api/workbench/grantee-deliverables/abstract';
 
 const GUID = '22222222-2222-2222-2222-222222222222';
@@ -111,6 +111,7 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     // The read-only record of what the grantee returned. Null/false pre-submit —
     // the DRAFTED fixture has no caption, image, or waiver acknowledgment.
     caption: null,
+    captionHtml: renderGranteeCaption(''),
     imageRef: null,
     imageUrl: null,
     hasImage: false,

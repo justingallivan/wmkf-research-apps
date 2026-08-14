@@ -24,7 +24,10 @@ import { scanBytes } from '../../lib/services/cloudmersive-scan';
 import { isVirusScanEnabled } from '../../lib/utils/virus-scan-config';
 import { writeGranteeDeliverables } from '../../lib/services/grantee-upload';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
-import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../shared/config/granteeAbstract';
+import {
+  MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH,
+  MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH,
+} from '../../shared/config/granteeAbstract';
 
 const REQ = {
   akoya_requestid: '11111111-1111-1111-1111-111111111111',
@@ -119,6 +122,17 @@ test('abstract length boundary rejects before image scan, upload, or Dataverse w
     editedAbstract: 'é'.repeat(MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH + 1),
   });
   expect(rejected).toEqual({ ok: false, reason: 'abstract_too_long', status: 400 });
+  expect(scanBytes).not.toHaveBeenCalled();
+  expect(GraphService.getDriveId).not.toHaveBeenCalled();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(runChangeset).not.toHaveBeenCalled();
+});
+
+test('caption length boundary rejects before image scan, upload, or Dataverse write', async () => {
+  const rejected = await call({
+    caption: 'é'.repeat(MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH + 1),
+  });
+  expect(rejected).toEqual({ ok: false, reason: 'caption_too_long', status: 400 });
   expect(scanBytes).not.toHaveBeenCalled();
   expect(GraphService.getDriveId).not.toHaveBeenCalled();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();

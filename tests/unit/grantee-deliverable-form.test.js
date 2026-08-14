@@ -36,14 +36,18 @@ jest.mock('../../shared/components/external/PolicyAckModal', () => ({
 // and the exact Markdown passed into FormData.
 jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
   __esModule: true,
-  default: ({ value, onChange, disabled, invalid }) => (
-    <textarea
-      aria-label="Abstract"
-      aria-invalid={invalid ? 'true' : 'false'}
-      value={value}
-      readOnly={disabled}
-      onChange={(event) => onChange(event.target.value)}
-    />
+  default: ({ value, htmlValue, onChange, disabled, invalid, ariaLabel, toolbarLabel = 'Abstract formatting' }) => (
+    <div>
+      <div role="toolbar" aria-label={toolbarLabel} />
+      <textarea
+        aria-label={ariaLabel}
+        aria-invalid={invalid ? 'true' : 'false'}
+        data-html-value={htmlValue}
+        value={value}
+        readOnly={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   ),
 }));
 
@@ -102,6 +106,23 @@ test('prefills the abstract and disables submit until waiver + fields are comple
   expect(submit).toBeEnabled();
 });
 
+test('caption uses the shared rich-text controls and the sanitized server seed', () => {
+  renderForm({
+    deliverable: {
+      ...deliverable,
+      caption: '*Escherichia coli* image',
+      captionHtml: '<em>Escherichia coli</em> image',
+    },
+  });
+
+  expect(screen.getByRole('toolbar', { name: 'Caption formatting' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Image caption')).toHaveValue('*Escherichia coli* image');
+  expect(screen.getByLabelText('Image caption')).toHaveAttribute(
+    'data-html-value',
+    '<em>Escherichia coli</em> image',
+  );
+});
+
 test('a missing render token keeps submit disabled even when everything else is complete (defensive gate)', () => {
   renderForm({ waiverToken: null });
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
@@ -120,6 +141,17 @@ test('serialized Markdown over the shared limit blocks submit without truncating
 
   expect(screen.getByLabelText('Abstract')).toHaveValue(overLimit);
   expect(screen.getByLabelText('Abstract')).toHaveAttribute('aria-invalid', 'true');
+  expect(submitBtn()).toBeDisabled();
+});
+
+test('caption Markdown over the shared limit blocks submit without truncating the edit', () => {
+  renderForm({ deliverable: { ...deliverable, hasImage: true } });
+  const overLimit = 'x'.repeat(2001);
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: overLimit } });
+  acknowledgeWaiver();
+
+  expect(screen.getByLabelText('Image caption')).toHaveValue(overLimit);
+  expect(screen.getByLabelText('Image caption')).toHaveAttribute('aria-invalid', 'true');
   expect(submitBtn()).toBeDisabled();
 });
 

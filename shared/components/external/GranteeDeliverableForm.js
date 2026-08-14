@@ -18,7 +18,10 @@
 import { useState } from 'react';
 import PolicyAckModal from './PolicyAckModal';
 import GranteeAbstractEditor from './GranteeAbstractEditor';
-import { MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH } from '../../config/granteeAbstract';
+import {
+  MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH,
+  MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH,
+} from '../../config/granteeAbstract';
 
 // Publication-consent waiver wording. As of 2026-07-09 the LIVE text comes from
 // the versioned `grantee-waiver` policy (shown in the acknowledgment modal from
@@ -37,19 +40,6 @@ const ACCEPTED_IMAGE_TYPES = 'image/png,image/jpeg,image/webp';
 const MAX_IMAGE_MB = 10;
 const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
 
-// Visible text-box styling so the fields read as inputs (the surrounding page
-// strips the default textarea border, leaving them white-on-white).
-const FIELD_STYLE = {
-  width: '100%',
-  marginTop: '.25rem',
-  padding: '.5rem',
-  border: '1px solid #b0b0b0',
-  borderRadius: 4,
-  fontFamily: 'inherit',
-  fontSize: '.95rem',
-  boxSizing: 'border-box',
-};
-
 export default function GranteeDeliverableForm({ token, deliverable, waiverPolicy, waiverToken, onSubmitted }) {
   const init = deliverable || {};
   const [abstract, setAbstract] = useState(init.abstractApproved || init.abstractFormatted || '');
@@ -64,6 +54,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
   // An image is satisfied by a new upload OR one already on file (replacing is optional).
   const hasImage = imageFile != null || Boolean(init.hasImage);
   const abstractOverLimit = abstract.length > MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH;
+  const captionOverLimit = caption.length > MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH;
   // The versioned waiver text + its binding token must be present to submit. The
   // context route fails closed, so on the edit view these are normally set; this
   // is a defensive gate against a partial payload.
@@ -81,6 +72,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     abstract.trim().length > 0 &&
     !abstractOverLimit &&
     caption.trim().length > 0 &&
+    !captionOverLimit &&
     hasImage &&
     !submitting;
 
@@ -136,9 +128,9 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
         confirm the publication waiver to submit.</p>
 
       <div style={{ marginTop: '1rem' }}>
-        <strong id="grantee-abstract-label">Abstract</strong>
+        <strong>Abstract</strong>
         <GranteeAbstractEditor
-          ariaLabelledBy="grantee-abstract-label"
+          ariaLabel="Abstract"
           value={abstract}
           htmlValue={init.abstractHtml || ''}
           onChange={setAbstract}
@@ -159,17 +151,20 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
         <p><em>An image is already on file; upload a new one only if you want to replace it.</em></p>
       )}
 
-      <label style={{ display: 'block', marginTop: '1rem' }}>
+      <div style={{ marginTop: '1rem' }}>
         <strong>Image caption</strong>
-        <textarea
-          aria-label="Image caption"
+        <GranteeAbstractEditor
+          ariaLabel="Image caption"
           value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          rows={3}
-          placeholder="Type a caption describing the image (required)."
-          style={FIELD_STYLE}
+          htmlValue={init.captionHtml || ''}
+          onChange={setCaption}
+          required
+          invalid={captionOverLimit}
+          maxLength={MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH}
+          toolbarLabel="Caption formatting"
+          compact
         />
-      </label>
+      </div>
 
       {/* Publication-consent waiver — read + acknowledge in a modal (mirrors the
           reviewer policy-acknowledgment UX). The acknowledgment is the client-side

@@ -152,6 +152,20 @@ test('abstractHtml uses approved precedence and renders only the allowed safe su
   expect(res.body.deliverable.abstractApproved).toBe(verified.request.wmkf_abstractapproved);
 });
 
+test('captionHtml renders the allowed inline subset without changing stored Markdown', async () => {
+  const verified = okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED);
+  verified.deliverable.wmkf_imagecaption = '*Escherichia coli* image <script>alert(1)</script>';
+  verifyGranteeToken.mockResolvedValue(verified);
+  const res = mockRes();
+  await handler({ method: 'GET', query: { token: 't' }, headers: {} }, res);
+
+  expect(res.body.deliverable.caption).toBe(verified.deliverable.wmkf_imagecaption);
+  expect(res.body.deliverable.captionHtml).toContain('<em>Escherichia coli</em>');
+  expect(res.body.deliverable.captionHtml).not.toContain('<script>');
+  expect(res.body.deliverable.captionHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+  expect(res.body.deliverable.captionHtml).not.toContain('<p>');
+});
+
 test('FAIL-CLOSED: waiver policy unavailable (transient) on edit view → 503 policy_unavailable, no token', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
   resolveActiveWaiverPolicy.mockResolvedValue({ ok: false, reason: 'policy_unavailable' });

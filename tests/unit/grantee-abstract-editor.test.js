@@ -38,6 +38,27 @@ test('renders only the allowed responsive toolbar and accessible editable region
   expect(baseProps.onChange).not.toHaveBeenCalled();
 });
 
+test('caption mode reuses the same formatting controls with a compact editor', async () => {
+  render(
+    <GranteeAbstractEditor
+      value="*Escherichia coli* image"
+      htmlValue="<em>Escherichia coli</em> image"
+      onChange={jest.fn()}
+      ariaLabel="Image caption"
+      toolbarLabel="Caption formatting"
+      maxLength={2000}
+      compact
+    />,
+  );
+
+  expect(await screen.findByRole('toolbar', { name: 'Caption formatting' })).toBeInTheDocument();
+  const editor = screen.getByRole('textbox', { name: 'Image caption' });
+  expect(editor).toHaveClass('min-h-[6rem]');
+  expect(editor).toHaveTextContent('Escherichia coli image');
+  expect(editor.querySelector('em')).toHaveTextContent('Escherichia coli');
+  expect(screen.getByText(/1,976 characters remaining/i)).toBeInTheDocument();
+});
+
 test('server-driven reseed replaces visible content without reporting a user edit', async () => {
   const { rerender } = render(<GranteeAbstractEditor {...baseProps} />);
   const editor = await screen.findByRole('textbox', { name: 'Abstract' });

@@ -3,7 +3,7 @@ title: Grantee Abstract Rich-Text Editor Build Plan
 domain: grantee-deliverables
 kind: plan
 status: active
-summary: "Implemented Markdown-backed rich-text editing for grantee abstracts on the feature branch; Preview smoke and production promotion remain."
+summary: "Implemented Markdown-backed rich-text editing for grantee abstracts and the image-caption follow-up."
 canonical: false
 cataloged: 2026-08-13
 owner: product-engineering
@@ -15,9 +15,9 @@ related:
 
 # Grantee Abstract Rich-Text Editor Build Plan
 
-**Status:** Implemented and locally verified on `codex/grantee-abstract-rich-text`; Preview smoke and production promotion remain.
-**Change surface:** Abstract editing in the external grantee portal and the staff Workbench Awardee tab.\
-**Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted` and `akoya_request.wmkf_abstractapproved`.\
+**Status:** Abstract editor merged; image-caption follow-up implemented and locally verified on `codex/grantee-caption-rich-text`, pending deliberate promotion.
+**Change surface:** Abstract and image-caption editing in the external grantee portal and the staff Workbench Awardee tab.\
+**Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted`, `akoya_request.wmkf_abstractapproved`, and `wmkf_granteedeliverable.wmkf_imagecaption`.\
 **Review owner:** Claude Opus, read-only adversarial plan review.\
 **Implementation owner:** Codex, following the Claude Opus-reviewed contract below.
 
@@ -48,6 +48,7 @@ related:
 | Two unescaped `~` or `^` characters on one line can pair into subscript/superscript even when the user intended approximation text; trailing whitespace inside `*...*` prevents emphasis. | `renderGranteeBody` | N/A | Editor serializer grammar | Read-only renderer probe on 2026-08-13 (`~5 ms rise, ~8 ms fall`; `^5 ms rise, ^8 ms fall`; `*E. coli *`) | VERIFIED |
 | Publication assembly prefers approved text, falls back to formatted text, and renders Markdown to HTML. | `assembleGranteeDocument` | Both abstract fields | Preview, website, and cycle export consumers | `lib/services/grantee-document-assembly.js:124-154` | VERIFIED |
 | Both abstract authoring surfaces use the restricted Markdown-backed Tiptap editor. | External grantee form; staff Awardee tab | Parent canonical-Markdown state | Existing submit/save payloads | `shared/components/external/GranteeDeliverableForm.js`; `shared/components/workbench/AwardeeTab.js`; `shared/components/external/GranteeAbstractEditor.js` | VERIFIED |
+| Both caption authoring surfaces reuse the same restricted editor and keep the existing caption write paths. | External grantee form; staff replacement panel | `wmkf_imagecaption` Markdown | Existing submit/replace payloads and shared export renderer | `GranteeDeliverableForm.js`; `AwardeeTab.js`; `grantee-upload.js`; `replace-submission-service.js` | VERIFIED |
 | The portal specification called for a lightweight WYSIWYG for occasional scientific formatting. | Product specification | N/A | Planned portal editor | `docs/GRANTEE_PORTAL_SPEC.md:233-258` | VERIFIED |
 | Reviewer answers already use a controlled Tiptap editor. | `RichReviewEditor` | Sanitized HTML plus a text mirror | Reviewer and staff review flows | `shared/components/external/RichReviewEditor.js:1-20,59-124`; `lib/external/sanitize-review-html.js:1-24,82-141` | VERIFIED |
 | Both Dataverse Memo attributes have `MaxLength=32000`; both clients and both server write paths now enforce the shared 20000-character serialized-Markdown limit. Busboy's 64 KiB field cap remains a transport backstop. | Shared contract; staff and external clients/routes/services | Both abstract fields | Editor counters and pre-write rejection | `shared/config/granteeAbstract.js`; `lib/services/grantee-upload.js`; `pages/api/workbench/grantee-deliverables/abstract.js`; focused boundary tests | VERIFIED |
@@ -82,9 +83,9 @@ Tests:       29 passed, 29 total
 
 ## 4. Selected design
 
-### 4.1 Abstract-specific editor
+### 4.1 Shared restricted editor
 
-[VERIFIED via source/tests] `shared/components/external/GranteeAbstractEditor.js` is a controlled, abstract-specific Tiptap editor; its persistence contract remains separate from reviewer answers.
+[VERIFIED via source/tests] `shared/components/external/GranteeAbstractEditor.js` is a controlled Tiptap editor shared by grantee abstracts and captions; its Markdown persistence contract remains separate from reviewer answers. Caption callers select the compact presentation and caption-specific toolbar label without changing the extension or serializer set.
 
 The abstract toolbar will contain:
 
@@ -168,13 +169,15 @@ Initial seeding must not emit `onChange`. A later server-driven reseed is allowe
 
 ### 4.4 External grantee flow
 
-[VERIFIED via component tests] Only the Abstract textarea in `GranteeDeliverableForm` was replaced with the new editor. Caption, image, waiver, token handling, validation, and the multipart submit boundary remain unchanged.
+[VERIFIED via component tests] The Abstract and Image caption textareas in `GranteeDeliverableForm` use the shared editor. Image, waiver, token handling, and the multipart submit boundary remain unchanged. Abstract Markdown still posts as `editedAbstract`; caption Markdown still posts as `caption`.
 
 The editor's `onChange(markdown)` updates the existing `abstract` state. Submission continues to append that state as `editedAbstract`. `writeGranteeDeliverables` continues trimming and writing it to `wmkf_abstractapproved` inside the existing request-and-package changeset.
 
 [VERIFIED via source/boundary tests] One shared `MAX_GRANTEE_ABSTRACT_MARKDOWN_LENGTH = 20000` contract governs both flows, preserving the staff route's prior limit and staying below the live 32000-character Dataverse ceiling. The external editor displays remaining/over-limit state, disables submission while over the cap, and the external service rejects an over-limit serialized value before image scanning, upload, or any Dataverse write. Busboy's existing 64 KiB field-size cap remains a transport backstop, not the semantic limit.
 
 No draft autosave will be added. Reviewer autosave depends on a distinct durable draft contract; adding one to the grantee's bundled abstract/image/caption/waiver workflow is outside this formatting change.
+
+[VERIFIED via source/boundary tests] Caption authors receive the same six toolbar controls and a shared `MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH = 2000` counter. The client blocks an over-limit submit and `writeGranteeDeliverables` rejects it before image scanning, SharePoint upload, or Dataverse writes. `captionHtml` is response-only output from `renderGranteeCaption`; `wmkf_imagecaption` remains Markdown.
 
 ### 4.5 Staff Awardee-tab flow
 
@@ -187,6 +190,8 @@ The staff PUT payload remains:
 ```
 
 The route and service keep their current validation, fresh-row target resolution, status allowlists, conditional Dataverse update, stale response, and post-save ETag refresh. No formatting authorization will be inferred solely in the client.
+
+[VERIFIED via component/service tests] The S412 replacement-caption panel uses the same restricted editor in compact mode. Its parent state and multipart `caption` field remain canonical Markdown, the 2000-character client gate mirrors the route, and the existing deliverable ETag/status/rollback contract is unchanged. The read-only submitted-caption display uses server-sanitized `captionHtml` with escaped text fallback.
 
 The former stale path reloaded immediately and overwrote the working textarea. [VERIFIED via component tests] On `code:'stale'`, the rich editor fetches the current server abstract into separate conflict state without reseeding the editor. It displays the current server value while the user's unsaved value remains in the editor, with explicit actions to keep the user's version or replace it with the server version. A successful save updates the ETag, effective field, and dirty baseline without reseeding editor content. Every conflict fetch and resolution remains guarded by the existing request id and abstract load generation.
 
@@ -239,13 +244,21 @@ Likely files:
 - `shared/components/workbench/AwardeeTab.js`
 - focused component/integration tests
 
-### Phase 4 — Downstream regression and documentation (local verification complete; Preview smoke remains)
+### Phase 4 — Downstream regression and documentation (abstract slice complete)
 
 1. Extend renderer and assembly tests with scientific-name italics and combined bold/sub/sup examples.
 2. Prove the same formatting reaches portal preview, website HTML, and cycle export through canonical document assembly.
 3. `GRANTEE_PORTAL_SPEC.md` now records the as-built contract. `GRANTEE_PORTAL_BUILD_PLAN.md` remains an explicitly historical implementation chronology and was not rewritten as current guidance.
 4. The API matrix, plan, canonical portal spec, and catalog were reconciled with `/sweep`; no schema change is claimed because none occurred.
 5. Run a Preview smoke with one test grantee edit and one staff edit before deliberate production promotion; verify Dataverse stores Markdown while rendered output shows formatting.
+
+### Phase 5 — Caption follow-up (locally verified; promotion pending)
+
+1. Reuse the restricted editor for both caption entry points with a compact presentation and caption-specific toolbar label.
+2. Add response-only `captionHtml` to the external context and staff abstract GET via `renderGranteeCaption`.
+3. Render the submitted caption from that sanitized value with escaped-text fallback.
+4. Share the 2000-character caption limit across both clients and both server writers.
+5. Preserve the existing `wmkf_imagecaption` Markdown field, external atomic changeset, staff deliverable ETag, and publication assembly path.
 
 ## 6. Tests and gates
 
@@ -312,7 +325,7 @@ Before implementation completion, inspect `docs/CI_GATES_REFERENCE.md` and `pack
 - Reviewer-style HTML plus plain-text mirror persistence.
 - Automatic scientific-name detection or AI-driven auto-italics.
 - Draft autosave for the external grantee submission.
-- Formatting controls for the image caption in this first slice.
+- Automatic formatting or conversion beyond the explicit caption toolbar.
 - Changes to abstract generation prompts.
 - Changes to publication precedence, lifecycle status, email invitation content, or document-export architecture.
 
@@ -330,10 +343,11 @@ The feature is acceptable when all of the following are true:
 8. The value submitted always matches the document visible in the editor, including after paste and serialization degradation.
 9. Initialization does not rewrite existing content; 20000-character serialized-Markdown limits and accessible editor semantics are enforced in both surfaces.
 10. Relevant documentation and gates are current and green.
+11. Both caption editors expose the same formatting options, persist only Markdown, and render the saved formatting in the staff display and existing exports.
 
 ## 10. Contract-reconciliation audit
 
-- **Whole-flow:** Covered from both editors through payloads, routes/services, Dataverse fields, canonical assembly, and output consumers.
+- **Whole-flow:** Covered from both abstract and caption editors through payloads, routes/services, Dataverse fields, canonical assembly, and output consumers.
 - **Partial success:** No new batch boundary. External submission remains the existing atomic request/package changeset; staff save remains one conditional field update.
 - **Async/stale state:** No autosave is added. Staff request-generation, base-field, status, and ETag guards must be preserved; controlled editor synchronization must not reset the caret or install stale request content. The current stale-save auto-reload is intentionally replaced because it overwrites the user's working copy.
 - **Helper extraction:** Reviewer and abstract editors may share presentation-only primitives, but their allowed formatting and persistence semantics must remain separate.

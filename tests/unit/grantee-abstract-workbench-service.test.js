@@ -85,7 +85,21 @@ describe('load: grantee submission fields (caption / image / waiver time)', () =
     expect(body.imageRef).toBe(SP_URL);
     expect(body.hasImage).toBe(true);
     expect(body.caption).toBe('Cryo-EM structure.');
+    expect(body.captionHtml).toBe('Cryo-EM structure.');
     expect(body.submittedAt).toBe('2026-07-12T15:04:05Z');
+  });
+
+  test('captionHtml preserves allowed formatting and sanitizes raw HTML', async () => {
+    const markdown = '*Escherichia coli* image <script>alert(1)</script>';
+    getDeliverableForRequest.mockResolvedValue({
+      wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.SUBMITTED,
+      wmkf_imagecaption: markdown,
+    });
+    const body = await loadGranteeAbstract({ requestId: GUID });
+    expect(body.caption).toBe(markdown);
+    expect(body.captionHtml).toContain('<em>Escherichia coli</em>');
+    expect(body.captionHtml).not.toContain('<script>');
+    expect(body.captionHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
   // THE TRAP: grantee-upload falls back to `${folder}/${filename}` when Graph
@@ -119,7 +133,7 @@ describe('load: grantee submission fields (caption / image / waiver time)', () =
     getDeliverableForRequest.mockResolvedValue(null);
     const body = await loadGranteeAbstract({ requestId: GUID });
     expect(body).toMatchObject({
-      caption: null, imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
+      caption: null, captionHtml: '', imageRef: null, imageUrl: null, hasImage: false, submittedAt: null,
     });
   });
 

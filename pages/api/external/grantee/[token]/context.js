@@ -5,7 +5,8 @@
  * variant of /api/external/review/[token]/context. Verifies the stateless
  * grantee magic-link token (signature + expiry + aud:'grantee') and returns
  * what the grantee landing page needs to render: the request header, the
- * formatted/approved abstract, caption, whether an image is already on file,
+ * formatted/approved abstract, caption, their response-only sanitized HTML
+ * editor seeds, whether an image is already on file,
  * and the package status — plus a fail-closed `editable` flag and `view`.
  *
  * Fail-closed: a missing deliverable row or unknown/missing deliverable status
@@ -24,7 +25,7 @@ import { resolveActiveWaiverPolicy } from '../../../../../lib/external/grantee-w
 import { mintWaiverRenderToken } from '../../../../../lib/services/external-token';
 import { assembleGranteeDocument } from '../../../../../lib/services/grantee-document-assembly';
 import { renderAwardBlock } from '../../../../../lib/services/grantee-document-html';
-import { renderGranteeBody } from '../../../../../shared/utils/grantee-markdown';
+import { renderGranteeBody, renderGranteeCaption } from '../../../../../shared/utils/grantee-markdown';
 import {
   GRANTEE_DELIVERABLE_STATUS,
   GRANTEE_DELIVERABLE_LABEL,
@@ -168,6 +169,9 @@ export default async function handler(req, res) {
         // persisted/submitted value and the two source fields remain unchanged.
         abstractHtml: renderGranteeBody(effectiveAbstract),
         caption: deliverable?.wmkf_imagecaption || null,
+        // Response-only safe HTML for the shared caption editor. The Markdown
+        // field above remains the persistence and submit contract.
+        captionHtml: renderGranteeCaption(deliverable?.wmkf_imagecaption || ''),
         hasImage: Boolean(deliverable?.wmkf_imagefileref),
         status,
         statusLabel: status !== null ? (GRANTEE_DELIVERABLE_LABEL[status] || null) : null,

@@ -29,12 +29,11 @@ import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { MAX_IMAGE_BYTES } from '../../../../lib/services/grantee-upload';
 import { replaceGranteeSubmission } from '../../../../lib/services/workbench/grantee-deliverables/replace-submission-service';
+import { MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH } from '../../../../shared/config/granteeAbstract';
 
 export const config = {
   api: { bodyParser: false }, // busboy needs the raw stream
 };
-
-const MAX_CAPTION = 2000;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -65,8 +64,8 @@ export default async function handler(req, res) {
   const caption = Object.prototype.hasOwnProperty.call(parsed.fields, 'caption')
     ? String(parsed.fields.caption)
     : null;
-  if (caption !== null && caption.length > MAX_CAPTION) {
-    return res.status(400).json({ error: `The caption is too long (max ${MAX_CAPTION} characters).` });
+  if (caption !== null && caption.length > MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH) {
+    return res.status(400).json({ error: `The caption is too long (max ${MAX_GRANTEE_CAPTION_MARKDOWN_LENGTH} characters).` });
   }
 
   const clientEtag = typeof parsed.fields.etag === 'string' ? parsed.fields.etag.trim() : '';

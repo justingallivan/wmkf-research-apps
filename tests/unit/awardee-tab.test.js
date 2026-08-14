@@ -22,14 +22,18 @@ jest.mock('../../shared/context/ProfileContext', () => ({
 }));
 jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
   __esModule: true,
-  default: ({ value, onChange, disabled, invalid, ariaLabel }) => (
-    <textarea
-      aria-label={ariaLabel}
-      aria-invalid={invalid ? 'true' : 'false'}
-      value={value}
-      readOnly={disabled}
-      onChange={(event) => onChange(event.target.value)}
-    />
+  default: ({ value, htmlValue, onChange, disabled, invalid, ariaLabel, toolbarLabel = 'Abstract formatting' }) => (
+    <div>
+      <div role="toolbar" aria-label={toolbarLabel} />
+      <textarea
+        aria-label={ariaLabel}
+        aria-invalid={invalid ? 'true' : 'false'}
+        data-html-value={htmlValue}
+        value={value}
+        readOnly={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   ),
 }));
 beforeEach(() => { mockPreferences = {}; mockProfileId = 'p1'; });
@@ -76,6 +80,7 @@ function wireFetch({
     editable: abstract?.editable ?? true,
     // Grantee submission fields — absent/false unless a test supplies them.
     caption: abstract?.caption ?? null,
+    captionHtml: abstract?.captionHtml ?? '',
     imageRef: abstract?.imageRef ?? null,
     imageUrl: abstract?.imageUrl ?? null,
     hasImage: abstract?.hasImage ?? false,
@@ -134,7 +139,7 @@ function wireFetch({
       return { ok: true, json: async () => ({
         effective: state.effective, effectiveHtml: state.effectiveHtml, effectiveField: state.effectiveField,
         etag: state.etag, status: state.status, editable: state.editable,
-        caption: state.caption, imageRef: state.imageRef,
+        caption: state.caption, captionHtml: state.captionHtml, imageRef: state.imageRef,
         imageUrl: state.imageUrl, hasImage: state.hasImage,
         submittedAt: state.submittedAt,
         invitedAt: state.invitedAt, remindedAt: state.remindedAt,
@@ -150,7 +155,10 @@ function wireFetch({
       // Mirror the service: an absent caption field leaves it alone, and a new
       // image lands as a fresh nonce ref (which is what re-keys the inline img).
       const form = opts.body;
-      if (form.has('caption')) state.caption = form.get('caption');
+      if (form.has('caption')) {
+        state.caption = form.get('caption');
+        state.captionHtml = String(state.caption).replace(/^\*([^*]+)\*$/, '<em>$1</em>');
+      }
       if (form.has('image')) {
         state.imageRef = `1002365_grantee_image_${replaceNonce}.png`;
         state.hasImage = true;
@@ -1130,7 +1138,13 @@ test('the Close-out pane offers no lifecycle transition actions yet', async () =
 // SharePoint/Dataverse. The gating pin matters most: `canReplace` is computed
 // server-side, and the client must not re-derive it from status.
 
-const REPLACEABLE = { caption: 'Original caption.', hasImage: true, imageRef: 'a/1002365_grantee_image_aaaaaaaa.png', canReplace: true };
+const REPLACEABLE = {
+  caption: 'Original caption.',
+  captionHtml: 'Original caption.',
+  hasImage: true,
+  imageRef: 'a/1002365_grantee_image_aaaaaaaa.png',
+  canReplace: true,
+};
 
 async function openReplace() {
   await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
@@ -1151,6 +1165,23 @@ test('the replace control appears when the server says it may', async () => {
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await openReplace();
   expect(screen.getByLabelText('Replacement caption')).toHaveValue('Original caption.');
+  expect(screen.getByRole('toolbar', { name: 'Caption formatting' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Replacement caption')).toHaveAttribute('data-html-value', 'Original caption.');
+});
+
+test('the submitted caption renders the server-sanitized formatting', async () => {
+  wireFetch({
+    abstract: submitted({
+      ...REPLACEABLE,
+      caption: '*Escherichia coli* image',
+      captionHtml: '<em>Escherichia coli</em> image',
+    }),
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await waitFor(() => expect(screen.getByText('Grantee submission')).toBeInTheDocument());
+
+  expect(screen.getByText('Escherichia coli', { selector: 'em' })).toBeInTheDocument();
+  expect(screen.getByText('Escherichia coli', { selector: 'em' }).closest('p')).toHaveTextContent('Escherichia coli image');
 });
 
 test('Save is disabled until something actually changes', async () => {
@@ -1168,6 +1199,15 @@ test('a blank caption cannot be submitted (never clear the record)', async () =>
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await openReplace();
   fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: '   ' } });
+  expect(screen.getByRole('button', { name: /save replacement/i })).toBeDisabled();
+});
+
+test('an overlong formatted caption cannot be submitted', async () => {
+  wireFetch({ abstract: submitted(REPLACEABLE) });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement caption'), { target: { value: 'x'.repeat(2001) } });
+  expect(screen.getByLabelText('Replacement caption')).toHaveAttribute('aria-invalid', 'true');
   expect(screen.getByRole('button', { name: /save replacement/i })).toBeDisabled();
 });
 

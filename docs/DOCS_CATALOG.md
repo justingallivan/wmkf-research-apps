@@ -160,7 +160,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md](GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md) | plan | active |  | Implemented Markdown-backed rich-text editing for grantee abstracts on the feature branch; Preview smoke and production promotion remain. | 2026-08-13 |
+| [GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md](GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md) | plan | active |  | Implemented Markdown-backed rich-text editing for grantee abstracts and the image-caption follow-up. | 2026-08-13 |
 | [GRANTEE_WAIVER_VERSIONING_PLAN.md](GRANTEE_WAIVER_VERSIONING_PLAN.md) | plan | historical |  | Historical design and rollout record for the shipped, versioned grantee publication waiver. |  |
 
 ## grantee-portal
@@ -171,7 +171,7 @@ related:
 | [GRANTEE_INVITE_BODY_CUSTOM_PLAN.md](GRANTEE_INVITE_BODY_CUSTOM_PLAN.md) | plan | historical |  | Historical record of the completed per-PD grantee-invite-body preference and Awardee-tab edit affordance. | 2026-07-02 |
 | [GRANTEE_PORTAL_BUILD_PLAN.md](GRANTEE_PORTAL_BUILD_PLAN.md) | plan | historical |  | Historical implementation chronology for the grantee deliverables portal; current behavior is defined by GRANTEE_PORTAL_SPEC, the Atlas, and source. | 2026-07-02 |
 | [GRANTEE_PORTAL_SPEC.md](GRANTEE_PORTAL_SPEC.md) | spec | active | yes | As-built grantee deliverables contract: abstract text on akoya_request; package state, image, caption, and waiver evidence on the child row. | 2026-07-02 |
-| [GRANTEE_SUBMIT_VISIBILITY_SPEC.md](GRANTEE_SUBMIT_VISIBILITY_SPEC.md) | spec | active |  | Production-verified submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab. | 2026-07-29 |
+| [GRANTEE_SUBMIT_VISIBILITY_SPEC.md](GRANTEE_SUBMIT_VISIBILITY_SPEC.md) | spec | active |  | Production-verified submit notification to the assigned PD, plus formatted caption and image visibility on the staff Awardee tab. | 2026-07-29 |
 
 ## intake-portal
 

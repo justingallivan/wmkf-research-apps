@@ -6,7 +6,7 @@
  *
  *   GET ?requestId=  -> { abstractFormatted, abstractApproved, effective, effectiveHtml,
  *                         effectiveField, etag, status, statusLabel, editable,
- *                         caption, imageRef, imageUrl, hasImage, submittedAt,
+ *                         caption, captionHtml, imageRef, imageUrl, hasImage, submittedAt,
  *                         invitedAt, remindedAt }
  *   PUT { requestId, text, etag, baseField }
  *

@@ -3,7 +3,7 @@ title: "Grantee Submission Visibility — Spec"
 domain: grantee-portal
 kind: spec
 status: active
-summary: "Production-verified submit notification to the assigned PD, plus caption and image visibility on the staff Awardee tab."
+summary: "Production-verified submit notification to the assigned PD, plus formatted caption and image visibility on the staff Awardee tab."
 canonical: false
 cataloged: 2026-07-29
 owner: product-engineering
@@ -220,12 +220,15 @@ Extend `tests/unit/grantee-submit-route.test.js`:
 
 ### Behavior `[PLANNED]`
 
-When a deliverable has been submitted, the Awardee tab shows, below the abstract editor: the image
-caption as read-only text, and a link that opens the uploaded image in SharePoint in a new tab. With
-no image, it says so rather than rendering an empty affordance.
+When a deliverable has been submitted, the Awardee tab shows the image caption with the same
+restricted bold/italic/subscript/superscript formatting used by publication exports, plus the inline
+image and its SharePoint fallback. With no image, it says so rather than rendering an empty
+affordance.
 
-Read-only in v1. Staff caption editing is a separate change with its own ETag concurrency story, and
-the caption is not staff-editable anywhere today.
+The original v1 surface was read-only. The S412 staff replacement path supplied the separate package
+ETag concurrency story, and the 2026-08-13 caption follow-up replaced its plain textarea with the
+shared Markdown-backed formatting editor. Staff caption edits remain status-gated to Submitted / Staff
+Review and continue through `replace-submission`; no new writer or status transition was added.
 
 ### Data path `[PLANNED]`
 
@@ -236,7 +239,8 @@ matching the other grantee-deliverable routes
 `[VERIFIED via pages/api/workbench/grantee-deliverables/abstract.js:20,43]`. Extend its 200 body:
 
 ```
-caption:     string|null   // deliverable.wmkf_imagecaption
+caption:     string|null   // exact Markdown from deliverable.wmkf_imagecaption
+captionHtml: string        // response-only sanitized inline HTML
 imageRef:    string|null   // deliverable.wmkf_imagefileref
 imageUrl:    string|null   // imageRef, ONLY when it is an absolute http(s) URL
 hasImage:    boolean       // Boolean(imageRef)
@@ -291,7 +295,7 @@ Grantee submission
 Waiver acknowledged 12 Jul 2026
 
 Caption
-  <caption text, read-only>                        — or "No caption provided."
+  <sanitized formatted caption display>            — or "No caption provided."
 
 Image
   Open image in SharePoint ↗                       — when imageUrl
@@ -299,10 +303,11 @@ Image
   No image uploaded.                               — when neither
 ```
 
-The caption is grantee-authored text rendered into a staff page. React escapes text children by
-default, so render it as one and **do not** reach for `dangerouslySetInnerHTML`. The server-side
-`captionHtml` on the assembly model `[VERIFIED via lib/services/grantee-document-assembly.js:156]`
-exists for the export document, not for this tab; ignore it here.
+The caption is grantee-authored text rendered into a staff page. The GET derives `captionHtml` with
+the same `renderGranteeCaption` sanitizer used by document assembly; only that response-only value may
+reach the formatted display/editor seed. The exact Markdown remains the dirty-tracking and write
+value. Raw stored Markdown or user-supplied HTML must never be installed at the HTML sink. When an
+older/partial response omits `captionHtml`, React's escaped text rendering remains the fallback.
 
 ### Rejected alternative: proxy the image through the app
 
@@ -341,7 +346,10 @@ Extend `tests/unit/awardee-tab.test.js`:
 - section hidden entirely pre-submit
 - link carries `rel="noopener noreferrer"` when `imageUrl` is present
 - plain text, no anchor, when `imageRef` is relative
-- a caption containing `<script>` renders as literal text
+- caption Markdown containing allowed formatting renders from sanitized `captionHtml`, while raw
+  `<script>` never becomes an element
+- the staff replacement editor receives the same safe `captionHtml` seed and emits Markdown through
+  the existing ETag-conditional replace path
 
 ---
 
