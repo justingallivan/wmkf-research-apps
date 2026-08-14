@@ -241,6 +241,16 @@ formatting** in the example.
   pulled from existing Dataverse data and **styled by the server-side template** — no rich-text
   storage. (Award amount = `akoya_grant` / `akoya_originalgrantamount`; **never** `akoya_request`,
   which is the migration-backfilled requested amount — Atlas: "never export as a real amount.")
+  - **Pulled from Dataverse is not the same as correct (2026-08-13).** A draft
+    abstract reached a grantee carrying a Co-PI who was wrong in the source data.
+    No staff surface displayed the byline, so the flow trusted these fields
+    precisely because they were structured. The Awardee tab now shows the PI and
+    Co-PIs beside the abstract before Send, derived by `resolveByline` — the same
+    producer the portal, website HTML, and cycle export render, so what a PD
+    checks is what publishes. It is a **visual check only**: Send is never gated
+    on it, and a wrong name is corrected in CRM, not here. A failed Co-PI lookup
+    reports *unverified* rather than an empty roster, because a lookup that could
+    not run must not read as a clean check.
 - **Body + caption** are the only fields needing *inline* formatting (the occasional italic
   species/gene name, the occasional bold caption). Keep them **plain memo with a light markdown
   convention**; no `FormatName=RichText` flip on the live prod columns, stays legible in Dataverse,

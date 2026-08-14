@@ -91,6 +91,11 @@ export default function AwardeeTab({ requestId, context }) {
   const [abstractEditable, setAbstractEditable] = useState(false);
   const [savingAbstract, setSavingAbstract] = useState(false);
   const [abstractMsg, setAbstractMsg] = useState(null);
+  // PI + Co-PI byline as the published document will render it. Loaded with the
+  // abstract (same request, same stale-response guard) so the PD can eyeball the
+  // names before sending — these come from Dataverse and nothing else in this
+  // flow shows them.
+  const [byline, setByline] = useState(null);
   // What the grantee returned, read-only. `imageUrl` is server-derived and is
   // non-null ONLY for an absolute http(s) ref, so it is the sole value allowed
   // into an href; `imageRef` may be a relative SharePoint library path.
@@ -257,6 +262,14 @@ export default function AwardeeTab({ requestId, context }) {
         setAbstractField(data.effectiveField || null);
         setAbstractEtag(data.etag || '');
         setAbstractEditable(Boolean(data.editable));
+        setByline({
+          pi: data.pi || null,
+          coPIs: Array.isArray(data.coPIs) ? data.coPIs : [],
+          names: data.bylineNames || null,
+          // Default to "unverified" when the field is absent: an older/partial
+          // response must not render as a confirmed empty roster.
+          unavailable: data.bylineUnavailable !== false,
+        });
         // Mirrors `granteeResponded` in the render — an approved abstract counts
         // as a response, and it is where the editor for that abstract lives, so
         // landing on the other pane would hide it behind a click.
@@ -655,6 +668,36 @@ export default function AwardeeTab({ requestId, context }) {
             {generating ? 'Working…' : hasAbstract ? 'Regenerate abstract' : 'Generate abstract'}
           </button>
         )}
+        {/* Names the grantee will see. Rendered whenever we have them — not
+            gated on hasAbstract — because a wrong name is worth catching before
+            the invitation goes out, and the empty case is shown explicitly: an
+            absent Co-PI is the same defect as a wrong one, and a hidden row
+            reads as "nothing to check". Display only; Send is never gated on
+            it, and the fix is in CRM, not here. */}
+        {byline && (byline.unavailable ? (
+          <p className="text-xs bg-amber-50 border border-amber-200 rounded p-3 text-amber-800">
+            Could not load the PI and Co-PI names. This is not a sign that none are
+            listed — check them in CRM before sending.
+          </p>
+        ) : (
+          <dl className="text-xs bg-gray-50 border border-gray-200 rounded p-3 space-y-1">
+            <div className="flex gap-2">
+              <dt className="text-gray-500 shrink-0">PI:</dt>
+              <dd className="text-gray-900">{byline.pi || <span className="text-amber-700">none listed</span>}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500 shrink-0">Co-PIs:</dt>
+              <dd className="text-gray-900">
+                {byline.coPIs.length > 0
+                  ? byline.coPIs.join(', ')
+                  : <span className="text-gray-500">none listed</span>}
+              </dd>
+            </div>
+            <p className="text-gray-500 pt-1">
+              From Dataverse — the grantee sees these names. Correct them in CRM before sending.
+            </p>
+          </dl>
+        ))}
         {hasAbstract && (
           <div className="space-y-1">
             <p className="text-xs text-gray-600">

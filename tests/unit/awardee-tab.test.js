@@ -72,6 +72,12 @@ function wireFetch({
     // Server-computed staff-replace capability + the package etag (S412).
     canReplace: abstract?.canReplace ?? false,
     deliverableEtag: abstract?.deliverableEtag ?? 'W/"d1"',
+    // PI/Co-PI byline for the pre-send visual check. Resolution succeeds by
+    // default; tests override to exercise the empty and unverified branches.
+    pi: abstract?.pi ?? null,
+    coPIs: abstract?.coPIs ?? [],
+    bylineNames: abstract?.bylineNames ?? null,
+    bylineUnavailable: abstract?.bylineUnavailable ?? false,
   };
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
@@ -107,6 +113,8 @@ function wireFetch({
         submittedAt: state.submittedAt,
         invitedAt: state.invitedAt, remindedAt: state.remindedAt,
         canReplace: state.canReplace, deliverableEtag: state.deliverableEtag,
+        pi: state.pi, coPIs: state.coPIs,
+        bylineNames: state.bylineNames, bylineUnavailable: state.bylineUnavailable,
       }) };
     }
     if (u.includes('/grantee-deliverables/replace-submission')) {
@@ -1341,4 +1349,50 @@ test.each([
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.'));
   expect(screen.getByRole('button', { name: /regenerate abstract/i })).toBeInTheDocument();
+});
+
+// ── PI/Co-PI byline (pre-send visual check) ──
+// Origin: a draft abstract reached a grantee carrying a Co-PI who was wrong in
+// Dataverse. Nothing in this tab displayed the names, so there was no point at
+// which a PD could have caught it.
+
+test('shows the PI and Co-PI names the grantee will see', async () => {
+  wireFetch({ abstract: {
+    effective: 'Draft text.', effectiveField: 'formatted', status: 100000000, editable: true,
+    pi: 'Kristen Buck',
+    coPIs: ['Mya Breitbart', 'Ada Lovelace'],
+    bylineNames: 'Kristen Buck, Mya Breitbart, and Ada Lovelace',
+  } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Kristen Buck')).toBeInTheDocument());
+  expect(screen.getByText('Mya Breitbart, Ada Lovelace')).toBeInTheDocument();
+});
+
+test('an empty Co-PI list is stated, not hidden', async () => {
+  // A MISSING Co-PI is the same class of defect as a wrong one, so the row has
+  // to assert emptiness rather than silently collapse.
+  wireFetch({ abstract: {
+    effective: 'Draft text.', effectiveField: 'formatted', status: 100000000, editable: true,
+    pi: 'Kristen Buck', coPIs: [], bylineNames: 'Kristen Buck',
+  } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText('Kristen Buck')).toBeInTheDocument());
+  expect(screen.getByText('none listed')).toBeInTheDocument();
+});
+
+test('a failed byline lookup reads as unverified, never as an empty roster', async () => {
+  wireFetch({ abstract: {
+    effective: 'Draft text.', effectiveField: 'formatted', status: 100000000, editable: true,
+    pi: null, coPIs: [], bylineNames: null, bylineUnavailable: true,
+  } });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+
+  await waitFor(() => expect(screen.getByText(/Could not load the PI and Co-PI names/i)).toBeInTheDocument());
+  // The false-clear this guards against: an unavailable lookup must not render
+  // the same "none listed" wording a genuinely empty roster does.
+  expect(screen.queryByText('none listed')).not.toBeInTheDocument();
+  // Display-only data must not disable the editor.
+  expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Draft text.');
 });

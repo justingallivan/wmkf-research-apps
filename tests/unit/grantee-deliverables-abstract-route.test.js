@@ -11,7 +11,7 @@ jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
-  DynamicsService: { getRecord: jest.fn(), updateRecord: jest.fn() },
+  DynamicsService: { getRecord: jest.fn(), updateRecord: jest.fn(), queryRecords: jest.fn() },
 }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (labelOrFn, maybeFn) => {
@@ -58,6 +58,7 @@ beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p1', session: { user: { dynamicsSystemuserId: 'sys-1' } } });
   DynamicsService.getRecord.mockReset();
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
+  DynamicsService.queryRecords.mockReset().mockResolvedValue({ records: [] });
   getDeliverableForRequest.mockReset().mockResolvedValue(deliverable(GRANTEE_DELIVERABLE_STATUS.DRAFTED));
 });
 
@@ -121,7 +122,60 @@ test('GET resolves the DRAFT as effective when approved is empty (full envelope 
     // been sent yet, so neither the invite nor the day-12 reminder has stamped.
     invitedAt: null,
     remindedAt: null,
+    // The PI/Co-PI byline the grantee will see, so a PD can eyeball the names
+    // before sending. The base fixture's request row carries no project-leader
+    // annotation and the Co-PI query returns nothing, so both are empty — but
+    // resolution SUCCEEDED, which is what bylineUnavailable:false records.
+    pi: null,
+    coPIs: [],
+    bylineNames: null,
+    bylineUnavailable: false,
   });
+});
+
+// ── PI/Co-PI byline (pre-send visual check) ──
+// A wrong Co-PI in Dataverse reached a grantee inside a draft abstract because
+// nothing in this flow displayed the names. These pin that the PD now sees
+// exactly what the published document will render.
+
+test('GET surfaces the PI and Co-PI names the grantee will see', async () => {
+  DynamicsService.getRecord.mockResolvedValue(row({
+    '_wmkf_projectleader_value_formatted': 'Kristen Buck',
+  }));
+  DynamicsService.queryRecords.mockResolvedValue({
+    records: [
+      { _wmkf_contact_value: 'c1', wmkf_Contact: { fullname: 'Mya Breitbart' } },
+      { _wmkf_contact_value: 'c2', wmkf_Contact: { firstname: 'Ada', lastname: 'Lovelace' } },
+    ],
+  });
+  const res = mockRes();
+  await handler(getReq({ requestId: GUID }), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body.pi).toBe('Kristen Buck');
+  expect(res.body.coPIs).toEqual(['Mya Breitbart', 'Ada Lovelace']);
+  // Same join the published byline uses — the check is worthless if the string
+  // the PD reads differs from the one the grantee receives.
+  expect(res.body.bylineNames).toBe('Kristen Buck, Mya Breitbart, and Ada Lovelace');
+  expect(res.body.bylineUnavailable).toBe(false);
+});
+
+test('a failed Co-PI read reports UNVERIFIED rather than an empty roster', async () => {
+  // The distinction is the whole point: "no Co-PIs" and "we could not check"
+  // must never render alike, or a failed lookup reads as a clean check.
+  DynamicsService.getRecord.mockResolvedValue(row({
+    '_wmkf_projectleader_value_formatted': 'Kristen Buck',
+  }));
+  DynamicsService.queryRecords.mockRejectedValue(new Error('Dataverse unavailable'));
+  const res = mockRes();
+  await handler(getReq({ requestId: GUID }), res);
+
+  // Display-only data must not take down the abstract editor.
+  expect(res.statusCode).toBe(200);
+  expect(res.body.effective).toBe(DRAFT);
+  expect(res.body.bylineUnavailable).toBe(true);
+  expect(res.body.coPIs).toEqual([]);
+  expect(res.body.bylineNames).toBeNull();
 });
 
 test('GET resolves the APPROVED version as effective once present', async () => {
