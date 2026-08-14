@@ -132,6 +132,22 @@ Claude config sync, and environment-specific operating notes.
   `EXTERNAL_LINK_SECRET`): `project-local-dev-auth-setup`. Editing `.env.local`
   does not reach an already-running `next dev` process — restart it after any
   change.
+- **A local Workbench run hits the target interlock before it hits anything else
+  (2026-08-13).** `.env.local` points `DYNAMICS_URL` at `wmkf.crm.dynamics.com`,
+  which `lib/dataverse/core/target-registry.js:28` classifies as **production**,
+  so every read fails closed with `[dataverse-interlock] denied:
+  deployment=local target=production ... DATAVERSE_ALLOW_PROD_READS not set to
+  yes`. The visible symptom is generic app-level copy — "Failed to load
+  dashboard", "Failed to list awardees" — which reads like a broken feature or a
+  credentials problem; the interlock line is only in the `next dev` console, so
+  check there first. Only the literal `'yes'` lifts it
+  (`interlock.js:327`), and it gates **reads only** — a local→production write
+  still needs the separate `resolveProdWriteAck` exception.
+  **Setting that flag is the owner's call, never an agent's**
+  (`feedback-never-self-authorize-prod-dataverse-reads`): hand over the command
+  and wait. It is a standing permission once set, so it belongs out of
+  `.env.local` again when the session's testing is done. Restart `next dev`
+  after the edit — see the `AUTH_REQUIRED` note above for why.
 - **Azure CLI is installed locally** (`/opt/homebrew/bin/az`, homebrew 2.89.0)
   and, after the owner runs `az login` themselves (browser/MFA; auth is
   per-user and expires), it can READ the Entra app registration
