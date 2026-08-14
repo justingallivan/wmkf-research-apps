@@ -225,6 +225,8 @@ export async function generateReviewReportDocx(report) {
           font: FONT,
           bold: !!run.bold,
           italics: !!run.italic,
+          subScript: !!run.subscript,
+          superScript: !!run.superscript,
           style: run.href ? 'Hyperlink' : undefined,
         }));
       });
@@ -389,6 +391,8 @@ export async function generateSingleReviewCopyDocx(copy) {
           font: FONT,
           bold: !!run.bold,
           italics: !!run.italic,
+          subScript: !!run.subscript,
+          superScript: !!run.superscript,
           style: run.href ? 'Hyperlink' : undefined,
         }));
       });

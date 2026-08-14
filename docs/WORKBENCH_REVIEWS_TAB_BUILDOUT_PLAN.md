@@ -227,7 +227,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   narrative sections (all reviewers' answers, matrix order, `retired` flag
   carried through). The sanitizer's allowlist
   [VERIFIED via `sanitize-review-html` allowlist] is simple
-  structural/inline tags only (p, br, strong/b, em/i, ul/ol/li, h2/h3,
+  structural/inline tags only (p, br, strong/b, em/i, sub/sup, ul/ol/li, h2/h3,
   blockquote, a — no tables/images/spans/divs), so the naive tag-mapping
   approach anticipated above was sufficient; no deep-review escalation was
   needed. The same module's `htmlToBlocks(html)` tokenizes that allowlisted
@@ -236,7 +236,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   unknown/malformed tag degrades to plain text rather than throwing or
   dropping content.
 - `shared/utils/review-report-docx.js` (dynamic `import('docx')`) preserves
-  bold/italic runs, lists, headings, blockquotes, and line breaks. Link runs
+  bold/italic/subscript/superscript runs, lists, headings, blockquotes, and line breaks. Link runs
   receive Word's `Hyperlink` style, but the current renderer does not embed the
   actual href as an external hyperlink relationship. The retained
   `shared/utils/review-report-pdf.js` flattens rich-text runs to plain text and
@@ -305,8 +305,8 @@ Required pre-build verification:
   cleanup/retry behavior, and whether the DOCX should be retained as an artifact.
 - Add route-security/lifecycle documentation, unit tests for redirect/auth-header
   handling and cleanup fall-through, and an authenticated conversion smoke using
-  representative headings, lists, quotes, mixed bold/italic runs, page breaks,
-  and links.
+  representative headings, lists, quotes, mixed bold/italic runs,
+  subscript/superscript, page breaks, and links.
 
 ### Phase 4 — AI synthesis (BUILT; provisioned; prompt current in production)
 - Tier-1 prompt `review-synthesis.generate` (`shared/config/prompts/review-synthesis.js`,

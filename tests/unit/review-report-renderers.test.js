@@ -1,9 +1,14 @@
+/**
+ * @jest-environment node
+ */
+
 import {
   TextDecoder as NodeTextDecoder,
   TextEncoder as NodeTextEncoder,
 } from 'util';
-import { composeReviewReport } from '../../shared/utils/review-report';
-import { generateReviewReportDocx } from '../../shared/utils/review-report-docx';
+import JSZip from 'jszip';
+import { composeReviewReport, composeSingleReviewCopy } from '../../shared/utils/review-report';
+import { generateReviewReportDocx, generateSingleReviewCopyDocx } from '../../shared/utils/review-report-docx';
 import { generateReviewReportPdf } from '../../shared/utils/review-report-pdf';
 import { PDFReportBuilder } from '../../shared/utils/pdf-export';
 
@@ -57,6 +62,52 @@ describe('review report categorical renderers', () => {
     const blob = await generateReviewReportDocx(categoricalReport());
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBeGreaterThan(0);
+  });
+
+  test('DOCX renderer preserves reviewer subscript and superscript runs', async () => {
+    const report = composeReviewReport({
+      requestNumber: 'R-101',
+      generatedAtIso: '2026-08-13T12:00:00.000Z',
+      matrix: {
+        reviewers: [{ suggestionId: 'suggestion-1', name: 'Reviewer One', affiliation: null }],
+        questions: [{
+          key: 'comments',
+          type: 'richtext',
+          text: 'Comments',
+          retired: false,
+          cells: [{
+            suggestionId: 'suggestion-1',
+            state: 'answered',
+            answerHtml: '<p>H<sub>2</sub>O and x<sup>2</sup></p>',
+          }],
+        }],
+      },
+    });
+
+    const blob = await generateReviewReportDocx(report);
+    const archive = await JSZip.loadAsync(await blob.arrayBuffer());
+    const documentXml = await archive.file('word/document.xml').async('string');
+    expect(documentXml).toContain('<w:vertAlign w:val="subscript"/>');
+    expect(documentXml).toContain('<w:vertAlign w:val="superscript"/>');
+  });
+
+  test('courtesy-copy DOCX preserves reviewer subscript and superscript runs', async () => {
+    const copy = composeSingleReviewCopy({
+      reviewerName: 'Reviewer One',
+      requestNumber: 'R-102',
+      generatedAtIso: '2026-08-13T12:00:00.000Z',
+      answers: [{
+        questionText: 'Comments',
+        questionType: 'richtext',
+        answerHtml: '<p>H<sub>2</sub>O and x<sup>2</sup></p>',
+      }],
+    });
+
+    const buffer = await generateSingleReviewCopyDocx(copy);
+    const archive = await JSZip.loadAsync(buffer);
+    const documentXml = await archive.file('word/document.xml').async('string');
+    expect(documentXml).toContain('<w:vertAlign w:val="subscript"/>');
+    expect(documentXml).toContain('<w:vertAlign w:val="superscript"/>');
   });
 
   test('PDF renderer accepts readable and unreadable multiselect answers', async () => {
