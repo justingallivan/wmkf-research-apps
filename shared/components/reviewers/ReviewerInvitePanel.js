@@ -31,7 +31,7 @@
  *     onSent) so the parent refetch can paint those rows invited.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell } from 'lucide-react';
 import { Card } from '../Layout';
@@ -39,6 +39,7 @@ import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
 import RemoveEntirelyModal from './RemoveEntirelyModal';
 import ReleaseEmailModal from './ReleaseEmailModal';
+import RespondReminderModal from './RespondReminderModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { splitReferredByReason } from '../../../lib/utils/reviewer-provenance';
@@ -215,17 +216,8 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   const [removeEntirelyTarget, setRemoveEntirelyTarget] = useState(null); // candidate row | null
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
-  const [nudgingId, setNudgingId] = useState(null);
+  const [nudgeTarget, setNudgeTarget] = useState(null); // active invited candidate | null
   const exportingRef = useRef(false);
-  const nudgeInFlightRef = useRef(null);
-  const mountedRef = useRef(true);
-
-  useLayoutEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   // Export the saved candidate list to Excel (same Request Info + Candidates
   // workbook the Find tab builds, server-side). The persisted rows carry only
@@ -335,49 +327,6 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
     }
   };
 
-  const sendRespondReminder = async (c) => {
-    if (nudgeInFlightRef.current) return;
-    const confirmed = confirm(
-      `Send a reminder to ${c.name || 'this reviewer'}?\n\n`
-      + 'This sends a real email with a fresh secure response link and cannot be undone.',
-    );
-    if (!confirmed) return;
-
-    const isCurrentRequest = () => mountedRef.current;
-    nudgeInFlightRef.current = c.suggestionId;
-    setNudgingId(c.suggestionId);
-    try {
-      const resp = await fetch('/api/review-manager/send-review-reminder', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, suggestionId: c.suggestionId, kind: 'respond' }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!isCurrentRequest()) return;
-      if (!resp.ok || !data.ok) {
-        const messages = {
-          removed: 'This reviewer was removed from the proposal — restore them first.',
-          revoked: "This reviewer's access was withdrawn — reissue their link before nudging.",
-          conflict: 'This reminder was already claimed by another send — refresh to see the latest status.',
-          not_found: 'This reviewer is no longer available — refresh to update the list.',
-          read_failed: "I couldn't verify this reviewer's latest status. No reminder was sent; try again.",
-          prepare_failed: 'I could not prepare the reminder. No reminder was sent; try again.',
-        };
-        alert(messages[data.reason] || 'Could not send the reminder. Refresh and try again.');
-        if (onRefresh && ['removed', 'revoked', 'not_found'].includes(data.reason)) onRefresh();
-        return;
-      }
-      if (onRefresh) onRefresh();
-    } catch (error) {
-      if (isCurrentRequest()) alert(`Network error sending reminder: ${error.message}`);
-    } finally {
-      if (isCurrentRequest()) {
-        nudgeInFlightRef.current = null;
-        setNudgingId(null);
-      }
-    }
-  };
-
   const invitable = candidates.filter(
     (c) => !c.invited && !c.accepted && !c.declined && !c.responseType && c.email
   );
@@ -420,6 +369,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // forwarded so the parent refetch can paint the just-confirmed rows invited
   // instead of trusting the read to already reflect the send.
   const afterSent = (confirmedInvites) => { setSelected(new Set()); if (onRefresh) onRefresh(confirmedInvites); };
+  const refreshAfterNudge = useCallback(() => { if (onRefresh) onRefresh(); }, [onRefresh]);
 
   return (
     <Card hover={false}>
@@ -516,14 +466,13 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                       {canManage && c.invited && !c.responseType && !c.declined && !c.accepted && (
                         <button
                           type="button"
-                          onClick={() => sendRespondReminder(c)}
-                          disabled={nudgingId !== null}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-medium text-blue-700 hover:text-blue-900 hover:bg-blue-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Send a respond-by reminder with a fresh secure link"
+                          onClick={() => setNudgeTarget(c)}
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-medium text-blue-700 hover:text-blue-900 hover:bg-blue-50 rounded"
+                          title="Review and send a respond-by reminder with a fresh secure link"
                           aria-label={`Send reminder to ${c.name || 'reviewer'}`}
                         >
                           <Bell size={13} aria-hidden="true" />
-                          {nudgingId === c.suggestionId ? 'Sending…' : 'Send reminder'}
+                          Send reminder
                         </button>
                       )}
                       {canManage && (
@@ -741,6 +690,16 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           suggestionIds={releaseModal.suggestionIds}
           onClose={() => setReleaseModal(null)}
           onReleased={() => { setSelected(new Set()); if (onRefresh) onRefresh(); }}
+        />
+      )}
+
+      {nudgeTarget && (
+        <RespondReminderModal
+          requestId={requestId}
+          candidate={nudgeTarget}
+          onClose={() => setNudgeTarget(null)}
+          onSent={refreshAfterNudge}
+          onStale={refreshAfterNudge}
         />
       )}
 

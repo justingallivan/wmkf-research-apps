@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvitePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -20,6 +20,15 @@ jest.mock('../../shared/components/reviewers/ReleaseEmailModal', () => function 
 jest.mock('../../shared/components/reviewers/RemoveEntirelyModal', () => function RemoveEntirelyModal() {
   return null;
 });
+jest.mock('../../shared/components/reviewers/RespondReminderModal', () => function RespondReminderModal({ candidate, onClose, onSent }) {
+  return (
+    <div>
+      <span>{`Reminder modal for ${candidate.name}`}</span>
+      <button type="button" onClick={onSent}>Complete reminder send</button>
+      <button type="button" onClick={onClose}>Cancel reminder</button>
+    </div>
+  );
+});
 
 const pending = {
   suggestionId: 'S-PENDING',
@@ -35,14 +44,6 @@ const pending = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }));
-  jest.spyOn(window, 'confirm').mockReturnValue(true);
-  jest.spyOn(window, 'alert').mockImplementation(() => {});
-});
-
-afterEach(() => {
-  window.confirm.mockRestore();
-  window.alert.mockRestore();
 });
 
 test('renders the action only for an active pending invite and surfaces last-nudged state', () => {
@@ -64,56 +65,38 @@ test('renders the action only for an active pending invite and surfaces last-nud
   expect(screen.getByText(/last nudged/i)).toBeInTheDocument();
 });
 
-test('confirms the real email, sends kind=respond, and refreshes the current request', async () => {
+test('opens the editable reminder modal without sending and refreshes only after modal success', () => {
   const onRefresh = jest.fn();
   render(<ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} onRefresh={onRefresh} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Dr. Pending' }));
 
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-  expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/real email.*cannot be undone/s));
-  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
-    requestId: 'REQ-1',
-    suggestionId: 'S-PENDING',
-    kind: 'respond',
-  });
-  await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('Reminder modal for Dr. Pending')).toBeInTheDocument();
+  expect(onRefresh).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Complete reminder send' }));
+  expect(onRefresh).toHaveBeenCalledTimes(1);
 });
 
-test.each([
-  ['removed', /restore them first/i, true],
-  ['revoked', /access was withdrawn/i, true],
-  ['not_found', /no longer available/i, true],
-  ['conflict', /already claimed by another send/i, false],
-  ['read_failed', /couldn't verify.*no reminder was sent/i, false],
-  ['prepare_failed', /could not prepare.*no reminder was sent/i, false],
-])('maps the %s refusal to actionable copy and refreshes only stale lifecycle rows', async (reason, copy, shouldRefresh) => {
-  global.fetch.mockResolvedValueOnce({ ok: false, status: 409, json: async () => ({ ok: false, reason }) });
+test('cancel closes the modal without refreshing', () => {
   const onRefresh = jest.fn();
   render(<ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} onRefresh={onRefresh} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Dr. Pending' }));
-
-  await waitFor(() => expect(window.alert).toHaveBeenCalledWith(expect.stringMatching(copy)));
-  expect(onRefresh).toHaveBeenCalledTimes(shouldRefresh ? 1 : 0);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel reminder' }));
+  expect(screen.queryByText('Reminder modal for Dr. Pending')).not.toBeInTheDocument();
+  expect(onRefresh).not.toHaveBeenCalled();
 });
 
-test('a late response cannot revive state or affect an A → B → A navigation', async () => {
-  let resolveFetch;
-  global.fetch.mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+test('request identity owns modal state across A → B → A navigation', () => {
   const onRefresh = jest.fn();
   const { rerender } = render(
     <ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} onRefresh={onRefresh} />,
   );
 
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Dr. Pending' }));
+  expect(screen.getByText('Reminder modal for Dr. Pending')).toBeInTheDocument();
   rerender(<ReviewerInvitePanel requestId="REQ-2" candidates={[pending]} onRefresh={onRefresh} />);
   rerender(<ReviewerInvitePanel requestId="REQ-1" candidates={[pending]} onRefresh={onRefresh} />);
-  expect(screen.getByRole('button', { name: 'Send reminder to Dr. Pending' })).not.toBeDisabled();
-  resolveFetch({ ok: false, status: 409, json: async () => ({ ok: false, reason: 'removed' }) });
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-  await Promise.resolve();
+  expect(screen.queryByText('Reminder modal for Dr. Pending')).not.toBeInTheDocument();
   expect(onRefresh).not.toHaveBeenCalled();
-  expect(window.alert).not.toHaveBeenCalled();
 });

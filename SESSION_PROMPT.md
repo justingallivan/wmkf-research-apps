@@ -1,4 +1,4 @@
-# Session 426 Prompt: Add an Editable Respond-Nudge Email Preview
+# Session 426: Editable Respond-Nudge Email Preview
 
 ## Session 425 Summary
 
@@ -42,14 +42,16 @@ confirmation and sends the configured template without showing its contents.
 
 ### Verified Open
 
-1. **[OWNER-REQUESTED, VERIFIED OPEN] Replace the respond-nudge confirmation
-   with an editable email preview modal.** Clicking `Send reminder` in Invite
-   Reviewers should launch a modal that shows the nudge email contents and lets
-   the PD edit them before an explicit send. Cancel must perform no marker,
-   token, or email mutation. Evidence: owner direction, 2026-08-13; the current
-   `sendRespondReminder` in `shared/components/reviewers/ReviewerInvitePanel.js`
-   uses `confirm(...)` and immediately POSTs only `requestId`, `suggestionId`,
-   and `kind: 'respond'`.
+1. **[IMPLEMENTED ON BRANCH; VERIFICATION/PROMOTION OPEN] Editable respond-nudge
+   preview modal.** `codex/editable-respond-nudge-preview` replaces the browser
+   confirmation with `RespondReminderModal`, a read-only preview request,
+   editable subject/body, non-editable delivery identity, and an explicit Send.
+   Cancel performs no send request; preview performs no marker/token/email
+   mutation. Send re-derives identities, preserves the atomic lifecycle claim,
+   escapes edited text, and injects the fresh secure link server-side. Focused
+   and relevant suites, scoped gates, type checking, and the webpack production
+   build pass. The full suite reaches 617/618 suites with one unrelated baseline
+   Atlas-count fixture drift; promotion remains open.
 
 2. **[VERIFIED OPEN] Phase B - mint-surface hardening.** Separate change, own
    review. `ensureToken`, `send-emails-service`, and `regenerate-token-service`
@@ -79,9 +81,9 @@ confirmation and sends the configured template without showing its contents.
 
 ### Owner Decision Needed
 
-1. **Preview scope.** The owner request was made in the context of the new
-   respond-by nudge in Invite Reviewers. Confirm before expanding the same modal
-   to the existing review-due reminder in Track Reviewers.
+1. **Preview scope is closed for this increment.** Owner explicitly scoped the
+   modal to the respond-by nudge in Invite Reviewers. The existing review-due
+   reminder in Track Reviewers remains unchanged.
 
 2. **Expose the campaign-settings reminder toggles at all?** Arming them is
    unsafe until Phase B and the cron guards land.
@@ -92,13 +94,11 @@ confirmation and sends the configured template without showing its contents.
 
 ### Verify Before Acting
 
-1. **Trace the preview contract end to end before implementation.** The server
-   currently reads the configured subject/body, mints the fresh token, renders,
-   and sends in one command path. Decide how preview obtains rendered content
-   without minting a live token or claiming the marker, and how edited content
-   reaches the send path without weakening server-side lifecycle authorization,
-   HTML safety, signature/link handling, or the at-most-once contract. Invoke
-   `/contract-reconcile` for this cross-layer change.
+1. **Re-run the preview contract gates before promotion.** `/contract-reconcile`
+   established and implemented the read-only preview → reviewed payload → fresh
+   identity/lifecycle authorization → atomic marker/token write → escaped email
+   with server-injected link flow. Full test/build and documentation gates must
+   remain green before promotion.
 
 2. **The production scale figures in the nudge plan remain `[ASSUMED]`.** The
    original probe artifact was never written because of the now-fixed output
@@ -129,7 +129,8 @@ confirmation and sends the configured template without showing its contents.
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Current browser-confirm flow and respond-nudge trigger |
+| `shared/components/reviewers/ReviewerInvitePanel.js` | Respond-nudge modal trigger |
+| `shared/components/reviewers/RespondReminderModal.js` | Read-only preview, editing, explicit send, typed errors |
 | `pages/api/review-manager/send-review-reminder.js` | Manual reminder route and `kind` discriminator |
 | `lib/services/reviewer-manual-reminder.js` | Manual preflight and fresh lifecycle authorization |
 | `lib/services/reviewer-reminder-sweep.js` | Template rendering, atomic marker/token persistence, and send |

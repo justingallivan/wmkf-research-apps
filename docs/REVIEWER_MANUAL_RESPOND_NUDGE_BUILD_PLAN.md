@@ -247,9 +247,11 @@ accepted 2026-08-13 — this is the point when chasing an overdue invitee.
 
 ### 4c. Route
 
-Extend `pages/api/review-manager/send-review-reminder.js` with
+`pages/api/review-manager/send-review-reminder.js` allowlists
 `kind: 'respond' | 'reviewdue'`, defaulting to `reviewdue` so the existing
-caller is unchanged. Reject any other value (allowlist, not denylist).
+caller is unchanged. It also allowlists `action: 'preview' | 'send'`, defaulting
+to `send`; preview is respond-only, and respond send requires complete reviewed
+copy plus previewed delivery-identity guards.
 
 No new route means no new `API_ROUTE_SECURITY_MATRIX.md` row, but the existing
 row must be **updated**: it currently describes only the review-due marker. Add
@@ -263,11 +265,9 @@ the respond marker and the new refusal reason. `check:api-routes` must pass.
 - **Active rows only.** The action must NOT render in the `removedCandidates`
   list (§2). Gate on the active-list render path, not on candidate shape alone,
   so a future refactor unifying the two renderers cannot silently expose it.
-- Confirm dialog before sending (a real email cannot be unsent — matches
-  `InviteEmailModal`'s send confirm).
-- Surface "last nudged" — requires adding `respondReminderSentAt` to the
-  my-candidates DTO (the column is written at
-  `[VERIFIED via my-candidates-service.js:633]` but is not currently emitted).
+- Open `RespondReminderModal` before sending. Its read-only preview exposes
+  editable subject/body and an explicit Send; Cancel issues no send request.
+- Surface "last nudged" from the emitted `respondReminderSentAt` DTO field.
   Without it a PD cannot see they already nudged, and re-sends are allowed.
 - Map every typed outcome to staff-facing copy: lifecycle refusal (`removed`,
   `revoked`, `not_found`), concurrency (`conflict`), transient authorization
@@ -346,7 +346,9 @@ Gates: `check:types`, `check:api-routes` (+ self-test), `check:route-lifecycle-a
 
 | Claim | Producer / entry point | Persistence / authority | Consumer | Strongest evidence | Status |
 |---|---|---|---|---|---|
-| Manual respond nudge is available for an active unanswered invite | `ReviewerInvitePanel` → `POST /api/review-manager/send-review-reminder` with `kind:'respond'` | Fresh suggestion lifecycle reads; respond template defaults | Dynamics email send | Component, route, and service tests; production deployment | **VERIFIED deployed; live send not smoked** |
+| Manual respond nudge is available for an active unanswered invite | `ReviewerInvitePanel` → `RespondReminderModal` → `POST /api/review-manager/send-review-reminder` with `kind:'respond'` | Read-only preview from respond defaults; send re-derives delivery identity and freshly authorizes lifecycle state | Staff-edited Dynamics email with server-injected fresh secure link | Modal, component, route, renderer, and service tests | **VERIFIED local branch; promotion/live send not yet performed** |
+| Preview and Cancel perform no durable action | `action:'preview'` or modal close | Preview reads request/PD/reviewer/signature/defaults only | Editable subject/body and read-only From/To | Preview service no-write assertions; modal Cancel request-count test | **VERIFIED local source/tests** |
+| Reviewed copy cannot redirect sender or recipient | Modal echoes previewed `to`/`from`/`senderId` as expected values | Send re-reads PD/reviewer identities; actual Dynamics destinations come only from those fresh server reads | Typed `recipient_changed` / `sender_changed` no-send result | Service drift tests and route validation | **VERIFIED local source/tests** |
 | Omitted `kind` preserves the existing review-due action; unknown values fail closed | Existing Reviews-tab caller omits `kind`; route allowlist | N/A | `sendManualReviewDueReminder` or HTTP 400 | Route discriminator tests; production CI | **VERIFIED production code** |
 | Removed/revoked rows cannot be resurrected by either manual reminder path | Both manual services preflight, then authorize again immediately before the write | Marker + token fields share one PATCH bound to the fresh row ETag; a refusal writes neither, and a concurrent change yields 412 before email send | Typed `removed`, `revoked`, or `conflict` response | Positive-control lifecycle-transition tests on both paths, read-failure tests, atomic-write 412 test, adversarial `mintAndStore` merge-order test, and production CI | **VERIFIED production code** |
 | Respond marker is visible as “last nudged” | `sendOneReminder(kind:'respond')` | `wmkf_respondremindersentat` | my-candidates DTO → active Invite-panel row | Service, DTO, and component tests; production CI | **VERIFIED production code** |
@@ -372,18 +374,22 @@ Gates: `check:types`, `check:api-routes` (+ self-test), `check:route-lifecycle-a
 - Durable restatements checked: this plan, `API_ROUTE_SECURITY_MATRIX.md`, the
   reviewer lifecycle wiki hazard, source, DTO consumers, and tests. The stale
   “No code written yet” status was structurally replaced above.
-- **Sweep verdict:** `RECONCILED` for Phase A production state. Remaining live
-  stale statements: 0. Remaining planned work: editable email preview modal,
-  Phase B mint-surface hardening, and cron guards before enabling
+- **Sweep verdict:** `RECONCILED` for Phase A production state and the local
+  editable-preview increment. Remaining live stale statements: 0. Remaining
+  work: promotion/live verification of the preview increment, Phase B
+  mint-surface hardening, and cron guards before enabling
   `respondReminderEnabled`.
 
-## 9. Next-session owner direction (2026-08-13)
+## 9. Editable respond-nudge preview implementation (2026-08-13)
 
-Replace the Invite-panel browser confirmation with an email preview modal. The
-modal must show the respond-nudge contents, allow the PD to edit them, and
-require an explicit send action; canceling must not claim a marker, mint a token,
-or send an email. The current client posts only IDs plus `kind:'respond'`, while
-the server reads defaults, renders, and sends, so the next implementation must
-trace preview → edited payload → atomic authorization/persistence → email and
-must not mint a live token merely to preview. Scope is the respond-by nudge
-unless the owner separately expands it to the review-due reminder.
+Implemented on `codex/editable-respond-nudge-preview`. `Send reminder` now opens
+`RespondReminderModal`, which loads a read-only preview, exposes editable subject
+and plain-text body, shows non-editable sender/recipient, and sends only after an
+explicit button click. Cancel issues no send request. Preview does not mint a
+token or write the reminder marker. Send posts the complete reviewed copy plus
+the previewed delivery identity as freshness guards; the service re-derives the
+actual sender/recipient, freshly authorizes the suggestion, atomically writes the
+marker plus token, escapes edited body text, injects the fresh secure link, and
+then dispatches. Scope remains the Invite Reviewers respond-by nudge; the
+Track Reviewers review-due flow is unchanged. Promotion and any deliberate live
+email smoke remain separate release actions.

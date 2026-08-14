@@ -37,6 +37,7 @@ jest.mock('../../lib/services/email-signature', () => ({
 }));
 
 const {
+  previewManualRespondReminder,
   sendManualRespondReminder,
   sendManualReviewDueReminder,
 } = require('../../lib/services/reviewer-manual-reminder');
@@ -360,10 +361,40 @@ describe('sendManualRespondReminder', () => {
     wmkf_externaltokenexpires: '2020-01-01T00:00:00Z',
     ...over,
   });
+  const reviewed = (over = {}) => ({
+    subject: RESPOND_SUBJECT,
+    bodyText: 'Dear Dr. Reviewer,\n\nPlease respond.\n\nDr. PD',
+    to: 'rev@example.org',
+    from: 'pd@keck.org',
+    senderId: PD,
+    ...over,
+  });
 
-  test('eligible unanswered invite claims only the respond marker and sends the respond template', async () => {
+  test('preview renders editable copy without claiming, minting, or sending', async () => {
     installReads({ suggestion: pendingInvitation() });
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1' });
+
+    const result = await previewManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({
+      ok: true,
+      draft: expect.objectContaining({
+        suggestionId: SUG,
+        name: 'Dr. Reviewer',
+        to: 'rev@example.org',
+        from: 'pd@keck.org',
+        senderId: PD,
+        subject: RESPOND_SUBJECT,
+        bodyText: expect.stringContaining('A Proposal'),
+      }),
+    });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('eligible unanswered invite claims only the respond marker and sends the reviewed copy', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1', reviewed: reviewed() });
 
     expect(result).toEqual({ ok: true });
     expect(updateRecord).not.toHaveBeenCalled();
@@ -379,9 +410,53 @@ describe('sendManualRespondReminder', () => {
     }));
   });
 
+  test('edited body is escaped and receives the server-minted secure link', async () => {
+    installReads({ suggestion: pendingInvitation() });
+
+    await expect(sendManualRespondReminder({
+      requestId: REQ,
+      suggestionId: SUG,
+      reviewed: reviewed({ subject: 'Edited subject', bodyText: 'Hello <script>alert(1)</script>' }),
+    })).resolves.toEqual({ ok: true });
+
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      subject: 'Edited subject',
+      body: expect.stringContaining('https://reviews.example/external/review/jwt'),
+    }));
+    const email = createAndSendEmail.mock.calls[0][0];
+    expect(email.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(email.body).not.toContain('<script>alert(1)</script>');
+  });
+
+  test.each([
+    ['recipient_changed', { to: 'redirect@example.org' }],
+    ['sender_changed', { from: 'other@keck.org' }],
+    ['sender_changed', { senderId: '55555555-5555-4555-8555-555555555555' }],
+  ])('%s guard rejects changed preview identity before mint/send', async (reason, override) => {
+    installReads({ suggestion: pendingInvitation() });
+
+    const result = await sendManualRespondReminder({
+      requestId: REQ,
+      suggestionId: SUG,
+      reviewed: reviewed(override),
+    });
+
+    expect(result).toEqual({ ok: false, reason });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('missing reviewed copy fails closed before mint/send', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG }))
+      .resolves.toEqual({ ok: false, reason: 'invalid_preview' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test('re-send remains allowed when the respond marker is already set', async () => {
     installReads({ suggestion: pendingInvitation({ wmkf_respondremindersentat: '2026-06-02T00:00:00Z' }) });
-    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG })).resolves.toEqual({ ok: true });
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() })).resolves.toEqual({ ok: true });
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -390,7 +465,7 @@ describe('sendManualRespondReminder', () => {
     ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
   ])('%s unanswered invite passes every other gate but is refused before claim/mint/send', async (_label, state, reason) => {
     installReads({ suggestion: pendingInvitation(state) });
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
     expect(result).toEqual({ ok: false, reason });
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
@@ -405,7 +480,7 @@ describe('sendManualRespondReminder', () => {
       suggestion: pendingInvitation(),
       suggestionAfterClaim: pendingInvitation({ ...state, _etag: 'W/"101"' }),
     });
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
     expect(result).toEqual({ ok: false, reason });
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
@@ -417,7 +492,7 @@ describe('sendManualRespondReminder', () => {
       suggestion: pendingInvitation(),
       suggestionAfterClaim: pendingInvitation({ wmkf_accepted: true, _etag: 'W/"101"' }),
     });
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
     expect(result).toEqual({ ok: false, reason: 'ineligible' });
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
@@ -431,7 +506,7 @@ describe('sendManualRespondReminder', () => {
     });
     mintAndStore.mockRejectedValueOnce(Object.assign(new Error('412'), { status: 412 }));
 
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
 
     expect(result).toEqual({ ok: false, reason: 'conflict' });
     expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"101"' }));
@@ -454,7 +529,7 @@ describe('sendManualRespondReminder', () => {
       return null;
     });
 
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
 
     expect(result).toEqual({ ok: false, reason: 'read_failed' });
     expect(updateRecord).not.toHaveBeenCalled();
@@ -472,7 +547,7 @@ describe('sendManualRespondReminder', () => {
     ['different request', { _wmkf_request_value: 'other-request' }],
   ])('ineligible: %s', async (_label, state) => {
     installReads({ suggestion: pendingInvitation(state) });
-    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG });
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
     expect(result).toEqual({ ok: false, reason: 'ineligible' });
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
