@@ -3,7 +3,7 @@ title: Claude Response — Codex Adversarial Review of the Workbench Observabili
 domain: architecture
 kind: audit
 status: final
-summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review: all eight findings independently confirmed against source; plan revised; fresh Mode A verdict."
+summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review (eight findings) and its follow-up pass (five findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -233,10 +233,76 @@ carries correlation, fixed 6→3/×6 denominator, prospective-T2/owner-blocked-T
    revisit on observed log volume.
 5. Verifier-deselect hardening stays an open owner decision tracked in `SESSION_PROMPT.md`, outside
    this plan.
+6. `[ASSUMED]` The exact `vercel logs` CLI flags and `--json` field names in the Stage 1 export
+   command match the installed CLI at window start; fallback (dashboard export / Log Drain) named
+   in the plan if not.
+
+## Follow-up review — second Codex pass (2026-08-15), five additional findings
+
+**Provenance:** no on-disk artifact for this second review was found in the worktree, the main
+checkout tree, any origin branch, or `outputs/` at revision time; the five findings were relayed
+verbatim in the owner-issued work order and are dispositioned from that enumeration. All five
+were verified against source before revision.
+
+### F1 (telemetry must preserve existing structured error transformations) — CONFIRMED
+
+- `lib/services/dynamics/http.js:41-50`: the Dynamics transport deliberately wraps every
+  no-response throw via `buildNoResponseError('dataverse', err)` so the drain's retry classifier
+  sees structured `err.noResponse`/`err.isTransient`/`err.causeKind`; the interlock assert sits
+  **before** the try block (`:32-38`) precisely so policy denials propagate un-reclassified.
+  `graph-service.js` applies the same transformation with tag `'graph'`. The prior plan text
+  ("rethrows the original error … no wrapping") was ambiguous against this.
+- **Plan change:** Stage 1 step 5 now states "original error" = the error the seam throws today
+  including these transformations; telemetry adds **no additional wrapping**; `outcome` is derived
+  by inspecting the existing structured error, never by replacing it; the timed span covers the
+  fetch leg only, excluding the pre-try interlock assert; `lib/dataverse/client.js` errors (raw
+  fetch, no existing transform) propagate unwrapped.
+
+### F2 (`lib/dataverse/client.js` browser-import safety) — CONFIRMED
+
+- `lib/dataverse/client.js:11-29`: the module carries an explicit browser-import-safety contract —
+  `fs`/`path` deferred behind variable-path requires because the module is reachable from a browser
+  bundle via the settings-service dispatch chain; its single static require (`core/interlock.js`)
+  is bundler-safe by that module's own contract. A top-level observability require (transitively
+  `node:async_hooks`) would violate this.
+- **Plan change:** Stage 1 now mandates a **lazy, server-only** integration inside the call bodies
+  using the file's existing deferred-require pattern; `request-correlation.js` must itself be
+  browser-import-safe; **`npm run build`** added to Stage 1 gates as the enforcement check.
+
+### F3 (explicit `event` field and `'unknown'` dependency variant) — CONFIRMED
+
+- The prior v1 contract named `workbench.dependency` only in prose and declared
+  `dependency: 'dataverse' | 'azuread' | 'graph'` while the classifier prose emitted `'unknown'` —
+  an internal union/prose mismatch.
+- **Plan change:** the contract now includes a literal `event: 'workbench.dependency'`
+  discriminator field and `'unknown'` as a first-class member of the dependency union.
+
+### F4 (global shared-seam vs Workbench-only sampling justification) — CONFIRMED
+
+- The three seams are app-wide transports (all `DynamicsService`/Graph/`client.js` callers emit
+  once wrapped — other routes, crons, cold-start checks), so "workbench traffic is low-volume"
+  was the wrong denominator for a 100% sampling claim.
+- **Plan change:** sampling is now stated as 100% of **all** seam traffic, justified by whole-app
+  volume; un-instrumented callers emit without correlation fields (the defined behavior); the
+  window filters on `routeName`; the event name is documented as naming the initiative, not a
+  scope restriction; any volume-driven sampling change is a named follow-up, not an implementer
+  choice.
+
+### F5 (executable, bounded log-export command) — CONFIRMED
+
+- The prior "dashboard export or `vercel logs`" workflow was not executable.
+- **Plan change:** a concrete capture-slice command (`timeout`-bounded `npx vercel logs
+  <production-deployment-url> --json` piped through a `jq` filter on the `event` discriminator,
+  appended to date-stamped NDJSON in scratch), with stated preconditions (`vercel login` +
+  `vercel link`, or `--scope`/`--token`), per-event timestamps sourced from the platform log
+  record, volume bounded by the filter, rotation by filename, and window-end aggregation. The
+  exact CLI flag/JSON shapes are labeled `[ASSUMED]` pending window-start confirmation, with the
+  dashboard export / Log Drain named as the fallback.
 
 ## Final verdict
 
-**READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15). The
-named changes are the owner items above, not structural rework. All eight Codex findings are
-CONFIRMED and folded in; the revised plan contains no claim contradicted by current source; it
-remains a draft not authorized for implementation.
+**READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15,
+second pass). The named changes are the owner items above, not structural rework. All eight
+findings from the first Codex review and all five findings from the second pass are CONFIRMED and
+folded in; the revised plan contains no claim contradicted by current source; it remains a draft
+not authorized for implementation.

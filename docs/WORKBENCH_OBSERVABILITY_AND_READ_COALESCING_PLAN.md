@@ -98,6 +98,17 @@ Any claim that instrumenting one of these seams covers another is false and must
      `lib/services/dynamics/http.js` (`fetchWithTimeout`), `lib/services/graph-service.js`
      (module-local `fetchWithTimeout`), `lib/dataverse/client.js` (both the token fetch at `:50` and
      the data fetch inside `createClient`, `:106`).
+   - **Browser-import safety for `lib/dataverse/client.js` (2026-08-15 follow-up review):** the
+     module is deliberately browser-import-safe — its header contract (`client.js:11-29`) defers
+     `fs`/`path` behind variable-path requires because the module is reachable from a browser
+     bundle via the settings-service dispatch chain, and its one static require
+     (`core/interlock.js`) is bundler-safe by that module's own contract. The observability
+     integration must not break this: **no top-level require of the observability module in
+     `client.js`.** Integrate lazily inside the server-only call bodies (`getAccessToken` /
+     `createClient`'s `call`), using the same deferred-require pattern the file already uses, and
+     `lib/observability/request-correlation.js` must itself be browser-import-safe (its
+     `node:async_hooks` dependency loaded lazily/guarded, never at module top level in a path a
+     bundler statically traces). The production build gate below is the enforcement check.
    - Establish correlation at handler entry in the three target routes:
      `pages/api/review-manager/reviewers.js` (handler entry, before `requireAppAccess` at `:43`),
      `pages/api/reviewer-finder/my-candidates.js` (before `:47`),
@@ -111,12 +122,16 @@ Any claim that instrumenting one of these seams covers another is false and must
      defined behavior, not an error.
 4. **Telemetry event contract (v1, provider-neutral, PII-safe):** one JSON object per dependency
    call:
-   `{v: 1, correlationId?, routeName?, dependency: 'dataverse' | 'azuread' | 'graph',
-   resourceClass, operation, ms, outcome: 'success' | 'http_error' | 'timeout' | 'network_error',
+   `{event: 'workbench.dependency', v: 1, correlationId?, routeName?,
+   dependency: 'dataverse' | 'azuread' | 'graph' | 'unknown', resourceClass, operation, ms,
+   outcome: 'success' | 'http_error' | 'timeout' | 'network_error',
    statusClass?: '2xx' | '3xx' | '4xx' | '5xx'}`.
+   - `event` is a **literal discriminator field inside the JSON object** (not just a prose name), so
+     log filtering needs no message-shape heuristics. The event's timestamp is the platform log
+     record's own timestamp (present in `vercel logs --json` output); the event body carries none.
    - `dependency` is derived from a **host-aware allowlisted classifier** (`login.microsoftonline.com`
      → `azuread`, `graph.microsoft.com` → `graph`, the configured Dynamics host → `dataverse`);
-     unknown hosts → `dependency: 'unknown'`.
+     unknown hosts → `dependency: 'unknown'` — a first-class variant of the union, not an error.
    - `resourceClass` is a **safe coarse class from a fixed allowlist** (for Dataverse: the entity-set
      name matched against a tracked allowlist; for Graph: a coarse operation class like `drive-item`,
      `site`, `search`, `token`). Anything unmatched fails closed to `resourceClass: 'unknown'` —
@@ -125,23 +140,68 @@ Any claim that instrumenting one of these seams covers another is false and must
      segments, tenant identifiers, drive/item ids, filenames, signed-URL material, tokens, headers,
      request/response bodies. A redaction unit test asserts the emitted object contains none of a
      seeded set of sensitive markers.
-5. **Failure semantics (explicit, per Codex P2-1):** timing is recorded in `finally` (or equivalent)
-   so **successes, non-2xx responses, timeouts, and thrown network errors are all timed**, with
+5. **Failure semantics (explicit, per Codex P2-1; error-transformation preservation per the
+   2026-08-15 follow-up review):** timing is recorded in `finally` (or equivalent) so **successes,
+   non-2xx responses, timeouts, and thrown network errors are all timed**, with
    `outcome`/`statusClass` set accordingly. The wrapper returns the **original `Response` object**
-   and rethrows the **original error** (same identity, same shape — no wrapping, no `.clone()`
-   substitution, no consumption of the body). **Only telemetry-emission failures are swallowed**
-   (try/catch around the emit alone); dependency failures always propagate unchanged.
+   and rethrows **exactly the error the seam throws today — telemetry adds no additional wrapping
+   layer**. Two of the seams already transform raw fetch throws deliberately, and that existing
+   behavior is preserved unchanged: `dynamics/http.js:41-50` wraps no-response throws via
+   `buildNoResponseError('dataverse', err)` so the drain's retry classifier sees structured
+   `err.noResponse`/`err.isTransient`/`err.causeKind`, and `graph-service.js` does the same with
+   provider tag `'graph'`. "Original error" means **that** structured error — same identity, same
+   shape; the telemetry wrapper must neither re-wrap it, suppress it, nor substitute its own error
+   type. `outcome` for thrown errors is **derived by inspecting** the existing structured error
+   (timeout-shaped `causeKind` → `'timeout'`, otherwise `'network_error'`), never by replacing it.
+   The **timed span covers the fetch leg only**: in `dynamics/http.js` the
+   `assertDataverseOperationAllowed` interlock call deliberately sits before the try block so policy
+   denials propagate un-reclassified (`http.js:32-38`) — instrumentation goes inside/around the
+   try, after the interlock assert, so a policy denial is neither timed as a dependency failure nor
+   re-wrapped. In `lib/dataverse/client.js` (raw `fetch`, no existing transformation) errors
+   propagate as thrown, unwrapped. **Only telemetry-emission failures are swallowed** (try/catch
+   around the emit alone); dependency failures always propagate unchanged.
 6. **Sink (chosen, per Codex P2-2): structured platform logs (Vercel) via a single `console.log` of
    the JSON event, event name `workbench.dependency`.** No new table, no durable write — consistent
    with this stage's stop condition. The existing `api_usage_log` is the **LLM token/cost ledger**
    (`docs/atlas/postgres-infra-tables.md:147-149`) and is **not** repurposed or imitated.
-   - **Sampling:** 100% (workbench traffic is low-volume; revisit only if log cost is observed).
-   - **Query workflow:** route-level counts and latency distributions are obtained from the Vercel
-     log stream filtered on `workbench.dependency`, exported (dashboard export or `vercel logs`)
-     into a scratch analysis at the end of the measurement window.
+   - **Sampling scope (resolved per the 2026-08-15 follow-up review):** the three wrapped seams are
+     **shared app-wide transports**, not Workbench-private — every server-side caller of
+     `DynamicsService`, Graph, and `lib/dataverse/client.js` (other routes, crons, cold-start
+     checks) emits events once the seams are wrapped. Sampling is therefore **100% of ALL seam
+     traffic**, justified by the application's overall low volume (a staff/intake app, not a
+     public-traffic site), **not** by "workbench traffic" alone. Events from un-instrumented
+     callers simply carry no `correlationId`/`routeName` (the defined no-correlation behavior);
+     the measurement window filters on `routeName` for its three target routes. The `event` name
+     `workbench.dependency` names the initiative that introduced the stream, not a scope
+     restriction. If observed volume or log cost surprises, the revisit knob is a follow-up
+     change, not a silent implementer choice.
+   - **Query workflow (executable, bounded):** capture slices are appended to a scratch NDJSON file
+     by re-running this command (manually or via a local scheduler) across the window:
+
+     ```bash
+     # Preconditions (one-time): `vercel login`, then `vercel link` from the repo root to the
+     # production project (or pass --scope/--token explicitly in a non-interactive shell).
+     # `vercel logs` tails LIVE production runtime logs — it is a stream, not a historical
+     # query — so each invocation captures only its own bounded tail session.
+     timeout 3600 npx vercel logs <production-deployment-url> --json 2>/dev/null \
+       | jq -c 'select(.message? // "" | test("\"event\":\"workbench\\.dependency\""))' \
+       >> "$SCRATCH/workbench-dependency-$(date +%Y%m%dT%H%M).ndjson"
+     ```
+
+     - **Time bounds:** each slice is bounded by `timeout` (1h above) and stamped in its filename;
+       per-event timestamps come from the platform log record in the `--json` output (the event
+       body deliberately carries no timestamp field).
+     - **Result-volume handling:** the `jq` filter keeps only `workbench.dependency` lines, so
+       file growth is bounded by actual dependency-call volume; slices are date-named for rotation
+       and aggregated at window end (per route × dependency × resourceClass counts, p50/p95 over
+       `ms`, outcome counts).
+     - **CLI-shape caveat `[ASSUMED]`:** the exact `vercel logs` flags/JSON field names must be
+       confirmed against the installed CLI version at window start; if the CLI's live-tail window
+       or plan limits make scheduled slices impractical, fall back to the dashboard log export or
+       a Log Drain — same filter, same aggregation.
    - **Retention:** platform log retention on the current Vercel plan must be **verified at window
-     start**; if retention is shorter than the measurement window, schedule periodic exports so no
-     window data is lost. `[NEEDS OWNER — plan-tier retention confirmation]`
+     start**; the capture-slice workflow above exists precisely so the window does not depend on
+     platform retention exceeding it. `[NEEDS OWNER — plan-tier retention confirmation]`
    - **Failure isolation:** emission is the try/catch-guarded `console.log` above; it cannot fail the
      request. If a durable sink is ever chosen later, that is a re-scope requiring migration, Atlas,
      retention, and privacy contracts — not an implementer option in this stage.
@@ -164,7 +224,8 @@ Any claim that instrumenting one of these seams covers another is false and must
     caller emits a well-formed event with no correlation fields. Integration — byte-identical
     response through one multi-adapter route.
 12. **Gates:** `check:dataverse-access-layer` + self-test (touching the transport), `check:types`,
-    `check:api-routes` + self-test (route files change) — run serially.
+    `check:api-routes` + self-test (route files change), and **`npm run build`** (production Next
+    build — proves the browser-import-safety contract above survives bundling) — run serially.
 13. **Performance acceptance:** wrapper overhead is negligible relative to a network call (assert no
     added awaits on the hot path beyond the original fetch); the *output* is the metric stream.
 14. **Security acceptance:** events carry no PII/token/secret (redaction test); the sink is the
@@ -313,10 +374,21 @@ any such change must preserve the S213/S400/S401 correctness invariants. Compone
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-15 (post-Codex, post-revision): READY WITH NAMED CHANGES.** Named changes (owner
+**Mode A, 2026-08-15, second pass (post-Codex follow-up review, five additional findings folded
+in): READY WITH NAMED CHANGES.** The follow-up pass verified: telemetry preserves the transports'
+existing structured error transformations (`buildNoResponseError` at `dynamics/http.js:41-50` and
+the Graph equivalent) and adds no wrapping of its own, with the timed span excluding the pre-try
+interlock assert; the `lib/dataverse/client.js` integration is lazy/server-only per that module's
+browser-import contract (`client.js:11-29`), enforced by the new `npm run build` gate; the event
+contract carries an explicit `event: 'workbench.dependency'` discriminator and a first-class
+`'unknown'` dependency variant; sampling is stated as 100% of all shared-seam traffic (the seams
+are app-wide, not Workbench-private), justified by whole-app volume; and the log-export workflow is
+an executable bounded capture-slice command with link preconditions, JSON output, time bounds,
+filtering, and volume handling (CLI flag shapes `[ASSUMED]` pending window-start confirmation).
+Named changes (owner
 items, not rework): (1) campaign window/release posture `[NEEDS OWNER]`; (2) Vercel plan log
 retention confirmed at measurement-window start; (3) implementation itself remains unauthorized
-until the owner names a stage (brief Phase 8). Verified in this pass: the egress inventory matches
+until the owner names a stage (brief Phase 8). Verified across both passes: the egress inventory matches
 source (three in-scope seams, each with its own transport; no shared-coverage claim); the
 correlation design uses a new independent ALS whose lifecycle cannot be disturbed by DAL scopes and
 begins before the pre-auth Dataverse lookup it must observe; the event contract, sink, and failure
