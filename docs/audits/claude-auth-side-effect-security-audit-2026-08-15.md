@@ -14,19 +14,25 @@ still-open Fable findings, on branch `codex/claude-security-followup-audit` off
 `origin/main` @ `307a68c8`. No runtime code changed. All 57 `check:*` gates were green
 on the tree before this audit began.
 
-**Revision (same day):** corrected after two rounds of Codex adversarial review. Material
-corrections: §1 disabled-account exposure is **unbounded for an active user**, not 8h, and
-now (round 2) covers the `link-profile` profile-creation revocation gap, the
-**both-layers-required** remediation (JWT-clear alone does not block the current bare-auth
-request), and the missing-profile-row fail-open in the two heavier helpers; §2 separates
-the reachable (`link-profile`) from the latent (`/api/intake/*`, blocked by a `proxy.js`
-routing mismatch) direct-session routes; §2's fail-open branches are **already unit-tested
+**Revision (same day):** corrected across three rounds of Codex adversarial review.
+Material corrections: §1 disabled-account exposure is **unbounded for an active user**, not
+8h, and now covers **three** distinct revocation gaps — (i) stale-token claims surviving a
+zero-row `is_active` lookup, (ii) a **fresh Azure sign-in for an already-disabled
+`azure_id`** minting a live `azureId`-only session (round 3), and (iii) `link-profile`
+re-establishing a durable active identity through **both** its `createNew` **and** its
+existing-profile (`profileId`) branches (round 3) — plus the **both-layers-required**
+remediation (JWT-clear alone does not block the current bare-auth request) and the
+missing-profile-row fail-open in the two heavier helpers; §2 separates the reachable
+(`link-profile`) from the latent (`/api/intake/*`, blocked by a `proxy.js` routing
+mismatch) direct-session routes; §2's fail-open branches are **already unit-tested
 behavior**; §4's verdict wording is de-contradicted (send-invite idempotency gap CONFIRMED,
 replace-submission REFUTED) and the false token-supersession claim removed; §6's inventory
-is rebuilt with **balanced-expression parsing** (27 sites, not 28 — `campaign-timeline-defaults`
-was a sliding-window false positive; the earlier "external trees clean" claim was wrong for
-`pages/api/bill`); §8's cosmetic fix now prescribes an escaped NUL, not a printable delimiter.
-The `SessionProvider` polling claim in the first revision was overstated and is corrected in §1.
+is rebuilt with **balanced-expression parsing** and now totals **28** sites (round 3 added
+`phase-i-dynamics/summarize-v2.js:82`, a template-interpolated `err.message` the round-2
+regex missed; `campaign-timeline-defaults` remains correctly excluded as a sliding-window
+false positive; the earlier "external trees clean" claim was wrong for `pages/api/bill`);
+§8's cosmetic fix now prescribes an escaped NUL, not a printable delimiter. The
+`SessionProvider` polling claim in the first revision was overstated and is corrected in §1.
 
 Evidence labels: `[VERIFIED via <source>]` = read in current source this session;
 `[ASSUMED]` = not probed. Live production runtime state was **not** probed (standing
@@ -45,7 +51,7 @@ accepted owner decisions (2026-08-15) and were **not** reopened.
 | 3 | Grantee `send-invite` client-controlled recipient/subject/body → email-send primitive | **PARTIAL (owner-decided primitive, one residual)** | Low–Medium | No code change; note residual |
 | 4 | Route idempotency: `send-invite` / `replace-submission` | **CONFIRMED for `send-invite` (no idempotency; duplicate mint+send; all minted tokens stay valid) / REFUTED for `replace-submission`** | Low | No change |
 | 5 | BILL onboarding replay protection (skew window, nonce, duplicate external effects) | **REFUTED (duplicate external effects) / CONFIRMED (open ±300s HTTP-replay window, harmless)** | Low | No change |
-| 6 | Authenticated routes return internal `error.message` | **CONFIRMED — 27 raw-500/502 sites across superuser, cron, staff app-auth, and internal-HMAC audiences** | Low | Optional convention cleanup |
+| 6 | Authenticated routes return internal `error.message` | **CONFIRMED — 28 raw-500/502 sites across superuser (7), cron (17), staff app-auth (3), and internal-HMAC (1) audiences** | Low | Optional convention cleanup (log-first at the one non-logging site) |
 | 7 | Non-constant-time cron-secret compare | **CONFIRMED** | Low | Optional, small (convention parity) |
 | 8 | Non-UTF8 bytes in `pricing-refresh.js` blind a route/security gate | **REFUTED (cannot blind any Node-based gate)** | Informational | Cosmetic only (escaped NUL) |
 
@@ -106,31 +112,55 @@ remain available **indefinitely**, not for ≤8h:
 - `health.js` / `api-capabilities.js` — service-health detail + boolean availability of
   ORCID/NCBI/SerpAPI keys (never the values `[VERIFIED via api-capabilities.js:24-28]`).
 
-**A fifth route: `/api/auth/link-profile` can create a fresh active profile for a disabled
-session.** (Round-2 addition.) This route is proxy-exempt (the `api/auth/*` matcher
-exemption `[VERIFIED via proxy.js:173]`) and uses `getServerSession` directly. Its only
-gate beyond a session is `if (!session.user.needsLinking) return 403`
-`[VERIFIED via link-profile.js:29-31]`. But `needsLinking` is a **token claim**, and the
-`jwt` callback only refreshes it from a `WHERE ... AND is_active = true` lookup — a disabled
-account's lookup returns zero rows, so the **stale `needsLinking = true` claim is retained**
-`[VERIFIED via [...nextauth].js:248-268]`. A disabled session that was mid-linking therefore
-still passes the gate and reaches the `createNew` branch, which **DELETEs the temp profile
-and INSERTs a new `user_profiles` row without setting `is_active`**
-`[VERIFIED via link-profile.js:42-58]` — and the column's DB default is `true`
-(`is_active BOOLEAN DEFAULT true` `[VERIFIED via scripts/setup-database.js:106]`). So a
-just-disabled account can mint itself a brand-new *active* profile. This is a
-revocation-hardening item (immediate scope), not merely a CSRF discussion point.
+**A third gap: a fresh Azure sign-in for an already-disabled `azure_id` mints a live
+session and fires provisioning side effects.** (Round-3 addition.) The `signIn` callback
+looks up the existing profile with `WHERE azure_id = ... AND is_active = true`
+`[VERIFIED via [...nextauth].js:119-123]`, so a **disabled** row returns zero rows and the
+"already linked → return true" branch is skipped. Execution falls through to the
+"create new" branch, whose `INSERT ... ON CONFLICT (azure_id) DO UPDATE SET last_login...`
+matches the existing disabled row and takes the **DO UPDATE** path — which bumps
+`last_login_at` but **does not set `is_active`**, so the row stays disabled — yet still
+`RETURNING id`, then runs `grantDefaultApps(id)`, `notifyNewUser(...)`, and
+`reconcileProfile(...)` and returns `true` `[VERIFIED via [...nextauth].js:172-194]`. The
+resulting JWT carries `azureId` but **no `profileId`** (the jwt callback's active-profile
+lookup is also `is_active = true` → zero rows `[VERIFIED via [...nextauth].js:248-268]`),
+and `proxy.js` admits a staff token on `azureId` alone (`return !!token?.azureId`
+`[VERIFIED via proxy.js:143]`). So a disabled user can **freshly sign in** and reach the
+four bare-`requireAuth` routes — and each sign-in fires default-grant + notification +
+Dynamics-reconcile side effects against the disabled row. This path is **not** covered by a
+"clear claims when the token previously carried `profileId`" fix, because a fresh token
+never carried one; the invariant must cover **any** staff token whose active-profile lookup
+returns zero rows.
+
+**A fourth gap — `/api/auth/link-profile` re-establishes a durable active identity through
+BOTH branches, not just `createNew`.** (Round-2/3.) This route is proxy-exempt (the
+`api/auth/*` matcher exemption `[VERIFIED via proxy.js:173]`) and uses `getServerSession`
+directly. Its only gate beyond a session is `if (!session.user.needsLinking) return 403`
+`[VERIFIED via link-profile.js:29-31]`. But `needsLinking` is a **token claim** the jwt
+callback only refreshes from an `is_active = true` lookup, so a disabled account's stale
+`needsLinking = true` survives `[VERIFIED via [...nextauth].js:248-268]`. Neither branch
+checks the **caller's** live `is_active`:
+- `createNew`: DELETEs the temp profile and INSERTs a new `user_profiles` row **without
+  setting `is_active`** `[VERIFIED via link-profile.js:42-58]`; the column default is
+  `true` (`is_active BOOLEAN DEFAULT true` `[VERIFIED via scripts/setup-database.js:106]`)
+  — a brand-new *active* profile.
+- existing-profile (`profileId`): requires only the **target** profile be active +
+  email-matching (`WHERE id = ${profileId} AND is_active = true AND azure_email = ...`
+  `[VERIFIED via link-profile.js:71-77]`) and then UPDATEs it to bind the caller's
+  `azure_id`, `needs_linking = false` `[VERIFIED via link-profile.js:95-100]` — a disabled
+  caller can **claim** an active email-matching profile.
+Both branches therefore need the same live caller-active guard; the fix must cover both.
 
 **Severity.** Medium. Realistic prerequisites: a disabled-for-cause account (offboarding /
-compromise response) whose holder **keeps a session active** — exactly the adversarial
-case revocation exists for. The bare-auth surfaces are staff-wide-by-design assets plus an
-upload-token mint (persistence of low-privilege access, not escalation); the `link-profile`
-path is worse in kind — it re-establishes a *durable* active identity — but needs a
-mid-linking (`needsLinking = true`) session, a narrower precondition. The common root is
-that **revocation is enforced at none of the three layers except the per-request
-route-helper `is_active` read**: not the session/JWT layer, not the proxy edge, and not the
-bare-`requireAuth`/`getServerSession`-direct routes. The *indefinite* duration defeats the
-purpose of disablement for all five routes.
+compromise response). The bare-auth surfaces are staff-wide-by-design assets plus an
+upload-token mint (persistence of low-privilege access, not escalation) and are reachable
+either by keeping a session active **or by a fresh sign-in**; the `link-profile` paths are
+worse in kind — they re-establish a *durable* active identity — but need a mid-linking
+(`needsLinking = true`) session, a narrower precondition. The common root is that
+**revocation is enforced at none of the layers except the per-request route-helper
+`is_active` read**: not `signIn`, not the session/JWT layer, not the proxy edge, and not
+the bare-`requireAuth`/`getServerSession`-direct routes. The *indefinite* duration defeats
+the purpose of disablement for all of them.
 
 **What tests/gates prove / don't.** `check:api-routes` proves guard-token presence only —
 it does not distinguish `requireAuth` from the revocation-aware variants. No unit test
@@ -152,33 +182,55 @@ revocation gate on every route, not just the bare-auth ones. The intended postur
 deleted, or otherwise missing staff profiles all **fail closed** — is a one-line change in
 each helper (treat `rows.length === 0` as not-active for a token that carried a `profileId`).
 
-**Disconfirming check.** If `requireAuth` gains an `is_active` read, the `jwt` callback
-clears staff claims on a zero-row lookup, `link-profile` re-checks live `is_active` before
-`createNew`, and the two helpers treat a missing row as not-active, the finding closes.
-Re-grep `requireAuth(` callers, re-read `[...nextauth].js:248-268`, `link-profile.js:29-58`,
-and `auth.js:205-209, 300` after any fix.
+**Disconfirming check.** The finding closes only when `signIn` refuses (or the jwt/proxy
+rejects) a disabled `azure_id`, `requireAuth` gains an `is_active` read, the jwt callback
+invalidates **any** staff token whose active lookup returns zero rows (not only ones that
+carried `profileId`), `link-profile` re-checks live caller `is_active` in **both** branches,
+and the two helpers treat a missing row as not-active. Re-grep `requireAuth(` callers,
+re-read `[...nextauth].js:119-194, 248-268`, `link-profile.js:29-100`, `proxy.js:143`, and
+`auth.js:205-209, 300` after any fix.
 
 **Remediation — behavioral invariants, not a fixed implementation.** This is broader than
 "add one read" and belongs in a dedicated Tier-2 revocation-hardening effort (see §11).
-Note that the two candidate fixes are **complementary, not interchangeable**: clearing the
-JWT to `{}` blocks *subsequent* proxy-gated requests, but the **current** bare-auth request
+Note the two candidate layers are **complementary, not interchangeable**: clearing the JWT
+to `{}` blocks *subsequent* proxy-gated requests, but the **current** bare-auth request
 already holds a session object, and NextAuth's session read still constructs a **non-null**
 session from a token even after a same-request clear — `requireAuth` checks only that the
 session object *exists* `[VERIFIED via lib/utils/auth.js:149-156]`, so that in-flight request
 would still proceed. Durable + immediate revocation therefore needs **both** a
 current-request route-level `is_active` guard (blocks the present request) **and** the
 JWT-claim invalidation (blocks the next request through the proxy). Neither alone closes the
-window.
+window. Separately, the persistence design must give **revocation vs linking a clear
+conditional/transactional ordering** — a live caller-active check must gate the
+DELETE/INSERT/UPDATE in `link-profile` (and the provisioning writes in `signIn`) so that a
+disabled caller cannot mutate identity state before the check, rather than bolting an
+after-the-fact guard onto a write that has already run.
+
+**Stale-token vs hard-deletion — an owner decision to record.** These gaps split into two
+cases with different fixes. (a) A **disabled** row (`is_active = false`) still exists, so
+every proposed check (`signIn`, jwt, helpers, `link-profile`) can see it and fail closed —
+**disablement is durable revocation** and the invariants below make it so. (b) A **hard
+deletion** removes the row entirely: a fresh sign-in then legitimately hits the
+"create new" path and re-provisions, because nothing records that the identity was revoked.
+If hard deletion must also prevent reprovisioning, a **tombstone / denylist** (a retained
+`revoked azure_id` marker the `signIn` and `link-profile` paths consult) is required — the
+`is_active` invariants alone cannot cover a row that no longer exists. Recommend: treat
+disablement as the durable-revocation mechanism; decide explicitly whether hard-delete
+reprovisioning is in scope (if so, add the tombstone).
 
 **Required regression tests for any implementation:**
+- **Fresh sign-in:** an Azure sign-in for an existing **disabled** `azure_id` is rejected
+  (no live session that reaches bare-auth routes) and performs **no** default-grant,
+  notification, Dynamics-reconcile, or profile-provisioning side effect.
 - `requireAuth` returns 403 for a session whose profile row has `is_active = false` (and
   still passes for profile-less `needsLinking` sessions).
 - `requireAuthWithProfile` and `requireAppAccess` fail **closed** on a zero-row lookup for a
   token that carried a `profileId` (deleted/missing profile).
-- jwt callback: a token with existing staff claims + a zero-row `is_active = true` lookup
-  does **not** retain `profileId`/staff claims.
+- jwt callback: **any** staff token (with or without a prior `profileId`) whose
+  `is_active = true` lookup returns zero rows does **not** yield a route-passing session.
 - `link-profile`: a disabled (`is_active = false`) session with a stale `needsLinking = true`
-  claim **cannot** create (`createNew`) or claim (`profileId`) a profile.
+  claim **cannot** create (`createNew`) **nor** claim an existing email-matching profile
+  (`profileId` branch).
 - Route-level: disabled account + valid session cookie → `blob-proxy` and `upload-handler`
   respond 403.
 - Idle/rolling: a disabled account remains blocked even when requests arrive inside the 2h
@@ -187,8 +239,9 @@ window.
   `AUTH_REQUIRED=false` dev bypass all remain functional; a DB lookup **failure** (not a
   zero-row result) still fails closed (503), not open.
 
-**Residual risk after fix.** One PG read per bare-auth request (low-QPS routes); none
-otherwise.
+**Residual risk after fix.** One PG read per bare-auth request (low-QPS routes); the
+hard-deletion reprovisioning case remains open unless a tombstone/denylist is adopted (owner
+decision above).
 
 ---
 
@@ -438,16 +491,17 @@ multi-instance serverless deployment where a shared nonce store is impractical.
 
 ## 6. Authenticated routes return internal `error.message` — CONFIRMED, four audience classes (Low)
 
-**Reproducible inventory.** (Rebuilt in round 2 — the first-revision "5-line sliding
-window" wrongly associated one response's status with a different response's message; see
-the `campaign-timeline-defaults` correction below.) Method: enumerate every
-`res.status(500|502).json(` call, **balance parentheses to capture that call's exact
-argument expression**, and flag only if *that expression* contains a raw
-`error.message`/`err.message`/`e.message`/`msg`, EXCLUDING (i) `ServiceHttpError` default
-bodies (`err.body ?? { error: err.message }`), and (ii) development-only details
-(`NODE_ENV === 'development' ? error.message : ...`). Result: **27 raw
-unhandled-error disclosure sites** `[VERIFIED via balanced-expression scan of `pages/api`
-this session]`, by audience:
+**Reproducible inventory.** (Rebuilt across rounds 2–3. Round 2 replaced a "5-line sliding
+window" — which wrongly associated one response's status with a different response's
+message — with balanced-parenthesis parsing; round 3 **broadened the message pattern to
+match template interpolation** after the round-2 regex missed a `` `...${err.message}` ``
+site.) Method: enumerate every `res.status(500|502).json(` call, **balance parentheses to
+capture that call's exact argument expression**, and flag if that expression contains any
+`error.message`/`err.message`/`e.message`/`msg` (including inside a template literal),
+EXCLUDING (i) `ServiceHttpError` default bodies (`err.body ?? { error: err.message }`), and
+(ii) development-only details (`NODE_ENV === 'development' ? error.message : ...`). Result:
+**28 raw unhandled-error disclosure sites** `[VERIFIED via balanced-expression scan of
+`pages/api` this session]`, by audience:
 
 - **Superuser (7):** `admin/policies.js:43`, `admin/prompts/[name].js:61`,
   `admin/prompts/index.js:31`, `admin/reconcile-identities.js:41`,
@@ -460,46 +514,54 @@ this session]`, by audience:
   `reconcile-identities:53`, `refresh-irs-bmf:85`, `reviewer-email-reconcile:62`,
   `reviewer-reminders:63`, `secret-check:128`, `send-review-thankyous:65`,
   `spend-check:58`, `sweep-stale-invites:59` — all `verifyCronSecret`.
-- **Ordinary staff app-auth (2):** `reviewer-finder/contact-history.js:49`,
-  `reviewer-finder/prompt-override.js:56` — both `requireAppAccess` `[VERIFIED per-file]`.
+- **Ordinary staff app-auth (3):** `reviewer-finder/contact-history.js:49`,
+  `reviewer-finder/prompt-override.js:56`, and **`phase-i-dynamics/summarize-v2.js:82`**
+  (`return res.status(500).json({ error: `Failed to load file: ${err.message}` })`,
+  guarded by `requireAppAccess` `[VERIFIED via summarize-v2.js:50, 82]`; **round-3
+  addition** — the template-interpolated message escaped the round-2 regex).
 - **Internal HMAC caller (1):** `bill/onboard-reviewer.js:107-110` returns
   `error: { code: 'unhandled', message: msg }` to the HMAC-authenticated internal caller
   `[VERIFIED]`. **The first draft's claim that `pages/api/bill` was clean is retracted** —
   it rested on a single-line grep that missed this multiline body.
 
-**Corrected false positive (round 2):** `review-manager/campaign-timeline-defaults.js` is
-**removed** from the app-auth list. Its `res.status(500)` at `:36-37` is a **generic**
-message (`'Failed to save reviewer campaign timeline defaults'`, no `error.message`); the
+**Still-excluded false positive:** `review-manager/campaign-timeline-defaults.js` remains
+**out** of the app-auth list. Its `res.status(500)` at `:36-37` is a **generic** message
+(`'Failed to save reviewer campaign timeline defaults'`, no `error.message`); the
 `{ error: error.message }` at `:41` is a **separate 400** on the `requireSuperuser` PUT
 catch path, not a raw 500 to an app-auth caller `[VERIFIED via
-review-manager/campaign-timeline-defaults.js:25-41]`. The sliding window had merged the
-two. This is why the total is 27, not 28.
+review-manager/campaign-timeline-defaults.js:25-41]`. It is correctly not among the 28.
 
 The external **token-authenticated** trees (`pages/api/external/*`, `pages/api/webhooks/*`)
 show no raw-message sites under the same scan `[VERIFIED via the balanced-expression scan —
 zero hits in those trees]`.
 
-**Logging note.** Each of the 27 retained catch paths was checked individually for a
-`console.error`/`warn` on the same catch: all 27 log the underlying error server-side
-(including `cron/maintenance.js:261` and `cron/drain-submissions.js:119`, whose log sits at
-the top of a long catch above the response line) `[VERIFIED per-hit this session]`. So
-generalizing the response bodies loses no diagnostic signal.
+**Logging note (corrected in round 3).** Each of the 28 catch paths was re-checked
+per-hit: **27 log the underlying error server-side** (including `cron/maintenance.js:261`
+and `cron/drain-submissions.js:119`, whose log sits at the top of a long catch above the
+response line). **The exception is `phase-i-dynamics/summarize-v2.js:82`, whose
+`catch (rawErr)` block does NOT call `console.*` — it discloses `err.message` to the caller
+and logs nothing** `[VERIFIED via summarize-v2.js:77-83]`. So the earlier "all sites already
+log" claim is retracted; generalizing that one site's response would drop the only place the
+error surfaces unless logging is added first.
 
-**Verdict:** CONFIRMED, Low. All 27 sites sit behind authentication, but the audience is
-broader than "superuser/cron": two routes disclose to any staffer with the relevant app
+**Verdict:** CONFIRMED, Low. All 28 sites sit behind authentication, but the audience is
+broader than "superuser/cron": three routes disclose to any staffer with the relevant app
 grant, and one to the internal HMAC principal. The `ServiceHttpError` convention shows the
-codebase already has the disciplined alternative; these 27 are drift from it.
+codebase already has the disciplined alternative; these 28 are drift from it.
 
 **What gates prove / don't.** No gate asserts response-body hygiene.
 
-**Disconfirming check.** Re-run the balanced-expression scan after any cleanup; any site
-outside the two excluded categories is a regression.
+**Disconfirming check.** Re-run the balanced-expression scan (with the template-literal
+pattern) after any cleanup; any site outside the two excluded categories is a regression.
 
 **Smallest remediation (optional).** Return a generic reason and keep `error.message` in
-the existing `console.error` at each site (all 27 log, verified above). Priority order: the
-2 `requireAppAccess` staff routes, then the HMAC route, then superuser/cron.
+the site's `console.error`. Priority order: the 3 `requireAppAccess` staff routes, then the
+HMAC route, then superuser/cron. **For `summarize-v2.js:82`, add a server-side
+`console.error(rawErr)` FIRST** — it is the one site that currently has no log, so
+generalizing its body before adding logging would lose the error entirely.
 
-**Residual risk.** None once messages are generalized; logging retains detail.
+**Residual risk.** None once messages are generalized **and** the one non-logging site
+gains a log.
 
 ---
 
@@ -579,15 +641,20 @@ delimiter. Zero security impact; do not prioritize.
   and well in BILL onboarding and grantee replace-submission. Send-invite deliberately
   opts out (resend is a feature). Mature partial-success posture.
 - **Revocation is enforced per-request at the route-helper layer only — and even there it
-  fails open on a missing profile row.** Neither the session layer (`jwt` callback keeps
-  stale staff claims on a zero-row active lookup, `[...nextauth].js:248-268`) nor the edge
-  (`proxy.js` checks idle + claim presence only) participates in disablement, and sessions
-  self-renew indefinitely with activity (§1). Worse, the two helpers that *do* read
-  `is_active` treat a **missing** row as active (`auth.js:205-209, 300`), and
-  `link-profile` can mint a fresh active profile for a disabled-but-`needsLinking` session.
-  No single layer is authoritative for revocation; §1's behavioral-invariant set (current
-  request blocked + subsequent claims invalidated + missing-row-fails-closed +
-  link-profile covered) is what makes the layers agree.
+  fails open on a missing profile row.** Disablement is honored at **none** of the other
+  layers: `signIn` re-provisions and returns true for a disabled `azure_id`
+  (`[...nextauth].js:119-194`), the `jwt` callback keeps/creates an `azureId`-only token on
+  a zero-row active lookup (`:248-268`), the proxy admits on `azureId` alone
+  (`proxy.js:143`), and sessions self-renew indefinitely with activity (§1). Worse, the two
+  helpers that *do* read `is_active` treat a **missing** row as active
+  (`auth.js:205-209, 300`), and `link-profile` re-establishes a durable active identity via
+  **both** its `createNew` and existing-profile branches for a disabled-but-`needsLinking`
+  session. No single layer is authoritative for revocation; §1's behavioral-invariant set
+  (fresh-sign-in refused + current request blocked + subsequent claims invalidated +
+  missing-row-fails-closed + both link-profile branches covered) is what makes the layers
+  agree. Note disablement vs hard-deletion split: the invariants cover a still-present
+  disabled row; preventing reprovisioning after a hard delete needs a tombstone/denylist
+  (owner decision, §10).
 - Two D1-class **config-regression fail-opens** recur: DAL enforcement (documented) and
   `validateOrigin`'s `NEXTAUTH_URL` skip (§2) — the latter deliberate and unit-tested,
   but still silent-on-regression in production. The target/write interlock's
@@ -602,23 +669,35 @@ delimiter. Zero security impact; do not prioritize.
 **Recommended owner decisions (to record):**
 
 1. **Authorize a separate Tier-2 revocation-hardening worktree after this audit merges.**
-   §1 is now a class of related gaps (bare-auth routes, `link-profile` profile creation,
-   session-claim staleness, missing-row fail-open in the two helpers), too broad for a
-   one-line patch and worth its own scoped effort.
+   §1 is now a class of related gaps (fresh sign-in for a disabled `azure_id`, the four
+   bare-auth routes, `link-profile`'s two identity-writing branches, session-claim
+   staleness, missing-row fail-open in the two helpers), too broad for a one-line patch and
+   worth its own scoped effort with a conditional/transactional revocation-vs-linking
+   ordering in the persistence design.
 2. **Authorize behavioral invariants, not a prematurely fixed implementation.** The
    worktree must satisfy, and add regression tests for:
+   - a fresh Azure sign-in for a disabled `azure_id` is refused and fires **no**
+     default-grant / notification / reconcile / provisioning side effect;
    - a disabled **or missing** staff profile blocks the **current** request;
-   - stale JWT claims are invalidated for **subsequent** requests;
-   - all four bare-auth routes **and** `link-profile` are covered;
+   - **any** staff token whose active lookup returns zero rows (with or without a prior
+     `profileId`) is invalidated for **subsequent** requests;
+   - all four bare-auth routes **and both** `link-profile` branches (`createNew` and
+     existing-profile claim) are covered;
    - active linking sessions, applicant sessions, and the `AUTH_REQUIRED=false` dev bypass
      remain functional;
    - a DB lookup **failure** (not a zero-row result) still **fails closed** (503).
-3. **Intake proxy + CSRF stays deferred but is a mandatory joint launch prerequisite** —
+3. **Disablement vs hard deletion — record the decision.** Disablement (`is_active = false`)
+   is the durable-revocation mechanism the invariants above enforce. A **hard delete**
+   removes the row, so a fresh sign-in legitimately re-provisions; if hard-delete
+   reprovisioning must be prevented, authorize a **tombstone / denylist** of revoked
+   `azure_id`s that `signIn` and `link-profile` consult. Decide whether that case is in
+   scope.
+4. **Intake proxy + CSRF stays deferred but is a mandatory joint launch prerequisite** —
    the proxy applicant-surface classification and intake Origin validation must ship
    together before the intake flow goes live (§2c).
-4. **Recipient override (§3) and stateless grantee tokens (§4) remain accepted risks** —
+5. **Recipient override (§3) and stateless grantee tokens (§4) remain accepted risks** —
    no change without a new owner decision.
-5. **The `NEXTAUTH_URL` fail-closed change (§2) can fold into the next release
+6. **The `NEXTAUTH_URL` fail-closed change (§2) can fold into the next release
    preflight** — it does not block this audit.
 
 **Read-only production probes (owner-executed; none block the source-level verdicts):**
@@ -631,12 +710,15 @@ delimiter. Zero security impact; do not prioritize.
 
 ## 11. What would change these verdicts
 
-- §1 → closes only when **all four** invariants in §10.2 hold: a current-request
-  `is_active` guard on the bare-auth routes, JWT-claim invalidation for subsequent
-  requests, missing-row-fails-closed in `requireAuthWithProfile`/`requireAppAccess`, and a
-  live `is_active` re-check in `link-profile` before `createNew`. Any single fix leaves a
-  window (JWT-clear alone does not block the in-flight bare-auth request; a route guard
-  alone does not stop the next proxy-gated request).
+- §1 → closes only when **all** the §10.2 invariants hold: `signIn` refuses a disabled
+  `azure_id` (no side effects), a current-request `is_active` guard on the bare-auth routes,
+  JWT invalidation for **any** zero-active-row staff token on subsequent requests,
+  missing-row-fails-closed in `requireAuthWithProfile`/`requireAppAccess`, and a live caller
+  `is_active` re-check in **both** `link-profile` branches (`createNew` and existing-profile
+  claim). Any single fix leaves a window (JWT-clear alone does not block the in-flight
+  bare-auth request; a route guard alone does not stop the next proxy-gated request; a
+  `createNew`-only guard leaves the profileId-claim branch open). Hard-delete reprovisioning
+  stays open unless a tombstone/denylist is adopted (§10.3).
 - §2 → fail-open closes if branches 3–4 fail closed in prod (tests updated); the intake
   CSRF item converts from latent to live the moment the proxy applicant-surface
   classification is extended — fix both together at intake launch.
@@ -651,7 +733,7 @@ delimiter. Zero security impact; do not prioritize.
 
 ---
 
-*Prepared read-only; revised same-day across two Codex adversarial-review rounds. No
+*Prepared read-only; revised same-day across three Codex adversarial-review rounds. No
 runtime code, tests, `SESSION_PROMPT.md`, or plan/observability surfaces were modified.
 Branch `codex/claude-security-followup-audit`. Do not merge; Codex performs the final
 bounded read-only verification.*
