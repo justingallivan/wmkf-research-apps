@@ -72,7 +72,8 @@ Claude independently re-reviews the Codex delta next.
 - `445dd1f8` — Implement disabled-account revocation hardening (audit §10.2 invariants)
 - `6268e26b` — Remediate Opus review findings: fail-closed NULL is_active + record review
 - `7b8b3d95` — Close Session 431 with reviewed revocation-hardening handoff
-- (Owner-authorized Codex race-remediation commits follow)
+- `b85a84f9` — Fix revocation-linking concurrency ordering (owner-authorized Codex remediation)
+- (Codex handoff-only commit follows this file's final reconciliation)
 
 ## Next Items
 
