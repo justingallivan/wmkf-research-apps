@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: security
-  last_verified: 2026-08-12 (S422) against route/service source, API route matrix, S207 rationale, and S289 design — re-checked, STILL UNADDRESSED
+  last_verified: 2026-08-14 (S428 Fable audit T1) against current route/service source — re-checked, STILL UNADDRESSED; service hardened 2026-08-13 (d8ffc4ae/f9beaec1: cap classification, pre-deactivate re-verify) but no authorization added
 ---
 
 ## Recall Rule
@@ -30,9 +30,12 @@ OPEN"*, staying permissive for superusers, unresolved viewer ids, and unresolved
 request PDs.
 
 What the endpoint can do is destructive and not transactional: `executeMerge`
-hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:432`) and
-deactivates the loser person (`:501`), with no compensation for a failure after the
-delete.
+hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:448` as of
+2026-08-14) and deactivates the loser person (`:541`), with no compensation for a
+failure after the delete (a `merge_retryable_replan` 409 tells the client to replan).
+Since `fa62db30` (2026-06-29) the merge ALSO writes `akoya_request` applicant slots
+(repoint/disassociate, `:466-486`) — request records the caller may not manage — so
+the unauthorized write reach is wider than the original suggestion+person scope.
 
 **So today, any user with reviewer-finder app access can POST two GUIDs and execute a
 global merge for records in requests they are not viewing.**
