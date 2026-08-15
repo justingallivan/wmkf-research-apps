@@ -42,8 +42,16 @@ import {
   describeRemoval,
   removeCandidateEntirely,
 } from '../../../lib/services/reviewer-finder/remove-candidate-service';
+import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
 
 export default async function handler(req, res) {
+  return withRequestCorrelation(
+    { correlationId: mintCorrelationId(), routeName: '/api/reviewer-finder/my-candidates' },
+    () => handleWithCorrelation(req, res),
+  );
+}
+
+async function handleWithCorrelation(req, res) {
   const access = await requireAppAccess(req, res, 'reviewer-finder', 'reviewers');
   if (!access) return;
 
