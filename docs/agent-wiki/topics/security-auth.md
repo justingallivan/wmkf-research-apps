@@ -67,6 +67,30 @@ not a current authority.
   "auth disabled" (Codex adversarial finding, S398: a cached transient 503
   disabled the client auth gate for the page lifetime). Regression tests:
   `tests/unit/require-auth-render-race.test.js`.
+- **Disabled-account revocation is enforced at sign-in, session/JWT, and every
+  route guard; the proxy edge inherits it via JWT invalidation (2026-08-15
+  revocation hardening, branch `codex/claude-revocation-hardening`):** the
+  NextAuth `signIn` callback looks up the caller's `azure_id` WITHOUT an
+  `is_active` filter and denies sign-in for a disabled row before any
+  provisioning/notification/reconcile side effect; the `jwt` callback returns
+  `{}` (full invalidation) when the active-profile lookup returns zero rows —
+  DB errors keep the token and defer to the route guards' 503; bare
+  `requireAuth` (and therefore the four bare-auth routes: blob-proxy,
+  upload-handler, health, api-capabilities) does a live `is_active` read per
+  request for non-applicant sessions; `requireAuthWithProfile` and
+  `requireAppAccess` fail closed on zero rows (a deleted profile is not
+  active); and `/api/auth/link-profile` locks and re-checks the live caller in
+  BOTH branches. `createNew` finalizes the temporary row in place; an
+  existing-profile claim locks caller + target and commits its DELETE/UPDATE
+  transfer transactionally, so a failed claim rolls the DELETE back. Profile
+  archive reports success only when its UPDATE affects a row. `is_active =
+  false` is the durable revocation mechanism; hard-delete reprovisioning is an
+  accepted residual (no tombstone by owner decision). Tests:
+  `tests/unit/nextauth-revocation.test.js`,
+  `tests/unit/bare-auth-revocation.test.js`,
+  `tests/unit/link-profile-revocation.test.js`,
+  `tests/unit/database-service-archive.test.js`, `tests/unit/utils/auth.test.js`.
+  Record: `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`.
 - A client-supplied id (`req.query`/`req.body`) that becomes a Dataverse selector
   must be GUID-validated at the route edge BEFORE the selector. `getRecord`/
   `updateRecord` interpolate the record id raw into the request URL

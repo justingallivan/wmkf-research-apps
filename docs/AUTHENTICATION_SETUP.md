@@ -288,7 +288,7 @@ View sign-in logs in Azure Portal:
 |----------|-------------------|
 | All non-API routes | `proxy.js` (`withAuth`) — fails closed before page code runs |
 | App-specific API routes | `requireAppAccess(req, res, 'app-key')` — combines CSRF origin check + auth + `is_active` check + per-app grant |
-| Infrastructure API routes (auth/admin/health) | `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()` |
+| Infrastructure API routes (auth/admin/health) | `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()` — all perform a live `is_active` read per request; disabled or missing (zero-row) profiles fail closed (403; DB error → 503) |
 | Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from proxy |
 | External-reviewer routes (`/api/external/*`) | HMAC JWT (`EXTERNAL_LINK_SECRET`) — public, allowlisted in proxy |
 | Auth routes (`/api/auth/*`) | Public (required for OAuth flow) — excluded from proxy |
@@ -300,7 +300,7 @@ View sign-in logs in Azure Portal:
 |------|---------|
 | `proxy.js` | Server-side auth gate (Next 16 `proxy` convention, `withAuth`/`jose`) + CSP nonce generation |
 | `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — `NODE_ENV=production` fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
-| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached) |
+| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached); every helper, including bare `requireAuth`, fails closed on a disabled or missing (zero-row) profile |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |
 | `pages/api/auth/status.js` | Public `{ enabled: boolean }` client-bootstrap endpoint; reports the same fail-closed `isAuthRequired()` enforcement state used by proxy/API guards |
 | `shared/components/RequireAuth.js` | Client-side auth guard |

@@ -212,6 +212,90 @@ export function mockIsActiveLookupFailure(profileId) {
 }
 
 /**
+ * Simulate a staff session whose user_profiles row has been deleted (zero
+ * rows on the is_active lookup) — the fail-open case the audit found in
+ * requireAuthWithProfile / requireAppAccess and that bare requireAuth never
+ * checked at all. Session carries a profileId (the deleted row's former id)
+ * so the profileId lookup key is exercised.
+ *
+ * @param {number} profileId
+ */
+export function mockMissingProfile(profileId) {
+  _mockSession = {
+    user: {
+      profileId,
+      email: `gone${profileId}@wmkeck.org`,
+      azureEmail: `gone${profileId}@wmkeck.org`,
+      name: `Deleted Profile ${profileId}`,
+    },
+  };
+
+  _mockAppKeys = [];
+  _mockSqlResults = {
+    // No 'is_active' key at all → the sql mock's default (empty rows) fires,
+    // simulating a zero-row SELECT.
+  };
+
+  process.env.AUTH_REQUIRED = 'true';
+  process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
+  process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
+  process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+}
+
+/**
+ * Simulate a staff session with NO profileId, only an azureId — the
+ * requireAuth fallback lookup key. Pass `disabled: true` for a disabled row
+ * (azure_id present, is_active false); omit it (or pass nothing) for a
+ * missing row (zero rows on the azure_id lookup).
+ *
+ * @param {string} azureId
+ * @param {{ disabled?: boolean }} [opts]
+ */
+export function mockAzureIdOnlySession(azureId, opts = {}) {
+  _mockSession = {
+    user: {
+      azureId,
+      email: `azureonly-${azureId}@wmkeck.org`,
+      name: `Azure-Only ${azureId}`,
+      // deliberately no profileId
+    },
+  };
+
+  _mockAppKeys = [];
+  _mockSqlResults = opts.disabled
+    ? { is_active: { rows: [{ is_active: false }], rowCount: 1 } }
+    : {}; // zero rows by default
+
+  process.env.AUTH_REQUIRED = 'true';
+  process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
+  process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
+  process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+}
+
+/**
+ * Simulate an applicant session (userType 'applicant'). Applicants have no
+ * user_profiles row by design; requireAuth must skip the is_active lookup
+ * entirely for them.
+ */
+export function mockApplicantSession() {
+  _mockSession = {
+    user: {
+      userType: 'applicant',
+      contactOid: 'applicant-contact-oid',
+      email: 'applicant@example.org',
+    },
+  };
+
+  _mockAppKeys = [];
+  _mockSqlResults = {};
+
+  process.env.AUTH_REQUIRED = 'true';
+  process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
+  process.env.AZURE_AD_CLIENT_SECRET = 'test-client-secret';
+  process.env.AZURE_AD_TENANT_ID = 'test-tenant-id';
+}
+
+/**
  * Merge additional preset rows into the `sql` mock, keyed by a query-text
  * fragment (e.g. 'dynamics_restrictions'). Call AFTER mockAuthenticatedUser
  * (which resets _mockSqlResults). Value shape matches @vercel/postgres:

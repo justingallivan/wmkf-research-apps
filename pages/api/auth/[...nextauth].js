@@ -96,6 +96,11 @@ export const authOptions = {
      * Applicant (`entra-external`): no DB write. Identity → Dynamics contact
      * mapping happens lazily on the first authenticated `/apply` write,
      * keyed off `contactOid`. Sign-in itself is just OAuth completion.
+     *
+     * Staff azure_id lookup is NOT filtered by `is_active` — a disabled
+     * profile must be found and denied here, not fall through to the
+     * provisioning branches (whose ON CONFLICT (azure_id) DO UPDATE would
+     * otherwise match the disabled row and mint a live session).
      */
     async signIn({ user, account, profile }) {
       if (account?.provider === 'entra-external') {
@@ -115,16 +120,27 @@ export const authOptions = {
             return false;
           }
 
-          // Check if a profile with this Azure ID already exists
+          // Check if a profile with this Azure ID already exists (active or
+          // disabled — an already-disabled azure_id must be denied here, not
+          // fall through to the provisioning branches below, whose
+          // ON CONFLICT (azure_id) DO UPDATE would otherwise match the
+          // disabled row and mint a live session with side effects).
           const existingByAzureId = await sql`
-            SELECT id, name, display_name, azure_email, needs_linking
+            SELECT id, name, display_name, azure_email, needs_linking, is_active
             FROM user_profiles
-            WHERE azure_id = ${azureId} AND is_active = true
+            WHERE azure_id = ${azureId}
           `;
 
           if (existingByAzureId.rows.length > 0) {
-            // User already linked, update last login
             const profile = existingByAzureId.rows[0];
+
+            if (profile.is_active !== true) {
+              // Disabled (or NULL, which is not active) account: deny
+              // sign-in outright. No writes, no provisioning side effects.
+              return false;
+            }
+
+            // User already linked and active, update last login
             await sql`
               UPDATE user_profiles
               SET last_login_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
@@ -213,6 +229,13 @@ export const authOptions = {
      *
      * Idle timeout (2 h) applies to both surfaces — staff JWTs are cleared
      * by missing `azureId`, applicant JWTs by missing `contactOid`.
+     *
+     * Staff revocation: the linked-profile lookup is `is_active = true`. A
+     * zero-row result (profile disabled/deleted since the token was issued)
+     * invalidates the token (`return {}`) rather than keeping stale staff
+     * claims. A DB error keeps the existing token as-is — route guards fail
+     * closed with a 503 on their own re-read; this callback should not mass
+     * invalidate sessions on a transient DB blip.
      */
     async jwt({ token, user, account, profile }) {
       const IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -261,8 +284,20 @@ export const authOptions = {
             token.needsLinking = result.rows[0].needs_linking;
             token.isNewUser = !result.rows[0].last_login_at;
             token.dynamicsSystemuserId = result.rows[0].dynamics_systemuser_id || null;
+          } else {
+            // Zero rows for an active-row lookup on a staff token means the
+            // profile was disabled (or deleted) since this token was issued.
+            // Invalidate the token outright — do not keep stale claims, and
+            // do not special-case a "profile-less staff" token: there is no
+            // legitimate session shape where azureId is present but the
+            // profile isn't active (signIn only mints a token after finding
+            // an active row).
+            return {};
           }
         } catch (error) {
+          // DB error: keep the existing token claims. Route guards fail
+          // closed with a 503 on a live DB error; a transient blip here must
+          // not mass-invalidate every staff session.
           console.error('Error looking up profile in jwt callback:', error);
         }
       }
