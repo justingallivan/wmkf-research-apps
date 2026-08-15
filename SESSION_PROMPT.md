@@ -1,4 +1,4 @@
-# Session 432 Prompt: Codex Race Remediation Complete — Claude Re-Review Next
+# Session 433 Prompt: Revocation Hardening Re-Review Complete — Owner Merge Decision Next
 
 ## Session 431 Summary
 
@@ -14,8 +14,10 @@ accepted DELETE-before-replacement link-profile race contradicted the durable
 revocation invariant. Justin authorized Codex to fix it on this branch.
 Codex preserved the caller row for `createNew`, made existing-profile transfer
 transactional, added truthful zero-row archive semantics and discriminating
-tests, and reconciled the durable record. The branch remains NOT merged;
-Claude independently re-reviews the Codex delta next.
+tests, and reconciled the durable record. Claude then completed an independent
+three-pass Opus adversarial re-review with no unresolved blocking or
+high-confidence findings. The branch remains NOT merged and awaits Justin's
+deliberate merge decision.
 
 ### What Was Completed
 
@@ -79,18 +81,17 @@ Claude independently re-reviews the Codex delta next.
 - `7b8b3d95` — Close Session 431 with reviewed revocation-hardening handoff
 - `b85a84f9` — Fix revocation-linking concurrency ordering (owner-authorized Codex remediation)
 - `49b4c402` — Prepare Claude race-fix re-review handoff (Codex)
-- (Claude's re-review closeout commit — two-reviewer verdict, self-claim +
-  healthy-release tests, matrix/record reconciliation — follows this file)
+- `1244718b` — Close Claude re-review; add self-claim/healthy-release tests and reconcile records
+- `613771e0` — Fix final delta-review documentation and test-comment nits
 
 ## Next Items
 
 ### Verified Open
 
-1. **Claude independent review of Codex's revocation-race remediation.**
-   Evidence: owner-authorized Codex changes on this branch after the initial
-   merge review. Claude verifies the transaction lifecycle, lock ordering,
-   in-place createNew semantics, archive row-count result, tests, and durable
-   reconciliation. Do not merge before this re-review.
+1. **Owner's deliberate merge decision for `codex/claude-revocation-hardening`.**
+   Evidence: Codex's remediation and Claude's independent three-pass Opus
+   re-review are complete with no unresolved blocking or high-confidence
+   findings. No further reviewer gate remains open; `main` auto-deploys.
 2. **Two pre-existing unit failures on `main`** (`reconcile-probe-entity-set-count`,
    `notification-trust-model-pushup`).
    Evidence: reproduced on pristine `d32e2d56` by three independent runs this
