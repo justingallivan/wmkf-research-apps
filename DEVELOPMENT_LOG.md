@@ -10,6 +10,21 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Disabled-account revocation is production-enforced (Sessions 431–433)
+
+**Milestone:** Staff-account disablement now fails closed across fresh sign-in, rolling JWT/session
+refresh, bare and profile-aware API guards, and both first-login profile-linking branches.
+**Sessions:** 431–433 (Sonnet implementation, Opus reviews, Codex concurrency remediation,
+Claude delta re-review, owner promotion, signed-in production-safe smoke).
+**Ship state:** `main` advanced `d32e2d56 → 486fd490`; profile linking now locks caller/target rows,
+finalizes create-new identities in place, and commits claim DELETE+UPDATE atomically; archive reports
+zero-row failure truthfully. The focused 93-test set, route gate, types, and production build passed;
+an already-linked production account received the expected pre-write 403.
+**Why it matters:** Disabling a staff identity now stops current and subsequent access without a
+linking race silently minting or transferring an active replacement identity.
+**Pointers:** `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`;
+`docs/AUTHENTICATION_SETUP.md`; commits `b85a84f9`, `486fd490`.
+
 ## August 2026 — Fable production audit, two security/reliability fixes shipped (Session 428)
 
 **Milestone:** A full Fable-led production audit set the refactor direction (measure/observability
