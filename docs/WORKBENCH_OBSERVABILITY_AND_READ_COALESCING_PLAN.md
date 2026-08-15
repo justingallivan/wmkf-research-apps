@@ -216,11 +216,11 @@ pairs exist across **two** services, plus one unmergeable single read in a third
 
 The previously named `lib/services/reviewer-finder/decline-referrals-service.js` **does not exist**;
 the decline service lives under `lib/services/workbench/`. Any fixed count ("6→3", "1/1/1 across
-three routes") is invalid: the fetch helpers chunk id filters at 25 ids per query
-(`const CHUNK = 25` — five copies at `reviewers-service.js:502,545`,
-`my-candidates-service.js:384,400,421` (`:400` is `fetchApplicantAkas`, a different entity, not part
-of any pair), `decline-referrals-service.js:45`) and every helper short-circuits empty id sets to
-zero queries.
+three routes") is invalid: the fetch helpers chunk id filters at 25 ids per query:
+six `const CHUNK = 25` sites (`reviewers-service.js:502,545`, `my-candidates-service.js:384,400,421`,
+`decline-referrals-service.js:45`), five of them person-read helpers — `my-candidates-service.js:400`
+is `fetchApplicantAkas`, a different entity, outside every pair — and every helper short-circuits
+empty id sets to zero queries.
 
 **Chunk-aware acceptance contract.** With `q(n) = ceil(n / 25)` and empty sets contributing zero:
 

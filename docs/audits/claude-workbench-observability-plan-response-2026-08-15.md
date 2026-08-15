@@ -94,9 +94,11 @@ claim ⇒ CONFIRMED finding).
 - Decline: `lib/services/workbench/decline-referrals-service.js:123` is the **sole** person read
   (helper `:42-57`); nothing to merge. `lib/services/reviewer-finder/decline-referrals-service.js`
   **does not exist** (directory listing checked).
-- Chunking: `const CHUNK = 25` — five copies at the **service-helper layer**
+- Chunking: six `const CHUNK = 25` sites at the **service-helper layer**
   (`reviewers-service.js:502,545`, `my-candidates-service.js:384,400,421`,
-  `decline-referrals-service.js:45`), not in the `potential-reviewer` adapter (grep: no chunk
+  `decline-referrals-service.js:45`) — five person-read helpers plus `fetchApplicantAkas`
+  (`my-candidates-service.js:400`, different entity, outside every pair) — not in the
+  `potential-reviewer` adapter (grep: no chunk
   constant there; adapter-side 25 exists only for suggestion reads,
   `reviewer-suggestion.js:352,383`). Every helper short-circuits empty id sets
   (`if (!ids?.length) return {};`).
