@@ -10,6 +10,24 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Fable production audit, two security/reliability fixes shipped (Session 428)
+
+**Milestone:** A full Fable-led production audit set the refactor direction (measure/observability
+first, not a Workbench Data Plane rewrite), closed two standing security questions by owner decision,
+and shipped two Tier-2 fixes to production — one an incident outcome.
+**Sessions:** 428 (audit Phases 0–7, Opus + Codex adversarial reviews, owner decisions, promotion).
+**Ship state:** `main` advanced `f8a606e6 → e802412c`. (1) Reviewer-reminder crons now filter to
+selected/not-revoked reviewers and write marker+token in one ETag-guarded PATCH, so an automatic
+reminder can no longer reactivate a staff-revoked link (Codex caught the clobber race). (2) Slow
+abstract saves reconcile a committed-but-timed-out Dataverse PATCH to success instead of a false
+failure. Owner decisions: reviewer merge (T1) and staff-wide document reads (D4) are org-open
+by-design — no Dataverse request/data ownership to scope against.
+**Why it matters:** A revoked reviewer link stays revoked; a slow-but-committed abstract edit is not
+lost; and the next refactor is evidence-gated on observability rather than a speculative rewrite.
+**Pointers:** `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`,
+`docs/audits/fable-audit-final-handoff-2026-08-14.md`,
+`.claude-memory/project-reviewer-org-open-access-by-design.md`; commits `42f190e0`, `aaf92cf5`, `171c46a9`.
+
 ## August 2026 — Grantee rich text and reviewer workflow controls are production-live (Session 426)
 
 **Milestone:** Staff and grantees can preserve scientific formatting in abstracts and captions;
