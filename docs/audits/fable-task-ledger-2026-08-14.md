@@ -7,7 +7,9 @@ not canonical architecture documentation.
 ## Phase 0 baseline
 
 - Branch: `fable/audit-refactor-planning-2026-08-14`, created from `origin/main` @ `f8a606e6`.
-  Upstream: **not pushed yet** — push `-u origin` before session end (non-main push does not deploy).
+  Upstream: `origin/fable/audit-refactor-planning-2026-08-14` (pushed 2026-08-14; non-main, no deploy).
+  Final commit at handoff: `bb234be`. Exercise complete through Phase 7 (the brief's stop point);
+  Phase 2 production probes and Phase 8 implementation remain owner-gated.
 - Worktree at branch creation: clean; `main` synchronized with `origin/main`.
 - Full `/start` gate battery (all 57 `check:*` scripts incl. self-tests, serial pairing): **all green**
   this session at `f8a606e6`. Not re-run for Phase 0 step 7; recorded as verified-this-session.
