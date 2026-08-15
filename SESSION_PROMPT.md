@@ -31,7 +31,8 @@ merged and deleted (local + remote); the worktree is clean.
      verdict NEEDS REWORK — all 8 findings confirmed) and revised on branch
      `codex/claude-workbench-plan-revision`
      (`docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`, fresh
-     Mode A `READY WITH NAMED CHANGES`). Full artifact set under
+     Mode A `READY WITH NAMED CHANGES`); a second five-finding Codex follow-up pass
+     was likewise confirmed and folded in on the same branch (`96190462`). Full artifact set under
      `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**
