@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-13
+last_verified: 2026-08-14
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -12,13 +12,17 @@ source_files:
   - pages/api/email-defaults/reviewer-templates.js
   - lib/seed/email-defaults/reviewer-templates.js
   - shared/components/reviewers/ReviewersTab.js
+  - shared/components/reviewers/ReviewerManagePanel.js
+  - pages/api/workbench/decline-referrals.js
+  - lib/services/workbench/decline-referrals-service.js
+  - lib/dataverse/adapters/reviewer-suggestion.js
+  - shared/utils/decline-referrals.js
   - shared/components/reviewers/InviteEmailModal.js
   - shared/components/reviewers/RespondReminderModal.js
   - shared/components/reviewers/render-preview-failure.js
   - lib/services/review-manager/render-emails-service.js
   - shared/components/reviewers/ReviewerFindPanel.js
   - shared/components/reviewers/ReviewerSearchSection.js
-  - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/ReviewerDueDateEditor.js
   - shared/components/workbench/ReviewsTab.js
   - lib/services/graph-service.js
@@ -233,18 +237,22 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   Reads selected and archived suggestions, then returns declined rows with a
   non-empty referral, each with the decliner's `wmkf_name` resolved. Structured
   envelopes expand to one DTO per referred person; legacy text remains one
-  display-only DTO. A structured item is omitted only when an existing
-  request-scoped candidate carries `referred` provenance, exactly matches the
-  normalized name (and email too when supplied), and is selected or engaged.
-  Resolved legacy notes are also omitted, so the Track badge represents
-  unresolved referral work rather than the lifetime count of decline responses.
+  display-only DTO. A structured item is omitted when its exact parsed index is
+  durably dismissed, or when an existing request-scoped candidate carries
+  `referred` provenance, exactly matches the normalized name (and email too when
+  supplied), and is selected or engaged. Resolved legacy notes are also omitted,
+  so the Track badge represents unresolved referral work rather than the
+  lifetime count of decline responses.
   **Deliberately independent of
   `review-manager/reviewers-service.js`**, which filters to accepted reviewers
   and early-returns when none are accepted — so referrals surface even when
   every invitee declined before anyone accepted.
 - **Surface:** `ReviewersTab` fetches it and passes `declineReferrals`,
-  `onAddReferral`, and `onResolveLegacyReferral` to `ReviewerManagePanel`, which
+  `onAddReferral`, and `onDismissDeclineReferral` to `ReviewerManagePanel`, which
   renders an amber callout at the top of the **Track Reviewers** sub-tab only.
+  Every structured row offers **Dismiss** beside **Add as candidate**, so a
+  previously considered suggestion can leave the work queue without creating a
+  duplicate candidate.
 - **One-click "Add as candidate" (in-place, S354):** does NOT bypass identity
   resolution. The button POSTs the suggested name, optional email/institution,
   and decliner straight to
@@ -263,12 +271,20 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   (incl. `applicant_excluded`) → inline message + "Try again". Lands `referred`
   provenance exactly as the S249 manual-referral path. On reload the referral
   reader derives closure from that durable candidate row; it does not add an
-  operational source token. Failed/ambiguous adds remain visible, as do remedy
-  outcomes that still require promotion or restore. Legacy prose is never
-  submitted wholesale as a reviewer name; staff add its people separately and
-  then use **Dismiss resolved note**. That PATCH is legacy-only, request-scoped,
-  ETag-guarded, retry-safe, and preserves the original note after a compact
-  resolved prefix in `wmkf_declinereferral`. Before S354 the button
+  operational source token. Staff may instead dismiss one structured row: the
+  PATCH carries its exact `referralIndex` and the GET-issued content identity,
+  is request-scoped and ETag-guarded, and replaces the same-width `v1` memo prefix with an `r<hex>`
+  four-bit mask while preserving the submitted JSON payload byte-for-byte.
+  A 412 retry merges mask-only changes but rejects reordered or replaced payloads
+  with 409, preventing a stale array index from dismissing another person.
+  Failed/ambiguous adds remain visible, as do remedy outcomes that still require
+  promotion or restore. Legacy prose is never submitted wholesale as a reviewer
+  name; staff add its people separately and then use **Dismiss resolved note**
+  when the preserved marker fits the 2,000-character memo.
+  The no-index PATCH preserves the original note after its compact resolved
+  prefix in `wmkf_declinereferral`. Overlength legacy values and malformed or
+  future `wmkf-referrals:*` envelopes remain visible but non-dismissible for
+  administrator repair. Before S354 the button
   pre-filled the Find-tab Add-or-Refer form and routed there via
   `router.push({sub:'find'})` (the `ReviewerFindPanel` `prefill` prop, now
   unused) — a colleague reported it "did nothing" (the tab hop was unreliable /

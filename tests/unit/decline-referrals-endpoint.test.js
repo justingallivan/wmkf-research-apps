@@ -12,10 +12,10 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 }));
 
 const getDeclineReferrals = jest.fn();
-const dismissLegacyDeclineReferral = jest.fn();
+const dismissDeclineReferral = jest.fn();
 jest.mock('../../lib/services/workbench/decline-referrals-service', () => ({
   getDeclineReferrals: (...args) => getDeclineReferrals(...args),
-  dismissLegacyDeclineReferral: (...args) => dismissLegacyDeclineReferral(...args),
+  dismissDeclineReferral: (...args) => dismissDeclineReferral(...args),
 }));
 
 import handler from '../../pages/api/workbench/decline-referrals';
@@ -37,7 +37,7 @@ function response() {
 beforeEach(() => {
   jest.clearAllMocks();
   getDeclineReferrals.mockResolvedValue({ success: true, referrals: [] });
-  dismissLegacyDeclineReferral.mockResolvedValue({ success: true, dismissed: true });
+  dismissDeclineReferral.mockResolvedValue({ success: true, dismissed: true });
 });
 
 test('GET lists referrals for the GUID-validated request', async () => {
@@ -51,13 +51,41 @@ test('PATCH dismisses one exact legacy source note with the authenticated actor'
   const res = response();
   await handler({
     method: 'PATCH',
-    body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID },
+    body: {
+      requestId: REQUEST_ID,
+      suggestionId: SUGGESTION_ID,
+      referralVersion: 'legacy:Ada Lovelace',
+    },
   }, res);
 
   expect(res.statusCode).toBe(200);
-  expect(dismissLegacyDeclineReferral).toHaveBeenCalledWith({
+  expect(dismissDeclineReferral).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
     suggestionId: SUGGESTION_ID,
+    referralIndex: undefined,
+    referralVersion: 'legacy:Ada Lovelace',
+    actingUserSystemId: 'user-1',
+  });
+});
+
+test('PATCH dismisses one exact structured referral index', async () => {
+  const res = response();
+  await handler({
+    method: 'PATCH',
+    body: {
+      requestId: REQUEST_ID,
+      suggestionId: SUGGESTION_ID,
+      referralIndex: 2,
+      referralVersion: 'structured:[{"n":"Ada"},{"n":"Grace"},{"n":"Katherine"}]',
+    },
+  }, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(dismissDeclineReferral).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    suggestionId: SUGGESTION_ID,
+    referralIndex: 2,
+    referralVersion: 'structured:[{"n":"Ada"},{"n":"Grace"},{"n":"Katherine"}]',
     actingUserSystemId: 'user-1',
   });
 });
@@ -66,5 +94,30 @@ test('PATCH rejects malformed ids', async () => {
   const res = response();
   await handler({ method: 'PATCH', body: { requestId: REQUEST_ID, suggestionId: 'bad', referralIndex: 0 } }, res);
   expect(res.statusCode).toBe(400);
-  expect(dismissLegacyDeclineReferral).not.toHaveBeenCalled();
+  expect(dismissDeclineReferral).not.toHaveBeenCalled();
+});
+
+test('PATCH rejects an out-of-range structured referral index', async () => {
+  const res = response();
+  await handler({
+    method: 'PATCH',
+    body: {
+      requestId: REQUEST_ID,
+      suggestionId: SUGGESTION_ID,
+      referralIndex: 4,
+      referralVersion: 'structured:[{"n":"Ada"}]',
+    },
+  }, res);
+  expect(res.statusCode).toBe(400);
+  expect(dismissDeclineReferral).not.toHaveBeenCalled();
+});
+
+test('PATCH requires the exact referral content version', async () => {
+  const res = response();
+  await handler({
+    method: 'PATCH',
+    body: { requestId: REQUEST_ID, suggestionId: SUGGESTION_ID },
+  }, res);
+  expect(res.statusCode).toBe(400);
+  expect(dismissDeclineReferral).not.toHaveBeenCalled();
 });

@@ -28,10 +28,10 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => functio
               onClick={() => props.onAddReferral(r)}
             >add</button>
           )}
-          {r.legacy && (
+          {r.dismissible && (
             <button
               data-testid={`dismiss-${r.referralId || r.suggestionId}`}
-              onClick={() => props.onResolveLegacyReferral(r)}
+              onClick={() => props.onDismissDeclineReferral(r)}
             >dismiss</button>
           )}
         </div>
@@ -78,6 +78,8 @@ const REFERRALS = [{
   referralText: 'Oleg Butovsky · Weill Cornell Medicine · oleg@example.edu',
   declinedAt: null,
   legacy: false,
+  dismissible: true,
+  referralVersion: 'structured:[{"n":"Oleg Butovsky","i":"Weill Cornell Medicine","e":"oleg@example.edu"}]',
 }];
 
 const LEGACY_REFERRALS = [{
@@ -91,6 +93,8 @@ const LEGACY_REFERRALS = [{
   referralText: 'Chris Lima, MSK\nKylie Walters, NCI',
   declinedAt: null,
   legacy: true,
+  dismissible: true,
+  referralVersion: 'legacy:Chris Lima, MSK\nKylie Walters, NCI',
 }];
 
 function actionsOf() {
@@ -172,7 +176,48 @@ test('legacy dismissal PATCHes the exact source note and clears its work state',
   expect(JSON.parse(patchCall[1].body)).toEqual({
     requestId: REQ,
     suggestionId: 's-legacy',
+    referralVersion: 'legacy:Chris Lima, MSK\nKylie Walters, NCI',
   });
+});
+
+test('structured dismissal PATCHes the exact row index without adding a candidate', async () => {
+  global.fetch = baseFetch(
+    () => Promise.reject(new Error('manual add should not run')),
+  );
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByTestId('dismiss-s-a:0')).toBeInTheDocument());
+  await act(async () => { screen.getByTestId('dismiss-s-a:0').click(); });
+
+  await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('dismissed'));
+  const patchCall = global.fetch.mock.calls.find(([url, opts]) => (
+    String(url).includes('/api/workbench/decline-referrals') && opts?.method === 'PATCH'
+  ));
+  expect(JSON.parse(patchCall[1].body)).toEqual({
+    requestId: REQ,
+    suggestionId: 's-a',
+    referralIndex: 0,
+    referralVersion: 'structured:[{"n":"Oleg Butovsky","i":"Weill Cornell Medicine","e":"oleg@example.edu"}]',
+  });
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/api/workbench/manual-reviewer'))).toBe(false);
+});
+
+test('an unreadable reserved referral stays visible without a dismissal action', async () => {
+  global.fetch = baseFetch(
+    () => Promise.reject(new Error('manual add should not run')),
+    [{
+      ...LEGACY_REFERRALS[0],
+      referralId: 's-corrupt',
+      suggestionId: 's-corrupt',
+      dismissible: false,
+      referralVersion: null,
+      referralText: 'wmkf-referrals:v2:[{"n":"Future Person"}]',
+    }],
+  );
+
+  render(<ReviewersTab requestId={REQ} />);
+  await waitFor(() => expect(screen.getByTestId('manage-panel')).toBeInTheDocument());
+  expect(screen.queryByTestId('dismiss-s-corrupt')).not.toBeInTheDocument();
 });
 
 test('an ambiguous identity (409 + lookup) switches the row to confirm; choosing a resolution re-posts it', async () => {

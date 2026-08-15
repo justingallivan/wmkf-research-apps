@@ -29,7 +29,7 @@ const {
   updateLifecycle,
   selectIfUnengaged,
   ensureApplicantRecommended,
-  dismissLegacyDeclineReferral,
+  dismissDeclineReferral,
   restore,
   APPLICANT_DISPOSITION_EXCLUDED,
   APPLICANT_DISPOSITION_MAP,
@@ -107,7 +107,7 @@ describe('disposition optionset + helpers', () => {
   });
 });
 
-describe('legacy decline-referral dismissal', () => {
+describe('decline-referral dismissal', () => {
   test('preserves the original text behind an ETag-guarded resolved marker', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       _etag: 'W/"7"',
@@ -116,9 +116,10 @@ describe('legacy decline-referral dismissal', () => {
       wmkf_declinereferral: 'Ada Lovelace, Example University',
     });
 
-    const result = await dismissLegacyDeclineReferral({
+    const result = await dismissDeclineReferral({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
+      referralVersion: 'legacy:Ada Lovelace, Example University',
     }, { actingUserSystemId: 'user-1' });
 
     expect(result).toEqual({ dismissed: true, alreadyDismissed: false });
@@ -130,6 +131,48 @@ describe('legacy decline-referral dismissal', () => {
     );
   });
 
+  test('marks one structured row resolved behind the same ETag guard', async () => {
+    const stored = 'wmkf-referrals:v1:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]';
+    DynamicsService.getRecord.mockResolvedValue({
+      _etag: 'W/"12"',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_declined: true,
+      wmkf_declinereferral: stored,
+    });
+
+    const result = await dismissDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      referralIndex: 1,
+      referralVersion: 'structured:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]',
+    }, { actingUserSystemId: 'user-1' });
+
+    expect(result).toEqual({ dismissed: true, alreadyDismissed: false });
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_declinereferral: 'wmkf-referrals:r2:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]' },
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"12"' },
+    );
+  });
+
+  test('structured dismissal is idempotent for the exact row', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      _etag: 'W/"13"',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_declined: true,
+      wmkf_declinereferral: 'wmkf-referrals:r2:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]',
+    });
+
+    await expect(dismissDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      referralIndex: 1,
+      referralVersion: 'structured:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]',
+    })).resolves.toEqual({ dismissed: true, alreadyDismissed: true });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
   test('is idempotent and refuses a referral from another request', async () => {
     DynamicsService.getRecord.mockResolvedValueOnce({
       _etag: 'W/"8"',
@@ -137,9 +180,10 @@ describe('legacy decline-referral dismissal', () => {
       wmkf_declined: true,
       wmkf_declinereferral: 'wmkf-referral-resolved:v1:Ada Lovelace',
     });
-    await expect(dismissLegacyDeclineReferral({
+    await expect(dismissDeclineReferral({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
+      referralVersion: 'legacy:Ada Lovelace',
     })).resolves.toEqual({ dismissed: true, alreadyDismissed: true });
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
 
@@ -149,9 +193,10 @@ describe('legacy decline-referral dismissal', () => {
       wmkf_declined: true,
       wmkf_declinereferral: 'Ada Lovelace',
     });
-    await expect(dismissLegacyDeclineReferral({
+    await expect(dismissDeclineReferral({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
+      referralVersion: 'legacy:Ada Lovelace',
     })).rejects.toMatchObject({ code: 'decline_referral_request_mismatch', status: 409 });
   });
 
@@ -162,9 +207,10 @@ describe('legacy decline-referral dismissal', () => {
       wmkf_declined: true,
       wmkf_declinereferral: 'wmkf-referrals:v1:[{"n":"Ada Lovelace"}]',
     });
-    await expect(dismissLegacyDeclineReferral({
+    await expect(dismissDeclineReferral({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
+      referralVersion: 'structured:[{"n":"Ada Lovelace"}]',
     })).rejects.toMatchObject({ code: 'structured_decline_referral_not_dismissible', status: 409 });
 
     DynamicsService.getRecord
@@ -184,15 +230,76 @@ describe('legacy decline-referral dismissal', () => {
       .mockRejectedValueOnce(Object.assign(new Error('race'), { status: 412 }))
       .mockResolvedValueOnce({});
 
-    await expect(dismissLegacyDeclineReferral({
+    await expect(dismissDeclineReferral({
       suggestionId: SUGGESTION_ID,
       requestId: REQUEST_ID,
+      referralVersion: 'legacy:Grace Hopper',
     })).resolves.toEqual({ dismissed: true, alreadyDismissed: false });
     expect(DynamicsService.updateRecord).toHaveBeenLastCalledWith(
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
       { wmkf_declinereferral: 'wmkf-referral-resolved:v1:Grace Hopper' },
       { actingUserSystemId: undefined, ifMatch: 'W/"11"' },
+    );
+  });
+
+  test('rejects a stale dismissal when the submitted referral content changes during an ETag retry', async () => {
+    DynamicsService.getRecord
+      .mockResolvedValueOnce({
+        _etag: 'W/"20"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: 'wmkf-referrals:v1:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]',
+      })
+      .mockResolvedValueOnce({
+        _etag: 'W/"21"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: 'wmkf-referrals:v1:[{"n":"Grace Hopper"},{"n":"Ada Lovelace"}]',
+      });
+    DynamicsService.updateRecord.mockRejectedValueOnce(
+      Object.assign(new Error('race'), { status: 412 }),
+    );
+
+    await expect(dismissDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      referralIndex: 0,
+      referralVersion: 'structured:[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]',
+    })).rejects.toMatchObject({ code: 'decline_referral_changed', status: 409 });
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+  });
+
+  test('merges a concurrent structured mask-only dismissal during an ETag retry', async () => {
+    const payload = '[{"n":"Ada Lovelace"},{"n":"Grace Hopper"}]';
+    DynamicsService.getRecord
+      .mockResolvedValueOnce({
+        _etag: 'W/"30"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: `wmkf-referrals:v1:${payload}`,
+      })
+      .mockResolvedValueOnce({
+        _etag: 'W/"31"',
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_declined: true,
+        wmkf_declinereferral: `wmkf-referrals:r1:${payload}`,
+      });
+    DynamicsService.updateRecord
+      .mockRejectedValueOnce(Object.assign(new Error('race'), { status: 412 }))
+      .mockResolvedValueOnce({});
+
+    await expect(dismissDeclineReferral({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      referralIndex: 1,
+      referralVersion: `structured:${payload}`,
+    })).resolves.toEqual({ dismissed: true, alreadyDismissed: false });
+    expect(DynamicsService.updateRecord).toHaveBeenLastCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_declinereferral: `wmkf-referrals:r3:${payload}` },
+      { actingUserSystemId: undefined, ifMatch: 'W/"31"' },
     );
   });
 });

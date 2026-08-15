@@ -11,7 +11,7 @@
 const findByRequest = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: (...a) => findByRequest(...a),
-  dismissLegacyDeclineReferral: jest.fn(),
+  dismissDeclineReferral: jest.fn(),
 }));
 
 const queryReviewers = jest.fn();
@@ -72,6 +72,8 @@ test('returns declined rows that carry a non-empty referral, with decliner name 
         email: null,
         referralText: 'Try Dr. Jane Smith at MIT',
         legacy: true,
+        dismissible: true,
+        referralVersion: 'legacy:Try Dr. Jane Smith at MIT',
         declinedAt: '2026-07-08T10:00:00Z',
       },
     ],
@@ -285,6 +287,76 @@ test('expands a structured memo into one actionable DTO per referred person', as
     referralId: 'sug-structured:1',
     referralName: 'Alex Rivera',
     institution: 'UCLA',
+  });
+});
+
+test('omits only the structured row durably marked resolved', async () => {
+  const {
+    normalizeDeclineReferrals,
+    resolveStructuredDeclineReferral,
+  } = require('../../shared/utils/decline-referrals');
+  const stored = normalizeDeclineReferrals([
+    { name: 'Sarah Chen', institution: 'Stanford' },
+    { name: 'Alex Rivera', institution: 'UCLA' },
+  ]).storedValue;
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-structured',
+      wmkf_declined: true,
+      wmkf_declinereferral: resolveStructuredDeclineReferral(stored, 0).storedValue,
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-structured:1',
+    referralIndex: 1,
+    referralName: 'Alex Rivera',
+  });
+});
+
+test('keeps an unreadable reserved envelope visible but non-dismissible', async () => {
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-corrupt',
+      wmkf_declined: true,
+      wmkf_declinereferral: 'wmkf-referrals:v2:[{"n":"Future Person"}]',
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-corrupt',
+    legacy: true,
+    dismissible: false,
+    referralVersion: null,
+    referralText: 'wmkf-referrals:v2:[{"n":"Future Person"}]',
+  });
+});
+
+test('keeps an overlength legacy note visible but does not offer an impossible dismissal', async () => {
+  const referralText = 'x'.repeat(1975);
+  findByRequest.mockResolvedValue([
+    suggestion({
+      wmkf_appreviewersuggestionid: 'sug-long-legacy',
+      wmkf_declined: true,
+      wmkf_declinereferral: referralText,
+    }),
+  ]);
+
+  const out = await getDeclineReferrals({ requestId: REQ });
+
+  expect(out.referrals).toHaveLength(1);
+  expect(out.referrals[0]).toMatchObject({
+    referralId: 'sug-long-legacy',
+    legacy: true,
+    dismissible: false,
+    referralVersion: `legacy:${referralText}`,
+    referralText,
   });
 });
 

@@ -7,7 +7,7 @@ summary: "Active hybrid plan: safe slices reach main behind legacy-default seams
 canonical: false
 cataloged: 2026-07-12
 owner: product-engineering
-last_verified: 2026-07-27
+last_verified: 2026-08-14
 related:
   - docs/audits/reviewer-holistic-review-comparison-2026-07-09.md
   - docs/audits/reviewer-holistic-review-codex-2026-07-09.md
@@ -954,11 +954,15 @@ an unmeasured slice implemented.
 **[VERIFIED]** The workbench surfaces structured decline referrals as individual
 people and routes each through the normal identity-safe manual-add service.
 The existing durable `referred` candidate row closes an exact structured person
-after selection/engagement; failed identity work and promotion/restore remedies
-stay visible. Legacy prose remains readable, is never submitted as a person
-name, and can be dismissed only after staff resolves its people separately. No
-operational marker is written into the provenance field. Do not rebuild this
-loop. M1.3 now provides the first observational
+after selection/engagement; staff may also dismiss one exact structured row when
+the suggestion was already considered, using a memo-prefix bitmask that preserves
+the submitted JSON. Failed identity work and promotion/restore remedies stay
+visible until either closure occurs. Legacy prose remains readable, is never
+submitted as a person name, and can be dismissed only after staff resolves its
+people separately and the preserved marker fits the Dataverse memo. Overlength
+legacy values remain visible but non-dismissible for administrator repair. No
+operational marker is written into the provenance field.
+Do not rebuild this loop. M1.3 now provides the first observational
 source/referral baseline; future refreshes and any interpretation remain
 observational. Separately, an **[OWNER-GATE]** remains on whether an external
 decline-acknowledgment email is worthwhile.
