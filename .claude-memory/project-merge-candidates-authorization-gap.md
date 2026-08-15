@@ -1,11 +1,11 @@
 ---
 name: project-merge-candidates-authorization-gap
-description: "/api/reviewer-finder/merge-candidates accepts any two GUIDs with no requestId and only app-level auth, while the UI gate computeCanManage is documented cosmetic and fail-open — so any reviewer-finder user can execute a globally destructive reviewer merge. Found S414, pre-existing, owner decision pending."
+description: "/api/reviewer-finder/merge-candidates uses org-open app-level auth (no requestId/caller scope) for a globally destructive reviewer merge. RESOLVED 2026-08-15: owner accepts as by-design — no technical ownership of requests/data exists in Dataverse, so there is no meaningful tighter boundary. Kept as-is; data-only block predicate remains the safety mechanism."
 metadata:
   type: project
-  status: active
+  status: closed
   scope: security
-  last_verified: 2026-08-12 (S422) against route/service source, API route matrix, S207 rationale, and S289 design — re-checked, STILL UNADDRESSED
+  last_verified: 2026-08-15 (S428) — owner decision: keep as-is (org-open), accepted by-design; rationale = no technical request/data ownership in Dataverse to scope against
 ---
 
 ## Recall Rule
@@ -30,9 +30,12 @@ OPEN"*, staying permissive for superusers, unresolved viewer ids, and unresolved
 request PDs.
 
 What the endpoint can do is destructive and not transactional: `executeMerge`
-hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:432`) and
-deactivates the loser person (`:501`), with no compensation for a failure after the
-delete.
+hard-deletes colliding suggestion rows (`lib/services/reviewer-merge.js:448` as of
+2026-08-14) and deactivates the loser person (`:541`), with no compensation for a
+failure after the delete (a `merge_retryable_replan` 409 tells the client to replan).
+Since `fa62db30` (2026-06-29) the merge ALSO writes `akoya_request` applicant slots
+(repoint/disassociate, `:466-486`) — request records the caller may not manage — so
+the unauthorized write reach is wider than the original suggestion+person scope.
 
 **So today, any user with reviewer-finder app access can POST two GUIDs and execute a
 global merge for records in requests they are not viewing.**
@@ -56,29 +59,29 @@ caller-supplied scope to authorize against. Do not mistake either for a guard.
 
 ## Status
 
-**Pre-existing — not introduced by any S414 proposal.** Surfaced while scoping an
-Invite-tab merge affordance (that scope was killed; see
-`outputs/reviewer-email-merge-surfacing-scope.md`). **Owner decision pending.**
+**RESOLVED — accepted as by-design, keep as-is (owner, 2026-08-15 / S428).** Org-open
+app-level auth on merge is the intended and only meaningful model. **Rationale (owner):
+there is no technical ownership of requests or data in Dataverse**, so a request-scoped
+or PD-scoped merge fence has nothing real to key on — "you can only merge reviewers on
+your own requests" is not an enforceable concept here. App-level access is therefore the
+correct boundary, and the data-only block predicate (pre-engagement/non-promoted/
+non-confirmed) remains the safety mechanism. This is accepted risk, not an open gap.
 
-The documentation trail is now investigated. The API route matrix explicitly
-records app-level auth and attributes safety to the merge block predicate. The
-S289 merge design made the same explicit choice: merge auth matches
-`my-candidates`, while the loser predicate limits data eligibility. The older
-S207 rationale kept the then-reused reviewer write APIs org-open for a small,
-trusted staff, but it predates the merge route and names field/file/email/token
-operations—not arbitrary-pair suggestion deletion plus person deactivation.
-Therefore the current route posture is deliberate in S289, but the evidence does
-not establish that the owner intended S207's trust decision to cover this later
-destructive primitive. The predicate is not caller or request authorization.
+Historical context (kept for provenance): surfaced S414 while scoping an Invite-tab merge
+affordance (scope killed; `outputs/reviewer-email-merge-surfacing-scope.md`); the S289
+design chose app-level auth deliberately; the older S207 org-open rationale predated the
+route. The 2026-08-15 owner decision settles the question the earlier framing left open —
+the absence of any ownership model means there is no tighter boundary to adopt.
 
 ## How to apply
 
-- Do **not** cite this route's `requireAppAccess` as evidence that a new merge
-  affordance is safely authorized — that mistake is exactly what hid the gap
-  (the S414 scope doc offered it as reassurance).
-- Any work making merge easier to reach should resolve this first, or state
-  explicitly that it is knowingly deferred.
-- Mirrors [[feedback-ui-gates-must-mirror-server-guards]]: the enable condition
-  must mirror a real server guard, and here there is no server guard to mirror.
+- The decision is settled: **org-open merge is intended.** Do not reopen it as a
+  security gap or propose a request/PD scope — there is no ownership model in
+  Dataverse to scope against. New merge affordances may rely on app-level access.
+- The data-only block predicate (`reviewer-merge.js:242-265`: pre-engagement,
+  non-promoted, non-confirmed-identity) is the real safety mechanism — preserve it.
+- Recall rule now: read this to confirm the merge posture is **accepted by-design**
+  (not a pending gap) before treating org-open merge auth as a finding.
 
-Related: [[project-reviewer-card-simplification-direction]].
+Related: [[project-reviewer-org-open-access-by-design]] (the general owner
+principle this merge decision is one instance of); [[project-reviewer-card-simplification-direction]].

@@ -72,6 +72,7 @@ related:
 | [SYSTEM_MODEL.md](SYSTEM_MODEL.md) | source-of-truth | canonical | yes | The model has one organizing principle, two orthogonal axes, and a small set of layers. Get those and the rest follows. | 2026-07-02 |
 | [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | spec | historical |  | _Concept Evaluator was retired 2026-04-25 (Session 110) — page/API/prompt archived to /_archived. Removed from this suite list; retained only as... | 2026-07-02 |
 | [TYPESCRIPT_OPTION_ASSESSMENT.md](TYPESCRIPT_OPTION_ASSESSMENT.md) | decision | draft |  | Whether/how to adopt TypeScript, the lever behind the Invariant Map's rung-1 finding. Recommends a scoped checkJs gate on the selector core, not file renames. |  |
+| [WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md](WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md) | plan | draft |  | Staged plan: instrument the Workbench data path, then coalesce in-request duplicate Dataverse reads. Full Data Plane deferred until measured. | 2026-08-14 |
 | [WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md](WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md) | plan | historical |  | Historical S258 build plan for the Workbench Proposal tab and Field Primer persistence, now shipped. | 2026-07-02 |
 | [WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md](WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md) | plan | historical |  | Historical S261 build plan for the Workbench triage field, built and deployed. | 2026-07-02 |
 
