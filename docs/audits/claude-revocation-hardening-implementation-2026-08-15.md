@@ -46,7 +46,7 @@ makes zero-row archive attempts report failure rather than false success.
 |---|---|---|
 | A | `pages/api/auth/[...nextauth].js` (signIn disabled-row denial; jwt zero-row invalidation) + `tests/unit/nextauth-revocation.test.js` (10 tests pre-remediation; count corrected per Opus reviewer 2 finding 5) | COMPLETE — mutation check: disabled-sign-in test fails against pre-fix code (`return true` + provisioning observed) |
 | B | `lib/utils/auth.js` (requireAuth active check; fail-closed zero-row fixes) + `tests/unit/utils/auth.test.js` (+9 tests) + `tests/helpers/auth-mock.js` (3 new presets) + `tests/unit/bare-auth-revocation.test.js` (8 route-level tests) + suite fallout triage (none needed; 2 failures pre-existing on baseline, re-confirmed by lead via `git stash -u`) | COMPLETE — discriminating fixtures: zero-row lookups where old/new predicates disagree, sequenced sql mocks to isolate `requireAuthWithProfile`'s own read |
-| C | `pages/api/auth/link-profile.js` (live caller guard + conditional writes + rowcount-checked UPDATE → 409) + `tests/unit/link-profile-revocation.test.js` (11 tests pre-remediation; 12 after the NULL-row test) | COMPLETE — empirical mutation check: suite re-run against the pre-fix handler; every revocation case failed (200 + writes executed), green after restore |
+| C | `pages/api/auth/link-profile.js` (live caller guard + conditional writes + rowcount-checked UPDATE → 409 — this conditional-write shape was later superseded by Codex's locked transactional rewrite, recorded below) + `tests/unit/link-profile-revocation.test.js` (11 tests pre-remediation; 12 after the NULL-row test; rewritten to 18 by the Codex remediation) | COMPLETE — empirical mutation check: suite re-run against the pre-fix handler; every revocation case failed (200 + writes executed), green after restore |
 
 ## Opus adversarial review passes
 
@@ -139,12 +139,59 @@ Justin authorized Codex to remediate the branch. The correction:
   both row locks, require rollback after a failed post-DELETE target update,
   and pin zero-row archive failure.
 
-The repository already ships `@vercel/postgres`'s pooled `db.connect()` API and
-uses explicit Postgres transactions in runtime routes, so the earlier record's
-claim that a serverless-route transaction was an exceptional unsupported risk
-was refuted by the installed dependency and repository precedent. Codex's
+The repository already ships `@vercel/postgres`'s pooled `db.connect()` API
+(the exported `db` is the same lazily-created pool object the `sql` tagged
+template already uses in every route — `node_modules/@vercel/postgres`
+`var db = sql`) and uses explicit Postgres transactions in runtime routes
+(via per-request node-postgres pools: `pages/api/intake/submit.js`,
+`lib/services/irs-bmf-service.js`, `lib/services/cron/drain-submissions-service.js`).
+`link-profile` is the first runtime route to run a transaction on the shared
+`@vercel/postgres` pool; the earlier record's claim that a serverless-route
+transaction was an exceptional unsupported risk was refuted by the installed
+dependency and this precedent. Codex's
 complete targeted revocation run passed 91/91 tests across five suites after
 the correction.
+
+### Claude adversarial re-review of the Codex remediation (`7b8b3d95..49b4c402`)
+
+Two further independent Opus reviewers examined commit `b85a84f9` (with the
+`49b4c402` handoff), seeded with the lead's transaction-lifecycle and
+provenance traces. **Verdict: no BLOCKING and no HIGH findings from either
+reviewer.** Reviewer A (transaction/concurrency) confirmed: every BEGIN exit
+reaches COMMIT or ROLLBACK with no flag desynchronization window; rollback
+failure destroys the pooled connection (`release(err)` semantics verified in
+the installed `@vercel/postgres` typings); the cross-claim deadlock aborts
+pre-writePhase → 503 with nothing committed; all four archive interleavings
+behave truthfully (including the load-bearing case where an archive of a
+claimed-away temp id now reports failure instead of false success); the
+three-way concurrent-signIn race is safe under READ COMMITTED (the DELETE and
+azure_id transfer commit atomically, so there is no zero-row window and the
+provisioning `ON CONFLICT` branches are unreachable during a claim); and the
+91/91 five-suite run reproduces. Reviewer B (contract/tests/docs) confirmed:
+exactly two `archiveUserProfile` callers, both already mapping `false` → 500,
+and their UI consumers handle the error body; response contracts inert (the
+linking dialog reads only `error` and reloads); scope containment exact; the
+auth-mock/db mock-shape collision risk REFUTED by static and dynamic sweep
+(no test co-loads both); all five regression classes (drop FOR UPDATE,
+reorder COMMIT, drop rollback-on-failed-update, reintroduce DELETE/INSERT on
+createNew, drop the archive rowCount check) are each pinned by a named test;
+every claimed test count re-derived empirically (18/2/49/91); and the
+overruled-race narrative in this record is accurate against the pre-delta
+source. The lead independently re-ran the full unit suite on the final tree:
+7,658/7,660 with only the two known pre-existing baseline failures.
+
+Second-cycle findings and dispositions:
+
+| # | Reviewer / severity | Finding | Disposition |
+|---|---|---|---|
+| 11 | B F1 LOW | `docs/API_ROUTE_SECURITY_MATRIX.md` link-profile row still said "Updates/inserts" — the route no longer has an INSERT path | CONFIRMED; **FIXED** (row now states the locked live-caller check and "Updates/deletes … in one transaction (no INSERT path)") |
+| 12 | B F2 + A4 LOW | Record's transaction-precedent sentence implied a runtime `db.connect()` precedent that did not exist (prior runtime transactions use per-request node-postgres pools; the only prior `db.connect()` was a script) | CONFIRMED; **FIXED** (sentence reworded: `db` is the same pool object `sql` uses; link-profile is the first runtime route transaction on the shared pool) |
+| 13 | B F3 MEDIUM-LOW + A2 LOW | Self-claim path (caller POSTs its own temp-row id; the `String()` guard skips the DELETE) untested; success paths never asserted a healthy no-argument `release()` | CONFIRMED; **FIXED** (tests added: self-claim 200 with exactly one UPDATE and no DELETE, numeric and string profileId variants; healthy-release assertions on all success paths) |
+| 14 | A1 LOW | `String(callerProfileId) !== String(profileId)` treats `"05"` ≠ `5` where the old SQL integer compare did not — fail-closed only (spurious 409+ROLLBACK), unreachable via the UI's select value | CONFIRMED mechanism; **ACCEPTED** (fail-closed direction; no live path) |
+| 15 | B F6 INFO | The in-place `createNew` finalize incidentally FIXES a pre-existing bug: the old DELETE+INSERT minted a new profile id, orphaning the Dataverse default app grants keyed to the temp id — createNew users landed with zero grants | CONFIRMED; recorded here for attributability (grants now survive by design) |
+| 16 | B F7 INFO | The durable-row `needs_linking !== true` → 403 check is a small hardening beyond the stated scope (previously only the stale JWT claim gated re-linking) | CONFIRMED; recorded — within the spirit of invariant 6 |
+| 17 | B F4 INFO | First runtime transaction over the pooled Neon endpoint — reasoned sound (transaction-mode pinning holds FOR UPDATE locks; same pool `sql` uses); a one-time signed-in preview smoke of both branches would convert reasoning to observation | Recommended to owner as a pre-merge (non-blocking) smoke |
+| 18 | A6/A7/B F5 INFO | Archive-failure 500 copy lacks a re-target hint; COMMIT-throw two-generals ambiguity (fail-closed 500); target-SELECT DB error now 503 instead of 500 (more accurate retryable copy) | ACCEPTED as-is; no consumer branches on these |
 
 ## Residual risks and owner decisions
 

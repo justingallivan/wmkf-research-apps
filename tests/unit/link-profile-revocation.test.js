@@ -64,6 +64,15 @@ function expectRollbackAndRelease() {
   expect(mockRelease).toHaveBeenCalledTimes(1);
 }
 
+// A success path must return the pooled connection healthy — release()
+// called exactly once with no error argument — not destroy it as the
+// rollback-failure path does.
+function expectHealthyRelease() {
+  expect(mockRelease).toHaveBeenCalledTimes(1);
+  expect(mockRelease.mock.calls[0].length).toBe(1);
+  expect(mockRelease).toHaveBeenCalledWith(undefined);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockConnect.mockResolvedValue({ query: mockQuery, release: mockRelease });
@@ -208,7 +217,7 @@ describe('/api/auth/link-profile', () => {
     expect(writes[0]).toMatch(/needs_linking\s*=\s*true/);
     expect(writes[0]).not.toMatch(/DELETE|INSERT/i);
     expect(mockQuery.mock.calls.at(-1)[0]).toBe('COMMIT');
-    expect(mockRelease).toHaveBeenCalledTimes(1);
+    expectHealthyRelease();
   });
 
   test('createNew conditional update losing its guard -> 409 and rollback', async () => {
@@ -242,8 +251,42 @@ describe('/api/auth/link-profile', () => {
     expect(queryTextAt(3)).toMatch(/^\s*DELETE/i);
     expect(queryTextAt(4)).toMatch(/^\s*UPDATE/i);
     expect(queryTextAt(5)).toBe('COMMIT');
-    expect(mockRelease).toHaveBeenCalledTimes(1);
+    expectHealthyRelease();
   });
+
+  test.each([
+    ['numeric profileId', 42],
+    ['string profileId', '42'],
+  ])(
+    'self-claim: caller claims its own temp-row id (%s) skips the DELETE and still commits',
+    async (_label, profileId) => {
+      getServerSession.mockResolvedValueOnce(activeSession);
+      mockQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 42, is_active: true, needs_linking: true }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 42, azure_id: 'azure-123', name: 'Caller Name', display_name: 'Caller Name' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 42, azure_id: 'azure-123', name: 'Caller Name', display_name: 'Caller Name' }],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+      const res = mockResponse();
+      await handler(mockReq({ profileId }), res);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.profile.id).toBe(42);
+      // The String() coercion guard treats 42 and '42' as the same row as the
+      // locked caller, so the temp-row DELETE must be skipped entirely — if
+      // that guard regressed to a strict ===, a DELETE would appear here.
+      const writes = writeQueryTexts();
+      expect(writes).toHaveLength(1);
+      expect(writes[0]).not.toMatch(/DELETE/i);
+      expect(writes[0]).toMatch(/^\s*UPDATE/i);
+      expect(mockQuery.mock.calls.some((args) => args[0] === 'COMMIT')).toBe(true);
+      expect(mockQuery.mock.calls.some((args) => args[0] === 'ROLLBACK')).toBe(false);
+      expectHealthyRelease();
+    },
+  );
 
   test('target disabled before its row lock -> 404 and caller temp row is not deleted', async () => {
     getServerSession.mockResolvedValueOnce(activeSession);

@@ -42,14 +42,16 @@ Claude independently re-reviews the Codex delta next.
    - No tombstone/denylist, no migration; `is_active = false` is the durable
      revocation mechanism; hard-delete reprovisioning stays an accepted
      residual.
-2. **49 new revocation tests** across `tests/unit/nextauth-revocation.test.js`
+2. **51 new revocation tests** across `tests/unit/nextauth-revocation.test.js`
    (11), `tests/unit/bare-auth-revocation.test.js` (8),
-   `tests/unit/link-profile-revocation.test.js` (18),
+   `tests/unit/link-profile-revocation.test.js` (20),
    `tests/unit/database-service-archive.test.js` (2), and
    `tests/unit/utils/auth.test.js` (+10 including discriminating zero-row and
    NULL fixtures). The Codex additions prohibit createNew DELETE/INSERT,
    require caller + target row locks, prove a post-DELETE target failure rolls
-   back rather than commits, and pin zero-row archive failure.
+   back rather than commits, and pin zero-row archive failure. Claude's
+   re-review round added the self-claim (own temp-row id, numeric and string)
+   cases and healthy-connection-release assertions on all success paths.
 3. **Adversarial review record** (invariant table, builder assignments, all
    three Opus passes, Codex's merge review/remediation, every finding
    disposition with evidence, residuals):
@@ -61,11 +63,14 @@ Claude independently re-reviews the Codex delta next.
 5. **Verification:** Claude's pre-Codex full-unit run executed 7,652 tests and
    reproduced only the two failures also present on pristine baseline
    `d32e2d56` (`reconcile-probe-entity-set-count` and
-   `notification-trust-model-pushup`). On the Codex-remediated final tree, the
-   complete targeted revocation run passed 91/91 tests across five suites;
-   `check:api-routes` + self-test, `check:types`, `npm run lint` (0 errors),
-   `npm run build`, `check:agent-invariants`, and the relevant doc gates +
-   self-tests all passed; `git diff --check` is clean.
+   `notification-trust-model-pushup`). On the Codex-remediated tree Codex's
+   targeted revocation run passed 91/91 across five suites; after Claude's
+   re-review round added two tests, the five-suite run passes 93/93 and
+   Claude's own full-unit run on the final tree passed 7,660/7,662 (same two
+   pre-existing baseline failures only). `check:api-routes` + self-test,
+   `check:types`, `npm run lint` (0 errors), `npm run build`,
+   `check:agent-invariants`, and the relevant doc gates + self-tests all
+   passed; `git diff --check` is clean.
 
 ### Commits (all on `codex/claude-revocation-hardening`)
 
@@ -73,7 +78,9 @@ Claude independently re-reviews the Codex delta next.
 - `6268e26b` — Remediate Opus review findings: fail-closed NULL is_active + record review
 - `7b8b3d95` — Close Session 431 with reviewed revocation-hardening handoff
 - `b85a84f9` — Fix revocation-linking concurrency ordering (owner-authorized Codex remediation)
-- (Codex handoff-only commit follows this file's final reconciliation)
+- `49b4c402` — Prepare Claude race-fix re-review handoff (Codex)
+- (Claude's re-review closeout commit — two-reviewer verdict, self-claim +
+  healthy-release tests, matrix/record reconciliation — follows this file)
 
 ## Next Items
 
