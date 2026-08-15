@@ -178,3 +178,36 @@ new findings. New findings and dispositions (fixed in the follow-up commit):
 Reviewer B also independently verified the applied SECURITY_OPERATING_PLAN /
 SERVICE_AND_UTILITY_CATALOG text as accurate, and confirmed the A-3/B-6 fidelity notes match
 both reviewers' probes.
+
+## Convergence and closeout (2026-08-15)
+
+- **Final confirmation round over `7e384ec9`:** reviewer A verified all four delta findings
+  RESOLVED (incl. probing the `.cause` unwrap against the live classifier across nine error
+  shapes) and raised no new issue; reviewer B had already closed all its findings. **No
+  blocking finding was raised at any point; zero findings remain open.**
+- **Final verification on `7e384ec9`:** six observability suites 124/124; full
+  `tests/unit` + `tests/integration`: **8173/8175 — the only 2 failures are the two known
+  baseline failures** (`reconcile-probe-entity-set-count`, `notification-trust-model-pushup`),
+  reproduced in isolation and unrelated to the changed files; lint 0 errors; `check:types`,
+  `check:dataverse-access-layer` + self-test, `check:api-routes` + self-test,
+  `check:doc-currency` + self-test, `check:fact-consistency` + self-test,
+  `check:build-claim-freshness`, `git diff --check`, and `npm run build` all PASS
+  (build re-verified on `bd986b68`; `7e384ec9` changed only comments, tests, and docs beyond
+  one classifier expression covered by the passing suites).
+- **Commits:** `ea0c207e` (implementation), `bd986b68` (remediation + doc reconciliation),
+  `7e384ec9` (delta-review closure). Base `31041461`.
+- **Residual risks / carry-forwards (named, not blockers):**
+  1. The browser-import contract's only automated guard is the production build; a
+     `.next/static` marker-scan CI gate is a recommended owner follow-up (new gate surface,
+     deliberately not added in Stage 1).
+  2. The measurement window must be read with the plan's emission-scope fidelity notes
+     (Graph token-leg under-attribution; deadline-timeouts surfacing as later successes;
+     download legs as `unknown`/`unknown`).
+  3. Cause-wrapped undici timeouts through `dynamics/http.js` classify `network_error`
+     (structured `causeKind:'unknown'`) while the same wire failure through raw `client.js`
+     classifies `timeout` — a plan-contract consequence; closing it fully would require a
+     `service-error.js` change, which invariant 3 forbids in this stage.
+- **Not performed (per authorization):** Stage 2 items, merge, deployment, production
+  measurement, production data access, durable persistence, Vercel CLI housekeeping. No
+  DEVELOPMENT_LOG milestone added — the repo records milestones on merge/ship, and this
+  branch is unmerged pending Codex independent read-only review.
