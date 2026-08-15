@@ -64,9 +64,12 @@ function expectRollbackAndRelease() {
   expect(mockRelease).toHaveBeenCalledTimes(1);
 }
 
-// A success path must return the pooled connection healthy — release()
-// called exactly once with no error argument — not destroy it as the
-// rollback-failure path does.
+// A success path must return the pooled connection healthy — not destroy it
+// as the rollback-failure path does. This deliberately pins the handler's
+// literal call shape, `release(releaseError)` with releaseError undefined
+// (exactly one argument): a refactor to zero-arg release() is semantically
+// equivalent for pg and may relax the length assertion, but an accidental
+// truthy argument must stay red.
 function expectHealthyRelease() {
   expect(mockRelease).toHaveBeenCalledTimes(1);
   expect(mockRelease.mock.calls[0].length).toBe(1);

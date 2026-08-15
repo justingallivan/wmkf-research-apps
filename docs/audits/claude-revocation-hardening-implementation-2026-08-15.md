@@ -143,8 +143,9 @@ The repository already ships `@vercel/postgres`'s pooled `db.connect()` API
 (the exported `db` is the same lazily-created pool object the `sql` tagged
 template already uses in every route — `node_modules/@vercel/postgres`
 `var db = sql`) and uses explicit Postgres transactions in runtime routes
-(via per-request node-postgres pools: `pages/api/intake/submit.js`,
-`lib/services/irs-bmf-service.js`, `lib/services/cron/drain-submissions-service.js`).
+(via node-postgres pools: per-request in `pages/api/intake/submit.js` and
+`lib/services/irs-bmf-service.js`; a module-memoized pool created in
+`pages/api/cron/drain-submissions.js` for the drain service).
 `link-profile` is the first runtime route to run a transaction on the shared
 `@vercel/postgres` pool; the earlier record's claim that a serverless-route
 transaction was an exceptional unsupported risk was refuted by the installed
@@ -177,8 +178,11 @@ reorder COMMIT, drop rollback-on-failed-update, reintroduce DELETE/INSERT on
 createNew, drop the archive rowCount check) are each pinned by a named test;
 every claimed test count re-derived empirically (18/2/49/91); and the
 overruled-race narrative in this record is accurate against the pre-delta
-source. The lead independently re-ran the full unit suite on the final tree:
-7,658/7,660 with only the two known pre-existing baseline failures.
+source. The lead independently re-ran the full unit suite on the reviewed
+tree (`49b4c402`): 7,658/7,660 with only the two known pre-existing baseline
+failures; after the second-cycle test additions below, the final tree runs
+7,660/7,662 with the same two failures (both counts re-derived empirically
+by the closing delta reviewer).
 
 Second-cycle findings and dispositions:
 
