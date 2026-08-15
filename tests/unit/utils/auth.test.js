@@ -16,6 +16,9 @@ import {
   mockNoProfile,
   mockRoleLookupFailure,
   mockIsActiveLookupFailure,
+  mockMissingProfile,
+  mockAzureIdOnlySession,
+  mockApplicantSession,
   createMockReq,
   createMockRes,
   clearAppAccessCache,
@@ -28,6 +31,7 @@ import {
   requireSuperuser,
   isAuthRequired,
 } from '../../../lib/utils/auth';
+import { sql } from '@vercel/postgres';
 import { listAppKeysForUser } from '../../../lib/services/app-access-service';
 
 const defaultListAppKeysForUser = listAppKeysForUser.getMockImplementation();
@@ -122,6 +126,113 @@ describe('requireAuth', () => {
 
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  // -------------------------------------------------------------------------
+  // Session revocation (audit 2026-08-15 §1): bare requireAuth previously did
+  // NO is_active read, so a disabled staff account kept working on the four
+  // bare-auth routes indefinitely. These pin the live-check contract.
+  // -------------------------------------------------------------------------
+
+  it('returns 403 for a disabled account looked up by profileId', async () => {
+    mockDisabledUser(99);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  it('returns 403 for a missing profile row (zero rows) when the session carries profileId — the previously fail-open case', async () => {
+    mockMissingProfile(50);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  it('returns 403 for a disabled account looked up by azureId when no profileId is present', async () => {
+    mockAzureIdOnlySession('azure-abc', { disabled: true });
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  it('returns 403 for a missing profile row (zero rows) on the azureId fallback lookup', async () => {
+    mockAzureIdOnlySession('azure-missing');
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  it('fails closed with 503 when the revocation check errors', async () => {
+    mockIsActiveLookupFailure(42);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('retry') })
+    );
+  });
+
+  it('skips the user_profiles lookup entirely for an applicant session', async () => {
+    mockApplicantSession();
+    const callsBefore = sql.mock.calls.length;
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+    // No query touching is_active was issued for the applicant path.
+    const newCalls = sql.mock.calls.slice(callsBefore);
+    const isActiveCalls = newCalls.filter(
+      (args) => Array.isArray(args[0]) && args[0].join(' ').toLowerCase().includes('is_active')
+    );
+    expect(isActiveCalls.length).toBe(0);
+  });
+
+  it('AUTH_REQUIRED=false bypass short-circuits before the revocation check', async () => {
+    mockUnauthenticated();
+    process.env.AUTH_REQUIRED = 'false';
+    process.env.NODE_ENV = 'test';
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toEqual({ user: {}, authBypassed: true });
+    expect(res.status).not.toHaveBeenCalled();
   });
 });
 
@@ -322,6 +433,35 @@ describe('requireAuthWithProfile', () => {
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(503);
   });
+
+  // Audit 2026-08-15 §1: the OLD requireAuthWithProfile predicate
+  // `rows.length > 0 && !is_active` only 403s when a row exists AND is
+  // inactive — a zero-row (deleted profile) result passed it silently.
+  // requireAuth (called first, inside requireAuthWithProfile) now ALSO
+  // fail-closes on zero rows using the identical profileId key, so a
+  // straight end-to-end call can't discriminate requireAuthWithProfile's own
+  // fix (requireAuth would already block it). To isolate the specific
+  // predicate at auth.js:~205-209, sequence the underlying `sql` mock so
+  // requireAuth's read (1st call) sees an active row and requireAuthWithProfile's
+  // own read (2nd call) sees zero rows — the fixture where the old and new
+  // predicates disagree.
+  it('returns 403 for a missing profile row (zero rows) on requireAuthWithProfile\'s own check — previously fail-open', async () => {
+    mockAuthenticatedUser(50, []);
+    sql
+      .mockImplementationOnce(() => Promise.resolve({ rows: [{ is_active: true }], rowCount: 1 })) // requireAuth's read
+      .mockImplementationOnce(() => Promise.resolve({ rows: [], rowCount: 0 })); // requireAuthWithProfile's own read
+
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAuthWithProfile(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -488,6 +628,27 @@ describe('requireAppAccess', () => {
 
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(503);
+  });
+
+  // Audit 2026-08-15 §1: the OLD predicate
+  // `rows.length === 0 || is_active !== false` maps a zero-row (deleted
+  // profile) result to "active" explicitly. requireAppAccess never calls
+  // requireAuth (it calls getSession directly), so this fixture (zero rows)
+  // fully isolates and discriminates the fix at auth.js:~300: it fails
+  // against the old predicate and passes against the new
+  // `rows.length > 0 && is_active !== false`.
+  it('returns 403 for a missing profile row (zero rows) — previously fail-open', async () => {
+    mockMissingProfile(60);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAppAccess(req, res, 'reviewer-finder');
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
   });
 
   it('allows an active superuser before loading app grants when Dataverse app access is unavailable', async () => {

@@ -8,6 +8,13 @@
  *
  * Identity (azureId, azureEmail, displayName) is always derived from the
  * server-side session — never trusted from the request body.
+ *
+ * Live-active guard: before any write, the caller's azure_id is re-checked
+ * against user_profiles. Zero rows or is_active = false is fail-closed 403
+ * (a legitimate linking session always has a live, active temp profile row
+ * for its azure_id, created by the signIn callback). Each write in both
+ * branches additionally carries an `is_active = true` condition as a TOCTOU
+ * backstop against a disable racing the pre-check.
  */
 
 import { getServerSession } from 'next-auth';
@@ -38,13 +45,35 @@ export default async function handler(req, res) {
   const displayName = session.user.name || azureEmail;
   const { profileId, createNew } = req.body;
 
+  // Verify the live caller is still active before any write. A legitimate
+  // linking session always has a live temp profile row for its azure_id
+  // (the signIn callback creates it active before the linking UI is
+  // reachable), so zero rows here is itself a fail-closed 403.
+  let caller;
+  try {
+    caller = await sql`
+      SELECT id, is_active FROM user_profiles WHERE azure_id = ${azureId}
+    `;
+  } catch (error) {
+    console.error('Error verifying caller account status:', error);
+    return res.status(503).json({ error: 'Unable to verify account status; please retry' });
+  }
+
+  if (caller.rows.length === 0 || caller.rows[0].is_active === false) {
+    return res.status(403).json({ error: 'Account has been disabled' });
+  }
+
   try {
     if (createNew) {
       // Create new profile and link it
-      // First, remove any temporary profile created during sign-in
+      // First, remove any temporary profile created during sign-in.
+      // is_active = true is a TOCTOU backstop: if the caller was disabled
+      // between the pre-check and here, this DELETE no-ops and the INSERT
+      // below fails on the azure_id unique constraint (caught below, 500,
+      // no state persisted).
       await sql`
         DELETE FROM user_profiles
-        WHERE azure_id = ${azureId} AND needs_linking = true
+        WHERE azure_id = ${azureId} AND needs_linking = true AND is_active = true
       `;
 
       // Create the new profile
@@ -85,19 +114,28 @@ export default async function handler(req, res) {
     }
 
     // Remove any temporary profile created during sign-in BEFORE updating
-    // (to avoid unique constraint violation on azure_id)
+    // (to avoid unique constraint violation on azure_id). is_active = true
+    // is a TOCTOU backstop matching the createNew branch.
     await sql`
       DELETE FROM user_profiles
-      WHERE azure_id = ${azureId} AND id != ${profileId} AND needs_linking = true
+      WHERE azure_id = ${azureId} AND id != ${profileId} AND needs_linking = true AND is_active = true
     `;
 
-    // Link the Azure account to this profile
-    await sql`
+    // Link the Azure account to this profile. is_active = true re-verifies
+    // the target is still active at write time (TOCTOU backstop); RETURNING
+    // lets us detect a no-op update (target went inactive mid-race) and
+    // respond 409 instead of a false success.
+    const updated = await sql`
       UPDATE user_profiles
       SET azure_id = ${azureId}, azure_email = ${azureEmail},
           needs_linking = false, last_login_at = CURRENT_TIMESTAMP
-      WHERE id = ${profileId}
+      WHERE id = ${profileId} AND is_active = true
+      RETURNING id
     `;
+
+    if (updated.rows.length === 0) {
+      return res.status(409).json({ error: 'Profile could not be linked' });
+    }
 
     return res.status(200).json({
       success: true,
