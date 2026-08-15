@@ -176,7 +176,13 @@ schema names, route names, timings, request correlation IDs, and redacted exampl
 Fable performs this phase personally.
 
 1. Run `/start`; capture branch, HEAD, upstream, cleanliness, and active work.
-2. Read at minimum:
+2. Before creating or editing any audit artifact, fetch `origin`, verify the
+   worktree is clean, and create a dedicated non-`main` branch from the current
+   `origin/main`. Record the branch name and upstream in the task ledger. All Fable
+   audit and planning commits belong on that branch; never commit them directly to
+   `main`. If the worktree is dirty or contains unpushed work, stop and coordinate
+   instead of stashing, discarding, or building the new branch on uncertain state.
+3. Read at minimum:
    - `CLAUDE.md`
    - `SESSION_PROMPT.md`
    - `docs/CURRENT_WORK_QUEUE.md`
@@ -190,19 +196,20 @@ Fable performs this phase personally.
    - `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`
    - `docs/CI_GATES_REFERENCE.md`
    - `docs/AGENT_COLLABORATION_PLAN.md`
-3. Determine the current campaign window and release posture. If unclear, mark it
+4. Determine the current campaign window and release posture. If unclear, mark it
    `[NEEDS OWNER]` and assume the more restrictive posture.
-4. Identify the last genuinely broad audit baseline from both the audit document and
+5. Identify the last genuinely broad audit baseline from both the audit document and
    Git history. Compute changed routes, auth/data/integration surfaces, migrations,
    dependencies, and docs since that baseline. Do not reuse a historical count.
-5. Create the task ledger, artifact skeletons, evidence-label legend, and probe
+6. Create the task ledger, artifact skeletons, evidence-label legend, and probe
    approval ledger.
-6. Run the current relevant inventory gates and their self-tests serially, including
+7. Run the current relevant inventory gates and their self-tests serially, including
    `check:api-routes` before `check:api-routes:self-test`. Record exactly what each
    proves and does not prove. Do not treat an existing red gate as unrelated.
 
-**Phase 0 exit gate:** repository baseline and audit scope are explicit; no delegate
-has a writable surface; unresolved authority or campaign constraints are visible.
+**Phase 0 exit gate:** Fable is on a clean dedicated branch based on current
+`origin/main`; the repository baseline and audit scope are explicit; no delegate has
+a writable surface; unresolved authority or campaign constraints are visible.
 
 ## Phase 1: delegated repository reconnaissance
 
