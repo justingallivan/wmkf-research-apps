@@ -89,6 +89,9 @@ describe('lib/dataverse/client.js observability telemetry', () => {
     const serialized = JSON.stringify(events[0]);
     expect(serialized).not.toContain('super-secret-marker-DO-NOT-LEAK');
     expect(serialized).not.toContain('ACCESS-TOKEN-MARKER-XYZ');
+    // The seeded DYNAMICS_TENANT_ID is embedded in the token URL path; the
+    // plan's never-emit list names tenant identifiers.
+    expect(serialized).not.toContain('tenant-marker-77');
   });
 
   test('getAccessToken non-2xx emits http_error/4xx and still throws the existing plain Error', async () => {
@@ -215,6 +218,31 @@ describe('lib/dataverse/client.js observability telemetry', () => {
     const events = dependencyEvents(logSpy);
     expect(events).toHaveLength(1);
     expect(events[0].outcome).toBe('network_error');
+    expect(events[0]).not.toHaveProperty('statusClass');
+  });
+
+  test('raw fetch rejection with code UND_ERR_HEADERS_TIMEOUT (no causeKind) classifies as timeout and rethrows the SAME instance', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const err = new Error('Headers Timeout Error');
+    err.code = 'UND_ERR_HEADERS_TIMEOUT';
+    global.fetch = jest.fn(async () => { throw err; });
+
+    const dvClient = client.createClient({
+      resourceUrl: 'https://org.crm.dynamics.com',
+      token: 'tkn',
+    });
+
+    let caught;
+    try {
+      await dvClient.get('/accounts');
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBe(err);
+
+    const events = dependencyEvents(logSpy);
+    expect(events).toHaveLength(1);
+    expect(events[0].outcome).toBe('timeout');
     expect(events[0]).not.toHaveProperty('statusClass');
   });
 

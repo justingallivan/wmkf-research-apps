@@ -188,6 +188,51 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 ## Current Watch Items
 
+### Workbench Dependency Telemetry
+
+Status: implemented on branch `codex/claude-workbench-observability-stage1` (Stage 1,
+`lib/observability/request-correlation.js`); not yet merged; production measurement window
+not yet opened.
+
+Every server-side call through the three instrumented egress seams
+(`lib/services/dynamics/http.js`, `lib/services/graph-service.js`,
+`lib/dataverse/client.js`) emits one `workbench.dependency` JSON line to the platform log
+stream at 100% sampling. These are **shared app-wide transports** — every caller emits, not
+only Workbench routes; non-HTTP callers (cron, cold start, `scripts/`) emit without
+`correlationId`/`routeName` by design.
+
+PII/secret contract: the event carries only closed-set literals (`dependency`,
+`resourceClass`, `operation`, `outcome`, `statusClass`), a duration, and two random UUIDs.
+Raw URLs, query strings, path segments, entity ids, filenames, tenant identifiers,
+signed-URL material, tokens, headers, and bodies are never emitted; classifiers fail closed
+to `'unknown'` rather than fall through to raw input, and error classification reads only
+structured error markers, never `error.message`. Pinned by redaction unit tests over seeded
+hostile-URL/secret markers plus exact-key-set assertions on the envelope. `correlationId` is
+a server-minted `crypto.randomUUID()` — never accepted from a request header or body,
+carries no user identity, and is never write authority. The sink is the existing platform
+log stream: no new table, no durable write, and deliberately not `api_usage_log` (the LLM
+token/cost ledger).
+
+Watch trigger (any one is sufficient):
+
+- Platform log throttling or truncation observed in a measurement slice.
+- A visible log-cost line item appears on the Vercel bill.
+- A new egress seam is instrumented, or a Dataverse entity set is added to the
+  `resourceClass` allowlist without a reviewed commit.
+
+Escalation threshold:
+
+- Watch becomes a stop condition when daily `workbench.dependency` volume exceeds
+  ~50,000 lines/day (per `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`
+  Stage 1). Whole-application dependency-call volume is `[ASSUMED — explicitly
+  unverified]`; measure it in the first 48 hours of emission. Exceeding the threshold is a
+  stop, not a silent tuning choice.
+
+Likely response:
+
+- Revert (the change is purely additive) or land a named sampling knob as a separately
+  reviewed follow-up.
+
 ### `wmkf_ai_run` Retention
 
 Status: partially adopted.

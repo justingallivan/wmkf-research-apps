@@ -13,9 +13,20 @@
  * need to hand-roll an ESM module mock for a policy module it doesn't own.
  */
 
-import { jest } from '@jest/globals';
+// NOTE: deliberately NOT `import { jest } from '@jest/globals'` here — under
+// this repo's SWC jest transform, importing the `jest` binding from
+// '@jest/globals' anywhere in the file disables jest.mock() factory
+// hoisting (the factory below silently never runs). The ambient `jest`
+// global works correctly for both jest.mock and every jest.fn/spyOn call
+// in this file.
+jest.mock('../../lib/observability/request-correlation.js', () => {
+  const actual = jest.requireActual('../../lib/observability/request-correlation.js');
+  return { ...actual, emitDependencyEvent: jest.fn(actual.emitDependencyEvent) };
+});
+
 import { fetchWithTimeout } from '../../lib/services/dynamics/http.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
+import { emitDependencyEvent as mockedEmitDependencyEvent } from '../../lib/observability/request-correlation.js';
 
 const DATAVERSE_URL = 'https://example.crm.dynamics.com/api/data/v9.2/accounts?$filter=x';
 const UNKNOWN_URL = 'https://someorg.crm.dynamics.com/api/data/v9.2/contacts';
@@ -207,5 +218,38 @@ describe('dynamics/http.js fetchWithTimeout — telemetry', () => {
     expect(events).toHaveLength(2);
     expect(events[0].operation).toBe('PATCH');
     expect(events[1].operation).toBe('unknown');
+  });
+
+  test('emitter throwing (despite its own guard) does not break the success path — safeEmitDependencyEvent seam guard', async () => {
+    mockedEmitDependencyEvent.mockImplementationOnce(() => {
+      throw new Error('emitter exploded despite its own try/catch');
+    });
+    const mockResponse = { ok: true, status: 200, headers: { get: () => null } };
+    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+
+    const result = await fetchWithTimeout(DATAVERSE_URL, {}, 5000);
+
+    expect(result).toBe(mockResponse);
+  });
+
+  test('emitter throwing (despite its own guard) does not break the error path — structured error still thrown intact', async () => {
+    mockedEmitDependencyEvent.mockImplementationOnce(() => {
+      throw new Error('emitter exploded despite its own try/catch');
+    });
+    const netErr = new Error('socket hang up');
+    netErr.code = 'ECONNRESET';
+    global.fetch = jest.fn().mockRejectedValue(netErr);
+
+    let caught;
+    try {
+      await fetchWithTimeout(DATAVERSE_URL, {}, 5000);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught.noResponse).toBe(true);
+    expect(caught.serviceName).toBe('dataverse');
+    expect(caught.causeKind).toBe('socket');
   });
 });

@@ -6,8 +6,19 @@
  * acquisition, a data call, cache hits, and the missing-env config guard).
  */
 
-import { jest } from '@jest/globals';
+// NOTE: deliberately NOT `import { jest } from '@jest/globals'` here — under
+// this repo's SWC jest transform, importing the `jest` binding from
+// '@jest/globals' anywhere in the file disables jest.mock() factory
+// hoisting (the factory below silently never runs). The ambient `jest`
+// global works correctly for both jest.mock and every jest.fn/spyOn call
+// in this file.
+jest.mock('../../lib/observability/request-correlation.js', () => {
+  const actual = jest.requireActual('../../lib/observability/request-correlation.js');
+  return { ...actual, emitDependencyEvent: jest.fn(actual.emitDependencyEvent) };
+});
+
 import { GraphService } from '../../lib/services/graph-service.js';
+import { emitDependencyEvent as mockedEmitDependencyEvent } from '../../lib/observability/request-correlation.js';
 
 const setupFetch = global.fetch;
 
@@ -195,4 +206,38 @@ test('an emission failure on the Graph path does not change the returned result'
 
   const result = await GraphService.getFileMetadataById('drive/id', 'item/id');
   expect(result).toMatchObject({ id: 'item/id', name: 'File.docx' });
+});
+
+test('emitter throwing (despite its own guard) does not break the Graph success path — safeEmitDependencyEvent seam guard', async () => {
+  mockedEmitDependencyEvent.mockImplementationOnce(() => {
+    throw new Error('emitter exploded despite its own try/catch');
+  });
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const metadataBody = { id: 'item/id', name: 'File.docx', file: { mimeType: 'application/octet-stream' } };
+  global.fetch = jest.fn().mockResolvedValueOnce(response(200, metadataBody));
+
+  const result = await GraphService.getFileMetadataById('drive/id', 'item/id');
+  expect(result).toMatchObject({ id: 'item/id', name: 'File.docx' });
+});
+
+test('emitter throwing (despite its own guard) does not break the Graph error path — structured error still thrown intact', async () => {
+  mockedEmitDependencyEvent.mockImplementationOnce(() => {
+    throw new Error('emitter exploded despite its own try/catch');
+  });
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const abortErr = new Error('The operation was aborted');
+  abortErr.name = 'AbortError';
+  global.fetch = jest.fn().mockRejectedValueOnce(abortErr);
+
+  let caught;
+  try {
+    await GraphService.getFileMetadataById('drive/id', 'item/id');
+  } catch (err) {
+    caught = err;
+  }
+
+  expect(caught).toBeDefined();
+  expect(caught.serviceName).toBe('graph');
+  expect(caught.noResponse).toBe(true);
+  expect(caught.causeKind).toBe('abort');
 });

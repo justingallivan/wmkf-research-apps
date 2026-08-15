@@ -188,6 +188,28 @@ describe('classifyOutcome', () => {
     expect(result).toEqual({ outcome: 'network_error' });
     expect(Object.prototype.hasOwnProperty.call(result, 'statusClass')).toBe(false);
   });
+
+  test('raw error name AbortError (no causeKind) -> timeout, mirrors service-error.js', () => {
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    expect(classifyOutcome({ error: err })).toEqual({ outcome: 'timeout' });
+  });
+
+  test.each(['UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'ETIMEDOUT'])(
+    'raw error code %s (no causeKind) -> timeout, mirrors service-error.js',
+    (code) => {
+      const err = new Error('timed out');
+      err.code = code;
+      expect(classifyOutcome({ error: err })).toEqual({ outcome: 'timeout' });
+    },
+  );
+
+  test('structured causeKind socket wins over a coincidentally-matching name -> network_error', () => {
+    const err = new Error('reset');
+    err.causeKind = 'socket';
+    err.name = 'AbortError';
+    expect(classifyOutcome({ error: err })).toEqual({ outcome: 'network_error' });
+  });
 });
 
 describe('emitDependencyEvent — envelope shape', () => {
@@ -370,6 +392,32 @@ describe('emitDependencyEvent — emission failure swallowing', () => {
       response: { ok: true, status: 200 },
     })).not.toThrow();
     logSpy.mockRestore();
+  });
+});
+
+describe('emitDependencyEvent — ms clamping', () => {
+  test('negative ms (clock step) clamps to 0', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    emitDependencyEvent({ url: 'https://graph.microsoft.com/v1.0/me', method: 'GET', ms: -5, response: { ok: true, status: 200 } });
+    expect(lastLoggedEvent(logSpy).ms).toBe(0);
+  });
+
+  test('NaN ms normalizes to 0', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    emitDependencyEvent({ url: 'https://graph.microsoft.com/v1.0/me', method: 'GET', ms: NaN, response: { ok: true, status: 200 } });
+    expect(lastLoggedEvent(logSpy).ms).toBe(0);
+  });
+
+  test('Infinity ms normalizes to 0', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    emitDependencyEvent({ url: 'https://graph.microsoft.com/v1.0/me', method: 'GET', ms: Infinity, response: { ok: true, status: 200 } });
+    expect(lastLoggedEvent(logSpy).ms).toBe(0);
+  });
+
+  test('a normal positive finite ms passes through unchanged', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    emitDependencyEvent({ url: 'https://graph.microsoft.com/v1.0/me', method: 'GET', ms: 42, response: { ok: true, status: 200 } });
+    expect(lastLoggedEvent(logSpy).ms).toBe(42);
   });
 });
 

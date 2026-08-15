@@ -112,6 +112,43 @@ tested. No open `else` falls through to raw input material.
   `git diff --check`: clean.
 - `npm run build` (production, browser-import gate): PASS (exit 0, 2026-08-15).
 
-## Opus adversarial review
+## Opus adversarial review (2026-08-15, two independent reviewers over `ea0c207e`)
 
-Recorded after the review passes; see the dispositions section appended below.
+No BLOCKING findings from either reviewer. All findings and dispositions (remediation applied
+by a bounded Sonnet pass; delta re-review recorded below):
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| A-1 | HIGH | Variable-path require does NOT defeat Turbopack — it statically resolves `require(modName)` to bundled module ids (verified in `.next/server/chunks`); browser-bundle safety actually rests on reachability (`.next/static` scan for the module's markers: zero hits), so the build gate proves reachability, not the require trick. Flip side verified clean: static resolution is why `client.js` telemetry works in the deployed bundle, and each of the three route entry graphs contains exactly ONE `request-correlation` module instance shared by the route wrapper and the app-access leg — invariant 14 holds in the bundle, not just jest. | FIXED (docs/comments): header claims corrected in `request-correlation.js` and `client.js`; invariant 17 restated below; catalog entry states the reachability basis. Residual: a scan-based CI gate over `.next/static` is a recommended follow-up (owner decision — new gate surface, not Stage 1 scope). |
+| A-2 | MEDIUM | `client.js` raw timeout-shaped errors (no `causeKind`) classified `network_error` while the identical failure through `dynamics/http.js` classifies `timeout` — the app-access leg would report zero timeouts by construction. | FIXED: `classifyOutcome` now mirrors `service-error.js:88-89` for raw errors (`AbortError` name / `ETIMEDOUT`/`UND_ERR_HEADERS_TIMEOUT`/`UND_ERR_BODY_TIMEOUT` codes ⇒ `timeout`) when `causeKind` is absent; structured `causeKind` still wins. Tests added incl. a client.js seam test. |
+| A-3 | MEDIUM | Measurement-semantics gaps: Graph `waitForPromiseWithin` deadline timeouts emit no event (the still-running fetch later emits its real outcome under the originating correlation); shared `tokenPromise` joiners emit nothing (one event, attributed to the initiator). Dynamics token leg has no shared promise — unaffected. | DOCUMENTED (plan "Emission-scope fidelity notes"; no emission added at the `waitForPromiseWithin` layer — a double-count decision reserved for the owner). |
+| A-4 | MEDIUM | A throwing emitter at the two ESM seams would escape raw (success emit inside the try; catch-path emit unguarded), destroying Response/error identity — defense-in-depth only (the shipped emitter's whole-body try/catch makes it unreachable), but invariant 5's "both paths tested" held only for `client.js`. | FIXED: module-local `safeEmitDependencyEvent` try/catch guard at both seams (mirrors `client.js` `emitTelemetry`); emit-throw tests added at both seams. |
+| A-5 | INFO | `mintCorrelationId()` is a new pre-auth expression that could in principle throw before `requireAppAccess` (not reachable on the Node runtime: `globalThis.crypto.randomUUID` always present, guarded `require('crypto')` fallback). | RECORDED; no change. |
+| B-1 | HIGH | The named deviation (`http_error` with omitted `statusClass` for statuses outside 200–599) would abort an ENTIRE export slice under the plan's jq validator, not just one event. Code is right; the plan validator was unreconciled. | FIXED (plan): validator now accepts `statusClass == null` for `http_error`; contract bullet documents the deviation explicitly. |
+| B-2 | MEDIUM | Negative `ms` (NTP step mid-fetch) is emittable and likewise aborts a slice (`ms >= 0` required). | FIXED: `emitDependencyEvent` clamps numeric `ms` (`Math.max(0, ms)`; `NaN`/`Infinity` ⇒ 0); non-numbers pass through so the pinned BigInt-swallow behavior is preserved. Tests added. |
+| B-3 | MEDIUM | The byte-identical characterization test compared normal vs. emitter-broken runs without pinning the response (both could be identical 500s). | FIXED: test now pins `status === 200` and the proposals success body shape. |
+| B-4 | LOW | Dead no-op filter line in the characterization test. | FIXED: replaced with a meaningful call-count-parity assertion (the literally-suggested "zero events recorded when console.log throws" is empirically false — jest records spy args before the implementation throws — so parity-plus-throw-evidence was implemented instead). |
+| B-5 | LOW | Seeded tenant marker (`DYNAMICS_TENANT_ID` embedded in the token URL) never asserted absent from events. | FIXED: assertion added. |
+| B-6 | LOW | Graph presigned/CDN download legs emit `unknown`/`unknown` (no signed-URL material leaks — probed); the manual-redirect `/content` leg emits `http_error`/`3xx` on its success path. Not reachable from the three target routes. | DOCUMENTED (plan fidelity notes). |
+| B-7 | LOW | Substring-based graph path classes and `indexOf` Dataverse prefix are fail-open in principle for URL shapes unreachable from current call sites (no `/lists` call sites; no prefixed-path construction). | RECORDED; no action — noted so a future Graph list integration doesn't silently mislabel. |
+| B-8 | INFO | Pre-existing `[dry-run]` console.log of raw URL/body in `client.js` (unchanged by this branch, script-only, no discriminator). | RECORDED; out of scope. |
+
+Reviewer A additionally verified clean, with probes: transport semantics (no added await, spans
+exclude body reads, dryRun/interlock paths silent), structured-error/Response identity, ALS
+isolation (incl. bundle-level single-instance proof per route entry), auth/DAL interactions.
+Reviewer B additionally verified clean: PII/secret leakage (hostile-URL probe battery through the
+real classifiers; the emitter at `request-correlation.js` is the only logging statement added),
+classification correctness (homograph hosts ⇒ `unknown`; `graph`/`token` impossible),
+scope/non-goal compliance (`git diff` probes over forbidden surfaces empty), and documentation
+accuracy (independently re-ran suites and three gates).
+
+**Invariant 17 (restated per A-1):** `client.js`'s browser-import contract is preserved in that
+no client bundle reaches `request-correlation.js` or its `node:async_hooks` load (verified by
+static-bundle scan of `.next/static`, 2026-08-15); the lazy guarded requires provide runtime
+degradation, not bundler invisibility — Turbopack statically resolves them.
+
+## Post-remediation verification
+
+- Six observability suites after remediation: 128/128 pass; `decline-referrals-endpoint`: pass;
+  lint: 0 errors (65 pre-existing warnings in unrelated files).
+- Delta re-review and final gate results recorded in the closeout section below.

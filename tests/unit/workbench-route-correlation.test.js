@@ -218,15 +218,33 @@ describe('workbench route correlation wiring', () => {
       const res = response();
       await handler({ method: 'GET', query: { mode: 'proposals' } }, res);
 
-      const events = dependencyEvents(logSpy).filter((e) => !breakLogging || false);
       return { status: res.statusCode, body: res.body, logSpy };
     }
 
     const normal = await runOnce({ breakLogging: false });
     const broken = await runOnce({ breakLogging: true });
 
+    // Pin the byte-identical comparison to a real success shape so it can't
+    // silently characterize an error response (e.g. both runs 500-ing the
+    // same way would otherwise still pass the JSON.stringify equality check).
+    expect(normal.status).toBe(200);
+    expect(normal.body).toMatchObject({ success: true, proposals: [] });
+
     expect(normal.status).toBe(broken.status);
     expect(JSON.stringify(normal.body)).toBe(JSON.stringify(broken.body));
+
+    // NOTE ON THE ORIGINAL DEAD LINE: completing it as "console.log throws
+    // => nothing recorded" would be an incorrect assertion — Jest's mock
+    // records a spy's call args synchronously as each call happens, BEFORE
+    // running mockImplementation, so a throwing console.log still leaves its
+    // JSON-stringified event in logSpy.mock.calls (verified empirically: the
+    // broken run below captures the same events as the normal run). The
+    // meaningful invariant is instead: every emission attempt made in the
+    // normal run was also attempted (and threw, and was swallowed) in the
+    // broken run — same call count — while status/body stayed identical.
+    expect(broken.logSpy.mock.calls.length).toBe(normal.logSpy.mock.calls.length);
+    expect(broken.logSpy.mock.calls.length).toBeGreaterThan(0);
+    expect(broken.logSpy.mock.results.some((r) => r.type === 'throw')).toBe(true);
 
     const normalEvents = normal.logSpy.mock.calls
       .map((c) => c[0])
