@@ -20,6 +20,7 @@ import * as suggestionAdapter from '../../lib/dataverse/adapters/reviewer-sugges
 
 const {
   notExcludedFilter,
+  selectedAndNotRevokedFilter,
   isExcluded,
   findById,
   getForEmailReconcile,
@@ -104,6 +105,15 @@ describe('disposition optionset + helpers', () => {
     expect(isExcluded({ wmkf_applicantdisposition: null })).toBe(false);
     expect(isExcluded({})).toBe(false);
     expect(isExcluded(null)).toBe(false);
+  });
+
+  test('selectedAndNotRevokedFilter is null-safe — requires selected, keeps never-revoked (null) rows (T2)', () => {
+    const f = selectedAndNotRevokedFilter();
+    expect(f).toBe('wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)');
+    // Must OR in `eq null` so the common (never-revoked) case is not dropped by
+    // Dataverse three-valued filter logic — a bare `ne true` would disable the sweep.
+    expect(f).toContain('eq false or wmkf_externaltokenrevoked eq null');
+    expect(f).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
   });
 });
 

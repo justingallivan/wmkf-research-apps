@@ -37,6 +37,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
   return {
     notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
+    // Mirror the real adapter fragment so the eligibility-clause assertions below
+    // test the actual OData the sweeps emit (T2 fix).
+    selectedAndNotRevokedFilter: () => 'wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)',
     queryAllSuggestions: (options) => DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', options),
     patchFields: (id, payload, opts = {}) => DynamicsService.updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
   };
@@ -128,6 +131,18 @@ beforeEach(() => {
 });
 
 describe('sweepRespondReminders', () => {
+  test('respond query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepRespondReminders();
+    const options = queryAllRecords.mock.calls[0][1];
+    // The eligibility guard IS the query filter: a revoked/deselected row is never
+    // returned to the JS sweep, so re-minting can't reactivate its link.
+    expect(options.filter).toContain('wmkf_selected eq true');
+    expect(options.filter).toContain('wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null');
+    // Null-safe form only: a bare `ne true` would drop every never-revoked (null) row.
+    expect(options.filter).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
+  });
+
   test('eligible candidate: claims the marker (If-Match) then sends', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
@@ -410,6 +425,18 @@ describe('sweepReviewDueReminders', () => {
     expect(options.filter).toContain('wmkf_reviewstatus eq 100000002');
     expect(options.filter).not.toContain('100000005');
     expect(options.filter).not.toContain('100000006');
+  });
+
+  test('review-due query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepReviewDueReminders();
+    const options = queryAllRecords.mock.calls[0][1];
+    // The eligibility guard IS the query filter: a revoked/deselected row is never
+    // returned to the JS sweep, so re-minting can't reactivate its link.
+    expect(options.filter).toContain('wmkf_selected eq true');
+    expect(options.filter).toContain('wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null');
+    // Null-safe form only: a bare `ne true` would drop every never-revoked (null) row.
+    expect(options.filter).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
   });
 
   test('default read is applied to review-due reminder subject and body', async () => {
