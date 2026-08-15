@@ -14,11 +14,12 @@ test('compact reviewer toolbar matches the caption formatting controls', async (
       value="<p><em>Escherichia coli</em> and H<sub>2</sub>O</p>"
       onChange={jest.fn()}
       ariaLabel="Scientific assessment"
+      toolbarLabel="Scientific assessment formatting"
       toolbarVariant="compact"
     />,
   );
 
-  const toolbar = await screen.findByRole('toolbar', { name: 'Review formatting' });
+  const toolbar = await screen.findByRole('toolbar', { name: 'Scientific assessment formatting' });
   expect(toolbar).toHaveClass('flex-wrap');
   expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
     'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
@@ -28,8 +29,46 @@ test('compact reviewer toolbar matches the caption formatting controls', async (
   );
 });
 
-test('full toolbar remains available to the staff rescue form by default', async () => {
-  render(<RichReviewEditor value="<p>Review</p>" onChange={jest.fn()} ariaLabel="Manual review" />);
+test('compact mode retains historical structural HTML in the shared schema', async () => {
+  render(
+    <RichReviewEditor
+      value="<h2>Prior heading</h2><ul><li>Prior item</li></ul>"
+      onChange={jest.fn()}
+      ariaLabel="Historical review"
+      toolbarVariant="compact"
+    />,
+  );
+
+  const editor = await screen.findByRole('textbox', { name: 'Historical review' });
+  expect(editor.querySelector('h2')).toHaveTextContent('Prior heading');
+  expect(editor.querySelector('ul li')).toHaveTextContent('Prior item');
+});
+
+test('an unknown toolbar variant fails closed to the compact controls', async () => {
+  render(
+    <RichReviewEditor
+      value="<p>Review</p>"
+      onChange={jest.fn()}
+      ariaLabel="Review"
+      toolbarVariant="unexpected"
+    />,
+  );
+
+  await screen.findByRole('toolbar', { name: 'Review formatting' });
+  expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+    'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
+  ]);
+});
+
+test('full toolbar remains available when the staff rescue form requests it', async () => {
+  render(
+    <RichReviewEditor
+      value="<p>Review</p>"
+      onChange={jest.fn()}
+      ariaLabel="Manual review"
+      toolbarVariant="full"
+    />,
+  );
 
   await screen.findByRole('toolbar', { name: 'Review formatting' });
   expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([

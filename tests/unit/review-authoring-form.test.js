@@ -23,12 +23,7 @@ test('external reviewer authoring selects the compact six-button toolbar', async
   render(
     <ReviewAuthoringForm
       data={{
-        questions: [{
-          key: 'comments',
-          label: 'Scientific assessment',
-          type: 'richtext',
-          required: true,
-        }],
+        questions: reviewFormSchema.fields,
         questionSetVersion: 'set-v1',
         prefill: {},
       }}
@@ -37,10 +32,15 @@ test('external reviewer authoring selects the compact six-button toolbar', async
     />,
   );
 
-  const toolbar = await screen.findByRole('toolbar', { name: 'Review formatting' });
-  expect(within(toolbar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
-    'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
-  ]);
+  const richtextFields = reviewFormSchema.fields.filter((field) => field.type === 'richtext');
+  const toolbars = await screen.findAllByRole('toolbar');
+  expect(toolbars).toHaveLength(8);
+  for (const field of richtextFields) {
+    const toolbar = screen.getByRole('toolbar', { name: `Question ${field.order} formatting` });
+    expect(within(toolbar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
+    ]);
+  }
 });
 
 describe('ReviewAuthoringForm multiselect reconciliation', () => {

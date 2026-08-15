@@ -76,7 +76,8 @@ export default function RichReviewEditor({
   onChange,
   disabled = false,
   ariaLabel,
-  toolbarVariant = 'full',
+  toolbarLabel = 'Review formatting',
+  toolbarVariant = 'compact',
 }) {
   const editor = useEditor({
     extensions: RICH_REVIEW_EXTENSIONS,
@@ -132,11 +133,13 @@ export default function RichReviewEditor({
   };
   const toggleSubscript = () => editor.chain().focus().unsetSuperscript().toggleSubscript().run();
   const toggleSuperscript = () => editor.chain().focus().unsetSubscript().toggleSuperscript().run();
-  const compactToolbar = toolbarVariant === 'compact';
+  // Only an explicit full variant exposes the structural controls. An invalid
+  // value must fail closed to the smaller reviewer-facing toolbar.
+  const compactToolbar = toolbarVariant !== 'full';
 
   return (
     <div className="border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-gray-900">
-      <div role="toolbar" aria-label="Review formatting" className="flex flex-wrap gap-1 border-b border-gray-200 p-2 bg-gray-50 rounded-t-lg">
+      <div role="toolbar" aria-label={toolbarLabel} className="flex flex-wrap gap-1 border-b border-gray-200 p-2 bg-gray-50 rounded-t-lg">
         <ToolbarButton label="Bold" active={editor.isActive('bold')} disabled={disabled} onClick={() => editor.chain().focus().toggleBold().run()}><strong>B</strong></ToolbarButton>
         <ToolbarButton label="Italic" active={editor.isActive('italic')} disabled={disabled} onClick={() => editor.chain().focus().toggleItalic().run()}><em>I</em></ToolbarButton>
         {compactToolbar ? (

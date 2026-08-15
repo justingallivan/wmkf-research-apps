@@ -145,6 +145,7 @@ export default function ManualReviewEntryForm({ reviewer, onCancel, onSubmitted 
         values={values}
         onChange={update}
         disabled={submitting}
+        richTextToolbar="full"
         className="mt-6 space-y-6"
       />
 

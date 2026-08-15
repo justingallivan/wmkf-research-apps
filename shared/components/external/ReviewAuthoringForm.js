@@ -397,7 +397,7 @@ export function ReviewQuestionFields({
   values,
   onChange,
   disabled = false,
-  richTextToolbar = 'full',
+  richTextToolbar = 'compact',
   className = 'space-y-6',
 }) {
   return (
@@ -416,7 +416,7 @@ export function ReviewQuestionFields({
   );
 }
 
-function FieldRow({ field, value, onChange, disabled = false, richTextToolbar = 'full' }) {
+function FieldRow({ field, value, onChange, disabled = false, richTextToolbar = 'compact' }) {
   const id = `rf-${field.key}`;
   const hintId = field.hint ? `${id}-hint` : undefined;
   const selectedValues = field.type === 'multiselect'
@@ -522,6 +522,9 @@ function FieldRow({ field, value, onChange, disabled = false, richTextToolbar = 
           value={value ?? ''}
           onChange={(html) => onChange(field.key, html)}
           ariaLabel={field.label}
+          toolbarLabel={Number.isFinite(field.order)
+            ? `Question ${field.order} formatting`
+            : `${field.label || field.key || 'Review'} formatting`}
           disabled={disabled}
           toolbarVariant={richTextToolbar}
         />

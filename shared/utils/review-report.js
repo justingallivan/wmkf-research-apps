@@ -19,10 +19,11 @@
  *     separate ratings table — ratings render inline in the question flow.
  *  2. `htmlToBlocks(html)` — a pure tokenizer for the sanitizer's ALLOWLISTED
  *     GRAMMAR ONLY (lib/external/sanitize-review-html.js `ALLOWED_TAGS`:
- *     p, br, strong, b, em, i, ul, ol, li, h2, h3, blockquote, a — no
+ *     p, br, strong, b, em, i, sub, sup, ul, ol, li, h2, h3, blockquote, a — no
  *     tables/images/spans/divs). Converts answerHtml into an array of typed
  *     blocks ({type, runs, items}) with inline runs
- *     ({text, bold, italic, href}). This intermediate form is what both the
+ *     ({text, bold, italic, subscript, superscript, href}). This intermediate
+ *     form is what both the
  *     DOCX (review-report-docx.js) and PDF (review-report-pdf.js) renderers
  *     consume, so neither renderer re-parses HTML. Unknown/unexpected tags
  *     degrade to plain text: the tag is stripped, its text content kept,
