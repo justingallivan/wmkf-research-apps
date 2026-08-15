@@ -261,7 +261,9 @@ describe('/api/auth/link-profile', () => {
 
 // Mutation check performed manually (not committed as a test): the pre-fix
 // handler (git show c87e2a34:pages/api/auth/link-profile.js) was swapped in
-// temporarily and this suite re-run against it. Result: 9 of 11 tests failed
+// temporarily and this suite re-run against it. Result: 9 of the 11 tests
+// present at that time failed (the NULL is_active test was added after this
+// run, in the review-remediation round)
 // (only the pre-existing 401 and needsLinking-403 pins passed, since those
 // don't touch the new logic) — including every disabled-caller,
 // missing-caller-row, DB-error, and race-backstop case, each of which the

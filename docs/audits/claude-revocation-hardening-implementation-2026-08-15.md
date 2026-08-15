@@ -2,7 +2,7 @@
 title: Disabled-Account Revocation Hardening — Implementation & Adversarial Review — 2026-08-15
 domain: security-auth
 kind: audit
-status: draft
+status: complete
 summary: "Tier-2 implementation record for the accepted disabled-account revocation invariants (audit §10.2): signIn denial before side effects, current-request bare-auth blocking, JWT zero-row invalidation, fail-closed missing-profile helpers, and both link-profile branches with conditional persistence ordering. Records builder assignments, both Opus adversarial review passes, and every finding disposition."
 canonical: false
 ---
@@ -42,7 +42,7 @@ unresolved blocking findings.
 |---|---|---|
 | A | `pages/api/auth/[...nextauth].js` (signIn disabled-row denial; jwt zero-row invalidation) + `tests/unit/nextauth-revocation.test.js` (10 tests pre-remediation; count corrected per Opus reviewer 2 finding 5) | COMPLETE — mutation check: disabled-sign-in test fails against pre-fix code (`return true` + provisioning observed) |
 | B | `lib/utils/auth.js` (requireAuth active check; fail-closed zero-row fixes) + `tests/unit/utils/auth.test.js` (+9 tests) + `tests/helpers/auth-mock.js` (3 new presets) + `tests/unit/bare-auth-revocation.test.js` (8 route-level tests) + suite fallout triage (none needed; 2 failures pre-existing on baseline, re-confirmed by lead via `git stash -u`) | COMPLETE — discriminating fixtures: zero-row lookups where old/new predicates disagree, sequenced sql mocks to isolate `requireAuthWithProfile`'s own read |
-| C | `pages/api/auth/link-profile.js` (live caller guard + conditional writes + rowcount-checked UPDATE → 409) + `tests/unit/link-profile-revocation.test.js` (11 tests) | COMPLETE — empirical mutation check: suite re-run against the pre-fix handler; every revocation case failed (200 + writes executed), green after restore |
+| C | `pages/api/auth/link-profile.js` (live caller guard + conditional writes + rowcount-checked UPDATE → 409) + `tests/unit/link-profile-revocation.test.js` (11 tests pre-remediation; 12 after the NULL-row test) | COMPLETE — empirical mutation check: suite re-run against the pre-fix handler; every revocation case failed (200 + writes executed), green after restore |
 
 ## Opus adversarial review passes
 
@@ -70,7 +70,7 @@ failures on pristine baseline `d32e2d56`.
 | 1 | R1 MEDIUM | Claim-branch 409 race: target profile disabled between the SELECT (`link-profile.js:101`) and the conditional UPDATE (`:128`) → temp row already deleted → caller has zero rows for `azure_id` → next sign-in falls to the create-new branch and provisions a fresh default-grant profile | CONFIRMED mechanism; **ACCEPTED as residual** (owner may overturn). The disabled target profile stays disabled — the user gains only a new vanilla identity with default grants, which is exactly the already-accepted email-only/hard-delete reprovisioning residual class. Invariant 7 (disabled *caller*) is not violated; closing the two-statement window would need a `db.connect()` transaction in a serverless route (real added risk) or a fragile CTE ordering. Recorded below. |
 | 2 | R1 LOW + R2 LOW | `is_active` NULL split-brain: `=== false` / `!== false` sites treat NULL as active while `!is_active` sites deny; `requireAppAccess` would be the fail-open side (~94 endpoints). No write path produces NULL today (both reviewers exhaustively enumerated writes) | CONFIRMED (latent, unreachable); **FIXED** in the remediation round — all revocation predicates normalized to `is_active === true`-grants / everything-else-denies, with a discriminating NULL test per site |
 | 3 | R1 LOW | Wiki bullet overclaimed "enforced at every layer" — the proxy edge itself has no `is_active` read (`proxy.js:96-144`); it inherits revocation via JWT invalidation | CONFIRMED; **FIXED** (wording corrected in `docs/agent-wiki/topics/security-auth.md`) |
-| 4 | R2 MEDIUM | Residual-list omission: the applicant pass-through on the four bare-auth routes (`auth.js` skips the check for `userType === 'applicant'`) is now a codified exemption but was unrecorded. Pre-existing, not a regression; proxy staff-surface classification rejects applicant tokens today (`proxy.js:142`) | CONFIRMED; **FIXED** (recorded in residuals below) |
+| 4 | R2 MEDIUM | Residual-list omission: the applicant pass-through on the four bare-auth routes (`auth.js` skips the check for `userType === 'applicant'`) is now a codified exemption but was unrecorded. Pre-existing, not a regression; proxy staff-surface classification rejects applicant tokens today (`proxy.js:141`) | CONFIRMED; **FIXED** (recorded in residuals below) |
 | 5 | R2 LOW | Implementation-record test count for builder A was wrong (claimed 13; file had 10) | CONFIRMED; **FIXED** (counts corrected in this record) |
 | 6 | R2 LOW + R1 INFO | Stale mutation-check comment in `link-profile-revocation.test.js` ("9 of 12"; the file has 11 tests) | CONFIRMED; **FIXED** in the remediation round |
 | 7 | R1 INFO | `/api/health` now 503s during a Postgres outage (fail-closed health surface) | Already recorded in residuals; verified by R1 |
@@ -92,6 +92,24 @@ disagree). Verified by the lead: targeted suites 86/86 green; full unit
 suite 7652 tests with only the two known pre-existing baseline failures;
 predicate diff inspected line-by-line.
 
+### Opus re-review of the remediation delta (`445dd1f8..6268e26b`)
+
+A third Opus reviewer verified the delta: predicate changes exact and
+NULL-only (true/false behavior unchanged); full `is_active` census across
+`lib/utils/auth.js` + `pages/api/auth/` shows **no NULL-permissive site
+remains** (JS predicates and SQL `AND is_active = true` three-valued logic
+alike); the three NULL tests are discriminating, including a mock-routing
+check proving the `requireAppAccess` test reaches the real read; no test
+weakened (delta is pure addition apart from the comment correction); scope
+exact; targeted suites 86/86 green. **Verdict: no BLOCKING, HIGH, or MEDIUM
+findings.** Its supporting check beyond the lead's trace: the new-profile
+INSERT omits `is_active`, and the schema default `true`
+(`scripts/setup-database.js`) keeps new users active under the tightened
+predicates — no new-user regression. Three LOW/INFO record-accuracy nits
+(builder-C test count, mutation-comment denominator context, proxy line
+citations) were fixed by the lead in the closing commit; review cycle
+converged with zero unresolved blocking or high-confidence findings.
+
 ## Residual risks and owner decisions
 
 - **Claim-branch 409 race (Opus R1 finding 1, accepted):** if the *target*
@@ -105,7 +123,7 @@ predicate diff inspected line-by-line.
   `userType === 'applicant'` sessions (applicants have no `user_profiles`
   row), so an applicant session reaching blob-proxy/upload-handler would face
   no profile check. Today the proxy classifies those routes as staff surface
-  and rejects applicant tokens (`proxy.js:140-143`); this exemption must be
+  and rejects applicant tokens (`proxy.js:141`); this exemption must be
   revisited if the applicant surface classification ever widens (the intake
   proxy/CSRF workstream).
 - **jwt fall-through backstop coupling (Opus R2 finding 8):** a non-applicant

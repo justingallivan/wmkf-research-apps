@@ -1,189 +1,147 @@
-# Session 430 Prompt: Reviewed Documentation Merged — Implementation Decisions Pending
+# Session 432 Prompt: Revocation Hardening Implemented & Reviewed — Codex Read-Only Review Next
 
-## Session 429 Summary
+## Session 431 Summary
 
-Session 429 ran the full adversarial review cycle over the Workbench
-observability/read-coalescing plan on the documentation-only branch
-`codex/claude-workbench-plan-revision` (worktree
-`WMKF_Apps-claude-observability`, base `b4c8e048`). Six Codex review passes
-(8 + 5 + 6 + 3 + 7 + 4 findings, plus a final graph/token amendment) were each
-independently verified against current source, confirmed, and folded into the
-plan; every pass's dispositions live in
-`docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`.
-
-In parallel, Claude completed the documentation-only auth/side-effect security
-audit on `codex/claude-security-followup-audit`. Four Codex correction rounds
-resolved the disabled-account revocation contract, both `link-profile` branches,
-fresh disabled-user sign-in side effects, missing-profile fail-open behavior,
-the 28-site raw-error inventory, and the two-verifier cron-auth topology. The
-final accepted audit is
-`docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md`.
-
-**Codex's final read-only verdict accepted the branch:** the graph/token
-amendment is correct (the Graph token request targets
-`login.microsoftonline.com` and classifies as `azuread`/`token`;
-`graph`/`token` is rejected), pass counts and durable restatements are
-reconciled, independent compatibility verification and all applicable
-documentation gates/self-tests passed, and **no further plan revision is
-requested**.
-
-**Codex's final bounded security verdict also accepted its branch:** all four
-round-four corrections match current source, the applicable documentation and
-API-route gates/self-tests passed independently, and no further audit revision
-is requested.
+Session 431 implemented the owner-authorized Tier-2 disabled-account
+revocation hardening in the dedicated worktree
+`WMKF_Apps-claude-revocation-hardening` on branch
+`codex/claude-revocation-hardening` (base `d32e2d56`, post-merge `main`).
+Claude Fable orchestrated: three Sonnet builders with disjoint file
+ownership implemented the accepted audit's §10.2 behavioral invariants; two
+independent Opus adversarial reviewers then a third delta reviewer verified
+the result. **No invariant was refuted; the review cycle converged with zero
+unresolved blocking or high-confidence findings.** The branch is pushed and
+NOT merged.
 
 ### What Was Completed
 
-1. **The plan is internally consistent and implementation-ready as a plan.**
-   Final state: verified external-egress inventory (emission vs. measurement
-   scope); independent pre-auth request-correlation ALS; v1 telemetry envelope
-   with `eventId`, fetch-semantics `operation`, source-resolved `resourceClass`
-   allowlists, and outcome↔statusClass consistency; exact error-preservation
-   semantics; structured-platform-log sink with a fixture-tested, fail-closed,
-   unfiltered export workflow; chunk-aware Stage 2 census/formula; T1/T2
-   uniformly closed as history; contract-reconcile Mode A (sixth pass):
-   **READY WITH NAMED CHANGES** (owner items only).
-2. **The security audit is complete and implementation-scoped.** Its primary
-   recommendation is a separate Tier-2 revocation-hardening effort: deny fresh
-   sign-in for disabled identities before side effects, block the current
-   request, invalidate subsequent staff tokens, fail closed on missing profiles,
-   and guard both `link-profile` branches with safe persistence ordering.
-3. **The owner merged both reviewed documentation branches into `main`:** the
-   Workbench plan at `741e7d99` and the security audit at `c0bf48da`. No runtime
-   implementation or stage authorization was included.
-4. **All review-cycle verification ran green on the final trees:** ten
-   documentation gate/self-test pairs (sequential), `npm run lint`,
-   `npm run build`, `git diff --check`, and the local fixture NDJSON test of
-   the export workflow's Steps 2–4; the security branch additionally passed the
-   API-route gate/self-test and an independent 19-route cron-verifier census.
+1. **All 12 §10.2 invariants implemented and regression-tested.**
+   - `signIn` looks up the caller's `azure_id` unfiltered and denies a
+     not-explicitly-active row before the `last_login` UPDATE and all
+     provisioning/notification/reconcile side effects.
+   - `jwt` invalidates any staff token (`return {}`) whose
+     `is_active = true` lookup returns zero rows, with or without a prior
+     `profileId`; DB errors keep the token and defer to route guards'
+     fail-closed 503.
+   - Bare `requireAuth` does a live per-request `is_active` read for
+     non-applicant sessions (profileId, falling back to azure_id) — covering
+     blob-proxy, upload-handler, health, api-capabilities; 403 on
+     disabled/missing, 503 on DB error.
+   - `requireAuthWithProfile` / `requireAppAccess` fail closed on zero rows.
+   - `link-profile` verifies the live caller before any write in BOTH
+     branches, with `is_active = true` conditional writes and a
+     rowcount-checked final UPDATE (409) as TOCTOU backstop.
+   - All revocation predicates are NULL-fail-closed (only
+     `is_active === true` grants; review-round remediation).
+   - No tombstone/denylist, no migration; `is_active = false` is the durable
+     revocation mechanism; hard-delete reprovisioning stays an accepted
+     residual.
+2. **41 new revocation tests** (verified by per-file jest runs + diff count) across `tests/unit/nextauth-revocation.test.js`
+   (11), `tests/unit/bare-auth-revocation.test.js` (8),
+   `tests/unit/link-profile-revocation.test.js` (12), and
+   `tests/unit/utils/auth.test.js` (+10 incl. discriminating zero-row and
+   NULL fixtures), each mutation-checked against the pre-fix code. Reviewer 2
+   mapped every §10.2 required-regression bullet to a concrete test.
+3. **Adversarial review record** (invariant table, builder assignments, all
+   three Opus passes, every finding disposition with evidence, residuals):
+   `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`
+   (status: complete).
+4. **Durable docs reconciled:** `docs/AUTHENTICATION_SETUP.md` (two contract
+   rows), `docs/agent-wiki/topics/security-auth.md` (revocation bullet,
+   layer wording per reviewer 1), source-file docblocks.
+5. **Verification, all green on the final tree:** full unit suite (7,652
+   tests; only the two failures that reproduce on pristine baseline
+   `d32e2d56`: `reconcile-probe-entity-set-count`,
+   `notification-trust-model-pushup` — pre-existing `main` drift, untouched
+   here); `check:api-routes` + self-test; `check:types`; `npm run lint`
+   (0 errors); `npm run build`; doc gates + self-tests (doc-currency,
+   fact-consistency, doc-symbol-refs, agent-wiki, canonical-pointers,
+   build-claim-freshness, docs-catalog); `git diff --check`.
 
-### Commits (all on `codex/claude-workbench-plan-revision`)
+### Commits (all on `codex/claude-revocation-hardening`)
 
-- `34e2378e` / `33b9d202` — initial revision per the first Codex review
-- `96190462` / `28a25e67` — second pass
-- `5f38f006` — third pass
-- `e51bf0fe` — fourth pass
-- `c408ca23` — fifth pass
-- `eec823a6` — sixth pass
-- `a33e2d6b` — graph/token amendment (final reviewed commit)
-- `ebcf469c` — Session 430 branch closeout
-
-### Security-audit commits
-
-- `571da7f0` — initial auth/side-effect audit
-- `4fbb99ef` / `7efcf929` / `7c447d5c` / `c34cf21f` — four Codex correction rounds
-
-### Main merge commits
-
-- `741e7d99` — merge reviewed Workbench observability plan
-- `c0bf48da` — merge reviewed auth and side-effect security audit
-
-## Final Disposition
-
-1. **Both documentation-only review branches are merged into `main`.**
-2. **The observability plan remains a draft and is NOT authorized for
-   implementation.** Naming a stage authorizes brief Phase 8; this review
-   authorized nothing.
-3. **If Stage 1 is explicitly authorized, implement it in a fresh Tier-2
-   worktree and branch based on current `main`.**
-4. **Do not reuse this plan-review worktree
-   (`WMKF_Apps-claude-observability`) for runtime implementation.**
-5. **Stage 2 remains separately authorized**, after Stage 1 supplies a usable
-   before/after dependency-call baseline (Stage 2 is source-certain, not
-   latency-gated; the baseline is for acceptance verification).
-6. **Security runtime hardening is also not yet authorized.** If authorized,
-   implement it in a separate fresh Tier-2 worktree, not either audit worktree.
+- `445dd1f8` — Implement disabled-account revocation hardening (audit §10.2 invariants)
+- `6268e26b` — Remediate Opus review findings: fail-closed NULL is_active + record review
+- (Session 431 closeout commit follows this file's update)
 
 ## Next Items
 
-### Owner Decision Needed
+### Verified Open
 
-1. **Authorize Stage 1 (and/or later Stage 2) implementation?** Phase 8 stays
-   dormant until a stage is explicitly named. Per the disposition above:
-   fresh Tier-2 worktree/branch off post-merge `main`.
-2. **Authorize Tier-2 revocation hardening?** The accepted security audit's
-   behavioral invariants are in §10.2; implementation belongs in a fresh branch.
-3. **Hard-delete reprovisioning policy?** Recommended posture: use
-   `is_active = false` as durable revocation. Add a tombstone/denylist only if a
-   hard-deleted Azure identity must also be prevented from reprovisioning.
-4. **Campaign window / release posture** remains `[NEEDS OWNER]`.
-5. **Vercel plan log-retention confirmation** at measurement-window start
-   (Stage 1 sink contract).
-6. **Intake launch authorization must keep proxy routing + CSRF together.**
-   Extending applicant routing without Origin validation would make the latent
-   gap live; ship both in one pre-launch change.
-7. **Verifier-deselect hardening?** The token verifier checks `revoked` but
-   not `wmkf_selected`; whether deselection alone should invalidate an
-   existing link is a separate small hardening (recommendation: leave revoke
-   and deselect distinct).
-8. **Run the 7-item read-only production-probe list?** Owner-executed
-   (standing rule bars self-authorized prod Dataverse reads). List in
-   `docs/audits/fable-current-state-evidence-2026-08-14.md`.
+1. **Codex independent read-only review of `codex/claude-revocation-hardening`.**
+   Evidence: this branch at origin; work-order handoff sequence. Codex
+   reviews the diff `d32e2d56..HEAD` against
+   `docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md` §10.2
+   and the implementation record. Do not merge before this review.
+2. **Two pre-existing unit failures on `main`** (`reconcile-probe-entity-set-count`,
+   `notification-trust-model-pushup`).
+   Evidence: reproduced on pristine `d32e2d56` by three independent runs this
+   session. Out of scope here; fix on `main`.
+3. Security Operating Plan drift (~12 controls unrecorded since 2026-05-05) —
+   reconcile with `/sweep` (carried from S430; this session's controls are
+   recorded in the implementation audit, not yet in the SOP).
+4. `check:trust-boundary-guid` / `check:status-enum-parity` CI backstop
+   (carried from S430).
+5. Untracked secret-rotation names absent from `lib/utils/tracked-secrets.js`
+   (carried from S430).
+6. Stale doc counts (DAL migration plan adapters; CANONICAL_COUNTS re-derive)
+   (carried from S430).
 
-### Verified Open (unchanged audit follow-ups, scope discipline)
+### Owner Decision Needed (sequence preserved from the work order)
 
-1. Security Operating Plan materially drifted (~12 controls unrecorded since
-   2026-05-05) — reconcile with `/sweep`.
-2. `check:trust-boundary-guid` and `check:status-enum-parity` have no CI
-   backstop (Claude-Code commit-hook only) — worth wiring into `test.yml`.
-3. Untracked secret-rotation names (`UPLOADS_BLOB_RW_TOKEN`,
-   `OPENAI_API_KEY`, etc.) absent from `lib/utils/tracked-secrets.js`.
-4. Stale doc counts: DAL migration plan says 19 adapters (now 20);
-   `CANONICAL_COUNTS.md` re-derive against 157 routes / 20 adapters /
-   29 migrations.
+1. **Review and deliberately merge `codex/claude-revocation-hardening`**
+   (after Codex's read-only review). `main` auto-deploys.
+2. **Workbench observability Stage 1** in a FRESH worktree off post-merge
+   `main` (never this worktree or the plan-review worktree).
+3. **Stage 2** only after a measured Stage 1 baseline and separate
+   authorization.
+4. **Intake proxy routing + intake CSRF together** in their own pre-launch
+   workstream (extending applicant routing without Origin validation makes
+   the latent gap live). Note: the revocation record adds a related residual —
+   `requireAuth`'s applicant exemption on bare-auth routes must be revisited
+   if the applicant surface classification widens.
+5. Campaign window / release posture `[NEEDS OWNER]` (carried).
+6. Vercel log-retention confirmation at measurement-window start (carried).
+7. Verifier-deselect hardening decision (carried; recommendation: keep
+   revoke and deselect distinct).
+8. Run the 7-item read-only production-probe list (owner-executed; carried).
 
-### Verify Before Acting
+### Accepted Residuals This Session (owner may overturn at merge review)
 
-1. **Confirm the Tier-2 production deploy of `171c46a9` reached Ready** and
-   scan for post-deploy errors on the reviewer-reminder and grantee-abstract
-   surfaces (Session 428 shipped two runtime changes; `main` auto-deploys).
+See `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`
+"Residual risks": claim-branch 409 race (reprovisioning class), applicant
+pass-through on bare-auth routes (pre-existing, proxy-guarded), jwt
+fall-through/`requireAuth` backstop coupling, createNew transient signout
+window, double `is_active` read on `requireAuthWithProfile` routes,
+`/api/health` 503 during a Postgres outage, hard-delete/email-only
+reprovisioning (no tombstone by owner decision).
 
 ### Do Not Reopen Without New Decision
 
-1. **Reviewer merge org-open access (T1)** — accepted by-design 2026-08-15.
-   See `.claude-memory/project-merge-candidates-authorization-gap.md` (closed).
-2. **Staff-wide cross-request document reads (D4)** — accepted by-design
-   2026-08-15. See `.claude-memory/project-reviewer-org-open-access-by-design.md`.
-3. **The full Request Workbench Data Plane as a big-bang refactor** — deferred
-   in favor of measure-first + incremental slices behind seams.
-4. **CLI-version upgrade/churn housekeeping** — the plan's rule is
-   version-agnostic (record installed version, inspect help, preflight against
-   a known emitted event at window start); do not add upgrade tasks.
-5. **Grantee recipient override and stateless invitation-token behavior** —
-   accepted risks in the security audit; require a new owner decision to change.
-
-## Historical Context (Session 428, retained for continuity)
-
-Session 428 executed the Fable audit brief (Phases 0–7), closed T1/D4 by owner
-decision (org-open by design — no technical ownership of requests/data in
-Dataverse to scope against), shipped the T2 reminder-eligibility fix and the
-abstract-save ambiguous-write reconciliation, and merged to `main`
-(`171c46a9`, `42f190e0`, `aaf92cf5` — historical Session 428 state; the
-current baseline has since advanced).
+1. Reviewer merge org-open access (T1) / staff-wide document reads (D4) —
+   accepted by-design 2026-08-15 (carried from S430).
+2. Full Request Workbench Data Plane big-bang refactor — deferred (carried).
+3. Grantee recipient override + stateless invitation tokens — accepted risks
+   (carried).
+4. Tombstone/denylist for hard-deleted azure_ids — explicitly out of scope by
+   owner decision; requires new authorization.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | The reviewed staged plan (draft, not authorized); Stage 1 is the next authorizable work |
-| `docs/audits/claude-workbench-observability-plan-response-2026-08-15.md` | All six review-pass dispositions + final Mode A verdict |
-| `docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md` | Accepted auth/side-effect audit, owner decisions, and Tier-2 revocation invariants |
-| `docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md` | First Codex review (point-in-time) |
-| `docs/audits/fable-audit-final-handoff-2026-08-14.md` | Audit decision trail and verdicts |
-| `.claude-memory/project-reviewer-org-open-access-by-design.md` | The org-open by-design principle (T1 + D4) |
-| `lib/services/reviewer-reminder-sweep.js` | T2 fix (eligibility filter + atomic ETag PATCH) |
+| `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md` | Implementation + adversarial-review record (invariants, dispositions, residuals) |
+| `docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md` | The accepted audit this branch implements (§10.2 invariants) |
+| `pages/api/auth/[...nextauth].js` | signIn disabled-denial + jwt zero-row invalidation |
+| `lib/utils/auth.js` | requireAuth live active check; fail-closed helpers |
+| `pages/api/auth/link-profile.js` | Live caller guard + conditional persistence ordering |
+| `tests/unit/*revocation*.test.js` | The new regression suites |
 
 ## Testing
 
-Review-cycle verification was green on both reviewed branches. Re-run the
-documentation gates on merged `main` before pushing the reconciliation commit:
-
 ```bash
-# ten documentation gate/self-test pairs, sequentially, e.g.:
-npm run check:doc-currency && npm run check:doc-currency:self-test
-# ... doc-symbol-refs, fact-consistency, build-claim-freshness,
-#     docs-catalog, agent-invariants ...
-npm run lint
-npm run build
-git diff --check
+# in the WMKF_Apps-claude-revocation-hardening worktree
+npx jest tests/unit --silent          # expect 2 known baseline failures only
+npm run check:api-routes && npm run check:api-routes:self-test
+npm run check:types && npm run lint && npm run build
 ```
