@@ -30,7 +30,8 @@ usable. No stage is started until the owner names it and authorizes implementati
 adversarial review** (`docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md`,
 disposition `docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`). All eight Codex
 findings were independently re-verified against current source and confirmed; the corrections are
-folded in below. Key changes: the false "Dynamics seam covers Graph" claim is replaced by a full
+folded in below, and four further same-day Codex review passes are dispositioned in the same
+response artifact (pass trail in the Contract-reconcile verdict section). Key changes: the false "Dynamics seam covers Graph" claim is replaced by a full
 egress inventory; correlation is an independent pre-auth ALS, not a DAL-context field; the telemetry
 event contract, sink, and failure semantics are now explicit; Stage 2's census is chunk-aware and
 formula-based; T2 moved to completed history; T1 is uniformly closed.
@@ -69,7 +70,7 @@ measurement window. The runtime seams to Dataverse / Azure AD / Graph are:
 |---|---|---|---|
 | `lib/services/dynamics/http.js:24` (`fetchWithTimeout`) | All `DynamicsService` traffic: token (`dynamics/auth.js:65`), reads (`dynamics/read-ops.js`), writes (`dynamics/write-core.js`), schema (`dynamics/schema.js`) | **Wrapped** | Every `DynamicsService` caller app-wide (routes, crons, cold-start checks) |
 | `lib/services/graph-service.js:1154` (module-local `fetchWithTimeout`; **no import from dynamics/http.js** — its only import is `service-error.js`) | All Graph/SharePoint traffic incl. Azure AD token acquisition (`graph-service.js:101-135`), ~20 call sites | **Wrapped** | Every Graph caller app-wide |
-| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **Wrapped** | Every `client.js` caller — **including the 56 script files under `scripts/` that directly import/require it** (count independently verified by Codex, fourth pass, 2026-08-15); script-emitted events carry no correlation fields and go to the invoking terminal's stdout, not the platform log stream |
+| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **Wrapped** | Every `client.js` caller — **including operational scripts that require it** (2026-08-15 grep: 58 files under `scripts/` reference the module, 2 of them archived under `scripts/archive/`; a further subset uses only `loadEnvLocal`, which performs no HTTP call and emits nothing — only script invocations that reach `getAccessToken`/`createClient` emit); script-emitted events carry no correlation fields and go to the invoking terminal's stdout, not the platform log stream |
 | `lib/services/dataverse-export/fetch-client.js:61` (fourth local `fetchWithTimeout` copy) and `lib/services/dataverse-export/live-taxonomy.js:38,64` (raw fetches) | Export tooling | **Not wrapped** | No emission — named so the inventory is complete |
 | `lib/utils/health-checker.js:70,94,123` | Azure AD/token health probes | **Not wrapped** | No emission — named for completeness |
 
@@ -141,23 +142,56 @@ instrumenting one of these seams covers another is false and must not reappear.
      `sort -u` are prohibited as uniqueness keys.** Planned unit test: every emitted event has an
      `eventId`, and two events emitted by the same wrapped call site in one request carry
      different values.
-   - `operation` (fourth-pass definition — it was previously declared but underived) is the
-     **uppercase HTTP method of the dependency call matched against a fixed allowlist**
-     `{'GET','POST','PATCH','PUT','DELETE','HEAD','OPTIONS'}`; any other or missing method →
-     `operation: 'unknown'` (fail-closed). It is never a URL, path, query fragment, entity id,
+   - `operation` (fifth-pass correction of the fourth-pass definition): derived as
+     `String(options?.method || 'GET').toUpperCase()` matched against the fixed allowlist
+     `{'GET','POST','PATCH','PUT','DELETE','HEAD','OPTIONS'}`. An **omitted** method is `GET` by
+     fetch semantics — and the real Dynamics/Graph read paths do omit it
+     (`lib/services/dynamics/read-ops.js:82,129,179,237` pass only `{headers}`), so mapping
+     missing → `'unknown'` would have mislabeled every Dynamics read; only an **invalid supplied**
+     value maps to `'unknown'` (fail-closed). It is never a URL, path, query fragment, entity id,
      filename, or any caller-provided arbitrary string — the allowlist is the entire value space.
      The redaction/contract tests assert `operation` ∈ allowlist ∪ `{'unknown'}` for every emitted
-     event, including a seeded weird-method case that must land on `'unknown'`.
+     event, and include the real omitted-method Dynamics/Graph read shape (must emit `'GET'`) plus
+     a seeded weird-method case (must emit `'unknown'`).
    - `event` is a **literal discriminator field inside the JSON object** (not just a prose name), so
      log filtering needs no message-shape heuristics. The event's timestamp is the platform log
      record's own timestamp (present in `vercel logs --json` output); the event body carries none.
    - `dependency` is derived from a **host-aware allowlisted classifier** (`login.microsoftonline.com`
      → `azuread`, `graph.microsoft.com` → `graph`, the configured Dynamics host → `dataverse`);
      unknown hosts → `dependency: 'unknown'` — a first-class variant of the union, not an error.
-   - `resourceClass` is a **safe coarse class from a fixed allowlist** (for Dataverse: the entity-set
-     name matched against a tracked allowlist; for Graph: a coarse operation class like `drive-item`,
-     `site`, `search`, `token`). Anything unmatched fails closed to `resourceClass: 'unknown'` —
-     never a raw path fallback.
+   - `resourceClass` (fifth-pass full specification) is a **fixed, closed value set** with an
+     allowlisted URL-pattern classifier; anything unmatched fails closed to `'unknown'` — never a
+     raw path fallback. The exact v1 value set and derivation:
+     - **`dependency: 'azuread'`** → always `resourceClass: 'token'` (the URL is the
+       `login.microsoftonline.com` token endpoint; no other class exists on this dependency).
+     - **`dependency: 'dataverse'`** → take the first path segment after `/api/data/v9.2/`, strip
+       any parenthesized key (`akoya_requests(9f8…)` → `akoya_requests`), and match **exactly**
+       against the tracked entity-set allowlist:
+       `{'wmkf_potentialreviewerses', 'wmkf_appreviewersuggestions', 'akoya_requests',
+       'wmkf_appuserappaccesses', 'systemusers', 'wmkf_appsettingses'}` — the sets the target
+       routes and the app-access/token legs actually read; the emitted value is the matched
+       entity-set literal (a schema name, not data). `$batch`, `EntityDefinitions…`, and any
+       unmatched segment → `'unknown'`. Extending the allowlist is a reviewed commit. **The exact
+       plural entity-set spellings above are `[ASSUMED]` until the implementer confirms them from
+       the adapters' request URLs — the classifier test fixtures must use the confirmed real
+       URLs.**
+     - **`dependency: 'graph'`** → coarse path class from the fixed set
+       `{'token', 'site', 'drive', 'drive-item', 'search'}` (token endpoint → `'token'`;
+       `/sites…` → `'site'`; `/drives…` root/children listing → `'drive'`; item-addressed
+       content/metadata/versions/upload/delete → `'drive-item'`; `/search/query` → `'search'`);
+       anything else → `'unknown'`.
+     - **Total v1 value set** (the `$RESOURCE_CLASSES` list the export validation checks):
+       the six Dataverse entity-set literals ∪ `{'token','site','drive','drive-item','search',
+       'unknown'}`.
+     - **Tests:** representative-URL fixtures for every class above **plus** hostile fixtures — a
+       Dataverse read with a `$filter` embedding an email, a GUID-keyed single-record URL, a Graph
+       item URL with an encoded filename, a signed/CDN-style download URL, and an unknown host —
+       asserting the emitted event contains the expected class and that **no query string, id,
+       filename, or path material appears in any field** of the event.
+     - **Stage 2 derivability:** the Stage 2 acceptance count is mechanically
+       `count(events where dependency == 'dataverse' and resourceClass == '<the confirmed
+       wmkf_potentialreviewers entity set>' and routeName ∈ the three target routes)` — no log
+       spelunking or URL inspection needed.
    - **Never emitted:** raw URLs, query strings (`$filter` embeds names/emails), arbitrary path
      segments, tenant identifiers, drive/item ids, filenames, signed-URL material, tokens, headers,
      request/response bodies. A redaction unit test asserts the emitted object contains none of a
@@ -222,51 +256,92 @@ instrumenting one of these seams covers another is false and must not reappear.
      line item appears, STOP — revert (pure additive change) or land a named sampling knob as a
      reviewed follow-up. Exceeding the threshold is a stop condition, not a silent implementer
      tuning choice.
-   - **Query workflow (executable, historical, fail-closed — corrected for Vercel CLI `59.0.0`,
-     verified locally 2026-08-15 via `vercel --version` and `vercel logs --help`):** `vercel logs`
-     performs a **historical query by default**; live streaming requires `--follow` (which this
-     workflow does not use — the previous live-tail framing was wrong). Each slice:
+   - **Query workflow (executable, historical, fail-closed):** `vercel logs` performs a
+     **historical query by default**; live streaming requires `--follow` (which this workflow does
+     not use — the previous live-tail framing was wrong). Flag existence was inspected on the CLI
+     installed at review time (59.0.0, 2026-08-15 — a historical observation, not a version
+     requirement; see the version-agnostic rule below). Each slice:
 
      ```bash
      # Preconditions (one-time): `vercel login`; repo linked to the production project via
-     # `vercel link` (or pass --project <NAME_OR_ID> explicitly, as below).
+     # `vercel link` (the linked project makes --project optional; the explicit variable
+     # form below also works from an unlinked checkout).
      set -euo pipefail   # errors visible and fatal; no stderr suppression anywhere
      OUT_DIR=${OUT_DIR:-$(mktemp -d)}   # or a defined scratch path; created explicitly
-     SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T06:00:00Z'; LIMIT=5000
+     PROJECT='actual-project-name-or-id'   # from `vercel project ls`; if the repo is
+                                           # linked, drop the --project flag entirely
+     SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T01:00:00Z'; LIMIT=5000
      RAW="$OUT_DIR/raw-${SINCE}--${UNTIL}.ndjson"
      SLICE="$OUT_DIR/workbench-dependency-${SINCE}--${UNTIL}.ndjson"
-     # Step 1 — RAW capture. --query is a coarse FULL-TEXT volume-reduction hint only
-     # (Vercel documents --query as full-text search; it is NOT an exact JSON-substring
-     # discriminator and must not be treated as the filter of record).
-     vercel logs --project <NAME_OR_ID> --environment production \
+
+     # Step 1 — capture of record: genuinely UNFILTERED. No --query here: any server-side
+     # filter would make the completeness check below meaningless (fifth-pass correction —
+     # the previous "RAW" capture still passed --query and was therefore server-filtered).
+     vercel logs --project "$PROJECT" --environment production \
        --since "$SINCE" --until "$UNTIL" \
-       --query 'workbench.dependency' \
        --json --limit "$LIMIT" > "$RAW"
-     # Step 2 — fail-closed completeness check on the UNFILTERED output, BEFORE any filtering:
-     # a raw capture at the limit is TRUNCATED, not complete.
+
+     # Step 2 — fail-closed completeness check on the truly unfiltered output, BEFORE any
+     # filtering. If unfiltered volume cannot fit bounded slices even at short windows,
+     # STOP: the Log Drain / dashboard-export fallback is REQUIRED — do not shrink
+     # confidence by filtering server-side.
      RAW_LINES=$(wc -l < "$RAW")
      if [ "$RAW_LINES" -ge "$LIMIT" ]; then
-       echo "TRUNCATED raw slice ($RAW_LINES >= $LIMIT): narrow --since/--until and re-run" >&2
+       echo "TRUNCATED unfiltered slice ($RAW_LINES >= $LIMIT): narrow --since/--until;" >&2
+       echo "if no bounded window fits, use the Log Drain / dashboard-export fallback" >&2
        exit 1
      fi
-     # Step 3 — the filter of record is LOCAL JSON parsing of each record's .message:
-     # keep only records whose message parses as JSON with the exact discriminator, and
-     # fail closed on telemetry lines missing required fields instead of counting them.
+
+     # Step 3 — filter of record: local parse + FULL v1 contract validation. Ordinary
+     # non-telemetry lines are skipped; any line CONTAINING the discriminator that fails
+     # to parse or fails validation ABORTS the slice (fromjson? alone silently drops
+     # malformed JSON — that is why unparseable candidates are turned into errors).
+     # The atomic tmp+mv publish means a failed run leaves no usable partial slice.
      jq -c '
-       (.message // "" | fromjson?) as $ev
-       | select($ev != null and $ev.event == "workbench.dependency")
-       | if ($ev.eventId and $ev.v and $ev.dependency and $ev.operation and $ev.outcome)
+       def uuid: test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+       select((.message // "") | contains("\"event\":\"workbench.dependency\""))
+       | ((.message | fromjson?) // error("candidate telemetry line did not parse — fail slice")) as $ev
+       | if ($ev.event == "workbench.dependency")
+           and ($ev.v == 1)
+           and (($ev.eventId | type) == "string" and ($ev.eventId | length) > 0 and ($ev.eventId | uuid))
+           and ($ev.dependency  | IN("dataverse","azuread","graph","unknown"))
+           and ($ev.outcome     | IN("success","http_error","timeout","network_error"))
+           and ($ev.operation   | IN("GET","POST","PATCH","PUT","DELETE","HEAD","OPTIONS","unknown"))
+           and ($ev.resourceClass | IN($ARGS.named.classes | split(",")[]))
+           and (($ev.ms | type) == "number" and ($ev.ms | isnan | not) and ($ev.ms | isinfinite | not) and $ev.ms >= 0)
+           and (($ev.statusClass == null) or ($ev.statusClass | IN("2xx","3xx","4xx","5xx")))
+           and (if $ev.outcome == "http_error" then ($ev.statusClass != null) else true end)
+           and (($ev.correlationId == null) or (($ev.correlationId | type) == "string"))
+           and (($ev.routeName == null) or (($ev.routeName | type) == "string"))
          then {record: ., ev: $ev}
-         else error("malformed workbench.dependency event — fail closed, do not count")
+         else error("workbench.dependency event failed v1 contract validation — fail slice")
          end
-     ' < "$RAW" > "$SLICE"
+     ' --arg classes "$RESOURCE_CLASSES" < "$RAW" > "$SLICE.tmp"
+     mv "$SLICE.tmp" "$SLICE"   # atomic publish
+
+     # Step 4 — cross-slice merge + sound dedup: exactly one payload per eventId.
+     # Conflicting payloads sharing an eventId are a DATA ERROR (fail), never a choice.
+     jq -cs '
+       group_by(.ev.eventId)
+       | map(if (map(.ev) | unique | length) > 1
+             then error("conflicting payloads share eventId " + .[0].ev.eventId + " — fail merge")
+             else .[0] end)
+       | .[]
+     ' "$OUT_DIR"/workbench-dependency-*.ndjson > "$OUT_DIR/merged.ndjson.tmp"
+     mv "$OUT_DIR/merged.ndjson.tmp" "$OUT_DIR/merged.ndjson"
      ```
+
+     (`$RESOURCE_CLASSES` is the comma-joined fixed `resourceClass` value set from the envelope
+     contract above, supplied by the operator; the jq argument-plumbing shape is part of the
+     window-start preflight.) An optional query-assisted **triage** command
+     (`vercel logs … --query 'workbench.dependency' …`) may be used to eyeball volume before
+     capture, but it is **never** the capture of record and proves nothing about completeness.
 
      - **Time bounds:** explicit `--since`/`--until` per slice (ISO timestamps), stamped into the
        filename; per-event timestamps come from the platform log record in the `--json` output
        (the event body deliberately carries no timestamp field).
-     - **What is verified vs. what must be preflighted:** `vercel logs --help` on the pinned CLI
-       proves the flags **exist** — it does NOT prove `--query`'s matching semantics or the exact
+     - **What is verified vs. what must be preflighted:** `vercel logs --help` on the installed
+       CLI proves the flags **exist** — it does NOT prove `--query`'s matching semantics or the exact
        `--json` record field names (`.message` etc.). At window start, **preflight against a known
        emitted event**: emit one test event, capture it with this workflow, and confirm the coarse
        query returns it and the `jq` filter isolates it, before trusting any measurement slice.
@@ -284,10 +359,14 @@ instrumenting one of these seams covers another is false and must not reappear.
        legitimate calls must both count. A verified-unique platform log-record id is an acceptable
        alternative key **only if** its presence and uniqueness in the actual CLI JSON output are
        explicitly confirmed in the window-start preflight, failing closed when absent.
-     - **Version contract:** flag existence is verified against installed CLI `59.0.0` only
-       (59.1.3 is already published — do **not** upgrade silently mid-plan); the plan stays pinned
-       to the tested version, and any CLI upgrade requires complete revalidation of the workflow
-       (flags, query behavior, JSON shape) before use.
+     - **Version contract (version-agnostic — fifth-pass correction):** the CLI installation is
+       not under this plan's control and must not be treated as pinned, and CLI version churn is
+       not this plan's housekeeping. The rule: **at measurement-window start, record the installed
+       `vercel --version`, inspect the current `vercel logs --help`, and validate the full
+       command and `--json` record shape against a known emitted event before relying on any
+       slice.** Historical note: flag existence was inspected on CLI 59.0.0 during the
+       third/fourth review passes — that is evidence about that inspection, not a current version
+       requirement or an upgrade recommendation.
    - **Retention:** platform log retention on the current Vercel plan must be **verified at window
      start**. Historical queries can only reach records still within retention, so slices must be
      captured on a cadence shorter than the retention period; if retention proves too short for
@@ -465,8 +544,28 @@ any such change must preserve the S213/S400/S401 correctness invariants. Compone
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-15, fourth pass (post-Codex fourth review, findings Q1–Q3 folded in): READY
-WITH NAMED CHANGES.** The fourth pass verified: event deduplication is now sound — a per-event
+**Mode A, 2026-08-15, fifth pass (post-Codex fifth review, findings R1–R7 folded in): READY WITH
+NAMED CHANGES.** The fifth pass verified: the capture of record is now genuinely unfiltered (no
+`--query`; server filtering would void the completeness check; query-assisted capture survives
+only as an optional triage command that proves nothing); the example is executable (a real
+`PROJECT` variable contract or the linked-project variant, `set -euo pipefail`, visible stderr);
+local filtering is genuinely fail-closed — discriminator-containing lines that fail `fromjson` or
+the full v1 contract validation (event/v/eventId-UUID/allowlists/finite-nonnegative
+`ms`/statusClass-outcome consistency/optional-field types) abort the slice, output publishes
+atomically via tmp+`mv`, and an executable eventId merge step fails on conflicting payloads
+sharing one id; `operation` derivation matches fetch semantics (omitted method ⇒ `GET` — the real
+Dynamics read shape, `read-ops.js:82,129,179,237`; only invalid supplied values ⇒ `'unknown'`);
+`resourceClass` has a fully specified closed value set and URL-pattern classifier (exact plural
+entity-set spellings `[ASSUMED]` pending implementer confirmation from real request URLs), with
+hostile-URL leak tests and the Stage 2 count mechanically derivable from
+dependency+resourceClass+routeName; the CLI contract is version-agnostic (record version, inspect
+help, preflight against a known emitted event at window start — no pinning claim, no upgrade
+housekeeping); and the script inventory is described by caller class (58 grep matches, 2
+archived; `loadEnvLocal`-only importers emit nothing) instead of a brittle single count. The
+fourth-pass paragraph below is superseded where it conflicts (its `--query`-bearing "RAW"
+workflow, missing-method→unknown rule, 59.0.0 pinning language, and bare "56" count).
+
+**Prior pass (fourth, same date):** The fourth pass verified: event deduplication is now sound — a per-event
 `eventId` (`crypto.randomUUID()`) is part of the v1 envelope and is the only permitted dedup key
 (`requestId`+timestamp and full-line `sort -u` are prohibited; a verified-unique platform
 log-record id is acceptable only after explicit window-start preflight, failing closed when

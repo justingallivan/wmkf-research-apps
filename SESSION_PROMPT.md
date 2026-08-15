@@ -40,7 +40,11 @@ worktree was clean.
      scope, unverified-volume sampling assumption, durable-state cleanup) and a
      fourth Q1–Q3 pass (per-event `eventId` dedup key, coarse-query + local-jq
      filter-of-record workflow with RAW-first truncation check, allowlisted
-     `operation` enum). Full artifact set under
+     `operation` enum) and a fifth R1–R7 pass (genuinely unfiltered capture of
+     record, executable example, full-contract fail-closed jq validation with
+     atomic publish and conflict-detecting eventId merge, fetch-semantics
+     `operation` derivation, fully specified `resourceClass`, version-agnostic
+     CLI rule, caller-class script inventory). Full artifact set under
      `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**

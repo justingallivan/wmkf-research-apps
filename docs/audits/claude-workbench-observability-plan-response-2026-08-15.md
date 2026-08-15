@@ -3,7 +3,7 @@ title: Claude Response — Codex Adversarial Review of the Workbench Observabili
 domain: architecture
 kind: audit
 status: final
-summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its three follow-up passes (8 + 5 + 6 + 3 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
+summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its four follow-up passes (8 + 5 + 6 + 3 + 7 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -235,11 +235,13 @@ pass: zero known live stale claims, re-verified by the third-pass semantic re-se
    not "workbench traffic", and carries a defined validation and stop threshold.
 5. Verifier-deselect hardening stays an open owner decision tracked in `SESSION_PROMPT.md`, outside
    this plan.
-6. The Stage 1 export command is `[VERIFIED via vercel --version / vercel logs --help]` against
-   installed CLI `59.0.0` (2026-08-15). `[ASSUMED]` only that the installed CLI at
-   measurement-window start still matches — the plan requires re-verifying then and forbids
-   assuming an upgrade preserves flags; Log Drain / dashboard export is the required fallback if
-   completeness cannot be proven.
+6. (Reframed by the fifth pass — version-agnostic.) Flag existence for the Stage 1 export command
+   was inspected on the CLI installed at review time (`59.0.0`, 2026-08-15) — a historical
+   observation, not a pin: the auto-updating CLI installation is not under the plan's control. The
+   operative rule is the plan's window-start preflight: record `vercel --version`, inspect the
+   current `vercel logs --help`, and validate the command and `--json` record shape against a
+   known emitted event; Log Drain / dashboard export is the required fallback if completeness or
+   JSON shape cannot be proven.
 7. `[ASSUMED — explicitly unverified]` Whole-application dependency-call volume and platform log
    cost under 100% emission; validated within 48 hours of enablement against the plan's
    ~50,000-lines/day stop/re-scope threshold.
@@ -445,11 +447,95 @@ these.
   written); the original third-pass wording remains in the branch history (`5f38f006`) as the
   point-in-time record.
 
+## Fifth pass — Codex fifth review (2026-08-15), findings R1–R7
+
+**Provenance:** findings relayed in the owner-issued work order; each verified locally before
+revision (source greps and re-reads recorded below).
+
+### R1 (the "RAW" capture still passed `--query`, so it was server-filtered) — CONFIRMED
+
+- The fourth-pass workflow's Step 1 passed `--query 'workbench.dependency'`, making the
+  "unfiltered" truncation check meaningless — a server-filtered result at the limit says nothing
+  about total volume, and a server-filtered result under the limit does not prove the unfiltered
+  stream fit.
+- **Plan change:** the capture of record carries **no** `--query`; truncation is checked on
+  genuinely unfiltered output before local filtering; if the unfiltered stream cannot fit bounded
+  slices even at short windows, the workflow fails and the Log Drain / dashboard-export fallback
+  is required. A query-assisted command survives only as an optional triage step explicitly
+  stated to prove nothing about completeness.
+
+### R2 (the example was not executable — shell-metacharacter placeholder) — CONFIRMED
+
+- `--project <NAME_OR_ID>` is a redirection-metacharacter placeholder that cannot be pasted.
+- **Plan change:** real variable contract (`PROJECT='actual-project-name-or-id'` …
+  `--project "$PROJECT"`) plus the documented linked-project variant that omits `--project`;
+  `set -euo pipefail` and visible stderr preserved.
+
+### R3 (local parsing was not genuinely fail-closed) — CONFIRMED
+
+- `fromjson?` silently drops malformed JSON — it never errors — so the fourth-pass filter would
+  silently skip an unparseable telemetry line rather than failing the slice, and it validated
+  field truthiness, not the contract.
+- **Plan change:** candidate lines are detected by discriminator substring; a candidate that
+  fails `fromjson` raises an explicit `error(…)` and aborts the slice; the full v1 contract is
+  validated (event, `v == 1`, UUID-shaped nonempty `eventId`, dependency/outcome/operation/
+  resourceClass against their declared allowlists, finite nonnegative `ms`, `statusClass`
+  absent-or-valid and required for `http_error`, optional `correlationId`/`routeName` typing);
+  output publishes atomically via tmp+`mv` so a failed run leaves no usable partial slice; an
+  executable eventId merge step fails on conflicting payloads sharing one id rather than choosing
+  silently.
+
+### R4 (missing-method → `'unknown'` contradicted fetch semantics) — CONFIRMED
+
+- `[VERIFIED via lib/services/dynamics/read-ops.js:82,129,179,237]` the real Dynamics reads pass
+  only `{headers}` — no `method` — and fetch defaults an omitted method to GET; the fourth-pass
+  rule would have labeled every Dynamics read `'unknown'`.
+- **Plan change:** derivation is `String(options?.method || 'GET').toUpperCase()` against the
+  allowlist; only an invalid **supplied** value maps to `'unknown'`; tests include the real
+  omitted-method read shape (must emit `'GET'`) plus the weird-method case.
+
+### R5 (`resourceClass` was underspecified) — CONFIRMED
+
+- The value set and classifier were sketched ("a tracked allowlist", "a coarse class like…"),
+  not defined — the same open-contract defect Q3 flagged for `operation`.
+- **Plan change:** exact closed v1 value set and derivation per dependency (azuread → `'token'`;
+  dataverse → entity-set path segment, parenthesized keys stripped, matched exactly against a
+  six-entry tracked allowlist covering the target routes and app-access legs — exact plural
+  spellings `[ASSUMED]` pending implementer confirmation from real request URLs; graph → fixed
+  coarse path classes); hostile-URL leak tests ($filter with email, GUID key, encoded filename,
+  signed URL, unknown host); Stage 2's `wmkf_potentialreviewers` count is mechanically derivable
+  from `dependency`+`resourceClass`+`routeName`.
+
+### R6 (CLI pinning language violated the owner's no-churn instruction) — CONFIRMED
+
+- The fourth-pass "pinned to 59.0.0 / 59.1.3 published / upgrade recommendation" language treated
+  an auto-updating installation as pinned and created recurring upgrade housekeeping.
+- **Plan change:** version-agnostic rule — record the installed version at window start, inspect
+  current help, preflight against a known emitted event; the 59.0.0 inspection is retained only
+  as a historical observation; no publication notes, no upgrade recommendation.
+
+### R7 (script inventory count imprecise) — CONFIRMED
+
+- `[VERIFIED via rg -l "lib/dataverse/client" scripts]` 58 files match, 2 under
+  `scripts/archive/` (56 non-archive); and importing only `loadEnvLocal` performs no HTTP call
+  and emits nothing.
+- **Plan change:** the inventory row now describes caller classes (58 grep matches, 2 archived;
+  `loadEnvLocal`-only importers emit nothing; only invocations reaching
+  `getAccessToken`/`createClient` emit) instead of a brittle bare count.
+
+**Durable-state status as of the fifth pass:** the three live surfaces were fully re-read; every
+superseded "RAW unfiltered", fail-closed overclaim, missing-method rule, pinned-version, and bare
+"56" statement was removed or explicitly demoted to a labeled prior-pass record. During the
+re-read, three additional residues beyond the enumerated findings were found and fixed (the
+workflow header's version-specific framing, a "pinned CLI" phrase, and an actual `--args` bug in
+the Step 3 jq invocation that would have swallowed the `--arg classes` flag as positional text).
+Zero known live stale claims remain as of this pass.
+
 ## Final verdict
 
 **READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15,
-fourth pass). The named changes are the owner items above plus the window-start preflight
-obligations now written into the plan, not structural rework. All findings across the four review
-passes (8 + 5 + 6 + 3) are CONFIRMED and folded in; as of this pass the revised plan contains no
-known claim contradicted by current source or platform documentation; it remains a draft not
+fifth pass). The named changes are the owner items above plus the window-start preflight
+obligations written into the plan, not structural rework. All findings across the five review
+passes (8 + 5 + 6 + 3 + 7) are CONFIRMED and folded in; as of this pass the revised plan contains
+no known claim contradicted by current source or platform documentation; it remains a draft not
 authorized for implementation.
