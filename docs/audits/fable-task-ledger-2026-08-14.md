@@ -47,12 +47,12 @@ not canonical architecture documentation.
 | ID | Owner | Scope | Writable surface | Expected artifact | Start | Last progress | Disposition |
 |---|---|---|---|---|---|---|---|
 | P0 | Fable | Control plane: branch, baselines, ledger, skeletons | this branch | this file + 3 skeletons | 2026-08-14 | 2026-08-14 | done |
-| S1 | Explore scout | Change/system inventory since baselines | none (read-only) | evidence table + top-5 risk surfaces | — | — | pending |
-| S2 | Explore scout | Semantic security route/side-effect map | none (read-only) | route trace table + confirm/refute prelims | — | — | pending |
-| S3 | Explore scout | Workbench performance/data-flow trace | none (read-only) | journey traces + duplicate-read census | — | — | pending |
-| S4 | Explore scout | Tests/gates/operability controls map | none (read-only) | enforcement map + false-confidence risks | — | — | pending |
-| T1 | Fable | Merge-candidates authorization trace (confirm/refute) | none | security-audit § finding | — | — | pending |
-| T2 | Fable | Reviewer token mint/regeneration eligibility trace | none | security-audit § finding | — | — | pending |
+| S1 | Explore scout | Change/system inventory since baselines | none (read-only) | evidence table + top-5 risk surfaces | 2026-08-14 | launched | running |
+| S2 | Explore scout | Semantic security route/side-effect map (T1/T2 surfaces excluded — Fable-personal) | none (read-only) | route trace table + defect-class findings | 2026-08-14 | relaunched after delegation-guard narrowing | running |
+| S3 | Explore scout | Workbench performance/data-flow trace | none (read-only) | journey traces + duplicate-read census | 2026-08-14 | launched | running |
+| S4 | Explore scout | Tests/gates/operability controls map | none (read-only) | enforcement map + false-confidence risks | 2026-08-14 | launched | running |
+| T1 | Fable | Merge-candidates authorization trace (confirm/refute) | none | security-audit § finding | 2026-08-14 | confirmed; recorded | done |
+| T2 | Fable | Reviewer token mint/regeneration eligibility trace | none | security-audit § finding | 2026-08-14 | divergence confirmed; recorded | done |
 
 ## Probe approval ledger (Phase 2)
 
