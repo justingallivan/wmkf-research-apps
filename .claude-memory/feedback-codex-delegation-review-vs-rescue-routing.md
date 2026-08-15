@@ -6,6 +6,13 @@ metadata:
   type: feedback
 ---
 
+## Recall Rule
+
+Read before routing any Claude-to-Codex review, adversarial verdict, or rescue
+implementation request. `[VERIFIED via
+.claude/hooks/pre-review-delegation-trace-guard.js and
+.claude/hooks/hook-enforcement.test.js, 2026-08-15]`
+
 Codex delegation routing has two enforced paths (discovered S401, 2026-08-05):
 
 - **Review-shaped work** (verdicts, adversarial passes, P0/required-changes

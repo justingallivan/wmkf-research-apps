@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-08-11 via source, production Dataverse create/publish/exact/runtime-select and Request 1002788 identity probes plus owner extension/email smoke, non-clobbering and honorific-rebaselined settings, Vercel production deployments, and live HTTP checks; terminal-status baseline via 2026-07-24 production deployment and controlled smoke
+  last_verified: 2026-08-15 via current source, focused tests, docs/atlas/dataverse-wmkf-appreviewersuggestion.md, and the active terminal-status/dispatch-evidence plan
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -18,127 +18,46 @@ fields opportunistically to the terminal-status feature.
 Owner goal (Justin, S369): WMKF wants durable evidence of reviewer quality —
 whether reviewers are on time and reliable — not just participation counts.
 
-## Verified state
+## Current contract
 
-- `aggregateReviewHistory()` counts
-  `wmkf_appreviewersuggestion` rows with `wmkf_reviewreceivedat ne null`.
-- `wmkf_accepted` supplies a denominator, but an accepted row with no received
-  review cannot distinguish a dropout from work still in flight.
-- Marking a dropout `complete` stamps `wmkf_reviewreceivedat`, creating a false
-  successful review in future history.
-- `withdrew` and `released` are live post-accept terminal statuses without
-  completion/receipt timestamps. Production Dataverse was provisioned and
-  verified with `withdrew=100000005` and `released=100000006`; PR #79 / merge
-  `fd610837` deployed the accepted/null-status repair on 2026-07-24. A controlled
-  production smoke read back `Withdrew`, token revoked, accepted preserved, and
-  no received/completed timestamp. That is the historical production baseline.
-  Production merge `70f51f45` superseded that behavior on 2026-07-24:
-  staff-recorded `withdrew` now applies the full withdrawal contract —
-  `accepted=false`, `declined=true`, token revoked, exact linked honorarium
-  deleted, and acceptance follow-up cancelled.
-- `wmkf_reviewduedate` is request-level mutable state, so production still lacks
-  durable evidence of the deadline communicated for each materials dispatch.
-- Dynamics email sending already creates a durable email activity and returns
-  its `emailId`.
+- `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js and focused tests]`
+  `aggregateReviewHistory()` counts received-review timestamps. Treating a dropout as
+  `complete` would therefore create false positive reliability evidence.
+- `[VERIFIED via lib/services/review-manager/terminal-transition-service.js,
+  shared/config/reviewerStatus.js, and
+  docs/atlas/dataverse-wmkf-appreviewersuggestion.md]` The terminal statuses are live:
+  `withdrew` means the reviewer ended an accepted engagement and is negative reliability
+  evidence; `released` means WMKF ended it and is reliability-neutral. Neither stamps a
+  received/completed timestamp. The dedicated ETag path revokes the token; staff-recorded
+  withdrawal also corrects response state and removes the exact linked honorarium.
+- `[VERIFIED via lib/services/reviewer-due-extension.js,
+  lib/external/reviewer-due-date.js, and the Atlas]` A nullable suggestion-level
+  `wmkf_reviewduedateoverride` is live for accepted reviewers. Its dedicated writer and
+  shared resolver feed staff display, portal, email/calendar, reminders, and token
+  lifecycle. It is mutable operational state, not historical proof of what deadline was
+  communicated.
 
-## Current decisions
+## Still deferred
 
-1. **Terminal statuses remain split.**
-   - `withdrew`: reviewer ended the accepted engagement; negative reliability
-     evidence.
-   - `released`: WMKF ended it; reliability-neutral.
-2. **Ship terminal safety independently.** It stops the active false-completion
-   workaround and does not depend on deadline measurement.
-3. **Do not use the discarded HMAC repair design.** The expiring receipt plus
-   mutable first/last fields could not represent out-of-order repairs or
-   engagement reuse without additional durable identity.
-4. **Design deadline evidence around ordered dispatches.** Probe whether the
-   existing Dynamics email activity can carry suggestion identity, engagement
-   generation, communicated due date, and sent state. If not, use a small
-   append-only dispatch entity keyed to the email activity.
-5. **Keep payability separate.** It annotates genuinely completed reviews and
-   does not replace terminal engagement status.
+Durable deadline evidence is **not built**. The active design is an ordered materials-
+dispatch identity that records the communicated due date and sent state, preferably
+anchored to the existing Dynamics email activity; use a small append-only dispatch entity
+only if that activity cannot carry the contract. The discarded expiring-HMAC/first-last
+repair design cannot represent out-of-order repairs or engagement reuse.
 
-## Verified per-reviewer extension gap (Session 416, 2026-08-11)
+Payability remains separate: it annotates genuinely completed reviews and does not replace
+terminal engagement status.
 
-- [VERIFIED via source + read-only production Dataverse probe] Request `1002926`
-  has proposal-wide `wmkf_reviewduedate=2026-09-09`; Mohammad Hafezi (the live
-  reviewer row is spelled `Mohamed Hafezi`) accepted and was granted an
-  individual extension to 2026-09-14. No suggestion-level due
-  date exists, so the portal and acceptance/calendar surfaces retain September 9.
-- Both automatic reminder flags on that request are null, which the cron treats
-  as disabled (`=== true` is required). His current portal token expires
-  2026-11-04, and final submission enforces token/lifecycle state rather than the
-  displayed request due date. The September 14 exception is operationally safe,
-  but it is tracked outside the product.
-- **Implementation production-live (2026-08-11):**
-  [VERIFIED via main source, focused tests, and production deployment] a nullable DateOnly
-  `wmkf_reviewduedateoverride`, accepted-row Track Reviewers extension modal,
-  dedicated `review-due-extension` writer, override-first resolver, and the
-  full staff → portal/email/calendar/reminder/token consumer fan-out are
-  implemented. A non-null extension must be strictly after the request's
-  original deadline, with no maximum; the PD may restore the original date.
-  Saving or restoring first validates the admin body, Dynamics impersonation
-  setting, assigned sender, confirmed recipient, signature, and calendar.
-  Confirmed engagement snapshot name/email take precedence; legacy missing
-  snapshot values fall back field-by-field to the server-read linked reviewer
-  person, and absence from both sources still fails before the write. It then
-  ETag-commits the date
-  and automatically dispatches the fixed-subject email. Only an actual Dynamics
-  dispatch failure leaves the date saved without the notice. The open modal
-  exposes a server-fresh retry, and an existing extension always offers Resend
-  deadline email without another date write. There is no durable
-  notification-owed marker, so a failed restore send still depends on the
-  immediate retry affordance. The
-  admin panel owns the body default only; the Invite surface has no editor.
-  Invitation response timing remains separate. A fresh re-add clears the stale
-  override; past dates fail closed using the Foundation-Pacific calendar date.
-  Editing alone does not rotate a live delivered token. The accepted-reviewer
-  due + 90d window is intentionally retained through the Board meeting and is
-  comfortably longer than ordinary roughly two-week reviewer extensions.
-  Claude Opus's final adversarial verification returned READY after the
-  preflight, retry-state, error-classification, and copy corrections; the final
-  local gates passed at 610 suites / 7,717 tests, 30 focused extension tests,
-  and a successful webpack production build.
-- **Wave 18 is production-live:** [VERIFIED via production
-  create/publish/exact/runtime-select probes, the non-clobbering settings seed,
-  main commit `8647af33`, Vercel deployment
-  `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 /
-  2026-08-12 UTC] the suggestion override, admin body, and runtime are live.
-  The production route rejects unauthenticated writes before service entry; a
-  first signed-in Request `1002788` attempt correctly made no write but exposed
-  blank legacy Test Homer engagement snapshots despite a complete linked active
-  reviewer. [VERIFIED via the exact read-only production row probe, main
-  `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks]
-  the snapshot-first/linked-person fallback is production-live. [VERIFIED via
-  owner production smoke on Request `1002788`] the retry saved the extension
-  and automatically delivered the deadline email. The received email exposed
-  a final greeting defect (`Dear Test Homer,`). The admin body now requires
-  `{{greeting}}`, resolved through the established reviewer honorific helper to
-  `Dear Dr. Homer,`, and the live Dataverse setting exactly matches that source
-  default. [VERIFIED via main `6526a934`, Vercel production deployment
-  `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build,
-  and live HTTP 200] the honorific correction is production-live. No second
-  test email was sent for the copy-only correction.
-- Do not conflate that mutable operational override with the append-only
-  dispatch/deadline evidence needed for reviewer-reliability measurement. Run
-  `/contract-reconcile` before implementation; this crosses Dataverse schema,
-  staff UI/API, external portal, email, cron, token lifecycle, Atlas, and tests.
+## Boundaries
 
-## Terminal-status implementation boundary
+- Do not infer on-time performance from the mutable request due date or per-reviewer
+  override alone.
+- Do not add deadline-evidence fields opportunistically to terminal-status work.
+- Keep `withdrew` and `released` distinct throughout producers, rollups, reminders, portal
+  gates, and UI mappings; `check:status-enum-parity` covers only its registered maps.
+- Run `/contract-reconcile` before implementing dispatch evidence: it crosses Dataverse
+  schema, staff UI/API, external portal, email, cron, tokens, Atlas, and tests.
 
-- Dedicated UI action and `/api/review-manager/terminal-transition`.
-- Fresh request-ownership and lifecycle predicate.
-- ETag-guarded status + token-revocation write; staff-recorded `withdrew` also
-  corrects accepted/declined response state and atomically deletes the exact
-  linked honorarium while `released` remains status-only.
-- Adapter-level irreversibility for all status-changing callers.
-- Receipt-writer guards at external submit, manual entry, mark-without-file, and
-  staff/reviewer upload.
-- Uploads use unique attempt folders. Every 412 loser is orphaned and never
-  deleted; winner inspection is intentionally absent.
-- Total UI/service/status-map coverage enforced by `check:status-enum-parity`.
-- No due-date schema, repair route, or reliability metric in this slice.
-
-Detailed contract:
-`docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md`.
+Canonical detail and dated production evidence:
+`docs/REVIEWER_TERMINAL_STATUS_AND_DUE_DATE_PLAN.md` and
+`docs/atlas/dataverse-wmkf-appreviewersuggestion.md`.

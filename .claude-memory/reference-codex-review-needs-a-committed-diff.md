@@ -6,6 +6,12 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+Read before asking Codex to review analysis, plans, or work that is not already
+visible in a Git diff. `[VERIFIED via .gitignore:55 and current review-routing
+guard tests, 2026-08-15]`
+
 The Codex review commands review a **git diff** (working tree, branch, or
 `--base <ref>`). They cannot see reasoning that exists only in the conversation.
 

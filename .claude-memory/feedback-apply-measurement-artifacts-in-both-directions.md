@@ -6,12 +6,20 @@ metadata:
   status: active
 ---
 
+## Recall Rule
+
+Read before publishing benchmark, audit, safety, recall, or error-rate numbers
+when any known artifact changes how outcomes are counted.
+
 When you discover that a measurement method has a known weakness, correct for it
 in **both** directions. Check specifically whether it also distorts the metric
 that would *undercut* your conclusion — not only the one you noticed because it
 depressed a number you wanted higher.
 
-**Why:** S406, ROR comparator. The falsification harness judges by exact string
+**Why:** S406, ROR comparator. `[VERIFIED via
+benchmarks/fuzzy-matching-falsification/README.md and
+benchmarks/fuzzy-matching-falsification/baseline/ror-chosen-2026-08-07.md]`
+The falsification harness judges by exact string
 match. I documented that weakness explicitly, then corrected for it only where it
 understated ROR's *recall* ("27/47 as judged, 30/47 artifact-corrected"). I never
 applied it to the *safety* count — where the identical artifact was hiding 6

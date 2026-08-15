@@ -15,6 +15,11 @@ Read this when writing or rewording any user-facing error message, banner, or
 guard response — especially for transient/system failures (5xx, lookups,
 timeouts).
 
+`[VERIFIED via lib/utils/auth.js and
+tests/unit/invite-preview-error-retry.test.js, 2026-08-15]` The owner-set 503
+copy remains the live `requireAppAccess` response and the retry surfaces preserve
+the same system-blame/action-ladder contract.
+
 ## What happened (S404, 2026-08-06)
 
 The shared 503 from `requireAppAccess` read "Unable to verify application

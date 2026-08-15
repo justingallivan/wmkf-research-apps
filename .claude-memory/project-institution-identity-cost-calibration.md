@@ -11,6 +11,12 @@ metadata:
   modified: 2026-08-09T17:27:47.503Z
 ---
 
+## Recall Rule
+
+Read before changing reviewer institution-mismatch thresholds, Stage 2 relationship
+policy, or any person-identity write gate. Display-tier institution errors are cheap;
+wrong-person persistence is not.
+
 Owner calibration (2026-08-09, Session 409 follow-on): institution names are
 not business-critical ("we aren't doing tax stuff"). Reviewers are asked to
 correct wrong info and fill in departmental detail themselves, so
@@ -18,6 +24,12 @@ Harvard/HMS/Beth-Israel-class conflations and even UCSD-vs-University-of-San-
 Diego mixups at the DISPLAY/ALERT tier get shrugged off and fixed by the
 reviewer. False clears there are cheap; every SURFACED pair costs the staff
 clicking the pair-consistency work exists to eliminate.
+
+`[VERIFIED via docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md,
+benchmarks/institution-pair-consistency/results/wave6-enrichment-flip-2026-08-09.json,
+and lib/services/workbench/enrich-recommended-service.js, 2026-08-15]` The
+owner calibration, frozen-40 safety result, additive comparison seam, and
+unchanged person-identity gate remain aligned.
 
 **Why:** the original problem statement ([[institution-pair-consistency]]
 plan) was human effort spent on verify-and-cite clicking. A cost model that

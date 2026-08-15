@@ -4,88 +4,52 @@ description: The card's 15 banners are a symptom of a matching layer with ~25 sc
 type: project
 status: active
 scope: reviewer
-last_verified: 2026-08-08 via current card/save gates, owner decisions, institution decision benchmark v3, and the deployed production ROR integration
+last_verified: 2026-08-15 via current ReviewerSearchSection source, save gates, owner decisions, and the strategic-reset brief
 ---
 
 ## Recall Rule
 
 Read this when: planning work on the Find-tab candidate card, the reviewer matching /
-normalizer layer, the fuzzy-matching reconciliation, or the containment-first
-institution comparison fix.
+normalizer layer, fuzzy-matching work, institution comparison, or COI presentation.
 
-Design memo (inventory, diagnosis, proposed structure, decisions, sequence):
-`https://claude.ai/code/artifact/e535ed0d-6724-40ad-9d1d-ff95b0ae85a1`
+## Current truth
 
-## The framing that decides sequencing
+- **Card simplification is not built.** `[VERIFIED via
+  shared/components/reviewers/ReviewerSearchSection.js, 2026-08-15]` The card still
+  renders separate COI, identity, mismatch, relevance, and address warnings. The
+  shared promotion/email helpers resolve blocking states, but there is no unified
+  ready / needs-review / blocked band or one Details disclosure.
+- **Matching work must start from the strategic reset, not the earlier ROR sequence.**
+  The falsification harness, comparators, and request-scoped shadow integration exist,
+  but the first diagnostic mixed reviewer relevance, person identity, and institution
+  normalization. Current authority is
+  `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`; production authority remains
+  legacy-default until a later owner decision.
+- Historical benchmark results and owner answers live in
+  `benchmarks/fuzzy-matching-falsification/`,
+  `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`, and
+  `outputs/fuzzy-matching-owner-answers-2026-08-06.md`. Do not restate their evolving
+  counts here.
 
-The card renders every contributing signal in parallel — up to 15 stacked banners, 10
-pills, 5 contact chips, a 7-control action row, 6 border states, and 4 independent
-severity encodings — because the matching layer never produces a single verdict.
-`getCandidatePromotionDecision` / `getCandidateEmailReadiness` already resolve to ONE
-blocking state in strict precedence (repair → identity → email → address), and the card
-ignores that.
+## Owner-decided direction (planned, not implementation)
 
-The independent fuzzy-matching research recommends Fellegi–Sunter additive scoring with
-**three-band decisions (auto / review / reject)**, which maps directly onto the proposed
-card **status band (ready / needs review / blocked)**. Adopt the model and the band
-renders a real scored verdict; skip it and the band is a hand-assembled precedence chain
-— the same accretion, better dressed. **The card redesign therefore follows the matching
-decision.** An earlier draft had the containment-first comparison fix first; the owner
-corrected the altitude — order by what most rapidly reduces complexity.
-
-## Decided (owner, 2026-08-06) — card redesign unbuilt; matching groundwork partial
-
-- **Sequence (step 1 DONE S404, 2026-08-06):** fuzzy-matching reconciliation — completed
-  as a confirmed Claude×Codex consensus,
-  `outputs/fuzzy-matching-consensus-recommendation-2026-08-06.md`; its six §4 owner
-  questions ANSWERED S405 (2026-08-06) —
-  `outputs/fuzzy-matching-owner-answers-2026-08-06.md`; falsification suite BUILT
-  and incumbent baseline FROZEN S405 (owner authorized) at
-  `benchmarks/fuzzy-matching-falsification/` — incumbent "safe but blind"
-  (0 wrong entities, 36/47 positives abstain), see
-  `baseline/incumbent-2026-08-06.md` → ROR v1 comparator DONE → canonical-ID
-  candidate benchmark v2 DONE (ROR API 128/141 vs incumbent 84/141; retrieval
-  still not decision authority), see
-  `benchmarks/fuzzy-matching-falsification/versions/v2/results/2026-08-07-api-candidate-benchmark.md`
-  → organization-span parsing + controlled query fallback + veto/scorer
-  comparator DONE (v3 141/141 institution labels, 0 wrong automatic resolutions),
-  see `benchmarks/fuzzy-matching-falsification/versions/v3/results/2026-08-07-api-decision-benchmark.md`
-  → production request-scoped shadow adapter + post-resolution ROR→OpenAlex bridge
-  BUILT, VERIFIED, and DEPLOYED with production authority still
-  `legacy-default`
-  → STRATEGIC RESET before further promotion or tuning: the first diagnostic
-  conflated reviewer relevance, person identity, and institution normalization;
-  current authority is `docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md`
-  → only after owner review, decide whether S2AFF profiling or any resolver work
-  remains warranted →
-  normalizer consolidation + shared scorer in small independently shippable increments →
-  card status band + Details disclosure + footer split → coauthor verdict →
-  institution-COI sort-to-bottom + audited override.
-- **The two "COI"s are different in kind and must be split.** Institution COI is the
-  authoritative server gate (recomputed at save, rejects even when the client claims
-  otherwise) → belongs in the status band, cards sort to the END of the list, override
-  exists but is rare and must be an audited server path. Coauthor COI blocks NOTHING
-  (appends a note to reasoning and saves) → an advisory pill expanding to the per-author
-  breakdown with a recorded verdict, replacing the `gradeCoauthorCOI` threshold constant.
-- **Coauthor verdicts are request-scoped**, never person-scoped: a judgement about one
-  proposal's author set must not carry onto a different one. It is durable state and
-  needs the address-attestation treatment (who/when/evidence, server-recorded, re-read)
-  plus a defined lifetime — a verdict on 4 shared papers must not survive to 15.
-- **Advisory notes collapse fully** into one "Details — N notes" disclosure (notes above
-  evidence). The earlier notes-vs-evidence two-chip split was rejected: "institution
-  mismatch" is a note whose content IS a comparison of two evidence items, so two
-  controls served one question.
-- Sort-to-bottom has a precedent to copy: `aiFlaggedNotRelevant` rows are already moved
-  to the end of the enriched list (`ReviewerSearchSection.js`).
+1. Decide the matching verdict before redesigning the card; otherwise a status band
+   becomes another hand-built precedence chain.
+2. Then add one status band, one “Details — N notes” disclosure, and a separate action
+   footer in small independently shippable increments.
+3. Keep institution COI and coauthor overlap distinct. Institution COI is already a
+   server-authoritative save rejection; coauthor overlap is advisory. Any institution
+   override would require a separately authorized, audited server path.
+4. Any future coauthor verdict is request-scoped durable evidence with who/when/source
+   and a defined lifetime; it must not become a global person attribute.
 
 ## Hazards
 
-- The evidence block keeps its own framing on identity-unresolved rows (retrieved for a
-  NAME, not confirmed about a PERSON; no mailto; Scholar name-search not profile link).
-  That is why evidence stays a coherent section instead of dissolving into the notes.
-- This work is the exact shape of the S395 debacle — see
-  [[feedback-latency-plan-scope-accretion-postmortem]]. Every increment must be
-  independently shippable; no pass may attempt to unify all ~25 predicates at once.
-- Fail-closed remedies, identity-before-address ordering, and contact/bibliometric
-  suppression on unresolved identity are safety properties, not styling —
-  [[project-reviewer-verify-fail-dangerous]], [[feedback-affordance-consistency-beats-deduplication]].
+- Preserve evidence framing on identity-unresolved rows: evidence was retrieved for a
+  name, not confirmed about a person.
+- Do not combine all card predicates in one pass; follow
+  [[feedback-latency-plan-scope-accretion-postmortem]].
+- Identity-before-address ordering, fail-closed remedies, and suppression of unconfirmed
+  contact/bibliometric claims are safety properties, not styling. See
+  [[project-reviewer-verify-fail-dangerous]] and
+  [[feedback-affordance-consistency-beats-deduplication]].

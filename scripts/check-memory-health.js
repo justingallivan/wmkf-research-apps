@@ -111,7 +111,12 @@ function analyzeStore(memDir) {
       if (!/^##\s+Recall Rule\s*$/m.test(body)) flags.push('no-recall-rule');
 
       const makesStructuralClaim = STRUCTURAL_RE.test(body);
-      if (makesStructuralClaim && (!lastVerified || WEAK_BASIS_RE.test(lastVerified))) {
+      // Feedback memories encode behavioral rules learned from owner correction.
+      // Their basis is the correction itself, not a live-state probe; requiring a
+      // `last_verified` date would contradict this check's documented contract.
+      const isBehavioralFeedback = f.startsWith('feedback-');
+      if (makesStructuralClaim && !isBehavioralFeedback
+        && (!lastVerified || WEAK_BASIS_RE.test(lastVerified))) {
         flags.push('weak-basis');
       }
 
