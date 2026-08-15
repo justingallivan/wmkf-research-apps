@@ -65,6 +65,7 @@ and answer the residual unknowns, they do not change the plan.
 | 5 | Recurring route/runtime errors + durations in prod | Vercel logs (aggregate) | read-only | Justin |
 | 6 | Branch-protection required checks on `main` (does the e2e path-filter leave a permanently-pending required check?) | GitHub repo settings / API | read-only | Justin |
 | 7 | Is alert-recipient config in `wmkf_appsystemsettings` populated? | included in probe #1 output or a scoped `$select` | read | Justin |
+| 8 | **T2 exposure sizing:** do any live requests have `wmkf_respondreminderenabled` / `wmkf_reviewduereminderenabled` = true (the only remaining gate on the armed reminder cron)? | scoped `$select` count on `akoya_request` | read | Justin |
 
 Resolved from source (no probe needed): drain lease protection PRESENT; 8 new routes all in the
 security matrix; multi-llm egress via safeFetch; migration runner has no checksum; DAL context has no

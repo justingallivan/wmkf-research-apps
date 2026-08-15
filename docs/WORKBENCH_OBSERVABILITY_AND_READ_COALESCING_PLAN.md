@@ -22,6 +22,11 @@ related:
 `docs/audits/fable-*-2026-08-14.md` artifacts. Every stage leaves the build green and the old path
 usable. No stage is started until the owner names it and authorizes implementation (brief Phase 8).
 
+**Revised 2026-08-14 after Opus adversarial review** (`docs/audits/fable-refactor-plan-opus-review-2026-08-14.md`,
+disposition `docs/audits/fable-refactor-plan-disposition-2026-08-14.md`). The review accepted the
+observability-first direction but corrected Stage 1's seam, Stage 2's mechanism, and the T2 severity
+framing. All accepted changes are folded in below.
+
 ## Why this and not the full Data Plane
 
 The audit found **zero per-dependency timing instrumentation** in the staff path (grep-verified
@@ -47,15 +52,24 @@ may warrant campaign-blocker status the owner must rank.
 
 ## Stage 1 — Observability seam (measurement foundation)
 
-1. **Objective / invariant:** add per-dependency timing + one correlation id per HTTP request across
-   the Workbench data path, changing **no** user-visible behavior. Emit `{correlationId, entity,
-   operation, ms}` at the `DynamicsService`/adapter boundary and a per-route server-duration line.
+1. **Objective / invariant:** add **external-dependency (Dataverse + Graph/SharePoint) timing** + one
+   correlation id per HTTP request across the Workbench data path, changing **no** user-visible
+   behavior. Emit `{correlationId, entitySet, operation, ms}` at the shared transport. (Scope
+   corrected per Opus P2-7: this stage times the external leg only; Postgres and client-render timing
+   are named later measurement, not gated by this stage.)
 2. **Preconditions / characterization:** a test asserting current responses are byte-identical before
    and after (timing is additive, non-functional). Confirm no existing correlation field collides
-   (the audit found only business-`requestId`; use a distinct key name, e.g. `reqCorrelationId`).
-3. **Exact files (in order):** add `lib/observability/request-correlation.js` (new); wrap the shared
-   transport in `lib/services/dynamics-service.js` timing emit; thread the id from the route shell via
-   `lib/dataverse/core/context.js` (`withDalContext` already scopes the request — carry the id there).
+   (the audit found only business-`requestId`; the `withDalContext` store's `requestId` slot is
+   already occupied by the scope label, so use a **distinct** key, e.g. `reqCorrelationId`).
+3. **Exact files (in order) — corrected per Opus P1-2:** add `lib/observability/request-correlation.js`
+   (new); wrap the **real transport `lib/services/dynamics/http.js:24` (`fetchWithTimeout`)** — NOT the
+   `dynamics-service.js` facade, which contains zero `fetch` calls; this seam also covers
+   `graph-service.js` (all its calls route through the same helper). **PII rule:** derive `entitySet`
+   from the URL **path segment only**; never emit the raw URL or `$filter` string (OData filters embed
+   names/emails). **Second-seam follow-up:** `lib/dataverse/client.js:50,106` is a separate egress used
+   by `dataverse-app-access-service.js`/`dataverse-settings-service.js` (on the `requireAppAccess` hot
+   path); it must be wrapped too or Stage 1 stays blind to auth-path Dataverse calls — do it in the
+   same stage or name it as the immediate Stage 1b. Thread the correlation id from the route shell.
    Consumers: a lightweight `api_usage_log`-style sink or structured `console` line (no new table in
    Stage 1).
 4. **Caller→auth→service→persistence→consumer trace:** route shell mints id → `withDalContext` carries
@@ -81,61 +95,88 @@ may warrant campaign-blocker status the owner must rank.
     and re-scope. **This stage must ship and run through one real usage window before Stage 2+ can
     claim measured improvement.**
 
-## Stage 2 — In-request read coalescing
+## Stage 2 — Merge the disjoint-`$select` sibling reads (re-scoped per Opus P1-1)
 
-1. **Objective / invariant:** coalesce identical Dataverse reads within a single request/action so the
-   duplicate `akoya_requests` / suggestion / `wmkf_potentialreviewers` reads collapse to one each,
-   with **identical response data** to today.
-2. **Preconditions:** Stage 1 metrics exist (so improvement is measurable, not "feels faster"); a
-   characterization test capturing the exact current response of `getReviewers` + `getMyCandidates` +
-   `decline-referrals` for one fixture request.
-3. **Exact files:** add a request-scoped memoization helper keyed inside `withDalContext`
-   (`lib/dataverse/core/context.js` — the audit verified it has none today, 68 lines); route the two
-   services' `fetchRequestByIdOrNumber` / `fetchPotentialReviewers` / `fetchResearchersByPerson`
-   through it (`lib/services/review-manager/reviewers-service.js`,
-   `lib/services/reviewer-finder/my-candidates-service.js`). Prefer merging the two near-identical
-   `$select` field lists into one superset read per entity per request.
-4. **Trace:** caller → service → coalescing helper (cache-hit returns the prior read within the same
-   `withDalContext` scope) → adapter on miss. No authz change; reads only.
-5. **Contracts:** cache key MUST include the `$select` superset so a narrower earlier read cannot
-   satisfy a wider later one with missing fields; scope is strictly per-request (cleared at context
-   exit) — never cross-request, never cross-user. Partial-failure: a miss that errors propagates as
-   today.
-6. **Non-goals / denylist:** no cross-request cache, no client cache, no invalidation logic, no
-   mutation-path change, no change to the deliberate broad post-mutation `refreshAll` (that is a
-   separate correctness invariant — S213). Denylist: all mutation services, `shared/components/**`.
-7. **Sonnet work order size:** one order for the helper + one order per service (2–3 total).
-8. **Tests:** the characterization test must pass byte-identical; a test proving the coalesced read
-   count drops (assert adapter call counts via mock); a test proving a wider `$select` after a
-   narrower read does NOT return stale/missing fields.
+**Why the original request-scoped-cache design was dropped:** the three duplicate-read contributors
+are three *separate HTTP requests* with three separate `withDalContext` scopes
+(`my-candidates.js:52`, `reviewers.js:46`, `decline-referrals.js:63`), so a request-scoped cache
+cannot span them. The two reads *within* each service run concurrently in `Promise.all`
+(`reviewers-service.js:225-228`, `my-candidates-service.js:168-180`) with **disjoint `$select`**, so a
+select-keyed cache would miss every time. An ALS memo dedupes zero of the cited reads. The real fix is
+a local query merge; it needs no cache, no `withDalContext` edit, no flag.
+
+1. **Objective / invariant:** in each of the two services, replace the concurrent
+   `fetchPotentialReviewers` + `fetchResearchersByPerson` pair (same entity, same OR-chain id filter,
+   disjoint `$select`) with **one superset-`$select` read of `wmkf_potentialreviewers`**, projecting
+   the same fields the two projections produce today, with **identical response data**. This removes 3
+   of the 6 per-action person queries (best case 6→3, spread 1/1/1 across the three routes; suggestion
+   reads are cross-request and stay at 3).
+2. **Preconditions:** Stage 1 metrics exist (so improvement is measured per-route, not "feels
+   faster"); a characterization test capturing the exact current response of `getReviewers`,
+   `getMyCandidates`, and `decline-referrals` for one fixture request.
+3. **Exact files:** `lib/services/review-manager/reviewers-service.js` (merge `:504`/`:548` reads),
+   `lib/services/reviewer-finder/my-candidates-service.js` (merge `:387`/`:424` reads; the
+   `:440-442` removed-rows read is a **different id set** — leave it or merge separately),
+   `lib/services/reviewer-finder/decline-referrals-service.js` (its `:48-49` person read — added per
+   Opus P2-6; merge or explicitly non-goal). **No** new helper, **no** `context.js` change.
+4. **Trace:** caller → service → single merged adapter read → existing projection. No authz change;
+   reads only.
+5. **Contracts:** the merged `$select` is the union of the two prior selects, so every field the
+   current projections read is present. **Partial-failure guard (Opus P4d):** `my-candidates-service.js:176-179`
+   deliberately catches `aggregateReviewHistory` failures so history loss doesn't fail the list — that
+   is a *different* read and must stay a separate fail-soft call; do NOT fold it into the merged
+   fail-hard person read.
+6. **Non-goals / denylist:** no cross-request cache, no ALS memo, no client cache, no invalidation, no
+   mutation-path change, no change to the deliberate broad post-mutation `refreshAll` (separate
+   correctness invariant — S213). Denylist: all mutation services, `shared/components/**`,
+   `lib/dataverse/core/context.js`.
+7. **Sonnet work order size:** one order per service (2–3 total), each a local read merge.
+8. **Tests:** characterization test passes byte-identical; a test asserting the person-query count per
+   route drops (adapter call-count mock); a test proving the merged projection returns every field the
+   two prior projections did.
 9. **Gates:** `check:dataverse-access-layer` + self-test, `check:types`, reviewer test suites.
-10. **Performance acceptance:** Stage-1 metric shows the per-action `wmkf_potentialreviewers` query
-    count drop from 5→≤2 and suggestion 3→≤1 for the traced journey, with response unchanged.
-11. **Security acceptance:** per-request scoping proven (no leakage across `withDalContext` scopes);
-    negative test that a second request does not see the first's cached rows.
-12. **Release:** Tier 2; rollback = disable the helper (feature-flagged server-side) → old path.
-13. **Docs:** Atlas note on request-scoped read coalescing; `docs/SYSTEM_MODEL.md` if it changes the
-    read-path description.
-14. **Stop conditions:** if any journey depends on reading the *same* entity with genuinely different
-    freshness within one action, stop — that is a correctness signal, not duplication.
+10. **Performance acceptance:** Stage-1 metric shows per-action `wmkf_potentialreviewers` queries drop
+    6→3 (1 per route) with response unchanged. (The earlier "5→≤2" was against a wrong denominator.)
+11. **Security acceptance:** no authority change; the merged read uses the same filter and the same DAL
+    path, so restriction/interlock behavior is unchanged (assert the adapter call is unchanged shape).
+12. **Release:** Tier 2; rollback = plain revert (local change, no flag — corrected per Opus P3-9).
+13. **Docs:** Atlas note if the read-path description changes; `docs/SYSTEM_MODEL.md` only if needed.
+14. **Stop conditions:** if the two projections turn out to read genuinely different row *sets* (not
+    just different fields of the same rows), stop — the merge is unsound and they are not duplicates.
 
-## Stage 3 (security repair, parallel track) — Reviewer merge authorization (T1)
+## Security repair T1 — Reviewer merge authorization (NOT a stage; owner-blocked)
 
-Smallest-safe repair for the confirmed gap (`pages/api/reviewer-finder/merge-candidates.js` +
-`lib/services/reviewer-merge.js`): add a caller/request-scope or superuser authorization to the
-destructive merge, mirroring a real server guard. **[NEEDS OWNER]** decision on the intended trust
-model (S207 org-open vs request-scoped) — this repair is owner-gated on that decision, already pending
-since S414. Not part of the refactor; its own tier/rollback/tests. Note the merge now also writes
-`akoya_request` applicant slots, widening the unauthorized write reach.
+**This is not a schedulable stage** (relabeled per Opus P3-8): it is blocked on an owner trust-model
+decision already pending since S414, so it cannot carry the 14 stage elements until that decision is
+made. Confirmed characterization: `pages/api/reviewer-finder/merge-candidates.js:23` guards with
+`requireAppAccess('reviewer-finder','reviewers')` only; body carries no `requestId`; `:35-36` is GUID
+validation not authorization; `actingUserSystemId` is write attribution; the block predicate
+(`reviewer-merge.js:242-265`) is data-only; the merge now also writes `akoya_request` applicant slots
+(`reviewer-merge.js:472-481`), widening unauthorized write reach. **[NEEDS OWNER]** the intended trust
+model (S207 org-open vs request-scoped). Once decided, the smallest-safe repair is a caller/request-scope
+or superuser authorization mirroring a real server guard, on its own tier/rollback/tests, separate from
+the refactor.
 
 ## Stage 4 (security repair, parallel track) — Cron reminder token eligibility (T2)
 
-Add `wmkf_selected eq true` and a revoked-token refusal to both reminder sweep filters
-(`lib/services/reviewer-reminder-sweep.js:111-117, 195-199`), mirroring the manual path
-(`lib/services/reviewer-manual-reminder.js:67-73`), so an automatic reminder cannot mint a fresh live
-link for a staff-revoked or deselected reviewer. Preserves the standing hold on arming automatic
-reminders. Characterization test first (current cron behavior), then the tightened filter, then a test
-proving a revoked/deselected row is skipped.
+**Severity note (corrected per Opus P1-4): the reviewer-reminders cron is LIVE-SCHEDULED, not held.**
+`vercel.json:61` runs `/api/cron/reviewer-reminders` daily; `reviewer-reminders.js:38` defaults
+`dryRun` to false. The only remaining gate is the per-request `wmkf_respondreminderenabled` /
+`wmkf_reviewduereminderenabled` flags, whose live state is unprobed (added to the Phase 2 probe
+list). Treat T2 as a **potentially-live exposure**, not a hold.
+
+Repair: extend **both** reminder sweep filters (`lib/services/reviewer-reminder-sweep.js:113-116`
+respond-by, `:197-199` review-due) with null-safe eligibility mirroring the manual path
+(`lib/services/reviewer-manual-reminder.js:69-70`):
+`wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)`.
+**Do NOT use `ne true`** — these are nullable booleans and `ne true` would exclude every never-revoked
+(null) row, silently disabling the cron (house pattern is the two-branch form, `:114-115`). If
+row-level checks are chosen instead of filter-level, extend each sweep's `$select` (`:112`, `:196`) to
+include `wmkf_selected` and `wmkf_externaltokenrevoked`. `authorizeMint`-parity (a fresh-read
+re-authorize like the manual path) is **optional defense-in-depth, not a correctness requirement** —
+the mid-sweep race is already largely closed by the ETag claim-before-send (`:312-322`), which 412s if
+a staff revoke/deselect bumps the row. Characterization test first (current cron behavior), then the
+tightened filter, then a test proving a revoked/deselected row is skipped.
 
 ## Deferred (evidence-gated, not scheduled)
 

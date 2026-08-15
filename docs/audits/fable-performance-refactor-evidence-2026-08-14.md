@@ -12,12 +12,16 @@ file:line citations are in the scout report; Fable-verified highlights:
   `decline-referrals`), but `getReviewers` is a 5-stage sequential server waterfall
   (`reviewers-service.js:175-441`) and `getMyCandidates` a 6-stage one
   (`my-candidates-service.js:128-337`).
-- **Duplicate-read census for one `refreshAll` after a bounded mutation:** `akoya_requests` row ×2
-  (×3 per page visit), suggestion set ×3 (three different filters), `wmkf_potentialreviewers` same
-  person ids ×5 queries — including twice *within each* of the two services with the same filter
-  and different `$select`. `[VERIFIED effective — no request-scoped memoization: grep of
-  lib/dataverse/core/context.js (68 lines) and lib/services/dynamics-context.js for
-  cache/memo/Map/dedup returned nothing, so each query is a real Dataverse HTTP call]`.
+- **Duplicate-read census for one `refreshAll` (corrected count, Opus P1-1):** `akoya_requests` row
+  ×2, suggestion set ×3 (three different filters), `wmkf_potentialreviewers` same person ids
+  **×6 queries across 3 routes** (Scout 3's ×5 was low — the removed-rows read is a 6th, on a
+  different id set). Critically, the three loaders are **three separate HTTP requests** with three
+  separate `withDalContext` scopes (`my-candidates.js:52`, `reviewers.js:46`,
+  `decline-referrals.js:63`), and the two person reads *within each* service run concurrently in
+  `Promise.all` with **disjoint `$select`**. So the fix is NOT a request-scoped cache (which dedupes
+  none of them) but a local **sibling-query merge** per service — see the revised Stage 2.
+  `[VERIFIED — lib/dataverse/core/context.js (68 lines) delegates to ALS with no memoization; the
+  three route scopes and concurrent disjoint reads confirmed in source]`.
 - **Tab navigation (J3):** conditional-render chain unmounts tabs; return re-fires all mount
   effects. `key={requestId}` remount is a documented *correctness* choice (stale cross-request
   leak), not perf.

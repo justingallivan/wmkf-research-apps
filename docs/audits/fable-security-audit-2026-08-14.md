@@ -70,11 +70,15 @@ sweeps never read the field, so an automatic reminder to a staff-revoked (leak-r
 deselected reviewer would mint and send a fresh live link, silently undoing the revocation.
 Preconditions: request has reminder flags enabled (`wmkf_respondreminderenabled` /
 `wmkf_reviewduereminderenabled`), row matches the sweep lifecycle filter, and for respond-by the
-prior token is unexpired. This confirms the brief's preliminary concern (b) and substantiates the
-standing "do not arm automatic reminders before the authority contract is re-verified" hold.
-Severity/repair shape pending Phase 3; candidate minimal repair: add
-`wmkf_selected eq true` and a revoked refusal to both sweep filters (mirroring
-`reviewer-manual-reminder.js:67-73`).
+prior token is unexpired. This confirms the brief's preliminary concern (b).
+
+**Severity correction (Opus P1-4, Fable-verified):** the earlier "substantiates the standing hold"
+framing was WRONG. `/api/cron/reviewer-reminders` is **live-scheduled daily** (`vercel.json:61`) with
+`dryRun` defaulting false (`reviewer-reminders.js:38`) — the cron is armed, gated only by the
+per-request enable flags (live state unprobed; on the Phase 2 probe list). Treat T2 as a
+**potentially-live exposure**, not a hold. Repair (see the plan Stage 4) must use null-safe filter
+syntax: `wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq
+null)` — NOT `ne true`, which would exclude all-null rows and disable the cron.
 
 ## Scout 2 defect-class findings (Fable-verified where marked)
 
