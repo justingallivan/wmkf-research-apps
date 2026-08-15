@@ -3,7 +3,7 @@ title: Claude Auth & Side-Effect Follow-Up Security Audit — 2026-08-15
 domain: security-auth
 kind: audit
 status: complete
-summary: "Read-only adversarial confirm/refute of eight still-open Fable security findings (disabled-account access on bare requireAuth, validateOrigin fail-open, grantee send-invite authority, send-invite/replace-submission replay, BILL onboarding replay, authenticated error.message leak, non-constant-time cron-secret compare, pricing-refresh non-UTF8 bytes)."
+summary: "Read-only adversarial confirm/refute of eight still-open Fable security findings (unbounded disabled-account access on bare requireAuth, validateOrigin fail-open, grantee send-invite authority, send-invite/replace-submission idempotency, BILL onboarding replay, authenticated error.message disclosure, non-constant-time cron-secret compare, pricing-refresh NUL bytes). Revised after Codex adversarial review (2026-08-15)."
 canonical: false
 ---
 
@@ -13,6 +13,16 @@ canonical: false
 still-open Fable findings, on branch `codex/claude-security-followup-audit` off
 `origin/main` @ `307a68c8`. No runtime code changed. All 57 `check:*` gates were green
 on the tree before this audit began.
+
+**Revision (same day):** corrected after Codex adversarial review. Material corrections:
+§1 disabled-account exposure is **unbounded for an active user**, not 8h; §2 now separates
+the reachable (`link-profile`) from the latent (`/api/intake/*`, blocked by a `proxy.js`
+routing mismatch) direct-session routes; §2's fail-open branches are **already unit-tested
+behavior**; §4's verdict wording is de-contradicted (send-invite idempotency gap CONFIRMED,
+replace-submission REFUTED) and the false token-supersession claim removed; §6's inventory
+is rebuilt with a reproducible pattern (28 sites, four audience classes — the earlier
+"external trees clean" claim was wrong for `pages/api/bill`); §8's cosmetic fix now
+prescribes an escaped NUL, not a printable delimiter.
 
 Evidence labels: `[VERIFIED via <source>]` = read in current source this session;
 `[ASSUMED]` = not probed. Live production runtime state was **not** probed (standing
@@ -26,18 +36,18 @@ accepted owner decisions (2026-08-15) and were **not** reopened.
 
 | # | Finding | Verdict | Severity | Remediation warranted? |
 |---|---------|---------|----------|------------------------|
-| 1 | Disabled-account access via bare `requireAuth` (blob/upload/health/api-capabilities) | **CONFIRMED** | Low–Medium | Optional, small |
-| 2 | `validateOrigin` fail-open when `NEXTAUTH_URL` absent/invalid; CSRF boundary vs docs | **CONFIRMED (fail-open branches) / PARTIAL (doc drift)** | Low | Optional hardening + doc fix |
-| 3 | Grantee `send-invite` client-controlled recipient/subject/body → email-send primitive | **PARTIAL (by-design primitive, one residual)** | Low–Medium | No code change; note residual |
-| 4 | Replay / duplicate side-effect / partial-success in `send-invite` + `replace-submission` | **REFUTED (duplicate-send) / CONFIRMED-as-designed (no route idempotency)** | Low | No change |
-| 5 | BILL onboarding replay protection (skew window, nonce, duplicate external effects) | **REFUTED (external effects deduped) / CONFIRMED (HTTP-replay window open, harmless)** | Low | No change |
-| 6 | Authenticated routes return internal `error.message` | **CONFIRMED** | Low | Optional convention cleanup |
+| 1 | Disabled-account access via bare `requireAuth` (blob/upload/health/api-capabilities) | **CONFIRMED — duration unbounded for an active session** | Medium | Yes, small |
+| 2 | `validateOrigin` fail-open when `NEXTAUTH_URL` absent/invalid; CSRF boundary vs docs | **CONFIRMED (fail-open, unit-tested behavior) / PARTIAL (doc drift; intake gap latent behind a proxy routing mismatch)** | Low (latent Medium at intake launch) | Optional hardening + doc fix; intake launch precondition |
+| 3 | Grantee `send-invite` client-controlled recipient/subject/body → email-send primitive | **PARTIAL (owner-decided primitive, one residual)** | Low–Medium | No code change; note residual |
+| 4 | Route idempotency: `send-invite` / `replace-submission` | **CONFIRMED for `send-invite` (no idempotency; duplicate mint+send; all minted tokens stay valid) / REFUTED for `replace-submission`** | Low | No change |
+| 5 | BILL onboarding replay protection (skew window, nonce, duplicate external effects) | **REFUTED (duplicate external effects) / CONFIRMED (open ±300s HTTP-replay window, harmless)** | Low | No change |
+| 6 | Authenticated routes return internal `error.message` | **CONFIRMED — 28 raw-500 sites across superuser, cron, staff app-auth, and internal-HMAC audiences** | Low | Optional convention cleanup |
 | 7 | Non-constant-time cron-secret compare | **CONFIRMED** | Low | Optional, small (convention parity) |
-| 8 | Non-UTF8 bytes in `pricing-refresh.js` blind a route/security gate | **REFUTED (cannot blind any gate)** | Informational | No (cosmetic only) |
+| 8 | Non-UTF8 bytes in `pricing-refresh.js` blind a route/security gate | **REFUTED (cannot blind any Node-based gate)** | Informational | Cosmetic only (escaped NUL) |
 
 ---
 
-## 1. Disabled-account access through bare `requireAuth` — CONFIRMED (Low–Medium)
+## 1. Disabled-account access through bare `requireAuth` — CONFIRMED, duration unbounded for an active session (Medium)
 
 **Trace.** `requireAuth` (`lib/utils/auth.js:136-157`) runs the kill-switch check, then
 `validateOrigin`, then `getSession`, and returns the session **without any
@@ -51,44 +61,83 @@ re-read `user_profiles.is_active` fresh per request and 403 a disabled account.
 `pages/api/upload-handler.js:11`, `pages/api/health.js:23`, `pages/api/api-capabilities.js:21`.
 `[VERIFIED via grep over pages/api]`
 
-**Reachable effect for a disabled-but-unexpired account** (JWT session, `maxAge: 8h`,
-`[VERIFIED via pages/api/auth/[...nextauth].js:311-312]`):
+**Exposure duration — NOT bounded by the 8-hour JWT `maxAge`.** (Correction from the
+first draft of this audit, per Codex review; each link verified in source.)
+
+1. The JWT `maxAge` is 8h (`pages/api/auth/[...nextauth].js:310-313`), **but next-auth v4
+   re-encodes the JWT session cookie with a fresh `now + maxAge` expiry on every session
+   read**: the session route computes `newExpires = fromDate(sessionMaxAge)` and re-issues
+   the cookie `[VERIFIED via node_modules/next-auth/core/routes/session.js:60-79]`. The
+   SPA's `SessionProvider` polls that endpoint, so an open tab keeps rolling the 8h window.
+2. The 2-hour idle timeout also rolls: the `jwt` callback stamps
+   `token.lastActivity = Date.now()` on **every** invocation that passes the idle check
+   `[VERIFIED via pages/api/auth/[...nextauth].js:236-242]`, and `proxy.js` only rejects
+   when `Date.now() - lastActivity > 2h` `[VERIFIED via proxy.js:125-129]`.
+3. Disablement never invalidates the token: the `jwt` callback's staff profile lookup
+   filters `WHERE azure_id = ... AND is_active = true`, and on **zero rows it simply skips
+   the claim refresh — it does not clear the token's existing `profileId`/staff claims or
+   return an empty token** `[VERIFIED via pages/api/auth/[...nextauth].js:248-268]`.
+   `proxy.js`'s authorized callback checks only idle + `token.azureId` presence
+   `[VERIFIED via proxy.js:140-143]`.
+
+**Net effect:** a staff account disabled mid-session keeps a *valid, indefinitely
+self-renewing* session as long as the user stays active within every 2-hour idle window.
+Every route on `requireAuthWithProfile`/`requireAppAccess`/`requireSuperuser` still blocks
+them per-request via the fresh `is_active` read — but the four bare-`requireAuth` routes
+remain available **indefinitely**, not for ≤8h:
+
 - `blob-proxy.js` — GET any allowlisted `*.public.blob.vercel-storage.com` asset
   (shared org templates/attachments; host-allowlist is the only boundary, by design
   `[VERIFIED via blob-proxy.js:8-18, 26, 51]`).
 - `upload-handler.js` — POST to mint a Vercel Blob client-upload token (public store, or
   private store if `UPLOADS_BLOB_RW_TOKEN` set); 50MB, content-type allowlisted
   `[VERIFIED via upload-handler.js:42-70]`.
-- `health.js` / `api-capabilities.js` — read service-health + boolean availability of
+- `health.js` / `api-capabilities.js` — service-health detail + boolean availability of
   ORCID/NCBI/SerpAPI keys (never the values `[VERIFIED via api-capabilities.js:24-28]`).
 
-**Severity.** Medium for the two write/read blob routes, Low for the two status routes.
-Realistic prerequisites: a staff account that was **disabled during a live 8-hour JWT
-window** (offboarding / compromise response) and still holds a valid session cookie.
-Outside that window the session is simply invalid. No privilege escalation; blob scope is
-already staff-wide-by-design, so the marginal exposure is "a just-disabled account keeps
-shared-asset read + upload-token mint for up to 8h."
+**Severity.** Medium. Realistic prerequisites: a disabled-for-cause account (offboarding /
+compromise response) whose holder **keeps a session active** — exactly the adversarial
+case revocation exists for. The surfaces are staff-wide-by-design assets plus an
+upload-token mint, so this is persistence of low-privilege access, not escalation — but
+the *indefinite* duration defeats the purpose of disablement for these four routes.
 
-**What tests/gates prove / don't.** `check:api-routes` proves each route carries a
-*recognized guard token* — it does not distinguish `requireAuth` from the revocation-aware
-variants, so a green gate says nothing about `is_active`. No unit test exercises the
-disabled-account-on-bare-`requireAuth` path. `[VERIFIED via scripts/check-api-route-security-matrix.js:96-104]`
+**What tests/gates prove / don't.** `check:api-routes` proves guard-token presence only —
+it does not distinguish `requireAuth` from the revocation-aware variants. No unit test
+exercises a disabled account against bare `requireAuth`, and no test pins the
+jwt-callback behavior that stale staff claims survive a zero-row active-profile lookup.
+`[VERIFIED via scripts/check-api-route-security-matrix.js:96-104; tests/unit/utils/auth.test.js
+covers validateOrigin branches, not is_active]`
 
-**Disconfirming check.** If `requireAuth` were later changed to read `is_active`, or if
-these four routes moved to `requireAuthWithProfile`, the finding closes. Re-grep
-`requireAuth(` callers and diff against the revocation check.
+**Disconfirming check.** If `requireAuth` gains an `is_active` read, or the `jwt` callback
+clears staff claims (or returns `{}`) when the `is_active = true` lookup returns zero
+rows, the finding closes. Re-grep `requireAuth(` callers and re-read
+`[...nextauth].js:248-268` after any fix.
 
-**Smallest remediation (optional).** Add a single fresh `is_active` read inside
-`requireAuth` itself (it already awaits `getSession`; one `sql` round-trip mirrors
-`requireAuthWithProfile:205`), OR migrate the two blob routes to `requireAuthWithProfile`.
-The former fixes all four callers at once and removes the "which helper revokes?" footgun.
+**Smallest remediation.** Two independent small fixes; either alone closes the four
+routes, both together close the class:
+1. Add a fresh `is_active` read inside `requireAuth` itself (mirror
+   `requireAuthWithProfile:205`, tolerating profile-less sessions in the `needsLinking`
+   window) — fixes all four callers at once.
+2. In the `jwt` callback, when the active-profile lookup returns zero rows for a token
+   that previously carried `profileId`, clear the staff claims (or return `{}` to force
+   re-auth) — bounds *every* future bare-session consumer, not just today's four.
 
-**Residual risk after fix.** None new; adds one PG read per bare-auth request (these are
-low-QPS routes).
+**Required regression tests for any implementation:**
+- `requireAuth` returns 403 for a session whose profile row has `is_active = false`
+  (and still passes for profile-less `needsLinking` sessions, if fix 1 is chosen).
+- jwt callback: a token with existing staff claims + a zero-row
+  `is_active = true` lookup does **not** retain `profileId`/staff claims (fix 2).
+- Route-level: disabled account + valid session cookie → `blob-proxy` and
+  `upload-handler` respond 403.
+- Idle/rolling: a disabled account remains blocked even when requests arrive inside the
+  2h idle window (guards against reintroducing the rolling-session bypass).
+
+**Residual risk after fix.** One PG read per bare-auth request (low-QPS routes); none
+otherwise.
 
 ---
 
-## 2. `validateOrigin` fail-open + CSRF boundary vs docs — CONFIRMED fail-open / PARTIAL doc drift (Low)
+## 2. `validateOrigin` fail-open + CSRF boundary vs docs — CONFIRMED fail-open / PARTIAL doc drift; intake gap latent (Low now; Medium at intake launch if unfixed)
 
 **Trace of `validateOrigin` (`lib/utils/auth.js:56-102`):**
 1. GET/HEAD/OPTIONS → `{valid:true}` (state-changing only). `[VERIFIED :59-61]`
@@ -96,62 +145,92 @@ low-QPS routes).
    cookie-bearing headerless request is rejected. `[VERIFIED :69-73]`
 3. **`NEXTAUTH_URL` unset → `{valid:true}` (SKIP).** `[VERIFIED :75-79]` — fail-open #1.
 4. `NEXTAUTH_URL` present but unparseable as URL → `catch` → `{valid:true}`. `[VERIFIED :81-86]` — fail-open #2.
-5. Source Origin/Referer unparseable → `{valid:false, 'Invalid Origin header'}`. `[VERIFIED :91-95]`
+5. Source Origin/Referer unparseable → `{valid:false}`. `[VERIFIED :91-95]`
 6. Origin mismatch → `{valid:false}`. `[VERIFIED :97-99]`
 
-**Fail-open confirmed:** branches 3 and 4 disable CSRF entirely. Their realistic trigger
-is a **misconfiguration** (env unset or malformed), not an attacker-chosen input — an
-attacker cannot unset a server env var. Production `NEXTAUTH_URL` is documented live and
-non-empty (`https://applications.wmkeck.org`, cut over 2026-06-23, verified via `/api/health`)
-`[VERIFIED via docs/CREDENTIALS_RUNBOOK.md:45]`, so branch 3 is not currently active in
-prod — but it is a silent fail-open on regression, exactly the D1-class pattern (a config
-regression should fail loud, not disable a control).
+**Fail-open confirmed — and it is deliberate, unit-tested behavior, not an unnoticed
+gap.** `tests/unit/utils/auth.test.js` explicitly pins both branches: "skips validation
+(allows) when NEXTAUTH_URL is unset, even on an Origin mismatch" and the unparseable-URL
+skip, alongside the malformed-Origin/Referer rejections `[VERIFIED via
+tests/unit/utils/auth.test.js:130-236]`. Moreover, unset is not exclusively a
+misconfiguration: the runbook states **Preview intentionally carries no fixed
+`NEXTAUTH_URL`** (host-derived), so `validateOrigin` is by-policy inactive in Preview
+`[VERIFIED via docs/CREDENTIALS_RUNBOOK.md:45]`. Production's value was verified live on
+2026-06-23 per the runbook; that is **dated evidence — current production state is
+`[ASSUMED]`** (not probed this session; see §10).
 
-**Defense-in-depth that remains under a validateOrigin skip:** next-auth v4.24.15
+**Defense-in-depth under a validateOrigin skip:** next-auth v4.24.15
 `[VERIFIED via package.json]` uses `SameSite=Lax` session cookies by default (no cookie
 override found — `grep sameSite` over `pages`/`lib` is empty `[VERIFIED]`), so a
-cross-site top-level POST does not carry the session cookie regardless of Origin checking.
-`validateOrigin` is the *second* CSRF layer; SameSite=Lax is the first. A total CSRF
-bypass needs both the Origin skip **and** a SameSite bypass (subdomain / browser edge
-case). This matches the historical M8 note. `[VERIFIED via docs/SECURITY_ARCHITECTURE.md:1202-1210]`
+cross-site top-level POST does not carry the session cookie. `validateOrigin` is the
+*second* CSRF layer; SameSite=Lax is the first. This matches the historical M8 note
+`[VERIFIED via docs/SECURITY_ARCHITECTURE.md:1202-1210]`.
 
-**Cookie-authenticated state-changing routes whose CSRF boundary differs from the
-`requireAuth`/`requireAppAccess` docs:** the five routes that call `getServerSession`
-directly rather than through the auth helpers — `pages/api/auth/link-profile.js`,
-`pages/api/intake/draft.js`, `pages/api/intake/submit.js`, `pages/api/intake/draft/attach.js`,
-`pages/api/intake/draft/upload-token.js` `[VERIFIED via grep getServerSession over pages/api]`.
-None of these calls `validateOrigin`, so **their only CSRF defense is SameSite=Lax** — the
-Origin layer that `docs/SECURITY_ARCHITECTURE.md:931` describes as covering "state-changing
-methods" does not reach them. For the four intake routes this is mitigated: they authenticate
-an **external-id applicant session** (`userType==='applicant'`), a different cookie/user
-population than staff, and enforce Dataverse membership guards `[VERIFIED via intake/draft.js:98-103,
-API_ROUTE_SECURITY_MATRIX.md:156-159]`. `link-profile` is gated to the first-login
-`needsLinking` window and derives all identity from the session `[VERIFIED via link-profile.js:29-37]`.
-The gap is **documentation-accuracy**, not an open exploit: the matrix/architecture doc implies
-Origin validation is universal on state-changing routes when five cookie-auth routes rely on
-SameSite alone.
+**Cookie-authenticated state-changing routes outside `validateOrigin`** — five routes
+call `getServerSession` directly rather than through the auth helpers `[VERIFIED via grep
+getServerSession over pages/api]`. Their reachability differs materially (Codex
+correction), so they must be characterized separately:
 
-**Verdict:** fail-open branches CONFIRMED (Low, misconfig-triggered, SameSite backstop).
-Doc-vs-effective-boundary drift PARTIAL — real but low-impact, and the pre-existing Fable
-"S1/S2" suspected items already flagged the direction.
+**(a) Reachable today: `pages/api/auth/link-profile.js`.** The `proxy.js` matcher exempts
+`api/auth/*` entirely `[VERIFIED via proxy.js:173]`, so this POST is reachable with a
+staff session and relies on **SameSite=Lax alone** for CSRF. Mitigations: gated to the
+first-login `needsLinking` window and all identity is session-derived
+`[VERIFIED via link-profile.js:29-37]`. Low.
 
-**What gates prove / don't.** No gate asserts anything about `validateOrigin` behavior or
-CSRF coverage; `check:api-routes` is guard-token presence only. No test covers the
-`NEXTAUTH_URL`-unset skip.
+**(b) Latent, NOT currently reachable by their intended callers: the four
+`/api/intake/*` routes** (`draft`, `submit`, `draft/attach`, `draft/upload-token`).
+`proxy.js` classifies only `/apply` and `/api/apply` as applicant surfaces
+`[VERIFIED via proxy.js:131]`; **everything else — including `/api/intake/*` — is staff
+surface, where applicant tokens are explicitly rejected**
+(`if (token?.userType === 'applicant') return false`) `[VERIFIED via proxy.js:140-143]`.
+The intake handlers themselves accept only applicant sessions
+(`userType === 'applicant'`) `[VERIFIED via pages/api/intake/submit.js:98-103]`. So an
+applicant session is bounced by the proxy before the handler runs, and a staff session
+reaching the handler is 401'd by the handler — the missing Origin validation on these
+routes is **latent**, not exploitable today. The applicant UI is the identity-only
+`/apply` smoke page (`pages/apply/index.js` is the sole page `[VERIFIED via ls
+pages/apply]`) and the intake flow is pre-pilot.
 
-**Disconfirming check.** Set `NEXTAUTH_URL=''` in a non-prod runtime and issue a
-cross-origin cookie-bearing POST to a `requireAppAccess` route; if it 403s, branch 3 is
-not the active gap (SameSite caught it). Confirms the SameSite backstop rather than the
-Origin layer.
+**(c) The dormant functional defect that (b) exposes:** the proxy's
+applicant-path classification (`/apply`, `/api/apply`) does not include the implemented
+applicant APIs (`/api/intake/*`). **This routing mismatch must be fixed before the intake
+flow can launch** — and the fix that makes the routes reachable is exactly the change
+that makes their missing Origin validation live. The proxy mismatch is a blocking bug for
+intake, **not** an acceptable CSRF control, and the two must be remediated together:
+extend the applicant-surface classification AND add Origin validation (or route intake
+through a helper that includes it) in the same change.
 
-**Smallest remediation (optional).** (a) Make branches 3–4 fail **closed** in production
-(`NODE_ENV==='production'` ⇒ treat unset/invalid `NEXTAUTH_URL` as reject), mirroring the
-D1 "config regression should fail loud" posture. (b) One-line doc correction in
-`SECURITY_ARCHITECTURE.md`/matrix: note the five `getServerSession`-direct routes rely on
-SameSite=Lax, not `validateOrigin`.
+**Docs delta.** `docs/SECURITY_ARCHITECTURE.md:931` (a labeled historical snapshot)
+describes Origin validation as covering state-changing methods via
+`requireAuth`/`requireAppAccess`; that is accurate about the helpers but does not surface
+that the five direct-session routes rely on SameSite alone, and its M8 remediation text
+("missing headers are allowed through") predates the current cookie-bearing-headerless
+rejection `[VERIFIED via auth.js:69-73 vs SECURITY_ARCHITECTURE.md:1210]`.
 
-**Residual risk.** Even fully remediated, CSRF ultimately rests on SameSite for the
-direct-session routes; that is the accepted platform posture.
+**Verdict:** fail-open branches CONFIRMED (deliberate, tested, by-policy active in
+Preview; production state ASSUMED-set from dated evidence). Doc-vs-effective-boundary
+PARTIAL. The intake CSRF gap is real but latent behind the proxy routing mismatch, which
+is itself a launch-blocking functional finding.
+
+**What tests/gates prove / don't.** The fail-open branches ARE unit-pinned (see above) —
+the tests document the behavior; they do not make it safe. No test covers the proxy's
+applicant-surface classification against the intake routes (the latent mismatch), and no
+gate asserts CSRF coverage.
+
+**Disconfirming check.** For (b): with an applicant session, POST to
+`/api/intake/draft` on a deployed environment — expect a proxy-level rejection/redirect,
+not a handler response. If it reaches the handler, the latency claim here is wrong and
+the CSRF gap is live, not latent.
+
+**Smallest remediation.** (a) Make branches 3–4 fail **closed** when
+`NODE_ENV === 'production'` and no valid `NEXTAUTH_URL` exists (Preview can stay
+permissive by deriving the allowed origin from `VERCEL_URL`), updating the two unit tests
+that pin the skip. (b) One-line doc correction for the direct-session routes. (c) At
+intake launch: fix the proxy applicant-surface classification and add Origin validation
+to the intake routes in the same change (owner-scheduled; pre-pilot today).
+
+**Residual risk.** CSRF for direct-session routes ultimately rests on SameSite=Lax; that
+is the accepted platform posture.
 
 ---
 
@@ -172,174 +251,185 @@ staff mailbox with `regardingId=requestId` `[VERIFIED :99-110]`. The send path a
 trusted DAL context first (`assertTrustedDalContext`) `[VERIFIED via lib/services/dynamics/email.js:77,
 149, 187]`.
 
-**Assessment.** This **is** a staff-authored-email primitive **by design** (owner S268:
-staff confirm recipients and preview/edit the body). The controls that keep it from being
-an *arbitrary* mailer: (1) the caller must already hold `reviewers` app access — not an
-anonymous or cross-app actor; (2) `From` is the caller's own mailbox, so every send is
-attributable and cannot spoof a third party; (3) `To` must be a single valid address
-(no bulk list); (4) the request-number leak guard blocks the one internal identifier that
-must not egress; (5) body HTML is escaped (`escapeHtml`/`escapeAttr`) before render
-`[VERIFIED via lib/external/grantee-invite-email.js:20-28, 36-50]`, so body text cannot
-inject markup/script into the email.
+**This shape is an explicit owner decision, not an accident.** The build plan records:
+"**Send UX: staff confirm recipients + preview/edit the email body, then send** (owner
+choice)" `[VERIFIED via docs/GRANTEE_PORTAL_BUILD_PLAN.md:286]`; recipient resolution
+surfaces PI + liaison for staff to confirm/override `[VERIFIED via :42]`; and the
+stateless 30-day no-revocation token design was decided at Q1 → Option A
+`[VERIFIED via :60-72, 90]` and implemented as such
+`[VERIFIED via lib/external/grantee-token-lifecycle.js:9-20, 54-69]`.
+
+**Assessment.** The controls that keep this from being an *arbitrary* mailer: (1) the
+caller must hold `reviewers` app access; (2) `From` is the caller's own mailbox —
+attributable, cannot spoof a third party; (3) `To` must be a single valid address (no
+bulk list); (4) the request-number leak guard blocks the one internal identifier that
+must not egress; (5) body HTML is escaped before render
+`[VERIFIED via lib/external/grantee-invite-email.js:20-28, 36-50]`.
 
 **Residual (the "unintended" edge):** an authenticated `reviewers`-app staffer can send a
-foundation-branded, magic-link-bearing email to **any single address they type**, tied to
-any request GUID they know, with largely free-form subject/body (subject has no
-length/charset ceiling beyond the 64kb body cap and the request-number check). Because the
-magic link is minted for `requestId` and grants grantee-portal edit scope for that request
-(30-day stateless JWT `[VERIFIED via lib/external/grantee-token-lifecycle.js:9-20, 54-69]`),
-a malicious-or-mistaken staffer could mail a **valid portal link to the wrong recipient**.
-That is an insider/authorization-trust concern, not an unauthenticated primitive, and it
-mirrors the accepted org-open trust model (staff are trusted within their app). No
-recipient-vs-request binding check exists (the route does not verify `toEmail` matches the
-request's PI/liaison of record).
+foundation-branded email containing a **live 30-day grantee magic link** for any request
+GUID with a Drafted..<Submitted deliverable to **any single address they type** — there
+is no server-side recipient↔request binding, per the owner's confirm/override decision
+above. A mistaken or malicious staffer can therefore mail a valid portal link to a wrong
+recipient. This is an insider/authorization-trust concern consistent with the accepted
+org-open trust model, not an unauthenticated primitive.
 
-**Verdict:** PARTIAL — the primitive is intended and reasonably fenced; the one residual is
-"no server-side recipient↔request binding," accepted-risk-adjacent to the org-open model.
+**Verdict:** PARTIAL — the primitive is owner-decided and reasonably fenced; the residual
+is the absent recipient binding, accepted-risk-adjacent.
 
 **What tests prove.** `grantee-send-invite-route.test.js` +
-`grantee-send-invite-workbench-service.test.js` exist and exercise the validation/status
-gates `[VERIFIED via tests/unit listing]`; they do not assert a recipient↔request identity
-binding (there is none to assert).
+`grantee-send-invite-workbench-service.test.js` exercise the validation/status gates
+`[VERIFIED via tests/unit listing]`; there is no recipient↔request binding to assert.
 
-**Disconfirming check.** If product wants the binding, add a server check that `toEmail`
-(and `ccEmail`) match the request's stored PI/liaison addresses before mint/send; today's
-absence is deliberate (staff may correct/override recipients — header comment `:6-8`).
+**Disconfirming check.** If product ever wants the binding, verify `toEmail`/`ccEmail`
+against the request's stored PI/liaison addresses before mint/send — today's absence is
+the documented staff-override affordance, so its "absence" cannot be read as a defect
+without a new owner decision.
 
-**Remediation.** None recommended without an owner decision — adding a binding would break
-the documented staff-override affordance. Flag as an insider-trust residual only.
+**Remediation.** None recommended without an owner decision — a binding would break the
+documented override affordance. Flag as an insider-trust residual only.
 
 ---
 
-## 4. Replay / duplicate-side-effect / partial-success — REFUTED (duplicate send) / CONFIRMED-as-designed (no route idempotency) (Low)
+## 4. Route idempotency — CONFIRMED for `send-invite`, REFUTED for `replace-submission` (Low)
 
-**`send-invite`.** No route- or service-level idempotency key: two identical POSTs 
-**will** each mint a fresh magic-link and send a fresh email while status is DRAFTED/INVITED.
-`[VERIFIED — send-invite-service.js has no dedup/etag-claim before send; the only guard is
-status < SUBMITTED :87-89]`. Partial success is handled correctly and non-dangerously: a
-send that succeeds but whose status PATCH fails returns **200 with `statusPersisted:false`**
-and the *actual* persisted status, never falsely reporting INVITED `[VERIFIED :116-138]`.
-So the "duplicate side effect" is a **duplicate staff-initiated invite email**, not a
-duplicate irreversible financial/state effect — the second link supersedes the first and
-both point at the same request. Low severity; matches the design comment that a re-send is
-an intentional affordance (reminder resends exist).
+**`send-invite`: the original finding is CONFIRMED.** There is no route- or
+service-level idempotency: two identical POSTs while status is DRAFTED/INVITED each mint
+a fresh magic-link and each send an email — the only gate is `status < SUBMITTED`
+`[VERIFIED via send-invite-service.js:87-89; no dedup/claim exists anywhere in the
+service]`. **Token semantics: a newly minted token does NOT supersede earlier ones.**
+Grantee tokens are stateless signed JWTs with no stored hash and no revocation
+`[VERIFIED via lib/external/grantee-token-lifecycle.js:9-16]`, so **every previously
+minted token remains independently valid until its own 30-day expiry**; the durable
+backstop is package status — the submit route refuses writes once the deliverable is
+complete/submitted (the compensating guard named in the token-lifecycle design note
+`[VERIFIED via grantee-token-lifecycle.js:14-17]`). Each resend therefore *widens* the
+set of live links rather than rotating them. This is within the accepted Q1 stateless
+design (§3), and resend is an intended affordance, so severity stays Low — but the
+duplicate-send behavior itself is confirmed, not refuted.
 
-**`replace-submission`.** This path is **more** defended than send-invite. It requires a
-client etag (fail-closed without one `[VERIFIED via replace-submission-service.js:95-101]`),
-does a conditional `ifMatch` PATCH `[VERIFIED :210]`, and on a thrown PATCH distinguishes
+Partial success is handled correctly and non-dangerously: a send that succeeds but whose
+status PATCH fails returns **200 with `statusPersisted:false`** and the *actual*
+persisted status, never falsely reporting INVITED `[VERIFIED via
+send-invite-service.js:116-138]`.
+
+**`replace-submission`: the dangerous reading is REFUTED.** It requires a client etag
+(fail-closed without one `[VERIFIED via replace-submission-service.js:95-101]`), does a
+conditional `ifMatch` PATCH `[VERIFIED :210]`, and on a thrown PATCH distinguishes
 412-stale (409 to client, SharePoint upload cleaned up) from a possible **response-drop
 after commit**: it re-reads and compares every requested field, returning success if the
-write actually committed and cleaning up the orphan upload only when `not_committed`;
-`unknown` leaves the upload rather than risk deleting a referenced image
-`[VERIFIED :211-254]`. Concurrency, partial success, and ambiguous-write are explicitly
-handled. A duplicate replace with a stale etag 409s; with a fresh etag it is a legitimate
-second edit.
-
-**Verdict:** the dangerous reading (duplicate *irreversible* side effect / ambiguous write
-mishandled) is **REFUTED**. The benign reading (no route idempotency on send-invite, so a
-double-submit sends two invites) is **CONFIRMED but as-designed** and Low.
+write actually committed, cleaning up the orphan upload only when `not_committed`, and
+leaving the upload on `unknown` rather than risk deleting a referenced image
+`[VERIFIED :211-254]`. A duplicate replace with a stale etag 409s; with a fresh etag it
+is a legitimate second edit. Concurrency, partial success, and ambiguous-write are
+explicitly handled.
 
 **What tests prove.** `grantee-replace-submission-service.test.js` +
-`grantee-deliverables-replace-submission-route.test.js` cover the etag/stale/commit paths
-`[VERIFIED via tests/unit listing]`. Send-invite tests cover validation and the
-`statusPersisted:false` partial-success branch; they do **not** assert single-send
-idempotency (there is none).
+`grantee-deliverables-replace-submission-route.test.js` cover the etag/stale/commit paths;
+send-invite tests cover validation and the `statusPersisted:false` branch but do **not**
+assert single-send behavior (there is none to assert) `[VERIFIED via tests/unit listing]`.
 
 **Disconfirming check.** POST send-invite twice in the DRAFTED window against a test
-request and count `emails` activities — expect two. If a future idempotency key is added,
-re-verify.
+request and count `emails` activities — expect two, and expect both mailed links to
+verify successfully until expiry.
 
 **Remediation.** None required. If duplicate-invite suppression is ever wanted, a short
-idempotency window keyed on `(requestId, status)` in the service would do it, but the
-reminder-resend affordance argues against it.
+idempotency window keyed on `(requestId, status)` would do it, but the reminder-resend
+affordance argues against it; token rotation would require abandoning the accepted
+stateless design and is a separate owner decision.
 
 ---
 
-## 5. BILL onboarding replay protection — REFUTED external duplication / CONFIRMED open HTTP-replay window (Low)
+## 5. BILL onboarding replay protection — REFUTED duplicate external effects / CONFIRMED open HTTP-replay window (Low)
 
 **Transport replay (`lib/bill/internal-call-auth.js`).** HMAC-SHA256 over
 `v1:${timestamp}:${nonce}:${rawBody}` with `crypto.timingSafeEqual` (padded, length-checked)
 `[VERIFIED :42-46, 92-109]`, a **±300s skew window**, and **no nonce store** — the header
 comment states the skew window is the actual replay defense because Vercel instances don't
 share memory `[VERIFIED :20-21, 27, 88-90]`. **Confirmed:** within ±300s an identical signed
-body can be replayed at the HTTP layer and will pass `verifyInternalCall`. So the transport
-alone does not prevent a replay.
+body can be replayed at the HTTP layer and will pass `verifyInternalCall`.
 
-**But the external/duplicate-effect question resolves at the orchestrator, not the
-transport.** `onboardReviewer` (`lib/bill/onboard-reviewer-service.js`) **reserves durable
-Postgres state before any BILL side effect**: `reserveOnboarding` does
-`INSERT ... ON CONFLICT (honorarium_request_id) DO NOTHING`
-`[VERIFIED via lib/bill/onboarding-state.js:25-29]`. A replayed/concurrent second call loses
-the PK race → `reserved:false` → short-circuits to `in_progress` or an **idempotent
-resume** (re-runs only the idempotent contact PATCH, and explicitly **never replays
-terminal BILL side effects** like network invitation) `[VERIFIED :128-179]`. Vendor creation
-is further guarded by a staged-vendor-id pre-read so a retry reuses the existing vendor
-rather than creating a second `[VERIFIED :181-238]`. Idempotency is keyed on
-`honorarium_request_id`, which is part of the signed body — so even a byte-identical replay
-targets the same reservation row and dedupes.
+**But the duplicate-effect question resolves at the orchestrator.** `onboardReviewer`
+(`lib/bill/onboard-reviewer-service.js`) **reserves durable Postgres state before any BILL
+side effect**: `reserveOnboarding` does `INSERT ... ON CONFLICT (honorarium_request_id)
+DO NOTHING` `[VERIFIED via lib/bill/onboarding-state.js:25-29]`. A replayed/concurrent
+second call loses the PK race → `reserved:false` → short-circuits to `in_progress` or an
+**idempotent resume** (re-runs only the idempotent contact PATCH; explicitly **never
+replays terminal BILL side effects** like network invitation) `[VERIFIED :128-179]`.
+Vendor creation is further guarded by a staged-vendor-id pre-read so a retry reuses the
+existing vendor `[VERIFIED :181-238]`. The idempotency key (`honorarium_request_id`) is
+inside the signed body, so a byte-identical replay necessarily targets the same
+reservation row.
 
-**Verdict:** "repeat valid requests cause duplicate external effects" is **REFUTED** — the
-Postgres reservation + resume logic dedupes at the effect layer. The transport's open ±300s
-replay window is **CONFIRMED** but harmless given that dedup: a replay inside the window hits
-the same reservation and produces no new BILL vendor/invite.
+**Verdict:** "repeat valid requests cause duplicate external effects" is **REFUTED** at
+the effect layer; the transport's ±300s replay window is **CONFIRMED but harmless** given
+that dedup.
 
 **What tests prove.** `bill-onboard-reviewer.test.js` covers skew>300s rejection
-(`:523-524`), signature verification (`:500-505`), and — crucially — the **stranded-row
-resume that does NOT replay BILL side effects** (`:384-397`) `[VERIFIED via tests/unit
-listing]`. `bill-onboarding-state.test.js` covers the reservation store. Gap: no test
-asserts that a **within-window byte-identical HTTP replay** produces no duplicate external
-effect end-to-end (the resume test drives the orchestrator directly, not a replayed HTTP
-request). The reservation logic makes the outcome sound, but that specific replay path is
-unit-proven only at the orchestrator layer.
+(`:523-524`), signature verification (`:500-505`), and the **stranded-row resume that
+does NOT replay BILL side effects** (`:384-397`); `bill-onboarding-state.test.js` covers
+the reservation store `[VERIFIED via tests/unit listing]`. Gap: no test drives a
+**within-window byte-identical HTTP replay** end-to-end through the route; the dedup is
+unit-proven at the orchestrator layer only.
 
-**Disconfirming check.** Replay a captured valid signed request within 300s against a test
-deployment and assert exactly one `bill_onboarding_state` row and zero second
-vendor/invite calls. Expected: dedup holds.
+**Disconfirming check.** Replay a captured valid signed request within 300s against a
+test deployment and assert exactly one `bill_onboarding_state` row and zero second
+vendor/invite calls.
 
-**Remediation.** None required — the effect-layer dedup is the right defense for a
-multi-instance serverless deployment where a shared nonce store is impractical. If
-belt-and-suspenders is wanted, tightening the skew window or adding a best-effort nonce
-cache would shrink the (already-harmless) replay window, at the cost of clock-skew
-fragility. Not recommended.
+**Remediation.** None required — effect-layer dedup is the right defense for a
+multi-instance serverless deployment where a shared nonce store is impractical.
 
 ---
 
-## 6. Authenticated routes return internal `error.message` — CONFIRMED (Low)
+## 6. Authenticated routes return internal `error.message` — CONFIRMED, four audience classes (Low)
 
-**Trace.** ~40 routes return `{ error: '...', message: error.message }` or
-`{ error: err.message || 'Internal error' }` in a 500 handler `[VERIFIED via grep over
-pages/api]`. Named examples: `cron/maintenance.js:279`, `cron/sweep-stale-invites.js:59`,
-`admin/reconcile-identities.js:41`, plus the `admin/*` prompt/policy/user/review-question
-routes.
+**Reproducible inventory.** Pattern: a `res.status(500|502).json(...)` whose object (scanned
+over a 5-line window to catch multiline bodies) includes `error.message` / `err.message` /
+`e.message` / `msg`, EXCLUDING (i) `ServiceHttpError` default bodies
+(`err.body ?? { error: err.message }` — deliberate, service-authored client messages;
+17 sites), (ii) development-only details
+(`NODE_ENV === 'development' ? error.message : ...`; 55 sites), and (iii) messages written
+to logs or durable operational records rather than responses. Result: **28 raw
+unhandled-error disclosure sites in 28 distinct handlers under `pages/api`**
+`[VERIFIED via scripted scan of pages/api this session]`, by audience:
 
-**Caller population.** The `admin/*` routes are `requireSuperuser`-gated
-`[VERIFIED — policies/prompts/users/review-questions/reconcile-identities all show
-requireSuperuser]`; the `cron/*` routes are `verifyCronSecret`-gated. So the leak audience
-is **authenticated staff / the cron principal**, never anonymous. **Crucially, the
-external-facing route trees are clean:** grep for raw-message returns over `pages/api/external`,
-`pages/api/bill`, `pages/api/webhooks` is **empty** `[VERIFIED]` — external reviewer/grantee
-and webhook surfaces already use generic reasons.
+- **Superuser (7):** `admin/policies.js:43`, `admin/prompts/[name].js:61`,
+  `admin/prompts/index.js:31`, `admin/reconcile-identities.js:41`,
+  `admin/review-questions.js:65`, `admin/users.js:51`, `test-email.js:60` — all
+  `requireSuperuser` `[VERIFIED per-file]`.
+- **Cron principal (17):** `auth-bypass-check:59`, `drain-review-syntheses:57`,
+  `drain-reviewer-acceptances:59`, `drain-submissions:130`, `health-check:129`,
+  `log-analysis:177`, `maintenance:279`, `pricing-canary:67`, `pricing-refresh:114`,
+  `reconcile-identities:53`, `refresh-irs-bmf:85`, `reviewer-email-reconcile:62`,
+  `reviewer-reminders:63`, `secret-check:128`, `send-review-thankyous:65`,
+  `spend-check:58`, `sweep-stale-invites:59` — all `verifyCronSecret`.
+- **Ordinary staff app-auth (3):** `review-manager/campaign-timeline-defaults.js:37`,
+  `reviewer-finder/contact-history.js:49`, `reviewer-finder/prompt-override.js:56` —
+  `requireAppAccess` `[VERIFIED per-file]`.
+- **Internal HMAC caller (1):** `bill/onboard-reviewer.js:107-110` returns
+  `error: { code: 'unhandled', message: msg }` to the HMAC-authenticated internal caller
+  `[VERIFIED]`. **The first draft's claim that `pages/api/bill` was clean is retracted** —
+  it rested on a single-line grep that missed this multiline body.
 
-**Verdict:** CONFIRMED but Low — an internal-detail disclosure to already-authenticated,
-mostly-superuser callers. It diverges from the disciplined generic-reason convention the
-external routes follow (and that `send-invite`/`replace-submission` follow via
-`ServiceHttpError` default bodies `[VERIFIED via send-invite.js:77-83]`). No secret material
-is knowingly placed in these messages; the risk is stack/driver detail aiding an
-already-inside actor.
+The external **token-authenticated** trees (`pages/api/external/*`, `pages/api/webhooks/*`)
+show no raw-message sites under the same scan `[VERIFIED via the scripted scan — zero
+hits in those trees]`.
 
-**What gates prove / don't.** No gate asserts response-body hygiene; this is convention,
-not enforced.
+**Verdict:** CONFIRMED, Low. All 28 sites sit behind authentication, but the audience is
+broader than "superuser/cron": three routes disclose to any staffer with the relevant app
+grant, and one to the internal HMAC principal. The `ServiceHttpError` convention shows the
+codebase already has the disciplined alternative; these 28 are drift from it.
 
-**Disconfirming check.** If any of these routes were reachable unauthenticated, severity
-would rise — re-confirm each carries `requireSuperuser`/`verifyCronSecret`/`requireAppAccess`
-(done this session for the named admin set; the full ~40 list is guard-mapped, not each
-semantically re-traced).
+**What gates prove / don't.** No gate asserts response-body hygiene.
 
-**Smallest remediation (optional).** Return a generic reason to the client and keep
-`error.message` in the existing `console.error` (already present at each site). A shared
-`500` helper would prevent regressions but is more than the finding warrants.
+**Disconfirming check.** Re-run the scan (pattern above) after any cleanup; any site
+outside the three excluded categories is a regression.
 
-**Residual risk.** None once messages are generalized; logging already retains detail.
+**Smallest remediation (optional).** Return a generic reason and keep `error.message` in
+the existing `console.error` at each site (all 28 already log). Priority order: the 3
+`requireAppAccess` staff routes, then the HMAC route, then superuser/cron.
+
+**Residual risk.** None once messages are generalized; logging retains detail.
 
 ---
 
@@ -347,32 +437,25 @@ semantically re-traced).
 
 **Trace.** `lib/utils/cron-auth.js:36` compares with `authHeader !== \`Bearer ${secret}\``
 — a short-circuiting string compare, not constant-time `[VERIFIED]`. Two sibling verifiers
-in the same codebase use `crypto.timingSafeEqual`: `lib/bill/internal-call-auth.js:99-108`
-and `pages/api/irs/verify-ein.js:51,58` `[VERIFIED]`. So this is a **convention violation**
-on the guard for **19** cron routes (`grep verifyCronSecret` over `pages/api` → 19 files
-`[VERIFIED]`), including bulk-delete/maintenance crons.
+use `crypto.timingSafeEqual`: `lib/bill/internal-call-auth.js:99-108` and
+`pages/api/irs/verify-ein.js:51,58` `[VERIFIED]`. This is a **convention violation** on
+the guard for **19** cron routes (`grep verifyCronSecret` over `pages/api` → 19 files
+`[VERIFIED]`), including maintenance/bulk-delete crons.
 
-**Practical threat.** Very low over HTTP: remote timing side-channels against a per-request
-string compare are swamped by network jitter, TLS, and serverless cold-start variance, and
-`CRON_SECRET` is a high-entropy env secret (not user-guessable), delivered by Vercel's cron
-scheduler over Authorization. There is no realistic remote oracle. The finding's weight is
-**consistency**, not an exploitable channel.
+**Practical threat.** Very low over HTTP: remote timing side-channels against a
+per-request string compare are swamped by network/TLS/serverless variance, and
+`CRON_SECRET` is a high-entropy env secret with no attacker-influenced comparison input.
+The finding's weight is **consistency**, not an exploitable channel.
 
-**Verdict:** CONFIRMED (real inconsistency), Low practical severity. The two sibling
-conventions (`timingSafeEqual` already imported and used elsewhere) are what justify the
-small fix — parity, not an active threat.
+**Verdict:** CONFIRMED (real inconsistency), Low practical severity; the sibling
+conventions justify the small fix.
 
-**What gates prove / don't.** No gate checks comparison style. `check:api-routes` recognizes
-`verifyCronSecret` as a guard token regardless of its internal compare.
+**What gates prove / don't.** No gate checks comparison style; `check:api-routes`
+recognizes `verifyCronSecret` regardless of its internals.
 
-**Disconfirming check.** None needed to confirm the code shape; to confirm *non*-exploitability,
-note the secret is not attacker-influenced and the compare runs server-side per request with
-no returned timing signal beyond total latency.
-
-**Smallest remediation (optional).** Replace the `!==` with a `timingSafeEqual` over
-`Buffer.from(authHeader)` vs `Buffer.from(\`Bearer ${secret}\`)` using the same
-pad-to-longest + length-equality pattern already written in `internal-call-auth.js:99-108`
-(copy the helper). ~6 lines, one file, closes the convention gap for all 19 routes at once.
+**Smallest remediation (optional).** Replace the `!==` with the pad-to-longest
+`timingSafeEqual` pattern already written in `internal-call-auth.js:99-108`. ~6 lines,
+one file, covers all 19 routes.
 
 **Residual risk.** None.
 
@@ -382,78 +465,90 @@ pad-to-longest + length-equality pattern already written in `internal-call-auth.
 
 **What the bytes actually are.** `file(1)` reports `pages/api/cron/pricing-refresh.js` as
 `data` `[VERIFIED]`. The cause is **three literal NUL (`0x00`) bytes** at lines 131, 138,
-160, each inside a template-literal map key `${model}\x00${tokenType}` used as a composite
-Map key, plus benign UTF-8 punctuation (em-dash `\xe2\x80\x94`, `×` `\xc3\x97`)
-`[VERIFIED via byte-offset inspection: NULs at offsets 5345/5721/6784]`. The file **is valid
-UTF-8** (`python3 .decode('utf-8')` succeeds `[VERIFIED]`); `file(1)` says `data` only
-because of the embedded NULs, which many text heuristics treat as "binary."
+160 — each a composite-Map-key delimiter written as a raw byte inside a template literal
+(`` `${model}<NUL>${tokenType}` ``) — plus benign UTF-8 punctuation
+`[VERIFIED via byte-offset inspection: NULs at offsets 5345/5721/6784]`. The file **is
+valid UTF-8** (`python3 .decode('utf-8')` succeeds `[VERIFIED]`); `file(1)` says `data`
+only because embedded NULs trip binary heuristics.
 
 **Can it blind a gate?** No.
-- The route **is** guarded: `verifyCronSecret` is imported (`:26`) and called (`:82`)
-  `[VERIFIED]`, and it carries a matrix row `[VERIFIED via API_ROUTE_SECURITY_MATRIX.md:117]`.
-- `check:api-routes` reads every file with `fs.readFileSync(file, 'utf8')` and does
-  substring matching `[VERIFIED via check-api-route-security-matrix.js:97, 100]`. Node's
-  UTF-8 reader does **not** stop at NUL — it returns the full string including ` ` — so
-  `source.includes('verifyCronSecret')` is `true`. I confirmed Node reads the guard:
-  `/verifyCronSecret\s*\(/.test(fs.readFileSync(...,'utf8'))` → `true` `[VERIFIED]`.
-- The gate walker enumerates files by directory listing (`fs.readdirSync`), not by grep, so
-  the file cannot be *skipped* either `[VERIFIED via check-api-route-security-matrix.js:32-38]`.
-- The only tools fooled are **NUL-naive line greps**: BSD `grep verifyCronSecret` prints
-  "Binary file … matches" and, without `-a`, suppresses the matched line; with `-a` it
-  prints it `[VERIFIED]`. That is a *human-ergonomics* wrinkle during manual review, not a
-  gate blind spot — no security gate depends on NUL-naive grep.
+- The route **is** guarded: `verifyCronSecret` imported (`:26`) and called (`:82`)
+  `[VERIFIED]`, with a matrix row `[VERIFIED via API_ROUTE_SECURITY_MATRIX.md:117]`.
+- `check:api-routes` reads every file with `fs.readFileSync(file, 'utf8')` and substring
+  matching `[VERIFIED via check-api-route-security-matrix.js:97, 100]`; Node's UTF-8
+  reader is NUL-tolerant, so `source.includes('verifyCronSecret')` is `true`
+  (`/verifyCronSecret\s*\(/.test(fs.readFileSync(...,'utf8'))` → `true` `[VERIFIED]`).
+- The gate enumerates by `fs.readdirSync` directory walk, not grep, so the file cannot be
+  skipped `[VERIFIED via check-api-route-security-matrix.js:32-38]`.
+- The only tools degraded are **NUL-naive line greps**: BSD `grep` still *matches*
+  (exit 0) but prints "Binary file … matches" instead of the line unless `-a` is passed
+  `[VERIFIED]`. That bit this very audit: a `grep -o` guard-classification pass printed
+  empty for this one file. Human/agent-tooling ergonomics, not a gate blind spot — no
+  security gate depends on NUL-naive grep.
 
-**Verdict:** REFUTED — the condition is real (NUL bytes → `file` says `data`) but it cannot
-blind any current route enumeration or security gate, because every gate that matters reads
-UTF-8 with Node's NUL-tolerant reader and enumerates by directory walk. Informational only.
+**Verdict:** REFUTED — the NULs cannot blind any current Node-based route enumeration or
+security gate. Informational.
 
-**Disconfirming check.** Add a throwaway file under `pages/api` with a NUL and no guard,
-run `check:api-routes`; expect it to be flagged as `noRecognizedGuard` (proving the walker
-sees NUL files). Not run here (would create a fixture; the self-test already exercises the
-walker).
+**Disconfirming check.** Drop a NUL-containing, guard-less fixture under `pages/api` and
+run `check:api-routes` — expect it flagged. (Not run here; the gate's self-test already
+exercises the walker.)
 
-**Remediation.** Optional cosmetic only: replace the `\x00` Map-key separator with a
-printable delimiter unlikely to appear in a model id (e.g. `␟` or `::`) so `file(1)`
-and line-greps treat it as text. Zero security impact; do not prioritize.
+**Remediation (cosmetic only).** Replace each literal NUL byte with the **escape sequence
+`'\u0000'` (or `'\x00'`) in source** — the runtime string, and therefore the composite-key
+semantics and collision behavior, are byte-identical, while the file becomes NUL-free for
+`file(1)` and line-greps. Do **not** substitute a printable delimiter: that changes the
+runtime key format and would require proving no model id / token type can contain the new
+delimiter. Zero security impact; do not prioritize.
 
 ---
 
 ## 9. Cross-cutting observations (not new findings)
 
 - The **effect-layer dedup pattern** (Postgres reservation before external side effect;
-  etag-claim-before-send; re-read-and-compare on response drop) is applied consistently and
-  well in BILL onboarding and grantee replace-submission. Send-invite deliberately opts out
-  (resend is a feature). This is a mature partial-success posture.
-- The **is_active revocation split** (§1) is the one place where "which auth helper you pick
-  changes whether revocation is enforced" is a latent footgun; folding the check into
-  `requireAuth` would make all three helpers uniformly revocation-aware.
+  etag-claim-before-send; re-read-and-compare on response drop) is applied consistently
+  and well in BILL onboarding and grantee replace-submission. Send-invite deliberately
+  opts out (resend is a feature). Mature partial-success posture.
+- **Revocation is enforced per-request at the route-helper layer only.** Neither the
+  session layer (`jwt` callback keeps stale staff claims on a zero-row active lookup,
+  `[...nextauth].js:248-268`) nor the edge (`proxy.js` checks idle + claim presence only)
+  participates in disablement, and sessions self-renew indefinitely with activity (§1).
+  Folding `is_active` into `requireAuth` and clearing stale claims in the jwt callback
+  would make all three layers agree.
 - Two D1-class **config-regression fail-opens** recur: DAL enforcement (documented) and
-  `validateOrigin`'s `NEXTAUTH_URL` skip (§2). Both fail open silently on misconfiguration
-  rather than loud; the target/write interlock's invalid-value-fails-closed posture is the
-  better pattern to converge on.
+  `validateOrigin`'s `NEXTAUTH_URL` skip (§2) — the latter deliberate and unit-tested,
+  but still silent-on-regression in production. The target/write interlock's
+  invalid-value-fails-closed posture is the better pattern to converge on.
+- The **proxy applicant-surface classification** (`/apply`, `/api/apply`) has drifted
+  from the implemented applicant API namespace (`/api/intake/*`) — currently a launch
+  blocker for intake rather than a security hole, but it must be fixed jointly with
+  intake CSRF (§2c).
 
 ## 10. Read-only production probes to assign to Justin
 
-None are required to stand behind the verdicts above (all rest on source). Optional
-confirmations, owner-executed:
+None are required for the source-level verdicts. Optional confirmations, owner-executed:
 
-1. `GET /api/health` → confirm `NEXTAUTH_URL` is set in Production (closes §2 branch-3
-   "not currently active in prod" from ASSUMED to VERIFIED-live).
-2. Nothing else — findings 1, 3–8 are fully source-decided; no prod read changes a verdict.
+1. Confirm current Production `NEXTAUTH_URL` is set and equals the branded staff host
+   (e.g. via the existing `/api/health` check used for the 2026-06-23 verification).
+   Until then, §2's "active in prod" status for the Origin layer is **`[ASSUMED]` on
+   dated (June 2026) evidence** — the code path, either way, is verified.
+2. Nothing else — findings 1 and 3–8 are fully source-decided.
 
 ## 11. What would change these verdicts
 
-- §1 → closes if `requireAuth` gains an `is_active` read or the blob routes move to
-  `requireAuthWithProfile`.
-- §2 → fail-open closes if branches 3–4 fail closed in prod; doc drift closes with a
-  one-line matrix correction.
-- §5 → the CONFIRMED replay window becomes moot if a nonce store is added, but is already
-  harmless via reservation dedup.
-- §8 → stays REFUTED unless a gate is ever rewritten to read files via a NUL-naive path
-  (none does today).
+- §1 → closes if `requireAuth` gains an `is_active` read AND/OR the jwt callback clears
+  stale staff claims; the required regression tests are listed in §1.
+- §2 → fail-open closes if branches 3–4 fail closed in prod (tests updated); the intake
+  CSRF item converts from latent to live the moment the proxy applicant-surface
+  classification is extended — fix both together at intake launch.
+- §4 → send-invite CONFIRMED status would change only with an idempotency window or a
+  token-rotation redesign (separate owner decisions).
+- §5 → the replay window becomes moot if a nonce store is added; already harmless via
+  reservation dedup.
+- §8 → stays REFUTED unless a gate is ever rewritten onto a NUL-naive read path (none
+  today).
 
 ---
 
-*Prepared read-only. No runtime code, `SESSION_PROMPT.md`, or observability-plan surfaces
-were modified. Branch `codex/claude-security-followup-audit`; handing back to Codex for
-independent review.*
+*Prepared read-only; revised same-day after Codex adversarial review. No runtime code,
+`SESSION_PROMPT.md`, or observability-plan surfaces were modified. Branch
+`codex/claude-security-followup-audit`. Do not merge; Codex performs read-only review.*
