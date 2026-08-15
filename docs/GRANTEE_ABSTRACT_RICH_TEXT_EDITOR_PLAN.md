@@ -15,7 +15,7 @@ related:
 
 # Grantee Abstract Rich-Text Editor Build Plan
 
-**Status:** Abstract editor merged; image-caption follow-up implemented and locally verified on `codex/grantee-caption-rich-text`, pending deliberate promotion.
+**Status:** Abstract and image-caption editors merged and deployed to production; staff abstract formatting and persistence observed in production on 2026-08-14. The slow-save ambiguous-write reconciliation is implemented on `codex/fix-abstract-save-timeout` but is not yet promoted to `main`.
 **Change surface:** Abstract and image-caption editing in the external grantee portal and the staff Workbench Awardee tab.\
 **Persistence:** Existing Dataverse Memo fields `akoya_request.wmkf_abstractformatted`, `akoya_request.wmkf_abstractapproved`, and `wmkf_granteedeliverable.wmkf_imagecaption`.\
 **Review owner:** Claude Opus, read-only adversarial plan review.\
@@ -252,7 +252,7 @@ Likely files:
 4. The API matrix, plan, canonical portal spec, and catalog were reconciled with `/sweep`; no schema change is claimed because none occurred.
 5. Run a Preview smoke with one test grantee edit and one staff edit before deliberate production promotion; verify Dataverse stores Markdown while rendered output shows formatting.
 
-### Phase 5 — Caption follow-up (locally verified; promotion pending)
+### Phase 5 — Caption follow-up ✅
 
 1. Reuse the restricted editor for both caption entry points with a compact presentation and caption-specific toolbar label.
 2. Add response-only `captionHtml` to the external context and staff abstract GET via `renderGranteeCaption`.
@@ -308,14 +308,14 @@ Before implementation completion, inspect `docs/CI_GATES_REFERENCE.md` and `pack
 - `npm run check:types`: passed.
 - `npm run check:api-routes` followed by `npm run check:api-routes:self-test`: passed.
 - Canonical Turbopack `npm run build`: not proven in this host because Turbopack failed twice while attempting to create a process/bind a port (`Operation not permitted`), including the approved out-of-sandbox retry. The documented `next build --webpack` fallback passed against the final file set; only the repository's existing dynamic-dependency warnings were emitted.
-- Signed-in Preview and production smoke: not run; remains a rollout requirement rather than an implementation claim.
+- Signed-in production observation: the owner confirmed staff rich-text formatting and persistence on 2026-08-14. The observed save exceeded the client timeout but committed; the reconciliation fix remains on `codex/fix-abstract-save-timeout` pending promotion.
 
 ## 7. Compatibility, rollout, and rollback
 
 - [VERIFIED] No bulk migration is required: plain text is valid Markdown, and existing allowed Markdown already renders through the canonical helper.
 - [VERIFIED via route/service tests] The API response additions are backward-compatible; existing fields and write payloads remain.
 - [ASSUMED] External Power Automate or direct Dataverse readers may exist outside this repository. Keeping the exact persisted field meanings and syntax minimizes that risk; no external-consumer claim is treated as proven.
-- [VERIFIED via git] Runtime UI work is isolated on `codex/grantee-abstract-rich-text` for deliberate promotion rather than landing directly on auto-deploying `main`.
+- [VERIFIED via git and owner production observation] Abstract and caption runtime UI work is merged to auto-deploying `main`; the separate slow-save reconciliation remains isolated on `codex/fix-abstract-save-timeout` pending deliberate promotion.
 - [VERIFIED by unchanged persistence contract] Rollback can revert the editor and derived response fields without data repair because stored values remain readable Markdown.
 - [VERIFIED by unchanged renderer] After rollback, allowed formatting markers may again appear visibly in a plain textarea, but publication output remains formatted because the canonical renderer is unchanged.
 
@@ -384,6 +384,7 @@ scope: rollback is data-safe, and the three precedence call sites carry differen
 field-target/editability semantics that should not be collapsed without a separate
 helper-semantics review.
 
-**Final plan verdict after reconciliation:** `READY TO IMPLEMENT`. Phase 1 must
-first convert the recorded renderer probes into characterization tests; no schema
-or data migration is authorized by this plan.
+**Final plan verdict after reconciliation:** `IMPLEMENTED AND PRODUCTION-LIVE`.
+No schema or data migration was required. The separate slow-save reconciliation
+is implemented and verified on its feature branch but is not part of this verdict
+until deliberately promoted.

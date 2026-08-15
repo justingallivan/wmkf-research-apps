@@ -10,6 +10,34 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Grantee rich text and reviewer workflow controls are production-live (Session 426)
+
+**Milestone:** Staff and grantees can preserve scientific formatting in abstracts and captions;
+reviewer outreach gained reviewed-before-send respond nudges and dismissible stale decline referrals.
+**Sessions:** 426 (design, Opus review, implementation, adversarial review, promotion, owner use).
+**Ship state:** `main` advanced `8529d4a5 → baa8285a`; the nudge preview is editable but keeps
+identity and secure-link injection server-controlled; abstract/caption editors persist canonical
+Markdown and render sanitized HTML; decline referrals can be dispositioned without creating a
+candidate, with content-version and ETag race guards. Reviews export is now Word-only; canonical
+DOCX-to-PDF conversion remains a documented future option.
+**Why it matters:** Scientific names retain their intended typography, staff can clear unusable
+referrals without polluting the candidate roster, and outbound nudges are visible before sending.
+**Pointers:** `docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md`;
+`docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`; commits `251814df`, `b0ada8ba`, `baa8285a`.
+
+## August 2026 — Development-agent authentication standardized on OAuth (Session 426)
+
+**Milestone:** Claude Code and Codex agent sessions must use interactive subscription OAuth, never
+project/provider API keys; delegated Claude checks run outside the Codex sandbox so macOS Keychain
+state is visible.
+**Sessions:** 426 (owner decision, instruction enforcement, multi-account operating brief).
+**Ship state:** the rule is canonical in `CLAUDE.md`; the commercial/personal Claude profile-alias
+configuration is documented but intentionally not installed or added to the shell profile yet.
+**Why it matters:** Agent collaboration cannot silently consume API credits or misdiagnose a valid
+Claude login from sandbox-isolated Keychain state.
+**Pointers:** `CLAUDE.md`; `docs/CLAUDE_INSTRUCTION_AUTHORITY.md`;
+`outputs/claude-code-multi-account-oauth-brief-2026-08-13.md`; commit `b3bd5986`.
+
 ## August 2026 - Manual respond-by reviewer nudges are production-live (Session 425)
 
 **Milestone:** Program Directors can send an on-demand reminder to an active invited

@@ -1,145 +1,164 @@
-# Session 426: Editable Respond-Nudge Email Preview
+# Session 427: Promote Pending Rich-Text Fixes and Continue Reviewer Hardening
 
-## Session 425 Summary
+## Session 426 Summary
 
-The manual respond-by nudge was completed, reviewed, promoted to `main`, and
-deployed to Production. Program Directors can now nudge an active invited
-reviewer who has not answered; the send uses a fresh secure response link and
-records when the reviewer was last nudged. The current UI still uses a browser
-confirmation and sends the configured template without showing its contents.
+Session 426 shipped three user-facing workflow improvements to `main`: an editable
+respond-nudge preview, Markdown-backed rich-text editing for grantee abstracts and
+captions, and a safe way to dismiss unusable decline referrals without creating
+candidate records. The Reviews tab is now Word-only, with canonical DOCX-to-PDF
+conversion documented as a future option. Agent-session authentication was also
+standardized on interactive OAuth, and the milestone-log governance/history was
+audited and corrected.
+
+Two follow-up implementations are pushed on feature branches but are **not on
+`main`**: slow/ambiguous abstract-save reconciliation and the simplified reviewer
+portal toolbar.
 
 ### What Was Completed
 
-1. **Shipped the manual respond-by nudge (PRODUCTION).** The Invite Reviewers
-   row exposes `Send reminder` only for active unanswered invitations. The route
-   distinguishes `kind: 'respond'` from the existing review-due reminder while
-   preserving the omitted-kind behavior used by the Reviews tab.
+1. **Editable respond-nudge preview shipped.** Invite Reviewers now opens a modal
+   with editable subject/body and non-editable delivery identity. Preview is
+   read-only; send re-authorizes lifecycle/identity, atomically claims the marker
+   and fresh token, escapes edited text, and injects the secure link server-side.
 
-2. **Made manual reminder authorization and persistence atomic.** Both manual
-   reminder paths freshly authorize the reviewer lifecycle and persist the
-   marker plus fresh token in one ETag-bound PATCH. Removed/revoked reviewers
-   fail closed, and a concurrent lifecycle change prevents the email send.
+2. **Reviews export simplified to Word-only.** The formatting-flattening client
+   PDF control was removed. `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` records
+   a future Graph-backed canonical DOCX-to-PDF design as `[PLANNED]`, not built.
 
-3. **Closed the adversarial review findings.** Claude Opus found no remaining
-   P0/P1/P2 issue after the atomic-claim and UI/error-state corrections. Local
-   verification passed 617 suites / 7,902 tests, type checking, the production
-   build, and the relevant contract/documentation gates.
+3. **Grantee abstract and caption rich text shipped.** An Opus-reviewed contract
+   led to a restricted Tiptap editor for staff and external grantees: bold,
+   italic, subscript, superscript, undo, and redo. Existing Dataverse Memo fields
+   still store canonical Markdown; response-only HTML is server-rendered and
+   sanitized. PI/co-PI bylines are shown before abstract outreach.
 
-4. **Promoted and verified Production.** `main` advanced to `8529d4a5`; the
-   Vercel deployment completed, all five GitHub workflows passed (Tests,
-   Playwright, Security Scan, Dependency Scan, Secret Scanning), and the public
-   application and external-review endpoint returned HTTP 200. No real nudge
-   email was sent during the deployment verification.
+4. **Decline referrals can be dismissed safely.** Staff can hide a structured or
+   legacy referral without adding it as a candidate. The final adversarial review
+   passed after binding dismissals to the GET-issued content version, rechecking
+   it on normal and 412 paths, and failing closed on malformed/future envelopes.
 
-### Commits
+5. **Agent OAuth governance made canonical.** `CLAUDE.md` now forbids API-key
+   authentication for Claude Code/Codex sessions and requires delegated Claude
+   authentication checks outside the Codex sandbox on macOS. A future multi-account
+   alias/profile configuration is documented but not installed.
 
-- `5891c65e` - feat(reviewers): add manual respond-by nudges
-- `8529d4a5` - fix(reviewers): make manual reminder claim atomic
-- Promotion also included the ten prerequisite investigation, probe, plan, and
-  handoff commits from `48aea0d5..2d169c77`.
+6. **Development-log history reconciled.** The retain-versus-retire question was
+   verified as settled in favor of milestone-only use. The misleading legacy
+   boundary and a stale gate comment were corrected without rewriting history.
+
+### Main Commits
+
+- `251814df` - feat(reviewers): add editable respond nudge preview
+- `772d3420` - Remove Reviews tab PDF export
+- `c28da32c`, `9c213b26` - write and Opus-review the grantee rich-text plan
+- `21bd6c55`, `461d1995`, `e92d4fbd`, `b0ada8ba` - implement and promote abstract/caption rich text
+- `a8ad1298`, `0ae9e4cc` - add and correctly reset PI/co-PI bylines
+- `1da40a8d`, `baa8285a` - implement and adversarially harden referral dismissal
+- `b3bd5986` - enforce OAuth-only agent authentication
+- `49976420` - record branch-aware plan-status verification
+- `bb19191e` - clarify development-log milestone history
+
+### Branch-Only Commits — Not Promoted
+
+- `f69e3289` on `codex/fix-abstract-save-timeout` - reconcile a Dataverse PATCH
+  that committed but exceeded the client timeout; render any remaining failure
+  beside Save. Pushed and locally verified, not merged.
+- `e1e98c81` on `codex/reviewer-skinny-toolbar` - replace the reviewer answer
+  toolbar with the same restricted six-control profile, omitting list controls.
+  Pushed and locally verified, not merged.
 
 ## Next Items
 
 ### Verified Open
 
-1. **[IMPLEMENTED ON BRANCH; VERIFICATION/PROMOTION OPEN] Editable respond-nudge
-   preview modal.** `codex/editable-respond-nudge-preview` replaces the browser
-   confirmation with `RespondReminderModal`, a read-only preview request,
-   editable subject/body, non-editable delivery identity, and an explicit Send.
-   Cancel performs no send request; preview performs no marker/token/email
-   mutation. Send re-derives identities, preserves the atomic lifecycle claim,
-   escapes edited text, and injects the fresh secure link server-side. Focused
-   and relevant suites, scoped gates, type checking, and the webpack production
-   build pass. The full suite reaches 617/618 suites with one unrelated baseline
-   Atlas-count fixture drift; promotion remains open.
+1. **Review and deliberately promote `codex/fix-abstract-save-timeout`.** The
+   production observation proved a PATCH can commit and then time out. The branch
+   re-reads after non-412 errors and reports success only when the effective field
+   and exact attempted Markdown match. Evidence: commit `f69e3289` and its service,
+   route, and Awardee-tab tests.
 
-2. **[VERIFIED OPEN] Phase B - mint-surface hardening.** Separate change, own
-   review. `ensureToken`, `send-emails-service`, and `regenerate-token-service`
-   still mint without a selected/revoked check. This is pre-existing exposure;
-   the resurrection invariant is not closed until Phase B lands. Evidence:
-   `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` mint-surface audit.
+2. **Review and deliberately promote `codex/reviewer-skinny-toolbar`.** The branch
+   has the owner-selected bold/italic/subscript/superscript/undo/redo toolbar with
+   no list controls. Evidence: commit `e1e98c81`.
 
-3. **[VERIFIED OPEN] The automatic respond-by cron remains unsafe and must not
-   be armed.** It still needs selected/revoked selection and authorization guards
-   before `respondReminderEnabled` is exposed or set. Evidence:
-   `lib/services/reviewer-reminder-sweep.js:99-168`.
+3. **Phase B reviewer-token mint-surface hardening remains open.** `ensureToken`,
+   `send-emails-service`, and `regenerate-token-service` still need selected/revoked
+   authorization guards. Evidence: `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md`.
 
-4. **[VERIFIED OPEN, carried from S423] The merge cascade is still
-   non-transactional.** `hardDeleteById` in `reviewer-merge.js` permanently
-   deletes colliding loser rows with no compensation.
+4. **The automatic respond-by cron remains unsafe and must stay unarmed.** It
+   still needs selected/revoked selection and fresh authorization guards before
+   campaign toggles are exposed. Evidence: `lib/services/reviewer-reminder-sweep.js`.
 
-5. **[VERIFIED OPEN, carried from S423] The slot-binding half of the ETag
-   question is unverified.** Needs a controlled sandbox write.
+5. **The reviewer merge cascade remains non-transactional.** `hardDeleteById` in
+   `reviewer-merge.js` permanently deletes colliding loser rows without compensation.
 
-6. **[VERIFIED OPEN, re-checked 2026-08-13 in S423] Repair `computeCanManage`
-   rather than delete it.** See `shared/components/reviewers/reviewer-modes.js`.
-
-7. **[VERIFIED OPEN, carried] SharePoint:** PnP.PowerShell audit with Connor;
-   Purview/holds evidence with the M365 compliance admin; board milestone
-   snapshot producer. The separate Claude handoff is
+6. **SharePoint follow-ups remain external/operational.** PnP.PowerShell audit
+   with Connor, Purview/holds evidence with the M365 compliance admin, and the
+   board milestone snapshot producer remain open. Evidence:
    `outputs/sharepoint-retention-handoff-to-codex-2026-08-13.md`.
 
 ### Owner Decision Needed
 
-1. **Preview scope is closed for this increment.** Owner explicitly scoped the
-   modal to the respond-by nudge in Invite Reviewers. The existing review-due
-   reminder in Track Reviewers remains unchanged.
-
-2. **Expose the campaign-settings reminder toggles at all?** Arming them is
-   unsafe until Phase B and the cron guards land.
-
-3. **Execute the phantom co-PI remediation?** Unchanged from S423/S424.
-
-4. **Should `merge-candidates` remain organization-open?** Unchanged.
+1. **Promote either pending feature branch?** Both are implemented and pushed,
+   but neither has been merged to `main`.
+2. **Execute the phantom co-PI remediation?** The script remains dry-run only;
+   no production rows were changed.
+3. **Expose campaign reminder toggles after Phase B/cron hardening?** They remain
+   intentionally unavailable now.
+4. **Install the commercial/personal Claude aliases?** The configuration brief is
+   ready at `outputs/claude-code-multi-account-oauth-brief-2026-08-13.md`; the owner
+   expected Claude to add the aliases to the shell profile in a future session.
 
 ### Verify Before Acting
 
-1. **Re-run the preview contract gates before promotion.** `/contract-reconcile`
-   established and implemented the read-only preview → reviewed payload → fresh
-   identity/lifecycle authorization → atomic marker/token write → escaped email
-   with server-injected link flow. Full test/build and documentation gates must
-   remain green before promotion.
-
-2. **The production scale figures in the nudge plan remain `[ASSUMED]`.** The
-   original probe artifact was never written because of the now-fixed output
-   flag parser. Re-run the read-only probe to re-measure before relying on them.
-
-3. **Requests 1002146 / 1002379 are last cycle and must never be nudged.** They
-   remain incidentally blocked by null offsets; do not use them for a live smoke.
+1. **Referral-dismissal production smoke.** A dismissal persists a disposition;
+   choose an intentionally unusable referral and verify the exact row/content
+   version before exercising the control.
+2. **Nudge-plan production scale figures remain `[ASSUMED]`.** Re-run the read-only
+   probe before relying on them.
+3. **Requests 1002146 / 1002379 are previous-cycle records and must never be
+   nudged.** Do not use them for a live smoke.
+4. **Re-check branch ancestry immediately before either promotion.** The two
+   pending branches were verified against their then-current bases; do not infer
+   promotion state from the plan text alone.
 
 ### Parked
 
-1. Per-reason `skipped` counters in the cron sweep.
-2. Sticky per-user reminder defaults (`INVITE_TIMING` extension).
-3. Excel export still carries the full match-reason blob including the referral
-   clause. No data is lost; it differs from the candidate card display.
-4. Invite-tab needs-merge alerts; exact activity ledger; staff review before
-   grantee co-PI display; bespoke per-invitation due date.
+1. Graph-backed canonical DOCX-to-PDF conversion for Reviews export.
+2. Per-reason cron `skipped` counters and sticky per-user reminder defaults.
+3. Excel export still carries the full referral clause in the match-reason blob.
+4. Invite-tab needs-merge alerts, exact activity ledger, bespoke invitation due dates.
 
 ### Do Not Reopen Without New Decision
 
-1. **Arming `respondReminderEnabled` before Phase B and cron hardening.**
-2. **Deleting `computeCanManage`.** Repair the fail-open branch instead.
-3. **Removing the Step 7 pre-deactivate re-check in the merge.**
-4. **Changing application code for the phantom co-PI.**
-5. **Reinstating a block on any `respondBy` condition in the invitation timeline.**
-6. **Re-encoding the referrer as a space-joined match-reason prefix.**
+1. **Using API keys or API credits for Claude Code/Codex agent sessions.** OAuth only.
+2. **Restoring the independent client-side Reviews PDF renderer.** Word-only is
+   the current decision; a future PDF converts the canonical DOCX.
+3. **Retiring `DEVELOPMENT_LOG.md`.** It remains the milestone record, not a
+   per-session diary.
+4. **Adding heading or list controls to the simplified reviewer rich-text toolbar.**
+5. **Arming `respondReminderEnabled` before Phase B and cron hardening.**
+6. **Changing application code to mask the phantom co-PI source-data problem.**
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Respond-nudge modal trigger |
-| `shared/components/reviewers/RespondReminderModal.js` | Read-only preview, editing, explicit send, typed errors |
-| `pages/api/review-manager/send-review-reminder.js` | Manual reminder route and `kind` discriminator |
-| `lib/services/reviewer-manual-reminder.js` | Manual preflight and fresh lifecycle authorization |
-| `lib/services/reviewer-reminder-sweep.js` | Template rendering, atomic marker/token persistence, and send |
-| `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md` | Phase A production record and Phase B boundaries |
+| `shared/components/reviewers/RespondReminderModal.js` | Editable respond-nudge preview |
+| `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` | Word-only current export and future PDF design |
+| `docs/GRANTEE_ABSTRACT_RICH_TEXT_EDITOR_PLAN.md` | Rich-text persistence/editor contract and rollout status |
+| `shared/components/external/GranteeAbstractEditor.js` | Restricted Markdown-backed editor |
+| `shared/components/reviewers/ReviewersTab.js` | Referral dismissal and Reviews UI consumer |
+| `lib/services/workbench/decline-referrals-service.js` | Referral read/dismiss service contract |
+| `outputs/claude-code-multi-account-oauth-brief-2026-08-13.md` | Planned multi-account OAuth aliases |
+| `DEVELOPMENT_LOG.md` | Milestone-only project history |
 
 ## Testing
 
 ```bash
 npm test -- --runInBand
 npm run check:types
+npm run check:api-routes
+npm run check:api-routes:self-test
+npm run check:docs-catalog
 npm run build
 ```
