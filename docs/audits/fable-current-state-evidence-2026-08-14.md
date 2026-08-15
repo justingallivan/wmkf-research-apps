@@ -59,7 +59,44 @@ _Pending; Atlas (`docs/APPLICATION_STATE_ATLAS.md`, last_verified 2026-08-01) is
 
 ## Drift/conflict matrix
 
-_Pending._
+Scout 4 (tests/gates/operability) returned 2026-08-14; Fable-verified structural finding below.
+
+- `docs/CI_GATES_REFERENCE.md` is materially accurate on gate→CI mapping, with omissions: the
+  session-stop hook has three blocking behaviors independent of `CLAUDE_STOP_GATE_MODE`
+  (agent-invariant regression, unresolved doc-staleness, missing review receipts); `check:memory-router`
+  and `check:scaffolding-tokens` also run as PreToolUse(Write/Edit) blockers.
+- **[VERIFIED via grep test.yml + empty .git/hooks]** `check:status-enum-parity` and
+  `check:trust-boundary-guid` are absent from all GitHub workflows and there are no local git hooks —
+  they run only inside Claude Code sessions. Recorded as a security finding in the security-audit doc.
+- `docs/SECURITY_OPERATING_PLAN.md` (last substantive update 2026-05-05) is materially drifted: it
+  omits ~12 security controls shipped since (DAL LAW gate + enforcement flip, target/write interlock,
+  trust-boundary-guid, route-service/odata/context/route-lifecycle LAW gates, secret-scan + gitleaks/
+  trivy/semgrep workflows, branded-domain CSRF pinning, rate-limit alerting, private-blob migration,
+  A7 tagging, model-registry gates, send-time token minting, campaign release strategy). It still says
+  "hardening tranche complete" and its frontmatter summary is corrupted. Queue for `/sweep`.
+- Test posture: 591 unit / 31 integration / 4 e2e; Jest coverage thresholds commented out;
+  `collectCoverageFrom` excludes `lib/**` (where DAL/interlock/token/drain logic lives). All 4
+  Playwright specs route-mock at the browser. No integrated rehearsal path for any external-user
+  journey; sandbox lacks reviewer schema (404s) so non-prod reviewer rehearsal is campaign-gated.
+- False-confidence risks (Scout 4): e2e is path-filtered so `lib/services/**` changes ship without the
+  suite on the PR; Semgrep broad SAST is `|| true` advisory; Trivy has no `exit-code` (reporting, not
+  gate); gitleaks skips dependabot PRs; commit guards only bind inside Claude Code and fail open.
+
+## Unknowns (production-answerable — Phase 1 exit list)
+
+Questions source alone cannot settle, carried to the Phase 2 probe question list (all read-only,
+owner-executed for production Dataverse):
+
+1. Deployed production commit and per-environment app ownership (Vercel).
+2. Live values/presence of `DATAVERSE_TARGET_INTERLOCK`, `DATAVERSE_DAL_ENFORCEMENT`,
+   `UPLOADS_BLOB_RW_TOKEN`, `VERCEL_API_TOKEN` (presence only, never values).
+3. Whether the `*/2` drains have overlapping-invocation lease protection (read migrations
+   009/011/024/028 + drain claim logic — source-answerable, do first).
+4. Whether the 8 routes added since the docs baseline are all in the security matrix and covered by
+   `check:api-routes` (source-answerable).
+5. Recurring route/runtime errors and durations in production logs (aggregate only).
+6. Branch-protection required-checks on `main` (GitHub settings — owner/API).
+7. Whether alert-recipient config in `wmkf_appsystemsettings` is populated (Dataverse read).
 
 ## Unknowns
 
