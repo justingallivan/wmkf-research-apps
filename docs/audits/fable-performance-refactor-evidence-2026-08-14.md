@@ -54,10 +54,73 @@ _Per the master brief: ReviewersTab broad reloads, overlapping service hydration
 components, AwardeeTab mixed contracts, active-tab conditional mounting, missing per-dependency
 timing. Each pending source inspection._
 
-## Candidate scorecard
+## Phase 4 conclusion — the four-way split
 
-_Pending Phase 5._
+The brief requires separating external latency, application-generated network work, server
+computation, and client rendering. Current evidence:
 
-## Measurement gaps
+- **External (Dataverse/Blob/SharePoint) latency:** `[UNKNOWN measured]`. No per-dependency timing
+  exists anywhere in the staff path (Scout 3 (f), grep-verified negative across services, routes,
+  `dynamics-service.js`, `lib/dataverse/core/`). "Dataverse is slow" is unproven.
+- **Application-generated network work:** `[VERIFIED — source-proven, unmeasured cost]`. One
+  reviewer-tab action issues, with no DAL-level dedup: `akoya_requests` ×2, suggestion set ×3,
+  `wmkf_potentialreviewers` same ids ×5 queries. This is avoidable work whose *existence* is certain
+  and whose *cost* is unmeasured.
+- **Server computation:** `[UNKNOWN measured]`. The 5- and 6-stage sequential service waterfalls are
+  source-proven; their wall-clock is not.
+- **Client rendering:** `[UNKNOWN measured]`. 3,487-line ReviewerSearchSection with 44 useState is
+  source-proven size; render cost deliberately not asserted.
 
-_Pending._
+**The decisive fact for candidate selection: three of four legs are unmeasured, and the one measured
+leg (redundant application reads) is a code fact with no attached latency.** No caching or data-plane
+refactor can be justified on measured return today because there is no measurement. Per the brief's
+own guidance, this makes observability the mandatory first stage.
+
+Also resolved this phase (source-answerable, not requiring production):
+- **Drain-cron overlap protection: PRESENT** `[VERIFIED via lib/db/migrations/028...sql:21-22
+  (locked_until, lease_token) + reviewer-acceptance-drain.js:91-99 lease-lost handling]`. Not a risk.
+- **New routes in security matrix: all present** `[VERIFIED via grep API_ROUTE_SECURITY_MATRIX.md]`.
+
+## Phase 5 — candidate scorecard
+
+Weighted 1–5 (impact 25 / security-correctness 20 / duplication-removed 15 / reversibility 15 /
+verification-feasibility 10 / delivery-fit 10 / authority-simplicity 5).
+
+| Candidate | Impact | Sec/Corr | Dup | Rev | Verify | Delivery | Authority | Weighted | Note |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 1. Request Workbench Data Plane (full) | ?/5 | 3 | 5 | 3 | 2 | 3 | 2 | ~2.9 | Impact UNMEASURED — cannot score leg 1; verification weak w/o metrics; authority risk if it becomes a durable cache |
+| 2. Reviewer orchestration + uniform mutation/authz contract | 3 | 5 | 4 | 4 | 4 | 4 | 4 | ~4.0 | Absorbs T1/D4 authz gap + patchReviewers no-authoritative-response; deterministic to test |
+| 3. Workbench client-state/component decomposition | ?/5 | 2 | 3 | 3 | 2 | 3 | 4 | ~2.7 | Size≠cost unproven; premature before data contracts stabilize |
+| 4. Dataverse transport dedup/caching | ?/5 | 3 | 4 | 4 | 3 | 4 | 3 | ~3.4 | In-request read coalescing is safe + high-dup-removal; cross-request cache is authority risk |
+| 5. Background-job lifecycle/security consolidation | 2 | 4 | 3 | 4 | 4 | 3 | 4 | ~3.3 | Drains already leased; smaller marginal gain |
+| **6. Observability + targeted security/correctness repairs** | **4** | **5** | **3** | **5** | **5** | **5** | **5** | **~4.6** | Everything else depends on its measurement; unblocks scoring candidates 1/3/4 |
+
+## Architecture verdict
+
+**Selected: Candidate 6 (measure/repair first), sequenced ahead of a scoped slice of Candidate 4
+(in-request read coalescing) and the Candidate 2 authorization repairs.** The full Request Workbench
+Data Plane (Candidate 1) is **deferred, not rejected** — it cannot be scored on verified impact until
+observability produces the latency/call-count evidence, and its stronger sub-parts (in-request
+dedup, authoritative mutation responses, selective invalidation) are exactly Candidate 4 + Candidate
+2 done incrementally behind stable seams.
+
+Three strongest pieces of evidence:
+1. Zero per-dependency timing instrumentation exists (grep-verified negative) → no measured basis for
+   any caching/data-plane refactor; observability is the precondition, not an option.
+2. The redundant-read pattern is source-certain (5× `wmkf_potentialreviewers`, 3× suggestions, 2–3×
+   request per action, no DAL memoization) → in-request coalescing is a safe, high-duplication-removal
+   slice that needs no new authority.
+3. The broad post-mutation refreshes and 4s invite double-fetch are deliberate fixes for prior
+   correctness bugs (S213, S400/S401) → any invalidation redesign must preserve those invariants,
+   which argues for incremental slices behind seams over a Workbench rewrite.
+
+**Non-goals of the selected direction:** no durable client cache, no second Dataverse copy, no
+receipts-as-authority, no cross-user shared cache without a reviewed authorization-aware key, no
+big-bang Workbench rewrite. Security repairs (T1 merge authz, T2 cron token eligibility, D3/D4) are
+tracked as their own smallest-safe repairs, NOT folded into or deferred behind the refactor.
+
+## Measurement gaps (become Stage 1 acceptance criteria)
+
+Per-dependency `{entity, operation, ms}` timing under one correlation id per HTTP request; server
+route p50/p95; client render/commit count for one tab-entry + one mutation. Until these exist, every
+latency attribution stays `[UNKNOWN]`.
