@@ -37,6 +37,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   const { DynamicsService } = jest.requireMock('../../lib/services/dynamics-service');
   return {
     notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
+    // Mirror the real adapter fragment so the eligibility-clause assertions below
+    // test the actual OData the sweeps emit (T2 fix).
+    selectedAndNotRevokedFilter: () => 'wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)',
     queryAllSuggestions: (options) => DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', options),
     patchFields: (id, payload, opts = {}) => DynamicsService.updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
   };
@@ -128,22 +131,36 @@ beforeEach(() => {
 });
 
 describe('sweepRespondReminders', () => {
-  test('eligible candidate: claims the marker (If-Match) then sends', async () => {
+  test('respond query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepRespondReminders();
+    const options = queryAllRecords.mock.calls[0][1];
+    // The eligibility guard IS the query filter: a revoked/deselected row is never
+    // returned to the JS sweep, so re-minting can't reactivate its link.
+    expect(options.filter).toContain('wmkf_selected eq true');
+    expect(options.filter).toContain('wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null');
+    // Null-safe form only: a bare `ne true` would drop every never-revoked (null) row.
+    expect(options.filter).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
+  });
+
+  test('eligible candidate: claims the marker + token in one ETag-guarded PATCH, then sends', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
     const r = await sweepRespondReminders();
     expect(r.sent).toBe(1);
-    // Claim happens with the row etag, setting the respond marker.
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions', SUG,
-      expect.objectContaining({ wmkf_respondremindersentat: expect.any(String) }),
-      expect.objectContaining({ ifMatch: 'W/"100"' }),
-    );
+    // Marker + token land in the single mintAndStore PATCH, bound to the query row's
+    // ETag (atomic-write fix): a concurrent revoke/deselect 412s the whole write.
     expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUG,
+      ifMatch: 'W/"100"',
+      writeFields: expect.objectContaining({ wmkf_respondremindersentat: expect.any(String) }),
+    }));
+    // No separate marker PATCH any more — the claim rides in the mint.
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    // Claim-before-send ordering: the marker write must precede mint + send, so a crash
-    // mid-op can never send without first claiming (Codex finding #4).
-    expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(mintAndStore.mock.invocationCallOrder[0]);
+    // Claim-before-send ordering: the atomic marker+token write must precede the send,
+    // so a crash mid-op can never send without first claiming.
     expect(mintAndStore.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
     // Sent from the PD; respond reminder is the "accept or decline" subject.
     const email = createAndSendEmail.mock.calls[0][0];
@@ -234,7 +251,8 @@ describe('sweepRespondReminders', () => {
     createAndSendEmail.mockRejectedValue(new Error('SMTP down')); // every send fails
     const r = await sweepRespondReminders({ maxBatch: 2 });
     // Only 2 rows may be claimed despite all sends failing — the rest are deferred.
-    expect(updateRecord).toHaveBeenCalledTimes(2);
+    // The claim now rides in the atomic mintAndStore PATCH, so it bounds the claims.
+    expect(mintAndStore).toHaveBeenCalledTimes(2);
     expect(r.sendFailed).toBe(2);
     expect(r.sent).toBe(0);
     expect(r.skipped).toBe(3);
@@ -301,22 +319,27 @@ describe('sweepRespondReminders', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('claim loses the If-Match race → claimFailed, no send', async () => {
+  test('concurrent revoke/deselect (412 on the atomic marker+token PATCH) → claimFailed, no send, no reactivation', async () => {
+    // Regression for the Codex P1 race: a staff revoke or deselect that lands after
+    // the sweep query but before the write must 412 the atomic mint (which would
+    // otherwise clear wmkf_externaltokenrevoked back to false). Verifies no email is
+    // sent and no marker is stamped.
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
-    updateRecord.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+    mintAndStore.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
     const r = await sweepRespondReminders();
     expect(r.claimFailed).toBe(1);
     expect(r.sent).toBe(0);
     expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
   });
 
-  test('send fails after a successful claim → at-most-once (sendFailed, marker stays)', async () => {
+  test('send fails after a successful atomic claim → at-most-once (sendFailed, marker stays)', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
     createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
     const r = await sweepRespondReminders();
-    expect(updateRecord).toHaveBeenCalledTimes(1); // claim landed
+    expect(mintAndStore).toHaveBeenCalledTimes(1); // atomic marker+token PATCH landed
     expect(r.sendFailed).toBe(1);
     expect(r.sent).toBe(0);
   });
@@ -343,16 +366,17 @@ describe('sweepReviewDueReminders', () => {
     };
   }
 
-  test('eligible: claims wmkf_remindersentat (+count) then sends the review-due reminder', async () => {
+  test('eligible: claims wmkf_remindersentat (+count) + token in one ETag-guarded PATCH, then sends', async () => {
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
     installReads({ request: reviewDueRequest() });
     const r = await sweepReviewDueReminders();
     expect(r.sent).toBe(1);
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions', SUG,
-      expect.objectContaining({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: 1 }),
-      expect.objectContaining({ ifMatch: 'W/"200"' }),
-    );
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
+      suggestionId: SUG,
+      ifMatch: 'W/"200"',
+      writeFields: expect.objectContaining({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: 1 }),
+    }));
+    expect(updateRecord).not.toHaveBeenCalled();
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.subject).toBe(REVIEW_DUE_SUBJECT);
     expect(email.body).toContain('Dear Dr. Reviewer,');
@@ -410,6 +434,18 @@ describe('sweepReviewDueReminders', () => {
     expect(options.filter).toContain('wmkf_reviewstatus eq 100000002');
     expect(options.filter).not.toContain('100000005');
     expect(options.filter).not.toContain('100000006');
+  });
+
+  test('review-due query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepReviewDueReminders();
+    const options = queryAllRecords.mock.calls[0][1];
+    // The eligibility guard IS the query filter: a revoked/deselected row is never
+    // returned to the JS sweep, so re-minting can't reactivate its link.
+    expect(options.filter).toContain('wmkf_selected eq true');
+    expect(options.filter).toContain('wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null');
+    // Null-safe form only: a bare `ne true` would drop every never-revoked (null) row.
+    expect(options.filter).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
   });
 
   test('default read is applied to review-due reminder subject and body', async () => {

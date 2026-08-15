@@ -107,8 +107,9 @@ Two enumeration rules that make this correct (verified):
   "loser's suggestions" query must NOT filter on `selected eq true`, or it misses
   removed rows that still occupy the (person,request) key and may still carry a
   honorarium link (`softDelete` clears `selected/accepted/declined/responsetype/
-  reviewstatus/heldat` only — `reviewer-suggestion.js:971-980` — it does NOT null
-  the FKs or clear reviewfile/honorarium). (O2)
+  reviewstatus/heldat` only — `reviewer-suggestion.js:1988` `softDelete` — it does
+  NOT null the FKs or clear reviewfile/honorarium). (O2)
+  <!-- [RECHECKED after lib/dataverse/adapters/reviewer-suggestion.js change: reviewer-suggestion.js:1988 — softDelete field-clearing claim still accurate; corrected the stale :971-980 pointer to softDelete's current line. The T2 change added selectedAndNotRevokedFilter() only (additive) and does not affect merge behavior.] -->
 - The predicate is evaluated at **execute time from live source**, not trusted from
   the plan response. The point-in-time probe is then irrelevant to safety: even if
   the population shifts, an engaged loser is blocked at the moment of merge. The
