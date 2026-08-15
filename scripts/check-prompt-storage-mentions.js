@@ -65,8 +65,8 @@ const EXCLUDE_DIR = /(^|\/)(archive|node_modules)(\/|$)/;
 // Narrow whole-file allowlist (script-side). For prompt-storage these are
 // historical-record docs explicitly documenting the rename.
 const ALLOWLIST_FILES = new Set([
-  // DEVELOPMENT_LOG.md is a session-by-session history; mentions of
-  // wmkf_prompt_template are correct historical records of past sessions.
+  // DEVELOPMENT_LOG.md combines current milestone history with a preserved
+  // chronological archive; its wmkf_prompt_template mentions are historical.
   'DEVELOPMENT_LOG.md',
 ]);
 

@@ -6,7 +6,7 @@ For current project documentation see [CLAUDE.md](./CLAUDE.md). For the most rec
 
 **Format reminder for future sessions:** Add an entry only at a real milestone. Tight: ~8 lines, with **Milestone**, **Sessions**, **Ship state**, **Why it matters**, **Pointers**. Skipping is the right answer most weeks.
 
-The pre-Session 84 chronological per-session log (everything after the September 2025 divider further down) is preserved in its original form — older format, kept for archaeology, not maintained going forward.
+The chronological archive after the `Legacy chronological session log` divider contains the original log through Session 84 plus three later append-at-tail entries (Sessions 137, 139, and 149). It is not a complete record of Sessions 85–149; the older format is preserved for archaeology and is not maintained going forward.
 
 ---
 
@@ -1898,9 +1898,9 @@ Built a natural-language chatbot for querying the Keck Foundation's Microsoft Dy
 
 ---
 
-# Legacy chronological session log (pre-2026-03-12, deprecated format)
+# Legacy chronological session log (deprecated format)
 
-Everything below is the original session-by-session log from before the milestone-log format was adopted. It's preserved verbatim for archaeology. **Do not add new entries below this point** — milestones go above.
+Everything below is the former chronological session archive: the original log through Session 84, followed by three later append-at-tail entries (Sessions 137, 139, and 149). It is not a complete record of Sessions 85–149. The entries are preserved for archaeology. **Do not add new entries below this point** — milestones go above.
 
 ---
 
