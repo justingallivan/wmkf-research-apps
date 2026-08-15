@@ -49,9 +49,26 @@ Scout 1 (change/system inventory) returned 2026-08-14; Fable sampled/verified th
   `*/2`–`*/5` drain crons (unattended LLM + Dataverse + email); app-access authorization data
   mid-migration.
 
-## Production probe ledger results
+## Production probe ledger — owner hand-off (Phase 2)
 
-_Pending Phase 2; approvals tracked in the task ledger._
+Standing rule `feedback-never-self-authorize-prod-dataverse-reads` applies: Fable does NOT run these
+against production. Each is read-only and inspected; **Justin runs them** (or approves + hands the
+signed-in run). The architecture verdict does NOT depend on these — they confirm current-state facts
+and answer the residual unknowns, they do not change the plan.
+
+| # | Question | Command / method | Read-only proof | Who runs |
+|---|---|---|---|---|
+| 1 | Live Dataverse schema/counts vs Atlas; target classification | `node scripts/audit-dataverse-state.js` | `[VERIFIED — only POST is the OAuth token request (`:31-33`); all entity access is GET/query; Atlas documents it read-only]` | Justin |
+| 2 | Applied migrations + live table/queue distributions | `node scripts/audit-postgres-state.js` | `[VERIFIED — no INSERT/UPDATE/DELETE; 9 read/SELECT sites, 0 write-shaped ops]` | Justin |
+| 3 | Deployed production commit + per-env app ownership | Vercel dashboard / `vercel inspect` | read-only dashboard | Justin |
+| 4 | Presence (not values) of `DATAVERSE_TARGET_INTERLOCK`, `DATAVERSE_DAL_ENFORCEMENT`, `UPLOADS_BLOB_RW_TOKEN`, `VERCEL_API_TOKEN` | Vercel env UI (presence only) | read-only; never print values | Justin |
+| 5 | Recurring route/runtime errors + durations in prod | Vercel logs (aggregate) | read-only | Justin |
+| 6 | Branch-protection required checks on `main` (does the e2e path-filter leave a permanently-pending required check?) | GitHub repo settings / API | read-only | Justin |
+| 7 | Is alert-recipient config in `wmkf_appsystemsettings` populated? | included in probe #1 output or a scoped `$select` | read | Justin |
+
+Resolved from source (no probe needed): drain lease protection PRESENT; 8 new routes all in the
+security matrix; multi-llm egress via safeFetch; migration runner has no checksum; DAL context has no
+memoization.
 
 ## Data ownership matrix deltas
 
