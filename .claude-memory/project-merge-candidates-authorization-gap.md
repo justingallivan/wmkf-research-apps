@@ -83,4 +83,5 @@ the absence of any ownership model means there is no tighter boundary to adopt.
 - Recall rule now: read this to confirm the merge posture is **accepted by-design**
   (not a pending gap) before treating org-open merge auth as a finding.
 
-Related: [[project-reviewer-card-simplification-direction]].
+Related: [[project-reviewer-org-open-access-by-design]] (the general owner
+principle this merge decision is one instance of); [[project-reviewer-card-simplification-direction]].

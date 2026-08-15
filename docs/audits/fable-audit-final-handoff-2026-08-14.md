@@ -34,9 +34,10 @@ follow-up. Plan: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`.
 - **Enforcement gap — `check:trust-boundary-guid` and `check:status-enum-parity` have no CI backstop**
   (Claude-Code commit-hook only; bypassed by any other tool). Worth a CI-wiring fix independent of the
   refactor.
-- Lower: D2 (cron non-constant-time compare), D3 (bare `requireAuth` skips `is_active`), D4 (app-level
-  guard on record-scoped review-file download — **[NEEDS OWNER]** intent), untracked secret-rotation
-  surface, Security Operating Plan materially drifted (queue for `/sweep`).
+- Lower: D2 (cron non-constant-time compare), D3 (bare `requireAuth` skips `is_active`), untracked
+  secret-rotation surface, Security Operating Plan materially drifted (queue for `/sweep`).
+- **D4 (staff-wide cross-request document read) — RESOLVED (owner, 2026-08-15): accept as by-design**,
+  same rationale as T1 (no Dataverse request/data ownership to scope against). No repair.
 
 ## 3. Production truth
 

@@ -99,13 +99,13 @@ Severity is preliminary; final P0/P1 ranking and repair scoping happen in Phase 
   (returns after session, no is_active) vs `:205-214`/`:296-312` where the check lives]`. Routes on bare
   `requireAuth`: `blob-proxy.js`, `upload-handler.js`, `api-capabilities.js`, `health.js`. A disabled
   staff account keeps shared-blob write + allowlisted-blob read until session expiry. Medium.
-- **D4 — app-level guard on request-scoped document reads.** `[VERIFIED via review-manager/download-review.js:37-48]`
-  (app grant + client `suggestionId`, GUID-validated, **no per-record membership check**) and the two
-  sibling download routes. Folder-confinement proves *folder ∈ requestId*, not *caller may see requestId*.
-  `download-review.js` returns another reviewer's submitted review file — the most confidentiality-
-  sensitive item — with no per-record scope. **[NEEDS OWNER]**: is staff-wide cross-request read the
-  accepted model (blob-proxy.js:11 documents it as intended for staff) or a gap for review files
-  specifically? Mirrors the T1 pattern: app grant used as the trust boundary for a record-scoped op.
+- **D4 — app-level guard on request-scoped document reads. RESOLVED (owner, 2026-08-15): accept
+  as by-design.** `[VERIFIED via review-manager/download-review.js:37-48]` (app grant + client
+  `suggestionId`, GUID-validated, no per-record membership check) and the two sibling download routes.
+  Staff-wide cross-request document read (including another reviewer's submitted review file) is the
+  accepted model — same rationale as T1: no technical ownership of requests or data exists in Dataverse
+  to scope against, so app-level access is the correct boundary. No repair; closed as accepted risk.
+  App-access remains the real gate (`blob-proxy.js:11` already documents staff-wide read as intended).
 - **D5 — internal `error.message` returned to callers** on `cron/maintenance.js:279`,
   `cron/sweep-stale-invites.js:59`, `admin/reconcile-identities.js:41`. Callers authenticated; low, but
   diverges from the disciplined generic-reason convention on external routes.
