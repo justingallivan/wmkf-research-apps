@@ -14,7 +14,7 @@ still-open Fable findings, on branch `codex/claude-security-followup-audit` off
 `origin/main` @ `307a68c8`. No runtime code changed. All 57 `check:*` gates were green
 on the tree before this audit began.
 
-**Revision (same day):** corrected across three rounds of Codex adversarial review.
+**Revision (same day):** corrected across four rounds of Codex adversarial review.
 Material corrections: §1 disabled-account exposure is **unbounded for an active user**, not
 8h, and now covers **three** distinct revocation gaps — (i) stale-token claims surviving a
 zero-row `is_active` lookup, (ii) a **fresh Azure sign-in for an already-disabled
@@ -22,7 +22,13 @@ zero-row `is_active` lookup, (ii) a **fresh Azure sign-in for an already-disable
 re-establishing a durable active identity through **both** its `createNew` **and** its
 existing-profile (`profileId`) branches (round 3) — plus the **both-layers-required**
 remediation (JWT-clear alone does not block the current bare-auth request) and the
-missing-profile-row fail-open in the two heavier helpers; §2 separates the reachable
+missing-profile-row fail-open in the two heavier helpers. Round 4 resolved the regression
+contract (there is no legitimate "profile-less staff" session — `profileId` and
+`needsLinking` come from the *same* active-row lookup, so an active linking session already
+carries a `profileId`), clarified that `signIn` fails closed by **denying sign-in** rather
+than emitting a 503, and corrected the cron-verifier topology (18 routes use the shared
+`verifyCronSecret`; `drain-submissions` uses a route-local `verifyDrainCronSecret`, both on
+`!==` — so §7's fix must cover both verifiers). §2 separates the reachable
 (`link-profile`) from the latent (`/api/intake/*`, blocked by a `proxy.js` routing
 mismatch) direct-session routes; §2's fail-open branches are **already unit-tested
 behavior**; §4's verdict wording is de-contradicted (send-invite idempotency gap CONFIRMED,
@@ -46,7 +52,7 @@ accepted owner decisions (2026-08-15) and were **not** reopened.
 
 | # | Finding | Verdict | Severity | Remediation warranted? |
 |---|---------|---------|----------|------------------------|
-| 1 | Disabled-account access via bare `requireAuth` (blob/upload/health/api-capabilities) + `link-profile` profile creation | **CONFIRMED — duration unbounded for an active session; revocation not enforced at route, session, or edge layer** | Medium | Yes — Tier 2 revocation-hardening scope |
+| 1 | Disabled-account access: fresh disabled-`azure_id` sign-in + bare `requireAuth` routes (blob/upload/health/api-capabilities) + both `link-profile` branches (createNew and existing-profile claim) | **CONFIRMED — duration unbounded for an active session; revocation not enforced at sign-in, session, edge, or bare-auth route layer** | Medium | Yes — Tier 2 revocation-hardening scope |
 | 2 | `validateOrigin` fail-open when `NEXTAUTH_URL` absent/invalid; CSRF boundary vs docs | **CONFIRMED (fail-open, unit-tested behavior) / PARTIAL (doc drift; intake gap latent behind a proxy routing mismatch)** | Low (latent Medium at intake launch) | Optional hardening + doc fix; intake launch precondition |
 | 3 | Grantee `send-invite` client-controlled recipient/subject/body → email-send primitive | **PARTIAL (owner-decided primitive, one residual)** | Low–Medium | No code change; note residual |
 | 4 | Route idempotency: `send-invite` / `replace-submission` | **CONFIRMED for `send-invite` (no idempotency; duplicate mint+send; all minted tokens stay valid) / REFUTED for `replace-submission`** | Low | No change |
@@ -222,8 +228,13 @@ reprovisioning is in scope (if so, add the tombstone).
 - **Fresh sign-in:** an Azure sign-in for an existing **disabled** `azure_id` is rejected
   (no live session that reaches bare-auth routes) and performs **no** default-grant,
   notification, Dynamics-reconcile, or profile-provisioning side effect.
-- `requireAuth` returns 403 for a session whose profile row has `is_active = false` (and
-  still passes for profile-less `needsLinking` sessions).
+- `requireAuth` returns 403 for a session whose staff profile lookup finds no **active**
+  row (`is_active = false` or missing). There is no "profile-less staff" exception to
+  preserve: the jwt callback derives `profileId` **and** `needsLinking` from the *same*
+  `is_active = true` lookup `[VERIFIED via [...nextauth].js:250-264]`, so a legitimate
+  active linking session is backed by its **active temporary profile** and therefore
+  already carries a `profileId` — it is covered by the non-regression case below, not by a
+  zero-row bypass.
 - `requireAuthWithProfile` and `requireAppAccess` fail **closed** on a zero-row lookup for a
   token that carried a `profileId` (deleted/missing profile).
 - jwt callback: **any** staff token (with or without a prior `profileId`) whose
@@ -235,9 +246,11 @@ reprovisioning is in scope (if so, add the tombstone).
   respond 403.
 - Idle/rolling: a disabled account remains blocked even when requests arrive inside the 2h
   idle window (guards against reintroducing the rolling-session bypass).
-- Non-regression: active `needsLinking` sessions, applicant sessions, and the
-  `AUTH_REQUIRED=false` dev bypass all remain functional; a DB lookup **failure** (not a
-  zero-row result) still fails closed (503), not open.
+- Non-regression: a **legitimate active linking session** (its temporary profile is
+  `is_active = true, needs_linking = true`, so the token carries `profileId` +
+  `needsLinking`) continues to work through `link-profile`; applicant sessions and the
+  `AUTH_REQUIRED=false` dev bypass remain functional; a DB lookup **failure** (not a
+  zero-row result) still fails closed (a route/helper returns 503), not open.
 
 **Residual risk after fix.** One PG read per bare-auth request (low-QPS routes); the
 hard-deletion reprovisioning case remains open unless a tombstone/denylist is adopted (owner
@@ -513,7 +526,9 @@ EXCLUDING (i) `ServiceHttpError` default bodies (`err.body ?? { error: err.messa
   `log-analysis:177`, `maintenance:279`, `pricing-canary:67`, `pricing-refresh:114`,
   `reconcile-identities:53`, `refresh-irs-bmf:85`, `reviewer-email-reconcile:62`,
   `reviewer-reminders:63`, `secret-check:128`, `send-review-thankyous:65`,
-  `spend-check:58`, `sweep-stale-invites:59` — all `verifyCronSecret`.
+  `spend-check:58`, `sweep-stale-invites:59` — **16 guarded by the shared `verifyCronSecret`;
+  `drain-submissions:130` uses its route-local `verifyDrainCronSecret`**
+  (`[VERIFIED via drain-submissions.js:69-85]` — deliberately strict, no dev bypass).
 - **Ordinary staff app-auth (3):** `reviewer-finder/contact-history.js:49`,
   `reviewer-finder/prompt-override.js:56`, and **`phase-i-dynamics/summarize-v2.js:82`**
   (`return res.status(500).json({ error: `Failed to load file: ${err.message}` })`,
@@ -567,12 +582,15 @@ gains a log.
 
 ## 7. Non-constant-time cron-secret compare — CONFIRMED (Low)
 
-**Trace.** `lib/utils/cron-auth.js:36` compares with `authHeader !== \`Bearer ${secret}\``
-— a short-circuiting string compare, not constant-time `[VERIFIED]`. Two sibling verifiers
-use `crypto.timingSafeEqual`: `lib/bill/internal-call-auth.js:99-108` and
-`pages/api/irs/verify-ein.js:51,58` `[VERIFIED]`. This is a **convention violation** on
-the guard for **19** cron routes (`grep verifyCronSecret` over `pages/api` → 19 files
-`[VERIFIED]`), including maintenance/bulk-delete crons.
+**Trace.** The 19 cron routes authenticate through **two** verifier implementations, both
+using a short-circuiting `!==` string compare (not constant-time):
+`lib/utils/cron-auth.js:36` (the shared `verifyCronSecret`, used by **18** routes) and
+`pages/api/cron/drain-submissions.js:77` (the route-local `verifyDrainCronSecret`, used by
+`drain-submissions` alone — deliberately strict with **no** `NODE_ENV=development` bypass,
+unlike the shared verifier's dev bypass at `cron-auth.js:24`) `[VERIFIED via both files]`.
+Two sibling verifiers elsewhere use `crypto.timingSafeEqual`:
+`lib/bill/internal-call-auth.js:99-108` and `pages/api/irs/verify-ein.js:51,58`
+`[VERIFIED]`. So the non-constant-time convention violation spans **both** cron verifiers.
 
 **Practical threat.** Very low over HTTP: remote timing side-channels against a
 per-request string compare are swamped by network/TLS/serverless variance, and
@@ -585,9 +603,13 @@ conventions justify the small fix.
 **What gates prove / don't.** No gate checks comparison style; `check:api-routes`
 recognizes `verifyCronSecret` regardless of its internals.
 
-**Smallest remediation (optional).** Replace the `!==` with the pad-to-longest
-`timingSafeEqual` pattern already written in `internal-call-auth.js:99-108`. ~6 lines,
-one file, covers all 19 routes.
+**Smallest remediation (optional).** Extract a shared constant-time comparison primitive
+(the pad-to-longest `timingSafeEqual` pattern already written in
+`internal-call-auth.js:99-108`) and route **both** cron verifiers through it — a fix to
+`cron-auth.js:36` alone covers only the 18 shared-verifier routes and leaves
+`drain-submissions`'s `verifyDrainCronSecret:77` on `!==`. The shared primitive must
+**preserve `drain-submissions`'s strict no-`development`-bypass behavior** (it intentionally
+omits the `cron-auth.js:24` dev bypass); change only the comparison, not the bypass policy.
 
 **Residual risk.** None.
 
@@ -676,16 +698,21 @@ delimiter. Zero security impact; do not prioritize.
    ordering in the persistence design.
 2. **Authorize behavioral invariants, not a prematurely fixed implementation.** The
    worktree must satisfy, and add regression tests for:
-   - a fresh Azure sign-in for a disabled `azure_id` is refused and fires **no**
-     default-grant / notification / reconcile / provisioning side effect;
+   - a fresh Azure sign-in for a disabled `azure_id` is refused **in the `signIn` callback
+     (deny authentication) before any** default-grant / notification / reconcile /
+     provisioning side effect runs — `signIn` returns `false`, it does not emit an
+     API-route 503;
    - a disabled **or missing** staff profile blocks the **current** request;
    - **any** staff token whose active lookup returns zero rows (with or without a prior
      `profileId`) is invalidated for **subsequent** requests;
    - all four bare-auth routes **and both** `link-profile` branches (`createNew` and
      existing-profile claim) are covered;
-   - active linking sessions, applicant sessions, and the `AUTH_REQUIRED=false` dev bypass
-     remain functional;
-   - a DB lookup **failure** (not a zero-row result) still **fails closed** (503).
+   - a legitimate active linking session (active temp profile → token carries `profileId` +
+     `needsLinking`), applicant sessions, and the `AUTH_REQUIRED=false` dev bypass remain
+     functional;
+   - a **route/helper database verification failure** (not a zero-row result) still **fails
+     closed** — the route/helper returns 503 (this applies to `requireAuth*`/`requireAppAccess`
+     DB errors, not to the `signIn` callback, which fails closed by denying sign-in).
 3. **Disablement vs hard deletion — record the decision.** Disablement (`is_active = false`)
    is the durable-revocation mechanism the invariants above enforce. A **hard delete**
    removes the row, so a fresh sign-in legitimately re-provisions; if hard-delete
@@ -733,7 +760,7 @@ delimiter. Zero security impact; do not prioritize.
 
 ---
 
-*Prepared read-only; revised same-day across three Codex adversarial-review rounds. No
+*Prepared read-only; revised same-day across four Codex adversarial-review rounds. No
 runtime code, tests, `SESSION_PROMPT.md`, or plan/observability surfaces were modified.
 Branch `codex/claude-security-followup-audit`. Do not merge; Codex performs the final
 bounded read-only verification.*
