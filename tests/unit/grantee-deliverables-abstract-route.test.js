@@ -325,6 +325,39 @@ test('CONCURRENCY: a 412 from the conditional write → 409 stale', async () => 
   expect(res.body.code).toBe('stale');
 });
 
+test('AMBIGUOUS WRITE: a timed-out PATCH that committed is reconciled to 200', async () => {
+  const savedText = 'the slow Dataverse write committed this edited abstract';
+  DynamicsService.getRecord
+    .mockResolvedValueOnce(row())
+    .mockResolvedValueOnce(row({ wmkf_abstractformatted: savedText, _etag: 'W/"2"' }));
+  DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('This operation was aborted'), {
+    noResponse: true,
+    isTransient: true,
+  }));
+  const res = mockRes();
+
+  await handler(putReq({ requestId: GUID, text: savedText, etag: 'W/"1"', baseField: 'formatted' }), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toMatchObject({ ok: true, field: 'formatted', etag: 'W/"2"' });
+});
+
+test('AMBIGUOUS WRITE: an unconfirmed PATCH remains a typed 503', async () => {
+  DynamicsService.getRecord
+    .mockResolvedValueOnce(row())
+    .mockRejectedValueOnce(new Error('reconciliation read timed out'));
+  DynamicsService.updateRecord.mockRejectedValue(Object.assign(new Error('This operation was aborted'), {
+    noResponse: true,
+    isTransient: true,
+  }));
+  const res = mockRes();
+
+  await handler(putReq({ requestId: GUID, text: 'an attempted edit', etag: 'W/"1"', baseField: 'formatted' }), res);
+
+  expect(res.statusCode).toBe(503);
+  expect(res.body.code).toBe('save_unconfirmed');
+});
+
 test('PUT request not found → 404', async () => {
   DynamicsService.getRecord.mockRejectedValue(new Error('gone'));
   const res = mockRes();
