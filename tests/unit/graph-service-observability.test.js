@@ -55,6 +55,9 @@ let originalCredentials;
 let logSpy;
 
 beforeEach(() => {
+  // Factory-created mock: restoreAllMocks() doesn't touch it, so clear any
+  // unconsumed mockImplementationOnce to prevent cross-test leakage.
+  mockedEmitDependencyEvent.mockClear();
   originalCredentials = {
     DYNAMICS_TENANT_ID: process.env.DYNAMICS_TENANT_ID,
     DYNAMICS_CLIENT_ID: process.env.DYNAMICS_CLIENT_ID,

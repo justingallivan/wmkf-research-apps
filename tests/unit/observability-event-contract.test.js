@@ -210,6 +210,20 @@ describe('classifyOutcome', () => {
     err.name = 'AbortError';
     expect(classifyOutcome({ error: err })).toEqual({ outcome: 'network_error' });
   });
+
+  // Real Node fetch shape: rejections are TypeError('fetch failed') with the
+  // undici error (carrying the code) on .cause — the code is NOT top-level.
+  test('real fetch shape: TypeError with cause code UND_ERR_HEADERS_TIMEOUT -> timeout', () => {
+    const err = new TypeError('fetch failed');
+    err.cause = Object.assign(new Error('headers timeout'), { code: 'UND_ERR_HEADERS_TIMEOUT' });
+    expect(classifyOutcome({ error: err })).toEqual({ outcome: 'timeout' });
+  });
+
+  test('real fetch shape: TypeError with cause code ECONNREFUSED -> network_error', () => {
+    const err = new TypeError('fetch failed');
+    err.cause = Object.assign(new Error('refused'), { code: 'ECONNREFUSED' });
+    expect(classifyOutcome({ error: err })).toEqual({ outcome: 'network_error' });
+  });
 });
 
 describe('emitDependencyEvent — envelope shape', () => {

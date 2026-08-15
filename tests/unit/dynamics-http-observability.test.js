@@ -53,6 +53,9 @@ let savedEnv;
 let logSpy;
 
 beforeEach(() => {
+  // Factory-created mock: restoreAllMocks() doesn't touch it, so clear any
+  // unconsumed mockImplementationOnce to prevent cross-test leakage.
+  mockedEmitDependencyEvent.mockClear();
   savedEnv = {};
   for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
   delete process.env.VERCEL_ENV;

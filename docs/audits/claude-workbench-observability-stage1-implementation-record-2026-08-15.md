@@ -149,6 +149,32 @@ degradation, not bundler invisibility — Turbopack statically resolves them.
 
 ## Post-remediation verification
 
-- Six observability suites after remediation: 128/128 pass; `decline-referrals-endpoint`: pass;
-  lint: 0 errors (65 pre-existing warnings in unrelated files).
-- Delta re-review and final gate results recorded in the closeout section below.
+- Six observability suites after remediation: **122/122** pass (108 baseline + 14 added by the
+  remediation delta; an earlier "128/128" figure was inflated by a transient reviewer probe file
+  present in the shared worktree during that run — corrected per delta findings A-NEW-2/B-N-1);
+  `decline-referrals-endpoint`: pass; lint: 0 errors (65 pre-existing warnings in unrelated
+  files).
+- Post-remediation gates on `bd986b68`: `check:dataverse-access-layer` + self-test,
+  `check:types`, `check:api-routes` + self-test, `git diff --check`, and `npm run build` — all
+  PASS. Doc gates over the edited docs (`check:doc-currency` + self-test,
+  `check:fact-consistency` + self-test, `check:build-claim-freshness`): PASS.
+
+## Opus delta re-review (2026-08-15, over `bd986b68`)
+
+Reviewer B: all eight findings RESOLVED (B-4's original suggestion withdrawn as empirically
+false — jest records spy args before the mock implementation throws; the call-count-parity
+replacement accepted as stronger). Reviewer A: A-3/A-4/A-5 RESOLVED; A-1 and A-2 PARTIAL with
+new findings. New findings and dispositions (fixed in the follow-up commit):
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| A-NEW-1 | LOW–MED | `client.js` `loadEnvLocal` comment still claimed variable-path require "defeats Turbopack's static tracer" — falsified by the same compiled-output probe (fs/path statically resolved) and contradicting the corrected comment below it. | FIXED: comment rewritten to the reachability framing. |
+| A-NEW-2 / B-N-1 | MED (doc) | Record claimed 128/128; committed tree yields 122/122 (both reviewers reproduced). | FIXED above with derivation. |
+| A-NEW-3 | MEDIUM | Node fetch rejects as `TypeError('fetch failed')` with the undici code on `.cause`, not top-level — so the A-2 raw-code timeout check never fired on real `client.js` fetch errors (probed). | FIXED: `classifyOutcome` reads `error.code ?? error.cause?.code` in the raw-error branch only; structured errors still never reach it (buildNoResponseError always sets causeKind), so the plan's structured mapping (`'unknown'` ⇒ `network_error`) is intact. Real-shape fixtures added (TypeError+cause timeout ⇒ timeout; TypeError+cause ECONNREFUSED ⇒ network_error). Residual: a cause-wrapped undici timeout surfacing through `dynamics/http.js` is structured `causeKind:'unknown'` ⇒ `network_error` by the plan's own mapping while the same wire failure through raw `client.js` now reads `timeout` — a plan-contract consequence, recorded, not silently "fixed". |
+| A-NEW-4 | INFO | `NaN`/`Infinity` `ms` normalizes to 0 — converts "unmeasurable" to "instant"; unreachable from the seams (`Date.now()` diffs are finite). | RECORDED as a disclosed design choice of the B-2 clamp. |
+| B-N-2a | LOW | Factory-created `emitDependencyEvent` mock never cleared between tests (restoreAllMocks doesn't touch it) — latent order-dependency. | FIXED: `mockClear()` added to both seam suites' `beforeEach`. |
+| B-N-3 | LOW | Catalog phrasing implied laziness satisfies the browser contract. | FIXED: reworded to "guarded lazy require that keeps the load off that module's import-time path". |
+
+Reviewer B also independently verified the applied SECURITY_OPERATING_PLAN /
+SERVICE_AND_UTILITY_CATALOG text as accurate, and confirmed the A-3/B-6 fidelity notes match
+both reviewers' probes.

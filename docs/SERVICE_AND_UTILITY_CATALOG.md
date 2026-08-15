@@ -289,8 +289,8 @@ If you're touching a service or utility, read its header before this catalog. If
   this module** (verified by static-bundle scan, 2026-08-15), not on the require pattern.
   Extending the Dataverse entity-set allowlist is a reviewed commit, not an env or ad-hoc
   edit. Wired at `lib/services/dynamics/http.js`, `lib/services/graph-service.js`, and
-  `lib/dataverse/client.js` (lazily, per that file's browser-import contract). Source
-  header is the contract.
+  `lib/dataverse/client.js` (via a guarded lazy require that keeps the load off that
+  module's import-time path). Source header is the contract.
 
 ---
 
