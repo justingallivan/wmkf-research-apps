@@ -94,13 +94,20 @@ describe('sanitizeReviewHtml — XSS bypass vectors are stripped', () => {
 
 describe('sanitizeReviewHtml — legitimate formatting survives', () => {
   test('standard formatting tags are preserved', () => {
-    const html = '<p><strong>bold</strong> <em>it</em></p><ul><li>a</li></ul><h2>H</h2><blockquote>q</blockquote>';
+    const html = '<p><strong>bold</strong> <em>it</em> H<sub>2</sub> x<sup>2</sup></p><ul><li>a</li></ul><h2>H</h2><blockquote>q</blockquote>';
     const out = sanitizeReviewHtml(html);
     expect(out).toContain('<strong>bold</strong>');
     expect(out).toContain('<em>it</em>');
+    expect(out).toContain('H<sub>2</sub>');
+    expect(out).toContain('x<sup>2</sup>');
     expect(out).toContain('<ul><li>a</li></ul>');
     expect(out).toContain('<h2>H</h2>');
     expect(out).toContain('<blockquote>q</blockquote>');
+  });
+
+  test('subscript and superscript attributes are stripped while their text and tags survive', () => {
+    const out = sanitizeReviewHtml('<p>H<sub style="color:red" onclick="x()">2</sub> x<sup class="bad">2</sup></p>');
+    expect(out).toBe('<p>H<sub>2</sub> x<sup>2</sup></p>');
   });
 
   test('https link is kept and forced to safe rel/target', () => {

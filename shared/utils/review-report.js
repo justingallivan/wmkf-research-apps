@@ -19,10 +19,11 @@
  *     separate ratings table — ratings render inline in the question flow.
  *  2. `htmlToBlocks(html)` — a pure tokenizer for the sanitizer's ALLOWLISTED
  *     GRAMMAR ONLY (lib/external/sanitize-review-html.js `ALLOWED_TAGS`:
- *     p, br, strong, b, em, i, ul, ol, li, h2, h3, blockquote, a — no
+ *     p, br, strong, b, em, i, sub, sup, ul, ol, li, h2, h3, blockquote, a — no
  *     tables/images/spans/divs). Converts answerHtml into an array of typed
  *     blocks ({type, runs, items}) with inline runs
- *     ({text, bold, italic, href}). This intermediate form is what both the
+ *     ({text, bold, italic, subscript, superscript, href}). This intermediate
+ *     form is what both the
  *     DOCX (review-report-docx.js) and PDF (review-report-pdf.js) renderers
  *     consume, so neither renderer re-parses HTML. Unknown/unexpected tags
  *     degrade to plain text: the tag is stripped, its text content kept,
@@ -33,7 +34,7 @@
  */
 
 const BLOCK_TAGS = new Set(['p', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li']);
-const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'a', 'br']);
+const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'sub', 'sup', 'a', 'br']);
 const VOID_TAGS = new Set(['br']);
 
 // Very small HTML tokenizer: walks the string once, emitting open/close/text/void
@@ -96,7 +97,21 @@ function decodeEntities(text) {
 }
 
 function emptyInlineState() {
-  return { bold: 0, italic: 0, link: null };
+  return { bold: 0, italic: 0, subscript: 0, superscript: 0, link: null };
+}
+
+function currentRunFormatting(inlineState) {
+  const subscript = inlineState.subscript > 0;
+  const superscript = inlineState.superscript > 0;
+  return {
+    bold: inlineState.bold > 0,
+    italic: inlineState.italic > 0,
+    // The editor prevents both marks on one range. A forged/malformed nested
+    // pair degrades to baseline text so DOCX never receives two conflicting
+    // vertical-alignment flags.
+    subscript: subscript && !superscript,
+    superscript: superscript && !subscript,
+  };
 }
 
 /**
@@ -106,7 +121,8 @@ function emptyInlineState() {
  *
  * @param {string|null|undefined} html
  * @returns {Array<{type:('paragraph'|'heading2'|'heading3'|'blockquote'|'list-item'),
- *   ordered?:boolean, runs:Array<{text:string, bold:boolean, italic:boolean, href:(string|null)}>}>}
+ *   ordered?:boolean, runs:Array<{text:string, bold:boolean, italic:boolean,
+ *   subscript:boolean, superscript:boolean, href:(string|null)}>}>}
  */
 export function htmlToBlocks(html) {
   if (typeof html !== 'string' || html.trim().length === 0) return [];
@@ -154,8 +170,7 @@ export function htmlToBlocks(html) {
     ensureBlock('paragraph');
     currentRuns.push({
       text,
-      bold: inlineState.bold > 0,
-      italic: inlineState.italic > 0,
+      ...currentRunFormatting(inlineState),
       href: inlineState.link,
     });
   }
@@ -171,7 +186,11 @@ export function htmlToBlocks(html) {
       // "line1<br>line2" stays one paragraph with an embedded newline —
       // renderers decide how to realize that (docx: line break; pdf: wrap).
       ensureBlock('paragraph');
-      currentRuns.push({ text: '\n', bold: inlineState.bold > 0, italic: inlineState.italic > 0, href: null });
+      currentRuns.push({
+        text: '\n',
+        ...currentRunFormatting(inlineState),
+        href: null,
+      });
       continue;
     }
     if (tok.type === 'open') {
@@ -194,6 +213,8 @@ export function htmlToBlocks(html) {
       if (INLINE_TAGS.has(tok.name)) {
         if (tok.name === 'strong' || tok.name === 'b') inlineState.bold += 1;
         else if (tok.name === 'em' || tok.name === 'i') inlineState.italic += 1;
+        else if (tok.name === 'sub') inlineState.subscript += 1;
+        else if (tok.name === 'sup') inlineState.superscript += 1;
         else if (tok.name === 'a') inlineState.link = tok.href || null;
         continue;
       }
@@ -214,6 +235,8 @@ export function htmlToBlocks(html) {
       if (INLINE_TAGS.has(tok.name)) {
         if (tok.name === 'strong' || tok.name === 'b') inlineState.bold = Math.max(0, inlineState.bold - 1);
         else if (tok.name === 'em' || tok.name === 'i') inlineState.italic = Math.max(0, inlineState.italic - 1);
+        else if (tok.name === 'sub') inlineState.subscript = Math.max(0, inlineState.subscript - 1);
+        else if (tok.name === 'sup') inlineState.superscript = Math.max(0, inlineState.superscript - 1);
         else if (tok.name === 'a') inlineState.link = null;
         continue;
       }

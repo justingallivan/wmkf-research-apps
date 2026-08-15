@@ -25,6 +25,10 @@ source_files:
   - shared/components/reviewers/ReviewerSearchSection.js
   - shared/components/reviewers/ReviewerDueDateEditor.js
   - shared/components/workbench/ReviewsTab.js
+  - shared/components/external/RichReviewEditor.js
+  - lib/external/sanitize-review-html.js
+  - shared/utils/review-report.js
+  - shared/utils/review-report-docx.js
   - lib/services/graph-service.js
   - pages/api/review-manager/review-due-extension.js
   - pages/api/review-manager/send-review-reminder.js
@@ -991,11 +995,13 @@ narrative sections (all reviewers' answers, matrix order, `retired` flag
 carried through). The same module's `htmlToBlocks(html)` is a small pure
 tokenizer scoped to the sanitizer's allowlisted grammar ONLY
 (`lib/external/sanitize-review-html.js` `ALLOWED_TAGS`: p, br, strong/b,
-em/i, ul/ol/li, h2/h3, blockquote, a — no tables/images/spans/divs), producing
+em/i, sub/sup, ul/ol/li, h2/h3, blockquote, a — no tables/images/spans/divs), producing
 typed blocks with inline runs; an unknown/malformed tag degrades to plain text
 (tag stripped, text kept) rather than throwing or dropping content.
 `shared/utils/review-report-docx.js` (docx, dynamic `import('docx')` per
-`word-export.js` convention) renders the current export. As of the owner
+`word-export.js` convention) renders bold, italic, subscript, and superscript
+as native Word text-run formatting while retaining the historical structural
+tags for already-saved reviews. As of the owner
 decision on 2026-08-13, `ReviewsTab` exposes only "Export: Word (.docx)"
 (visible only once ≥1 review is submitted), because the earlier independent
 `pdf-lib` rendition flattened reviewer-authored formatting. It composes

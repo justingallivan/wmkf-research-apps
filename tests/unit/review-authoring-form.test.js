@@ -2,13 +2,46 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import {
+  default as ReviewAuthoringForm,
   buildInitialValues,
   isComplete,
   ReviewQuestionFields,
 } from '../../shared/components/external/ReviewAuthoringForm';
 import { reviewFormSchema } from '../../lib/external/review-form-schema';
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+test('external reviewer authoring selects the compact six-button toolbar', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ ok: true, draftJson: {} }),
+  });
+  render(
+    <ReviewAuthoringForm
+      data={{
+        questions: reviewFormSchema.fields,
+        questionSetVersion: 'set-v1',
+        prefill: {},
+      }}
+      token="review-token"
+      onSubmitted={jest.fn()}
+    />,
+  );
+
+  const richtextFields = reviewFormSchema.fields.filter((field) => field.type === 'richtext');
+  const toolbars = await screen.findAllByRole('toolbar');
+  expect(toolbars).toHaveLength(8);
+  for (const field of richtextFields) {
+    const toolbar = screen.getByRole('toolbar', { name: `Question ${field.order} formatting` });
+    expect(within(toolbar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
+    ]);
+  }
+});
 
 describe('ReviewAuthoringForm multiselect reconciliation', () => {
   test('hydrates numeric live values only, deduplicated in option order', () => {

@@ -355,6 +355,7 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
         values={values}
         onChange={update}
         disabled={frozen}
+        richTextToolbar="compact"
         className="mt-6 space-y-6"
       />
 
@@ -391,7 +392,14 @@ export default function ReviewAuthoringForm({ data, token, onSubmitted }) {
   );
 }
 
-export function ReviewQuestionFields({ fields, values, onChange, disabled = false, className = 'space-y-6' }) {
+export function ReviewQuestionFields({
+  fields,
+  values,
+  onChange,
+  disabled = false,
+  richTextToolbar = 'compact',
+  className = 'space-y-6',
+}) {
   return (
     <div className={className}>
       {(fields || []).map((field) => (
@@ -401,13 +409,14 @@ export function ReviewQuestionFields({ fields, values, onChange, disabled = fals
           value={values?.[field.key]}
           onChange={onChange}
           disabled={disabled}
+          richTextToolbar={richTextToolbar}
         />
       ))}
     </div>
   );
 }
 
-function FieldRow({ field, value, onChange, disabled = false }) {
+function FieldRow({ field, value, onChange, disabled = false, richTextToolbar = 'compact' }) {
   const id = `rf-${field.key}`;
   const hintId = field.hint ? `${id}-hint` : undefined;
   const selectedValues = field.type === 'multiselect'
@@ -513,7 +522,11 @@ function FieldRow({ field, value, onChange, disabled = false }) {
           value={value ?? ''}
           onChange={(html) => onChange(field.key, html)}
           ariaLabel={field.label}
+          toolbarLabel={Number.isFinite(field.order)
+            ? `Question ${field.order} formatting`
+            : `${field.label || field.key || 'Review'} formatting`}
           disabled={disabled}
+          toolbarVariant={richTextToolbar}
         />
       )}
     </div>

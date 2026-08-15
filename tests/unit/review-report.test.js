@@ -4,7 +4,7 @@
  *
  * Covers: the HTML→block tokenizer against every tag in the sanitizer's
  * allowlist (lib/external/sanitize-review-html.js ALLOWED_TAGS — p, br,
- * strong/b, em/i, ul/ol/li, h2/h3, blockquote, a), nesting, unknown-tag
+ * strong/b, em/i, sub/sup, ul/ol/li, h2/h3, blockquote, a), nesting, unknown-tag
  * degradation, empty/null input, malformed fragments, and the report
  * composition itself (header/summary/answerSections) built
  * on top of `deriveReviewMatrix`.
@@ -24,7 +24,14 @@ describe('htmlToBlocks', () => {
   test('plain <p> paragraph', () => {
     const blocks = htmlToBlocks('<p>Hello world</p>');
     expect(blocks).toEqual([
-      { type: 'paragraph', runs: [{ text: 'Hello world', bold: false, italic: false, href: null }] },
+      { type: 'paragraph', runs: [{
+        text: 'Hello world',
+        bold: false,
+        italic: false,
+        subscript: false,
+        superscript: false,
+        href: null,
+      }] },
     ]);
   });
 
@@ -51,6 +58,24 @@ describe('htmlToBlocks', () => {
     expect(both).toMatchObject({ bold: true, italic: true });
   });
 
+  test('sub/sup produce mutually independent vertical-alignment runs', () => {
+    const blocks = htmlToBlocks('<p>H<sub>2</sub>O and x<sup>2</sup></p>');
+    expect(blocks[0].runs.find((run) => run.text === '2')).toMatchObject({
+      subscript: true,
+      superscript: false,
+    });
+    expect(blocks[0].runs.at(-1)).toMatchObject({
+      text: '2',
+      subscript: false,
+      superscript: true,
+    });
+  });
+
+  test('forged nested sub/sup degrades to baseline text instead of conflicting DOCX flags', () => {
+    const run = htmlToBlocks('<p>x<sub><sup>2</sup></sub></p>')[0].runs.find((candidate) => candidate.text === '2');
+    expect(run).toMatchObject({ subscript: false, superscript: false });
+  });
+
   test('h2/h3 map to heading2/heading3 blocks', () => {
     expect(htmlToBlocks('<h2>Section</h2>')[0]).toMatchObject({ type: 'heading2', runs: [{ text: 'Section' }] });
     expect(htmlToBlocks('<h3>Sub</h3>')[0]).toMatchObject({ type: 'heading3', runs: [{ text: 'Sub' }] });
@@ -64,8 +89,8 @@ describe('htmlToBlocks', () => {
   test('ul/li produces unordered list-item blocks; ol/li produces ordered ones', () => {
     const ul = htmlToBlocks('<ul><li>one</li><li>two</li></ul>');
     expect(ul).toEqual([
-      { type: 'list-item', ordered: false, runs: [{ text: 'one', bold: false, italic: false, href: null }] },
-      { type: 'list-item', ordered: false, runs: [{ text: 'two', bold: false, italic: false, href: null }] },
+      { type: 'list-item', ordered: false, runs: [{ text: 'one', bold: false, italic: false, subscript: false, superscript: false, href: null }] },
+      { type: 'list-item', ordered: false, runs: [{ text: 'two', bold: false, italic: false, subscript: false, superscript: false, href: null }] },
     ]);
     const ol = htmlToBlocks('<ol><li>first</li></ol>');
     expect(ol[0]).toMatchObject({ type: 'list-item', ordered: true });

@@ -129,9 +129,14 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `multiselect`, and `richtext` fields. The active target seed has 11 numbered
   questions — 2 rating radios, 1 checkbox multiselect, and 8 `RichReviewEditor`
   (tiptap) narrative answers — plus the affiliation field; the exact target set
-  was published to production on 2026-07-26. The form autosaves to
-  Postgres `review_drafts` via the `GET/PUT /api/external/review/[token]/draft` route
-  (`ReviewDraftService`). Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
+  was published to production on 2026-07-26. The form autosaves through
+  `GET/PUT /api/external/review/[token]/draft` and `ReviewDraftService` to
+  Postgres `review_drafts`.
+  The reviewer-facing editor deliberately exposes the same compact toolbar as the
+  grantee abstract/caption editor: **bold, italic, subscript, superscript, undo,
+  and redo**. Headings, lists, blockquotes, and links are no longer reviewer-facing
+  controls; their tags remain accepted for backward compatibility with saved reviews
+  and the separate staff manual-entry surface. Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
   `sanitize-html`, never DOMPurify+jsdom) before persisting, and the staff render must
   re-sanitize. The file-upload route/infra (`upload.js`, `review-upload.js`) is RETAINED
