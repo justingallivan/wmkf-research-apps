@@ -44,7 +44,10 @@ worktree was clean.
      record, executable example, full-contract fail-closed jq validation with
      atomic publish and conflict-detecting eventId merge, fetch-semantics
      `operation` derivation, fully specified `resourceClass`, version-agnostic
-     CLI rule, caller-class script inventory). Full artifact set under
+     CLI rule, caller-class script inventory) and a sixth S1–S4 pass
+     (self-contained fixture-tested export example, source-resolved Dataverse
+     resourceClass allowlist incl. `accounts`, dependency/statusClass-consistent
+     validation, `--query` contradictions removed). Full artifact set under
      `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**

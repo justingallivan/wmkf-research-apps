@@ -166,31 +166,44 @@ instrumenting one of these seams covers another is false and must not reappear.
        `login.microsoftonline.com` token endpoint; no other class exists on this dependency).
      - **`dependency: 'dataverse'`** → take the first path segment after `/api/data/v9.2/`, strip
        any parenthesized key (`akoya_requests(9f8…)` → `akoya_requests`), and match **exactly**
-       against the tracked entity-set allowlist:
-       `{'wmkf_potentialreviewerses', 'wmkf_appreviewersuggestions', 'akoya_requests',
-       'wmkf_appuserappaccesses', 'systemusers', 'wmkf_appsettingses'}` — the sets the target
-       routes and the app-access/token legs actually read; the emitted value is the matched
-       entity-set literal (a schema name, not data). `$batch`, `EntityDefinitions…`, and any
-       unmatched segment → `'unknown'`. Extending the allowlist is a reviewed commit. **The exact
-       plural entity-set spellings above are `[ASSUMED]` until the implementer confirms them from
-       the adapters' request URLs — the classifier test fixtures must use the confirmed real
-       URLs.**
+       against the tracked entity-set allowlist, resolved from current source (sixth-pass
+       verification — no longer assumed):
+       `'wmkf_potentialreviewerses'` `[VERIFIED via lib/dataverse/adapters/potential-reviewer.js:17]`,
+       `'wmkf_appreviewersuggestions'` `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js:40]`,
+       `'akoya_requests'` `[VERIFIED via lib/dataverse/adapters/grant-request.js:50]`,
+       `'accounts'` `[VERIFIED via lib/dataverse/adapters/account.js:11 — read by the target
+       my-candidates route via fetchApplicantAkas, my-candidates-service.js:171,397]`,
+       `'systemusers'` `[VERIFIED via lib/dataverse/adapters/system-user.js:23]`,
+       `'wmkf_appuserappaccesses'` `[VERIFIED via lib/services/dataverse-app-access-service.js:41,55,80]`.
+       The emitted value is the matched entity-set literal (a schema name, not data). **Scope
+       precision:** this allowlist covers the entity sets read by the three target measurement
+       routes plus the app-access/token legs — it does NOT claim to enumerate all app-wide
+       Dataverse traffic; everything else (including settings reads, whose real path is
+       `/wmkf_appsystemsettings` — `dataverse-settings-service.js:36` — deliberately not
+       allowlisted), `$batch`, `EntityDefinitions…`, and any unmatched segment fails closed to
+       `'unknown'`. Extending the allowlist is a reviewed commit.
      - **`dependency: 'graph'`** → coarse path class from the fixed set
        `{'token', 'site', 'drive', 'drive-item', 'search'}` (token endpoint → `'token'`;
        `/sites…` → `'site'`; `/drives…` root/children listing → `'drive'`; item-addressed
        content/metadata/versions/upload/delete → `'drive-item'`; `/search/query` → `'search'`);
        anything else → `'unknown'`.
-     - **Total v1 value set** (the `$RESOURCE_CLASSES` list the export validation checks):
-       the six Dataverse entity-set literals ∪ `{'token','site','drive','drive-item','search',
-       'unknown'}`.
+     - **Total v1 value set** (inlined as `classesFor(dependency)` in the export validator, keyed
+       per dependency): the six Dataverse entity-set literals ∪
+       `{'token','site','drive','drive-item','search','unknown'}` — the validator additionally
+       enforces that each event's `resourceClass` is legal **for its `dependency`**, not merely a
+       member of the union.
      - **Tests:** representative-URL fixtures for every class above **plus** hostile fixtures — a
        Dataverse read with a `$filter` embedding an email, a GUID-keyed single-record URL, a Graph
        item URL with an encoded filename, a signed/CDN-style download URL, and an unknown host —
        asserting the emitted event contains the expected class and that **no query string, id,
        filename, or path material appears in any field** of the event.
+     - **Outcome↔statusClass consistency (part of the v1 contract):** `success` ⇒
+       `statusClass: '2xx'` (`resp.ok`); `http_error` ⇒ `statusClass ∈ {'3xx','4xx','5xx'}`;
+       `timeout`/`network_error` ⇒ no `statusClass` (no response was received). The export
+       validator enforces this.
      - **Stage 2 derivability:** the Stage 2 acceptance count is mechanically
-       `count(events where dependency == 'dataverse' and resourceClass == '<the confirmed
-       wmkf_potentialreviewers entity set>' and routeName ∈ the three target routes)` — no log
+       `count(events where dependency == 'dataverse' and resourceClass ==
+       'wmkf_potentialreviewerses' and routeName ∈ the three target routes)` — no log
        spelunking or URL inspection needed.
    - **Never emitted:** raw URLs, query strings (`$filter` embeds names/emails), arbitrary path
      segments, tenant identifiers, drive/item ids, filenames, signed-URL material, tokens, headers,
@@ -231,10 +244,10 @@ instrumenting one of these seams covers another is false and must not reappear.
    (including a `JSON.stringify` throw) cannot fail the request. **Planned unit test:** capture the
    emitted `console.log` argument, assert `JSON.parse` succeeds on it and that the parsed object
    contains the literal discriminator `event: 'workbench.dependency'`. The **filter of record** in
-   the export workflow below is local JSON parsing of each log record's message (`fromjson?` +
-   `event == "workbench.dependency"`); the server-side `--query` is only a coarse full-text
-   volume-reduction hint (fourth-pass correction — exact-substring `--query` semantics were never
-   verified). No new
+   the export workflow below is the strict local v1 contract validator (parse each string
+   `message`, abort on discriminator-containing lines that fail parsing or validation); the
+   capture of record and the trusted preflight are **unfiltered** — `--query` exists only as
+   optional triage that proves nothing and is a prerequisite for no measurement step. No new
    table, no durable write — consistent with this stage's stop condition. The existing
    `api_usage_log` is the **LLM token/cost ledger** (`docs/atlas/postgres-infra-tables.md:147-149`)
    and is **not** repurposed or imitated.
@@ -267,7 +280,7 @@ instrumenting one of these seams covers another is false and must not reappear.
      # `vercel link` (the linked project makes --project optional; the explicit variable
      # form below also works from an unlinked checkout).
      set -euo pipefail   # errors visible and fatal; no stderr suppression anywhere
-     OUT_DIR=${OUT_DIR:-$(mktemp -d)}   # or a defined scratch path; created explicitly
+     OUT_DIR=${OUT_DIR:-$(mktemp -d)}; mkdir -p "$OUT_DIR"   # caller-supplied or fresh; always created
      PROJECT='actual-project-name-or-id'   # from `vercel project ls`; if the repo is
                                            # linked, drop the --project flag entirely
      SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T01:00:00Z'; LIMIT=5000
@@ -292,31 +305,50 @@ instrumenting one of these seams covers another is false and must not reappear.
        exit 1
      fi
 
-     # Step 3 — filter of record: local parse + FULL v1 contract validation. Ordinary
-     # non-telemetry lines are skipped; any line CONTAINING the discriminator that fails
-     # to parse or fails validation ABORTS the slice (fromjson? alone silently drops
-     # malformed JSON — that is why unparseable candidates are turned into errors).
-     # The atomic tmp+mv publish means a failed run leaves no usable partial slice.
-     jq -c '
+     # Step 3 — filter of record: local parse + FULL v1 contract validation, fully
+     # self-contained (the closed value sets are inlined — no operator-supplied
+     # variables). Non-telemetry records (non-string or discriminator-free messages)
+     # are skipped; any line CONTAINING the discriminator that fails to parse or fails
+     # validation ABORTS the slice (fromjson? alone silently drops malformed JSON —
+     # that is why unparseable candidates are turned into errors). jq failure is
+     # handled explicitly (not left to `set -e`, which conditional contexts suspend),
+     # and the tmp file is removed on failure so no partial slice is ever published.
+     VALIDATE='
        def uuid: test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
-       select((.message // "") | contains("\"event\":\"workbench.dependency\""))
+       def classesFor(d):
+         if   d == "azuread"   then ["token"]
+         elif d == "dataverse" then ["wmkf_potentialreviewerses","wmkf_appreviewersuggestions",
+                                     "akoya_requests","accounts","systemusers",
+                                     "wmkf_appuserappaccesses","unknown"]
+         elif d == "graph"     then ["token","site","drive","drive-item","search","unknown"]
+         elif d == "unknown"   then ["unknown"]
+         else [] end;
+       select((.message | type) == "string"
+              and (.message | contains("\"event\":\"workbench.dependency\"")))
        | ((.message | fromjson?) // error("candidate telemetry line did not parse — fail slice")) as $ev
        | if ($ev.event == "workbench.dependency")
            and ($ev.v == 1)
            and (($ev.eventId | type) == "string" and ($ev.eventId | length) > 0 and ($ev.eventId | uuid))
-           and ($ev.dependency  | IN("dataverse","azuread","graph","unknown"))
-           and ($ev.outcome     | IN("success","http_error","timeout","network_error"))
-           and ($ev.operation   | IN("GET","POST","PATCH","PUT","DELETE","HEAD","OPTIONS","unknown"))
-           and ($ev.resourceClass | IN($ARGS.named.classes | split(",")[]))
-           and (($ev.ms | type) == "number" and ($ev.ms | isnan | not) and ($ev.ms | isinfinite | not) and $ev.ms >= 0)
-           and (($ev.statusClass == null) or ($ev.statusClass | IN("2xx","3xx","4xx","5xx")))
-           and (if $ev.outcome == "http_error" then ($ev.statusClass != null) else true end)
+           and ($ev.dependency | IN("dataverse","azuread","graph","unknown"))
+           and ($ev.outcome    | IN("success","http_error","timeout","network_error"))
+           and ($ev.operation  | IN("GET","POST","PATCH","PUT","DELETE","HEAD","OPTIONS","unknown"))
+           and ([$ev.resourceClass] | inside(classesFor($ev.dependency)))
+           and (($ev.ms | type) == "number" and (($ev.ms | isnan) | not)
+                and (($ev.ms | isinfinite) | not) and $ev.ms >= 0)
+           and (if   $ev.outcome == "success"    then $ev.statusClass == "2xx"
+                elif $ev.outcome == "http_error" then ($ev.statusClass | IN("3xx","4xx","5xx"))
+                else $ev.statusClass == null end)
            and (($ev.correlationId == null) or (($ev.correlationId | type) == "string"))
            and (($ev.routeName == null) or (($ev.routeName | type) == "string"))
          then {record: ., ev: $ev}
          else error("workbench.dependency event failed v1 contract validation — fail slice")
          end
-     ' --arg classes "$RESOURCE_CLASSES" < "$RAW" > "$SLICE.tmp"
+     '
+     if ! jq -c "$VALIDATE" < "$RAW" > "$SLICE.tmp"; then
+       rm -f "$SLICE.tmp"
+       echo "slice validation failed — no partial slice published" >&2
+       exit 1
+     fi
      mv "$SLICE.tmp" "$SLICE"   # atomic publish
 
      # Step 4 — cross-slice merge + sound dedup: exactly one payload per eventId.
@@ -331,21 +363,27 @@ instrumenting one of these seams covers another is false and must not reappear.
      mv "$OUT_DIR/merged.ndjson.tmp" "$OUT_DIR/merged.ndjson"
      ```
 
-     (`$RESOURCE_CLASSES` is the comma-joined fixed `resourceClass` value set from the envelope
-     contract above, supplied by the operator; the jq argument-plumbing shape is part of the
-     window-start preflight.) An optional query-assisted **triage** command
-     (`vercel logs … --query 'workbench.dependency' …`) may be used to eyeball volume before
-     capture, but it is **never** the capture of record and proves nothing about completeness.
+     **Steps 2–4 were exercised locally (2026-08-15) under `set -euo pipefail` against fixture
+     NDJSON:** valid events pass (ordinary string logs and non-string `message` records are
+     skipped, not fatal); a discriminator-containing unparseable line fails the slice with no
+     partial file; an invalid contract (success + `4xx`) fails; an incompatible
+     dependency/resourceClass pair (`azuread` + `drive-item`) fails; identical duplicate
+     `eventId`s dedupe to one; conflicting payloads sharing an `eventId` fail the merge. An
+     optional query-assisted **triage** command (`vercel logs … --query 'workbench.dependency' …`)
+     may be used to eyeball volume before capture, but it is **never** the capture of record, is
+     not part of the trusted preflight, and proves nothing about completeness — no measurement
+     step depends on `--query` semantics.
 
      - **Time bounds:** explicit `--since`/`--until` per slice (ISO timestamps), stamped into the
        filename; per-event timestamps come from the platform log record in the `--json` output
        (the event body deliberately carries no timestamp field).
      - **What is verified vs. what must be preflighted:** `vercel logs --help` on the installed
-       CLI proves the flags **exist** — it does NOT prove `--query`'s matching semantics or the exact
-       `--json` record field names (`.message` etc.). At window start, **preflight against a known
-       emitted event**: emit one test event, capture it with this workflow, and confirm the coarse
-       query returns it and the `jq` filter isolates it, before trusting any measurement slice.
-       `--limit` stays explicit (CLI default is 100 — far too low to rely on implicitly).
+       CLI proves the flags **exist** — it does NOT prove the exact `--json` record field names
+       (`.message` etc.). At window start, **preflight against a known emitted event**: emit one
+       test event, capture it with the unfiltered workflow above (no `--query`), and confirm the
+       validator isolates it, before trusting any measurement slice. `--query` semantics are not
+       part of this preflight and are a prerequisite for nothing. `--limit` stays explicit (CLI
+       default is 100 — far too low to rely on implicitly).
      - **Truncation/completeness:** checked on the RAW unfiltered line count, before local
        filtering (a post-filter count says nothing about what the server dropped). At-limit ⇒
        exit 1 ⇒ re-slice narrower. **If slices cannot be proven complete within the plan's
@@ -544,8 +582,28 @@ any such change must preserve the S213/S400/S401 correctness invariants. Compone
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-15, fifth pass (post-Codex fifth review, findings R1–R7 folded in): READY WITH
-NAMED CHANGES.** The fifth pass verified: the capture of record is now genuinely unfiltered (no
+**Mode A, 2026-08-15, sixth pass (post-Codex sixth review, findings S1–S4 folded in): READY WITH
+NAMED CHANGES.** The sixth pass verified: the export example is self-contained under
+`set -euo pipefail` (closed value sets inlined in the validator — no operator-supplied variable;
+`OUT_DIR` always created; jq failure handled explicitly with tmp cleanup so conditional contexts
+cannot publish a partial slice), and Steps 2–4 were **executed locally against fixture NDJSON**
+covering valid, malformed-candidate, invalid-contract, incompatible-class,
+identical-duplicate-eventId, and conflicting-duplicate-eventId cases — all behaved as specified;
+the Dataverse `resourceClass` allowlist is resolved from current source (six entity sets each
+`[VERIFIED via file:line]`, including `accounts` read by the target my-candidates route; the
+nonexistent `wmkf_appsettingses` removed; real settings path `/wmkf_appsystemsettings`
+deliberately left fail-closed `'unknown'`; the allowlist explicitly covers the target measurement
+paths plus app-access legs, not all app-wide traffic); the validator enforces
+dependency↔resourceClass compatibility and outcome↔statusClass semantics (success ⇒ 2xx;
+http_error ⇒ 3xx/4xx/5xx; timeout/network_error ⇒ none) and type-checks `message` before
+`contains` so non-string records are skipped, not fatal; and every current-state `--query`/
+`fromjson?` contradiction is removed — capture and trusted preflight are unfiltered, `--query` is
+optional triage that is a prerequisite for nothing and appears in no residual assumption. The
+fifth-pass paragraph below is superseded where it conflicts (its `[ASSUMED]` entity-set
+spellings, `$RESOURCE_CLASSES` operator variable, jq-argument-plumbing preflight item, and
+`--query`-semantics residual assumption).
+
+**Prior pass (fifth, same date):** The fifth pass verified: the capture of record is now genuinely unfiltered (no
 `--query`; server filtering would void the completeness check; query-assisted capture survives
 only as an optional triage command that proves nothing); the example is executable (a real
 `PROJECT` variable contract or the linked-project variant, `set -euo pipefail`, visible stderr);

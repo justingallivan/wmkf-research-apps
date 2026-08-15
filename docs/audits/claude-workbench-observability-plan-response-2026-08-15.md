@@ -3,7 +3,7 @@ title: Claude Response — Codex Adversarial Review of the Workbench Observabili
 domain: architecture
 kind: audit
 status: final
-summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its four follow-up passes (8 + 5 + 6 + 3 + 7 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
+summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its five follow-up passes (8 + 5 + 6 + 3 + 7 + 4 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -531,11 +531,76 @@ workflow header's version-specific framing, a "pinned CLI" phrase, and an actual
 the Step 3 jq invocation that would have swallowed the `--arg classes` flag as positional text).
 Zero known live stale claims remain as of this pass.
 
+## Sixth pass — Codex sixth review (2026-08-15), findings S1–S4
+
+**Provenance:** findings relayed in the owner-issued work order from Codex's fifth-pass read-only
+review; each verified locally before revision.
+
+### S1 (export example not self-contained; untested) — CONFIRMED
+
+- The fifth-pass example referenced `$RESOURCE_CLASSES` as an undocumented operator-supplied
+  variable (an unbound-variable abort under `set -u`), and `OUT_DIR` creation was not guaranteed
+  for a caller-supplied path. The workflow had never been executed.
+- **Plan change:** the validator inlines the closed value sets (`classesFor`), no operator
+  variable exists, `OUT_DIR` is always `mkdir -p`-created, and jq failure is handled explicitly
+  with tmp cleanup (local testing showed `set -e` is suspended in conditional contexts, so a
+  failed jq could otherwise fall through to `mv` and publish a partial slice — the explicit
+  handler closes that).
+- **Verification:** Steps 2–4 executed locally under `set -euo pipefail` against fixture NDJSON:
+  valid events kept (2/4 lines; ordinary string logs and non-string `message` records skipped);
+  malformed candidate ⇒ slice fails, no partial file; invalid contract (success+4xx) ⇒ fails;
+  incompatible pair (azuread+drive-item) ⇒ fails; identical duplicate `eventId`s ⇒ merged to one;
+  conflicting duplicate `eventId`s ⇒ merge fails.
+
+### S2 (Dataverse allowlist must be resolved now, not `[ASSUMED]`) — CONFIRMED
+
+- All six entity sets resolved from current source:
+  `wmkf_potentialreviewerses` `[VERIFIED via lib/dataverse/adapters/potential-reviewer.js:17]`;
+  `wmkf_appreviewersuggestions` `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js:40]`;
+  `akoya_requests` `[VERIFIED via lib/dataverse/adapters/grant-request.js:50]`;
+  `accounts` `[VERIFIED via lib/dataverse/adapters/account.js:11]`, read by the target
+  my-candidates route (`my-candidates-service.js:171,397` `fetchApplicantAkas`);
+  `systemusers` `[VERIFIED via lib/dataverse/adapters/system-user.js:23]`;
+  `wmkf_appuserappaccesses` `[VERIFIED via lib/services/dataverse-app-access-service.js:41,55,80]`.
+- `wmkf_appsettingses` does not exist — `[VERIFIED via grep]` the real settings path is
+  `/wmkf_appsystemsettings` (`lib/services/dataverse-settings-service.js:36`); settings traffic is
+  not on the target measurement paths and deliberately stays fail-closed `'unknown'`.
+- **Plan change:** allowlist rewritten with the six verified literals and per-entry citations;
+  `[ASSUMED]` label removed; scope precision added (covers target measurement paths plus
+  app-access legs — no claim of enumerating all app-wide traffic).
+
+### S3 ("full v1 validation" was not full) — CONFIRMED
+
+- The fifth-pass validator did not enforce dependency↔resourceClass compatibility or
+  outcome↔statusClass semantics, and `(.message // "") | contains(...)` would error on a
+  non-string `message` (an unrelated record shape could fail the slice).
+- **Plan change:** validator enforces `classesFor(dependency)` membership; success ⇒ `2xx`,
+  `http_error` ⇒ `3xx/4xx/5xx`, `timeout`/`network_error` ⇒ no `statusClass` (added to the
+  envelope as an explicit contract bullet); `(.message | type) == "string"` is checked before
+  `contains`, so non-telemetry records are skipped while discriminator-containing
+  malformed/invalid telemetry still fails closed. All paths covered by the fixture test above.
+
+### S4 (current-state query contradictions) — CONFIRMED
+
+- The sink bullet still described the filter of record as "`fromjson?` + event ==" with `--query`
+  as a "volume-reduction hint", and the preflight bullet required confirming "the coarse query
+  returns it" — making `--query` semantics a de-facto measurement prerequisite in contradiction
+  with the fifth-pass unfiltered capture.
+- **Plan change:** sink prose replaced with the strict-local-validator description; the trusted
+  preflight uses the unfiltered workflow only; `--query` survives solely as optional triage that
+  is a prerequisite for nothing and appears in no residual assumption; the Stage 2 derivability
+  example now names the resolved `wmkf_potentialreviewerses` literal.
+
+**Durable-state status as of the sixth pass:** plan, response audit, and `SESSION_PROMPT.md`
+reconciled; the fifth-pass `[ASSUMED]` spellings, `$RESOURCE_CLASSES` variable,
+jq-argument-plumbing preflight item, and `--query`-semantics assumption are superseded in labeled
+prior-pass records. Zero known live stale claims remain as of this pass.
+
 ## Final verdict
 
 **READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15,
-fifth pass). The named changes are the owner items above plus the window-start preflight
-obligations written into the plan, not structural rework. All findings across the five review
-passes (8 + 5 + 6 + 3 + 7) are CONFIRMED and folded in; as of this pass the revised plan contains
-no known claim contradicted by current source or platform documentation; it remains a draft not
-authorized for implementation.
+sixth pass). The named changes are the owner items above plus the window-start preflight
+obligations written into the plan, not structural rework. All findings across the six review
+passes (8 + 5 + 6 + 3 + 7 + 4) are CONFIRMED and folded in; as of this pass the revised plan
+contains no known claim contradicted by current source or platform documentation; it remains a
+draft not authorized for implementation.
