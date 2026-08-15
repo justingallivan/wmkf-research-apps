@@ -135,8 +135,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   The reviewer-facing editor deliberately exposes the same compact toolbar as the
   grantee abstract/caption editor: **bold, italic, subscript, superscript, undo,
   and redo**. Headings, lists, blockquotes, and links are no longer reviewer-facing
-  controls; their tags remain accepted for backward compatibility with saved reviews
-  and the separate staff manual-entry surface. Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
+  controls. The staff manual-entry surface uses the same compact toolbar; structural
+  tags remain accepted for backward compatibility with saved reviews. Reviewer HTML is UNTRUSTED: the draft PUT server-sanitizes
   every rich-text answer with `lib/external/sanitize-review-html.js` (DOM-free
   `sanitize-html`, never DOMPurify+jsdom) before persisting, and the staff render must
   re-sanitize. The file-upload route/infra (`upload.js`, `review-upload.js`) is RETAINED

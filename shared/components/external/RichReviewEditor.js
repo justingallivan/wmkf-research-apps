@@ -2,14 +2,14 @@
  * RichReviewEditor — controlled tiptap WYSIWYG for a single rich-text review
  * answer. The external reviewer portal uses the same compact scientific-text
  * toolbar as the grantee abstract/caption editor: bold, italic, subscript,
- * superscript, undo, and redo. The staff rescue form retains the original full
- * toolbar for backward-compatible manual entry. Both modes emit HTML from the
- * same schema and remain bounded by the server sanitizer allowlist.
+ * superscript, undo, and redo. The staff rescue form uses that compact toolbar
+ * too. Both live authoring surfaces emit HTML from the same schema and remain
+ * bounded by the server sanitizer allowlist.
  *
  * The editor is convenience, NOT the security boundary — every answer is
  * server-sanitized on autosave (draft PUT) and submit, and re-sanitized before
  * staff render. Every exposed control maps to a sanitizer-preserved tag; the
- * wider structural allowlist exists only for historical/staff compatibility.
+ * wider structural allowlist exists for historical-content compatibility.
  *
  * Controlled: `value` is HTML in, `onChange(html)` fires on edits. External
  * value changes (e.g. a draft load) are synced in without clobbering the

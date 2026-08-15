@@ -9,7 +9,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('staff manual review entry retains the full rich-text toolbar', async () => {
+test('staff manual review entry uses the compact rich-text toolbar', async () => {
   const question = {
     key: 'scientificAssessment',
     order: 1,
@@ -38,6 +38,6 @@ test('staff manual review entry retains the full rich-text toolbar', async () =>
 
   const toolbar = await screen.findByRole('toolbar', { name: 'Question 1 formatting' });
   expect(within(toolbar).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual([
-    'Bold', 'Italic', 'Heading 2', 'Heading 3', 'Bulleted list', 'Numbered list', 'Quote', 'Link',
+    'Bold', 'Italic', 'Subscript', 'Superscript', 'Undo', 'Redo',
   ]);
 });
