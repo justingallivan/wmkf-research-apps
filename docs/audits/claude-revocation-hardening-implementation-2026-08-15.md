@@ -3,7 +3,7 @@ title: Disabled-Account Revocation Hardening — Implementation & Adversarial Re
 domain: security-auth
 kind: audit
 status: complete
-summary: "Tier-2 implementation record for the accepted disabled-account revocation invariants (audit §10.2): signIn denial before side effects, current-request bare-auth blocking, JWT zero-row invalidation, fail-closed missing-profile helpers, and both link-profile branches with conditional persistence ordering. Records builder assignments, both Opus adversarial review passes, and every finding disposition."
+summary: "Tier-2 implementation record for the accepted disabled-account revocation invariants (audit §10.2): signIn denial before side effects, current-request bare-auth blocking, JWT zero-row invalidation, fail-closed missing-profile helpers, and both link-profile branches with locked transactional persistence ordering. Records builder assignments, Opus adversarial review, Codex's independent merge review/remediation, and every finding disposition."
 canonical: false
 ---
 
@@ -17,7 +17,11 @@ authorization: SESSION_PROMPT.md Session 430 "Owner Decision Needed" item 2,
 executed via the 2026-08-15 orchestration work order. Lead integrator: Claude
 Fable. Implementation: three Sonnet builders with disjoint file ownership.
 Adversarial review: two independent read-only Opus reviewers, repeated until no
-unresolved blocking findings.
+unresolved blocking findings. A subsequent independent Codex merge review found
+that the accepted DELETE-before-replacement race contradicted invariant 7;
+Justin authorized Codex to correct it on this branch. The correction preserves
+the caller row for `createNew`, serializes the existing-profile transfer, and
+makes zero-row archive attempts report failure rather than false success.
 
 ## Invariant table (contract-reconcile Mode B)
 
@@ -29,8 +33,8 @@ unresolved blocking findings.
 | 4 | `requireAuthWithProfile`/`requireAppAccess` fail closed on disabled, deleted, or missing rows | `lib/utils/auth.js` | zero-row → 403 tests (previously fail-open predicates) |
 | 5 | Guard DB failure → 503 fail-closed, never authorization success; signIn DB failure denies sign-in (no API-route 503 claim) | both | existing 503 tests + jwt-error-keeps-token test + signIn catch pin |
 | 6 | Both link-profile branches verify live caller `is_active` | `pages/api/auth/link-profile.js` | disabled caller → 403 on both branches with zero write queries issued |
-| 7 | Revocation-vs-linking conditional ordering: no create/claim/update/delete persists for a disabled caller | `link-profile.js` | pre-check before writes + `AND is_active = true` conditional writes + rowcount check on the final UPDATE |
-| 8 | Active linking session (active temp profile → token carries `profileId` + `needsLinking`) keeps working | `link-profile.js`, jwt | positive tests on both branches |
+| 7 | Revocation-vs-linking ordering: no failed or concurrent disable/claim path commits a rowless caller identity | `link-profile.js`, `database-service.js` | caller + target `FOR UPDATE`; `createNew` in-place UPDATE; claim DELETE+UPDATE in one transaction with rollback; archive succeeds only when `rowCount > 0` |
+| 8 | Active linking session (active temp profile → token carries `profileId` + `needsLinking`) keeps working | `link-profile.js`, jwt | positive tests on both branches; createNew preserves the temp profile id and its existing grants |
 | 9 | Applicant sessions + `AUTH_REQUIRED=false` dev bypass unchanged | `auth.js`, `[...nextauth].js` | applicant skips the staff lookup; authBypassed early-return untouched |
 | 10 | All four bare-auth routes covered via the shared `requireAuth` contract | `requireAuth` only (no route edits) | handler-level tests: blob-proxy, upload-handler, health, api-capabilities |
 | 11 | `is_active = false` is the durable revocation mechanism | all | no alternate mechanism introduced |
@@ -67,7 +71,7 @@ failures on pristine baseline `d32e2d56`.
 
 | # | Reviewer / severity | Finding | Disposition |
 |---|---|---|---|
-| 1 | R1 MEDIUM | Claim-branch 409 race: target profile disabled between the SELECT (`link-profile.js:101`) and the conditional UPDATE (`:128`) → temp row already deleted → caller has zero rows for `azure_id` → next sign-in falls to the create-new branch and provisions a fresh default-grant profile | CONFIRMED mechanism; **ACCEPTED as residual** (owner may overturn). The disabled target profile stays disabled — the user gains only a new vanilla identity with default grants, which is exactly the already-accepted email-only/hard-delete reprovisioning residual class. Invariant 7 (disabled *caller*) is not violated; closing the two-statement window would need a `db.connect()` transaction in a serverless route (real added risk) or a fragile CTE ordering. Recorded below. |
+| 1 | R1 MEDIUM | Claim-branch race: target profile disabled between the target SELECT and conditional UPDATE → temp row already deleted → caller becomes rowless and can reprovision | CONFIRMED mechanism. The initial **ACCEPTED** disposition was **OVERRULED during Codex's independent merge review**: the missing row was created by this route, not by the owner's accepted hard-delete policy, so it contradicted invariants 7 and 11. **FIXED** with caller/target row locks and a transaction whose rollback restores the temp row when the target update fails. |
 | 2 | R1 LOW + R2 LOW | `is_active` NULL split-brain: `=== false` / `!== false` sites treat NULL as active while `!is_active` sites deny; `requireAppAccess` would be the fail-open side (~94 endpoints). No write path produces NULL today (both reviewers exhaustively enumerated writes) | CONFIRMED (latent, unreachable); **FIXED** in the remediation round — all revocation predicates normalized to `is_active === true`-grants / everything-else-denies, with a discriminating NULL test per site |
 | 3 | R1 LOW | Wiki bullet overclaimed "enforced at every layer" — the proxy edge itself has no `is_active` read (`proxy.js:96-144`); it inherits revocation via JWT invalidation | CONFIRMED; **FIXED** (wording corrected in `docs/agent-wiki/topics/security-auth.md`) |
 | 4 | R2 MEDIUM | Residual-list omission: the applicant pass-through on the four bare-auth routes (`auth.js` skips the check for `userType === 'applicant'`) is now a codified exemption but was unrecorded. Pre-existing, not a regression; proxy staff-surface classification rejects applicant tokens today (`proxy.js:141`) | CONFIRMED; **FIXED** (recorded in residuals below) |
@@ -75,7 +79,7 @@ failures on pristine baseline `d32e2d56`.
 | 6 | R2 LOW + R1 INFO | Stale mutation-check comment in `link-profile-revocation.test.js` ("9 of 12"; the file has 11 tests) | CONFIRMED; **FIXED** in the remediation round |
 | 7 | R1 INFO | `/api/health` now 503s during a Postgres outage (fail-closed health surface) | Already recorded in residuals; verified by R1 |
 | 8 | R2 INFO | jwt's `if (token.azureId)` fall-through (non-applicant token without azureId keeps stale claims) is safe only because `requireAuth`'s keyless-session 403 backstops it | CONFIRMED; **recorded below** so a future edit doesn't remove the requireAuth check believing jwt covers it |
-| 9 | R1 INFO | Transient signout window in createNew (DELETE→INSERT gap: a concurrent session read sees zero rows → `{}` → re-sign-in) | ACCEPTED — fail-closed direction is the right trade; recoverable; recorded below |
+| 9 | R1 INFO | Transient signout/revocation window in createNew (DELETE→INSERT gap) | The initial **ACCEPTED** disposition was **OVERRULED and FIXED** during Codex review. `createNew` now finalizes the locked temp row in place, preserving its id and grants; it performs no DELETE or INSERT. |
 | 10 | R1/R2 INFO | Minor optional test gaps (no end-to-end unique-violation race test — not exercisable in a mock-based suite; no `entra-external` early-return pin) | ACCEPTED as non-load-bearing; both reviewers judged them acceptable |
 
 ### Remediation round (post-review)
@@ -110,14 +114,40 @@ predicates — no new-user regression. Three LOW/INFO record-accuracy nits
 citations) were fixed by the lead in the closing commit; review cycle
 converged with zero unresolved blocking or high-confidence findings.
 
+### Independent Codex merge review and remediation
+
+Codex then reviewed the final branch read-only and found one blocking
+concurrency class the Opus passes had not discharged. Both link branches
+committed the active temporary-row DELETE before securing the replacement
+identity. A concurrent archive could therefore update zero rows (while
+`archiveUserProfile` still returned `true`) and the link request could create
+or claim an active identity. The already-recorded target-disable 409 race was
+the same root defect; treating it as the owner's hard-delete residual was
+incorrect because `link-profile` itself manufactured the missing row.
+
+Justin authorized Codex to remediate the branch. The correction:
+
+- locks the caller row and requires live `is_active = true` plus
+  `needs_linking = true` inside the transaction;
+- finalizes `createNew` with one conditional UPDATE of that locked row, so the
+  stable profile id and its default app grants survive;
+- locks the existing-profile target and performs temp DELETE + target UPDATE
+  in one transaction, rolling back the DELETE on every failed target outcome;
+- returns archive success only when Postgres reports `rowCount > 0`, preventing
+  a concurrent identity transfer from producing a false revocation success;
+- adds discriminating tests that prohibit DELETE/INSERT on createNew, require
+  both row locks, require rollback after a failed post-DELETE target update,
+  and pin zero-row archive failure.
+
+The repository already ships `@vercel/postgres`'s pooled `db.connect()` API and
+uses explicit Postgres transactions in runtime routes, so the earlier record's
+claim that a serverless-route transaction was an exceptional unsupported risk
+was refuted by the installed dependency and repository precedent. Codex's
+complete targeted revocation run passed 91/91 tests across five suites after
+the correction.
+
 ## Residual risks and owner decisions
 
-- **Claim-branch 409 race (Opus R1 finding 1, accepted):** if the *target*
-  profile is disabled between link-profile's target SELECT and its
-  conditional UPDATE, the caller's temp row is already deleted and the 409
-  leaves the caller row-less; their next sign-in provisions a fresh
-  default-grant profile. The disabled profile itself stays disabled — this is
-  the accepted reprovisioning residual class, not a revocation bypass.
 - **Applicant pass-through on bare-auth routes (Opus R2 finding 4,
   pre-existing):** `requireAuth`'s revocation check deliberately skips
   `userType === 'applicant'` sessions (applicants have no `user_profiles`
@@ -130,11 +160,6 @@ converged with zero unresolved blocking or high-confidence findings.
   token without `azureId` skips the jwt active lookup and keeps its claims;
   it is denied only by `requireAuth`'s keyless-session 403. Do not remove
   that requireAuth branch on the belief that the jwt callback covers it.
-- **Transient signout window in createNew (Opus R1 finding 9, accepted):**
-  between the temp DELETE and the INSERT, a concurrent session read sees zero
-  rows and invalidates the token; the user re-signs-in and re-enters the
-  linking flow. Fail-closed direction, recoverable.
-
 - Hard-delete reprovisioning remains an explicitly accepted residual
   (audit §10.3); no tombstone/denylist implemented per owner scope.
 - A disabled profile that shares only an email (not `azure_id`) with a fresh

@@ -1,4 +1,4 @@
-# Session 432 Prompt: Revocation Hardening Implemented & Reviewed — Codex Read-Only Review Next
+# Session 432 Prompt: Codex Race Remediation Complete — Claude Re-Review Next
 
 ## Session 431 Summary
 
@@ -9,9 +9,13 @@ revocation hardening in the dedicated worktree
 Claude Fable orchestrated: three Sonnet builders with disjoint file
 ownership implemented the accepted audit's §10.2 behavioral invariants; two
 independent Opus adversarial reviewers then a third delta reviewer verified
-the result. **No invariant was refuted; the review cycle converged with zero
-unresolved blocking or high-confidence findings.** The branch is pushed and
-NOT merged.
+the result. An independent Codex merge review subsequently found that the
+accepted DELETE-before-replacement link-profile race contradicted the durable
+revocation invariant. Justin authorized Codex to fix it on this branch.
+Codex preserved the caller row for `createNew`, made existing-profile transfer
+transactional, added truthful zero-row archive semantics and discriminating
+tests, and reconciled the durable record. The branch remains NOT merged;
+Claude independently re-reviews the Codex delta next.
 
 ### What Was Completed
 
@@ -28,51 +32,57 @@ NOT merged.
      blob-proxy, upload-handler, health, api-capabilities; 403 on
      disabled/missing, 503 on DB error.
    - `requireAuthWithProfile` / `requireAppAccess` fail closed on zero rows.
-   - `link-profile` verifies the live caller before any write in BOTH
-     branches, with `is_active = true` conditional writes and a
-     rowcount-checked final UPDATE (409) as TOCTOU backstop.
+   - `link-profile` locks and verifies the live caller inside a transaction.
+     `createNew` finalizes the temporary row in place; existing-profile claims
+     lock caller + target and commit DELETE + UPDATE atomically, rolling the
+     DELETE back on any failed target outcome. Archive reports success only
+     when its UPDATE affects a row.
    - All revocation predicates are NULL-fail-closed (only
      `is_active === true` grants; review-round remediation).
    - No tombstone/denylist, no migration; `is_active = false` is the durable
      revocation mechanism; hard-delete reprovisioning stays an accepted
      residual.
-2. **41 new revocation tests** (verified by per-file jest runs + diff count) across `tests/unit/nextauth-revocation.test.js`
+2. **49 new revocation tests** across `tests/unit/nextauth-revocation.test.js`
    (11), `tests/unit/bare-auth-revocation.test.js` (8),
-   `tests/unit/link-profile-revocation.test.js` (12), and
-   `tests/unit/utils/auth.test.js` (+10 incl. discriminating zero-row and
-   NULL fixtures), each mutation-checked against the pre-fix code. Reviewer 2
-   mapped every §10.2 required-regression bullet to a concrete test.
+   `tests/unit/link-profile-revocation.test.js` (18),
+   `tests/unit/database-service-archive.test.js` (2), and
+   `tests/unit/utils/auth.test.js` (+10 including discriminating zero-row and
+   NULL fixtures). The Codex additions prohibit createNew DELETE/INSERT,
+   require caller + target row locks, prove a post-DELETE target failure rolls
+   back rather than commits, and pin zero-row archive failure.
 3. **Adversarial review record** (invariant table, builder assignments, all
-   three Opus passes, every finding disposition with evidence, residuals):
+   three Opus passes, Codex's merge review/remediation, every finding
+   disposition with evidence, residuals):
    `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`
    (status: complete).
 4. **Durable docs reconciled:** `docs/AUTHENTICATION_SETUP.md` (two contract
    rows), `docs/agent-wiki/topics/security-auth.md` (revocation bullet,
    layer wording per reviewer 1), source-file docblocks.
-5. **Verification, all green on the final tree:** full unit suite (7,652
-   tests; only the two failures that reproduce on pristine baseline
-   `d32e2d56`: `reconcile-probe-entity-set-count`,
-   `notification-trust-model-pushup` — pre-existing `main` drift, untouched
-   here); `check:api-routes` + self-test; `check:types`; `npm run lint`
-   (0 errors); `npm run build`; doc gates + self-tests (doc-currency,
-   fact-consistency, doc-symbol-refs, agent-wiki, canonical-pointers,
-   build-claim-freshness, docs-catalog); `git diff --check`.
+5. **Verification:** Claude's pre-Codex full-unit run executed 7,652 tests and
+   reproduced only the two failures also present on pristine baseline
+   `d32e2d56` (`reconcile-probe-entity-set-count` and
+   `notification-trust-model-pushup`). On the Codex-remediated final tree, the
+   complete targeted revocation run passed 91/91 tests across five suites;
+   `check:api-routes` + self-test, `check:types`, `npm run lint` (0 errors),
+   `npm run build`, `check:agent-invariants`, and the relevant doc gates +
+   self-tests all passed; `git diff --check` is clean.
 
 ### Commits (all on `codex/claude-revocation-hardening`)
 
 - `445dd1f8` — Implement disabled-account revocation hardening (audit §10.2 invariants)
 - `6268e26b` — Remediate Opus review findings: fail-closed NULL is_active + record review
-- (Session 431 closeout commit follows this file's update)
+- `7b8b3d95` — Close Session 431 with reviewed revocation-hardening handoff
+- (Owner-authorized Codex race-remediation commits follow)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Codex independent read-only review of `codex/claude-revocation-hardening`.**
-   Evidence: this branch at origin; work-order handoff sequence. Codex
-   reviews the diff `d32e2d56..HEAD` against
-   `docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md` §10.2
-   and the implementation record. Do not merge before this review.
+1. **Claude independent review of Codex's revocation-race remediation.**
+   Evidence: owner-authorized Codex changes on this branch after the initial
+   merge review. Claude verifies the transaction lifecycle, lock ordering,
+   in-place createNew semantics, archive row-count result, tests, and durable
+   reconciliation. Do not merge before this re-review.
 2. **Two pre-existing unit failures on `main`** (`reconcile-probe-entity-set-count`,
    `notification-trust-model-pushup`).
    Evidence: reproduced on pristine `d32e2d56` by three independent runs this
@@ -90,7 +100,8 @@ NOT merged.
 ### Owner Decision Needed (sequence preserved from the work order)
 
 1. **Review and deliberately merge `codex/claude-revocation-hardening`**
-   (after Codex's read-only review). `main` auto-deploys.
+   (after Claude's independent re-review of the Codex delta). `main`
+   auto-deploys.
 2. **Workbench observability Stage 1** in a FRESH worktree off post-merge
    `main` (never this worktree or the plan-review worktree).
 3. **Stage 2** only after a measured Stage 1 baseline and separate
@@ -109,12 +120,12 @@ NOT merged.
 ### Accepted Residuals This Session (owner may overturn at merge review)
 
 See `docs/audits/claude-revocation-hardening-implementation-2026-08-15.md`
-"Residual risks": claim-branch 409 race (reprovisioning class), applicant
-pass-through on bare-auth routes (pre-existing, proxy-guarded), jwt
-fall-through/`requireAuth` backstop coupling, createNew transient signout
-window, double `is_active` read on `requireAuthWithProfile` routes,
-`/api/health` 503 during a Postgres outage, hard-delete/email-only
-reprovisioning (no tombstone by owner decision).
+"Residual risks": applicant pass-through on bare-auth routes (pre-existing,
+proxy-guarded), jwt fall-through/`requireAuth` backstop coupling, double
+`is_active` read on `requireAuthWithProfile` routes, `/api/health` 503 during
+a Postgres outage, and hard-delete/email-only reprovisioning (no tombstone by
+owner decision). The link-profile 409 and createNew DELETE/INSERT races are
+resolved, not residuals.
 
 ### Do Not Reopen Without New Decision
 
@@ -134,7 +145,7 @@ reprovisioning (no tombstone by owner decision).
 | `docs/audits/claude-auth-side-effect-security-audit-2026-08-15.md` | The accepted audit this branch implements (§10.2 invariants) |
 | `pages/api/auth/[...nextauth].js` | signIn disabled-denial + jwt zero-row invalidation |
 | `lib/utils/auth.js` | requireAuth live active check; fail-closed helpers |
-| `pages/api/auth/link-profile.js` | Live caller guard + conditional persistence ordering |
+| `pages/api/auth/link-profile.js` | Locked caller guard + transactional identity transfer |
 | `tests/unit/*revocation*.test.js` | The new regression suites |
 
 ## Testing
