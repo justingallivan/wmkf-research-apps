@@ -69,7 +69,7 @@ measurement window. The runtime seams to Dataverse / Azure AD / Graph are:
 |---|---|---|---|
 | `lib/services/dynamics/http.js:24` (`fetchWithTimeout`) | All `DynamicsService` traffic: token (`dynamics/auth.js:65`), reads (`dynamics/read-ops.js`), writes (`dynamics/write-core.js`), schema (`dynamics/schema.js`) | **Wrapped** | Every `DynamicsService` caller app-wide (routes, crons, cold-start checks) |
 | `lib/services/graph-service.js:1154` (module-local `fetchWithTimeout`; **no import from dynamics/http.js** — its only import is `service-error.js`) | All Graph/SharePoint traffic incl. Azure AD token acquisition (`graph-service.js:101-135`), ~20 call sites | **Wrapped** | Every Graph caller app-wide |
-| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **Wrapped** | Every `client.js` caller — **including the ~55 operational scripts that require it**; script-emitted events carry no correlation fields and go to the invoking terminal's stdout, not the platform log stream |
+| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **Wrapped** | Every `client.js` caller — **including the 56 script files under `scripts/` that directly import/require it** (count independently verified by Codex, fourth pass, 2026-08-15); script-emitted events carry no correlation fields and go to the invoking terminal's stdout, not the platform log stream |
 | `lib/services/dataverse-export/fetch-client.js:61` (fourth local `fetchWithTimeout` copy) and `lib/services/dataverse-export/live-taxonomy.js:38,64` (raw fetches) | Export tooling | **Not wrapped** | No emission — named so the inventory is complete |
 | `lib/utils/health-checker.js:70,94,123` | Azure AD/token health probes | **Not wrapped** | No emission — named for completeness |
 
@@ -127,10 +127,27 @@ instrumenting one of these seams covers another is false and must not reappear.
      defined behavior, not an error.
 4. **Telemetry event contract (v1, provider-neutral, PII-safe):** one JSON object per dependency
    call:
-   `{event: 'workbench.dependency', v: 1, correlationId?, routeName?,
+   `{event: 'workbench.dependency', v: 1, eventId, correlationId?, routeName?,
    dependency: 'dataverse' | 'azuread' | 'graph' | 'unknown', resourceClass, operation, ms,
    outcome: 'success' | 'http_error' | 'timeout' | 'network_error',
    statusClass?: '2xx' | '3xx' | '4xx' | '5xx'}`.
+   - `eventId` (fourth-pass addition) is a **fresh `crypto.randomUUID()` minted once per emitted
+     event** — PII-free by construction, carrying no user, request, or resource identity. It exists
+     solely so downstream export slices can deduplicate soundly: `correlationId` identifies a whole
+     HTTP request and Vercel's `requestId` likewise spans every log line of a request, so neither —
+     with or without a timestamp — can distinguish two dependency calls that complete in the same
+     timestamp resolution, and full-line `sort -u` would collapse two legitimate identical calls.
+     **Deduplication happens ONLY on parsed `eventId`; `requestId`+timestamp and full-line
+     `sort -u` are prohibited as uniqueness keys.** Planned unit test: every emitted event has an
+     `eventId`, and two events emitted by the same wrapped call site in one request carry
+     different values.
+   - `operation` (fourth-pass definition — it was previously declared but underived) is the
+     **uppercase HTTP method of the dependency call matched against a fixed allowlist**
+     `{'GET','POST','PATCH','PUT','DELETE','HEAD','OPTIONS'}`; any other or missing method →
+     `operation: 'unknown'` (fail-closed). It is never a URL, path, query fragment, entity id,
+     filename, or any caller-provided arbitrary string — the allowlist is the entire value space.
+     The redaction/contract tests assert `operation` ∈ allowlist ∪ `{'unknown'}` for every emitted
+     event, including a seeded weird-method case that must land on `'unknown'`.
    - `event` is a **literal discriminator field inside the JSON object** (not just a prose name), so
      log filtering needs no message-shape heuristics. The event's timestamp is the platform log
      record's own timestamp (present in `vercel logs --json` output); the event body carries none.
@@ -179,8 +196,11 @@ instrumenting one of these seams covers another is false and must not reappear.
    locally with a Node check, 2026-08-15) — wrapped in the try/catch guard so a telemetry failure
    (including a `JSON.stringify` throw) cannot fail the request. **Planned unit test:** capture the
    emitted `console.log` argument, assert `JSON.parse` succeeds on it and that the parsed object
-   contains the literal discriminator `event: 'workbench.dependency'`. The log-query filter below
-   matches this exact serialization (`"event":"workbench.dependency"` as a JSON substring). No new
+   contains the literal discriminator `event: 'workbench.dependency'`. The **filter of record** in
+   the export workflow below is local JSON parsing of each log record's message (`fromjson?` +
+   `event == "workbench.dependency"`); the server-side `--query` is only a coarse full-text
+   volume-reduction hint (fourth-pass correction — exact-substring `--query` semantics were never
+   verified). No new
    table, no durable write — consistent with this stage's stop condition. The existing
    `api_usage_log` is the **LLM token/cost ledger** (`docs/atlas/postgres-infra-tables.md:147-149`)
    and is **not** repurposed or imitated.
@@ -213,35 +233,61 @@ instrumenting one of these seams covers another is false and must not reappear.
      set -euo pipefail   # errors visible and fatal; no stderr suppression anywhere
      OUT_DIR=${OUT_DIR:-$(mktemp -d)}   # or a defined scratch path; created explicitly
      SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T06:00:00Z'; LIMIT=5000
+     RAW="$OUT_DIR/raw-${SINCE}--${UNTIL}.ndjson"
      SLICE="$OUT_DIR/workbench-dependency-${SINCE}--${UNTIL}.ndjson"
+     # Step 1 — RAW capture. --query is a coarse FULL-TEXT volume-reduction hint only
+     # (Vercel documents --query as full-text search; it is NOT an exact JSON-substring
+     # discriminator and must not be treated as the filter of record).
      vercel logs --project <NAME_OR_ID> --environment production \
        --since "$SINCE" --until "$UNTIL" \
-       --query '"event":"workbench.dependency"' \
-       --json --limit "$LIMIT" > "$SLICE"
-     # Fail-closed completeness check: a slice at the limit is TRUNCATED, not complete.
-     LINES=$(wc -l < "$SLICE")
-     if [ "$LINES" -ge "$LIMIT" ]; then
-       echo "TRUNCATED slice ($LINES >= $LIMIT): narrow --since/--until and re-run" >&2
+       --query 'workbench.dependency' \
+       --json --limit "$LIMIT" > "$RAW"
+     # Step 2 — fail-closed completeness check on the UNFILTERED output, BEFORE any filtering:
+     # a raw capture at the limit is TRUNCATED, not complete.
+     RAW_LINES=$(wc -l < "$RAW")
+     if [ "$RAW_LINES" -ge "$LIMIT" ]; then
+       echo "TRUNCATED raw slice ($RAW_LINES >= $LIMIT): narrow --since/--until and re-run" >&2
        exit 1
      fi
+     # Step 3 — the filter of record is LOCAL JSON parsing of each record's .message:
+     # keep only records whose message parses as JSON with the exact discriminator, and
+     # fail closed on telemetry lines missing required fields instead of counting them.
+     jq -c '
+       (.message // "" | fromjson?) as $ev
+       | select($ev != null and $ev.event == "workbench.dependency")
+       | if ($ev.eventId and $ev.v and $ev.dependency and $ev.operation and $ev.outcome)
+         then {record: ., ev: $ev}
+         else error("malformed workbench.dependency event — fail closed, do not count")
+         end
+     ' < "$RAW" > "$SLICE"
      ```
 
      - **Time bounds:** explicit `--since`/`--until` per slice (ISO timestamps), stamped into the
        filename; per-event timestamps come from the platform log record in the `--json` output
        (the event body deliberately carries no timestamp field).
-     - **Server-side filtering:** `--query` matches the exact emitted serialization
-       (`"event":"workbench.dependency"`, produced by `console.log(JSON.stringify(event))`), so
-       result volume is bounded to actual dependency events; `--limit` is set explicitly (CLI
-       default is 100 — far too low to rely on implicitly).
-     - **Truncation/completeness:** a slice whose line count reaches `--limit` fails the run
-       (exit 1) and must be re-sliced narrower. **If slices cannot be proven complete within the
-       plan's retention and result limits, the REQUIRED fallback is a Log Drain or the dashboard
-       log export — incomplete CLI output is not valid measurement evidence.**
-     - **Deduplication:** if adjacent slice windows overlap, dedupe at aggregation time on the log
-       record's request id + timestamp (full-line `sort -u` as the degenerate fallback).
-     - **Version contract:** this command shape is verified against CLI `59.0.0` only; re-verify
-       `vercel --version` and `vercel logs --help` at measurement-window start, and do **not**
-       assume a CLI upgrade preserves these flags.
+     - **What is verified vs. what must be preflighted:** `vercel logs --help` on the pinned CLI
+       proves the flags **exist** — it does NOT prove `--query`'s matching semantics or the exact
+       `--json` record field names (`.message` etc.). At window start, **preflight against a known
+       emitted event**: emit one test event, capture it with this workflow, and confirm the coarse
+       query returns it and the `jq` filter isolates it, before trusting any measurement slice.
+       `--limit` stays explicit (CLI default is 100 — far too low to rely on implicitly).
+     - **Truncation/completeness:** checked on the RAW unfiltered line count, before local
+       filtering (a post-filter count says nothing about what the server dropped). At-limit ⇒
+       exit 1 ⇒ re-slice narrower. **If slices cannot be proven complete within the plan's
+       retention and result limits, or the `--json` record shape cannot be confirmed in
+       preflight, the REQUIRED fallback is a Log Drain or the dashboard log export — incomplete
+       CLI output is not valid measurement evidence.**
+     - **Deduplication:** across overlapping slices, deduplicate **only on the parsed event's
+       `eventId`** (unique per emitted event by construction — see the envelope contract).
+       `requestId`+timestamp and full-line `sort -u` are prohibited: a request's `requestId` spans
+       all its log lines, two dependency calls can share a timestamp resolution, and identical
+       legitimate calls must both count. A verified-unique platform log-record id is an acceptable
+       alternative key **only if** its presence and uniqueness in the actual CLI JSON output are
+       explicitly confirmed in the window-start preflight, failing closed when absent.
+     - **Version contract:** flag existence is verified against installed CLI `59.0.0` only
+       (59.1.3 is already published — do **not** upgrade silently mid-plan); the plan stays pinned
+       to the tested version, and any CLI upgrade requires complete revalidation of the workflow
+       (flags, query behavior, JSON shape) before use.
    - **Retention:** platform log retention on the current Vercel plan must be **verified at window
      start**. Historical queries can only reach records still within retention, so slices must be
      captured on a cadence shorter than the retention period; if retention proves too short for
@@ -419,8 +465,24 @@ any such change must preserve the S213/S400/S401 correctness invariants. Compone
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-15, third pass (post-Codex third review, six additional findings folded in):
-READY WITH NAMED CHANGES.** The third pass verified: thrown-error `outcome` mapping matches the
+**Mode A, 2026-08-15, fourth pass (post-Codex fourth review, findings Q1–Q3 folded in): READY
+WITH NAMED CHANGES.** The fourth pass verified: event deduplication is now sound — a per-event
+`eventId` (`crypto.randomUUID()`) is part of the v1 envelope and is the only permitted dedup key
+(`requestId`+timestamp and full-line `sort -u` are prohibited; a verified-unique platform
+log-record id is acceptable only after explicit window-start preflight, failing closed when
+absent); the export workflow no longer overclaims `--query` semantics — the server query is a
+coarse full-text volume-reduction hint, the filter of record is local `jq` parsing of `.message`
+via `fromjson?` with fail-closed handling of malformed/missing-field events, and truncation is
+checked on the RAW unfiltered line count before any filtering; `operation` is now a fixed
+allowlisted HTTP-method enum with fail-closed `'unknown'`, covered by the redaction/contract
+tests; the CLI contract stays pinned to the tested 59.0.0 (59.1.3 published — no silent upgrade;
+upgrade ⇒ full revalidation), with flag existence separated from the query/JSON-shape semantics
+that a window-start preflight against a known emitted event must confirm; and the `client.js`
+script-consumer count is corrected to the independently verified 56. Named changes remain the
+owner items listed at the end of this section; the third-pass "no claim contradicted by current
+source" statement is superseded by this paragraph for the Q1–Q3 surfaces.
+
+**Prior pass (third, same date):** The third pass verified: thrown-error `outcome` mapping matches the
 actual `service-error.js` classification (`AbortError` → `causeKind: 'abort'`, `:88` — helper
 timeouts are aborts, so `abort`/`timeout` both map to `outcome: 'timeout'`; `service-error.js`
 unchanged); the emitter contract is exactly `console.log(JSON.stringify(event))` with a planned

@@ -3,7 +3,7 @@ title: Claude Response — Codex Adversarial Review of the Workbench Observabili
 domain: architecture
 kind: audit
 status: final
-summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its two follow-up passes (8 + 5 + 6 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
+summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its three follow-up passes (8 + 5 + 6 + 3 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -384,10 +384,72 @@ work order and were verified locally before revision.
 - `SESSION_PROMPT.md` said "`main` is at `171c46a9` and auto-deployed" — present-tense and stale
   (the local baseline has advanced). Reworded as historical Session 428 state.
 
+## Fourth pass — Codex fourth review (2026-08-15), findings Q1–Q3
+
+**Provenance:** findings relayed in Codex's review message accompanying the owner work order
+(with Vercel documentation citations); verified against the plan text and the emission/count
+semantics before revision. Codex independently re-verified the third-pass corrections and re-ran
+the ten documentation gates + self-tests, lint, and production build (all passed) before raising
+these.
+
+### Q1 (dedup key `requestId`+timestamp / `sort -u` is not sound) — CONFIRMED
+
+- Vercel's `requestId` identifies the whole HTTP request (every log line of a request shares it),
+  multiple dependency events in one request can share a timestamp resolution, and full-line
+  `sort -u` collapses legitimate identical calls — corrupting exactly the dependency-call-count
+  numerator Stage 2's acceptance formula depends on.
+- **Plan change:** `eventId` (fresh `crypto.randomUUID()` per emitted event, PII-free by
+  construction) added to the v1 envelope with a planned uniqueness test; deduplication is
+  permitted **only** on parsed `eventId`; `requestId`+timestamp and full-line `sort -u` are
+  prohibited; a verified-unique platform log-record id is an acceptable alternative only after
+  explicit window-start preflight confirms its presence and uniqueness, failing closed when
+  absent.
+
+### Q2 (`--query` exact-match overclaim; truncation must precede filtering) — CONFIRMED
+
+- `vercel logs --help` (the basis of the third-pass verification) proves the `--query` flag
+  exists; it does not prove matching semantics. Vercel documents `--query` as full-text search;
+  the quoted colon expression may be parsed as query syntax. Additionally, checking truncation on
+  a server-filtered result says nothing about what the server dropped.
+- **Plan change:** two-step workflow — coarse full-text `--query 'workbench.dependency'`
+  explicitly labeled a volume-reduction hint; RAW unfiltered NDJSON written first; truncation
+  checked on RAW line count **before** any filtering (at-limit ⇒ exit 1); the filter of record is
+  local `jq` parsing of `.message` via `fromjson?` selecting `event == "workbench.dependency"`,
+  failing closed (error, not silent skip) on events missing required fields; dedup on the Q1
+  `eventId`; Log Drain / dashboard export remains the required fallback when completeness or JSON
+  shape cannot be proven. The plan now separates what `--help` verified (flag existence) from
+  what a window-start preflight against a known emitted event must confirm (query behavior,
+  `--json` record field shape). The sink bullet's "filter matches this exact serialization"
+  claim was corrected to match.
+
+### Q3 (`operation` declared but underived in a PII-safe contract) — CONFIRMED
+
+- The envelope declared `operation` while defining allowlisted derivation only for `dependency`
+  and `resourceClass` — an open field in a contract whose whole point is a closed value space.
+- **Plan change:** `operation` = uppercase HTTP method matched against the fixed allowlist
+  `{'GET','POST','PATCH','PUT','DELETE','HEAD','OPTIONS'}`, anything else → `'unknown'`
+  (fail-closed); never a URL, path, query fragment, entity id, filename, or caller-provided
+  string; redaction/contract tests assert membership including a seeded weird-method →
+  `'unknown'` case.
+
+### Fourth-pass corrections of record
+
+- Script-consumer count: Codex independently counted **56** files under `scripts/` directly
+  importing/requiring `lib/dataverse/client.js`; the plan's "~55" (from the first-pass trace) is
+  corrected to the verified 56.
+- CLI pinning: installed 59.0.0 is behind published 59.1.3; the plan stays pinned to the tested
+  version, forbids silent upgrade mid-plan, and requires complete workflow revalidation on any
+  upgrade.
+- The third-pass "the revised plan contains no claim contradicted by current source" statement is
+  **superseded for the Q1–Q3 surfaces** (they contained the defects above at the time it was
+  written); the original third-pass wording remains in the branch history (`5f38f006`) as the
+  point-in-time record.
+
 ## Final verdict
 
 **READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15,
-third pass). The named changes are the owner items above, not structural rework. All eight
-findings from the first Codex review, all five from the second pass, and all six from the third
-pass are CONFIRMED and folded in; the revised plan contains no claim contradicted by current
-source; it remains a draft not authorized for implementation.
+fourth pass). The named changes are the owner items above plus the window-start preflight
+obligations now written into the plan, not structural rework. All findings across the four review
+passes (8 + 5 + 6 + 3) are CONFIRMED and folded in; as of this pass the revised plan contains no
+known claim contradicted by current source or platform documentation; it remains a draft not
+authorized for implementation.

@@ -37,7 +37,10 @@ worktree was clean.
      was likewise confirmed and folded in on the same branch (`96190462`), as was a
      third six-finding correction pass (timeout classification, JSON emitter
      contract, historical Vercel CLI 59.0.0 log workflow, emission-vs-measurement
-     scope, unverified-volume sampling assumption, durable-state cleanup). Full artifact set under
+     scope, unverified-volume sampling assumption, durable-state cleanup) and a
+     fourth Q1–Q3 pass (per-event `eventId` dedup key, coarse-query + local-jq
+     filter-of-record workflow with RAW-first truncation check, allowlisted
+     `operation` enum). Full artifact set under
      `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**
