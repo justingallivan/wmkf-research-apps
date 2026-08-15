@@ -591,6 +591,15 @@ review; each verified locally before revision.
   is a prerequisite for nothing and appears in no residual assumption; the Stage 2 derivability
   example now names the resolved `wmkf_potentialreviewerses` literal.
 
+**Sixth-pass amendment (same day):** Codex's read-only re-review caught one compatibility error
+in the sixth-pass map — it allowed `graph`/`'token'`, but GraphService acquires its token from
+`login.microsoftonline.com` (`[VERIFIED via lib/services/graph-service.js:122]`), so the host
+classifier labels that leg `azuread`/`'token'` and no `graph`/`'token'` event can legally exist.
+`'token'` is removed from `classesFor("graph")` in the plan's validator; fixture coverage
+re-run proves `azuread`/`token` and `graph`/`site`,`drive`,`drive-item`,`search`,`unknown` are
+accepted while `graph`/`token` is rejected, with all prior suites still green. The plan's
+revision-history pass count is corrected to five further same-day passes.
+
 **Durable-state status as of the sixth pass:** plan, response audit, and `SESSION_PROMPT.md`
 reconciled; the fifth-pass `[ASSUMED]` spellings, `$RESOURCE_CLASSES` variable,
 jq-argument-plumbing preflight item, and `--query`-semantics assumption are superseded in labeled

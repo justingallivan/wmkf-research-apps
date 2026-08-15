@@ -30,7 +30,7 @@ usable. No stage is started until the owner names it and authorizes implementati
 adversarial review** (`docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md`,
 disposition `docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`). All eight Codex
 findings were independently re-verified against current source and confirmed; the corrections are
-folded in below, and four further same-day Codex review passes are dispositioned in the same
+folded in below, and five further same-day Codex review passes are dispositioned in the same
 response artifact (pass trail in the Contract-reconcile verdict section). Key changes: the false "Dynamics seam covers Graph" claim is replaced by a full
 egress inventory; correlation is an independent pre-auth ALS, not a DAL-context field; the telemetry
 event contract, sink, and failure semantics are now explicit; Stage 2's census is chunk-aware and
@@ -183,10 +183,12 @@ instrumenting one of these seams covers another is false and must not reappear.
        allowlisted), `$batch`, `EntityDefinitions…`, and any unmatched segment fails closed to
        `'unknown'`. Extending the allowlist is a reviewed commit.
      - **`dependency: 'graph'`** → coarse path class from the fixed set
-       `{'token', 'site', 'drive', 'drive-item', 'search'}` (token endpoint → `'token'`;
-       `/sites…` → `'site'`; `/drives…` root/children listing → `'drive'`; item-addressed
-       content/metadata/versions/upload/delete → `'drive-item'`; `/search/query` → `'search'`);
-       anything else → `'unknown'`.
+       `{'site', 'drive', 'drive-item', 'search'}` (`/sites…` → `'site'`; `/drives…`
+       root/children listing → `'drive'`; item-addressed content/metadata/versions/upload/delete
+       → `'drive-item'`; `/search/query` → `'search'`); anything else → `'unknown'`. There is
+       **no** `graph`/`'token'` pair: GraphService acquires its token from
+       `login.microsoftonline.com` (`graph-service.js:122`), which the host classifier labels
+       `dependency: 'azuread'`, `resourceClass: 'token'`.
      - **Total v1 value set** (inlined as `classesFor(dependency)` in the export validator, keyed
        per dependency): the six Dataverse entity-set literals ∪
        `{'token','site','drive','drive-item','search','unknown'}` — the validator additionally
@@ -320,7 +322,7 @@ instrumenting one of these seams covers another is false and must not reappear.
          elif d == "dataverse" then ["wmkf_potentialreviewerses","wmkf_appreviewersuggestions",
                                      "akoya_requests","accounts","systemusers",
                                      "wmkf_appuserappaccesses","unknown"]
-         elif d == "graph"     then ["token","site","drive","drive-item","search","unknown"]
+         elif d == "graph"     then ["site","drive","drive-item","search","unknown"]
          elif d == "unknown"   then ["unknown"]
          else [] end;
        select((.message | type) == "string"
@@ -366,9 +368,12 @@ instrumenting one of these seams covers another is false and must not reappear.
      **Steps 2–4 were exercised locally (2026-08-15) under `set -euo pipefail` against fixture
      NDJSON:** valid events pass (ordinary string logs and non-string `message` records are
      skipped, not fatal); a discriminator-containing unparseable line fails the slice with no
-     partial file; an invalid contract (success + `4xx`) fails; an incompatible
-     dependency/resourceClass pair (`azuread` + `drive-item`) fails; identical duplicate
-     `eventId`s dedupe to one; conflicting payloads sharing an `eventId` fail the merge. An
+     partial file; an invalid contract (success + `4xx`) fails; incompatible
+     dependency/resourceClass pairs fail (`azuread`+`drive-item`, and `graph`+`token` — the
+     GraphService token leg classifies as `azuread`/`token` by host, so `graph`/`token` is
+     illegal) while `azuread`/`token` and `graph`/`site`, `drive`, `drive-item`, `search`,
+     `unknown` are all accepted; identical duplicate `eventId`s dedupe to one; conflicting
+     payloads sharing an `eventId` fail the merge. An
      optional query-assisted **triage** command (`vercel logs … --query 'workbench.dependency' …`)
      may be used to eyeball volume before capture, but it is **never** the capture of record, is
      not part of the trusted preflight, and proves nothing about completeness — no measurement
@@ -601,7 +606,12 @@ http_error ⇒ 3xx/4xx/5xx; timeout/network_error ⇒ none) and type-checks `mes
 optional triage that is a prerequisite for nothing and appears in no residual assumption. The
 fifth-pass paragraph below is superseded where it conflicts (its `[ASSUMED]` entity-set
 spellings, `$RESOURCE_CLASSES` operator variable, jq-argument-plumbing preflight item, and
-`--query`-semantics residual assumption).
+`--query`-semantics residual assumption). **Same-day amendment:** the sixth-pass compatibility
+map erroneously allowed `graph`/`'token'` — GraphService acquires its token from
+`login.microsoftonline.com` (`graph-service.js:122`), so that leg classifies as
+`azuread`/`'token'` and `'token'` is removed from the graph class set; fixture coverage now
+proves `graph`/`token` fails while `azuread`/`token` and all four graph path classes (plus
+`unknown`) pass.
 
 **Prior pass (fifth, same date):** The fifth pass verified: the capture of record is now genuinely unfiltered (no
 `--query`; server filtering would void the completeness check; query-assisted capture survives
