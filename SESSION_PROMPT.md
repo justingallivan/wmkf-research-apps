@@ -19,12 +19,20 @@ merged and deleted (local + remote); the worktree is clean.
    - Architecture verdict: **measure/observability-first, then an in-service read
      merge — NOT the full Request Workbench Data Plane** (deferred, not rejected,
      because there is zero per-dependency timing instrumentation to justify it). The
-     source-certain finding is redundant reads (`wmkf_potentialreviewers` ×6 across
-     3 routes per reviewer-tab action, no DAL memoization).
+     source-certain finding is redundant reads: three sibling `wmkf_potentialreviewers`
+     read-pairs across two services (chunk-aware count, `q(n)=ceil(n/25)`:
+     before `2q+2q+2q+q(decline)`, after `q+q+q+q` — the earlier fixed "×6 across
+     3 routes" phrasing was not a valid census; decline-referrals has a single
+     unmergeable read).
    - Staged plan `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`, Opus
      adversarially reviewed (`changes required` → all 9 findings folded in, incl. a
-     corrected Stage 2 mechanism), contract-reconcile Mode A `READY WITH NAMED
-     CHANGES`. Full artifact set under `docs/audits/fable-*-2026-08-14.md`.
+     corrected Stage 2 mechanism). Subsequently re-reviewed by Codex on 2026-08-15
+     (`docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md`,
+     verdict NEEDS REWORK — all 8 findings confirmed) and revised on branch
+     `codex/claude-workbench-plan-revision`
+     (`docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`, fresh
+     Mode A `READY WITH NAMED CHANGES`). Full artifact set under
+     `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**
    - **T1 — reviewer merge authorization:** keep as-is (org-open, app-level access).
@@ -58,11 +66,16 @@ merged and deleted (local + remote); the worktree is clean.
 ### Verified Open
 
 1. **Stage 1 — the observability seam — is the next authorizable implementation.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` Stage 1 is
-   fully specified (per-dependency timing at `lib/services/dynamics/http.js:24` +
-   the `lib/dataverse/client.js` second egress, PII-redacted, correlation id) and is
-   the measurement foundation every later stage depends on. It is a draft NOT yet
-   authorized to build; naming it authorizes Phase 8.
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` Stage 1 (as
+   revised 2026-08-15 after the Codex adversarial review) instruments **three**
+   egress seams — `lib/services/dynamics/http.js:24`, the module-local
+   `graph-service.js` transport (Graph does NOT route through the Dynamics helper),
+   and `lib/dataverse/client.js` — with a versioned PII-safe event contract and an
+   independent pre-auth request-correlation ALS (not the DAL context). It is the
+   measurement foundation every later stage depends on. It is a draft NOT yet
+   authorized to build; naming it authorizes Phase 8. Merge of branch
+   `codex/claude-workbench-plan-revision` (Codex read-only review first) precedes
+   any authorization.
 
 2. **Audit follow-ups surfaced but not acted on (scope discipline):**
    - Security Operating Plan is materially drifted (~12 controls unrecorded since

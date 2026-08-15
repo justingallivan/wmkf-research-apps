@@ -6,12 +6,14 @@ status: draft
 summary: "Staged plan: instrument the Workbench data path, then coalesce in-request duplicate Dataverse reads. Full Data Plane deferred until measured."
 canonical: false
 cataloged: 2026-08-14
-last_verified: 2026-08-14
+last_verified: 2026-08-15
 owner: product-engineering
 related:
   - docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md
   - docs/audits/fable-performance-refactor-evidence-2026-08-14.md
   - docs/audits/fable-security-audit-2026-08-14.md
+  - docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md
+  - docs/audits/claude-workbench-observability-plan-response-2026-08-15.md
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
 ---
 
@@ -22,174 +24,304 @@ related:
 `docs/audits/fable-*-2026-08-14.md` artifacts. Every stage leaves the build green and the old path
 usable. No stage is started until the owner names it and authorizes implementation (brief Phase 8).
 
-**Revised 2026-08-14 after Opus adversarial review** (`docs/audits/fable-refactor-plan-opus-review-2026-08-14.md`,
-disposition `docs/audits/fable-refactor-plan-disposition-2026-08-14.md`). The review accepted the
-observability-first direction but corrected Stage 1's seam, Stage 2's mechanism, and the T2 severity
-framing. All accepted changes are folded in below.
+**Revision history:** revised 2026-08-14 after Opus adversarial review
+(`docs/audits/fable-refactor-plan-opus-review-2026-08-14.md`, disposition
+`docs/audits/fable-refactor-plan-disposition-2026-08-14.md`); revised again **2026-08-15 after Codex
+adversarial review** (`docs/audits/codex-workbench-observability-plan-adversarial-review-2026-08-15.md`,
+disposition `docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`). All eight Codex
+findings were independently re-verified against current source and confirmed; the corrections are
+folded in below. Key changes: the false "Dynamics seam covers Graph" claim is replaced by a full
+egress inventory; correlation is an independent pre-auth ALS, not a DAL-context field; the telemetry
+event contract, sink, and failure semantics are now explicit; Stage 2's census is chunk-aware and
+formula-based; T2 moved to completed history; T1 is uniformly closed.
 
 ## Why this and not the full Data Plane
 
 The audit found **zero per-dependency timing instrumentation** in the staff path (grep-verified
-negative), so no caching or data-plane refactor can be justified on measured return today. It also
-found a **source-certain** redundant-read pattern (per reviewer-tab action, with no DAL-level dedup:
-`akoya_requests` ×2, suggestion set ×3, `wmkf_potentialreviewers` ×6 queries across 3 routes). And it found that the
-broad post-mutation refreshes are **deliberate fixes for prior correctness bugs** (S213, S400/S401).
+negative, re-verified 2026-08-15: no middleware, no correlation header handling, one ALS in the repo
+and it is the DAL restriction context). It also found a **source-certain** redundant-read pattern:
+per reviewer-tab action, three sibling person-read pairs run the same `wmkf_potentialreviewers`
+id-filtered query twice with disjoint `$select` (see Stage 2 for the exact chunk-aware census; the
+earlier fixed "×6 across 3 routes" phrasing was not a valid count). And it found that the broad
+post-mutation refreshes are **deliberate fixes for prior correctness bugs** (S213, S400/S401).
 
 Conclusion: measure first, then remove certain-avoidable work behind stable seams, and only expand
 toward the Data Plane's authoritative-response/selective-invalidation parts once Stage 1 metrics show
-they pay. The reviewer authorization gap (T1) and cron-token eligibility divergence (T2) are real and
-are handled as **separate smallest-safe security repairs**, not folded into the refactor.
+they pay. The two security findings the audit raised are both closed: T1 accepted by design (owner,
+2026-08-15) and T2 fixed and shipped in Session 428 — see the closed-findings sections below.
 
 ## Release-tier and posture
 
-All stages touch Dataverse-read paths and/or reviewer/authz surfaces → **Tier 2** under
+All stages touch Dataverse-read paths → **Tier 2** under
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` (branch/worktree isolation, characterization
 tests first, preview rehearsal, recorded last-known-good + rollback, explicit owner merge decision).
-Campaign window is **[NEEDS OWNER]** — assume the restrictive posture; the security repairs (S3/S4)
-may warrant campaign-blocker status the owner must rank.
+Campaign window is **[NEEDS OWNER]** — assume the restrictive posture.
+
+## External-egress inventory (verified 2026-08-15)
+
+There is **no single shared transport**. The runtime seams to Dataverse / Azure AD / Graph are:
+
+| Seam | What it carries | Stage 1 scope |
+|---|---|---|
+| `lib/services/dynamics/http.js:24` (`fetchWithTimeout`) | All `DynamicsService` traffic: token (`dynamics/auth.js:65`), reads (`dynamics/read-ops.js`), writes (`dynamics/write-core.js`), schema (`dynamics/schema.js`) | **In scope** |
+| `lib/services/graph-service.js:1154` (module-local `fetchWithTimeout`; **no import from dynamics/http.js** — its only import is `service-error.js`) | All Graph/SharePoint traffic incl. Azure AD token acquisition (`graph-service.js:101-135`), ~20 call sites | **In scope** |
+| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **In scope** |
+| `lib/services/dataverse-export/fetch-client.js:61` (fourth local `fetchWithTimeout` copy) and `lib/services/dataverse-export/live-taxonomy.js:38,64` (raw fetches) | Export tooling | Out of scope (not the Workbench request path) — named so the inventory is complete |
+| `lib/utils/health-checker.js:70,94,123` | Azure AD/token health probes | Out of scope — named for completeness |
+| `scripts/**` via `lib/dataverse/client.js` | Operational scripts | Out of scope |
+
+Any claim that instrumenting one of these seams covers another is false and must not reappear.
 
 ---
 
 ## Stage 1 — Observability seam (measurement foundation)
 
-1. **Objective / invariant:** add **external-dependency (Dataverse + Graph/SharePoint) timing** + one
-   correlation id per HTTP request across the Workbench data path, changing **no** user-visible
-   behavior. Emit `{correlationId, entitySet, operation, ms}` at the shared transport. (Scope
-   corrected per Opus P2-7: this stage times the external leg only; Postgres and client-render timing
-   are named later measurement, not gated by this stage.)
-2. **Preconditions / characterization:** a test asserting current responses are byte-identical before
-   and after (timing is additive, non-functional). Confirm no existing correlation field collides
-   (the audit found only business-`requestId`; the `withDalContext` store's `requestId` slot is
-   already occupied by the scope label, so use a **distinct** key, e.g. `reqCorrelationId`).
-3. **Exact files (in order) — corrected per Opus P1-2:** add `lib/observability/request-correlation.js`
-   (new); wrap the **real transport `lib/services/dynamics/http.js:24` (`fetchWithTimeout`)** — NOT the
-   `dynamics-service.js` facade, which contains zero `fetch` calls; this seam also covers
-   `graph-service.js` (all its calls route through the same helper). **PII rule:** derive `entitySet`
-   from the URL **path segment only**; never emit the raw URL or `$filter` string (OData filters embed
-   names/emails). **Second-seam follow-up:** `lib/dataverse/client.js:50,106` is a separate egress used
-   by `dataverse-app-access-service.js`/`dataverse-settings-service.js` (on the `requireAppAccess` hot
-   path); it must be wrapped too or Stage 1 stays blind to auth-path Dataverse calls — do it in the
-   same stage or name it as the immediate Stage 1b. Thread the correlation id from the route shell.
-   Consumers: a lightweight `api_usage_log`-style sink or structured `console` line (no new table in
-   Stage 1).
-4. **Caller→auth→service→persistence→consumer trace:** route shell mints id → `withDalContext` carries
-   it → adapters read it for the timing emit → sink. No authz change; no durable write beyond the
-   existing log path.
-5. **Contracts:** timing emit must never throw into the request path (best-effort, try/catch, drop on
-   error). No status-code, partial-success, or concurrency semantics change.
-6. **Non-goals / denylist:** no caching, no dedup, no response-shape change, no new Dataverse entity,
-   no client change. Denylist: `shared/components/**`, all mutation services.
-7. **Sonnet work order size:** one focused order (~1 new file + 2 wrapped seams + tests).
-8. **Tests:** unit (timing wrapper emits on success + swallows on error), integration (byte-identical
-   response), and a check that the correlation id propagates through one multi-adapter route.
-9. **Gates:** `check:dataverse-access-layer` + self-test (touching the transport), `check:types`,
-   `check:api-routes` if a route file changes — run serially.
-10. **Performance acceptance:** overhead < a small fixed budget per request (measure the wrapper cost
-    itself); the *output* is the metric stream, compared against the pre-Stage-1 absence of data.
-11. **Security acceptance:** the correlation id and timings carry **no** PII/token/secret (assert in a
-    redaction test); the sink is not a new sensitive-content store.
-12. **Release:** Tier 2; last-known-good = pre-stage deployment; rollback = revert (pure additive).
-13. **Docs:** update `docs/SECURITY_OPERATING_PLAN.md` observability section and the Atlas if a sink
-    table is added later (not in Stage 1).
-14. **Stop conditions / owner:** if adding the seam requires touching authz or a durable write, stop
-    and re-scope. **This stage must ship and run through one real usage window before Stage 2+ can
-    claim measured improvement.**
+1. **Objective / invariant:** add external-dependency (Dataverse + Azure AD + Graph/SharePoint)
+   timing with one correlation id per HTTP request across the Workbench data path, changing **no**
+   user-visible behavior. (Scope per Opus P2-7: external legs only; Postgres and client-render timing
+   are later measurement, not gated by this stage.)
+2. **Correlation context (corrected per Codex P1-2):** new `lib/observability/request-correlation.js`
+   owning its **own dedicated `AsyncLocalStorage` instance** — fully independent of the DAL
+   restriction ALS in `lib/services/dynamics-context.js`. API: `withRequestCorrelation({correlationId,
+   routeName}, fn)` and `getRequestCorrelation()` (returns the store or `undefined`). It is
+   established at the **first line of each target HTTP handler, before `requireAppAccess`** — this is
+   mandatory because an uncached app-access lookup performs a Dataverse call inside
+   `requireAppAccess` itself (`lib/utils/auth.js:321-341`, cache miss on cold instance or after the
+   2-minute TTL, via `dataverse-app-access-service.js` → `lib/dataverse/client.js`). Because the two
+   ALS instances are separate, entering/leaving nested or sequential `withDalContext` scopes cannot
+   replace or erase the correlation store. The DAL store (`{restrictions, requestId}`, where
+   `requestId` is the scope label — `dynamics-context.js:55-58`) is **not modified**; do not add
+   fields to it and do not claim `withDalContext` carries correlation.
+3. **Exact files:**
+   - `lib/observability/request-correlation.js` (new — ALS + emit helper).
+   - Wrap the three egress seams marked in scope in the inventory above:
+     `lib/services/dynamics/http.js` (`fetchWithTimeout`), `lib/services/graph-service.js`
+     (module-local `fetchWithTimeout`), `lib/dataverse/client.js` (both the token fetch at `:50` and
+     the data fetch inside `createClient`, `:106`).
+   - Establish correlation at handler entry in the three target routes:
+     `pages/api/review-manager/reviewers.js` (handler entry, before `requireAppAccess` at `:43`),
+     `pages/api/reviewer-finder/my-candidates.js` (before `:47`),
+     `pages/api/workbench/decline-referrals.js` (before `:32`).
+     There is no existing shared route wrapper (verified — the routes hand-roll
+     `requireAppAccess` → `withDalContext` inline); wrapping these three handlers directly is the
+     Stage 1 scope. If a common wrapper is preferred, it is a separately reviewed change, not an
+     implementer improvisation.
+   - **Non-HTTP callers** (cron, cold-start `instrumentation.js`, scripts): `getRequestCorrelation()`
+     returns `undefined` and events are emitted **without** `correlationId`/`routeName`. That is the
+     defined behavior, not an error.
+4. **Telemetry event contract (v1, provider-neutral, PII-safe):** one JSON object per dependency
+   call:
+   `{v: 1, correlationId?, routeName?, dependency: 'dataverse' | 'azuread' | 'graph',
+   resourceClass, operation, ms, outcome: 'success' | 'http_error' | 'timeout' | 'network_error',
+   statusClass?: '2xx' | '3xx' | '4xx' | '5xx'}`.
+   - `dependency` is derived from a **host-aware allowlisted classifier** (`login.microsoftonline.com`
+     → `azuread`, `graph.microsoft.com` → `graph`, the configured Dynamics host → `dataverse`);
+     unknown hosts → `dependency: 'unknown'`.
+   - `resourceClass` is a **safe coarse class from a fixed allowlist** (for Dataverse: the entity-set
+     name matched against a tracked allowlist; for Graph: a coarse operation class like `drive-item`,
+     `site`, `search`, `token`). Anything unmatched fails closed to `resourceClass: 'unknown'` —
+     never a raw path fallback.
+   - **Never emitted:** raw URLs, query strings (`$filter` embeds names/emails), arbitrary path
+     segments, tenant identifiers, drive/item ids, filenames, signed-URL material, tokens, headers,
+     request/response bodies. A redaction unit test asserts the emitted object contains none of a
+     seeded set of sensitive markers.
+5. **Failure semantics (explicit, per Codex P2-1):** timing is recorded in `finally` (or equivalent)
+   so **successes, non-2xx responses, timeouts, and thrown network errors are all timed**, with
+   `outcome`/`statusClass` set accordingly. The wrapper returns the **original `Response` object**
+   and rethrows the **original error** (same identity, same shape — no wrapping, no `.clone()`
+   substitution, no consumption of the body). **Only telemetry-emission failures are swallowed**
+   (try/catch around the emit alone); dependency failures always propagate unchanged.
+6. **Sink (chosen, per Codex P2-2): structured platform logs (Vercel) via a single `console.log` of
+   the JSON event, event name `workbench.dependency`.** No new table, no durable write — consistent
+   with this stage's stop condition. The existing `api_usage_log` is the **LLM token/cost ledger**
+   (`docs/atlas/postgres-infra-tables.md:147-149`) and is **not** repurposed or imitated.
+   - **Sampling:** 100% (workbench traffic is low-volume; revisit only if log cost is observed).
+   - **Query workflow:** route-level counts and latency distributions are obtained from the Vercel
+     log stream filtered on `workbench.dependency`, exported (dashboard export or `vercel logs`)
+     into a scratch analysis at the end of the measurement window.
+   - **Retention:** platform log retention on the current Vercel plan must be **verified at window
+     start**; if retention is shorter than the measurement window, schedule periodic exports so no
+     window data is lost. `[NEEDS OWNER — plan-tier retention confirmation]`
+   - **Failure isolation:** emission is the try/catch-guarded `console.log` above; it cannot fail the
+     request. If a durable sink is ever chosen later, that is a re-scope requiring migration, Atlas,
+     retention, and privacy contracts — not an implementer option in this stage.
+7. **Preconditions / characterization:** a test asserting current responses are byte-identical before
+   and after (timing is additive, non-functional).
+8. **Trace:** handler entry mints `{correlationId, routeName}` in the observability ALS →
+   `requireAppAccess` (its cache-miss Dataverse call is inside the correlation scope) → route
+   `withDalContext` scope → services/adapters → the three wrapped seams read the correlation store at
+   emit time → platform log line. No authz change; no durable write.
+9. **Non-goals / denylist:** no caching, no dedup, no response-shape change, no new Dataverse entity,
+   no client change, no edits to `lib/services/dynamics-context.js` or
+   `lib/dataverse/core/context.js`. Denylist: `shared/components/**`, all mutation services.
+10. **Work order size:** one focused order (~1 new file + 3 wrapped seams + 3 route-entry lines +
+    tests).
+11. **Tests:** unit — wrapper emits on success, non-2xx, timeout, and thrown network error; original
+    `Response`/error identity preserved when telemetry works **and when the emit itself throws**;
+    redaction test (no sensitive markers). Correlation — two concurrent requests do not leak ids
+    across each other; a nested `withDalContext` scope preserves the outer correlation; the uncached
+    `requireAppAccess` lookup sees the same correlation id as the post-auth service reads; a non-HTTP
+    caller emits a well-formed event with no correlation fields. Integration — byte-identical
+    response through one multi-adapter route.
+12. **Gates:** `check:dataverse-access-layer` + self-test (touching the transport), `check:types`,
+    `check:api-routes` + self-test (route files change) — run serially.
+13. **Performance acceptance:** wrapper overhead is negligible relative to a network call (assert no
+    added awaits on the hot path beyond the original fetch); the *output* is the metric stream.
+14. **Security acceptance:** events carry no PII/token/secret (redaction test); the sink is the
+    existing platform log stream, not a new sensitive-content store; the correlation id is random
+    (`crypto.randomUUID()`), carries no user identity, and is never write authority.
+15. **Release:** Tier 2; last-known-good = pre-stage deployment; rollback = revert (pure additive).
+16. **Docs:** update `docs/SECURITY_OPERATING_PLAN.md` observability section;
+    `docs/SERVICE_AND_UTILITY_CATALOG.md` entry for the new module.
+17. **Stop conditions / owner:** if adding the seam requires touching authz or a durable write, stop
+    and re-scope.
 
-## Stage 2 — Merge the disjoint-`$select` sibling reads (re-scoped per Opus P1-1)
+### Stage 1 measurement window (executable decision rule, per Codex P2-3)
 
-**Why the original request-scoped-cache design was dropped:** the three duplicate-read contributors
-are three *separate HTTP requests* with three separate `withDalContext` scopes
-(`my-candidates.js:52`, `reviewers.js:46`, `decline-referrals.js:63`), so a request-scoped cache
-cannot span them. The two reads *within* each service run concurrently in `Promise.all`
-(`reviewers-service.js:225-228`, `my-candidates-service.js:168-180`) with **disjoint `$select`**, so a
-select-keyed cache would miss every time. An ALS memo dedupes zero of the cited reads. The real fix is
-a local query merge; it needs no cache, no `withDalContext` edit, no flag.
+- **Environment:** production (the only environment with real staff usage patterns).
+- **Target routes:** `/api/review-manager/reviewers`, `/api/reviewer-finder/my-candidates`,
+  `/api/workbench/decline-referrals`.
+- **Minimum sample:** ≥ 20 requests per route (workbench usage cadence is low — see
+  `.claude-memory/project-reviewer-find-usage-cadence-blocks-observation-windows.md`; if 20 is not
+  reached in 2 calendar weeks, report the shortfall rather than extrapolating).
+- **Aggregation:** per route × dependency × resourceClass: request count, dependency-call count per
+  request, p50 and p95 of `ms`, outcome counts.
+- **What the window decides:** the **Deferred section** (Data Plane invalidation work) remains
+  latency-gated on this data. **Stage 2 is NOT latency-gated:** its duplicate reads are
+  source-certain (verified again 2026-08-15), so Stage 2 proceeds on owner authorization regardless
+  of measured latency; the window supplies the **before/after verification baseline** for Stage 2's
+  acceptance (dependency-call counts per route), not its justification.
+- **Route-level honesty:** the three routes are three separate HTTP requests; a per-request
+  correlation id cannot by itself prove they came from one client tab action. Route-level
+  measurement is sufficient for this plan's decisions and is what is claimed. No action-level id is
+  added in Stage 1.
 
-1. **Objective / invariant:** in each of the two services, replace the concurrent
-   `fetchPotentialReviewers` + `fetchResearchersByPerson` pair (same entity, same OR-chain id filter,
-   disjoint `$select`) with **one superset-`$select` read of `wmkf_potentialreviewers`**, projecting
-   the same fields the two projections produce today, with **identical response data**. This removes 3
-   of the 6 per-action person queries (best case 6→3, spread 1/1/1 across the three routes; suggestion
-   reads are cross-request and stay at 3).
-2. **Preconditions:** Stage 1 metrics exist (so improvement is measured per-route, not "feels
-   faster"); a characterization test capturing the exact current response of `getReviewers`,
-   `getMyCandidates`, and `decline-referrals` for one fixture request.
-3. **Exact files:** `lib/services/review-manager/reviewers-service.js` (merge `:504`/`:548` reads),
-   `lib/services/reviewer-finder/my-candidates-service.js` (merge `:387`/`:424` reads; the
-   `:440-442` removed-rows read is a **different id set** — leave it or merge separately),
-   `lib/services/reviewer-finder/decline-referrals-service.js` (its `:48-49` person read — added per
-   Opus P2-6; merge or explicitly non-goal). **No** new helper, **no** `context.js` change.
-4. **Trace:** caller → service → single merged adapter read → existing projection. No authz change;
-   reads only.
+## Stage 2 — Merge the disjoint-`$select` sibling reads
+
+**Why the original request-scoped-cache design was dropped (Opus P1-1, unchanged):** the
+duplicate-read contributors are separate HTTP requests with separate `withDalContext` scopes, and
+each sibling pair runs concurrently in `Promise.all` with **disjoint `$select`**, so any
+request-scoped or select-keyed cache dedupes zero of them. The real fix is a local query merge; it
+needs no cache, no `withDalContext` edit, no flag.
+
+**Census (corrected per Codex P1-3, verified against source 2026-08-15).** Three mergeable sibling
+pairs exist across **two** services, plus one unmergeable single read in a third:
+
+| Site | Reads today | Id set | Mergeable? |
+|---|---|---|---|
+| `lib/services/review-manager/reviewers-service.js:225-228` (pair defined at `:498-512`, `:542-555`) | `fetchPotentialReviewers` + `fetchResearchersByPerson`, same id OR-chain, disjoint `$select` | suggestion reviewer ids | **Yes — pair 1** |
+| `lib/services/reviewer-finder/my-candidates-service.js:166-180` (definitions `:381-395`, `:418-432`) | same pair | **active**-candidate ids | **Yes — pair 2** |
+| `lib/services/reviewer-finder/my-candidates-service.js:437-443` (`projectRemovedCandidates`) | same pair, invoked again | **removed**-candidate ids (distinct set, single-request mode only) | **Yes — pair 3 (separate merge; do NOT union with active ids)** |
+| `lib/services/workbench/decline-referrals-service.js:123` (helper `:42-57`) | **one** person read (`fetchReviewerPeople`) | referral person ids | **No — nothing to merge; explicitly unchanged** |
+
+The previously named `lib/services/reviewer-finder/decline-referrals-service.js` **does not exist**;
+the decline service lives under `lib/services/workbench/`. Any fixed count ("6→3", "1/1/1 across
+three routes") is invalid: the fetch helpers chunk id filters at 25 ids per query
+(`const CHUNK = 25` — five copies at `reviewers-service.js:502,545`,
+`my-candidates-service.js:384,400,421` (`:400` is `fetchApplicantAkas`, a different entity, not part
+of any pair), `decline-referrals-service.js:45`) and every helper short-circuits empty id sets to
+zero queries.
+
+**Chunk-aware acceptance contract.** With `q(n) = ceil(n / 25)` and empty sets contributing zero:
+
+```text
+before = 2·q(reviewers) + 2·q(active) + 2·q(removed) + q(decline)
+after  =   q(reviewers) +   q(active) +   q(removed) + q(decline)
+```
+
+(All sets nonempty and within one chunk → 7→4. The merge halves the pair queries; the decline read
+is unchanged.)
+
+1. **Objective / invariant:** in each of the three pair sites, replace the concurrent
+   `fetchPotentialReviewers` + `fetchResearchersByPerson` pair (same entity, same OR-chain id
+   filter, disjoint `$select`) with **one superset-`$select` read of `wmkf_potentialreviewers`**,
+   projecting the same fields the two projections produce today, with **identical response data**.
+   Chunking at 25 ids and the empty-set short-circuit are preserved at the service-helper layer
+   (that is where they live — not in the adapter).
+2. **Preconditions:** Stage 1 events exist (before/after call counts are observable per route); a
+   characterization test capturing the exact current response of `getReviewers`, `getMyCandidates`,
+   and the decline-referrals listing for one fixture request.
+3. **Exact files:** `lib/services/review-manager/reviewers-service.js` (merge pair 1),
+   `lib/services/reviewer-finder/my-candidates-service.js` (merge pair 2 and, separately, pair 3 —
+   the removed-candidate id set stays a distinct query set),
+   `lib/services/workbench/decline-referrals-service.js` (**unchanged** — listed only to record the
+   explicit non-goal). **No** new helper, **no** `context.js` change.
+4. **Trace:** caller → service → single merged chunked read per id set → existing projection. No
+   authz change; reads only.
 5. **Contracts:** the merged `$select` is the union of the two prior selects, so every field the
-   current projections read is present. **Partial-failure guard (Opus P4d):** `my-candidates-service.js:176-179`
-   deliberately catches `aggregateReviewHistory` failures so history loss doesn't fail the list — that
-   is a *different* read and must stay a separate fail-soft call; do NOT fold it into the merged
-   fail-hard person read.
-6. **Non-goals / denylist:** no cross-request cache, no ALS memo, no client cache, no invalidation, no
-   mutation-path change, no change to the deliberate broad post-mutation `refreshAll` (separate
-   correctness invariant — S213). Denylist: all mutation services, `shared/components/**`,
-   `lib/dataverse/core/context.js`.
-7. **Sonnet work order size:** one order per service (2–3 total), each a local read merge.
-8. **Tests:** characterization test passes byte-identical; a test asserting the person-query count per
-   route drops (adapter call-count mock); a test proving the merged projection returns every field the
-   two prior projections did.
+   current projections read is present. **Partial-failure guard (Opus P4d):**
+   `my-candidates-service.js:176-179` deliberately catches `aggregateReviewHistory` failures so
+   history loss doesn't fail the list — that is a *different* read and must stay a separate
+   fail-soft call; do NOT fold it into the merged fail-hard person read. `fetchApplicantAkas` is a
+   different entity and stays separate.
+6. **Non-goals / denylist:** no cross-request cache, no ALS memo, no client cache, no invalidation,
+   no mutation-path change, no change to the deliberate broad post-mutation `refreshAll` (S213
+   correctness invariant), no decline-referrals change. Denylist: all mutation services,
+   `shared/components/**`, `lib/dataverse/core/context.js`.
+7. **Work order size:** one order per service (2 total), each a local read merge.
+8. **Tests:** characterization test passes byte-identical; adapter call-count tests assert the
+   formula (not a fixed number) across fixtures: active-only, removed-only, combined, empty sets,
+   and a >25-id set (two chunks); a test proving the merged projection returns every field the two
+   prior projections did.
 9. **Gates:** `check:dataverse-access-layer` + self-test, `check:types`, reviewer test suites.
-10. **Performance acceptance:** Stage-1 metric shows per-action `wmkf_potentialreviewers` queries drop
-    6→3 (1 per route) with response unchanged. (The earlier "5→≤2" was against a wrong denominator.)
-11. **Security acceptance:** no authority change; the merged read uses the same filter and the same DAL
-    path, so restriction/interlock behavior is unchanged (assert the adapter call is unchanged shape).
-12. **Release:** Tier 2; rollback = plain revert (local change, no flag — corrected per Opus P3-9).
-13. **Docs:** Atlas note if the read-path description changes; `docs/SYSTEM_MODEL.md` only if needed.
+10. **Performance acceptance:** Stage-1 events show per-route `wmkf_potentialreviewers` query counts
+    matching the `after` formula with responses unchanged. A response-equality assertion alone is
+    NOT acceptance — the call-count tests above are required.
+11. **Security acceptance:** no authority change; the merged read uses the same filter and the same
+    DAL path, so restriction/interlock behavior is unchanged.
+12. **Release:** Tier 2; rollback = plain revert (local change, no flag).
+13. **Docs:** Atlas note if the read-path description changes.
 14. **Stop conditions:** if the two projections turn out to read genuinely different row *sets* (not
-    just different fields of the same rows), stop — the merge is unsound and they are not duplicates.
+    just different fields of the same rows), stop — the merge is unsound and they are not
+    duplicates.
 
-## Security finding T1 — Reviewer merge authorization: RESOLVED, no repair (owner, 2026-08-15)
+## Closed security findings (history — no prospective work)
 
-**Closed as accepted by-design — no stage, no repair.** The owner decided (2026-08-15) to keep the
-merge org-open: **there is no technical ownership of requests or data in Dataverse**, so a
-request-scoped or PD-scoped merge fence has nothing to key on and app-level access is the correct and
-only meaningful boundary. The data-only block predicate (`reviewer-merge.js:242-265`) remains the
-safety mechanism. Characterization (retained for the record): `merge-candidates.js:23` guards with
-`requireAppAccess('reviewer-finder','reviewers')` only; no `requestId`; `actingUserSystemId` is write
-attribution; the merge also writes `akoya_request` applicant slots (`reviewer-merge.js:472-481`). This
-is accepted risk, not an open gap. See `.claude-memory/project-merge-candidates-authorization-gap.md`.
+### T1 — Reviewer merge authorization: CLOSED, accepted by design (owner, 2026-08-15)
 
-## Stage 4 (security repair, parallel track) — Cron reminder token eligibility (T2)
+The owner decided (2026-08-15) to keep the merge org-open: **there is no technical ownership of
+requests or data in Dataverse**, so a request-scoped or PD-scoped merge fence has nothing to key on
+and app-level access is the correct and only meaningful boundary. The data-only block predicate
+(`reviewer-merge.js:242-265`) remains the safety mechanism. Characterization (retained for the
+record): `merge-candidates.js:23` guards with `requireAppAccess('reviewer-finder','reviewers')`
+only; no `requestId`; `actingUserSystemId` is write attribution; the merge also writes
+`akoya_request` applicant slots (`reviewer-merge.js:472-481`). This is accepted risk, not an open
+gap, and **not a stage of this plan**. See
+`.claude-memory/project-merge-candidates-authorization-gap.md` (status: closed). Do not reopen
+without a new owner decision.
 
-**Severity note (corrected per Opus P1-4): the reviewer-reminders cron is LIVE-SCHEDULED, not held.**
-`vercel.json:61` runs `/api/cron/reviewer-reminders` daily; `reviewer-reminders.js:38` defaults
-`dryRun` to false. The only remaining gate is the per-request `wmkf_respondreminderenabled` /
-`wmkf_reviewduereminderenabled` flags, whose live state is unprobed (added to the Phase 2 probe
-list). Treat T2 as a **potentially-live exposure**, not a hold.
+### T2 — Cron reminder token eligibility: FIXED AND SHIPPED (Session 428) — history only
 
-Repair: extend **both** reminder sweep filters (`lib/services/reviewer-reminder-sweep.js:113-116`
-respond-by, `:197-199` review-due) with null-safe eligibility mirroring the manual path
-(`lib/services/reviewer-manual-reminder.js:69-70`):
-`wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)`.
-**Do NOT use `ne true`** — these are nullable booleans and `ne true` would exclude every never-revoked
-(null) row, silently disabling the cron (house pattern is the two-branch form, `:114-115`). If
-row-level checks are chosen instead of filter-level, extend each sweep's `$select` (`:112`, `:196`) to
-include `wmkf_selected` and `wmkf_externaltokenrevoked`. `authorizeMint`-parity (a fresh-read
-re-authorize like the manual path) is **optional defense-in-depth, not a correctness requirement** —
-the mid-sweep race is already largely closed by the ETag claim-before-send (`:312-322`), which 412s if
-a staff revoke/deselect bumps the row. Characterization test first (current cron behavior), then the
-tightened filter, then a test proving a revoked/deselected row is skipped.
+The formerly planned "Stage 4" repair **shipped in Session 428** and is verified in current source
+(2026-08-15): both reminder sweep queries carry the null-safe eligibility filter
+(`lib/services/reviewer-reminder-sweep.js:120,204` → `selectedAndNotRevokedFilter()` at
+`lib/dataverse/adapters/reviewer-suggestion.js:108-110`, the two-branch
+`eq false or eq null` form, never `ne true`); the cron marker+token is a single ETag-guarded
+`mintAndStore` PATCH (`reviewer-reminder-sweep.js:283-343`, 412 → `claimFailed`, no send); and both
+filters have regression coverage (`tests/unit/reviewer-reminder-sweep.test.js:134-143,439-448`).
+There is **no prospective T2 work in this plan.** Residual follow-up (verifier-deselect hardening —
+whether deselection alone should invalidate an existing link) is tracked in `SESSION_PROMPT.md` as
+an owner decision, outside this plan.
 
 ## Deferred (evidence-gated, not scheduled)
 
 Authoritative mutation responses (`patchReviewers` returning the confirmed record) and selective
-invalidation are the Data Plane's remaining parts. They are deferred until Stage 1 metrics show the
-broad `refreshAll` is a measured cost worth the added invalidation complexity — and any such change
-must preserve the S213/S400/S401 correctness invariants. Component decomposition (ReviewerSearchSection)
-is deferred until a measured render cost justifies it.
+invalidation are the Data Plane's remaining parts. They are deferred until the Stage 1 measurement
+window shows the broad `refreshAll` is a measured cost worth the added invalidation complexity — and
+any such change must preserve the S213/S400/S401 correctness invariants. Component decomposition
+(ReviewerSearchSection) is deferred until a measured render cost justifies it.
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-14 (post-Opus, post-revision): READY WITH NAMED CHANGES — all named changes already
-folded in.** Stage 2's sibling-merge mechanism matches its target (3 separate route scopes + concurrent
-disjoint selects verified); Stage 1's seam corrected to `dynamics/http.js:24` with PII redaction and
-the `lib/dataverse/client.js` second-egress follow-up named; Stage 4's null-safe filter is the total
-predicate with the ETag claim as the named idempotency guard. No new issues. No plan intent is stated
-as current state; all live-state claims carry `[VERIFIED]`/`[NEEDS OWNER]` labels. Remains a draft NOT
-authorized for implementation (brief Phase 8 dormant); T1 stays owner-blocked (not a stage).
+**Mode A, 2026-08-15 (post-Codex, post-revision): READY WITH NAMED CHANGES.** Named changes (owner
+items, not rework): (1) campaign window/release posture `[NEEDS OWNER]`; (2) Vercel plan log
+retention confirmed at measurement-window start; (3) implementation itself remains unauthorized
+until the owner names a stage (brief Phase 8). Verified in this pass: the egress inventory matches
+source (three in-scope seams, each with its own transport; no shared-coverage claim); the
+correlation design uses a new independent ALS whose lifecycle cannot be disturbed by DAL scopes and
+begins before the pre-auth Dataverse lookup it must observe; the event contract, sink, and failure
+semantics are explicit and PII-safe; Stage 2's census and formula match the verified source sites
+(three pairs, decline unchanged at its correct `lib/services/workbench/` path, chunking preserved at
+the service layer); T1 and T2 are uniformly closed with no prospective work. No live-state claim in
+this document is presented as built runtime state; the plan remains a **draft NOT authorized for
+implementation**.
