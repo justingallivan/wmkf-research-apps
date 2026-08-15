@@ -23,9 +23,11 @@ follow-up. Plan: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`.
 
 ## 2. Immediate-risk verdict
 
-- **T1 — reviewer merge has no caller/request-scope authorization** (confirmed; write reach has widened
-  to `akoya_request` applicant slots). **[NEEDS OWNER]** trust model (S207 org-open vs request-scoped);
-  pending since S414. Not a schedulable stage until decided.
+- **T1 — reviewer merge authorization: RESOLVED (owner, 2026-08-15), keep as-is.** Confirmed org-open
+  (app-level auth, no request/caller scope; write reach includes `akoya_request` applicant slots), but
+  accepted by-design: no technical ownership of requests/data exists in Dataverse to scope against, so
+  app-level access is the correct boundary and the data-only block predicate is the safety mechanism.
+  No repair; closed as accepted risk.
 - **T2 — automatic reminder crons skip the `selected`/`revoked` eligibility the manual path enforces,
   and the cron is LIVE-SCHEDULED daily (`dryRun` default false)** — a potentially-live exposure, not a
   hold. Repair specified (null-safe filter). Owner should decide whether to ship Stage 4 promptly.
@@ -64,11 +66,12 @@ gates. Production probes: not run (owner-gated), listed as incomplete by design.
 
 ## 7. Next authorization requested
 
-**One precise next action:** owner decides the two pending items — (a) the reviewer-merge trust model
-(unblocks T1), and (b) whether to authorize implementation of Stage 1 (observability seam) and/or the
-T2 reminder-eligibility repair. Also useful but non-blocking: the current campaign window/release
-posture, and running the 7 read-only production probes. No implementation, deployment, merge, or push
-to `main` is authorized by this exercise.
+**One precise next action:** owner decides whether to authorize implementation of Stage 1
+(observability seam) and/or the T2 reminder-eligibility repair (arguably urgent — the reminder cron is
+live-scheduled). T1 is now resolved (2026-08-15: keep as-is, accepted by-design — no repair). Also
+useful but non-blocking: the current campaign window/release posture, and running the 7 read-only
+production probes. No implementation, deployment, merge, or push to `main` is authorized by this
+exercise.
 
 ## Follow-ups surfaced (not acted on — avoid scope accretion)
 

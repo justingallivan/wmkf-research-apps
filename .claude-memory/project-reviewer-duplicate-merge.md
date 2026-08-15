@@ -29,10 +29,11 @@ predicate** (positive whitelist: an unknown lifecycle field defaults to *blockin
 re-evaluated at execute time from live source, is the load-bearing safety rule, NOT a
 permission gate. That's why auth is the same as my-candidates: the predicate, not the
 role, restricts merge to the low-risk case so the colleague who hit the bug can fix it.
-This records the S289 design rationale, not a proof of caller authorization. The
-route still receives no `requestId` and performs no request-membership or pair
-authorization; whether app-level access is sufficient for this destructive
-primitive remains an owner decision. Read
+This records the S289 design rationale. The route receives no `requestId` and
+performs no request-membership or pair authorization — and per the owner decision
+of 2026-08-15, that is **accepted as by-design**: app-level access is the intended
+merge boundary because no technical request/data ownership exists in Dataverse to
+scope against. The predicate, not a caller check, is the safety mechanism. Read
 [[project-merge-candidates-authorization-gap]] before changing merge discovery.
 
 **Hazards that already bit (Codex post-impl S289):** picking a field from the loser

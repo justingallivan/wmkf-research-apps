@@ -47,8 +47,10 @@ Status: `[VERIFIED 2026-08-14 via source reads on branch @ f8a606e6]`
   colliding suggestion rows are hard-deleted (`:448`) before loser deactivation (`:541`) with a
   pre-deactivate reference re-check; no compensation after the hard delete (client is told to replan).
 - Design provenance: S289 deliberately chose app-level auth + data predicate; S207 org-open rationale
-  predates this destructive primitive. **[NEEDS OWNER]** whether that trust decision extends here
-  (owner decision was already pending per S414/S422).
+  predates this destructive primitive. **RESOLVED (owner, 2026-08-15): keep as-is, accepted by-design.**
+  Rationale: no technical ownership of requests or data exists in Dataverse, so there is no meaningful
+  request/PD scope to fence against; app-level access is the correct boundary and the data-only
+  predicate is the safety mechanism. No repair; closed as accepted risk.
 
 ### T2 — Token mint/reminder authority graph diverges: cron sweeps skip the selected/revoked checks the manual path enforces (CONFIRMED in current source)
 

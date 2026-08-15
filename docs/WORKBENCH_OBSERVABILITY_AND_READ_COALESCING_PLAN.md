@@ -144,18 +144,16 @@ a local query merge; it needs no cache, no `withDalContext` edit, no flag.
 14. **Stop conditions:** if the two projections turn out to read genuinely different row *sets* (not
     just different fields of the same rows), stop — the merge is unsound and they are not duplicates.
 
-## Security repair T1 — Reviewer merge authorization (NOT a stage; owner-blocked)
+## Security finding T1 — Reviewer merge authorization: RESOLVED, no repair (owner, 2026-08-15)
 
-**This is not a schedulable stage** (relabeled per Opus P3-8): it is blocked on an owner trust-model
-decision already pending since S414, so it cannot carry the 14 stage elements until that decision is
-made. Confirmed characterization: `pages/api/reviewer-finder/merge-candidates.js:23` guards with
-`requireAppAccess('reviewer-finder','reviewers')` only; body carries no `requestId`; `:35-36` is GUID
-validation not authorization; `actingUserSystemId` is write attribution; the block predicate
-(`reviewer-merge.js:242-265`) is data-only; the merge now also writes `akoya_request` applicant slots
-(`reviewer-merge.js:472-481`), widening unauthorized write reach. **[NEEDS OWNER]** the intended trust
-model (S207 org-open vs request-scoped). Once decided, the smallest-safe repair is a caller/request-scope
-or superuser authorization mirroring a real server guard, on its own tier/rollback/tests, separate from
-the refactor.
+**Closed as accepted by-design — no stage, no repair.** The owner decided (2026-08-15) to keep the
+merge org-open: **there is no technical ownership of requests or data in Dataverse**, so a
+request-scoped or PD-scoped merge fence has nothing to key on and app-level access is the correct and
+only meaningful boundary. The data-only block predicate (`reviewer-merge.js:242-265`) remains the
+safety mechanism. Characterization (retained for the record): `merge-candidates.js:23` guards with
+`requireAppAccess('reviewer-finder','reviewers')` only; no `requestId`; `actingUserSystemId` is write
+attribution; the merge also writes `akoya_request` applicant slots (`reviewer-merge.js:472-481`). This
+is accepted risk, not an open gap. See `.claude-memory/project-merge-candidates-authorization-gap.md`.
 
 ## Stage 4 (security repair, parallel track) — Cron reminder token eligibility (T2)
 

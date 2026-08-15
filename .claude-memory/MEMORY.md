@@ -51,7 +51,7 @@
 - Dataverse / Dynamics / Explorer / CRM facts: ../docs/agent-wiki/topics/dataverse-dynamics.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md; project-cache-hit-rate-review.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
-- Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-merge-candidates-authorization-gap.md (S414 — merge route takes no requestId, UI gate is cosmetic/fail-open; owner decision pending)
+- Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-merge-candidates-authorization-gap.md (RESOLVED 2026-08-15 — org-open merge accepted by-design; no request/data ownership in Dataverse to scope against)
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Dev environment / secrets / Vercel / CI / local build: ../docs/agent-wiki/topics/dev-environment.md; ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
