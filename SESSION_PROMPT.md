@@ -6,8 +6,10 @@ Session 428 executed the Fable Production Audit, Security, and Refactor master b
 end to end, resolved two standing security questions by owner decision, shipped two
 runtime fixes, and merged everything to `main`.
 
-`main` is at `171c46a9` and auto-deployed. All Session 428 feature branches were
-merged and deleted (local + remote); the worktree is clean.
+At Session 428 close, `main` was at `171c46a9` and auto-deployed (historical
+Session 428 state — the current baseline has since advanced; check `git log`).
+All Session 428 feature branches were merged and deleted (local + remote); the
+worktree was clean.
 
 ### What Was Completed
 
@@ -32,7 +34,10 @@ merged and deleted (local + remote); the worktree is clean.
      `codex/claude-workbench-plan-revision`
      (`docs/audits/claude-workbench-observability-plan-response-2026-08-15.md`, fresh
      Mode A `READY WITH NAMED CHANGES`); a second five-finding Codex follow-up pass
-     was likewise confirmed and folded in on the same branch (`96190462`). Full artifact set under
+     was likewise confirmed and folded in on the same branch (`96190462`), as was a
+     third six-finding correction pass (timeout classification, JSON emitter
+     contract, historical Vercel CLI 59.0.0 log workflow, emission-vs-measurement
+     scope, unverified-volume sampling assumption, durable-state cleanup). Full artifact set under
      `docs/audits/fable-*-2026-08-14.md` + the two 2026-08-15 audit files.
 
 2. **Two standing security questions were closed by owner decision (2026-08-15).**

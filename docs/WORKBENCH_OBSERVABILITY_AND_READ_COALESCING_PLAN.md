@@ -59,18 +59,23 @@ Campaign window is **[NEEDS OWNER]** — assume the restrictive posture.
 
 ## External-egress inventory (verified 2026-08-15)
 
-There is **no single shared transport**. The runtime seams to Dataverse / Azure AD / Graph are:
+There is **no single shared transport**. Two scopes must not be conflated (third-pass correction):
+**instrumentation/emission scope** — which seams get wrapped, and therefore which callers emit
+events (ALL callers of a wrapped seam emit, Workbench or not) — versus **target measurement
+scope** — the three named Workbench routes whose events (selected by `routeName`) feed the
+measurement window. The runtime seams to Dataverse / Azure AD / Graph are:
 
-| Seam | What it carries | Stage 1 scope |
-|---|---|---|
-| `lib/services/dynamics/http.js:24` (`fetchWithTimeout`) | All `DynamicsService` traffic: token (`dynamics/auth.js:65`), reads (`dynamics/read-ops.js`), writes (`dynamics/write-core.js`), schema (`dynamics/schema.js`) | **In scope** |
-| `lib/services/graph-service.js:1154` (module-local `fetchWithTimeout`; **no import from dynamics/http.js** — its only import is `service-error.js`) | All Graph/SharePoint traffic incl. Azure AD token acquisition (`graph-service.js:101-135`), ~20 call sites | **In scope** |
-| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **In scope** |
-| `lib/services/dataverse-export/fetch-client.js:61` (fourth local `fetchWithTimeout` copy) and `lib/services/dataverse-export/live-taxonomy.js:38,64` (raw fetches) | Export tooling | Out of scope (not the Workbench request path) — named so the inventory is complete |
-| `lib/utils/health-checker.js:70,94,123` | Azure AD/token health probes | Out of scope — named for completeness |
-| `scripts/**` via `lib/dataverse/client.js` | Operational scripts | Out of scope |
+| Seam | What it carries | Stage 1 wrapped? | Who emits once wrapped |
+|---|---|---|---|
+| `lib/services/dynamics/http.js:24` (`fetchWithTimeout`) | All `DynamicsService` traffic: token (`dynamics/auth.js:65`), reads (`dynamics/read-ops.js`), writes (`dynamics/write-core.js`), schema (`dynamics/schema.js`) | **Wrapped** | Every `DynamicsService` caller app-wide (routes, crons, cold-start checks) |
+| `lib/services/graph-service.js:1154` (module-local `fetchWithTimeout`; **no import from dynamics/http.js** — its only import is `service-error.js`) | All Graph/SharePoint traffic incl. Azure AD token acquisition (`graph-service.js:101-135`), ~20 call sites | **Wrapped** | Every Graph caller app-wide |
+| `lib/dataverse/client.js:50` (token) and `:106` (data) — raw `fetch`, no timeout helper | Second Dataverse egress. Runtime consumers: `dataverse-app-access-service.js` (the `requireAppAccess` hot path), `dataverse-settings-service.js`, `grant-cycles-dataverse.js`, `dataverse-identity-map.js` | **Wrapped** | Every `client.js` caller — **including the ~55 operational scripts that require it**; script-emitted events carry no correlation fields and go to the invoking terminal's stdout, not the platform log stream |
+| `lib/services/dataverse-export/fetch-client.js:61` (fourth local `fetchWithTimeout` copy) and `lib/services/dataverse-export/live-taxonomy.js:38,64` (raw fetches) | Export tooling | **Not wrapped** | No emission — named so the inventory is complete |
+| `lib/utils/health-checker.js:70,94,123` | Azure AD/token health probes | **Not wrapped** | No emission — named for completeness |
 
-Any claim that instrumenting one of these seams covers another is false and must not reappear.
+Only events whose `routeName` is one of the three target routes enter the measurement analysis;
+everything else in the stream is emission-scope by-product, present but unselected. Any claim that
+instrumenting one of these seams covers another is false and must not reappear.
 
 ---
 
@@ -151,8 +156,16 @@ Any claim that instrumenting one of these seams covers another is false and must
    `err.noResponse`/`err.isTransient`/`err.causeKind`, and `graph-service.js` does the same with
    provider tag `'graph'`. "Original error" means **that** structured error — same identity, same
    shape; the telemetry wrapper must neither re-wrap it, suppress it, nor substitute its own error
-   type. `outcome` for thrown errors is **derived by inspecting** the existing structured error
-   (timeout-shaped `causeKind` → `'timeout'`, otherwise `'network_error'`), never by replacing it.
+   type. `outcome` for thrown errors is **derived by inspecting** the existing structured error,
+   never by replacing it, with this exact mapping (2026-08-15 third-pass correction): both helpers
+   implement their timeout via `AbortController.abort()`, which `buildNoResponseError` records as
+   `causeKind: 'abort'` (`lib/utils/service-error.js:88`; `'timeout'` there is reserved for
+   `ETIMEDOUT`/undici header/body-timeout codes, `:89`) — and since the helpers overwrite any
+   caller-provided signal (`http.js:25-30`), a helper-seen abort **is** the helper's own timeout.
+   Therefore `causeKind ∈ {'abort', 'timeout'}` → `outcome: 'timeout'`; all other `causeKind`
+   values (`'socket'`, `'dns'`, `'unknown'`) → `outcome: 'network_error'`. `service-error.js` is
+   **not changed**; the exact existing structured error object and its public semantics are
+   preserved — telemetry only reads it.
    The **timed span covers the fetch leg only**: in `dynamics/http.js` the
    `assertDataverseOperationAllowed` interlock call deliberately sits before the try block so policy
    denials propagate un-reclassified (`http.js:32-38`) — instrumentation goes inside/around the
@@ -160,48 +173,80 @@ Any claim that instrumenting one of these seams covers another is false and must
    re-wrapped. In `lib/dataverse/client.js` (raw `fetch`, no existing transformation) errors
    propagate as thrown, unwrapped. **Only telemetry-emission failures are swallowed** (try/catch
    around the emit alone); dependency failures always propagate unchanged.
-6. **Sink (chosen, per Codex P2-2): structured platform logs (Vercel) via a single `console.log` of
-   the JSON event, event name `workbench.dependency`.** No new table, no durable write — consistent
-   with this stage's stop condition. The existing `api_usage_log` is the **LLM token/cost ledger**
-   (`docs/atlas/postgres-infra-tables.md:147-149`) and is **not** repurposed or imitated.
+6. **Sink (chosen, per Codex P2-2): structured platform logs (Vercel).** The emitter calls exactly
+   **`console.log(JSON.stringify(event))`** — never `console.log(event)`, whose inspect-format
+   output (`{ event: 'workbench.dependency', … }`, unquoted keys) is not parseable JSON (verified
+   locally with a Node check, 2026-08-15) — wrapped in the try/catch guard so a telemetry failure
+   (including a `JSON.stringify` throw) cannot fail the request. **Planned unit test:** capture the
+   emitted `console.log` argument, assert `JSON.parse` succeeds on it and that the parsed object
+   contains the literal discriminator `event: 'workbench.dependency'`. The log-query filter below
+   matches this exact serialization (`"event":"workbench.dependency"` as a JSON substring). No new
+   table, no durable write — consistent with this stage's stop condition. The existing
+   `api_usage_log` is the **LLM token/cost ledger** (`docs/atlas/postgres-infra-tables.md:147-149`)
+   and is **not** repurposed or imitated.
    - **Sampling scope (resolved per the 2026-08-15 follow-up review):** the three wrapped seams are
      **shared app-wide transports**, not Workbench-private — every server-side caller of
      `DynamicsService`, Graph, and `lib/dataverse/client.js` (other routes, crons, cold-start
      checks) emits events once the seams are wrapped. Sampling is therefore **100% of ALL seam
-     traffic**, justified by the application's overall low volume (a staff/intake app, not a
-     public-traffic site), **not** by "workbench traffic" alone. Events from un-instrumented
+     traffic** — a choice resting on the explicitly unverified volume/cost assumption below, **not**
+     on "workbench traffic" alone and not on any measured fact. Events from un-instrumented
      callers simply carry no `correlationId`/`routeName` (the defined no-correlation behavior);
      the measurement window filters on `routeName` for its three target routes. The `event` name
      `workbench.dependency` names the initiative that introduced the stream, not a scope
-     restriction. If observed volume or log cost surprises, the revisit knob is a follow-up
-     change, not a silent implementer choice.
-   - **Query workflow (executable, bounded):** capture slices are appended to a scratch NDJSON file
-     by re-running this command (manually or via a local scheduler) across the window:
+     restriction. **Volume/cost assumption `[ASSUMED — explicitly unverified]` (third-pass
+     correction):** whole-application dependency-call volume and its platform log cost have NOT
+     been measured; no evidence currently supports "low volume" as a fact. Validation: within the
+     first 48 hours after enabling 100% emission, count `workbench.dependency` lines per day via
+     the log-export workflow below. **Stop/re-scope threshold:** if daily event volume exceeds
+     ~50,000 lines/day, or platform log throttling/truncation is observed, or a visible log-cost
+     line item appears, STOP — revert (pure additive change) or land a named sampling knob as a
+     reviewed follow-up. Exceeding the threshold is a stop condition, not a silent implementer
+     tuning choice.
+   - **Query workflow (executable, historical, fail-closed — corrected for Vercel CLI `59.0.0`,
+     verified locally 2026-08-15 via `vercel --version` and `vercel logs --help`):** `vercel logs`
+     performs a **historical query by default**; live streaming requires `--follow` (which this
+     workflow does not use — the previous live-tail framing was wrong). Each slice:
 
      ```bash
-     # Preconditions (one-time): `vercel login`, then `vercel link` from the repo root to the
-     # production project (or pass --scope/--token explicitly in a non-interactive shell).
-     # `vercel logs` tails LIVE production runtime logs — it is a stream, not a historical
-     # query — so each invocation captures only its own bounded tail session.
-     timeout 3600 npx vercel logs <production-deployment-url> --json 2>/dev/null \
-       | jq -c 'select(.message? // "" | test("\"event\":\"workbench\\.dependency\""))' \
-       >> "$SCRATCH/workbench-dependency-$(date +%Y%m%dT%H%M).ndjson"
+     # Preconditions (one-time): `vercel login`; repo linked to the production project via
+     # `vercel link` (or pass --project <NAME_OR_ID> explicitly, as below).
+     set -euo pipefail   # errors visible and fatal; no stderr suppression anywhere
+     OUT_DIR=${OUT_DIR:-$(mktemp -d)}   # or a defined scratch path; created explicitly
+     SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T06:00:00Z'; LIMIT=5000
+     SLICE="$OUT_DIR/workbench-dependency-${SINCE}--${UNTIL}.ndjson"
+     vercel logs --project <NAME_OR_ID> --environment production \
+       --since "$SINCE" --until "$UNTIL" \
+       --query '"event":"workbench.dependency"' \
+       --json --limit "$LIMIT" > "$SLICE"
+     # Fail-closed completeness check: a slice at the limit is TRUNCATED, not complete.
+     LINES=$(wc -l < "$SLICE")
+     if [ "$LINES" -ge "$LIMIT" ]; then
+       echo "TRUNCATED slice ($LINES >= $LIMIT): narrow --since/--until and re-run" >&2
+       exit 1
+     fi
      ```
 
-     - **Time bounds:** each slice is bounded by `timeout` (1h above) and stamped in its filename;
-       per-event timestamps come from the platform log record in the `--json` output (the event
-       body deliberately carries no timestamp field).
-     - **Result-volume handling:** the `jq` filter keeps only `workbench.dependency` lines, so
-       file growth is bounded by actual dependency-call volume; slices are date-named for rotation
-       and aggregated at window end (per route × dependency × resourceClass counts, p50/p95 over
-       `ms`, outcome counts).
-     - **CLI-shape caveat `[ASSUMED]`:** the exact `vercel logs` flags/JSON field names must be
-       confirmed against the installed CLI version at window start; if the CLI's live-tail window
-       or plan limits make scheduled slices impractical, fall back to the dashboard log export or
-       a Log Drain — same filter, same aggregation.
+     - **Time bounds:** explicit `--since`/`--until` per slice (ISO timestamps), stamped into the
+       filename; per-event timestamps come from the platform log record in the `--json` output
+       (the event body deliberately carries no timestamp field).
+     - **Server-side filtering:** `--query` matches the exact emitted serialization
+       (`"event":"workbench.dependency"`, produced by `console.log(JSON.stringify(event))`), so
+       result volume is bounded to actual dependency events; `--limit` is set explicitly (CLI
+       default is 100 — far too low to rely on implicitly).
+     - **Truncation/completeness:** a slice whose line count reaches `--limit` fails the run
+       (exit 1) and must be re-sliced narrower. **If slices cannot be proven complete within the
+       plan's retention and result limits, the REQUIRED fallback is a Log Drain or the dashboard
+       log export — incomplete CLI output is not valid measurement evidence.**
+     - **Deduplication:** if adjacent slice windows overlap, dedupe at aggregation time on the log
+       record's request id + timestamp (full-line `sort -u` as the degenerate fallback).
+     - **Version contract:** this command shape is verified against CLI `59.0.0` only; re-verify
+       `vercel --version` and `vercel logs --help` at measurement-window start, and do **not**
+       assume a CLI upgrade preserves these flags.
    - **Retention:** platform log retention on the current Vercel plan must be **verified at window
-     start**; the capture-slice workflow above exists precisely so the window does not depend on
-     platform retention exceeding it. `[NEEDS OWNER — plan-tier retention confirmation]`
+     start**. Historical queries can only reach records still within retention, so slices must be
+     captured on a cadence shorter than the retention period; if retention proves too short for
+     that cadence to be practical, the Log Drain / dashboard-export fallback becomes required.
+     `[NEEDS OWNER — plan-tier retention confirmation]`
    - **Failure isolation:** emission is the try/catch-guarded `console.log` above; it cannot fail the
      request. If a durable sink is ever chosen later, that is a re-scope requiring migration, Atlas,
      retention, and privacy contracts — not an implementer option in this stage.
@@ -374,15 +419,30 @@ any such change must preserve the S213/S400/S401 correctness invariants. Compone
 
 ## Contract-reconcile verdict
 
-**Mode A, 2026-08-15, second pass (post-Codex follow-up review, five additional findings folded
-in): READY WITH NAMED CHANGES.** The follow-up pass verified: telemetry preserves the transports'
+**Mode A, 2026-08-15, third pass (post-Codex third review, six additional findings folded in):
+READY WITH NAMED CHANGES.** The third pass verified: thrown-error `outcome` mapping matches the
+actual `service-error.js` classification (`AbortError` → `causeKind: 'abort'`, `:88` — helper
+timeouts are aborts, so `abort`/`timeout` both map to `outcome: 'timeout'`; `service-error.js`
+unchanged); the emitter contract is exactly `console.log(JSON.stringify(event))` with a planned
+parse-and-discriminator unit test (the `console.log(object)` inspect format was locally
+demonstrated to be non-JSON); the log-export workflow is a fail-closed **historical** query
+verified against installed Vercel CLI `59.0.0` (`--project`/`--environment production`/
+`--since`/`--until`/`--query`/`--json`/explicit `--limit`, truncation ⇒ exit 1, Log Drain /
+dashboard export as the required fallback when completeness cannot be proven, version re-check at
+window start); the egress inventory now separates instrumentation/emission scope (all wrapped-seam
+callers, scripts included) from target measurement scope (the three Workbench routes); and the
+100%-sampling volume/cost assumption is explicitly unverified with a 48-hour validation and a
+concrete stop/re-scope threshold.
+
+**Prior pass (second, same date):** The follow-up pass verified: telemetry preserves the transports'
 existing structured error transformations (`buildNoResponseError` at `dynamics/http.js:41-50` and
 the Graph equivalent) and adds no wrapping of its own, with the timed span excluding the pre-try
 interlock assert; the `lib/dataverse/client.js` integration is lazy/server-only per that module's
 browser-import contract (`client.js:11-29`), enforced by the new `npm run build` gate; the event
 contract carries an explicit `event: 'workbench.dependency'` discriminator and a first-class
 `'unknown'` dependency variant; sampling is stated as 100% of all shared-seam traffic (the seams
-are app-wide, not Workbench-private), justified by whole-app volume; and the log-export workflow is
+are app-wide, not Workbench-private — the volume justification was later re-labeled an unverified
+assumption by the third pass); and the log-export workflow is
 an executable bounded capture-slice command with link preconditions, JSON output, time bounds,
 filtering, and volume handling (CLI flag shapes `[ASSUMED]` pending window-start confirmation).
 Named changes (owner

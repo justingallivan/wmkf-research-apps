@@ -3,7 +3,7 @@ title: Claude Response — Codex Adversarial Review of the Workbench Observabili
 domain: architecture
 kind: audit
 status: final
-summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review (eight findings) and its follow-up pass (five findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
+summary: "Point-in-time disposition of the 2026-08-15 Codex adversarial review and its two follow-up passes (8 + 5 + 6 findings): all independently confirmed against source; plan revised; fresh Mode A verdict."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -220,7 +220,9 @@ carries correlation, fixed 6→3/×6 denominator, prospective-T2/owner-blocked-T
   (the wiki's "Stage 4" hits are the unrelated Q9 app-access migration).
 - Other doc hits of "6→3" (`docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md`) are unrelated counts.
 
-**Live stale claims remaining: 0.**
+**Live stale claims remaining: 0** *(first-pass scope; passes two and three each corrected further
+wording in these same surfaces — see the per-pass sections below. Current status as of the third
+pass: zero known live stale claims, re-verified by the third-pass semantic re-search.)*
 
 ## Remaining assumptions and owner decisions
 
@@ -229,13 +231,18 @@ carries correlation, fixed 6→3/×6 denominator, prospective-T2/owner-blocked-T
    sink contract).
 3. `[NEEDS OWNER]` Authorization to implement any stage (brief Phase 8 remains dormant; this
    revision does not authorize anything).
-4. `[ASSUMED]` Workbench traffic is low enough that 100% telemetry sampling is cost-negligible;
-   revisit on observed log volume.
+4. Superseded by item 7 (third pass): the sampling assumption is whole-application volume/cost,
+   not "workbench traffic", and carries a defined validation and stop threshold.
 5. Verifier-deselect hardening stays an open owner decision tracked in `SESSION_PROMPT.md`, outside
    this plan.
-6. `[ASSUMED]` The exact `vercel logs` CLI flags and `--json` field names in the Stage 1 export
-   command match the installed CLI at window start; fallback (dashboard export / Log Drain) named
-   in the plan if not.
+6. The Stage 1 export command is `[VERIFIED via vercel --version / vercel logs --help]` against
+   installed CLI `59.0.0` (2026-08-15). `[ASSUMED]` only that the installed CLI at
+   measurement-window start still matches — the plan requires re-verifying then and forbids
+   assuming an upgrade preserves flags; Log Drain / dashboard export is the required fallback if
+   completeness cannot be proven.
+7. `[ASSUMED — explicitly unverified]` Whole-application dependency-call volume and platform log
+   cost under 100% emission; validated within 48 hours of enablement against the plan's
+   ~50,000-lines/day stop/re-scope threshold.
 
 ## Follow-up review — second Codex pass (2026-08-15), five additional findings
 
@@ -282,11 +289,13 @@ were verified against source before revision.
 - The three seams are app-wide transports (all `DynamicsService`/Graph/`client.js` callers emit
   once wrapped — other routes, crons, cold-start checks), so "workbench traffic is low-volume"
   was the wrong denominator for a 100% sampling claim.
-- **Plan change:** sampling is now stated as 100% of **all** seam traffic, justified by whole-app
-  volume; un-instrumented callers emit without correlation fields (the defined behavior); the
-  window filters on `routeName`; the event name is documented as naming the initiative, not a
-  scope restriction; any volume-driven sampling change is a named follow-up, not an implementer
-  choice.
+- **Plan change:** sampling is now stated as 100% of **all** seam traffic; un-instrumented
+  callers emit without correlation fields (the defined behavior); the window filters on
+  `routeName`; the event name is documented as naming the initiative, not a scope restriction;
+  any volume-driven sampling change is a named follow-up, not an implementer choice. (The
+  "justified by whole-app volume" phrasing this pass introduced was itself unverified and is
+  superseded by third-pass T5: the volume/cost assumption is now explicitly labeled unverified
+  with a validation plan and stop threshold.)
 
 ### F5 (executable, bounded log-export command) — CONFIRMED
 
@@ -299,10 +308,86 @@ were verified against source before revision.
   exact CLI flag/JSON shapes are labeled `[ASSUMED]` pending window-start confirmation, with the
   dashboard export / Log Drain named as the fallback.
 
+## Third pass — Codex third review (2026-08-15), six findings
+
+**Provenance:** as with the second pass, no on-disk artifact for this review was found (worktree,
+main checkout tree, origin branches, `outputs/`); findings are dispositioned from the owner-relayed
+work order and were verified locally before revision.
+
+### T1 (helper timeouts classify as `causeKind: 'abort'`, not `'timeout'`) — CONFIRMED
+
+- `[VERIFIED via lib/utils/service-error.js:88-92]` `AbortError` → `causeKind: 'abort'`;
+  `'timeout'` is reserved for `ETIMEDOUT`/undici header/body-timeout codes. Both helpers implement
+  their timeout via `AbortController.abort()` (`dynamics/http.js:39-42`, agent-verified Graph
+  equivalent), and caller signals are overwritten (`http.js:25-30`), so a helper-seen abort IS the
+  helper's timeout. The prior mapping ("timeout-shaped causeKind → 'timeout'") would have
+  misclassified every helper timeout as `network_error`.
+- **Plan change:** exact mapping `causeKind ∈ {'abort','timeout'}` → `outcome: 'timeout'`; all
+  other causeKinds → `network_error`; `service-error.js` unchanged; the structured error object
+  and public semantics preserved (telemetry only reads it).
+
+### T2 (emitter must be `console.log(JSON.stringify(event))`) — CONFIRMED
+
+- `[VERIFIED via local Node check]` `console.log(object)` emits inspect format
+  (`{ event: 'workbench.dependency', … }`) which `JSON.parse` rejects; `JSON.stringify` output
+  parses.
+- **Plan change:** emitter contract is exactly `console.log(JSON.stringify(event))`, guarded so
+  telemetry failures (including a stringify throw) cannot fail the request; planned unit test
+  asserts the captured argument parses as JSON and contains the literal
+  `event: 'workbench.dependency'` discriminator; the documented log filter
+  (`"event":"workbench.dependency"`) matches this exact serialization.
+
+### T3 (log workflow was a false live-tail; CLI 59.0.0 is historical-by-default) — CONFIRMED
+
+- `[VERIFIED via `vercel --version` = 59.0.0 and `vercel logs --help`]` `vercel logs` performs
+  historical queries by default; `--follow` streams; flags `--project`, `--environment`,
+  `--since`, `--until`, `--query`, `--json`, `--limit` (default 100) all present.
+- **Plan change:** the capture command is now a fail-closed historical slice: `set -euo pipefail`
+  (no stderr suppression), `mktemp -d` (or defined path) for output, explicit
+  `--project`/`--environment production`/`--since`/`--until`, server-side `--query` on the
+  discriminator, `--json`, explicit `--limit 5000`, line-count-at-limit ⇒ truncated ⇒ exit 1 and
+  re-slice; Log Drain / dashboard export is the **required** fallback when completeness cannot be
+  proven within retention/result limits; overlap dedup rule (request id + timestamp, `sort -u`
+  fallback); command/version contract re-verified at window start with no assumption that a CLI
+  upgrade preserves flags. The retention bullet now states that historical queries reach only
+  records within retention, so capture cadence must beat retention.
+
+### T4 (misleading "Out of scope" conflated emission and measurement) — CONFIRMED
+
+- Wrapping shared seams instruments **all** their callers, including the ~55 operational scripts
+  requiring `lib/dataverse/client.js` (script events carry no correlation fields and land on the
+  invoking terminal's stdout, not platform logs). Labeling the scripts row "Out of scope" was
+  misleading.
+- **Plan change:** the inventory now defines instrumentation/emission scope (all wrapped-seam
+  callers) versus target measurement scope (the three Workbench routes, selected by `routeName`),
+  the table columns are "Stage 1 wrapped?" / "Who emits once wrapped", and the not-wrapped rows
+  (export tooling, health-checker) are labeled "no emission" rather than "out of scope". This
+  supersedes the second pass's F4 wording in place.
+
+### T5 (remaining "low volume" justification was unverified) — CONFIRMED
+
+- No measurement of whole-application dependency-call volume or log cost exists; "a staff/intake
+  app is low-volume" was an inference presented as justification.
+- **Plan change:** the sampling choice now rests on an explicitly labeled
+  `[ASSUMED — explicitly unverified]` whole-application volume/cost assumption, with a defined
+  validation (count `workbench.dependency` lines per day in the first 48 hours after enabling)
+  and a concrete stop/re-scope threshold (~50,000 lines/day, observed throttling/truncation, or a
+  visible cost line item ⇒ STOP; revert or land a named sampling knob as a reviewed follow-up).
+
+### T6 (durable-state cleanup: sweep claim and stale present-tense baseline) — CONFIRMED
+
+- The narrow-sweep "zero live stale claims" statement below is a **first-pass** record; passes two
+  and three each found and removed further contradictions, so it holds only as of each pass's own
+  scope. Restated: **as of the third pass, the two live surfaces again contain zero known stale
+  claims** — the pass-1/pass-2 wordings corrected in later passes are visible in this artifact's
+  per-pass sections, which is the audit trail, not a live contradiction.
+- `SESSION_PROMPT.md` said "`main` is at `171c46a9` and auto-deployed" — present-tense and stale
+  (the local baseline has advanced). Reworded as historical Session 428 state.
+
 ## Final verdict
 
 **READY WITH NAMED CHANGES** — contract-reconcile Mode A over the revised plan (2026-08-15,
-second pass). The named changes are the owner items above, not structural rework. All eight
-findings from the first Codex review and all five findings from the second pass are CONFIRMED and
-folded in; the revised plan contains no claim contradicted by current source; it remains a draft
-not authorized for implementation.
+third pass). The named changes are the owner items above, not structural rework. All eight
+findings from the first Codex review, all five from the second pass, and all six from the third
+pass are CONFIRMED and folded in; the revised plan contains no claim contradicted by current
+source; it remains a draft not authorized for implementation.
