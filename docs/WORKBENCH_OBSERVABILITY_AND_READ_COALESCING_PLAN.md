@@ -32,7 +32,7 @@ framing. All accepted changes are folded in below.
 The audit found **zero per-dependency timing instrumentation** in the staff path (grep-verified
 negative), so no caching or data-plane refactor can be justified on measured return today. It also
 found a **source-certain** redundant-read pattern (per reviewer-tab action, with no DAL-level dedup:
-`akoya_requests` ×2, suggestion set ×3, `wmkf_potentialreviewers` ×5 queries). And it found that the
+`akoya_requests` ×2, suggestion set ×3, `wmkf_potentialreviewers` ×6 queries across 3 routes). And it found that the
 broad post-mutation refreshes are **deliberate fixes for prior correctness bugs** (S213, S400/S401).
 
 Conclusion: measure first, then remove certain-avoidable work behind stable seams, and only expand
@@ -188,4 +188,10 @@ is deferred until a measured render cost justifies it.
 
 ## Contract-reconcile verdict
 
-_To be run (Mode A) over this plan after Opus review and disposition._
+**Mode A, 2026-08-14 (post-Opus, post-revision): READY WITH NAMED CHANGES — all named changes already
+folded in.** Stage 2's sibling-merge mechanism matches its target (3 separate route scopes + concurrent
+disjoint selects verified); Stage 1's seam corrected to `dynamics/http.js:24` with PII redaction and
+the `lib/dataverse/client.js` second-egress follow-up named; Stage 4's null-safe filter is the total
+predicate with the ETag claim as the named idempotency guard. No new issues. No plan intent is stated
+as current state; all live-state claims carry `[VERIFIED]`/`[NEEDS OWNER]` labels. Remains a draft NOT
+authorized for implementation (brief Phase 8 dormant); T1 stays owner-blocked (not a stage).

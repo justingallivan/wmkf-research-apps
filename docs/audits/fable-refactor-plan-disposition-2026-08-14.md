@@ -23,4 +23,6 @@ work*, not the audit's characterization of live state — which held up under re
 
 ## Post-disposition contract-reconcile
 
-Mode A over the revised plan: pending (run after the plan revision lands).
+Mode A over the revised plan, 2026-08-14: **READY WITH NAMED CHANGES** — all named changes already
+folded in; no rework before hand-off to an implementer. Verdict recorded in the plan's
+Contract-reconcile verdict section. The plan remains a draft not authorized for implementation.
