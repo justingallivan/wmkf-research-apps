@@ -10,8 +10,9 @@
  * server-side session — never trusted from the request body.
  *
  * Live-active guard: before any write, the caller's azure_id is re-checked
- * against user_profiles. Zero rows or is_active = false is fail-closed 403
- * (a legitimate linking session always has a live, active temp profile row
+ * against user_profiles. Zero rows, is_active = false, or is_active = NULL
+ * is fail-closed 403 (a legitimate linking session always has a live, active
+ * temp profile row
  * for its azure_id, created by the signIn callback). Each write in both
  * branches additionally carries an `is_active = true` condition as a TOCTOU
  * backstop against a disable racing the pre-check.
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Unable to verify account status; please retry' });
   }
 
-  if (caller.rows.length === 0 || caller.rows[0].is_active === false) {
+  if (caller.rows.length === 0 || caller.rows[0].is_active !== true) {
     return res.status(403).json({ error: 'Account has been disabled' });
   }
 

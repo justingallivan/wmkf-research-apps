@@ -19,6 +19,7 @@ import {
   mockMissingProfile,
   mockAzureIdOnlySession,
   mockApplicantSession,
+  setMockSqlResults,
   createMockReq,
   createMockRes,
   clearAppAccessCache,
@@ -639,6 +640,27 @@ describe('requireAppAccess', () => {
   // `rows.length > 0 && is_active !== false`.
   it('returns 403 for a missing profile row (zero rows) — previously fail-open', async () => {
     mockMissingProfile(60);
+    const req = createMockReq();
+    const res = createMockRes();
+
+    const result = await requireAppAccess(req, res, 'reviewer-finder');
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('disabled') })
+    );
+  });
+
+  // Audit follow-up: NULL is_active must be denied, not treated as active.
+  // The old predicate (`is_active !== false`) reads `null !== false` as
+  // true and grants access; the fixed predicate (`is_active === true`)
+  // denies it. requireAppAccess never calls requireAuth, so overriding the
+  // `is_active` key after mockAuthenticatedUser is sufficient — no
+  // sequencing needed.
+  it('returns 403 for a profile row with NULL is_active — previously fail-open', async () => {
+    mockAuthenticatedUser(61, ['reviewer-finder']);
+    setMockSqlResults({ is_active: { rows: [{ is_active: null }], rowCount: 1 } });
     const req = createMockReq();
     const res = createMockRes();
 

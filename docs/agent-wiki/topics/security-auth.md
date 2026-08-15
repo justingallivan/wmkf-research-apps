@@ -67,7 +67,8 @@ not a current authority.
   "auth disabled" (Codex adversarial finding, S398: a cached transient 503
   disabled the client auth gate for the page lifetime). Regression tests:
   `tests/unit/require-auth-render-race.test.js`.
-- **Disabled-account revocation is enforced at every layer (2026-08-15
+- **Disabled-account revocation is enforced at sign-in, session/JWT, and every
+  route guard; the proxy edge inherits it via JWT invalidation (2026-08-15
   revocation hardening, branch `codex/claude-revocation-hardening`):** the
   NextAuth `signIn` callback looks up the caller's `azure_id` WITHOUT an
   `is_active` filter and denies sign-in for a disabled row before any

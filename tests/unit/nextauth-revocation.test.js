@@ -52,6 +52,30 @@ describe('nextauth signIn revocation (disabled azure_id)', () => {
     expect(reconcileProfile).not.toHaveBeenCalled();
   });
 
+  test('NULL is_active azure_id: signIn returns false, no writes, no side effects (fails closed on NULL, not just false)', async () => {
+    // is_active: null — a row that is neither explicitly active nor
+    // explicitly disabled. The old predicate (`profile.is_active === false`)
+    // treats null as active and falls through to the UPDATE/return-true
+    // branch; the fixed predicate (`profile.is_active !== true`) denies it.
+    sql.mockResolvedValueOnce({
+      rows: [{ id: 'profile-null', name: 'x', display_name: 'X', azure_email: 'x@example.org', needs_linking: false, is_active: null }],
+    });
+
+    const ok = await authOptions.callbacks.signIn({
+      user: { id: 'azure-null', email: 'NULLACTIVE@example.org', name: 'Null Active Person' },
+      account: { provider: 'azure-ad' },
+      profile: { oid: 'azure-null', name: 'Null Active Person' },
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(ok).toBe(false);
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(grantApps).not.toHaveBeenCalled();
+    expect(NotificationService.notifyNewUser).not.toHaveBeenCalled();
+    expect(reconcileProfile).not.toHaveBeenCalled();
+  });
+
   test('active linked sign-in still works: last_login UPDATE issued, returns true', async () => {
     sql
       .mockResolvedValueOnce({

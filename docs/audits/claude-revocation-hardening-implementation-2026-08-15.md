@@ -40,16 +40,82 @@ unresolved blocking findings.
 
 | Builder | Exclusive scope | Status |
 |---|---|---|
-| A | `pages/api/auth/[...nextauth].js` (signIn disabled-row denial; jwt zero-row invalidation) + `tests/unit/nextauth-revocation.test.js` (13 tests) | COMPLETE — mutation check: disabled-sign-in test fails against pre-fix code (`return true` + provisioning observed) |
+| A | `pages/api/auth/[...nextauth].js` (signIn disabled-row denial; jwt zero-row invalidation) + `tests/unit/nextauth-revocation.test.js` (10 tests pre-remediation; count corrected per Opus reviewer 2 finding 5) | COMPLETE — mutation check: disabled-sign-in test fails against pre-fix code (`return true` + provisioning observed) |
 | B | `lib/utils/auth.js` (requireAuth active check; fail-closed zero-row fixes) + `tests/unit/utils/auth.test.js` (+9 tests) + `tests/helpers/auth-mock.js` (3 new presets) + `tests/unit/bare-auth-revocation.test.js` (8 route-level tests) + suite fallout triage (none needed; 2 failures pre-existing on baseline, re-confirmed by lead via `git stash -u`) | COMPLETE — discriminating fixtures: zero-row lookups where old/new predicates disagree, sequenced sql mocks to isolate `requireAuthWithProfile`'s own read |
 | C | `pages/api/auth/link-profile.js` (live caller guard + conditional writes + rowcount-checked UPDATE → 409) + `tests/unit/link-profile-revocation.test.js` (11 tests) | COMPLETE — empirical mutation check: suite re-run against the pre-fix handler; every revocation case failed (200 + writes executed), green after restore |
 
 ## Opus adversarial review passes
 
-(To be recorded: reviewer scopes, every finding, disposition
-CONFIRMED/REFUTED with file:line evidence, and remediation round results.)
+Two independent read-only Opus reviewers ran against commit `445dd1f8`
+(diff over `d32e2d56`), each seeded with the lead's lifecycle/provenance
+trace to verify rather than trust. **Neither reviewer refuted any of the 12
+invariants; neither reported a BLOCKING finding.** Reviewer 1 (end-to-end
+auth/authz semantics) independently verified the next-auth v4 internals
+(`node_modules/next-auth/core/routes/session.js`: a `{}` token still yields a
+non-null session object — confirming the audit's both-layers-required
+premise), swept every `getServerSession`/`getSession(` consumer to prove no
+DB-outage path becomes authorization success, and traced all four
+link-profile race interleavings. Reviewer 2 (TOCTOU/negative-test
+adequacy/coverage/docs) re-derived pre-fix behavior for every new negative
+test (none decorative), confirmed the exact four-route bare-auth census and
+that the route tests import the real handlers, mapped **all six §10.2
+required-regression-test bullets to concrete tests** (table in its report;
+no bullet uncovered), and independently reproduced the two known unit-suite
+failures on pristine baseline `d32e2d56`.
+
+### Findings and dispositions
+
+| # | Reviewer / severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | R1 MEDIUM | Claim-branch 409 race: target profile disabled between the SELECT (`link-profile.js:101`) and the conditional UPDATE (`:128`) → temp row already deleted → caller has zero rows for `azure_id` → next sign-in falls to the create-new branch and provisions a fresh default-grant profile | CONFIRMED mechanism; **ACCEPTED as residual** (owner may overturn). The disabled target profile stays disabled — the user gains only a new vanilla identity with default grants, which is exactly the already-accepted email-only/hard-delete reprovisioning residual class. Invariant 7 (disabled *caller*) is not violated; closing the two-statement window would need a `db.connect()` transaction in a serverless route (real added risk) or a fragile CTE ordering. Recorded below. |
+| 2 | R1 LOW + R2 LOW | `is_active` NULL split-brain: `=== false` / `!== false` sites treat NULL as active while `!is_active` sites deny; `requireAppAccess` would be the fail-open side (~94 endpoints). No write path produces NULL today (both reviewers exhaustively enumerated writes) | CONFIRMED (latent, unreachable); **FIXED** in the remediation round — all revocation predicates normalized to `is_active === true`-grants / everything-else-denies, with a discriminating NULL test per site |
+| 3 | R1 LOW | Wiki bullet overclaimed "enforced at every layer" — the proxy edge itself has no `is_active` read (`proxy.js:96-144`); it inherits revocation via JWT invalidation | CONFIRMED; **FIXED** (wording corrected in `docs/agent-wiki/topics/security-auth.md`) |
+| 4 | R2 MEDIUM | Residual-list omission: the applicant pass-through on the four bare-auth routes (`auth.js` skips the check for `userType === 'applicant'`) is now a codified exemption but was unrecorded. Pre-existing, not a regression; proxy staff-surface classification rejects applicant tokens today (`proxy.js:142`) | CONFIRMED; **FIXED** (recorded in residuals below) |
+| 5 | R2 LOW | Implementation-record test count for builder A was wrong (claimed 13; file had 10) | CONFIRMED; **FIXED** (counts corrected in this record) |
+| 6 | R2 LOW + R1 INFO | Stale mutation-check comment in `link-profile-revocation.test.js` ("9 of 12"; the file has 11 tests) | CONFIRMED; **FIXED** in the remediation round |
+| 7 | R1 INFO | `/api/health` now 503s during a Postgres outage (fail-closed health surface) | Already recorded in residuals; verified by R1 |
+| 8 | R2 INFO | jwt's `if (token.azureId)` fall-through (non-applicant token without azureId keeps stale claims) is safe only because `requireAuth`'s keyless-session 403 backstops it | CONFIRMED; **recorded below** so a future edit doesn't remove the requireAuth check believing jwt covers it |
+| 9 | R1 INFO | Transient signout window in createNew (DELETE→INSERT gap: a concurrent session read sees zero rows → `{}` → re-sign-in) | ACCEPTED — fail-closed direction is the right trade; recoverable; recorded below |
+| 10 | R1/R2 INFO | Minor optional test gaps (no end-to-end unique-violation race test — not exercisable in a mock-based suite; no `entra-external` early-return pin) | ACCEPTED as non-load-bearing; both reviewers judged them acceptable |
+
+### Remediation round (post-review)
+
+One Sonnet remediation builder implemented findings 2 and 6:
+`[...nextauth].js` signIn `is_active === false` → `!== true`;
+`requireAppAccess` `is_active !== false` → `=== true`; `link-profile.js`
+caller check `=== false` → `!== true` (the `!is_active` sites in
+`requireAuth`/`requireAuthWithProfile` already denied NULL and were left
+alone); stale mutation-check comment corrected to "9 of 11". Three
+discriminating NULL-row tests added (one per site — each seeds a PRESENT row
+with `is_active: null`, the fixture where the old and new predicates
+disagree). Verified by the lead: targeted suites 86/86 green; full unit
+suite 7652 tests with only the two known pre-existing baseline failures;
+predicate diff inspected line-by-line.
 
 ## Residual risks and owner decisions
+
+- **Claim-branch 409 race (Opus R1 finding 1, accepted):** if the *target*
+  profile is disabled between link-profile's target SELECT and its
+  conditional UPDATE, the caller's temp row is already deleted and the 409
+  leaves the caller row-less; their next sign-in provisions a fresh
+  default-grant profile. The disabled profile itself stays disabled — this is
+  the accepted reprovisioning residual class, not a revocation bypass.
+- **Applicant pass-through on bare-auth routes (Opus R2 finding 4,
+  pre-existing):** `requireAuth`'s revocation check deliberately skips
+  `userType === 'applicant'` sessions (applicants have no `user_profiles`
+  row), so an applicant session reaching blob-proxy/upload-handler would face
+  no profile check. Today the proxy classifies those routes as staff surface
+  and rejects applicant tokens (`proxy.js:140-143`); this exemption must be
+  revisited if the applicant surface classification ever widens (the intake
+  proxy/CSRF workstream).
+- **jwt fall-through backstop coupling (Opus R2 finding 8):** a non-applicant
+  token without `azureId` skips the jwt active lookup and keeps its claims;
+  it is denied only by `requireAuth`'s keyless-session 403. Do not remove
+  that requireAuth branch on the belief that the jwt callback covers it.
+- **Transient signout window in createNew (Opus R1 finding 9, accepted):**
+  between the temp DELETE and the INSERT, a concurrent session read sees zero
+  rows and invalidates the token; the user re-signs-in and re-enters the
+  linking flow. Fail-closed direction, recoverable.
 
 - Hard-delete reprovisioning remains an explicitly accepted residual
   (audit §10.3); no tombstone/denylist implemented per owner scope.

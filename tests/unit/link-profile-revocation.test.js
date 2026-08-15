@@ -103,6 +103,21 @@ describe('/api/auth/link-profile', () => {
     expect(writeQueryTexts()).toEqual([]);
   });
 
+  // NULL is_active discriminates the old and new predicates: the old
+  // `caller.rows[0].is_active === false` reads `null === false` as false and
+  // falls through to the writes below; the fixed `!== true` denies it.
+  test('NULL is_active caller, createNew branch -> 403 disabled, zero writes', async () => {
+    getServerSession.mockResolvedValueOnce(activeSession);
+    sql.mockResolvedValueOnce({ rows: [{ id: 1, is_active: null }] });
+    const res = mockResponse();
+
+    await handler(mockReq({ createNew: true }), res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({ error: 'Account has been disabled' });
+    expect(writeQueryTexts()).toEqual([]);
+  });
+
   test('disabled caller, profileId claim branch -> 403 disabled, zero writes', async () => {
     getServerSession.mockResolvedValueOnce(activeSession);
     sql.mockResolvedValueOnce({ rows: [{ id: 1, is_active: false }] });
@@ -246,7 +261,7 @@ describe('/api/auth/link-profile', () => {
 
 // Mutation check performed manually (not committed as a test): the pre-fix
 // handler (git show c87e2a34:pages/api/auth/link-profile.js) was swapped in
-// temporarily and this suite re-run against it. Result: 9 of 12 tests failed
+// temporarily and this suite re-run against it. Result: 9 of 11 tests failed
 // (only the pre-existing 401 and needsLinking-403 pins passed, since those
 // don't touch the new logic) — including every disabled-caller,
 // missing-caller-row, DB-error, and race-backstop case, each of which the

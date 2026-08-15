@@ -134,9 +134,9 @@ export const authOptions = {
           if (existingByAzureId.rows.length > 0) {
             const profile = existingByAzureId.rows[0];
 
-            if (profile.is_active === false) {
-              // Disabled account: deny sign-in outright. No writes, no
-              // provisioning side effects.
+            if (profile.is_active !== true) {
+              // Disabled (or NULL, which is not active) account: deny
+              // sign-in outright. No writes, no provisioning side effects.
               return false;
             }
 
