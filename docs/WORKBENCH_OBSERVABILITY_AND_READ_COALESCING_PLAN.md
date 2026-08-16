@@ -19,10 +19,11 @@ related:
 
 # Workbench Observability and Read-Coalescing Staged Plan
 
-**Status: Stage 1 authorized and implemented on branch
-`codex/claude-workbench-observability-stage1` (owner work order, 2026-08-15) — Codex independent
-review complete with merge recommended and two P3 cleanups applied; not merged, not deployed,
-measurement program not opened. Stage 2 and the Deferred section remain NOT authorized.**
+**Status: Stage 1 merged to `main` at `30ed5fe0` and deployed to Production as
+`dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB` (READY 2026-08-16 00:53:40Z); the custom application domain was
+verified to resolve to that exact deployment. The passive 48-hour safety window and controlled
+GET-only before-baseline opened 2026-08-15. Stage 2 and the Deferred section remain NOT
+authorized.**
 Implementation record:
 `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
 by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
@@ -300,9 +301,8 @@ instrumenting one of these seams covers another is false and must not reappear.
      tuning choice.
    - **Query workflow (executable, historical, fail-closed):** `vercel logs` performs a
      **historical query by default**; live streaming requires `--follow` (which this workflow does
-     not use — the previous live-tail framing was wrong). Flag existence was inspected on the CLI
-     installed at review time (59.0.0, 2026-08-15 — a historical observation, not a version
-     requirement; see the version-agnostic rule below). Each slice:
+     not use — the previous live-tail framing was wrong). Flag existence and the actual Production
+     JSON record shape were preflighted at window start (2026-08-15). Each slice:
 
      ```bash
      # Preconditions (one-time): `vercel login`; repo linked to the production project via
@@ -315,6 +315,7 @@ instrumenting one of these seams covers another is false and must not reappear.
      SINCE='2026-08-20T00:00:00Z'; UNTIL='2026-08-20T01:00:00Z'; LIMIT=5000
      RAW="$OUT_DIR/raw-${SINCE}--${UNTIL}.ndjson"
      SLICE="$OUT_DIR/workbench-dependency-${SINCE}--${UNTIL}.ndjson"
+     trap 'rm -f "$RAW" "$SLICE.tmp"' EXIT  # RAW can contain unrelated application logs
 
      # Step 1 — capture of record: genuinely UNFILTERED. No --query here: any server-side
      # filter would make the completeness check below meaningless (fifth-pass correction —
@@ -334,9 +335,12 @@ instrumenting one of these seams covers another is false and must not reappear.
        exit 1
      fi
 
-     # Step 3 — filter of record: local parse + FULL v1 contract validation, fully
-     # self-contained (the closed value sets are inlined — no operator-supplied
-     # variables). Non-telemetry records (non-string or discriminator-free messages)
+     # Step 3 — filter of record: flatten each Vercel request record's .logs[] array,
+     # then locally parse + FULL v1 contract validation. The top-level .message is only
+     # one duplicated child log and is NOT a complete source (Production preflight,
+     # 2026-08-15: 14 top-level matches versus 116 nested telemetry lines).
+     # It remains self-contained (the closed value sets are inlined — no operator-supplied
+     # variables). Non-telemetry child logs (non-string or discriminator-free messages)
      # are skipped; any line CONTAINING the discriminator that fails to parse or fails
      # validation ABORTS the slice (fromjson? alone silently drops malformed JSON —
      # that is why unparseable candidates are turned into errors). jq failure is
@@ -352,8 +356,13 @@ instrumenting one of these seams covers another is false and must not reappear.
          elif d == "graph"     then ["site","drive","drive-item","search","unknown"]
          elif d == "unknown"   then ["unknown"]
          else [] end;
-       select((.message | type) == "string"
-              and (.message | contains("\"event\":\"workbench.dependency\"")))
+       . as $record
+       | if ($record.logs | type) != "array"
+         then error("Vercel JSON record lacks .logs[] — fail slice and re-preflight")
+         else $record.logs[]
+         end
+       | select((.message | type) == "string"
+                and (.message | contains("\"event\":\"workbench.dependency\"")))
        | ((.message | fromjson?) // error("candidate telemetry line did not parse — fail slice")) as $ev
        | if ($ev.event == "workbench.dependency")
            and ($ev.v == 1)
@@ -370,16 +379,18 @@ instrumenting one of these seams covers another is false and must not reappear.
                 else $ev.statusClass == null end)
            and (($ev.correlationId == null) or (($ev.correlationId | type) == "string"))
            and (($ev.routeName == null) or (($ev.routeName | type) == "string"))
-         then {record: ., ev: $ev}
+         then {recordId: $record.id, timestamp: $record.timestamp,
+               deploymentId: $record.deploymentId, ev: $ev}
          else error("workbench.dependency event failed v1 contract validation — fail slice")
          end
      '
      if ! jq -c "$VALIDATE" < "$RAW" > "$SLICE.tmp"; then
-       rm -f "$SLICE.tmp"
+       rm -f "$SLICE.tmp" "$RAW"
        echo "slice validation failed — no partial slice published" >&2
        exit 1
      fi
      mv "$SLICE.tmp" "$SLICE"   # atomic publish
+     rm -f "$RAW"                # retain only the PII-safe validated telemetry slice
 
      # Step 4 — cross-slice merge + sound dedup: exactly one payload per eventId.
      # Conflicting payloads sharing an eventId are a DATA ERROR (fail), never a choice.
@@ -401,7 +412,10 @@ instrumenting one of these seams covers another is false and must not reappear.
      GraphService token leg classifies as `azuread`/`token` by host, so `graph`/`token` is
      illegal) while `azuread`/`token` and `graph`/`site`, `drive`, `drive-item`, `search`,
      `unknown` are all accepted; identical duplicate `eventId`s dedupe to one; conflicting
-     payloads sharing an `eventId` fail the merge. An
+     payloads sharing an `eventId` fail the merge. The amended `.logs[]` extractor was then
+     exercised against bounded unfiltered Production slices: all 116 nested telemetry events
+     passed the full v1 validator with 116 unique `eventId`s; the old top-level-only extractor
+     would have retained only 14 and is superseded. An
      optional query-assisted **triage** command (`vercel logs … --query 'workbench.dependency' …`)
      may be used to eyeball volume before capture, but it is **never** the capture of record, is
      not part of the trusted preflight, and proves nothing about completeness — no measurement
@@ -410,19 +424,28 @@ instrumenting one of these seams covers another is false and must not reappear.
      - **Time bounds:** explicit `--since`/`--until` per slice (ISO timestamps), stamped into the
        filename; per-event timestamps come from the platform log record in the `--json` output
        (the event body deliberately carries no timestamp field).
-     - **What is verified vs. what must be preflighted:** `vercel logs --help` on the installed
-       CLI proves the flags **exist** — it does NOT prove the exact `--json` record field names
-       (`.message` etc.). At window start, **preflight against a known emitted event**: emit one
-       test event, capture it with the unfiltered workflow above (no `--query`), and confirm the
-       validator isolates it, before trusting any measurement slice. `--query` semantics are not
-       part of this preflight and are a prerequisite for nothing. `--limit` stays explicit (CLI
-       default is 100 — far too low to rely on implicitly).
+     - **What is verified vs. what must be preflighted:** the 2026-08-15 Production preflight
+       verified that each returned record carries an array `.logs`, each child log carries a
+       string `.message`, and the top-level `.message` duplicates only one child message rather
+       than representing the whole request. Every future window still begins with an unfiltered
+       known-event preflight because this is a platform response contract, not an application
+       type contract. `--query` semantics are not part of this preflight and are a prerequisite
+       for nothing. `--limit` stays explicit (CLI default is 100 — far too low to rely on
+       implicitly).
      - **Truncation/completeness:** checked on the RAW unfiltered line count, before local
        filtering (a post-filter count says nothing about what the server dropped). At-limit ⇒
        exit 1 ⇒ re-slice narrower. **If slices cannot be proven complete within the plan's
        retention and result limits, or the `--json` record shape cannot be confirmed in
        preflight, the REQUIRED fallback is a Log Drain or the dashboard log export — incomplete
        CLI output is not valid measurement evidence.**
+     - **Retention at this window:** live API probes on 2026-08-15 verified the team is Pro,
+       Observability Plus is not enabled, and no Log Drain exists. [Current Vercel runtime-log
+       documentation](https://vercel.com/docs/logs/runtime) gives base Pro a one-day retention
+       window. Therefore the 48-hour Track A
+       window requires complete exports at least once per day (12-hour slices are the operating
+       target); waiting until hour 48 would irretrievably lose day-one evidence. The unfiltered
+       RAW files are restricted transient artifacts and are deleted after validation; only the
+       PII-safe telemetry slices are retained.
      - **Deduplication:** across overlapping slices, deduplicate **only on the parsed event's
        `eventId`** (unique per emitted event by construction — see the envelope contract).
        `requestId`+timestamp and full-line `sort -u` are prohibited: a request's `requestId` spans
@@ -489,7 +512,8 @@ distinct tracks; neither may be represented as the other.
 #### Track A — passive operational safety
 
 - **Environment:** production.
-- **Duration:** the first 48 hours after deployment, followed by open-ended passive watching.
+- **Duration:** the first 48 hours after deployment (opened at Production READY,
+  2026-08-16 00:53:40Z), followed by open-ended passive watching.
 - **Scope:** all app-wide `workbench.dependency` events from the three shared seams, not only the
   target routes.
 - **Measure:** total lines/day, malformed/invalid events, log throttling or truncation, visible log
@@ -499,6 +523,13 @@ distinct tracks; neither may be represented as the other.
   result, not evidence of safety or performance, and does not block Stage 2.
 
 #### Track B — controlled read-only before/after baseline
+
+**Before-baseline opened 2026-08-15.** The first signed-in pass is recorded in
+`docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`: the three target
+routes returned successfully for a small/typical fixture, an empty person-id-set fixture, and a
+combined active + removed + decline-referral fixture. The observed `wmkf_potentialreviewerses`
+counts match the pre-Stage-2 formula for those strata; a >25-id fixture was unavailable and is
+recorded as such rather than manufactured.
 
 - **Environment:** production, using a signed-in staff account and deliberately selected existing
   requests. This is owner- or orchestrator-driven evidence, not manufactured organic traffic.

@@ -190,9 +190,9 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 ### Workbench Dependency Telemetry
 
-Status: implemented on branch `codex/claude-workbench-observability-stage1` (Stage 1,
-`lib/observability/request-correlation.js`); not yet merged; production measurement window
-not yet opened.
+Status: Stage 1 is merged and Production-live at `main` merge `30ed5fe0` / deployment
+`dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB`; the passive 48-hour measurement window opened at
+2026-08-16 00:53:40Z and remains active. Stage 2 is not authorized.
 
 Every server-side call through the three instrumented egress seams
 (`lib/services/dynamics/http.js`, `lib/services/graph-service.js`,
@@ -214,9 +214,18 @@ carries no user identity, and is never write authority. The sink is the existing
 log stream: no new table, no durable write, and deliberately not `api_usage_log` (the LLM
 token/cost ledger).
 
+Production extraction contract (window-start verified): each Vercel JSON request record carries
+all console lines in `.logs[]`; the top-level `.message` duplicates only one child and is not a
+complete telemetry source. The plan's fail-closed extractor flattens `.logs[]`, validates each
+event, retains only PII-safe telemetry plus safe record metadata, and removes the transient
+unfiltered RAW capture. The live team is Pro without Observability Plus or a Log Drain, so current
+one-day runtime-log retention requires exports at least daily during the 48-hour window (12-hour
+slices are the target).
+
 Watch trigger (any one is sufficient):
 
 - Platform log throttling or truncation observed in a measurement slice.
+- The `.logs[]` record shape changes or a discriminator-bearing child fails v1 validation.
 - A visible log-cost line item appears on the Vercel bill.
 - A new egress seam is instrumented, or a Dataverse entity set is added to the
   `resourceClass` allowlist without a reviewed commit.

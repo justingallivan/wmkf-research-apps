@@ -2,8 +2,8 @@
 title: Workbench Observability Stage 1 — Implementation and Adversarial-Review Record
 domain: architecture
 kind: audit
-status: draft
-summary: "Point-in-time record of the Stage 1 observability implementation on codex/claude-workbench-observability-stage1: invariants, builder assignments, Opus dispositions, Codex independent review, and the owner-amended measurement program."
+status: active
+summary: "Stage 1 implementation, adversarial-review, Production promotion, log-shape preflight, and owner-amended measurement record."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -18,8 +18,9 @@ related:
 **Date:** 2026-08-15
 **Branch:** `codex/claude-workbench-observability-stage1`, base `31041461`
 **Orchestrator:** Claude Fable; Sonnet builders A/B/C; two Opus adversarial reviewers.
-**Authorization:** Stage 1 only (owner work order, 2026-08-15). Stage 2, merge, deployment,
-and production measurement explicitly NOT performed.
+**Authorization:** Stage 1 only (owner work order, 2026-08-15). Stage 2 remains unauthorized.
+The branch-closeout sections below preserve their point-in-time "not merged/deployed" state;
+current promotion and measurement evidence is recorded in the final section.
 
 ## What was built
 
@@ -234,5 +235,35 @@ conflicted with the active campaign-cadence memory and is withdrawn. Measurement
 before/after baseline over representative existing requests, with production mutations prohibited;
 and (C) optional organic latency evidence that never blocks Stage 2 and must be reported as
 insufficient when sparse. The Deferred Data Plane remains gated on genuine organic latency
-evidence. Stage 2, merge, deployment, and measurement remain unperformed and separately
-owner-controlled.
+evidence. **At that branch-closeout checkpoint**, Stage 2, merge, deployment, and measurement were
+unperformed and separately owner-controlled; the promotion addendum below supersedes that
+point-in-time statement for merge, deployment, and Stage 1 measurement only.
+
+## Production promotion and measurement opening (2026-08-15)
+
+The owner authorized promotion after Codex review. `main` advanced to merge commit `30ed5fe0` and
+Vercel deployment `dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB` reached READY in Production at
+2026-08-16 00:53:40Z. The custom application domain was independently verified through the Vercel
+alias API to resolve to that exact deployment. Six focused suites remained green on merged main
+(124/124) before push.
+
+A signed-in GET/read-only Production smoke loaded Workbench dashboard, detail, Find, and Track
+views without any application mutation. The three target routes emitted 39 correlated dependency
+events across three non-identifying fixture strata; every correlated target event reported success,
+and the observed `wmkf_potentialreviewerses` counts matched the pre-Stage-2 formula for available
+empty, small/typical, active, removed, and decline sets. A >25-id fixture was unavailable and was
+not manufactured.
+
+The window-start log preflight discovered and corrected a plan-only extraction defect: Vercel JSON
+request records carry all console lines under `.logs[]`, while the top-level `.message` duplicates
+only one child line. A bounded complete slice contained 116 validated nested telemetry events but
+only 14 top-level matches. The plan now flattens `.logs[]`, retains only safe record metadata plus
+the validated event, and deletes the unfiltered RAW capture after validation. Across the bounded
+preflight/baseline slices, 293 unique events passed the full v1 validator after overlap-safe
+`eventId` deduplication.
+
+Live probes verified the team is Pro, Observability Plus is not enabled, and no Log Drain exists;
+current base-Pro runtime-log retention is one day. Track A therefore requires daily-or-more-frequent
+exports during its 48-hour window and remains open through 2026-08-18 00:53:40Z. Full evidence,
+fixture counts, limitations, and the corrected extraction contract are in
+`docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`.

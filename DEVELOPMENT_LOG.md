@@ -10,6 +10,22 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Workbench dependency observability is Production-live (Sessions 434–436)
+
+**Milestone:** Shared Dataverse, Azure AD, and Graph transports now emit PII-safe dependency timing
+events, with pre-auth request correlation on the three Workbench measurement routes.
+**Sessions:** 434–436 (Sonnet implementation, Opus adversarial review, Codex review/remediation,
+owner promotion, signed-in GET-only Production baseline).
+**Ship state:** `main` advanced `31041461 → 30ed5fe0`; deployment
+`dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB` reached READY. Production preflight corrected the Vercel export
+contract from incomplete top-level `.message` parsing to fail-closed `.logs[]` extraction; 293
+unique events validated and all 39 correlated target-route baseline events succeeded.
+**Why it matters:** Stage 2's source-certain duplicate reads now have a measurable before-baseline
+without waiting months for organic campaign traffic, while the 48-hour whole-app safety watch can
+stop excessive logging before further optimization.
+**Pointers:** `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`;
+`docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`; merge `30ed5fe0`.
+
 ## August 2026 — Disabled-account revocation is production-enforced (Sessions 431–433)
 
 **Milestone:** Staff-account disablement now fails closed across fresh sign-in, rolling JWT/session
