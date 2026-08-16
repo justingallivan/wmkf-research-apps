@@ -188,6 +188,34 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 ## Current Watch Items
 
+### Raw Internal Error Responses
+
+Status: cleanup implemented and adversarially self-reviewed on
+`codex/raw-error-message-cleanup` from base `fb735651`; awaiting an owner merge decision. It is
+not yet Production-live.
+
+The 2026-08-15 auth/side-effect audit identified 28 literal 500/502 response sites that
+serialized an unexpected exception message: 7 superuser routes, 17 cron routes, 3 staff
+app-auth routes, and 1 internal-HMAC route. The cleanup replaces only those unhandled-failure
+details with stable generic text while preserving status codes, response shapes, authentication,
+structured `ServiceHttpError` bodies, and details that are explicitly gated to development.
+The underlying exception remains available in server logs and existing operator records/alerts;
+the one route that previously lacked a server log (`phase-i-dynamics/summarize-v2` file loading)
+now logs before returning its generic 500.
+
+Regression protection lives in `tests/unit/api-error-response-hygiene.test.js`. It parses every
+`pages/api/**/*.js` file and fails when a literal 500/502 JSON response includes `.message`
+(including optional chaining), a stringified exception, or the historical `msg` alias outside a
+structural `NODE_ENV === 'development'` guard. Self-test fixtures prove direct/optional members,
+aliases, stringification, and template interpolation fail; a dynamic-status structured service
+error and guarded development detail remain allowed.
+
+The same change converts three literal NUL bytes in `pages/api/cron/pricing-refresh.js` to escaped
+`\u0000` source notation. JavaScript still produces the same NUL-delimited composite key at
+runtime, but the tracked source becomes text and can no longer obscure normal diff/search output.
+
+Record: `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`.
+
 ### Origin and Cron Authentication Hardening
 
 Status: merged and Production-live at main merge `96d89c32`; deployment

@@ -276,7 +276,7 @@ export default async function handler(req, res) {
       category: 'ops',
     }));
 
-    return res.status(500).json({ error: 'Maintenance failed', message: error.message });
+    return res.status(500).json({ error: 'Maintenance failed', message: 'Internal error' });
   }
 }
 

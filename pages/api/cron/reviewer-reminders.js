@@ -60,6 +60,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[cron:reviewer-reminders] error:', error);
     await MaintenanceService.completeRun(runId, { status: 'failed', errorMessage: error.message });
-    return res.status(500).json({ error: 'Reminder sweep failed', message: error.message });
+    return res.status(500).json({ error: 'Reminder sweep failed', message: 'Internal error' });
   }
 }

@@ -93,6 +93,7 @@ jest.mock('../../lib/utils/file-loader', () => ({
   // exercise that path in this test (proposal_text is `kind: 'override'`).
   extractTextFromBuffer: jest.fn(async () => ''),
 }));
+const { loadFile } = require('../../lib/utils/file-loader');
 
 // Stub Dynamics — return the v2 prompt row with the new variable declaration.
 // The prompt row mirrors what scripts/seed-phase-i-summary-prompt.js will
@@ -196,6 +197,7 @@ function createMockRes() {
 
 beforeEach(() => {
   fetchedBodies.length = 0;
+  loadFile.mockImplementation(async () => ({ text: mockedFileText, filename: 'phase1.pdf' }));
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
   process.env.AUTH_REQUIRED = 'true';
   process.env.AZURE_AD_CLIENT_ID = 'test-client-id';
@@ -242,5 +244,28 @@ describe('/api/phase-i-dynamics/summarize-v2 payload boundary (Executor-enforced
 
     // Sanity — handler returned 200 (not an early auth/preflight failure).
     expect(res.statusCode).toBe(200);
+  });
+
+  test('unexpected file-load failure is logged and returned without exception text', async () => {
+    const failure = new Error('private storage hostname and token detail');
+    loadFile.mockRejectedValueOnce(failure);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const handler = (await import('../../pages/api/phase-i-dynamics/summarize-v2')).default;
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+      body: {
+        requestGuid: '11111111-1111-1111-1111-111111111111',
+        fileRef: { source: 'upload', fileUrl: 'https://example.invalid/private.pdf' },
+      },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res._data).toEqual({ error: 'Failed to load file' });
+    expect(errorSpy).toHaveBeenCalledWith('[summarize-v2] loadFile failed:', failure);
+    errorSpy.mockRestore();
   });
 });

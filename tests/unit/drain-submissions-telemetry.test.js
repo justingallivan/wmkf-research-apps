@@ -152,7 +152,7 @@ describe('drain telemetry — maintenance_runs wiring', () => {
     expect(payload.details).toMatchObject({ phase: 'fatal', claimed: 0 });
 
     expect(res.statusCode).toBe(500);
-    expect(res.body).toMatchObject({ error: 'drain fatal', message: 'connection terminated' });
+    expect(res.body).toMatchObject({ error: 'drain fatal', message: 'Internal error' });
     // The pooled client is still released on the fatal path.
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });

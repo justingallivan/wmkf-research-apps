@@ -125,6 +125,6 @@ export default async function handler(req, res) {
       status: 'failed',
       errorMessage: error.message,
     });
-    return res.status(500).json({ error: 'Secret check failed', message: error.message });
+    return res.status(500).json({ error: 'Secret check failed', message: 'Internal error' });
   }
 }

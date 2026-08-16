@@ -13,6 +13,12 @@ Raw-error cleanup, grantee policy, and tombstones were explicitly outside this c
 proxy/CSRF finding is only a conditional prerequisite for the parked applicant-intake product; it
 is not an active follow-up or backlog item.
 
+Raw-error cleanup is now implemented and adversarially self-reviewed separately on
+`codex/raw-error-message-cleanup` from base `fb735651`, awaiting an owner merge decision. The branch generalizes the 28
+audited literal 500/502 disclosures, adds the one missing server log, installs a whole-API AST
+regression guard with self-tests, and converts the pricing-refresh composite-key NULs to escaped
+source notation without changing runtime delimiter semantics. It is not yet Production-live.
+
 - Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
 - Promotion record: `897ac285`
 - Current verification deployment: `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`
@@ -44,6 +50,9 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
    fail-closed, and deduplicate only on `eventId`. Stop/re-scope at ~50,000 events/day, platform
    throttling/truncation, or visible log cost. Classify the unrelated Graph `drive-item` 4xx
    activity without attributing it to Stage 2.
+2. **Deliberately promote the raw-error cleanup.** Start from
+   `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`; the branch is ready
+   for the owner merge decision after its bounded review, response-inventory proof, and gates.
 
 ### Recently closed
 
@@ -85,4 +94,5 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
 - `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`
 - `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`
 - `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`
+- `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`
 - `tests/unit/workbench-read-coalescing-stage2-callcounts.test.js`

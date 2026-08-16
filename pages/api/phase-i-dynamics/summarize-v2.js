@@ -79,7 +79,8 @@ export default async function handler(req, res) {
   } catch (rawErr) {
     const err = /** @type {any} */ (rawErr);
     if (err.status) return res.status(err.status).json({ error: err.message });
-    return res.status(500).json({ error: `Failed to load file: ${err.message}` });
+    console.error('[summarize-v2] loadFile failed:', err);
+    return res.status(500).json({ error: 'Failed to load file' });
   }
 
   /** @type {any} */

@@ -102,10 +102,10 @@ it('golden: single-row full envelope pinned (every mapRow field)', async () => {
   });
 });
 
-it('domain error: adapter query throws -> 500 with err.message envelope', async () => {
+it('unexpected adapter failure returns a generic 500 envelope', async () => {
   DynamicsService.queryRecords.mockRejectedValue(new Error('Dataverse unavailable'));
   const r = res();
   await handler({ method: 'GET' }, r);
   expect(r.statusCode).toBe(500);
-  expect(r.body).toEqual({ error: 'Dataverse unavailable' });
+  expect(r.body).toEqual({ error: 'Internal error' });
 });

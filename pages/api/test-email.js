@@ -59,7 +59,7 @@ export default async function handler(req, res) {
       console.error('Test email error:', error);
       return res.status(500).json({
         success: false,
-        error: error.message,
+        error: 'Test email failed',
       });
     }
   });

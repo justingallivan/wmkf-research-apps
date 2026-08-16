@@ -105,13 +105,13 @@ describe('/api/test-email — superuser-only gate', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Missing required fields: to, subject, body' });
   });
 
-  it('domain error: service rejection → 500 with { success:false, error } envelope', async () => {
+  it('service rejection → generic 500 without exposing the exception', async () => {
     mockAuthenticatedUser(2, [], { isSuperuser: true });
     createAndSendEmail.mockRejectedValueOnce(new Error('Dynamics unavailable'));
     const req = createMockReq({ method: 'POST', body: validBody({ sendMode: 'send' }) });
     const res = createMockRes();
     await handler(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Dynamics unavailable' });
+    expect(res.json).toHaveBeenCalledWith({ success: false, error: 'Test email failed' });
   });
 });

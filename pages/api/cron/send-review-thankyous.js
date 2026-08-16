@@ -62,6 +62,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('[cron:review-thankyous] error:', error);
     await MaintenanceService.completeRun(runId, { status: 'failed', errorMessage: error.message });
-    return res.status(500).json({ error: 'Thank-you sweep failed', message: error.message });
+    return res.status(500).json({ error: 'Thank-you sweep failed', message: 'Internal error' });
   }
 }

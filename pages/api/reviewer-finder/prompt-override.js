@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('[reviewer-finder/prompt-override] error:', err);
-    return res.status(500).json({ error: err.message || 'Internal error' });
+    return res.status(500).json({ error: 'Internal error' });
   }
 }
 
