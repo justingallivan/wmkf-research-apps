@@ -243,15 +243,24 @@ describe('requireAuth', () => {
 // auth.js:33-79. Prior tests cover Origin-match, Origin-mismatch, and the
 // no-header cases. These pin the branches the Codebase eval (2026-05-29 #4)
 // flagged as untested: the `origin || referer` fallback (auth.js:66), the
-// malformed-URL rejection (:71), and the skip-validation escapes when
-// NEXTAUTH_URL is unset or unparseable (:53-55, :61-63). All exercised
-// through requireAuth on a state-changing (POST) request.
+// malformed-URL rejection (:71), the Preview VERCEL_URL fallback, and the
+// environment-specific behavior when NEXTAUTH_URL is unset or unparseable.
+// All are exercised through requireAuth on a state-changing (POST) request.
 // ---------------------------------------------------------------------------
 describe('validateOrigin — Referer fallback + config edge cases', () => {
   const ORIGINAL_NEXTAUTH_URL = process.env.NEXTAUTH_URL;
+  const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+  const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
+  const ORIGINAL_VERCEL_URL = process.env.VERCEL_URL;
   afterEach(() => {
     if (ORIGINAL_NEXTAUTH_URL === undefined) delete process.env.NEXTAUTH_URL;
     else process.env.NEXTAUTH_URL = ORIGINAL_NEXTAUTH_URL;
+    if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
+    if (ORIGINAL_VERCEL_URL === undefined) delete process.env.VERCEL_URL;
+    else process.env.VERCEL_URL = ORIGINAL_VERCEL_URL;
   });
 
   it('falls back to Referer when Origin is absent and the Referer origin matches', async () => {
@@ -337,9 +346,12 @@ describe('validateOrigin — Referer fallback + config edge cases', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('skips validation (allows) when NEXTAUTH_URL is unset, even on an Origin mismatch', async () => {
+  it('keeps the non-production fallback when NEXTAUTH_URL is unset', async () => {
     mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'test';
     delete process.env.NEXTAUTH_URL;
+    delete process.env.VERCEL_ENV;
+    delete process.env.VERCEL_URL;
 
     const req = createMockReq({
       method: 'POST',
@@ -353,8 +365,9 @@ describe('validateOrigin — Referer fallback + config edge cases', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('skips validation (allows) when NEXTAUTH_URL is itself unparseable', async () => {
+  it('keeps the non-production fallback when NEXTAUTH_URL is unparseable', async () => {
     mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'test';
     process.env.NEXTAUTH_URL = 'not-a-url';
 
     const req = createMockReq({
@@ -367,6 +380,138 @@ describe('validateOrigin — Referer fallback + config edge cases', () => {
 
     expect(result).toBeTruthy();
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('fails closed in production when NEXTAUTH_URL is unset', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    process.env.VERCEL_URL = 'applications.wmkeck.org';
+    delete process.env.NEXTAUTH_URL;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://applications.wmkeck.org' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed in production when NEXTAUTH_URL is unparseable', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    process.env.NEXTAUTH_URL = 'not-a-url';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://applications.wmkeck.org' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('derives the Preview allowlist from a scheme-less VERCEL_URL', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_URL = 'wmkf-preview-abc.vercel.app';
+    delete process.env.NEXTAUTH_URL;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://wmkf-preview-abc.vercel.app' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('rejects an Origin mismatch against the Preview VERCEL_URL allowlist', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_URL = 'wmkf-preview-abc.vercel.app';
+    delete process.env.NEXTAUTH_URL;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://evil.com' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed on an explicitly invalid Preview NEXTAUTH_URL instead of falling back', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    process.env.NEXTAUTH_URL = 'not-a-url';
+    process.env.VERCEL_URL = 'wmkf-preview-abc.vercel.app';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://wmkf-preview-abc.vercel.app' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed when Preview VERCEL_URL is unparseable', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    delete process.env.NEXTAUTH_URL;
+    process.env.VERCEL_URL = 'bad host';
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://bad-host.example' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed when Preview has neither NEXTAUTH_URL nor VERCEL_URL', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    delete process.env.NEXTAUTH_URL;
+    delete process.env.VERCEL_URL;
+
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'https://wmkf-preview-abc.vercel.app' },
+    });
+    const res = createMockRes();
+
+    const result = await requireAuth(req, res);
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 });
 
