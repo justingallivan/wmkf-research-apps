@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     });
     return res.status(500).json({
       error: 'Reviewer acceptance drain failed',
-      message: error.message,
+      message: 'Internal error',
     });
   }
 }

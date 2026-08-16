@@ -64,7 +64,7 @@ export default async function handler(req, res) {
       status: 'failed',
       errorMessage: error.message,
     });
-    return res.status(500).json({ error: 'pricing-canary failed', message: error.message });
+    return res.status(500).json({ error: 'pricing-canary failed', message: 'Internal error' });
   }
 }
 

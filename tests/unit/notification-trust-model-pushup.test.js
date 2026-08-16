@@ -746,6 +746,10 @@ describe('notification trust-model Stage 1 pushed-up wrappers', () => {
     }), res);
 
     expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({
+      ok: false,
+      error: { code: 'unhandled', message: 'Internal error' },
+    });
     expectTrustedNotify(seen, { type: 'bill_unhandled_error', source: 'bill/onboard-reviewer' });
   });
 

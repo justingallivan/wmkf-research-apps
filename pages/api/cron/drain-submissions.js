@@ -128,7 +128,7 @@ export default async function handler(req, res) {
       details: { ...stats, elapsedMs: Date.now() - startedAt, phase: 'fatal' },
     });
     client.release();
-    return res.status(500).json({ error: 'drain fatal', message: err.message });
+    return res.status(500).json({ error: 'drain fatal', message: 'Internal error' });
   }
 
   client.release();

@@ -174,7 +174,7 @@ export default async function handler(req, res) {
       status: 'failed',
       errorMessage: error.message,
     });
-    return res.status(500).json({ error: 'Log analysis failed', message: error.message });
+    return res.status(500).json({ error: 'Log analysis failed', message: 'Internal error' });
   }
 }
 
