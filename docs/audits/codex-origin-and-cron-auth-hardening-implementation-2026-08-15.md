@@ -18,9 +18,9 @@ related:
 
 ## Status and scope
 
-Implemented on `codex/security-origin-cron-hardening` from main `715ab060`; awaiting independent
-review and deliberate owner promotion. The controls in this record are **not Production-live**
-until that branch is merged and deployed.
+Implemented on `codex/security-origin-cron-hardening` from main `715ab060`, independently reviewed,
+merged to main as `96d89c32`, and deployed to Production as
+`dpl_9aLVHCXupik2CwXDgVrNzcFXXkaC` (READY 2026-08-15).
 
 Authorized scope is limited to two findings from the accepted follow-up security audit:
 
@@ -87,13 +87,14 @@ were reconciled in `docs/AUTHENTICATION_SETUP.md`, `docs/CREDENTIALS_RUNBOOK.md`
 `docs/SECURITY_OPERATING_PLAN.md`, `docs/agent-wiki/topics/security-auth.md`, and
 `SESSION_PROMPT.md`. The originating Claude audit and older security audits remain labeled
 point-in-time historical evidence and were not rewritten to pretend the finding had always been
-closed. `DEVELOPMENT_LOG.md` remains unchanged because the branch is unmerged and no Production
-milestone has occurred.
+closed. `DEVELOPMENT_LOG.md` remains unchanged because this incremental closure of two low-severity
+follow-ups does not meet that file's milestone threshold; the implementation record is the durable
+promotion evidence.
 
 ## Promotion and residuals
 
-After independent review, the owner may deliberately merge the branch. Deployment verification is
-then:
+The owner deliberately merged the reviewed branch. The Git-triggered Production deployment reached
+READY with all branded aliases attached. Optional application-level confirmation is:
 
 1. a signed-in state-changing request on `applications.wmkeck.org` succeeds;
 2. the same class of request with a mismatched Origin returns 403; and

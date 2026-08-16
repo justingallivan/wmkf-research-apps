@@ -190,9 +190,9 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 ### Origin and Cron Authentication Hardening
 
-Status: implemented, regression-tested, and independently adversarially reviewed on branch
-`codex/security-origin-cron-hardening`; awaiting deliberate owner promotion. It is not yet a
-Production-live control.
+Status: merged and Production-live at main merge `96d89c32`; deployment
+`dpl_9aLVHCXupik2CwXDgVrNzcFXXkaC` reached READY on 2026-08-15 after regression tests,
+documentation gates, and independent adversarial review converged with no open finding.
 
 The branch closes two accepted follow-up audit findings without expanding their scope:
 
@@ -204,10 +204,10 @@ The branch closes two accepted follow-up audit findings without expanding their 
   primitive. The shared verifier retains its local-development bypass; the strict
   drain-submissions verifier retains no bypass.
 
-Promotion checks: run the auth/cron regression suites and a Production build, then deliberately
-merge. After deployment, verify a signed-in state-changing request succeeds on the branded
-Production host and a mismatched Origin remains 403. Preview validation is a separate smoke on a
-current Preview deployment; it must succeed without setting a fixed Preview `NEXTAUTH_URL`.
+Post-deployment confirmation remains optional but useful: verify a signed-in state-changing request
+succeeds on the branded Production host and a mismatched Origin remains 403. Preview validation is
+a separate smoke on a current Preview deployment; it must succeed without setting a fixed Preview
+`NEXTAUTH_URL`.
 
 Record: `docs/audits/codex-origin-and-cron-auth-hardening-implementation-2026-08-15.md`.
 
