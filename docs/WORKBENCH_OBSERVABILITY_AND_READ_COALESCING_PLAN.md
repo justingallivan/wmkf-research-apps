@@ -571,8 +571,9 @@ recorded as such rather than manufactured.
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
 
 **Status: IMPLEMENTED on `codex/claude-workbench-read-coalescing-stage2` (base `ab4a87b8`,
-characterization pin `32030b50`, implementation `1b64a0da`) on 2026-08-15; NOT merged, NOT
-deployed, Production after-baseline NOT run.** Pending independent Codex read-only review and an
+characterization pin `32030b50`, implementation `1b64a0da`, adversarial-review closure commits
+following on the same branch) on 2026-08-15; NOT merged, NOT deployed, Production after-baseline
+NOT run.** Pending independent Codex read-only review and an
 explicit owner merge decision. Implementation record:
 `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
 The census and contract below are preserved as the authorized work order; **every `file:line`

@@ -148,10 +148,17 @@ single read with nothing to merge; census conclusion unaffected). Reviewer 2 als
 During review, intermittent non-reproducible failures (13–16 false reds concentrated in
 call-count/select assertions) appeared in parallel cold-cache runs; Reviewer 1 proved the executed
 module could not be HEAD source (single call site cannot yield two calls; `clearAllMocks` rules
-out carryover) and attributed it to stale jest transform-cache entries written during
-mid-build states in this shared worktree; warm/serial runs were 100% green (15/15). Resolution:
-`npx jest --clearCache`, then three consecutive parallel runs of the six affected suites —
-**111/111 each**. Tooling hazard only; no defect in the diff.
+out carryover). **Cause: consistent with stale jest transform-cache entries from mid-build states
+in this shared worktree, but UNCONFIRMED** — one signature (the fail-soft test rejecting with
+`'history query failed'`) would require an executed module lacking the S308-era `.catch`, which no
+committed version lacks, and remains unexplained. The load-bearing conclusions hold regardless:
+the hazard produces false REDS only, never false greens, so committed-green claims are not
+silently corrupted. Warm/serial baselines were fully green across repeated runs (Reviewer 1:
+`-w 1` ×3 and 12 warm parallel runs, all green). Resolution: `npx jest --clearCache`, then three
+consecutive parallel runs of the six affected suites (the five changed test files plus
+`decline-referrals-service.test.js`) — **111/111 each**; Reviewer 1's delta pass re-ran a
+seven-suite superset three times at 115/115 with zero recurrence. Tooling hazard only; no defect
+in the diff.
 
 ## Opus adversarial review (2026-08-15, two independent reviewers over `1b64a0da`)
 
@@ -165,7 +172,9 @@ active/removed independence, fail-soft/fail-hard preservation, DAL/auth/interloc
 absence from the diff, and mutation-path isolation. Reviewer 2 (test teeth) mutation-tested the
 suite: duplicate-read revival → 13 failures across 3 suites; select narrowing → the 2
 projection-completeness tests fail; active/removed unioning → the 2 independence tests fail;
-fail-soft removal → 2 failures; fail-hard softening → 2 failures; and re-ran the unedited
+fail-soft removal → 3 failures (the 2 fail-soft tests plus a collateral mock-carryover failure of
+the fail-hard test under the mutant; pristine code unaffected — the `.catch` neutralizes the
+carryover); fail-hard softening → 2 failures; and re-ran the unedited
 characterization pins against the restored pristine services (10/10 both sides, pin file diff
 between the two commits empty). Scope containment, observability suites (124/124, telemetry
 untouched), and gate spot-runs were all clean; the worktree was left byte-identical
@@ -211,9 +220,24 @@ mutants; the callcounts fixture-7 comment now states this precisely.
   results; neither references the changed files.
 - Repo-wide lint: 0 errors, 65 warnings (baseline). `git diff --check`: clean.
 
-## Delta re-review
+## Delta re-review (2026-08-15, both reviewers over `2e704797`, diff `1b64a0da..2e704797`)
 
-Recorded below after the remediation delta passes.
+Both reviewers independently confirmed: the delta is comment/doc-only (zero source files; zero
+assertion lines changed — Reviewer 2 grep-verified no `expect` line in the diff and re-planted the
+duplicate-read mutation post-delta with a byte-identical 13-failure outcome); every original
+finding RESOLVED, RECORDED, or VERIFIED as dispositioned; all post-merge plan anchors verified
+against live source (Reviewer 1 additionally corrected its own first-pass `:425` to the record's
+`:426`); the equivalent-mutant claim in the retitled tests independently re-verified by both
+(plain guard deletion → 97/97 green, correctly undetectable; query-issuing empty-set mutant →
+caught by fixtures 4/8); the 14-suite enumeration reproduces 135/135 exactly; the final-tree
+numbers (264/264, 8206/8208 with the two pre-existing base failures, gates, lint 0/65) all
+independently reproduced. Reviewer 2's final `git status` was completely clean with sha256-matched
+service files. Delta findings — all LOW/INFO documentation-precision items, closed in the closeout
+commit: the R1-1 cause is now recorded as unconfirmed-with-one-unexplained-signature (false-reds
+only); the six-suite list is enumerated; the fail-soft mutation count corrected to 3 (collateral
+mock-carryover explained); the plan/security docs now cite implementation vs. closeout commits
+distinctly. **Zero findings remain open; no blocking or high finding was raised at any point
+across all passes.**
 
 ## Not performed (per authorization)
 
