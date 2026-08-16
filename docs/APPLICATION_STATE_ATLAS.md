@@ -7,7 +7,7 @@ summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md)
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
-last_verified: 2026-08-01
+last_verified: 2026-08-15
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
   - scripts/audit-postgres-state.js
@@ -56,7 +56,7 @@ The canonical reference for the live state of the application's data layer.
 | Entity | Rows | Status | Page |
 |---|---:|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** — bibliometric sidecar collapsed into `wmkf_potentialreviewers` (17 fields folded onto the person); see `docs/archive/APPRESEARCHER_COLLAPSE_PLAN_V2.md` | (page removed) |
-| `wmkf_appreviewersuggestion` | 724 | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
+| `wmkf_appreviewersuggestion` | 793 (2026-08-15 PT snapshot) | active lifecycle ledger | [dataverse-wmkf-appreviewersuggestion.md](atlas/dataverse-wmkf-appreviewersuggestion.md) |
 | `wmkf_potentialreviewers` (custom WMKF entity) | 4,427 | canonical reusable reviewer-person record; also carries the bibliometric fields (affiliation/h-index/citations/scholar/orcid/etc.) folded in from the dropped sidecar (S213) | [dataverse-wmkf-potentialreviewers.md](atlas/dataverse-wmkf-potentialreviewers.md) |
 | `wmkf_apppublication` | — | **DROPPED S213** (was 0 rows, no callers) — went down with the appresearcher collapse | (page section removed) |
 | `wmkf_appgrantcycle` | 10 | Dataverse-primary post-W3 (2026-05-12); full 11-attr schema deployed; consumed by reviewer-finder/grant-cycles + review-manager render/send-emails + maintenance-service blob-cleanup | same page |
@@ -192,7 +192,7 @@ Useful summary of how Postgres ↔ Dataverse currently join (or will join post-c
 | Entity | Schema-as-code | Live deployment | Has data |
 |---|---|---|---|
 | `wmkf_appresearcher` | — | **DROPPED S213** (collapsed into `wmkf_potentialreviewers`) | — |
-| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 724 rows |
+| `wmkf_appreviewersuggestion` | extension manifest | ✅ 52 attrs | ✅ 793 rows (2026-08-15 PT snapshot) |
 | `wmkf_apppublication` | — | **DROPPED S213** | — |
 | `wmkf_appgrantcycle` | ✅ 8 attrs | ✅ 10 attrs (different gap from Postgres) | ✅ 10 rows (2026-05-14 audit) |
 | `wmkf_appproposalsearch` | ✅ | ✅ (entity set `wmkf_appproposalsearchs`, NOT `-es`) | empty |

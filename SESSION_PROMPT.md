@@ -44,17 +44,17 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
    throttling/truncation, or visible log cost. Classify the unrelated Graph `drive-item` 4xx
    activity without attributing it to Stage 2.
 
-### Verified open
+### Recently closed
 
-1. **Reconcile Atlas row-count drift** for
-   `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (790 documented versus 791 observed by the
-   Session 438 reconcile probe). Re-probe before editing; this is a small main-side documentation
-   correction, separate from Stage 2 acceptance.
-2. **Complete the optional post-deployment auth smoke.** On the branded Production host, confirm a
-   signed-in state-changing request succeeds and a mismatched Origin receives 403. Separately,
-   confirm a current Preview deployment accepts its own origin with fixed `NEXTAUTH_URL` absent.
-   The deployment is READY and source/gate verified; these application-level smokes are residual
-   confirmation, not blockers to the completed promotion.
+1. **Atlas row-count drift reconciled.** A fresh read-only Dataverse `/$count` request returned 793
+   `wmkf_appreviewersuggestion` rows at `2026-08-16T04:47:14Z`; the canonical page and its two
+   active Atlas summaries now carry that dated snapshot. The earlier Session 438 observation of
+   791 remains historical evidence of normal table growth.
+2. **Production auth route reached its same-origin validation path.** A signed-in empty PATCH to
+   `/api/workbench/decline-referrals` returned the expected pre-write 400, confirming the request
+   passed the new Origin guard before body validation. An authenticated Preview smoke was not
+   pursued because its generated callback would require Azure redirect configuration; Preview is
+   rarely used, and the owner accepted that testing limitation. No Azure/config change is planned.
 
 ### Residual, not blockers
 
@@ -71,6 +71,8 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
 2. Reviewer merge org-open access, grantee recipient override, and hard-delete without a tombstone
    remain accepted design/risk decisions.
 3. Decline-referrals person reads stay unmerged because there is no duplicate sibling read.
+4. Do not reopen authenticated Preview smoke coverage or Azure redirect configuration without a
+   new owner decision.
 
 ## Key references
 
