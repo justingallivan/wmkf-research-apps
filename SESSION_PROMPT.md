@@ -1,53 +1,47 @@
-# Session 441 Prompt: Workbench Stage 2 Production After-Baseline
+# Session 442 Prompt: Close Track A and Reconcile Atlas Drift
 
 ## Current state
 
-Workbench read coalescing Stage 2 is merged and Production-live. The owner authorized the merge
-after Claude Fable's implementation/adversarial-review cycle and Codex's independent review.
+Workbench read coalescing Stage 2 is merged, Production-live, and controlled-verified.
 
-- `main` merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
-- First Stage 2 Production deployment: `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B`
-  (READY 2026-08-16 03:01:20Z)
+- Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
+- Promotion record: `897ac285`
+- Current verification deployment: `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`
 - Recorded pre-Stage-2 rollback deployment: `dpl_9uZV2SZKizF5dwJFbGVWWD4V4s2Y`
-- Stage 2 implementation branch: `codex/claude-workbench-read-coalescing-stage2`
-  (implementation `1b64a0da`; final reviewed branch commit `614f05be`)
+- Production after-baseline:
+  `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`
 
-The merged runtime replaces three duplicate sibling reads with one union-`$select` chunked read per
-independent reviewer/active/removed id set. Active and removed sets remain separate. The decline
-referrals read remains unchanged. There is no new cache, flag, migration, durable write, mutation
-path, auth change, or Stage 1 telemetry change.
+The signed-in GET-only after-baseline exercised empty, small, active+removed, and populated
+decline-referral structural strata. All 44 target-route telemetry events succeeded. The
+`wmkf_potentialreviewerses` counts were `0/0/0`, `1/1/0`, `1/2/0`, and `1/2/1` for
+reviewers/my-candidates/decline-referrals, matching the Stage 2 chunk-aware formula. The combined
+before/after count changed `2/4/1 → 1/2/1`; decline remained deliberately unchanged.
 
-Merged-main verification before push: seven focused suites 115/115; Dataverse access-layer gate
-and self-test PASS; type check PASS; `git diff --check` PASS; clean-output Production build PASS.
+One initial unfiltered one-minute log export reached the 5,000-record ceiling and was rejected and
+deleted. Five short complete slices were validated fail-closed: 181 telemetry occurrences merged
+to 180 unique `eventId`s, with one duplicate occurrence and no conflicting payload. No raw log,
+business identifier, response body, or Production record was retained or mutated.
+
+Limits remain explicit: the original before-baseline intentionally retained no request identifiers,
+so structural-stratum equivalence is verified but exact request identity is not. No safe >25-id
+fixture exists. Controlled timing is descriptive only; no organic-user latency claim is authorized.
 
 ## Next actions
 
+### In progress
+
+1. **Close the Track A passive safety window after 2026-08-18 00:53:40Z.** Continue complete
+   unfiltered exports within the one-day retention window, flatten `.logs[]`, validate v1
+   fail-closed, and deduplicate only on `eventId`. Stop/re-scope at ~50,000 events/day, platform
+   throttling/truncation, or visible log cost. Classify the unrelated Graph `drive-item` 4xx
+   activity without attributing it to Stage 2.
+
 ### Verified open
 
-1. **Run the controlled Stage 2 Production after-baseline.** Repeat only the same safely available
-   signed-in GET/read Track B strata from
-   `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`. Compare
-   `wmkf_potentialreviewerses` event counts against:
-
-   ```text
-   after = q(reviewers) + q(active) + q(removed) + q(decline)
-   q(n) = ceil(n / 25), with empty sets contributing zero
-   ```
-
-   Do not PATCH, DELETE, dismiss, merge, send, select, or change Production state. Record a missing
-   >25-id stratum as unavailable. Do not claim organic p50/p95 improvement from controlled traffic.
-2. **Reconcile Atlas row-count drift** for
+1. **Reconcile Atlas row-count drift** for
    `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (790 documented versus 791 observed by the
    Session 438 reconcile probe). Re-probe before editing; this is a small main-side documentation
    correction, separate from Stage 2 acceptance.
-
-### In progress
-
-1. **Track A passive safety watch** remains open through 2026-08-18 00:53:40Z. Continue complete
-   unfiltered exports within the one-day retention window, flatten `.logs[]`, validate v1
-   fail-closed, and deduplicate only on `eventId`. Stop/re-scope at ~50,000 events/day, platform
-   throttling/truncation, or visible log cost. The unrelated Graph `drive-item` 4xx activity remains
-   a classification watch item.
 
 ### Residual, not blockers
 
@@ -68,7 +62,7 @@ and self-test PASS; type check PASS; `git diff --check` PASS; clean-output Produ
 ## Key references
 
 - `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`
-- `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`
+- `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`
 - `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`
+- `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`
 - `tests/unit/workbench-read-coalescing-stage2-callcounts.test.js`
-- `tests/unit/workbench-read-coalescing-stage2-characterization.test.js`

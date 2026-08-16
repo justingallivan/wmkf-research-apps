@@ -114,9 +114,10 @@ The owner authorized Stage 2 after reviewing this controlled baseline. Track A r
 parallel and is not a calendar or organic-traffic prerequisite; an actual named stop condition still
 pauses further rollout work. Stage 2 was subsequently merged to `main` at `06a615fc` and its first
 Production deployment, `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B`, reached READY at
-2026-08-16 03:01:20Z. The Stage 2 after-baseline remains pending: it must repeat the same available
-safe strata and compare the `wmkf_potentialreviewerses` call counts against the formula; it must not
-use repeated artificial requests to claim organic latency improvement.
+2026-08-16 03:01:20Z. The Stage 2 after-baseline then passed on
+`dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`; its non-identifying evidence, extraction record, formula
+comparison, and exact-request-identity limitation are in
+`docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`.
 
 ## Evidence verdict
 
@@ -127,6 +128,6 @@ use repeated artificial requests to claim organic latency improvement.
 - Three target-route before-baseline contracts: **VERIFIED** for the three available strata above.
 - More-than-25-id fixture: **UNKNOWN / unavailable without manufacturing state**.
 - 48-hour whole-app volume and cost posture: **OPEN** pending Track A completion.
-- Stage 2 state: **PRODUCTION-LIVE; AFTER-BASELINE PENDING** — source-certain call-count baseline
-  exists; Track A remains an independent concurrent safety watch unless a named stop condition
-  fires.
+- Stage 2 state: **PRODUCTION-LIVE; CONTROLLED AFTER-BASELINE PASSED** — the source-certain
+  call-count reduction is verified across the available structural strata; Track A remains an
+  independent concurrent safety watch unless a named stop condition fires.

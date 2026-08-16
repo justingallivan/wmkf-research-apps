@@ -282,8 +282,9 @@ build. The first Stage 2 Production deployment, `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3
 READY at 2026-08-16 03:01:20Z. The recorded pre-Stage-2 rollback deployment is
 `dpl_9uZV2SZKizF5dwJFbGVWWD4V4s2Y`.
 
-The controlled Production after-baseline was not run as part of the merge. It remains the next
-measurement action: repeat only the safe Track B read-only strata, compare
-`wmkf_potentialreviewerses` dependency-call counts with the `after` formula, record unavailable
-strata rather than manufacturing Production state, and make no organic-latency claim from the
-controlled fixtures.
+The controlled Production after-baseline was not run as part of the merge. It subsequently passed
+on deployment `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`: all 44 target-route events succeeded and the
+available empty/small/active+removed/decline structural strata matched the `after` formula. The
+exact prior request identities and a >25-id Production fixture were unavailable, and no organic
+latency claim was made. Evidence:
+`docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`.

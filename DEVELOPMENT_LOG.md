@@ -18,8 +18,9 @@ one union-projection chunked read per independent id set, preserving response an
 bounded corrections, owner promotion).
 **Ship state:** `main` advanced `ab4a87b8 → 06a615fc`; deployment
 `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` reached READY. Focused merged-main tests passed 115/115 and the
-Dataverse access-layer gate, types, and clean-output Production build passed. The controlled
-Production after-baseline remains pending; no organic-latency claim has been made.
+Dataverse access-layer gate, types, and clean-output Production build passed. A subsequent
+GET-only Production after-baseline on `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq` matched the formula across
+the available structural strata (44/44 target events successful); no organic-latency claim was made.
 **Why it matters:** Reviewer Find/Track removes one redundant Dataverse round trip per populated
 reviewer, active-candidate, and removed-candidate chunk without adding caching or invalidation risk.
 **Pointers:** `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`;

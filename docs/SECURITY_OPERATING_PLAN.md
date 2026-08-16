@@ -196,8 +196,10 @@ Status: Stage 1 is merged and Production-live at `main` merge `30ed5fe0` / deplo
 `codex/claude-workbench-read-coalescing-stage2` (implementation `1b64a0da`), independently reviewed
 by Codex with no runtime defect, merged to `main` at `06a615fc`, and deployed to Production as
 `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled Production
-after-baseline remains pending. Track A continues concurrently and retains the same named stop
-conditions.
+after-baseline subsequently passed on `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`: 44/44 target-route
+events succeeded and person-read counts matched the Stage 2 formula across the available structural
+strata. Track A continues concurrently and retains the same named stop conditions; no organic
+latency claim was made.
 
 Every server-side call through the three instrumented egress seams
 (`lib/services/dynamics/http.js`, `lib/services/graph-service.js`,

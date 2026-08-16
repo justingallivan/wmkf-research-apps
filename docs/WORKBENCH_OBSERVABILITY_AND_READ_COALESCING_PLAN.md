@@ -24,9 +24,10 @@ related:
 verified to resolve to that exact deployment. The passive 48-hour safety window and controlled
 GET-only before-baseline opened 2026-08-15. Stage 2 was authorized by the owner on 2026-08-15,
 merged to `main` at `06a615fc`, and deployed to Production as
-`dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). Its controlled Production
-after-baseline has not yet run. Track A continues concurrently; the Deferred section remains NOT
-authorized.**
+`dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled Production
+after-baseline completed on deployment `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`: all 44 target-route
+events succeeded and the empty/small/active+removed/decline strata matched the chunk-aware `after`
+formula. Track A continues concurrently; the Deferred section remains NOT authorized.**
 Implementation record:
 `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
 by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
@@ -578,9 +579,15 @@ recorded as such rather than manufactured.
 `32030b50`, implementation `1b64a0da`, adversarial-review closure commits following on the same
 branch), independently reviewed by Codex with no runtime defect, merged to `main` at `06a615fc`,
 and deployed as `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled
-Production after-baseline remains pending and must not be inferred from deployment readiness.
+Production after-baseline completed on `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`: the three formula
+strata plus an additional active+removed load produced `0/0/0`, `1/1/0`, `1/2/1`, and `1/2/0`
+reviewers/my-candidates/decline person-read counts, with all 44 target-route events successful.
+Exact prior request identity and a >25-id Production fixture remain unavailable, so no organic or
+request-identity-matched latency claim is made.
 Implementation and promotion record:
 `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
+Production evidence:
+`docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`.
 The census and contract below are preserved as the authorized work order; **every `file:line`
 reference in this Stage 2 section is a PRE-MERGE anchor** (the state the characterization commit
 pinned) and no longer resolves against the merged services. Post-merge state: `fetchResearchersByPerson`
@@ -806,5 +813,5 @@ semantics are explicit and PII-safe; Stage 2's census and formula match the veri
 the service layer); T1 and T2 are uniformly closed with no prospective work. No live-state claim in
 that prior-pass review was presented as built runtime state; at that historical boundary the plan
 remained a **draft NOT authorized for implementation**. Current state is governed by the status
-sections above: Stages 1 and 2 are Production-live, the controlled Stage 2 after-baseline is
-pending, and the Deferred section remains unauthorized.
+sections above: Stages 1 and 2 are Production-live, the controlled Stage 2 after-baseline passed,
+and the Deferred section remains unauthorized.
