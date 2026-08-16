@@ -383,7 +383,22 @@ describe('getMyCandidates — call-count acceptance', () => {
     expect(queryReviewersImpl.mock.calls[2][0].filter).toBe('wmkf_potentialreviewersid eq rm-0');
   });
 
-  test('7) empty active + empty removed → 0 calls', async () => {
+  test('7) empty active + empty removed → 0 calls (envelope-level early return, not the helper guard)', async () => {
+    // This pins getMyCandidates' own `suggestions.length === 0 && removedRows.length
+    // === 0` early-return envelope (my-candidates-service.js:159) short-circuiting
+    // before fetchPotentialReviewers is ever reached — NOT fetchPotentialReviewers'
+    // own `if (!ids?.length) return {}` guard. A mutation deleting that inner guard
+    // leaves this fixture green, since the envelope return never calls the helper at
+    // all. Plain deletion of that guard line is in fact an EQUIVALENT mutant here:
+    // lib/utils/chunk.js's `chunked([], 25)` yields zero chunks regardless, so the
+    // loop still never issues a query — the guard's real value is null/undefined
+    // safety (ids?.length), not behavior on an empty array. What fixtures 4
+    // (removed-only: the ACTIVE set is empty and flows through
+    // fetchPotentialReviewers([]) on the main path) and 8 (getReviewers' empty
+    // person-id set) actually prove is that the helper issues ZERO Dataverse calls
+    // for an empty id set — a mutation that makes it issue any (e.g. an unfiltered)
+    // query before returning fails their exact === totals — confirmed by mutation
+    // testing.
     getRequestById.mockResolvedValueOnce({ akoya_requestid: 'req-7', akoya_requestnum: 'R-7', akoya_title: 'T' });
     findByRequest.mockResolvedValueOnce([]);
     findRemovedByRequest.mockResolvedValueOnce([]);

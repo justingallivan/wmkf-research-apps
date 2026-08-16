@@ -318,6 +318,22 @@ describe('getMyCandidates', () => {
     }
   });
 
+  // This fixture (active set empty, removed set populated) is what actually
+  // exercises fetchPotentialReviewers' `if (!ids?.length) return {}` guard on
+  // the ACTIVE side: personIds is [] here, so the active-site call inside the
+  // main Promise.all short-circuits via the guard and contributes zero
+  // queryReviewers calls, leaving exactly the one call from the (separate)
+  // removed-site fetchPotentialReviewers(removedPersonIds) call. Verified by
+  // temporarily deleting the guard line and re-running: this test's
+  // `toHaveBeenCalledTimes(1)` assertion does NOT fail, because
+  // chunked([], 25) already yields zero chunks for a genuine empty array
+  // (`chunk.js`'s for-loop never executes when array.length is 0) — the
+  // `for` loop body that issues the query simply never runs either way. The
+  // guard's only behavioral effect is protecting a null/undefined `ids`
+  // argument (`chunked(null, ...)` throws), which no current caller passes;
+  // for the array-typed empty inputs every fixture here uses, the guard is
+  // an early-exit optimization, not something these tests can observe by its
+  // presence/absence.
   test('Stage 2 coalescing: removed-only fixture → exactly 1 call, filter = removed person ids', async () => {
     grantRequestAdapter.getById.mockResolvedValue({
       akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
@@ -340,7 +356,17 @@ describe('getMyCandidates', () => {
     );
   });
 
-  test('Stage 2 coalescing: empty active and removed id sets → queryReviewers never called', async () => {
+  // Pins the getMyCandidates EMPTY-ENVELOPE early return (my-candidates-service.js
+  // ~line 159: `if (suggestions.length === 0 && removedRows.length === 0) return
+  // {...}`) — the service returns before any hydration is attempted, so zero
+  // Dataverse calls happen. This does NOT exercise fetchPotentialReviewers'
+  // `if (!ids?.length) return {}` guard (that guard is never reached here because
+  // hydration itself never runs); the guard's behavior for an empty ACTIVE id set
+  // is instead covered by the removed-only fixture above, and for an empty
+  // REMOVED id set by every active-candidates test (projectRemovedCandidates is
+  // only invoked when removedRows.length > 0, so an empty removed set never calls
+  // fetchPotentialReviewers at all — nothing to guard there either).
+  test('getMyCandidates empty-envelope early return: no suggestions and no removed rows → queryReviewers never called', async () => {
     grantRequestAdapter.getById.mockResolvedValue({
       akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
     });

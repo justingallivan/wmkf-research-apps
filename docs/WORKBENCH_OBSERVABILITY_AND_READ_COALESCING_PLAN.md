@@ -570,11 +570,21 @@ recorded as such rather than manufactured.
 
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
 
-**Status: AUTHORIZED by the owner on 2026-08-15; not yet implemented.** Build in a fresh Tier-2
-worktree from post-Stage-1 `main`. The open 48-hour Track A watch runs concurrently; sparse organic
-traffic and the calendar duration are not prerequisites, but an actual Track A stop condition
-(~50,000 telemetry events/day, platform throttling/truncation, or visible log cost) pauses promotion
-until resolved.
+**Status: IMPLEMENTED on `codex/claude-workbench-read-coalescing-stage2` (base `ab4a87b8`,
+characterization pin `32030b50`, implementation `1b64a0da`) on 2026-08-15; NOT merged, NOT
+deployed, Production after-baseline NOT run.** Pending independent Codex read-only review and an
+explicit owner merge decision. Implementation record:
+`docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
+The census and contract below are preserved as the authorized work order; **every `file:line`
+reference in this Stage 2 section is a PRE-MERGE anchor** (the state the characterization commit
+pinned) and no longer resolves against the merged services. Post-merge state: `fetchResearchersByPerson`
+is deleted in both services; the surviving `const CHUNK = 25` sites in the three census files are
+`reviewers-service.js:510`, `my-candidates-service.js:392,408` (the latter `fetchApplicantAkas`),
+and `decline-referrals-service.js:45`; the fail-soft `aggregateReviewHistory` catch sits at
+`my-candidates-service.js:175-178` and `projectRemovedCandidates` at `:426`. The open 48-hour Track A
+watch runs concurrently; sparse organic traffic and the calendar duration are not prerequisites,
+but an actual Track A stop condition (~50,000 telemetry events/day, platform
+throttling/truncation, or visible log cost) pauses promotion until resolved.
 
 **Why the original request-scoped-cache design was dropped (Opus P1-1, unchanged):** the
 duplicate-read contributors are separate HTTP requests with separate `withDalContext` scopes, and
