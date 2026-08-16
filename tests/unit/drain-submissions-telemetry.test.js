@@ -47,6 +47,8 @@ import handler from '../../pages/api/cron/drain-submissions';
 import MaintenanceService from '../../lib/services/maintenance-service';
 
 const CRON_SECRET = 'test-cron-secret';
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_CRON_SECRET = process.env.CRON_SECRET;
 
 let startRunSpy;
 let completeRunSpy;
@@ -63,12 +65,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  startRunSpy.mockRestore();
-  completeRunSpy.mockRestore();
+  jest.restoreAllMocks();
+  if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  if (ORIGINAL_CRON_SECRET === undefined) delete process.env.CRON_SECRET;
+  else process.env.CRON_SECRET = ORIGINAL_CRON_SECRET;
 });
 
-function makeReq() {
-  return { method: 'GET', headers: { authorization: `Bearer ${CRON_SECRET}` } };
+function makeReq(authorization = `Bearer ${CRON_SECRET}`) {
+  return { method: 'GET', headers: authorization ? { authorization } : {} };
 }
 function makeRes() {
   const res = {
@@ -79,6 +84,40 @@ function makeRes() {
   };
   return res;
 }
+
+describe('drain cron auth — strict policy with shared constant-time compare', () => {
+  test('rejects a wrong-length secret before opening a database connection', async () => {
+    const res = makeRes();
+
+    await handler(makeReq(`Bearer ${CRON_SECRET}-extra`), res);
+
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: 'Unauthorized' });
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test('keeps rejecting in development rather than inheriting the shared verifier bypass', async () => {
+    process.env.NODE_ENV = 'development';
+    const res = makeRes();
+
+    await handler(makeReq('Bearer wrong'), res);
+
+    expect(res.statusCode).toBe(401);
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+
+  test('preserves the missing-secret 500', async () => {
+    delete process.env.CRON_SECRET;
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = makeRes();
+
+    await handler(makeReq(), res);
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'CRON_SECRET not configured' });
+    expect(mockConnect).not.toHaveBeenCalled();
+  });
+});
 
 describe('drain telemetry — maintenance_runs wiring', () => {
   test('idle tick (no jobs claimed) opens NO maintenance_runs row', async () => {

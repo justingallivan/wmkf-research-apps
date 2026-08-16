@@ -4,6 +4,13 @@
 
 Workbench read coalescing Stage 2 is merged, Production-live, and controlled-verified.
 
+Separately, the owner authorized the remaining small auth follow-ups. Branch
+`codex/security-origin-cron-hardening` (base `715ab060`) implements production-mode
+allowed-origin fail-closed behavior plus shared constant-time cron-secret comparison. It is
+regression-tested and independently adversarially reviewed, but remains unmerged and not
+Production-live pending an owner promotion decision. Intake proxy/CSRF, raw-error cleanup, grantee
+policy, and tombstones are explicitly outside that branch.
+
 - Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
 - Promotion record: `897ac285`
 - Current verification deployment: `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`
@@ -42,6 +49,10 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
    `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (790 documented versus 791 observed by the
    Session 438 reconcile probe). Re-probe before editing; this is a small main-side documentation
    correction, separate from Stage 2 acceptance.
+2. **Review and deliberately promote `codex/security-origin-cron-hardening`.** Confirm the
+   implementation record and verification evidence first; do not treat branch completion as a
+   Production activation. After promotion, run the branded-host signed-in write/mismatched-Origin
+   smoke and a separate Preview write smoke with fixed `NEXTAUTH_URL` absent.
 
 ### Residual, not blockers
 

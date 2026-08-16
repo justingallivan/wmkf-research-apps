@@ -6,7 +6,7 @@ status: active
 summary: "This guide explains how to configure Azure AD (Microsoft Entra ID) authentication to restrict app access to your organization only."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-08-15
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -131,7 +131,8 @@ openssl rand -base64 32
 | `NEXTAUTH_URL` | `https://your-app.vercel.app` | Production only |
 
 **Notes:**
-- `NEXTAUTH_URL` is automatically set by Vercel for preview deployments
+- Production must set a valid `NEXTAUTH_URL`; state-changing staff API requests fail closed when it is missing or invalid.
+- Preview intentionally omits the fixed Production `NEXTAUTH_URL`. In a production-mode Preview runtime, the Origin/Referer allowlist is derived from Vercel's deployment hostname (`VERCEL_URL`) and still fails closed if neither value is usable.
 - For local development, set `NEXTAUTH_URL=http://localhost:3000` in `.env.local`
 
 ### 2.3 Redeploy
@@ -289,7 +290,7 @@ View sign-in logs in Azure Portal:
 | All non-API routes | `proxy.js` (`withAuth`) — fails closed before page code runs |
 | App-specific API routes | `requireAppAccess(req, res, 'app-key')` — combines CSRF origin check + auth + `is_active` check + per-app grant |
 | Infrastructure API routes (auth/admin/health) | `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()` — all perform a live `is_active` read per request; disabled or missing (zero-row) profiles fail closed (403; DB error → 503) |
-| Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from proxy |
+| Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from proxy; both cron verifier variants use the shared constant-time comparison primitive while preserving their distinct development-bypass policies |
 | External-reviewer routes (`/api/external/*`) | HMAC JWT (`EXTERNAL_LINK_SECRET`) — public, allowlisted in proxy |
 | Auth routes (`/api/auth/*`) | Public (required for OAuth flow) — excluded from proxy |
 | Client UI | `RequireAuth` / `RequireAppAccess` (defense-in-depth, not the security boundary) |
@@ -300,7 +301,7 @@ View sign-in logs in Azure Portal:
 |------|---------|
 | `proxy.js` | Server-side auth gate (Next 16 `proxy` convention, `withAuth`/`jose`) + CSP nonce generation |
 | `lib/utils/auth-policy.js` | proxy-bundle-safe `isAuthRequired()` (shared by `proxy.js` Node.js runtime + `lib/utils/auth.js`) — `NODE_ENV=production` fails closed unless `EMERGENCY_AUTH_BYPASS=true` |
-| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached); every helper, including bare `requireAuth`, fails closed on a disabled or missing (zero-row) profile |
+| `lib/utils/auth.js` | Server-side auth helpers (`requireAuth`, `requireAuthWithProfile`, `requireAppAccess`, `requireSuperuser`) — app grants cached 2-min in-memory; `is_active` + superuser role read fresh each request (never cached); every helper, including bare `requireAuth`, fails closed on a disabled or missing (zero-row) profile; state-changing Origin/Referer validation fails closed on missing/invalid allowed-origin configuration in production-mode runtimes, with Preview deriving it from `VERCEL_URL` when `NEXTAUTH_URL` is intentionally absent |
 | `pages/api/auth/[...nextauth].js` | NextAuth dual-provider configuration (`azure-ad` + `entra-external`) |
 | `pages/api/auth/status.js` | Public `{ enabled: boolean }` client-bootstrap endpoint; reports the same fail-closed `isAuthRequired()` enforcement state used by proxy/API guards |
 | `shared/components/RequireAuth.js` | Client-side auth guard |

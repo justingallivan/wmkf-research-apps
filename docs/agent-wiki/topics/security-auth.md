@@ -1,16 +1,18 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-06-23
+last_verified: 2026-08-15
 stale_after_days: 60
 owner: platform-security
 source_files:
   - lib/utils/auth.js
+  - lib/utils/cron-auth.js
   - lib/utils/tracked-secrets.js
   - lib/utils/intake-blob.js
   - lib/utils/guid.js
   - scripts/check-trust-boundary-guid.js
   - pages/api/auth/[...nextauth].js
+  - pages/api/cron/drain-submissions.js
   - pages/api/
 canonical_docs:
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -53,6 +55,14 @@ not a current authority.
 - `NEXTAUTH_URL` is the canonical public origin for NextAuth callbacks and the
   state-changing API Origin/Referer check. Do not point it at a new staff domain
   until the matching Azure/Entra redirect URI is configured and smoke-tested.
+- The Origin/Referer check fails closed on missing or invalid allowed-origin
+  configuration whenever `NODE_ENV=production`. Preview deliberately omits the
+  fixed Production `NEXTAUTH_URL` and derives its allowed origin from
+  `VERCEL_URL`; request headers never supply the allowlist. Cookie-free,
+  headerless server-to-server calls retain their existing exemption.
+- Cron bearer-secret checks share `lib/utils/cron-auth.js` `constantTimeEqual`.
+  The shared `verifyCronSecret` keeps its local-development bypass, while
+  `drain-submissions` keeps its route-local strict verifier with no bypass.
 - **Client auth-gate render contract (S398, `27aba5be`):** `RequireAuth` keeps
   children mounted through `useSession()` 'loading' — it must NOT swap to a
   spinner mid-resolution (that unmounted `ProfileProvider`+`AppAccessProvider`,
@@ -131,8 +141,10 @@ not a current authority.
   in earlier docs. The authoritative producer is runtime `/api/health` (reports
   `process.env.NEXTAUTH_URL`); do not infer the value from a pull of a Sensitive
   var.
-- Preview env should NOT carry a fixed `NEXTAUTH_URL` (leave host-derived) or
-  preview-deployment sign-in/writes break; see `project-branded-domains.md`.
+- Preview env should NOT carry a fixed `NEXTAUTH_URL` or preview-deployment
+  sign-in/writes break. In production-mode Preview, `lib/utils/auth.js` derives
+  the allowed Origin/Referer value from `VERCEL_URL` and fails closed if neither
+  is usable; see `project-branded-domains.md`.
 
 ## Trust-Boundary GUID Validation
 

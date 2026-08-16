@@ -32,6 +32,7 @@
 
 import pkg from 'pg';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import { constantTimeEqual } from '../../../lib/utils/cron-auth';
 import {
   claimBatch,
   processJob,
@@ -74,7 +75,7 @@ function verifyDrainCronSecret(req, res) {
     return false;
   }
   const got = req.headers.authorization;
-  if (got !== `Bearer ${secret}`) {
+  if (!constantTimeEqual(got, `Bearer ${secret}`)) {
     res.status(401).json({ error: 'Unauthorized' });
     return false;
   }

@@ -6,7 +6,7 @@ status: canonical
 summary: "*Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-28
+last_verified: 2026-08-15
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -42,7 +42,7 @@ changes that policy.
 | Variable | Purpose | Source | Rotation |
 |----------|---------|--------|----------|
 | `CLAUDE_API_KEY` | AI processing for all apps | [Anthropic Console](https://console.anthropic.com) → API Keys | Create new key, update in Vercel, revoke old one |
-| `NEXTAUTH_URL` | Production URL for OAuth callbacks and staff API Origin/Referer checks | `https://applications.wmkeck.org` (Production; set + cut over 2026-06-23, non-sensitive) | **Live value `https://applications.wmkeck.org`** — staff auth cut over to the branded host 2026-06-23 and was VERIFIED via live runtime `/api/health` + an authenticated write probe (POST/DELETE 200) on `applications.wmkeck.org`. The `lib/utils/auth.js` Origin/Referer CSRF check is ON, pinned to this host; the legacy `wmkfresearch.vercel.app` host now 403s state-changing requests and funnels sign-in to the branded host. **Caveat:** while this var was Sensitive, `vercel env pull` read it back as `""` — which caused a false "Production is empty" belief in earlier docs/memory. The real runtime value (verifiable only via `/api/health`) was always non-empty. Do not re-introduce the "empty" claim from a pull. Preview should NOT carry a fixed `NEXTAUTH_URL` (host-derived) — see `project-branded-domains.md`. |
+| `NEXTAUTH_URL` | Production URL for OAuth callbacks and staff API Origin/Referer checks | `https://applications.wmkeck.org` (Production; set + cut over 2026-06-23, non-sensitive) | **Live value `https://applications.wmkeck.org`** — staff auth cut over to the branded host 2026-06-23 and was VERIFIED via live runtime `/api/health` + an authenticated write probe (POST/DELETE 200) on `applications.wmkeck.org`. The `lib/utils/auth.js` Origin/Referer CSRF check is ON, pinned to this host; a production-mode runtime fails closed when its allowed-origin configuration is missing or invalid. Preview should NOT carry a fixed `NEXTAUTH_URL`: when it is intentionally absent, the check derives the allowed origin from `VERCEL_URL` and fails closed if that deployment hostname is unavailable. The legacy `wmkfresearch.vercel.app` host still 403s state-changing requests and funnels sign-in to the branded host. **Caveat:** while this var was Sensitive, `vercel env pull` read it back as `""` — which caused a false "Production is empty" belief in earlier docs/memory. The real Production runtime value (verifiable only via `/api/health`) was always non-empty. Do not re-introduce the "empty" claim from a pull. See `project-branded-domains.md`. |
 | `REVIEWER_PORTAL_BASE_URL` | Public base URL used in external-reviewer invitation links | `https://reviews.wmkeck.org` | Non-secret. Active in Production as of 2026-06-23 and redeployed. Defaults to `NEXTAUTH_URL` if unset, but keep explicit so reviewer email links move independently from staff OAuth callbacks. |
 | `GRANTEE_PORTAL_BASE_URL` | Public base URL used in grantee deliverables magic-links (invite + reminder) | `https://grantees.wmkeck.org` | Non-secret. Active in Production as of 2026-06-23 and redeployed. Code resolves `GRANTEE_PORTAL_BASE_URL || NEXTAUTH_URL || ''` — **MUST stay set** so grantee magic-links use the grantee host; otherwise they fall back to `NEXTAUTH_URL` (now the staff host `applications.wmkeck.org`), which is wrong for grantee-facing links. |
 | `REVIEWER_EMAIL_DELIVERY_MODE` | Reviewer invite delivery mode | Manual (`send` or `capture`) | Non-secret. Default `send`. `capture` is for non-production E2E rehearsal only; it returns rendered email artifacts without sending through Dynamics and is refused when `VERCEL_ENV=production`. |
@@ -58,7 +58,7 @@ changes that policy.
 
 | Variable | Purpose | Source | Notes |
 |----------|---------|--------|-------|
-| `CRON_SECRET` | Authenticates `/api/cron/*` endpoints | Self-generated (`openssl rand -base64 32`) | Required for cron jobs (secret-check, retraction-watch, etc.) |
+| `CRON_SECRET` | Authenticates `/api/cron/*` endpoints | Self-generated (`openssl rand -base64 32`) | Required for cron jobs (secret-check, retraction-watch, etc.). Both the shared verifier and the stricter drain-submissions verifier use `constantTimeEqual`; the shared verifier alone retains its local-development bypass. |
 | `EXTERNAL_LINK_SECRET` | HMAC-signs external-reviewer JWTs (`/api/external/*`) | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `NEXTAUTH_SECRET`**; read by `lib/services/external-token.js`. Rotatable without breaking live links — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
 | `EXTERNAL_LINK_SECRET_PREVIOUS` | Outgoing `EXTERNAL_LINK_SECRET` value during a rotation window | The previous `EXTERNAL_LINK_SECRET` | **Optional** — set only while rotating. `verifyToken` also accepts tokens signed with it; `mintToken` never uses it. Clear once all old tokens have expired. |
 | `VRP_ALLOWED_PROVIDERS` | Comma-separated allowlist for Virtual Review Panel | Manual (e.g., `claude,openai,gemini`) | Must include `claude`. Production fails closed if unset. Intersects with configured API keys |
@@ -354,7 +354,7 @@ Free tier is 800 scans/month. Pilot-cycle estimate: ~150 reviewer uploads + (whe
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
 | SSO login fails with "OAuthCallback" | `AZURE_AD_CLIENT_SECRET` expired or wrong | Rotate the secret (see above) |
-| SSO login fails, no error visible | `NEXTAUTH_URL` not set | Add `NEXTAUTH_URL` in Vercel |
+| SSO login or state-changing staff API calls fail with no obvious configuration error | Production `NEXTAUTH_URL` is missing/invalid, or Preview lacks a usable `VERCEL_URL` | Set the branded `NEXTAUTH_URL` in Production; keep it unset in Preview and verify Vercel supplies that deployment's `VERCEL_URL` |
 | "Authentication required" on API calls | `AUTH_REQUIRED=true` but credentials missing | Check all Azure AD vars are set |
 | API key save fails | `USER_PREFS_ENCRYPTION_KEY` not set | Generate and add to Vercel |
 | Dynamics Explorer: "missing credentials" | `DYNAMICS_*` vars not set in production | Add all four Dynamics vars to Vercel |
