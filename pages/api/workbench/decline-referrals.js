@@ -20,10 +20,18 @@ import {
   getDeclineReferrals,
 } from '../../../lib/services/workbench/decline-referrals-service';
 import { MAX_DECLINE_REFERRALS } from '../../../shared/utils/decline-referrals';
+import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
+  return withRequestCorrelation(
+    { correlationId: mintCorrelationId(), routeName: '/api/workbench/decline-referrals' },
+    () => handleWithCorrelation(req, res),
+  );
+}
+
+async function handleWithCorrelation(req, res) {
   if (!['GET', 'PATCH'].includes(req.method)) {
     res.setHeader('Allow', 'GET, PATCH');
     return res.status(405).json({ error: 'Method not allowed' });

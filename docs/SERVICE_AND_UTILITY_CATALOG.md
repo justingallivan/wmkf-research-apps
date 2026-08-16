@@ -13,11 +13,12 @@ related:
   - lib/external/
   - lib/bill/
   - lib/utils/
+  - lib/observability/
 ---
 
 # Service & Utility Catalog
 
-One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, and `lib/utils/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
+One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, `lib/utils/`, and `lib/observability/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
 
 If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your change rather than rely on this doc.
 
@@ -264,6 +265,32 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Secrets
 
 - **`tracked-secrets.js`** — Canonical `TRACKED_SECRETS` list for rotation/expiration alerting. Consumed by `pages/api/cron/secret-check.js` + `pages/api/admin/secrets.js`. **`docs/CREDENTIALS_RUNBOOK.md` mirrors this list by hand — this file is the canonical source.**
+
+---
+
+## `lib/observability/`
+
+- **`request-correlation.js`** — Request-correlation ALS + the `workbench.dependency`
+  telemetry emitter (Workbench Observability Stage 1). Owns a **dedicated
+  `AsyncLocalStorage`, fully independent of the DAL restriction ALS** in
+  `lib/services/dynamics-context.js` — nesting either inside the other leaks nothing.
+  `withRequestCorrelation({correlationId, routeName}, fn)` returns `fn`'s value verbatim;
+  `getRequestCorrelation()` is `undefined` outside any scope (the defined behavior for
+  cron/scripts/cold start, not an error); `mintCorrelationId()` is `crypto.randomUUID()` —
+  random, carries no user identity, never write authority. `emitDependencyEvent({url,
+  method, ms, response, error})` **never throws** (whole body try/catch), never reads a
+  request/response body, and emits exactly `console.log(JSON.stringify(event))` to the
+  platform log stream — no durable write, no new table, and explicitly **not**
+  `api_usage_log` (the LLM token/cost ledger). All classifiers use **closed value sets that
+  fail closed to `'unknown'`**, so no URL, query string, path segment, GUID, filename,
+  tenant id, token, header, or body material can reach an event field. `node:async_hooks`
+  and `crypto` load lazily via guarded requires; note Turbopack statically resolves even
+  variable-path requires, so browser-bundle safety rests on **no client bundle reaching
+  this module** (verified by static-bundle scan, 2026-08-15), not on the require pattern.
+  Extending the Dataverse entity-set allowlist is a reviewed commit, not an env or ad-hoc
+  edit. Wired at `lib/services/dynamics/http.js`, `lib/services/graph-service.js`, and
+  `lib/dataverse/client.js` (via a guarded lazy require that keeps the load off that
+  module's import-time path). Source header is the contract.
 
 ---
 

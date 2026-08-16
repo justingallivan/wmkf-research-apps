@@ -38,8 +38,16 @@ import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { getReviewers, patchReviewers } from '../../../lib/services/review-manager/reviewers-service';
+import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
 
 export default async function handler(req, res) {
+  return withRequestCorrelation(
+    { correlationId: mintCorrelationId(), routeName: '/api/review-manager/reviewers' },
+    () => handleWithCorrelation(req, res),
+  );
+}
+
+async function handleWithCorrelation(req, res) {
   const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 

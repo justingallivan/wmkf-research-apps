@@ -19,10 +19,16 @@ related:
 
 # Workbench Observability and Read-Coalescing Staged Plan
 
-**Status: draft plan — NOT authorized for implementation.** Produced by the Fable audit
-(`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
+**Status: Stage 1 authorized and implemented on branch
+`codex/claude-workbench-observability-stage1` (owner work order, 2026-08-15) — Codex independent
+review complete with merge recommended and two P3 cleanups applied; not merged, not deployed,
+measurement program not opened. Stage 2 and the Deferred section remain NOT authorized.**
+Implementation record:
+`docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
+by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
 `docs/audits/fable-*-2026-08-14.md` artifacts. Every stage leaves the build green and the old path
-usable. No stage is started until the owner names it and authorizes implementation (brief Phase 8).
+usable. No further stage starts until the owner names it and authorizes implementation (brief
+Phase 8).
 
 **Revision history:** revised 2026-08-14 after Opus adversarial review
 (`docs/audits/fable-refactor-plan-opus-review-2026-08-14.md`, disposition
@@ -200,9 +206,30 @@ instrumenting one of these seams covers another is false and must not reappear.
        asserting the emitted event contains the expected class and that **no query string, id,
        filename, or path material appears in any field** of the event.
      - **Outcome↔statusClass consistency (part of the v1 contract):** `success` ⇒
-       `statusClass: '2xx'` (`resp.ok`); `http_error` ⇒ `statusClass ∈ {'3xx','4xx','5xx'}`;
+       `statusClass: '2xx'` (`resp.ok`); `http_error` ⇒ `statusClass ∈ {'3xx','4xx','5xx'}`
+       **or absent** — an absent `statusClass` on `http_error` means the response carried a
+       non-standard status outside 200–599 (undici can surface these from the wire); it is a
+       deliberate fail-closed omission, never a fabricated bucket (implementation named
+       deviation, 2026-08-15 Opus review B-1, folded into the validator below);
        `timeout`/`network_error` ⇒ no `statusClass` (no response was received). The export
        validator enforces this.
+     - **Emission-scope fidelity notes (2026-08-15 Opus review, findings A-3/B-6 — read
+       before interpreting the measurement window):** (1) Graph presigned-download and
+       CDN-follow legs (`graph-service.js` `downloadFile`'s `@microsoft.graph.downloadUrl`
+       and manual-redirect `Location` fetches) traverse the instrumented helper but hit
+       `*.sharepoint.com`/CDN hosts outside the allowlist, so they appear as
+       `unknown`/`unknown` — no signed-URL material reaches the event (probed); the
+       manual-redirect `/content` leg deliberately expects a 302 and therefore emits
+       `http_error`/`3xx` on its *success* path. (2) GraphService's shared in-flight
+       `tokenPromise`: when request B joins a token fetch request A started, exactly one
+       `azuread`/`token` event is emitted, attributed to A's correlation — B's token
+       dependency is invisible by construction. (3) A `waitForPromiseWithin` deadline
+       timeout fires *above* the instrumented fetch: the caller sees a structured timeout
+       but no event is emitted at that moment; the still-running fetch later emits its own
+       real outcome (possibly `success`) under the originating correlation. None of the
+       three target routes traverse `downloadFile`; (2) and (3) are token-leg
+       under-/re-attribution to be kept in mind when reading per-route token counts, not
+       corrections to make silently.
      - **Stage 2 derivability:** the Stage 2 acceptance count is mechanically
        `count(events where dependency == 'dataverse' and resourceClass ==
        'wmkf_potentialreviewerses' and routeName ∈ the three target routes)` — no log
@@ -338,7 +365,8 @@ instrumenting one of these seams covers another is false and must not reappear.
            and (($ev.ms | type) == "number" and (($ev.ms | isnan) | not)
                 and (($ev.ms | isinfinite) | not) and $ev.ms >= 0)
            and (if   $ev.outcome == "success"    then $ev.statusClass == "2xx"
-                elif $ev.outcome == "http_error" then ($ev.statusClass | IN("3xx","4xx","5xx"))
+                elif $ev.outcome == "http_error" then (($ev.statusClass == null)
+                                                       or ($ev.statusClass | IN("3xx","4xx","5xx")))
                 else $ev.statusClass == null end)
            and (($ev.correlationId == null) or (($ev.correlationId | type) == "string"))
            and (($ev.routeName == null) or (($ev.routeName | type) == "string"))
@@ -450,25 +478,63 @@ instrumenting one of these seams covers another is false and must not reappear.
 17. **Stop conditions / owner:** if adding the seam requires touching authz or a durable write, stop
     and re-scope.
 
-### Stage 1 measurement window (executable decision rule, per Codex P2-3)
+### Stage 1 measurement program (owner-amended 2026-08-15)
 
-- **Environment:** production (the only environment with real staff usage patterns).
-- **Target routes:** `/api/review-manager/reviewers`, `/api/reviewer-finder/my-candidates`,
-  `/api/workbench/decline-referrals`.
-- **Minimum sample:** ≥ 20 requests per route (workbench usage cadence is low — see
-  `.claude-memory/project-reviewer-find-usage-cadence-blocks-observation-windows.md`; if 20 is not
-  reached in 2 calendar weeks, report the shortfall rather than extrapolating).
-- **Aggregation:** per route × dependency × resourceClass: request count, dependency-call count per
-  request, p50 and p95 of `ms`, outcome counts.
-- **What the window decides:** the **Deferred section** (Data Plane invalidation work) remains
-  latency-gated on this data. **Stage 2 is NOT latency-gated:** its duplicate reads are
-  source-certain (verified again 2026-08-15), so Stage 2 proceeds on owner authorization regardless
-  of measured latency; the window supplies the **before/after verification baseline** for Stage 2's
-  acceptance (dependency-call counts per route), not its justification.
-- **Route-level honesty:** the three routes are three separate HTTP requests; a per-request
-  correlation id cannot by itself prove they came from one client tab action. Route-level
-  measurement is sufficient for this plan's decisions and is what is claimed. No action-level id is
-  added in Stage 1.
+The original `≥ 20 requests per route within two calendar weeks` rule is withdrawn as a Stage 2
+prerequisite. Reviewer Find is campaign-driven and runs about twice per year (owner evidence in
+`.claude-memory/project-reviewer-find-usage-cadence-blocks-observation-windows.md`), so waiting for
+organic traffic could yield no evidence for months. The measurement program therefore has two
+distinct tracks; neither may be represented as the other.
+
+#### Track A — passive operational safety
+
+- **Environment:** production.
+- **Duration:** the first 48 hours after deployment, followed by open-ended passive watching.
+- **Scope:** all app-wide `workbench.dependency` events from the three shared seams, not only the
+  target routes.
+- **Measure:** total lines/day, malformed/invalid events, log throttling or truncation, visible log
+  cost, and unexpected `unknown` classifications. Apply the existing ~50,000-lines/day
+  stop/re-scope threshold above.
+- **Non-gate:** absence of activity on a target Workbench route is an expected business-cadence
+  result, not evidence of safety or performance, and does not block Stage 2.
+
+#### Track B — controlled read-only before/after baseline
+
+- **Environment:** production, using a signed-in staff account and deliberately selected existing
+  requests. This is owner- or orchestrator-driven evidence, not manufactured organic traffic.
+- **Target GET/read surfaces:** `/api/review-manager/reviewers`,
+  `/api/reviewer-finder/my-candidates`, and `/api/workbench/decline-referrals`.
+- **Mutation prohibition:** exercise view/load behavior only. Do not invoke PATCH, DELETE, dismiss,
+  merge, send, or any other state-changing action to generate measurement traffic.
+- **Fixture strata:** use non-identifying labels in the report and, where safely available, cover
+  an empty/small reviewer set, a typical active-candidate set, a request with removed candidates,
+  a set crossing the 25-id chunk boundary, and a request with decline referrals. Record a stratum
+  as unavailable rather than changing production state to create it. Repeating one identical
+  request does not substitute for missing workload variety.
+- **Repeatability:** record the procedure and repeat the same safe fixtures after Stage 2 so the
+  dependency-call comparison is like-for-like. Record response status and structural contract
+  checks; do not copy response bodies or business identifiers into telemetry or the measurement
+  report.
+- **Aggregation:** per route × fixture stratum × dependency × `resourceClass`: request count,
+  dependency-call count per request, p50/p95 of `ms` (labeled **controlled/descriptive**), and
+  outcome counts. The Stage 2 acceptance numerator is the count of events where
+  `dependency == 'dataverse'` and `resourceClass == 'wmkf_potentialreviewerses'` for the target
+  routes.
+- **Acceptance use:** the controlled before/after call counts verify Stage 2 against the
+  chunk-aware formula. They do not support a claim about organic staff p50/p95 improvement.
+
+#### Organic latency evidence
+
+- Natural target-route traffic may continue accumulating after Track A, but it is never a
+  calendar-time or traffic-count prerequisite for Stage 2.
+- Do not make quantified organic-latency claims until at least 20 natural requests exist for a
+  route. If that threshold is not reached, report `insufficient organic sample`; do not
+  extrapolate and do not manufacture repeated requests to satisfy it.
+- The **Deferred section** (Data Plane invalidation work) remains latency-gated on genuine organic
+  evidence. **Stage 2 is NOT latency-gated:** its duplicate reads are source-certain, and Track B
+  supplies its before/after verification baseline.
+- **Route-level honesty:** the three routes are separate HTTP requests; a per-request correlation
+  id cannot prove they came from one client-tab action. No action-level id is added in Stage 1.
 
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
 
