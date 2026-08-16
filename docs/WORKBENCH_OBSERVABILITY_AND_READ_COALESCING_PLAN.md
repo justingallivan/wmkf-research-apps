@@ -22,9 +22,11 @@ related:
 **Status: Stage 1 merged to `main` at `30ed5fe0` and deployed to Production as
 `dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB` (READY 2026-08-16 00:53:40Z); the custom application domain was
 verified to resolve to that exact deployment. The passive 48-hour safety window and controlled
-GET-only before-baseline opened 2026-08-15. Stage 2 was authorized by the owner on 2026-08-15
-after the controlled baseline; Track A continues concurrently and blocks only if one of its named
-stop conditions actually fires. The Deferred section remains NOT authorized.**
+GET-only before-baseline opened 2026-08-15. Stage 2 was authorized by the owner on 2026-08-15,
+merged to `main` at `06a615fc`, and deployed to Production as
+`dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). Its controlled Production
+after-baseline has not yet run. Track A continues concurrently; the Deferred section remains NOT
+authorized.**
 Implementation record:
 `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
 by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
@@ -571,12 +573,13 @@ recorded as such rather than manufactured.
 
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
 
-**Status: IMPLEMENTED on `codex/claude-workbench-read-coalescing-stage2` (base `ab4a87b8`,
-characterization pin `32030b50`, implementation `1b64a0da`, adversarial-review closure commits
-following on the same branch) on 2026-08-15; NOT merged, NOT deployed, Production after-baseline
-NOT run.** Codex completed the independent read-only review with no runtime defect; three bounded
-documentation/comment corrections were applied on the branch. An explicit owner merge decision is
-pending. Implementation record:
+**Status: IMPLEMENTED, MERGED, AND PRODUCTION-LIVE.** The work was built on
+`codex/claude-workbench-read-coalescing-stage2` (base `ab4a87b8`, characterization pin
+`32030b50`, implementation `1b64a0da`, adversarial-review closure commits following on the same
+branch), independently reviewed by Codex with no runtime defect, merged to `main` at `06a615fc`,
+and deployed as `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled
+Production after-baseline remains pending and must not be inferred from deployment readiness.
+Implementation and promotion record:
 `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
 The census and contract below are preserved as the authorized work order; **every `file:line`
 reference in this Stage 2 section is a PRE-MERGE anchor** (the state the characterization commit
@@ -801,5 +804,7 @@ begins before the pre-auth Dataverse lookup it must observe; the event contract,
 semantics are explicit and PII-safe; Stage 2's census and formula match the verified source sites
 (three pairs, decline unchanged at its correct `lib/services/workbench/` path, chunking preserved at
 the service layer); T1 and T2 are uniformly closed with no prospective work. No live-state claim in
-this document is presented as built runtime state; the plan remains a **draft NOT authorized for
-implementation**.
+that prior-pass review was presented as built runtime state; at that historical boundary the plan
+remained a **draft NOT authorized for implementation**. Current state is governed by the status
+sections above: Stages 1 and 2 are Production-live, the controlled Stage 2 after-baseline is
+pending, and the Deferred section remains unauthorized.

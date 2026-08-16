@@ -16,7 +16,7 @@ related:
 
 # Security Operating Plan
 
-Last updated: 2026-05-05
+Last updated: 2026-08-15
 
 This plan captures the operating rhythm we want after the May 2026 hardening tranche. The goal is to keep the app suite secure and maintainable as it moves further into production use, without turning every week into a fresh security audit.
 
@@ -192,12 +192,12 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 Status: Stage 1 is merged and Production-live at `main` merge `30ed5fe0` / deployment
 `dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB`; the passive 48-hour measurement window opened at
-2026-08-16 00:53:40Z and remains active. Stage 2 read coalescing is implemented on
-`codex/claude-workbench-read-coalescing-stage2` (implementation `1b64a0da`; adversarial-review
-closure commits follow on the same branch). Codex's independent review found no runtime defect and
-its three bounded documentation/comment corrections are applied; the owner merge decision remains
-pending. It is not merged or deployed. Track A continues concurrently and blocks promotion only if
-a named telemetry stop condition actually fires.
+2026-08-16 00:53:40Z and remains active. Stage 2 read coalescing was implemented on
+`codex/claude-workbench-read-coalescing-stage2` (implementation `1b64a0da`), independently reviewed
+by Codex with no runtime defect, merged to `main` at `06a615fc`, and deployed to Production as
+`dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled Production
+after-baseline remains pending. Track A continues concurrently and retains the same named stop
+conditions.
 
 Every server-side call through the three instrumented egress seams
 (`lib/services/dynamics/http.js`, `lib/services/graph-service.js`,

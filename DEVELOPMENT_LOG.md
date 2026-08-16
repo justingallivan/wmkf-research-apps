@@ -10,6 +10,21 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Workbench duplicate Dataverse reads coalesced in Production (Session 440)
+
+**Milestone:** Three source-certain sibling `wmkf_potentialreviewerses` read pairs now execute as
+one union-projection chunked read per independent id set, preserving response and failure contracts.
+**Sessions:** 438–440 (Sonnet builders, two Opus adversarial passes, Codex independent review and
+bounded corrections, owner promotion).
+**Ship state:** `main` advanced `ab4a87b8 → 06a615fc`; deployment
+`dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` reached READY. Focused merged-main tests passed 115/115 and the
+Dataverse access-layer gate, types, and clean-output Production build passed. The controlled
+Production after-baseline remains pending; no organic-latency claim has been made.
+**Why it matters:** Reviewer Find/Track removes one redundant Dataverse round trip per populated
+reviewer, active-candidate, and removed-candidate chunk without adding caching or invalidation risk.
+**Pointers:** `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`;
+`docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`; merge `06a615fc`.
+
 ## August 2026 — Workbench dependency observability is Production-live (Sessions 434–436)
 
 **Milestone:** Shared Dataverse, Azure AD, and Graph transports now emit PII-safe dependency timing

@@ -112,9 +112,11 @@ The ~50,000 telemetry-events/day stop/re-scope threshold remains in force.
 
 The owner authorized Stage 2 after reviewing this controlled baseline. Track A remains open in
 parallel and is not a calendar or organic-traffic prerequisite; an actual named stop condition still
-pauses promotion. The Stage 2 after-baseline must repeat the same available safe strata and compare
-the `wmkf_potentialreviewerses` call counts against the formula; it must not use repeated artificial
-requests to claim organic latency improvement.
+pauses further rollout work. Stage 2 was subsequently merged to `main` at `06a615fc` and its first
+Production deployment, `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B`, reached READY at
+2026-08-16 03:01:20Z. The Stage 2 after-baseline remains pending: it must repeat the same available
+safe strata and compare the `wmkf_potentialreviewerses` call counts against the formula; it must not
+use repeated artificial requests to claim organic latency improvement.
 
 ## Evidence verdict
 
@@ -125,5 +127,6 @@ requests to claim organic latency improvement.
 - Three target-route before-baseline contracts: **VERIFIED** for the three available strata above.
 - More-than-25-id fixture: **UNKNOWN / unavailable without manufacturing state**.
 - 48-hour whole-app volume and cost posture: **OPEN** pending Track A completion.
-- Stage 2 readiness: **AUTHORIZED / READY TO BUILD** — source-certain call-count baseline exists;
-  Track A remains an independent concurrent safety watch unless a named stop condition fires.
+- Stage 2 state: **PRODUCTION-LIVE; AFTER-BASELINE PENDING** — source-certain call-count baseline
+  exists; Track A remains an independent concurrent safety watch unless a named stop condition
+  fires.

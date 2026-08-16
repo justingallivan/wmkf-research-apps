@@ -3,7 +3,7 @@ title: Workbench Read Coalescing Stage 2 — Implementation and Adversarial-Revi
 domain: architecture
 kind: audit
 status: active
-summary: "Stage 2 read-coalescing implementation, Mode B invariants, builder assignments, and adversarial-review record; branch pending Codex review and owner merge decision."
+summary: "Stage 2 read-coalescing implementation, Mode B invariants, adversarial-review record, and subsequent Production promotion."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -21,7 +21,8 @@ related:
 **Orchestrator:** Claude Fable; Sonnet builders A/B/C; two independent Opus adversarial reviewers.
 **Authorization:** Stage 2 implementation only. Merge, deployment, and Production after-baseline
 traffic are NOT authorized from this session. Codex completed the independent read-only review;
-the owner merge decision is next.
+the owner merge decision was the next action at this historical boundary. The later promotion is
+recorded in the addendum below.
 
 ## What was built
 
@@ -240,7 +241,7 @@ mock-carryover explained); the plan/security docs now cite implementation vs. cl
 distinctly. **Zero findings remain open; no blocking or high runtime finding was raised across any
 pass. The resolved R1-1 tooling finding was the only high-severity item.**
 
-## Not performed (per authorization)
+## Not performed in the implementation session (historical authorization boundary)
 
 Merge, deployment, Production probes or after-baseline traffic, organic-latency claims, mutation
 of any production state, Stage 1 telemetry changes, unrelated work. The observed unrelated Graph
@@ -270,3 +271,19 @@ corrections, seven directly affected suites passed 115/115. The Dataverse access
 self-test, type check, relevant documentation/memory gates and self-tests, production build, and
 `git diff --check` passed. The branch remained clean relative to its tracked content before the
 correction commit, with no merge, deployment, Production probe, or after-baseline traffic.
+
+## Owner promotion addendum (2026-08-15 / 2026-08-16Z)
+
+The owner authorized the merge after Codex's independent review. The branch was merged to `main`
+with merge commit `06a615fcc9301bbd31d5b0a603ef585d588b12f6` and pushed to `origin/main`.
+Before push, the merged tree passed seven focused Stage 2 suites (115/115), the Dataverse
+access-layer gate and self-test, the type check, `git diff --check`, and a clean-output Production
+build. The first Stage 2 Production deployment, `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B`, reached
+READY at 2026-08-16 03:01:20Z. The recorded pre-Stage-2 rollback deployment is
+`dpl_9uZV2SZKizF5dwJFbGVWWD4V4s2Y`.
+
+The controlled Production after-baseline was not run as part of the merge. It remains the next
+measurement action: repeat only the safe Track B read-only strata, compare
+`wmkf_potentialreviewerses` dependency-call counts with the `after` formula, record unavailable
+strata rather than manufacturing Production state, and make no organic-latency claim from the
+controlled fixtures.
