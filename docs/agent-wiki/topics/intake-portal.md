@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-13
+last_verified: 2026-08-15
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -52,6 +52,10 @@ update_triggers:
 > applicants.
 > `docs/INTAKE_PORTAL_DESIGN.md` is the historical cancelled-pilot design, not
 > an active plan.
+> The joint `proxy.js` applicant-surface + `/api/intake/*` Origin/CSRF correction
+> remains a valid launch invariant, but belongs to this parked product. Do not
+> surface it as independent security backlog work; it activates only if the owner
+> explicitly revives applicant intake.
 
 Use this page before work on applicant intake: draft capture, submit, attachment
 handling, intake Blob storage, auth/external identity, institution match, and

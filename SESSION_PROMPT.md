@@ -9,8 +9,9 @@ Separately, the remaining small auth follow-ups are merged and Production-live. 
 allowed-origin validation now fails closed on missing/invalid configuration, Preview derives its
 trusted origin from `VERCEL_URL` when fixed `NEXTAUTH_URL` is absent, and both cron verifiers use
 the shared constant-time comparison while retaining their distinct development-bypass policies.
-Intake proxy/CSRF, raw-error cleanup, grantee policy, and tombstones were explicitly outside this
-change.
+Raw-error cleanup, grantee policy, and tombstones were explicitly outside this change. The intake
+proxy/CSRF finding is only a conditional prerequisite for the parked applicant-intake product; it
+is not an active follow-up or backlog item.
 
 - Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
 - Promotion record: `897ac285`
@@ -73,6 +74,10 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
 3. Decline-referrals person reads stay unmerged because there is no duplicate sibling read.
 4. Do not reopen authenticated Preview smoke coverage or Azure redirect configuration without a
    new owner decision.
+5. The June 2026 Phase II applicant-intake pilot was cancelled and the product remains parked while
+   WMKF evaluates Connor's GOApply re-engineering. Exclude the portal and its proxy/CSRF launch
+   prerequisites from next-step and backlog summaries unless the owner explicitly reactivates the
+   product; existing `/apply` and `/api/intake/*` foundation code does not fire that trigger.
 
 ## Key references
 

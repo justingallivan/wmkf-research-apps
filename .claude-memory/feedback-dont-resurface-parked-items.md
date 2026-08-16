@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: process
-  last_verified: 2026-06-13 (S256) — the session this lesson came from
+  last_verified: 2026-08-15 (S442) — rule reaffirmed after a parked intake launch prerequisite was promoted into an active-looking backlog summary
 ---
 
 ## Recall Rule
@@ -13,6 +13,13 @@ metadata:
 When preparing proactive startup or next-step summaries, omit parked or
 externally gated items unless their recorded un-park condition has demonstrably
 fired or the user asks about them.
+
+**Current named instance (owner reaffirmed 2026-08-15):** the cancelled/parked
+applicant-intake product and its conditional proxy-routing + CSRF launch
+prerequisite. Do not list either as a security backlog item or next step merely
+because an audit calls the fix mandatory *if the product launches*. Existing
+`/apply` and `/api/intake/*` foundation code does not reactivate the product; only
+an explicit owner decision does. See [[project-intake-portal-parked]].
 
 When a carryover item is flagged **parked / externally gated / do NOT proactively
 resurface**, do not echo it into any output I generate unprompted — including the

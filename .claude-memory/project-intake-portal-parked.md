@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: intake
-  last_verified: 2026-07-08 (S348) — owner decision
+  last_verified: 2026-08-15 (S442) — owner reaffirmed parked routing after the conditional intake proxy/CSRF prerequisite was incorrectly promoted into a next-step summary
 ---
 
 ## Recall Rule
@@ -17,6 +17,10 @@ Read this when: about to plan, scope, or build any applicant intake-portal work
 Do:
 - Treat the intake-portal build as **PARKED / back-burner** (owner decision
   2026-07-08). Do NOT spin up intake-portal build/planning as if it's active work.
+- Treat security and reliability work whose only trigger is an intake launch — including
+  the joint `proxy.js` applicant-surface + `/api/intake/*` Origin/CSRF fix — as part of
+  the parked product, not as an independent security backlog item. It becomes actionable
+  only after the owner explicitly reactivates the applicant product.
 - Keep the existing intake design memories as retained-for-revival (they capture
   real design decisions): [[project-intake-portal-skinny-scope]],
   [[project-intake-portal-institution-match]], [[project-intake-portal-ui-todo]],
@@ -29,6 +33,9 @@ Do not:
   finished. It may revive.
 - Re-raise "let's build the intake portal" unprompted (see
   [[feedback-dont-resurface-parked-items]]).
+- Include the portal or its conditional launch prerequisites in proactive todo,
+  security-backlog, or "what next" summaries. Existing foundation code is not an
+  un-park trigger.
 
 **Why (owner, 2026-07-08):** We had started building an applicant intake portal
 (the skinny "external-reviewer-intake-but-for-applicants" model) but switched to the
