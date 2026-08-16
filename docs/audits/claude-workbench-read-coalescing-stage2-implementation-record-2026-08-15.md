@@ -20,7 +20,8 @@ related:
 **Branch:** `codex/claude-workbench-read-coalescing-stage2`, base `ab4a87b8` (post-Stage-1 `main`).
 **Orchestrator:** Claude Fable; Sonnet builders A/B/C; two independent Opus adversarial reviewers.
 **Authorization:** Stage 2 implementation only. Merge, deployment, and Production after-baseline
-traffic are NOT authorized from this session; Codex performs the next independent read-only review.
+traffic are NOT authorized from this session. Codex completed the independent read-only review;
+the owner merge decision is next.
 
 ## What was built
 
@@ -143,7 +144,7 @@ single read with nothing to merge; census conclusion unaffected). Reviewer 2 als
   base at session start; the final-tree gate re-run is recorded in the closeout section below
   (Opus R2-16 closed).
 
-### Jest transform-cache hazard (Opus R1-1, resolved)
+### Jest false-red hazard, cache involvement suspected (Opus R1-1, resolved)
 
 During review, intermittent non-reproducible failures (13–16 false reds concentrated in
 call-count/select assertions) appeared in parallel cold-cache runs; Reviewer 1 proved the executed
@@ -152,8 +153,8 @@ out carryover). **Cause: consistent with stale jest transform-cache entries from
 in this shared worktree, but UNCONFIRMED** — one signature (the fail-soft test rejecting with
 `'history query failed'`) would require an executed module lacking the S308-era `.catch`, which no
 committed version lacks, and remains unexplained. The load-bearing conclusions hold regardless:
-the hazard produces false REDS only, never false greens, so committed-green claims are not
-silently corrupted. Warm/serial baselines were fully green across repeated runs (Reviewer 1:
+the observed failures were false reds, not false greens, so committed-green claims are not silently
+corrupted. Warm/serial baselines were fully green across repeated runs (Reviewer 1:
 `-w 1` ×3 and 12 warm parallel runs, all green). Resolution: `npx jest --clearCache`, then three
 consecutive parallel runs of the six affected suites (the five changed test files plus
 `decline-referrals-service.test.js`) — **111/111 each**; Reviewer 1's delta pass re-ran a
@@ -184,7 +185,7 @@ Findings and dispositions:
 
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
-| R1-1 | HIGH (tooling) | Intermittent false-red jest failures in this worktree not producible from HEAD source — stale parallel cold-cache transform entries from mid-build states; warm/serial runs 100% green. | RESOLVED: `npx jest --clearCache` + three consecutive parallel runs of the six affected suites, 111/111 each (recorded above). No code change. |
+| R1-1 | HIGH (tooling) | Intermittent false-red jest failures in this worktree were not producible from HEAD source; stale parallel cold-cache transform entries were a plausible but unconfirmed cause, and one signature remains unexplained. Warm/serial runs were 100% green. | RESOLVED: `npx jest --clearCache` + three consecutive parallel runs of the six affected suites, 111/111 each (recorded above). No code change. |
 | R1-2 | MEDIUM | Select-agnostic characterization pins alone cannot detect the merge or a select regression; equivalence rests on the callcounts/projection tests + the zero-cross-read source proof. | FIXED (doc): builder-assignments section now states exactly what the pins prove and where discrimination lives. |
 | R1-3 | LOW | Integration route mock flattened to one merged record — that suite no longer distinguishes projections. | RECORDED: inherent to the merge (one call, one select); projection protection lives in the two unit-level completeness tests (see R2-3). |
 | R1-4 | INFO | `wmkf_areaofexpertise` selected but unconsumed — pre-existing, unchanged. | RECORDED; removing it would be a select-narrowing outside this stage's response-equivalence mandate. |
@@ -236,11 +237,36 @@ service files. Delta findings — all LOW/INFO documentation-precision items, cl
 commit: the R1-1 cause is now recorded as unconfirmed-with-one-unexplained-signature (false-reds
 only); the six-suite list is enumerated; the fail-soft mutation count corrected to 3 (collateral
 mock-carryover explained); the plan/security docs now cite implementation vs. closeout commits
-distinctly. **Zero findings remain open; no blocking or high finding was raised at any point
-across all passes.**
+distinctly. **Zero findings remain open; no blocking or high runtime finding was raised across any
+pass. The resolved R1-1 tooling finding was the only high-severity item.**
 
 ## Not performed (per authorization)
 
 Merge, deployment, Production probes or after-baseline traffic, organic-latency claims, mutation
 of any production state, Stage 1 telemetry changes, unrelated work. The observed unrelated Graph
 drive-item 4xx activity remains a Track A watch item.
+
+## Codex independent review and bounded corrections (2026-08-15)
+
+Codex reviewed the clean pushed branch at `9b099d6b` without relying on the Fable handoff. The
+caller → service → Dataverse-read → projection → response trace, both union selects, the three
+independent id-set sites, chunk and empty-set behavior, fail-soft/fail-hard paths, adapter
+restriction/annotation behavior, mutation isolation, and protected surfaces were verified. No
+runtime defect was found.
+
+Three current-state precision findings were confirmed and corrected on the same branch:
+
+1. The summary's “no high finding” claim contradicted the table's resolved `R1-1 HIGH (tooling)`
+   row; current summaries now distinguish zero high runtime findings from the one resolved high
+   tooling finding.
+2. A live integration-test comment still described the deleted two-read path; it now describes the
+   single merged read.
+3. Active memory stated stale Jest transform cache as the cause of the false reds even though the
+   record labels that theory unconfirmed; the hygiene recommendation remains, while every live
+   restatement now preserves the uncertainty and unexplained signature.
+
+Independent verification: seven focused suites passed 116/116 during review; after the bounded
+corrections, seven directly affected suites passed 115/115. The Dataverse access-layer gate and
+self-test, type check, relevant documentation/memory gates and self-tests, production build, and
+`git diff --check` passed. The branch remained clean relative to its tracked content before the
+correction commit, with no merge, deployment, Production probe, or after-baseline traffic.

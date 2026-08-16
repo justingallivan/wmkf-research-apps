@@ -1,4 +1,4 @@
-# Session 439 Prompt: Codex Read-Only Review of Workbench Read Coalescing Stage 2
+# Session 440 Prompt: Owner Merge Decision for Workbench Read Coalescing Stage 2
 
 ## Session 438 Summary
 
@@ -7,7 +7,8 @@ Claude Fable orchestrated the authorized Stage 2 read-coalescing build to comple
 `WMKF_Apps-claude-workbench-read-coalescing-stage2`, exact base `ab4a87b8`). The branch is pushed
 and the worktree is clean and synchronized. **Not performed, per authorization: merge, deployment,
 Production probes/after-baseline traffic, organic-latency claims, Stage 1 telemetry changes, or
-unrelated work.** Codex performs the next independent read-only review; merge remains an explicit
+unrelated work.** Codex completed the independent review: no runtime defect was found, and three
+bounded documentation/comment findings were corrected on this branch. Merge remains an explicit
 owner decision.
 
 ### What Was Completed
@@ -32,8 +33,9 @@ owner decision.
    counts, >25-id two-chunk fixtures, union-content proof per call, and the unchanged decline
    select. Existing suites' select-dispatch mocks replaced with exact-count + union assertions.
 3. **Adversarial convergence.** Two independent Opus reviewers (behavior/contract; test
-   teeth/docs) + Sonnet remediation + Opus delta re-review: **zero blocking or high findings at
-   any point; zero findings open.** Mutation testing confirmed teeth (duplicate-read revival →
+   teeth/docs) + Sonnet remediation + Opus delta re-review: **zero blocking or high runtime
+   findings; one high tooling finding resolved; zero findings open.** Mutation testing confirmed
+   teeth (duplicate-read revival →
    13 failures; select narrowing, set unioning, fail-soft removal, fail-hard softening all
    caught). Full findings/disposition tables:
    `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
@@ -49,6 +51,11 @@ owner decision.
    fixed; `CHUNK_CONSOLIDATION_PLAN.md` / `REVIEWER_STAGE2A_IDENTITY_CAPTURE_BUILD_PLAN.md`
    classified HISTORICAL under their `status: historical` frontmatter; Atlas/wiki never described
    the pair count — nothing stale there).
+6. **Codex independent review.** Runtime contract, projection unions, chunking, active/removed
+   separation, error behavior, test teeth, protected surfaces, and the production build were
+   independently verified. Codex corrected: the review-summary contradiction around one resolved
+   HIGH tooling finding, an obsolete two-read integration-test comment, and an unconfirmed
+   Jest-cache cause presented too strongly in active memory. No runtime source or assertion changed.
 
 ### Commits (base `ab4a87b8`)
 
@@ -61,10 +68,10 @@ owner decision.
 
 ### Session gotchas for continuity
 
-- **Jest transform-cache false reds** in the shared worktree (Opus R1-1): after multi-agent
-  edits, `npx jest --clearCache` before citable verification runs; the hazard produced false
-  REDS only. New memory: `feedback-clear-jest-cache-in-shared-worktrees.md`. One failure
-  signature remains unexplained (cause recorded as unconfirmed in the implementation record).
+- **Intermittent Jest false reds, with cache involvement suspected** in the shared worktree
+  (Opus R1-1): after multi-agent edits, run `npx jest --clearCache` before citable verification;
+  the observed failures were false reds, but their cause remains unconfirmed and one signature
+  remains unexplained. New memory: `feedback-clear-jest-cache-in-shared-worktrees.md`.
 - The `/start` gate battery's reconcile probe rewrote `docs/RECONCILIATION_REPORT.json` with a
   live drift observation (`wmkf_appreviewersuggestion` Atlas claim 790 vs live 791, plus
   sibling-entity rows); the rewrite was reverted to keep the branch scoped. **The Atlas
@@ -74,14 +81,11 @@ owner decision.
 
 ### Verified Open
 
-1. **Codex independent read-only review of `codex/claude-workbench-read-coalescing-stage2`.**
-   Evidence: this branch at `96fa1566`+; work order in Session 438 prompt; implementation record.
-   Review the five commits, the invariant table, and the acceptance suites; do not merge.
-2. **Owner merge decision, then deployment and the Stage 2 Production after-baseline** (repeat
+1. **Owner merge decision, then deployment and the Stage 2 Production after-baseline** (repeat
    the Track B safe strata; compare `wmkf_potentialreviewerses` counts against the `after`
    formula; no manufactured >25-id fixture; no organic-latency claims).
    Evidence: plan §Stage 2 acceptance/Track B; baseline audit doc. Owner-gated.
-3. **Atlas row-count drift** on `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (claim 790,
+2. **Atlas row-count drift** on `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` (claim 790,
    live 791 as of 2026-08-16 probe). Evidence: reconcile-probe output observed this session (file
    reverted); `reconcile-probe-entity-set-count` is also one of the two known-failing baseline
    suites. Small doc reconcile on `main`, outside Stage 2 scope.
@@ -99,7 +103,7 @@ owner decision.
    (Opus R2-3) — deleting either silently removes it.
 2. `wmkf_areaofexpertise` selected but unconsumed in my-candidates (pre-existing; narrowing
    would breach this stage's response-equivalence mandate).
-3. Jest cache hazard cause unconfirmed (one unexplained signature; false-reds only).
+3. Jest false-red cause unconfirmed; cache involvement suspected (one unexplained signature).
 4. Stage-1-inherited owner options: `.next/static` marker-scan CI gate; browser-bundle gate.
 
 ### Do Not Reopen Without New Decision

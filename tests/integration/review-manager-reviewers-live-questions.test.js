@@ -127,9 +127,9 @@ test('fails soft to liveQuestions: null (not a 500) when the fetcher throws', as
 // reviewer shape together in one place — each targets a single slice (answers,
 // outstanding fields, synthesis, liveQuestions). This test pins every key the
 // route emits for one fully-populated reviewer, using the same
-// DynamicsService.queryRecords-serves-both-calls mocking pattern the other
-// tests in this suite already rely on (fetchPotentialReviewers and
-// fetchResearchersByPerson both read via queryReviewers → queryRecords).
+// DynamicsService.queryRecords mocking pattern the other tests in this suite
+// already rely on (the merged fetchPotentialReviewers read flows through
+// queryReviewers → queryRecords).
 // ---------------------------------------------------------------------------
 test('GET success returns the full proposal + reviewer envelope', async () => {
   DynamicsService.getRecord.mockResolvedValue({
