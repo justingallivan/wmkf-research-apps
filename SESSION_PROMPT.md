@@ -1,99 +1,133 @@
-# Session 442 Prompt: Close Track A and Reconcile Atlas Drift
+# Session 443 Prompt: Close Track A; Campaign May Proceed
 
-## Current state
+## Session 442 Summary
 
-Workbench read coalescing Stage 2 is merged, Production-live, and controlled-verified.
+Session 442 completed the remaining bounded security follow-ups and removed the parked applicant
+intake pilot from the active queue. Workbench Stage 2 remains Production-live and verified under
+controlled conditions; its passive Track A safety window is the only required engineering
+carryover. The owner may begin the new campaign without waiting for Track A to close.
 
-Separately, the remaining small auth follow-ups are merged and Production-live. Main merge
-`96d89c32` deployed as `dpl_9aLVHCXupik2CwXDgVrNzcFXXkaC` (READY 2026-08-15): production-mode
-allowed-origin validation now fails closed on missing/invalid configuration, Preview derives its
-trusted origin from `VERCEL_URL` when fixed `NEXTAUTH_URL` is absent, and both cron verifiers use
-the shared constant-time comparison while retaining their distinct development-bypass policies.
-Raw-error cleanup, grantee policy, and tombstones were explicitly outside this change. The intake
-proxy/CSRF finding is only a conditional prerequisite for the parked applicant-intake product; it
-is not an active follow-up or backlog item.
+### What Was Completed
 
-Raw-error cleanup is merged and Production-live at main merge `51fc8472` / deployment
-`dpl_ErcYWaLLe74zi55MAsL65wJB75vk` (READY 2026-08-16 05:16Z). The promoted change generalizes the
-28 audited literal 500/502 disclosures, adds the one missing server log, installs a whole-API AST
-regression guard with self-tests, and converts the pricing-refresh composite-key NULs to escaped
-source notation without changing runtime delimiter semantics.
+1. **Origin and cron authentication hardening shipped**
+   - Production-mode allowed-origin validation now fails closed on missing/invalid configuration;
+     Preview may derive only from platform `VERCEL_URL` when fixed `NEXTAUTH_URL` is intentionally
+     absent.
+   - Both cron verifier variants use the shared constant-time comparison while preserving their
+     distinct development-bypass policies.
+   - Main merge `96d89c32` deployed READY as `dpl_9aLVHCXupik2CwXDgVrNzcFXXkaC`; a signed-in
+     same-origin empty PATCH reached body validation and returned the expected pre-write 400.
 
-- Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
-- Promotion record: `897ac285`
-- Current verification deployment: `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`
-- Recorded pre-Stage-2 rollback deployment: `dpl_9uZV2SZKizF5dwJFbGVWWD4V4s2Y`
-- Production after-baseline:
-  `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`
+2. **Raw internal error responses cleaned and shipped**
+   - All 28 audited unguarded literal 500/502 disclosures now return generic text while preserving
+     response status/shape, structured service errors, development-only diagnostics, and operator
+     logs/records/alerts.
+   - Added the missing `summarize-v2` file-load log and a whole-API Babel AST regression guard with
+     self-tests for ordinary/optional members, aliases, interpolation, and stringification.
+   - Replaced three literal pricing-refresh NUL bytes with escaped `\u0000` source notation without
+     changing runtime composite-key semantics.
+   - Main merge `51fc8472` deployed READY as `dpl_ErcYWaLLe74zi55MAsL65wJB75vk`; the reconciled
+     main head `2e562f75` subsequently deployed READY as `dpl_5nd2G3KqUqXyidnaQQKyBtLVU6uS`.
 
-The signed-in GET-only after-baseline exercised empty, small, active+removed, and populated
-decline-referral structural strata. All 44 target-route telemetry events succeeded. The
-`wmkf_potentialreviewerses` counts were `0/0/0`, `1/1/0`, `1/2/0`, and `1/2/1` for
-reviewers/my-candidates/decline-referrals, matching the Stage 2 chunk-aware formula. The combined
-before/after count changed `2/4/1 → 1/2/1`; decline remained deliberately unchanged.
+3. **Atlas drift reconciled**
+   - A fresh read-only Dataverse `/$count` returned 793 `wmkf_appreviewersuggestion` rows at
+     `2026-08-16T04:47:14Z`; the canonical Atlas page and both active summaries were reconciled.
+   - The stale unit-test expectation remains one of the two documented main baseline failures; the
+     canonical count is not to be rolled back to satisfy it.
 
-One initial unfiltered one-minute log export reached the 5,000-record ceiling and was rejected and
-deleted. Five short complete slices were validated fail-closed: 181 telemetry occurrences merged
-to 180 unique `eventId`s, with one duplicate occurrence and no conflicting payload. No raw log,
-business identifier, response body, or Production record was retained or mutated.
+4. **Applicant intake pilot explicitly parked**
+   - The June 2026 Phase II pilot was cancelled while WMKF evaluates Connor's GOApply
+     re-engineering. Existing `/apply` and `/api/intake/*` foundation code does not reactivate it.
+   - Proxy/CSRF launch prerequisites are therefore not current backlog items.
 
-Limits remain explicit: the original before-baseline intentionally retained no request identifiers,
-so structural-stratum equivalence is verified but exact request identity is not. No safe >25-id
-fixture exists. Controlled timing is descriptive only; no organic-user latency claim is authorized.
+5. **Session evidence bookkeeping attempted**
+   - `report:claim-evidence-pilot -- --current` ran during `/stop`, but its local metadata state was
+     unavailable. No canonical observation row was added because no eligible report could be
+     established.
 
-## Next actions
+### Commits
 
-### In progress
+- `1b6f71ce` — Harden origin and cron authentication checks
+- `96d89c32` — Merge origin and cron authentication hardening
+- `b9683d82` — Record auth hardening production promotion
+- `87718c94` — Reconcile reviewer suggestion Atlas count
+- `fb735651` — Keep parked intake work out of active backlog
+- `820dd5af` — Harden API error responses
+- `51fc8472` — Merge raw API error response cleanup
+- `2e562f75` — Record raw error cleanup production promotion
 
-1. **Close the Track A passive safety window after 2026-08-18 00:53:40Z.** Continue complete
-   unfiltered exports within the one-day retention window, flatten `.logs[]`, validate v1
-   fail-closed, and deduplicate only on `eventId`. Stop/re-scope at ~50,000 events/day, platform
-   throttling/truncation, or visible log cost. Classify the unrelated Graph `drive-item` 4xx
-   activity without attributing it to Stage 2.
+## Next Items
 
-### Recently closed
+### Verified Open
 
-1. **Atlas row-count drift reconciled.** A fresh read-only Dataverse `/$count` request returned 793
-   `wmkf_appreviewersuggestion` rows at `2026-08-16T04:47:14Z`; the canonical page and its two
-   active Atlas summaries now carry that dated snapshot. The earlier Session 438 observation of
-   791 remains historical evidence of normal table growth.
-2. **Production auth route reached its same-origin validation path.** A signed-in empty PATCH to
-   `/api/workbench/decline-referrals` returned the expected pre-write 400, confirming the request
-   passed the new Origin guard before body validation. An authenticated Preview smoke was not
-   pursued because its generated callback would require Azure redirect configuration; Preview is
-   rarely used, and the owner accepted that testing limitation. No Azure/config change is planned.
-3. **Raw internal error responses cleaned.** Main merge `51fc8472` is Production-live on
-   `dpl_ErcYWaLLe74zi55MAsL65wJB75vk` (READY). The 28 audited unguarded literal 500/502 disclosures
-   now return generic text while retaining operator diagnostics; the whole-API AST regression guard
-   is active. See `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`.
+1. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
+   17:53:40 PDT).**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` Track A and
+   `docs/SECURITY_OPERATING_PLAN.md` Workbench Dependency Telemetry watch item.
+   Perform the final read-only unfiltered export within the one-day retention window, flatten
+   `.logs[]`, validate v1 fail-closed, deduplicate only by `eventId`, and document whether any stop
+   condition fired. Classify the unrelated Graph `drive-item` 4xx activity without attributing it
+   to Stage 2. Track A is a safety observation, not a campaign-launch blocker.
 
-### Residual, not blockers
+### Owner Decision Needed
 
-1. Union-select protection rests on one projection-completeness test per service; preserve both.
-2. `wmkf_areaofexpertise` remains selected but unconsumed to preserve response equivalence.
-3. The shared-worktree Jest false-red cause remains unconfirmed; clear Jest cache before citable
-   multi-agent verification if the symptom recurs.
-4. Optional Stage 1 follow-ups remain owner decisions: `.next/static` marker-scan CI gate and a
-   browser-bundle gate.
+1. **Optional Stage 1 browser-bundle guards.**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
+   `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`.
+   Decide only if desired whether to add a `.next/static` marker-scan CI gate and a browser-bundle
+   gate. Neither is required for the campaign or Track A closeout.
 
-### Do not reopen without a new owner decision
+### Parked
 
-1. Deferred Data Plane invalidation work remains latency-gated on genuine organic evidence.
-2. Reviewer merge org-open access, grantee recipient override, and hard-delete without a tombstone
-   remain accepted design/risk decisions.
-3. Decline-referrals person reads stay unmerged because there is no duplicate sibling read.
-4. Do not reopen authenticated Preview smoke coverage or Azure redirect configuration without a
-   new owner decision.
-5. The June 2026 Phase II applicant-intake pilot was cancelled and the product remains parked while
-   WMKF evaluates Connor's GOApply re-engineering. Exclude the portal and its proxy/CSRF launch
-   prerequisites from next-step and backlog summaries unless the owner explicitly reactivates the
-   product; existing `/apply` and `/api/intake/*` foundation code does not fire that trigger.
+1. **Phase II applicant-intake portal.**
+   Evidence: main commit `fb735651` and the Session 442 owner decision.
+   Re-open only if the owner explicitly reactivates the product after the GOApply evaluation; only
+   then do proxy applicant-surface routing and intake CSRF become joint pre-launch prerequisites.
 
-## Key references
+### Verify Before Acting
 
-- `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`
-- `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md`
-- `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`
-- `docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`
-- `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`
-- `tests/unit/workbench-read-coalescing-stage2-callcounts.test.js`
+1. **Further Workbench performance optimization.**
+   Evidence currently available: controlled Stage 2 after-baseline proves the read-count formula,
+   but no organic-user latency claim is authorized and no safe >25-id fixture exists.
+   Require Track A or later organic evidence before proposing cache invalidation or another
+   optimization stage.
+
+### Do Not Reopen Without New Decision
+
+1. Authenticated Preview smoke coverage or Azure redirect configuration.
+2. Reviewer-merge organization-open access, grantee recipient override, or hard-delete tombstones.
+3. Decline-referrals person-read merging; no duplicate sibling read exists.
+4. Deferred Data Plane invalidation without genuine latency evidence.
+
+## Key Files Reference
+
+| File | Purpose |
+|---|---|
+| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A closeout contract and stop conditions |
+| `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md` | Controlled Production after-baseline |
+| `docs/SECURITY_OPERATING_PLAN.md` | Current Production security posture and watch items |
+| `docs/audits/codex-origin-and-cron-auth-hardening-implementation-2026-08-15.md` | Auth hardening implementation record |
+| `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md` | Raw-error cleanup and promotion evidence |
+| `tests/unit/api-error-response-hygiene.test.js` | Whole-API raw-error regression guard |
+
+## Testing
+
+Session 442 final security-cleanup evidence:
+
+```bash
+npx jest tests/unit tests/integration --runInBand --silent
+# 8232/8234; only the two documented main baseline failures
+
+npm run check:api-routes
+npm run check:api-routes:self-test
+npm run check:types
+npm run check:doc-currency
+npm run check:doc-currency:self-test
+npm run check:fact-consistency
+npm run check:fact-consistency:self-test
+```
+
+The focused raw-error suites, route/type/security/documentation gates, lint (0 errors), and the
+webpack production build passed. Standard Turbopack local build verification was blocked by the
+execution environment's local-worker port permission; both Vercel Production deployments reached
+READY.
