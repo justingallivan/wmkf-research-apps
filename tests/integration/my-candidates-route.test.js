@@ -149,11 +149,8 @@ describe('GET', () => {
       wmkf_relevancescore: 0.9,
       wmkf_matchreason: 'Strong topical match',
     }]);
-    potentialReviewerAdapter.queryReviewers.mockImplementation(async ({ select }) => {
-      if (select.includes('wmkf_organizationname')) {
-        return { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X', wmkf_emailaddress: 'x@example.org' }] };
-      }
-      return { records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_primaryaffiliation: 'MIT' }] };
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X', wmkf_emailaddress: 'x@example.org', wmkf_primaryaffiliation: 'MIT' }],
     });
 
     const req = { method: 'GET', query: { requestId: REQUEST_ID }, body: {} };

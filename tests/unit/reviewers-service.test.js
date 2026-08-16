@@ -180,7 +180,7 @@ describe('getReviewers', () => {
     expect(out.proposals[0].reviewDeadline).toBe('2026-09-09');
   });
 
-  test('chunk boundary: 26 distinct person ids chunk both the reviewer and researcher OR-chains at 25, first call gets ids 0-24 in order, second gets id 25', async () => {
+  test('chunk boundary: 26 distinct person ids yield EXACTLY 2 total queryReviewers calls (merged read), first call gets ids 0-24 in order, second gets id 25, and every call select includes both former person-only and researcher-only fields', async () => {
     getRequestById.mockResolvedValueOnce({
       akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
@@ -197,20 +197,143 @@ describe('getReviewers', () => {
 
     await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
 
-    // Both fetchPotentialReviewers (wmkf_name select) and fetchResearchersByPerson
-    // (wmkf_primaryaffiliation select) run their own two-chunk loop over the same
-    // personIds; disambiguate by select since the two loops interleave under Promise.all.
-    const reviewerCalls = queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_name'));
-    const researcherCalls = queryReviewers.mock.calls.filter((c) => c[0].select.includes('wmkf_primaryaffiliation'));
-    expect(reviewerCalls).toHaveLength(2);
-    expect(researcherCalls).toHaveLength(2);
-    for (const calls of [reviewerCalls, researcherCalls]) {
-      expect(calls[0][0].filter.split(' or ')).toEqual(
-        personIds.slice(0, 25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
-      );
-      expect(calls[1][0].filter.split(' or ')).toEqual(
-        personIds.slice(25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
-      );
+    // Stage 2 read coalescing collapsed the former person + researcher sibling
+    // reads into ONE chunked read over the same entity/filter/select. An
+    // exact call count of 2 fails if the duplicate pair ever returns.
+    expect(queryReviewers.mock.calls).toHaveLength(2);
+    expect(queryReviewers.mock.calls[0][0].filter.split(' or ')).toEqual(
+      personIds.slice(0, 25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+    );
+    expect(queryReviewers.mock.calls[1][0].filter.split(' or ')).toEqual(
+      personIds.slice(25).map((id) => `wmkf_potentialreviewersid eq ${id}`),
+    );
+    for (const call of queryReviewers.mock.calls) {
+      expect(call[0].select).toEqual(expect.stringContaining('wmkf_name'));
+      expect(call[0].select).toEqual(expect.stringContaining('wmkf_primaryaffiliation'));
     }
+  });
+
+  test('single-chunk exact count: 2 person ids → exactly 1 queryReviewers call', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+      { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-b', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    expect(queryReviewers).toHaveBeenCalledTimes(1);
+  });
+
+  test('empty person-id set (no suggestion has a _wmkf_potentialreviewer_value) → queryReviewers never called', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: null, wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    expect(queryReviewers).not.toHaveBeenCalled();
+  });
+
+  test('projection completeness: merged select contains every field from both former split selects', async () => {
+    const FORMER_PERSON_SELECT = ['wmkf_potentialreviewersid', 'wmkf_name', 'wmkf_emailaddress', 'wmkf_organizationname'];
+    const FORMER_RESEARCHER_SELECT = ['wmkf_potentialreviewersid', 'wmkf_primaryaffiliation', 'wmkf_website', 'wmkf_hindex', 'wmkf_totalcitations'];
+
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    const actualSelectFields = queryReviewers.mock.calls[0][0].select.split(',');
+    for (const field of [...FORMER_PERSON_SELECT, ...FORMER_RESEARCHER_SELECT]) {
+      expect(actualSelectFields).toContain(field);
+    }
+  });
+
+  test('hydration equivalence: a merged record hydrates the reviewer DTO exactly as the two split records used to', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+      { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-missing', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+    queryReviewers.mockResolvedValueOnce({
+      records: [{
+        wmkf_potentialreviewersid: 'person-a',
+        wmkf_name: 'Dr. A',
+        wmkf_emailaddress: 'a@example.com',
+        wmkf_organizationname: 'Fallback Org',
+        wmkf_primaryaffiliation: 'Primary Affiliation',
+        wmkf_website: 'https://example.com',
+        wmkf_hindex: 12,
+        wmkf_totalcitations: 345,
+      }],
+    });
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    const found = out.proposals[0].reviewers.find((r) => r.suggestionId === IDS[0]);
+    expect(found).toMatchObject({
+      name: 'Dr. A',
+      email: 'a@example.com',
+      affiliation: 'Primary Affiliation', // prefers wmkf_primaryaffiliation over wmkf_organizationname
+      website: 'https://example.com',
+      hIndex: 12,
+      totalCitations: 345,
+    });
+
+    const missing = out.proposals[0].reviewers.find((r) => r.suggestionId === IDS[1]);
+    expect(missing).toMatchObject({
+      name: null,
+      affiliation: null,
+      email: null,
+      website: null,
+      hIndex: null,
+      totalCitations: null,
+    });
+  });
+
+  test('affiliation fallback: missing wmkf_primaryaffiliation falls back to wmkf_organizationname', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+    queryReviewers.mockResolvedValueOnce({
+      records: [{
+        wmkf_potentialreviewersid: 'person-a',
+        wmkf_name: 'Dr. A',
+        wmkf_emailaddress: 'a@example.com',
+        wmkf_organizationname: 'Fallback Org',
+      }],
+    });
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+
+    expect(out.proposals[0].reviewers[0].affiliation).toBe('Fallback Org');
+  });
+
+  test('merged-read rejection propagates untyped (fail-hard preserved)', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+    queryReviewers.mockRejectedValueOnce(new Error('dataverse 500'));
+
+    await expect(getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' }))
+      .rejects.toThrow('dataverse 500');
   });
 });

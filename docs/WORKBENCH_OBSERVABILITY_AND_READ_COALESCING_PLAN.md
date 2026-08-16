@@ -49,9 +49,10 @@ formula-based; T2 moved to completed history; T1 is uniformly closed.
 The audit found **zero per-dependency timing instrumentation** in the staff path (grep-verified
 negative, re-verified 2026-08-15: no middleware, no correlation header handling, one ALS in the repo
 and it is the DAL restriction context). It also found a **source-certain** redundant-read pattern:
-per reviewer-tab action, three sibling person-read pairs run the same `wmkf_potentialreviewers`
+per reviewer-tab action, three sibling person-read pairs ran the same `wmkf_potentialreviewers`
 id-filtered query twice with disjoint `$select` (see Stage 2 for the exact chunk-aware census; the
-earlier fixed "×6 across 3 routes" phrasing was not a valid count). And it found that the broad
+earlier fixed "×6 across 3 routes" phrasing was not a valid count; the pairs were merged by the
+Stage 2 branch implementation — see the Stage 2 status header). And it found that the broad
 post-mutation refreshes are **deliberate fixes for prior correctness bugs** (S213, S400/S401).
 
 Conclusion: measure first, then remove certain-avoidable work behind stable seams, and only expand
@@ -570,11 +571,23 @@ recorded as such rather than manufactured.
 
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
 
-**Status: AUTHORIZED by the owner on 2026-08-15; not yet implemented.** Build in a fresh Tier-2
-worktree from post-Stage-1 `main`. The open 48-hour Track A watch runs concurrently; sparse organic
-traffic and the calendar duration are not prerequisites, but an actual Track A stop condition
-(~50,000 telemetry events/day, platform throttling/truncation, or visible log cost) pauses promotion
-until resolved.
+**Status: IMPLEMENTED on `codex/claude-workbench-read-coalescing-stage2` (base `ab4a87b8`,
+characterization pin `32030b50`, implementation `1b64a0da`, adversarial-review closure commits
+following on the same branch) on 2026-08-15; NOT merged, NOT deployed, Production after-baseline
+NOT run.** Codex completed the independent read-only review with no runtime defect; three bounded
+documentation/comment corrections were applied on the branch. An explicit owner merge decision is
+pending. Implementation record:
+`docs/audits/claude-workbench-read-coalescing-stage2-implementation-record-2026-08-15.md`.
+The census and contract below are preserved as the authorized work order; **every `file:line`
+reference in this Stage 2 section is a PRE-MERGE anchor** (the state the characterization commit
+pinned) and no longer resolves against the merged services. Post-merge state: `fetchResearchersByPerson`
+is deleted in both services; the surviving `const CHUNK = 25` sites in the three census files are
+`reviewers-service.js:510`, `my-candidates-service.js:392,408` (the latter `fetchApplicantAkas`),
+and `decline-referrals-service.js:45`; the fail-soft `aggregateReviewHistory` catch sits at
+`my-candidates-service.js:175-178` and `projectRemovedCandidates` at `:426`. The open 48-hour Track A
+watch runs concurrently; sparse organic traffic and the calendar duration are not prerequisites,
+but an actual Track A stop condition (~50,000 telemetry events/day, platform
+throttling/truncation, or visible log cost) pauses promotion until resolved.
 
 **Why the original request-scoped-cache design was dropped (Opus P1-1, unchanged):** the
 duplicate-read contributors are separate HTTP requests with separate `withDalContext` scopes, and
