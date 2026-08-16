@@ -218,7 +218,14 @@ describe('workbench route correlation wiring', () => {
       const res = response();
       await handler({ method: 'GET', query: { mode: 'proposals' } }, res);
 
-      return { status: res.statusCode, body: res.body, logSpy };
+      // Snapshot and restore before the next run. Calling jest.spyOn again
+      // while the first spy is still installed returns the same mock object,
+      // which would make the normal-vs-broken call-count comparison
+      // tautological because both results would observe the combined calls.
+      const logCalls = logSpy.mock.calls.map((call) => [...call]);
+      const logResults = [...logSpy.mock.results];
+      logSpy.mockRestore();
+      return { status: res.statusCode, body: res.body, logCalls, logResults };
     }
 
     const normal = await runOnce({ breakLogging: false });
@@ -242,11 +249,11 @@ describe('workbench route correlation wiring', () => {
     // meaningful invariant is instead: every emission attempt made in the
     // normal run was also attempted (and threw, and was swallowed) in the
     // broken run — same call count — while status/body stayed identical.
-    expect(broken.logSpy.mock.calls.length).toBe(normal.logSpy.mock.calls.length);
-    expect(broken.logSpy.mock.calls.length).toBeGreaterThan(0);
-    expect(broken.logSpy.mock.results.some((r) => r.type === 'throw')).toBe(true);
+    expect(broken.logCalls.length).toBe(normal.logCalls.length);
+    expect(broken.logCalls.length).toBeGreaterThan(0);
+    expect(broken.logResults.some((r) => r.type === 'throw')).toBe(true);
 
-    const normalEvents = normal.logSpy.mock.calls
+    const normalEvents = normal.logCalls
       .map((c) => c[0])
       .filter((l) => typeof l === 'string')
       .map((l) => { try { return JSON.parse(l); } catch { return null; } })

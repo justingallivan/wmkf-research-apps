@@ -3,7 +3,7 @@ title: Workbench Observability Stage 1 — Implementation and Adversarial-Review
 domain: architecture
 kind: audit
 status: draft
-summary: "Point-in-time record of the Stage 1 observability implementation on codex/claude-workbench-observability-stage1: invariant table, builder assignments, verification results, and Opus adversarial-review dispositions."
+summary: "Point-in-time record of the Stage 1 observability implementation on codex/claude-workbench-observability-stage1: invariants, builder assignments, Opus dispositions, Codex independent review, and the owner-amended measurement program."
 canonical: false
 cataloged: 2026-08-15
 last_verified: 2026-08-15
@@ -210,4 +210,29 @@ both reviewers' probes.
 - **Not performed (per authorization):** Stage 2 items, merge, deployment, production
   measurement, production data access, durable persistence, Vercel CLI housekeeping. No
   DEVELOPMENT_LOG milestone added — the repo records milestones on merge/ship, and this
-  branch is unmerged pending Codex independent read-only review.
+  branch was unmerged and pending Codex independent read-only review at this closeout checkpoint.
+
+## Codex independent review and owner measurement amendment (2026-08-15)
+
+Codex independently re-ran the six focused suites (**124/124**), production build, post-build
+`.next/static` marker scan (zero telemetry/`node:async_hooks` markers), typecheck, lint,
+Dataverse-access gate + self-test, API-route gate + self-test, applicable documentation gates +
+self-tests, and `git diff --check`; all passed. The review found no runtime, security, or contract
+blocker and recommended merge with two P3 cleanups, both applied on this branch:
+
+1. The route characterization test now snapshots and restores each `console.log` spy before the
+   next run. Previously both result objects referenced Jest's same reused spy, making the
+   normal-vs-broken call-count comparison tautological even though the response-equivalence and
+   dedicated seam tests remained valid.
+2. `docs/SECURITY_OPERATING_PLAN.md` now states UUID optionality precisely: `eventId` is universal;
+   `correlationId` is additionally present on the three correlated target routes.
+
+The owner also confirmed that dormant campaign surfaces may see no organic activity for months.
+The plan's former `≥20 requests per route within two calendar weeks` Stage 2 prerequisite
+conflicted with the active campaign-cadence memory and is withdrawn. Measurement now separates:
+(A) a passive 48-hour app-wide operational-safety check; (B) a deliberate signed-in **GET-only**
+before/after baseline over representative existing requests, with production mutations prohibited;
+and (C) optional organic latency evidence that never blocks Stage 2 and must be reported as
+insufficient when sparse. The Deferred Data Plane remains gated on genuine organic latency
+evidence. Stage 2, merge, deployment, and measurement remain unperformed and separately
+owner-controlled.

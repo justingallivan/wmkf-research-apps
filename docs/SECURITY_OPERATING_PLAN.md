@@ -202,7 +202,8 @@ only Workbench routes; non-HTTP callers (cron, cold start, `scripts/`) emit with
 `correlationId`/`routeName` by design.
 
 PII/secret contract: the event carries only closed-set literals (`dependency`,
-`resourceClass`, `operation`, `outcome`, `statusClass`), a duration, and two random UUIDs.
+`resourceClass`, `operation`, `outcome`, `statusClass`), a duration, a random event UUID,
+and — for the three correlated target routes — a separate random correlation UUID.
 Raw URLs, query strings, path segments, entity ids, filenames, tenant identifiers,
 signed-URL material, tokens, headers, and bodies are never emitted; classifiers fail closed
 to `'unknown'` rather than fall through to raw input, and error classification reads only
