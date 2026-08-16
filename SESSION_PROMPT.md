@@ -1,12 +1,14 @@
-# Session 435 Prompt: Stage 1 Implemented and Converged — Codex Independent Review Next
+# Session 436 Prompt: Stage 1 Codex-Reviewed — Owner Merge Decision Next
 
-## Session 434 Summary
+## Session 435 Summary
 
-Session 434 implemented Workbench Observability Stage 1 on
-`codex/claude-workbench-observability-stage1` (base `31041461`), in the dedicated worktree,
-orchestrated by Claude Fable with three Sonnet builders (disjoint file ownership), two
-independent Opus adversarial reviewers, one bounded Sonnet remediation pass, and Opus delta
-re-reviews to full convergence. The branch is pushed and synchronized; the worktree is clean.
+Codex completed the independent review of Workbench Observability Stage 1 on
+`codex/claude-workbench-observability-stage1` (base `31041461`). No runtime, security, or contract
+blocker was found; merge is recommended. Two P3 cleanups and the owner-amended measurement program
+landed in `60b5aa1`: the route characterization test now compares separate console-spy snapshots,
+the UUID documentation reflects optional correlation, and the former passive 20-request/two-week
+Stage 2 prerequisite is replaced by a passive 48-hour safety track plus a controlled GET-only
+before/after baseline. The branch is pushed and synchronized; the worktree is clean.
 **Not performed:** Stage 2 items, merge, deployment, production measurement, durable
 persistence, production data access, Vercel CLI housekeeping.
 
@@ -32,16 +34,23 @@ persistence, production data access, Vercel CLI housekeeping.
      rests on reachability (bundle-scan verified), not the require pattern; `classifyOutcome`
      unwraps `error.cause.code` for raw Node fetch errors; plan validator now accepts the
      omitted-`statusClass` `http_error` deviation.
-3. **Verification green on final HEAD `930bd082`.**
+3. **Codex independent review closed.**
+   - Fresh review found no runtime/security blocker and independently passed the focused suites,
+     production build, client-bundle marker scan, typecheck, lint, transport/route gates, and doc
+     gates.
+   - P3 test fix: normal and broken-emitter runs now snapshot distinct Jest spies before parity is
+     asserted. P3 doc fix: every event has `eventId`; only correlated target-route events also have
+     `correlationId`.
+4. **Verification green through `60b5aa1`.**
    - Six observability suites 124/124; full unit+integration 8173/8175 — the only 2 failures
      are the known baselines (`reconcile-probe-entity-set-count`,
      `notification-trust-model-pushup`), reproduced identically on the pristine base
      `31041461` in the main checkout.
    - `check:dataverse-access-layer`(+self-test), `check:types`, `check:api-routes`(+self-test),
      lint, doc gates(+self-tests), `git diff --check`, and the production build all PASS.
-4. **Durable docs reconciled (narrow sweep over the changed facts).**
-   - Plan: status header (Stage 1 implemented on branch, pending review), validator
-     amendment, emission-scope fidelity notes.
+5. **Durable docs reconciled (Mode A sweep over the changed facts).**
+   - Plan: Stage 1 is implemented and independently reviewed; validator amendment,
+     emission-scope fidelity notes, and owner-amended measurement program are current.
    - `docs/SECURITY_OPERATING_PLAN.md`: new Workbench Dependency Telemetry watch item.
    - `docs/SERVICE_AND_UTILITY_CATALOG.md`: `lib/observability/` section.
    - Implementation/adversarial-review record created (see Key Files).
@@ -53,19 +62,18 @@ persistence, production data access, Vercel CLI housekeeping.
 - `bd986b68` — Apply Opus adversarial-review remediations and reconcile Stage 1 docs
 - `7e384ec9` — Close Opus delta re-review findings
 - `930bd082` — Record Stage 1 convergence and closeout
+- `670ac6d9` — Session 435 prompt / Claude handoff
+- `60b5aa1` — Close Codex P3 findings and amend the measurement program
 
 ## Next Items
 
 ### Verified Open
 
-1. **Codex independent read-only review of `codex/claude-workbench-observability-stage1`.**
-   Evidence: owner work order (Session 434) names this as the next action; branch pushed at
-   `930bd082`. Provide Codex the implementation record and the plan; review is read-only.
-2. **Two pre-existing full-unit failures on `main`.**
+1. **Two pre-existing full-unit failures on `main`.**
    Evidence: reproduced this session on pristine `31041461` (main checkout, clean tree):
    `reconcile-probe-entity-set-count` (Atlas count drift 724 vs 790) and
    `notification-trust-model-pushup`. Unrelated to Stage 1.
-3. **Security-operating/documentation backlog.**
+2. **Security-operating/documentation backlog.**
    Evidence: carried from Sessions 430/433 — tracked-secret inventory drift and stale derived
    doc counts. (The formerly-proposed `check:trust-boundary-guid` / `check:status-enum-parity`
    backstops now exist as passing gates — verified via `package.json` and this session's
@@ -73,10 +81,15 @@ persistence, production data access, Vercel CLI housekeeping.
 
 ### Owner Decision Needed
 
-1. **Stage 1 promotion (merge) and measurement-window opening.**
+1. **Stage 1 promotion (merge) and owner-amended measurement program.**
    Evidence: plan Tier 2; campaign window/release posture `[NEEDS OWNER]`; Codex review is the
-   gate before merge. At window start: record `vercel --version`, verify log retention and the
-   unfiltered `--json` record shape, preflight against a known emitted event (plan workflow).
+   gate before merge. The first 48 hours are a passive app-wide volume/safety check. Because
+   Reviewer Find runs about twice per year, Stage 2 is not gated on 20 organic requests per route:
+   capture a deliberate signed-in GET-only baseline over representative existing requests, with
+   no PATCH/DELETE/dismiss/merge/send action, then repeat the same fixtures after Stage 2. Organic
+   latency remains optional evidence and must be labeled insufficient when sparse. At window
+   start: verify log retention and the unfiltered JSON record shape and preflight against a known
+   emitted event (plan workflow).
 2. **`.next/static` marker-scan CI gate for the browser-import contract.**
    Evidence: Opus finding A-1 — the production build proves reachability today only as a
    point-in-time scan; a scan gate is a new gate surface deliberately not added in Stage 1.
@@ -123,7 +136,7 @@ persistence, production data access, Vercel CLI housekeeping.
 ## Testing
 
 ```bash
-# Stage 1 branch verification (all green at 930bd082)
+# Stage 1 branch verification (all green through 60b5aa1)
 npx jest tests/unit/request-correlation.test.js tests/unit/observability-event-contract.test.js \
   tests/unit/dynamics-http-observability.test.js tests/unit/graph-service-observability.test.js \
   tests/unit/dataverse-client-observability.test.js tests/unit/workbench-route-correlation.test.js
