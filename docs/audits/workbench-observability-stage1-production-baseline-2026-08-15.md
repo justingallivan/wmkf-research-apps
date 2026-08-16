@@ -24,8 +24,9 @@ related:
 - **Smoke:** a signed-in staff session loaded the Workbench dashboard and existing-request detail,
   Find, and Track views. Only navigation and GET/read behavior were exercised. No PATCH, DELETE,
   dismiss, merge, send, selection, status change, or other production mutation was performed.
-- **Scope:** this is the Stage 1 before-baseline and opening preflight, not Stage 2 authorization and
-  not evidence of organic-user latency.
+- **Scope:** this is the Stage 1 before-baseline and opening preflight, not itself the later Stage 2
+  authorization and not evidence of organic-user latency. The subsequent owner decision is recorded
+  below.
 
 No request number, Dataverse GUID, reviewer/applicant name, email, filename, response body, URL
 query, or other business identifier is retained in this report.
@@ -109,9 +110,11 @@ Track A remains open until 2026-08-18 00:53:40Z and measures validated telemetry
 malformed events, extraction truncation, unexpected classifications/outcomes, and visible log cost.
 The ~50,000 telemetry-events/day stop/re-scope threshold remains in force.
 
-Stage 2 remains unauthorized. Its eventual after-baseline must repeat the same available safe
-strata and compare the `wmkf_potentialreviewerses` call counts against the formula; it must not use
-repeated artificial requests to claim organic latency improvement.
+The owner authorized Stage 2 after reviewing this controlled baseline. Track A remains open in
+parallel and is not a calendar or organic-traffic prerequisite; an actual named stop condition still
+pauses promotion. The Stage 2 after-baseline must repeat the same available safe strata and compare
+the `wmkf_potentialreviewerses` call counts against the formula; it must not use repeated artificial
+requests to claim organic latency improvement.
 
 ## Evidence verdict
 
@@ -122,5 +125,5 @@ repeated artificial requests to claim organic latency improvement.
 - Three target-route before-baseline contracts: **VERIFIED** for the three available strata above.
 - More-than-25-id fixture: **UNKNOWN / unavailable without manufacturing state**.
 - 48-hour whole-app volume and cost posture: **OPEN** pending Track A completion.
-- Stage 2 readiness: **PARTIAL** — source-certain call-count baseline exists, but Track A is still
-  open and owner authorization is still required.
+- Stage 2 readiness: **AUTHORIZED / READY TO BUILD** — source-certain call-count baseline exists;
+  Track A remains an independent concurrent safety watch unless a named stop condition fires.

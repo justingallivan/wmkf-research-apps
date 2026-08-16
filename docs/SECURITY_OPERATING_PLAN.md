@@ -192,7 +192,9 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 Status: Stage 1 is merged and Production-live at `main` merge `30ed5fe0` / deployment
 `dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB`; the passive 48-hour measurement window opened at
-2026-08-16 00:53:40Z and remains active. Stage 2 is not authorized.
+2026-08-16 00:53:40Z and remains active. Stage 2 read coalescing is owner-authorized but not yet
+implemented; Track A continues concurrently and blocks it only if a named telemetry stop condition
+actually fires.
 
 Every server-side call through the three instrumented egress seams
 (`lib/services/dynamics/http.js`, `lib/services/graph-service.js`,

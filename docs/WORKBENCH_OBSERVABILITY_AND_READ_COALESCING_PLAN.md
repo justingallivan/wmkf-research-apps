@@ -22,8 +22,9 @@ related:
 **Status: Stage 1 merged to `main` at `30ed5fe0` and deployed to Production as
 `dpl_AEHShYKKSb4WxeuxkUZgMRbLp3kB` (READY 2026-08-16 00:53:40Z); the custom application domain was
 verified to resolve to that exact deployment. The passive 48-hour safety window and controlled
-GET-only before-baseline opened 2026-08-15. Stage 2 and the Deferred section remain NOT
-authorized.**
+GET-only before-baseline opened 2026-08-15. Stage 2 was authorized by the owner on 2026-08-15
+after the controlled baseline; Track A continues concurrently and blocks only if one of its named
+stop conditions actually fires. The Deferred section remains NOT authorized.**
 Implementation record:
 `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
 by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
@@ -568,6 +569,12 @@ recorded as such rather than manufactured.
   id cannot prove they came from one client-tab action. No action-level id is added in Stage 1.
 
 ## Stage 2 — Merge the disjoint-`$select` sibling reads
+
+**Status: AUTHORIZED by the owner on 2026-08-15; not yet implemented.** Build in a fresh Tier-2
+worktree from post-Stage-1 `main`. The open 48-hour Track A watch runs concurrently; sparse organic
+traffic and the calendar duration are not prerequisites, but an actual Track A stop condition
+(~50,000 telemetry events/day, platform throttling/truncation, or visible log cost) pauses promotion
+until resolved.
 
 **Why the original request-scoped-cache design was dropped (Opus P1-1, unchanged):** the
 duplicate-read contributors are separate HTTP requests with separate `withDalContext` scopes, and

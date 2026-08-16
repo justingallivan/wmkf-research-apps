@@ -18,7 +18,8 @@ related:
 **Date:** 2026-08-15
 **Branch:** `codex/claude-workbench-observability-stage1`, base `31041461`
 **Orchestrator:** Claude Fable; Sonnet builders A/B/C; two Opus adversarial reviewers.
-**Authorization:** Stage 1 only (owner work order, 2026-08-15). Stage 2 remains unauthorized.
+**Authorization:** Stage 1 owner work order and promotion complete. Stage 2 was separately
+authorized by the owner on 2026-08-15 after the controlled Production baseline; it is not yet built.
 The branch-closeout sections below preserve their point-in-time "not merged/deployed" state;
 current promotion and measurement evidence is recorded in the final section.
 
@@ -267,3 +268,7 @@ current base-Pro runtime-log retention is one day. Track A therefore requires da
 exports during its 48-hour window and remains open through 2026-08-18 00:53:40Z. Full evidence,
 fixture counts, limitations, and the corrected extraction contract are in
 `docs/audits/workbench-observability-stage1-production-baseline-2026-08-15.md`.
+
+**Owner decision after baseline:** Stage 2 may build while Track A continues. The 48-hour duration
+and sparse organic traffic are not prerequisites; only a named Track A stop condition pauses the
+Stage 2 work or promotion.
