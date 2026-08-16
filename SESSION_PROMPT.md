@@ -13,11 +13,11 @@ Raw-error cleanup, grantee policy, and tombstones were explicitly outside this c
 proxy/CSRF finding is only a conditional prerequisite for the parked applicant-intake product; it
 is not an active follow-up or backlog item.
 
-Raw-error cleanup is now implemented and adversarially self-reviewed separately on
-`codex/raw-error-message-cleanup` from base `fb735651`, awaiting an owner merge decision. The branch generalizes the 28
-audited literal 500/502 disclosures, adds the one missing server log, installs a whole-API AST
+Raw-error cleanup is merged and Production-live at main merge `51fc8472` / deployment
+`dpl_ErcYWaLLe74zi55MAsL65wJB75vk` (READY 2026-08-16 05:16Z). The promoted change generalizes the
+28 audited literal 500/502 disclosures, adds the one missing server log, installs a whole-API AST
 regression guard with self-tests, and converts the pricing-refresh composite-key NULs to escaped
-source notation without changing runtime delimiter semantics. It is not yet Production-live.
+source notation without changing runtime delimiter semantics.
 
 - Runtime merge: `06a615fcc9301bbd31d5b0a603ef585d588b12f6`
 - Promotion record: `897ac285`
@@ -50,9 +50,6 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
    fail-closed, and deduplicate only on `eventId`. Stop/re-scope at ~50,000 events/day, platform
    throttling/truncation, or visible log cost. Classify the unrelated Graph `drive-item` 4xx
    activity without attributing it to Stage 2.
-2. **Deliberately promote the raw-error cleanup.** Start from
-   `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`; the branch is ready
-   for the owner merge decision after its bounded review, response-inventory proof, and gates.
 
 ### Recently closed
 
@@ -65,6 +62,10 @@ fixture exists. Controlled timing is descriptive only; no organic-user latency c
    passed the new Origin guard before body validation. An authenticated Preview smoke was not
    pursued because its generated callback would require Azure redirect configuration; Preview is
    rarely used, and the owner accepted that testing limitation. No Azure/config change is planned.
+3. **Raw internal error responses cleaned.** Main merge `51fc8472` is Production-live on
+   `dpl_ErcYWaLLe74zi55MAsL65wJB75vk` (READY). The 28 audited unguarded literal 500/502 disclosures
+   now return generic text while retaining operator diagnostics; the whole-API AST regression guard
+   is active. See `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md`.
 
 ### Residual, not blockers
 

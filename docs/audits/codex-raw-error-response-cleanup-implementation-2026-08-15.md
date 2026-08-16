@@ -19,7 +19,7 @@ related:
 Date: 2026-08-15  
 Branch: `codex/raw-error-message-cleanup`  
 Base: `fb735651`  
-Status: implemented and adversarially self-reviewed; not merged or deployed
+Status: merged and Production-live
 
 ## Scope and authoritative inventory
 
@@ -135,6 +135,15 @@ Optional members and `String(error|err|rawErr|e)` are now rejected and fixture-p
 
 ## Promotion posture
 
-This is campaign-sensitive runtime hardening, so it stays on its release branch until the owner's
-deliberate merge decision. No deployment or Production mutation is part of this implementation
-record.
+The owner authorized promotion. Branch commit `820dd5af` merged to `main` at `51fc8472` and pushed
+to origin. Vercel deployment `dpl_ErcYWaLLe74zi55MAsL65wJB75vk` reached READY at 2026-08-16
+05:16Z and attached the branded Production aliases.
+
+Promotion sweep addendum (Mode A): merge ancestry and origin synchronization verified the code on
+`main`; the deployment inspection independently verified the Production artifact and aliases.
+Three live durable surfaces contained seven pre-promotion status/next-action lines; all seven were
+STALE after promotion and were structurally reconciled here, in `docs/SECURITY_OPERATING_PLAN.md`,
+and in `SESSION_PROMPT.md`. Re-search found zero remaining live “awaiting merge,” “not deployed,”
+or “promote raw-error cleanup” claims. The dated source audit remains HISTORICAL. Claims: 3
+VERIFIED (main merge, origin push, READY Production deployment); 0 PARTIAL, PLANNED, ASSUMED,
+STALE-CONFLICT, or UNKNOWN. Remaining live STALE: 0. Verdict: RECONCILED for the promotion fact.

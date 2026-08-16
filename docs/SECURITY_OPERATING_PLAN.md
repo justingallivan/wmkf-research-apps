@@ -190,9 +190,9 @@ The application's Postgres database is provisioned via Vercel's Neon integration
 
 ### Raw Internal Error Responses
 
-Status: cleanup implemented and adversarially self-reviewed on
-`codex/raw-error-message-cleanup` from base `fb735651`; awaiting an owner merge decision. It is
-not yet Production-live.
+Status: merged to `main` at `51fc8472` and Production-live on deployment
+`dpl_ErcYWaLLe74zi55MAsL65wJB75vk` (READY 2026-08-16 05:16Z). The implementation branch was
+`codex/raw-error-message-cleanup`, based at `fb735651`.
 
 The 2026-08-15 auth/side-effect audit identified 28 literal 500/502 response sites that
 serialized an unexpected exception message: 7 superuser routes, 17 cron routes, 3 staff
