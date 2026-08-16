@@ -19,7 +19,7 @@ jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
 jest.mock('../../lib/dataverse/core/changeset.js', () => ({ runChangeset: jest.fn() }));
 jest.mock('../../lib/services/execute-prompt.js', () => ({ executePrompt: jest.fn() }));
 jest.mock('../../lib/services/workbench-proposal-documents.js', () => ({
-  getProposalText: jest.fn(),
+  getAiProposalNarrativeText: jest.fn(),
 }));
 jest.mock('../../lib/services/graph-service.js', () => ({
   GraphService: {

@@ -23,7 +23,7 @@ jest.mock('../../lib/services/execute-prompt.js', () => ({
   executePrompt: jest.fn(),
 }));
 jest.mock('../../lib/services/workbench-proposal-documents.js', () => ({
-  getProposalText: jest.fn(),
+  getAiProposalNarrativeText: jest.fn(),
 }));
 jest.mock('../../lib/services/graph-service.js', () => ({
   GraphService: {
@@ -49,7 +49,7 @@ import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-do
 import { runChangeset } from '../../lib/dataverse/core/changeset.js';
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { GraphService } from '../../lib/services/graph-service.js';
-import { getProposalText } from '../../lib/services/workbench-proposal-documents.js';
+import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import {
@@ -159,9 +159,9 @@ beforeEach(() => {
   etagVersion = 1;
   grantRequestAdapter.getById.mockResolvedValue(request);
   grantRequestAdapter.findByIds.mockResolvedValue({ records: [request] });
-  getProposalText.mockResolvedValue({
+  getAiProposalNarrativeText.mockResolvedValue({
     text: 'Proposal source material '.repeat(20),
-    filename: 'Proposal_1003001.pdf',
+    filename: 'ProposalNarrative_1003001.pdf',
   });
   getRequestSharePointBuckets.mockResolvedValue([{
     source: 'dynamics',
@@ -323,7 +323,7 @@ it('returns a Ready row without rerunning AI or overwriting SharePoint', async (
 
   const result = await generateInitialAssessment({ requestId: REQUEST_ID });
 
-  expect(getProposalText).toHaveBeenCalledWith(REQUEST_ID, '1003001');
+  expect(getAiProposalNarrativeText).toHaveBeenCalledWith(REQUEST_ID, '1003001');
   expect(result.reused).toBe(true);
   expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(executePrompt).not.toHaveBeenCalled();
@@ -331,13 +331,13 @@ it('returns a Ready row without rerunning AI or overwriting SharePoint', async (
   expect(requestDocumentAdapter.update).not.toHaveBeenCalled();
 });
 
-it('fails closed before persistence or AI when the canonical reviewer proposal is absent', async () => {
-  getProposalText.mockResolvedValue(null);
+it('fails closed before persistence or AI when the AI proposal narrative is absent', async () => {
+  getAiProposalNarrativeText.mockResolvedValue(null);
 
   await expect(generateInitialAssessment({ requestId: REQUEST_ID })).rejects.toMatchObject({
     httpStatus: 409,
     message:
-      'No usable canonical reviewer proposal was found at Reviewer Materials/Proposal_1003001.pdf.',
+      'No usable AI proposal narrative was found at AI Materials/ProposalNarrative_1003001.pdf.',
   });
   expect(requestDocumentAdapter.create).not.toHaveBeenCalled();
   expect(executePrompt).not.toHaveBeenCalled();
@@ -1223,7 +1223,7 @@ it('changes deterministic artifact identity when the authoritative cycle changes
     requestNumber: request.akoya_requestnum,
     title: request.akoya_title,
     institution: request.wmkf_organizationname,
-    proposalFilename: 'Proposal_1003001.pdf',
+    proposalFilename: 'ProposalNarrative_1003001.pdf',
     proposalText: 'Proposal source material '.repeat(20),
   };
   const d26 = buildInitialAssessmentIdentity({ ...base, cycleCode: 'D26' });

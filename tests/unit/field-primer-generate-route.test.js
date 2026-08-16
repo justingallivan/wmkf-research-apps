@@ -30,13 +30,13 @@ jest.mock('../../lib/services/field-primer-service', () => ({
   groundPrimerExperts: jest.fn(async (experts) => experts),
 }));
 jest.mock('../../lib/services/workbench-proposal-documents', () => ({
-  getProposalText: jest.fn(),
+  getAiProposalNarrativeText: jest.fn(),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { generateFieldPrimer } from '../../lib/services/field-primer-service';
-import { getProposalText } from '../../lib/services/workbench-proposal-documents';
+import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents';
 import { FIELD_PRIMER_ENVELOPE_SCHEMA, makeFieldPrimerLease } from '../../shared/utils/field-primer-envelope';
 import handler from '../../pages/api/field-primer/generate';
 
@@ -67,7 +67,7 @@ beforeEach(() => {
   DynamicsService.getRecord.mockReset();
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   generateFieldPrimer.mockReset();
-  getProposalText.mockReset();
+  getAiProposalNarrativeText.mockReset();
 });
 
 describe('POST /api/field-primer/generate — envelope inventory gap fill (Stage 5 Phase A)', () => {
@@ -156,7 +156,10 @@ describe('POST /api/field-primer/generate (requestId mode, grant-request adapter
       }
       return {};
     });
-    getProposalText.mockResolvedValue({ text: 'A'.repeat(60), filename: 'p.pdf' });
+    getAiProposalNarrativeText.mockResolvedValue({
+      text: 'A'.repeat(60),
+      filename: 'ProposalNarrative_1002900.pdf',
+    });
     generateFieldPrimer.mockResolvedValue({
       primer: { experts: [] }, model: 'claude-test', runId: 'run-1', promptName: 'field-primer', promptVersion: 1,
     });

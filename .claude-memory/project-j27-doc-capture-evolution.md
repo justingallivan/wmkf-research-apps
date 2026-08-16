@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: The D26 Proposal tab retains its Phase I display bridge; governed analysis requires the canonical Reviewer Materials proposal, while Reviewer Finder has one exact current-cycle fallback. The 1002788 artifact pilot proved mechanics only.
+description: The D26 Proposal tab retains its Phase I display bridge; Initial Assessment and Field Primer require the exact AI Materials narrative, while current-cycle Reviewer Finder remains separate.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-08-01 via source/tests, production deployment 84155a5a, signed-in Request 1003109 generation/retry/recovery, and Dataverse/SharePoint lineage readback
+last_verified: 2026-08-16 via owner direction, source/tests, and live read-only Request 1002788 narrative extraction; historical artifact mechanics via production readback
 ---
 
 ## Recall Rule
@@ -27,17 +27,24 @@ subfolder** and matches the cycle filenames `ProjectDescription.pdf`,
 `Project Budget spreadsheet.xlsx`; `Application Cover Page.docx` is excluded
 because its content comes from the Dataverse-derived top panel.
 
-**Governed proposal analysis is separate and canonical as of 2026-07-30.**
+**Governed proposal analysis has a separate internal input as of 2026-08-16.**
 Initial Assessment and Workbench Field Primer request mode require the exact
-active `Reviewer Materials/Proposal_{Request#}.pdf` file. They do not use the
-Proposal-tab `ProjectDescription.pdf` bridge, a raw Phase I export, an archive
-match, or a best-guess classifier. Missing or ambiguous exact input fails
-before model/result writes. Request `1003109` is the live-verified example.
+active `AI Materials/ProposalNarrative_{Request#}.pdf` file. They do not use the
+outbound reviewer package, Proposal-tab `ProjectDescription.pdf` bridge, a raw
+Phase I export, an archive match, or a best-guess classifier. Missing or
+ambiguous exact input fails before model/result writes. Request `1002788` is
+the live read-only resolver/extraction example; its earlier generated artifact
+still proves mechanics only because that run used an old Phase I document.
 Reviewer Finder is a separate staff discovery surface: its current-cycle
-default prefers that canonical file and falls back only to exactly one active
+default prefers the exact outbound reviewer package and falls back only to exactly one active
 `Phase I/ProjectDescription.pdf`; neither or ambiguity returns a server-listed
 picker before download/Blob write. The fallback does not alter the governed or
 external-reviewer contracts.
+
+For the next combined-submission cycle, Reviewer Finder is planned to consume
+a version of the clean AI narrative that includes the bibliography received at
+initial submission. The prompt already prioritizes named researchers and cited
+authors; the exact version/cutover contract remains future work.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 

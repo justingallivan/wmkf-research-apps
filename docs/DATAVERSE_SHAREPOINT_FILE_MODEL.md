@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-16
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -123,22 +123,38 @@ hood.
 The default proposal source for Initial Assessment and Workbench Field Primer
 request mode is the one exact active request file:
 
-`Reviewer Materials/Proposal_{Request#}.pdf`
+`AI Materials/ProposalNarrative_{Request#}.pdf`
 
 The file must be under the request's Dynamics-associated `akoya_request`
 SharePoint folder. An archive-only match, multiple active exact matches, a raw
-application export, or `Phase I/ProjectDescription.pdf` does not satisfy the
-contract; default automation fails before the model and before result
-persistence. Reviewer Finder's authenticated explicit `fileKey` remains a
-deliberate historical/ad-hoc staff override. Separately, Reviewer Finder's
-current-cycle default loader prefers the canonical file and falls back only to
-exactly one active `Phase I/ProjectDescription.pdf`; neither or ambiguity
-returns the server-listed picker before download/Blob write. This bounded
-staff-discovery compatibility rule does not change the governed writeup input
-or external reviewer visibility. The Workbench Proposal tab separately
-continues to display the D26 Phase I document slots.
+application export, `Reviewer Materials/Proposal_{Request#}.pdf`, or
+`Phase I/ProjectDescription.pdf` does not satisfy the contract; default
+automation fails before the model and before result persistence. Reviewer
+Finder remains a separate current-cycle surface: its authenticated explicit
+`fileKey` supports deliberate historical/ad-hoc staff selection, while its
+default loader prefers the exact outbound reviewer package and falls back only
+to exactly one active `Phase I/ProjectDescription.pdf`. Neither or ambiguity
+returns the server-listed picker before download/Blob write. The Workbench
+Proposal tab separately continues to display the D26 Phase I document slots.
 
-**[VERIFIED 2026-07-30 via live read-only Graph/Dataverse probe]** Request
+**[VERIFIED IN SOURCE 2026-08-16 via resolver tests and a read-only live
+Dataverse/Graph extraction]** Request `1002788` resolves exactly
+`AI Materials/ProposalNarrative_1002788.pdf` from the active
+Dynamics-associated request folder and returns non-empty proposal text. Field
+Primer preserves its existing stored-envelope behavior, so this source change
+applies to new generations and explicit regenerations rather than silently
+invalidating an existing primer.
+
+**[PLANNED for the next combined-submission cycle; owner direction
+2026-08-16]** Reviewer Finder should move to a version of this clean AI
+narrative that includes the proposal bibliography received at initial
+submission. The existing reviewer prompt prioritizes named researchers and
+cited authors, so the bibliography offers stronger proposal-grounded reviewer
+signals. The exact version/cutover contract remains future implementation; the
+current-cycle Reviewer Finder resolver is unchanged.
+
+**Historical proof for the superseded automated-input contract:** [VERIFIED
+2026-07-30 via live read-only Graph/Dataverse probe] Request
 `1003109` has the exact active file
 `Reviewer Materials/Proposal_1003109.pdf` in library `akoya_request`.
 Request `1002788`'s earlier Initial Assessment instead used an old Phase I

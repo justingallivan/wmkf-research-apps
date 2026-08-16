@@ -52,9 +52,11 @@ test environment. Request `1002788` became the authorized target. Generation,
 registry/pointer lineage, both consumer surfaces, native SharePoint version
 creation, and same-input retry mechanics passed on 2026-07-30. The source was
 an old Phase I proposal, so approved-input semantic proof did not pass.
-Automated request-bound analysis now requires the exact active
-`Reviewer Materials/Proposal_{Request#}.pdf`; Request `1003109` is the
-live-verified example. Normalized recovery hashing and future-run request
+Initial Assessment and Field Primer now require the exact active
+`AI Materials/ProposalNarrative_{Request#}.pdf`; Request `1002788` is the
+live read-only resolver/extraction example. Current-cycle Reviewer Finder and
+external reviewer release retain their separate Reviewer Materials contract.
+Normalized recovery hashing and future-run request
 linkage are deployed in production. Request `1003109` then production-proved
 the exact canonical input, a newly linked AI run, the Ready/Draft registry and
 request pointer, and exact-input no-duplicate reuse on deployment

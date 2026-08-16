@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-10
+last_verified: 2026-08-16
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -275,16 +275,31 @@ Initial Assessment. Each is a one-page Word document with this sequence:
    Plan**, **Team Expertise**, and **Foundation Opportunity**.
 
 The approved automated proposal input is exactly
-`Reviewer Materials/Proposal_{Request#}.pdf` in the active request's
+`AI Materials/ProposalNarrative_{Request#}.pdf` in the active request's
 Dynamics-associated `akoya_request` SharePoint folder. Initial Assessment and
 Workbench Field Primer request mode share that strict contract. They must fail
 before any model or result write when the exact active file is missing or
 ambiguous; they must not silently fall back to the D26 Proposal-tab
-`Phase I/ProjectDescription.pdf` display bridge. Reviewer Finder is a separate
-staff discovery surface: for the current cycle only, its default loader first
-prefers the same exact canonical file and then falls back to exactly one active
+`Phase I/ProjectDescription.pdf` display bridge or the outbound
+`Reviewer Materials/Proposal_{Request#}.pdf`. Reviewer Finder is a separate
+staff discovery surface: its current-cycle default loader remains the exact
+outbound reviewer package with a fallback to exactly one active
 `Phase I/ProjectDescription.pdf`. That bounded compatibility rule does not
 change the approved governed-artifact input or external reviewer visibility.
+
+**[VERIFIED IN SOURCE 2026-08-16 via focused tests and a read-only live
+Dataverse/Graph extraction]** Request `1002788` resolves
+`AI Materials/ProposalNarrative_1002788.pdf` and returns non-empty proposal
+text. Existing stored Field Primers remain cached until an explicit
+regeneration.
+
+**[PLANNED for the next combined-submission cycle; owner direction
+2026-08-16]** Reviewer Finder should key off a version of this clean narrative
+that also contains the bibliography collected at initial submission. The
+reviewer prompt already prioritizes researchers named in the proposal and
+authors from references/citations, so this is expected to improve
+proposal-grounded reviewer discovery. The current-cycle Reviewer Finder loader
+is intentionally unchanged.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a
@@ -997,6 +1012,14 @@ Owner-decided:
     population: accepted suggestion affiliation first, potential-reviewer
     affiliation fallback, explicit missing state, and no dependency on the
     linked Contact's `parentcustomerid`.
+46. on 2026-08-16 the owner separated internal AI input from the outbound
+    reviewer package: Initial Assessment and Field Primer now require
+    `AI Materials/ProposalNarrative_{Request#}.pdf`; current-cycle external
+    release and Reviewer Finder behavior remain unchanged; and
+47. for the next combined-submission cycle, the owner expects Reviewer Finder
+    to consume a version of that clean narrative containing the bibliography
+    received with initial submission, so cited authors become stronger
+    reviewer-discovery signals. Exact versioning and cutover remain future work.
 
 Still required:
 
