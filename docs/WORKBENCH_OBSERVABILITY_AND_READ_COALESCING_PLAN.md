@@ -49,9 +49,10 @@ formula-based; T2 moved to completed history; T1 is uniformly closed.
 The audit found **zero per-dependency timing instrumentation** in the staff path (grep-verified
 negative, re-verified 2026-08-15: no middleware, no correlation header handling, one ALS in the repo
 and it is the DAL restriction context). It also found a **source-certain** redundant-read pattern:
-per reviewer-tab action, three sibling person-read pairs run the same `wmkf_potentialreviewers`
+per reviewer-tab action, three sibling person-read pairs ran the same `wmkf_potentialreviewers`
 id-filtered query twice with disjoint `$select` (see Stage 2 for the exact chunk-aware census; the
-earlier fixed "×6 across 3 routes" phrasing was not a valid count). And it found that the broad
+earlier fixed "×6 across 3 routes" phrasing was not a valid count; the pairs were merged by the
+Stage 2 branch implementation — see the Stage 2 status header). And it found that the broad
 post-mutation refreshes are **deliberate fixes for prior correctness bugs** (S213, S400/S401).
 
 Conclusion: measure first, then remove certain-avoidable work behind stable seams, and only expand
