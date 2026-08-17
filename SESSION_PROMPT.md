@@ -1,133 +1,138 @@
-# Session 443 Prompt: Close Track A; Campaign May Proceed
+# Session 444 Prompt: Persist and Finish the Pre-Site Draft
 
-## Session 442 Summary
+## Session 443 Summary
 
-Session 442 completed the remaining bounded security follow-ups and removed the parked applicant
-intake pilot from the active queue. Workbench Stage 2 remains Production-live and verified under
-controlled conditions; its passive Track A safety window is the only required engineering
-carryover. The owner may begin the new campaign without waiting for Track A to close.
+Session 443 established the final-cycle Phase I/Phase II proposal-source rules, built and tested
+the Pre-Site Visit Word draft on `codex/ai-proposal-narrative-source`, published the governed v3
+prompt, and recorded the owner's Dataverse persistence direction. The feature branch has not been
+merged or deployed, and no Pre-Site Draft schema or business-data write path exists yet.
 
 ### What Was Completed
 
-1. **Origin and cron authentication hardening shipped**
-   - Production-mode allowed-origin validation now fails closed on missing/invalid configuration;
-     Preview may derive only from platform `VERCEL_URL` when fixed `NEXTAUTH_URL` is intentionally
-     absent.
-   - Both cron verifier variants use the shared constant-time comparison while preserving their
-     distinct development-bypass policies.
-   - Main merge `96d89c32` deployed READY as `dpl_9aLVHCXupik2CwXDgVrNzcFXXkaC`; a signed-in
-     same-origin empty PATCH reached body validation and returned the expected pre-write 400.
+1. **Canonical AI narrative source established**
+   - Initial Assessment and Field Primer use the exact
+     `AI Materials/ProposalNarrative_{Request#}.pdf` convention for this final two-phase cycle.
+   - The next-cycle Reviewer Finder requirement—use the narrative plus the newly available
+     bibliography to identify cited experts—remains parked for later implementation.
 
-2. **Raw internal error responses cleaned and shipped**
-   - All 28 audited unguarded literal 500/502 disclosures now return generic text while preserving
-     response status/shape, structured service errors, development-only diagnostics, and operator
-     logs/records/alerts.
-   - Added the missing `summarize-v2` file-load log and a whole-API Babel AST regression guard with
-     self-tests for ordinary/optional members, aliases, interpolation, and stringification.
-   - Replaced three literal pricing-refresh NUL bytes with escaped `\u0000` source notation without
-     changing runtime composite-key semantics.
-   - Main merge `51fc8472` deployed READY as `dpl_ErcYWaLLe74zi55MAsL65wJB75vk`; the reconciled
-     main head `2e562f75` subsequently deployed READY as `dpl_5nd2G3KqUqXyidnaQQKyBtLVU6uS`.
+2. **Pre-Site proposal core and Word renderer built on the feature branch**
+   - The proposal core combines the exact proposal narrative with read-only Dataverse request,
+     organization, budget, and personnel data and validates eight named output sections.
+   - The authenticated interim route renders a Word download from in-memory validated output; it
+     does not yet persist a business draft or artifact.
+   - Formatting fixes cover metadata alignment and spacing, the 1 pt Executive Summary divider,
+     first-page bullet spacing, and the stray pre-break paragraph.
+   - Personnel output is one paragraph, omits degrees, uses PI/co-PI, and underlines personnel
+     names in both the first-page overview and detailed section.
 
-3. **Atlas drift reconciled**
-   - A fresh read-only Dataverse `/$count` returned 793 `wmkf_appreviewersuggestion` rows at
-     `2026-08-16T04:47:14Z`; the canonical Atlas page and both active summaries were reconciled.
-   - The stale unit-test expectation remains one of the two documented main baseline failures; the
-     canonical count is not to be rolled back to satisfy it.
+3. **Governed prompt v3 published and tested**
+   - Sole-current prompt `pre-site-visit.proposal-core.generate` v3 has Dataverse id
+     `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` and model `claude-sonnet-4-6`; inherited runtime
+     settings were retained from v2.
+   - A controlled Request 1002379 direct application-LLM test used the exact live v3 prompt and
+     normal untrusted-input boundaries. It produced 574 combined Background/Methodology words and
+     145 Personnel words, with no degrees and correct PI/co-PI formatting.
+   - The test intentionally created no `wmkf_ai_run`: the local-to-Production Dataverse audit write
+     is interlocked, so this is not governed Production-run evidence. The accepted v2 Executor run
+     remains the latest governed run.
+   - The four-page visual inspection passed the requested name underlining. The final Methodology
+     sentence still spills to page four, and the Recommendation label/placeholder spacing remains
+     a separate minor template issue.
 
-4. **Applicant intake pilot explicitly parked**
-   - The June 2026 Phase II pilot was cancelled while WMKF evaluates Connor's GOApply
-     re-engineering. Existing `/apply` and `/api/intake/*` foundation code does not reactivate it.
-   - Proxy/CSRF launch prerequisites are therefore not current backlog items.
+4. **Dataverse persistence direction recorded**
+   - Current branch behavior remains pass-through-only: target kind `none`, in-memory rendering,
+     and the normal Executor's raw `wmkf_ai_run` audit are not an editable business record.
+   - Owner direction is Request parent → versioned Pre-Site Draft child → exact-version Word/PDF
+     artifacts. The eight generated sections are sibling editable Multiline Text columns on one
+     draft row, not one child row per section.
+   - An optional Multiline Text JSON snapshot may retain the exact validated Claude response, but
+     named columns remain the working representation for Dataverse forms, views, and Power
+     Automate. Existing Dataverse writeup/artifact tables must be inventoried before schema work.
 
 5. **Session evidence bookkeeping attempted**
-   - `report:claim-evidence-pilot -- --current` ran during `/stop`, but its local metadata state was
-     unavailable. No canonical observation row was added because no eligible report could be
-     established.
+   - `report:claim-evidence-pilot -- --current` ran during `/stop`, but local state was unavailable.
+     No canonical observation row was added.
 
-### Commits
+### Feature-Branch Commits
 
-- `1b6f71ce` — Harden origin and cron authentication checks
-- `96d89c32` — Merge origin and cron authentication hardening
-- `b9683d82` — Record auth hardening production promotion
-- `87718c94` — Reconcile reviewer suggestion Atlas count
-- `fb735651` — Keep parked intake work out of active backlog
-- `820dd5af` — Harden API error responses
-- `51fc8472` — Merge raw API error response cleanup
-- `2e562f75` — Record raw error cleanup production promotion
+- `badc0d1b` — Use AI proposal narrative for governed analysis
+- `2b0d0e0a` — Draft pre-site visit proposal core prompt
+- `739e2480` — Refine pre-site visit personnel and model ownership
+- `f10dff3f` — Harden pre-site prompt model publishing
+- `e16bfea9` — Build guarded pre-site proposal core renderer
+- `39f129ea` — Fix pre-site metadata table spacing
+- `cdd2d766` — Refine pre-site summary divider
+- `e77f44e6` — Make pre-site divider 1pt
+- `c979156c` — Add Pre-Site Visit Word draft download
+- `abda6686` — Use valid Pre-Site AI run source
+- `4048159a` — Validate Pre-Site proposal prompt output
+- `4b71fecf` — Fix Pre-Site first-page paragraph spacing
+- `2023671a` — Refine Pre-Site narrative and personnel output
+- `fd8dbfd7` — Record Pre-Site prompt v3 controlled render
+- `b19d27ee` — Underline personnel names in both summaries
 
 ## Next Items
 
 ### Verified Open
 
-1. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
+1. **Inventory Dataverse before proposing a Pre-Site schema.**
+   Read `docs/APPLICATION_STATE_ATLAS.md`, the relevant `docs/atlas/` pages, and the two design
+   documents listed below; probe existing writeup, artifact, and version records. Then use
+   `/contract-reconcile` across caller → persistence → renderer → artifact. No table name, column
+   name, status model, or writer is approved yet.
+
+2. **Review and deliberately promote the feature branch.**
+   `codex/ai-proposal-narrative-source` is 15 commits ahead of `main`; its focused tests, gates,
+   types, and webpack build passed, but the authenticated route is not Production-live.
+
+3. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
    17:53:40 PDT).**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` Track A and
-   `docs/SECURITY_OPERATING_PLAN.md` Workbench Dependency Telemetry watch item.
-   Perform the final read-only unfiltered export within the one-day retention window, flatten
-   `.logs[]`, validate v1 fail-closed, deduplicate only by `eventId`, and document whether any stop
-   condition fired. Classify the unrelated Graph `drive-item` 4xx activity without attributing it
-   to Stage 2. Track A is a safety observation, not a campaign-launch blocker.
+   Retain the Session 442 closeout contract in
+   `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`. This remains a safety observation,
+   not a campaign-launch blocker.
 
 ### Owner Decision Needed
 
-1. **Optional Stage 1 browser-bundle guards.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
-   `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`.
-   Decide only if desired whether to add a `.next/static` marker-scan CI gate and a browser-bundle
-   gate. Neither is required for the campaign or Track A closeout.
+1. **Accept the v3 page spill or tighten a v4 prompt.**
+   Decide whether the soft one-page Background/Methodology goal is adequate or whether to target
+   roughly 500–540 combined words and publish v4. The Recommendation spacing fix can proceed
+   independently of prompt content.
+
+2. **Optional Stage 1 browser-bundle guards.**
+   Retain the prior choice only if desired; these guards are unrelated to Pre-Site persistence and
+   are not required for the campaign or Track A closeout.
 
 ### Parked
 
-1. **Phase II applicant-intake portal.**
-   Evidence: main commit `fb735651` and the Session 442 owner decision.
-   Re-open only if the owner explicitly reactivates the product after the GOApply evaluation; only
-   then do proxy applicant-surface routing and intake CSRF become joint pre-launch prerequisites.
+1. **Next-cycle Reviewer Finder narrative-plus-bibliography sourcing.**
+2. **Phase II applicant-intake portal pending the GOApply evaluation.**
 
 ### Verify Before Acting
 
-1. **Further Workbench performance optimization.**
-   Evidence currently available: controlled Stage 2 after-baseline proves the read-count formula,
-   but no organic-user latency claim is authorized and no safe >25-id fixture exists.
-   Require Track A or later organic evidence before proposing cache invalidation or another
-   optimization stage.
+1. Do not implement schema from this handoff alone; inventory live Dataverse and reconcile the
+   ownership/write contract first.
+2. Do not treat the direct v3 Request 1002379 test as a governed Production Executor run.
 
 ### Do Not Reopen Without New Decision
 
-1. Authenticated Preview smoke coverage or Azure redirect configuration.
-2. Reviewer-merge organization-open access, grantee recipient override, or hard-delete tombstones.
-3. Decline-referrals person-read merging; no duplicate sibling read exists.
-4. Deferred Data Plane invalidation without genuine latency evidence.
+1. One child record per generated section; the working owner direction is one versioned draft row
+   with named section columns.
+2. Closed Session 442 security and applicant-intake items except where explicitly retained above.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A closeout contract and stop conditions |
-| `docs/audits/workbench-read-coalescing-stage2-production-after-baseline-2026-08-15.md` | Controlled Production after-baseline |
-| `docs/SECURITY_OPERATING_PLAN.md` | Current Production security posture and watch items |
-| `docs/audits/codex-origin-and-cron-auth-hardening-implementation-2026-08-15.md` | Auth hardening implementation record |
-| `docs/audits/codex-raw-error-response-cleanup-implementation-2026-08-15.md` | Raw-error cleanup and promotion evidence |
-| `tests/unit/api-error-response-hygiene.test.js` | Whole-API raw-error regression guard |
+| `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Pre-Site source, generation, and persistence direction |
+| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Dataverse/SharePoint draft and artifact ownership model |
+| `docs/APPLICATION_STATE_ATLAS.md` | Required entry point for live data ownership inventory |
+| `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` | Prompt and execution-audit contracts |
+| `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` | Branch, test, and promotion rules |
+| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A closeout contract |
 
 ## Testing
 
-Session 442 final security-cleanup evidence:
-
-```bash
-npx jest tests/unit tests/integration --runInBand --silent
-# 8232/8234; only the two documented main baseline failures
-
-npm run check:api-routes
-npm run check:api-routes:self-test
-npm run check:types
-npm run check:doc-currency
-npm run check:doc-currency:self-test
-npm run check:fact-consistency
-npm run check:fact-consistency:self-test
-```
-
-The focused raw-error suites, route/type/security/documentation gates, lint (0 errors), and the
-webpack production build passed. Standard Turbopack local build verification was blocked by the
-execution environment's local-worker port permission; both Vercel Production deployments reached
-READY.
+The feature branch passed focused Pre-Site unit and integration tests, type checking, prompt gates
+and self-tests, API-route gates and self-tests, documentation gates and self-tests, and a webpack
+production build. The rendered Request 1002379 Word draft received four-page visual inspection.
+Only the repository's previously documented dynamic-import build warnings remained.

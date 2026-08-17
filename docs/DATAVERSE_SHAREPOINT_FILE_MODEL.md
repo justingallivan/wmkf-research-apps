@@ -235,6 +235,20 @@ Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 
+**[OWNER DIRECTION 2026-08-16; SCHEMA NOT YET APPROVED OR BUILT.]** The working
+persistence model places versioned Pre-Site Draft rows beneath the Request. The
+eight proposal-core sections are sibling editable Multiline Text columns on a
+draft row, not eight child records. The row also carries prompt/run/source and
+template provenance. A separate Multiline Text JSON snapshot may preserve the
+exact validated Claude response for troubleshooting and reproducibility, but
+JSON is not the only working representation because Dataverse forms, views,
+and Power Automate need direct section access. `wmkf_ai_run` remains the
+append-only execution audit rather than the editable business record. Each
+rendered Word/PDF artifact links to the exact draft version used for rendering.
+Before schema work, probe the existing Dataverse writeup/artifact inventory and
+Atlas ownership contracts for a reusable record; the table name, field names,
+relationships, statuses, and writer remain undecided.
+
 The review-derived portion has two presentation channels over that same exact
 submitted-review population. Application/template code renders a named reviewer
 roster; `review-synthesis.generate` supplies anonymous observations. For each

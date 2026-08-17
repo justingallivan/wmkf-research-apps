@@ -349,6 +349,29 @@ The Pre-Site draft has two independently refreshable source layers:
    the template—not the model—renders reviewer names and affiliations. Contact
    `parentcustomerid` is not a prerequisite for the roster.
 
+#### Pre-Site Draft persistence direction
+
+**[OWNER DIRECTION 2026-08-16; SCHEMA NOT YET APPROVED OR BUILT.]** Treat the
+Request as the parent and each versioned Pre-Site Draft as one child row. Do
+not create one child row per generated section. The working Dataverse shape is
+one draft row with eight editable Multiline Text columns for the proposal-core
+sections (executive summary, impact overview, methodology overview, personnel
+overview, Keck funding rationale, background and impact, detailed methodology,
+and personnel details), plus prompt/run/source/template provenance. An optional
+Multiline Text JSON column may retain Claude's exact validated response as an
+immutable troubleshooting/reproducibility snapshot, but JSON is not the sole
+working copy: Dataverse views, forms, and Power Automate should consume the
+named columns directly. `wmkf_ai_run` remains an append-only execution audit,
+not the business-data source for an editable draft. Rendered Word/PDF artifacts
+link to the exact draft version that produced them.
+
+Before creating any table or column, inventory the existing Dataverse
+writeup/artifact tables and Atlas ownership pages to determine whether a
+suitable draft/version record already exists. Reconcile the full
+caller→persistence→renderer→artifact contract with `/contract-reconcile`; no
+schema name, relationship, status model, or write path was approved in this
+session.
+
 The two named prompt surfaces do not currently have the same runtime posture:
 
 - **[VERIFIED via
