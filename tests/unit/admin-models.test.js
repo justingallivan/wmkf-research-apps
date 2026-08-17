@@ -76,6 +76,8 @@ describe('GET /api/admin/models', () => {
         status: 'reviewed',
         supportsTemperature: true,
         supportsEffort: true,
+        supportsStructuredOutput: true,
+        maxOutputTokens: 128000,
       },
       pricing: {
         status: 'reviewed',

@@ -12,6 +12,7 @@ import {
   PROMPT_VARIABLES,
   PROPOSAL_CORE_KEYS,
   PROMPT_OUTPUT_SCHEMA,
+  REQUIRED_SYSTEM_ASSERTIONS,
 } from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
 const sampleProposalCore = Object.fromEntries(
@@ -50,9 +51,17 @@ test('keeps Dataverse personnel authoritative without assuming affiliations', ()
   expect(SYSTEM_PROMPT).toContain('The applicant institution is not automatically the affiliation of every investigator');
   expect(SYSTEM_PROMPT).toContain('Otherwise omit it');
   expect(SYSTEM_PROMPT).toContain('personnelDetails: One paragraph total');
+  expect(SYSTEM_PROMPT).toContain('personnelOverview: One paragraph');
   expect(SYSTEM_PROMPT).toContain('Do not insert paragraph breaks between people');
   expect(SYSTEM_PROMPT).not.toContain('One short paragraph per person');
   expect(SYSTEM_PROMPT).not.toContain('<u>');
+});
+
+test('exports the load-bearing caller assertions', () => {
+  expect(REQUIRED_SYSTEM_ASSERTIONS).toEqual([
+    expect.stringContaining('Use every personnel name and role exactly as supplied'),
+    expect.stringContaining('applicant institution is not automatically the affiliation'),
+  ]);
 });
 
 test('leaves runtime model selection to the governed prompt row', () => {
@@ -114,3 +123,20 @@ test('local validation rejects missing and injected sections', () => {
   expect(injectedResult.ok).toBe(false);
   expect(injectedResult.errors).toContain('$.proposalCore: unexpected key "staffRecommendation".');
 });
+
+test.each(['personnelOverview', 'personnelDetails'])(
+  'local validation rejects multiple paragraphs in %s',
+  (field) => {
+    const result = validateAiJson(
+      {
+        proposalCore: {
+          ...sampleProposalCore,
+          [field]: 'First paragraph.\n\nSecond paragraph.',
+        },
+      },
+      PROMPT_OUTPUT_SCHEMA.validationSchema,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain(`$.proposalCore.${field}: contains a forbidden text pattern.`);
+  },
+);

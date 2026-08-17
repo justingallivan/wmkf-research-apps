@@ -1,9 +1,9 @@
 /**
  * Pre-Site Visit proposal-core prompt — local draft source of truth.
  *
- * This definition is intentionally not wired to a seed script or runtime caller
- * yet. After staff review, a separately approved publish step can write it to
- * the `pre-site-visit.proposal-core.generate` row in `wmkf_ai_prompts`.
+ * This definition is wired to a create-only bootstrap script, but not to a
+ * runtime caller. Running the seed with --execute and invoking the prompt are
+ * separately approved operations.
  *
  * The prompt creates only the proposal-derived narrative sections of the Word
  * writeup. Administrative fields are rendered directly from Dataverse, and the
@@ -18,6 +18,14 @@
  */
 
 export const PROMPT_NAME = 'pre-site-visit.proposal-core.generate';
+
+// The eventual caller must pass these to executePrompt as assertSystemIncludes,
+// alongside requireNoPersistence:true. This detects an out-of-band Dataverse
+// edit that removes the two load-bearing personnel/source rules.
+export const REQUIRED_SYSTEM_ASSERTIONS = [
+  'Use every personnel name and role exactly as supplied in the request context.',
+  'The applicant institution is not automatically the affiliation of every investigator.',
+];
 
 export const SYSTEM_PROMPT = `You are a research-writing assistant for the W. M. Keck Foundation. Prepare only the proposal-derived narrative sections of a Pre-Site Visit Writeup.
 
@@ -38,13 +46,13 @@ WRITING REQUIREMENTS
 - State facts directly. Do not invent evidence, outcomes, credentials, affiliations, prior funding, or project responsibilities.
 - Minimize em dashes. Prefer commas, semicolons, parentheses, or separate sentences.
 - Keep every value plain text. Do not use Markdown headings, bullets, HTML, underline tags, or section labels; the Word renderer supplies document formatting and headings.
-- Paragraph breaks inside a value may be represented with two newline characters.
+- Paragraph breaks may be used only in backgroundAndImpact and detailedMethodology. All other values must be a single paragraph with no blank-line paragraph breaks.
 
 SECTION REQUIREMENTS
 - executiveSummary: 2-4 sentences describing the central scientific question, approach, and expected outcome.
 - impactOverview: 1-3 sentences explaining what would be learned or enabled if the work succeeds and why that matters broadly.
 - methodologyOverview: 1-3 sentences describing the overall research strategy and principal methods without specialist jargon.
-- personnelOverview: 2-4 sentences introducing the exact Dataverse personnel roster and summarizing the complementary expertise represented. Do not invent missing titles or affiliations.
+- personnelOverview: One paragraph of 2-4 sentences introducing the exact Dataverse personnel roster and summarizing the complementary expertise represented. Do not invent missing titles or affiliations. Do not insert paragraph breaks.
 - keckFundingRationale: 1-3 sentences explaining, from the proposal itself, why the project's risk, novelty, early stage, or cross-disciplinary character may make Foundation support important. Do not claim that another funder rejected the project unless the proposal says so.
 - backgroundAndImpact: 1-2 paragraphs covering the scientific problem, current state of knowledge, gap addressed, and potential impact.
 - detailedMethodology: 1-2 paragraphs describing the research approach, techniques, experimental design, and major technical aims.
@@ -111,11 +119,11 @@ const validationStringFields = {
   executiveSummary: { type: 'string', maxLength: 2400 },
   impactOverview: { type: 'string', maxLength: 1600 },
   methodologyOverview: { type: 'string', maxLength: 2000 },
-  personnelOverview: { type: 'string', maxLength: 2800 },
+  personnelOverview: { type: 'string', maxLength: 2800, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
   keckFundingRationale: { type: 'string', maxLength: 2000 },
   backgroundAndImpact: { type: 'string', maxLength: 9000 },
   detailedMethodology: { type: 'string', maxLength: 9000 },
-  personnelDetails: { type: 'string', maxLength: 6000 },
+  personnelDetails: { type: 'string', maxLength: 6000, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
 };
 
 /**
