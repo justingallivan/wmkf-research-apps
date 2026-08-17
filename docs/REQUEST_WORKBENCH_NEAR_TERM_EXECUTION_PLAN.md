@@ -340,9 +340,10 @@ structures can change without rewriting prior artifacts.
 
 ### Pre Site Visit input, regeneration, and template contract
 
-**[VERIFIED via owner decisions 2026-07-28 and local source/tests plus a
-read-only Request `1002379` probe on 2026-08-16; proposal-core producer and
-template renderer IMPLEMENTED LOCALLY, end-to-end document pipeline PARTIAL.]**
+**[VERIFIED via owner decisions 2026-07-28, local source/tests, live prompt
+readback, a read-only Request `1002379` probe, and a controlled model/render
+run on 2026-08-16; direct-download slice IMPLEMENTED LOCALLY, end-to-end
+durable document pipeline PARTIAL.]**
 The Pre-Site draft has two independently refreshable source layers:
 
 1. **Proposal-derived factual material.** Use the full proposal text with an
@@ -372,8 +373,8 @@ The two named prompt surfaces do not currently have the same runtime posture:
 - **[VERIFIED via
   `lib/services/pre-site-visit/proposal-core-service.js`,
   `lib/services/pre-site-visit/docx-renderer.js`, focused tests, retained
-  template render, and the read-only Request `1002379` source probe on
-  2026-08-16.]** The local producer now uses the exact
+  template render, live prompt readback, and controlled Request `1002379`
+  generation on 2026-08-16.]** The local producer uses the exact
   `AI Materials/ProposalNarrative_{Request#}.pdf`, supplies authoritative
   Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
   `pre-site-visit.proposal-core.generate` through the shared Executor with
@@ -382,11 +383,18 @@ The two named prompt surfaces do not currently have the same runtime posture:
   The Workbench now has an authenticated interim direct-download route and tab:
   the server performs the governed call, renders the tracked template, and
   streams the DOCX to the PD. The current Admin-published prompt row owns the
-  Claude model; callers cannot override it. A read-only live dry-run on
-  2026-08-16 returned `action=create version=1`, so the create-only prompt seed
-  has not been executed and no model call has run. The download is not a
-  durable artifact: no SharePoint upload, registry row, request pointer,
-  review-layer merge, or distribution workflow exists.
+  Claude model; callers cannot override it. Dataverse sole-current prompt v2
+  `1d276948-ed99-f111-b8db-70a8a59cded0` uses reviewed
+  `claude-sonnet-4-6`. The first controlled v1 run completed but failed the
+  document acceptance gate because summary overflow displaced the intended
+  page starts. Version-preserving publication of tighter overview limits
+  produced v2, and controlled Request `1002379` run
+  `5bd65180-ed99-f111-b8db-7ced8d6e2f44` then produced a four-page DOCX that
+  passed structural and rendered-page QA. These are local/test invocations
+  against live prompt/request data, not a deployed signed-in Workbench smoke.
+  The download remains non-durable: no SharePoint upload, registry row,
+  request pointer, business-field write, review-layer merge, or distribution
+  workflow exists.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.
@@ -739,10 +747,11 @@ leave the review with this contract:
 
 Decision order:
 
-1. **Pre Site Visit Writeup** — input and regeneration behavior are
-   owner-decided. Next freeze its calendar, first versioned Word template,
-   prompt/template compatibility contract, and artifact persistence/access
-   contract.
+1. **Pre Site Visit Writeup** — input and regeneration behavior, the first
+   versioned Word template, and the proposal-core prompt/template pair are
+   owner-decided and controlled-run verified. Next promote and signed-in smoke
+   the interim direct-download slice, then freeze the durable artifact
+   persistence/access contract and review-layer merge.
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
@@ -1041,9 +1050,11 @@ Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
-2. production approval/promotion of the locally implemented version-1 Pre-Site
-   Word template and proposal-core prompt, plus the still-unbuilt deterministic
-   reviewer roster and anonymous review-narrative merge;
+2. production promotion and signed-in Workbench smoke of the locally
+   implemented Pre-Site direct-download slice; the proposal-core prompt is
+   live at v2 and its controlled Request `1002379` document passed render QA,
+   while the deterministic reviewer roster, anonymous review-narrative merge,
+   SharePoint upload, and registry flow remain unbuilt;
 3. administrator verification of the target library's configured version
    limit, second-stage recycle recovery, applicable site/library Purview
    retention, and ordinary-editor least-privilege policy; stable-identity

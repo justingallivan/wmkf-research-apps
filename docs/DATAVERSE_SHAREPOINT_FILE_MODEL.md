@@ -249,11 +249,17 @@ It is drafted from the full proposal through the governed
 `pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
 of the retired Phase II summarizer while removing inferred administrative
 fields. Authoritative request metadata and the ordered PI/Co-PI roster come
-from Dataverse. **[VERIFIED IN SOURCE/TEST 2026-08-16; not production-live]**
-the guarded local producer and version-1 Word template renderer exist, and a
-read-only Request `1002379` probe resolved the exact narrative plus every
-template metadata field. The prompt bootstrap, model execution, route/UI,
-artifact upload/registry, and review-layer merge remain unexecuted/unbuilt.
+from Dataverse. **[VERIFIED IN SOURCE/TEST/LIVE CONTROLLED RUN 2026-08-16;
+application branch not production-live]** the guarded local producer,
+tracked Word template renderer, and authenticated direct-download route/UI
+exist. Request `1002379` resolved the exact narrative and every template
+metadata field. Sole-current prompt v2
+`1d276948-ed99-f111-b8db-70a8a59cded0` uses reviewed
+`claude-sonnet-4-6`; controlled run
+`5bd65180-ed99-f111-b8db-7ced8d6e2f44` produced a four-page DOCX that passed
+structural and rendered-page QA. The signed-in Workbench route remains
+unpromoted/unproven, and artifact upload/registry plus the review-layer merge
+remain unbuilt.
 Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.

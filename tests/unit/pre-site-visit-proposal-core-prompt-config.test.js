@@ -1,6 +1,6 @@
 /**
- * Pins the local draft contract for the Pre-Site Visit proposal-core prompt.
- * Publishing to Dataverse and executing Claude are separately approved steps.
+ * Pins the tracked bootstrap/recovery contract for the governed Pre-Site Visit
+ * proposal-core prompt.
  */
 
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
@@ -87,6 +87,22 @@ test('returns one strict pass-through proposalCore object', () => {
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.additionalProperties).toBe(false);
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.required).toEqual(PROPOSAL_CORE_KEYS);
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.additionalProperties).toBe(false);
+});
+
+test('enforces the overview-page length ceilings in native and local schemas', () => {
+  const expected = {
+    executiveSummary: 700,
+    impactOverview: 420,
+    methodologyOverview: 500,
+    personnelOverview: 520,
+    keckFundingRationale: 480,
+  };
+  for (const [field, maxLength] of Object.entries(expected)) {
+    expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.properties[field].maxLength)
+      .toBe(maxLength);
+    expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields[field].maxLength)
+      .toBe(maxLength);
+  }
 });
 
 test('local validation accepts the exact eight-section shape', () => {

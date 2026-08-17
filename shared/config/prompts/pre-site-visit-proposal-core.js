@@ -1,9 +1,9 @@
 /**
- * Pre-Site Visit proposal-core prompt — local draft source of truth.
+ * Pre-Site Visit proposal-core prompt — tracked bootstrap/recovery source.
  *
- * This definition is wired to a create-only bootstrap script, but not to a
- * runtime caller. Running the seed with --execute and invoking the prompt are
- * separately approved operations.
+ * This definition is wired to the version-preserving prompt seed and the
+ * Workbench producer. Dataverse owns the current published runtime version;
+ * this file remains the reviewed bootstrap/recovery contract.
  *
  * The prompt creates only the proposal-derived narrative sections of the Word
  * writeup. Administrative fields are rendered directly from Dataverse, and the
@@ -49,11 +49,11 @@ WRITING REQUIREMENTS
 - Paragraph breaks may be used only in backgroundAndImpact and detailedMethodology. All other values must be a single paragraph with no blank-line paragraph breaks.
 
 SECTION REQUIREMENTS
-- executiveSummary: 2-4 sentences describing the central scientific question, approach, and expected outcome.
-- impactOverview: 1-3 sentences explaining what would be learned or enabled if the work succeeds and why that matters broadly.
-- methodologyOverview: 1-3 sentences describing the overall research strategy and principal methods without specialist jargon.
-- personnelOverview: One paragraph of 2-4 sentences introducing the exact Dataverse personnel roster and summarizing the complementary expertise represented. Do not invent missing titles or affiliations. Do not insert paragraph breaks.
-- keckFundingRationale: 1-3 sentences explaining, from the proposal itself, why the project's risk, novelty, early stage, or cross-disciplinary character may make Foundation support important. Do not claim that another funder rejected the project unless the proposal says so.
+- executiveSummary: 2-4 sentences and 80-90 words describing the central scientific question, approach, and expected outcome.
+- impactOverview: 1-2 sentences and 35-55 words explaining what would be learned or enabled if the work succeeds and why that matters broadly.
+- methodologyOverview: 1-2 sentences and 45-65 words describing the overall research strategy and principal methods without specialist jargon.
+- personnelOverview: One paragraph of 2-3 sentences and 45-60 words introducing the exact Dataverse personnel roster and summarizing the complementary expertise represented. Do not invent missing titles or affiliations. Do not insert paragraph breaks.
+- keckFundingRationale: 1-2 sentences and 45-60 words explaining, from the proposal itself, why the project's risk, novelty, early stage, or cross-disciplinary character may make Foundation support important. Do not claim that another funder rejected the project unless the proposal says so.
 - backgroundAndImpact: 1-2 paragraphs covering the scientific problem, current state of knowledge, gap addressed, and potential impact.
 - detailedMethodology: 1-2 paragraphs describing the research approach, techniques, experimental design, and major technical aims.
 - personnelDetails: One paragraph total, regardless of the number of people. Introduce every person in the exact order supplied in the request context, using each person's exact name and role. Explain each person's relevant expertise and specific project contribution within that single paragraph. Include a title, department, degree, or affiliation only under the source-authority rules above. Do not insert paragraph breaks between people.
@@ -111,20 +111,23 @@ export const PROPOSAL_CORE_KEYS = [
   'personnelDetails',
 ];
 
-const jsonStringProperties = Object.fromEntries(
-  PROPOSAL_CORE_KEYS.map((key) => [key, { type: 'string' }]),
-);
-
 const validationStringFields = {
-  executiveSummary: { type: 'string', maxLength: 2400 },
-  impactOverview: { type: 'string', maxLength: 1600 },
-  methodologyOverview: { type: 'string', maxLength: 2000 },
-  personnelOverview: { type: 'string', maxLength: 2800, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
-  keckFundingRationale: { type: 'string', maxLength: 2000 },
+  executiveSummary: { type: 'string', maxLength: 700 },
+  impactOverview: { type: 'string', maxLength: 420 },
+  methodologyOverview: { type: 'string', maxLength: 500 },
+  personnelOverview: { type: 'string', maxLength: 520, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
+  keckFundingRationale: { type: 'string', maxLength: 480 },
   backgroundAndImpact: { type: 'string', maxLength: 9000 },
   detailedMethodology: { type: 'string', maxLength: 9000 },
   personnelDetails: { type: 'string', maxLength: 6000, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
 };
+
+const jsonStringProperties = Object.fromEntries(
+  Object.entries(validationStringFields).map(([key, value]) => [key, {
+    type: 'string',
+    maxLength: value.maxLength,
+  }]),
+);
 
 /**
  * Pass-through structured output. No request field is written: the caller gets

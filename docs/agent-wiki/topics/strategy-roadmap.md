@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-16
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -283,10 +283,13 @@ document inventory, and individual implementation plans do not establish priorit
   version-1 template renderer are local and tested; read-only Request `1002379`
   resolved the exact narrative and all template metadata. An authenticated
   Workbench tab and route now perform an interim direct DOCX download; focused
-  tests cover the binary response and stale-request cancellation. A live
-  read-only seed dry-run returned `action=create version=1`, so the prompt seed
-  and model call remain unexecuted. SharePoint upload/registry and the
-  review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
+  tests cover the binary response and stale-request cancellation. Dataverse
+  now has sole-current prompt v2 on reviewed `claude-sonnet-4-6`; controlled
+  Request `1002379` run `5bd65180-ed99-f111-b8db-7ced8d6e2f44` produced a
+  four-page DOCX that passed structural and rendered-page QA. The earlier v1
+  run remains append-only history after layout rejection. The branch and
+  signed-in Workbench route remain unpromoted; SharePoint upload/registry and
+  the review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
