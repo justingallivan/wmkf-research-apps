@@ -123,9 +123,13 @@ type but has no Pre-Site rows. The legacy `wmkf_sitevisit` activity and
 `akoya_request.wmkf_researchwriteuptype` classification are not suitable draft
 stores. Additive Wave 19 now specifies eight named Pre-Site proposal-core Memo
 fields, exact generated/input snapshots, render/source identity, and
-`akoya_request.wmkf_CurrentPreSiteVisit`. The wave is **not applied**; no live
-field, pointer, adapter selection, or writer exists yet. Exact design and
-deployment boundary: `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
+`akoya_request.wmkf_CurrentPreSiteVisit` plus
+`akoya_request.wmkf_CurrentFinalWriteup`. The wave is **not applied**; no live
+field, pointer, adapter selection, or writer exists yet. There is intentionally
+no Site Visit writeup pointer: staff observations remain direct edits in the
+Pre-Site Word workspace. Exact design and deployment boundary:
+`docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 ## Ownership
 
@@ -139,6 +143,12 @@ deployment boundary: `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
 - Planned `akoya_request.wmkf_CurrentPreSiteVisit` provides the equivalent
   current-pointer/fence for a Ready Pre-Site Word row after Wave 19 is applied
   and the writer is built. It is not live yet.
+- Planned `akoya_request.wmkf_CurrentFinalWriteup` provides the equivalent
+  current-pointer/fence for the independent Final Word row. Final records the
+  exact source Pre-Site row/version/hash. It is not live yet.
+- Site Visit has no current writeup pointer. The current Pre-Site Word item
+  remains the workspace during that stage and SharePoint versions preserve PD
+  observations.
 - Workbench and the pilot locator consume the same registry row; neither joins
   by filename. The planned full Editor Dashboard will reuse this identity
   contract.
@@ -175,6 +185,10 @@ deployment boundary: `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
   `wmkf_SourceDocument` to the exact Word row and source version/hash.
 - SharePoint Word becomes authoritative for staff prose once the row is Ready;
   no automatic Word-to-Dataverse section synchronization is claimed.
+- The Site Visit tab reuses that stable Word item for staff observations while
+  registering supporting files separately. Final creation copies an exact
+  Pre-Site item version to a new Final row/file and sets the separate planned
+  current-Final pointer.
 
 This contract is schema/design only. The feature-branch pass-through producer
 and DOCX renderer do not persist these business fields or create governed

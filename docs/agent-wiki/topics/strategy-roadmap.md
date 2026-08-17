@@ -246,9 +246,12 @@ document inventory, and individual implementation plans do not establish priorit
   registry/workflow/structured-decision authority; Microsoft Search supplies
   body search; version recovery, retention, least-privilege editing, and frozen
   Board milestones are required parts of the design. Initial Assessment,
-  Pre-Site, and Final are three distinct documents; Final is copied from a
-  the latest Pre-Site version at action time, with a rare explicit regeneration
-  option that preserves prior Final content. The Initial Assessment registry
+  Pre-Site, and Final are three distinct documents. The Pre-Site Word item
+  remains the PD workspace during the Site Visit stage, with observations
+  preserved through native SharePoint versions. Final is copied from the exact
+  current Pre-Site row/version/hash at action time, with a rare explicit
+  regeneration option that creates a new Final row/file and preserves prior
+  Final content. The Initial Assessment registry
   and request pointer are live in Production, governed prompt v1 is
   provisioned, and the application is deployed as of 2026-07-30.
   The controlled Request `1002788` rehearsal proved generation, registry and
@@ -285,9 +288,10 @@ document inventory, and individual implementation plans do not establish priorit
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and
   Board/consultant participants; no separate visit-status field is needed.
-  Its categories are applicant slides, other applicant materials, recording,
-  transcript, transcript summary, and one paste-friendly staff-observations
-  area without per-entry timestamps. Do not add a general material-revision
+  Its file categories are applicant slides, other applicant materials,
+  recording, transcript, and transcript summary. Staff observations are direct
+  edits in the existing Pre-Site Word workspace; do not add a separate
+  Dataverse notes area or Site Visit Writeup. Do not add a general material-revision
   workflow absent observed need, but the applicant surface explicitly supports
   recoverable delete/replace rather than inferring replacement from duplicate
   files. Pre-Site distributions and Final remain linked writeups, not material

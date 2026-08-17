@@ -83,14 +83,21 @@ read-only preflight, while the business-data writer remains unbuilt.
    stores. `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`, the two
    `lib/dataverse/schema/wave19-pre-site-draft/` specs, and
    `scripts/preflight-pre-site-draft-schema.mjs` now define the proposed additive fields and
-   current pointer. Nothing is applied, and no adapter/writer may select the fields before an
+   current Pre-Site/Final pointers. Nothing is applied, and no adapter/writer may select the fields before an
    approved target apply and exact metadata readback.
 
-2. **Review and deliberately promote the feature branch.**
+2. **Use the approved cross-tab Word lifecycle.**
+   `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
+   Word document remains the PD workspace during the Site Visit stage; staff enter observations
+   directly in Word; Site Visit supporting files are separately registered; and Final copies the
+   exact current Pre-Site row/version/hash into a new governed Word document. There is no Site
+   Visit Writeup or Dataverse staff-observations field.
+
+3. **Review and deliberately promote the feature branch.**
    `codex/ai-proposal-narrative-source` is 15 commits ahead of `main`; its focused tests, gates,
    types, and webpack build passed, but the authenticated route is not Production-live.
 
-3. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
+4. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
    17:53:40 PDT).**
    Retain the Session 442 closeout contract in
    `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`. This remains a safety observation,
@@ -131,6 +138,7 @@ read-only preflight, while the business-data writer remains unbuilt.
 |---|---|
 | `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Pre-Site source, generation, and persistence direction |
 | `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Dataverse/SharePoint draft and artifact ownership model |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Cross-tab Pre-Site → Site Visit workspace → Final lineage plan |
 | `docs/APPLICATION_STATE_ATLAS.md` | Required entry point for live data ownership inventory |
 | `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` | Prompt and execution-audit contracts |
 | `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` | Branch, test, and promotion rules |

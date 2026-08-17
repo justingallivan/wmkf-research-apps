@@ -73,16 +73,20 @@ milestone snapshots remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
-**2026-07-28 Site Visit/writeup reconciliation:** Initial Assessment,
-Pre-Site, and Final are three separate governed Word documents. Final is
-created from the latest Pre-Site version at action time, with a rare deliberate
-regeneration option that preserves prior Final content; Site Visit is a
-dossier, not a fourth writeup. Its logistics are date, time/time zone, format,
+**2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
+notes-area detail):** Initial Assessment,
+Pre-Site, and Final are three separate governed Word documents. During the Site
+Visit stage, the same Pre-Site Word item is the PD workspace and observations
+are entered directly into it with native SharePoint version history. Final is
+created from the exact current Pre-Site row/version/hash at action time, with a
+rare deliberate regeneration option that creates a new Final row/file and
+preserves prior Final content; Site Visit is a dossier, not a fourth writeup.
+Its logistics are date, time/time zone, format,
 location/link, lead PD, WMKF staff, applicant participants, and
 Board/consultant participants; no separate visit-status field is needed. Its
-categories are applicant slides, other applicant materials, recording,
-transcript, transcript summary, and one paste-friendly staff-observations area
-without per-entry timestamps. No general material-revision workflow is planned
+file categories are applicant slides, other applicant materials, recording,
+transcript, and transcript summary. There is no separate Dataverse
+staff-observations area. No general material-revision workflow is planned
 absent observed need, but the applicant surface explicitly supports recoverable
 delete/replace rather than inferred replacement. It accepts PDF/PPTX, permits
 additional uploads while access remains active, and is capped at 1 GB per file

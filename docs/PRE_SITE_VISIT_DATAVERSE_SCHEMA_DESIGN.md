@@ -3,7 +3,7 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: draft
-summary: "Implementation-ready additive Wave 19 design for versioned Pre-Site proposal-core drafts on the governed Request Document registry."
+summary: "Additive Wave 19 design for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-17
@@ -12,8 +12,9 @@ related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
+  - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
-  - lib/dataverse/schema/wave19-pre-site-draft/02_akoya_request_current_pre_site_visit.json
+  - lib/dataverse/schema/wave19-pre-site-draft/02_akoya_request_writeup_pointers.json
   - scripts/preflight-pre-site-draft-schema.mjs
 ---
 
@@ -30,8 +31,10 @@ Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
 Document row beneath its Request. That row owns the eight named proposal-core
 fields, immutable generation snapshots, prompt/run/template provenance, and
-the stable SharePoint identity of the Word document. The Request has one
-canonical-current lookup to the active Word row.
+the stable SharePoint identity of the Word document. The Request has separate
+canonical-current lookups to its active Pre-Site and Final Word rows. There is
+no Site Visit writeup lookup because staff add Site Visit observations directly
+to the Pre-Site Word workspace.
 
 A PDF distribution copy is a separate Request Document row because one
 registry row must identify exactly one SharePoint file. Its
@@ -41,13 +44,17 @@ version/hash fields identify the exact Word version exported to PDF.
 ```text
 akoya_request
   ├── wmkf_CurrentPreSiteVisit ───────────────┐
-  └── wmkf_requestdocument (Pre Site Visit, Word, current)
+  ├── wmkf_requestdocument (Pre Site Visit, Word, current)
         ├── eight named proposal-core fields │
         ├── exact generated/input snapshots  │
         ├── prompt + AI run + template       │
         ├── stable Word file identity ◀──────┘
+        ├── native Word versions include Site Visit observations
         └── wmkf_requestdocument (Pre Site Visit, PDF)
               └── SourceDocument + exact source version/hash
+  └── wmkf_CurrentFinalWriteup ──────────────┐
+      wmkf_requestdocument (Final Writeup, Word, current)
+        └── SourceDocument + exact Pre-Site version/hash ◀──┘
 ```
 
 ## Evidence and rejected alternatives
@@ -60,7 +67,7 @@ akoya_request
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The current Workbench Pre-Site route persists a business draft | The feature branch renders validated output from memory; only the normal AI-run audit persists | PARTIAL |
-| Wave 19 fields and current pointer exist in Dataverse | Read-only preflight is the required falsification check; until an approved apply and readback, they are absent | PLANNED |
+| Wave 19 fields and current pointers exist in Dataverse | Read-only preflight is the required falsification check; until an approved apply and readback, they are absent | PLANNED |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -104,15 +111,21 @@ is not a durable identity, while the existing `wmkf_SourceDocument` lookup can
 only reference another governed Request Document row. The Phase II narrative
 in `AI Materials` is not currently registered as one.
 
-### `akoya_request` relationship
+### `akoya_request` relationships
 
 Add the optional N:1 lookup `wmkf_CurrentPreSiteVisit` through relationship
 `wmkf_request_currentpresitevisit`. It points only to the canonical Ready,
 non-superseded Pre-Site Word row for that Request.
 
+Add the optional N:1 lookup `wmkf_CurrentFinalWriteup` through relationship
+`wmkf_request_currentfinalwriteup`. It points only to the canonical Ready,
+non-superseded Final Writeup Word row for that Request. Final creation copies
+the exact current Pre-Site Word version at action time and records the source
+row/version/hash. There is intentionally no Site Visit writeup relationship.
+
 Dataverse relationship metadata cannot enforce the target row's owning
 Request, artifact type, operation status, lifecycle, or content type. The
-service must enforce all five and update the pointer atomically with prior-row
+service must enforce all five and update each pointer atomically with prior-row
 supersession, mirroring the Initial Assessment transition.
 
 ## Row and version semantics
@@ -237,7 +250,7 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 
 1. Run the self-test and the read-only target preflight.
 2. Obtain explicit approval for the target Dataverse metadata write.
-3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 16
+3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 17
    declared artifacts are exact.
 4. Only after schema readback, add the new fields to the request-document
    adapter and request lookup selects.
@@ -262,3 +275,9 @@ attribute. The schema files and preflight are safe to review before apply.
 - Which staff-facing Dataverse form, if any, exposes the named fields before
   Word creation. Direct unrestricted edits to Ready rows are not part of this
   design.
+- The remaining Site Visit logistics mapping and Institutional Funding History
+  result field are later bounded schema decisions. Neither is silently folded
+  into Wave 19.
+
+The cross-tab lifecycle, Site Visit file paths, and Final copy transaction are
+specified in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.

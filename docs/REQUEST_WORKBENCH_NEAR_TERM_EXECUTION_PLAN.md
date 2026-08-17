@@ -231,22 +231,24 @@ The three writeup stages are three distinct governed Word documents:
    Every distribution version must state its review coverage and as-of time,
    and the Workbench must mark the working document stale when later review
    evidence arrives.
-3. **Final Writeup** — a separate Word document created from the latest
-   Pre Site Visit version available when staff invokes creation. The registry
+3. **Final Writeup** — a separate Word document created from the exact latest
+   Pre Site Visit version available when staff invokes creation, after the PD
+   has entered Site Visit observations directly into that Pre-Site workspace.
+   The registry
    must preserve the source artifact and exact source version used for that
    copy. The Final then evolves independently as the PD incorporates the visit,
    late reviews, transcript evidence, and staff edits. A rare, explicit
    regenerate-from-latest action is required, but it must preserve the prior
    Final version and must never silently overwrite staff edits.
 
-There is no fourth “Site Visit Writeup.” The Site Visit tab is a dossier that
-brings together structured visit metadata, applicant slides and other
-applicant materials, recordings, transcripts and their derived summaries, and
-staff observations. Pre-Site distribution snapshots and the Final Writeup
-remain linked lifecycle documents rather than Site Visit material categories.
-“Create Final Writeup” copies the latest Pre-Site version at action time into
-the separate Final artifact; it does not rename or overwrite the Pre-Site
-document.
+There is no fourth “Site Visit Writeup.” The Site Visit tab links to the same
+Pre-Site Word workspace, where staff enter observations, and brings together a
+separate dossier of structured visit metadata, applicant slides and other
+applicant materials, recordings, transcripts, and derived summaries. Pre-Site
+distribution snapshots and the Final Writeup remain linked lifecycle documents
+rather than Site Visit material categories. “Create Final Writeup” copies the
+exact current Pre-Site row and SharePoint version/hash at action time into a
+new Final row/file; it does not rename or overwrite the Pre-Site document.
 
 Internal staff receive the canonical Word link. When a Board member or
 consultant without staff access joins a visit, the minimum external
@@ -369,10 +371,13 @@ structured-input JSON snapshots, render/source identity, and prompt/run/source/
 template provenance. `wmkf_ai_run` remains the append-only execution audit, not
 the business-data source. A PDF is a separate Request Document row linked to
 the exact Word row and source SharePoint version/hash; the Request's planned
-`wmkf_CurrentPreSiteVisit` pointer targets only the current Ready Word row.
+`wmkf_CurrentPreSiteVisit` and `wmkf_CurrentFinalWriteup` pointers target only
+their respective current Ready Word rows. There is no Site Visit writeup
+pointer.
 
-The exact schema and transition contract are in
-`docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`. The JSON specifications and
+The exact schema, transition, and cross-tab contracts are in
+`docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The JSON specifications and
 read-only preflight exist locally, but no Dataverse metadata, adapter, writer,
 or consumer has been changed. Applying the wave remains a separately approved
 Production metadata write.
@@ -446,20 +451,20 @@ The Site Visit dossier captures this structured visit information:
 Do not add a separate visit-status field such as Scheduled, Completed,
 Cancelled, or Rescheduled unless a consuming workflow is later identified.
 
-The dossier's material categories are limited to:
+The dossier's file-backed material categories are limited to:
 
 1. applicant slides;
 2. other applicant materials;
 3. recording;
 4. transcript;
-5. transcript summary; and
-6. staff observations.
+5. transcript summary.
 
-The first five categories are file-backed artifacts. Staff observations are
-one paste-friendly notes area for the lead PD; the product does not require
-separate entries, authors, or timestamps. Normal Dataverse audit and
-modified-by/modified-on metadata may still protect the record behind the
-scenes.
+The current Pre-Site Word document remains the PD's workspace during the Site
+Visit stage. Staff enter observations directly into that Word document and
+SharePoint preserves the edits as native versions. Do not create a Site Visit
+Writeup, a staff-observations material category, or a Dataverse observations
+Memo for the new workflow. Existing `akoya_sitevisitnotes` data is historical
+state and is not silently repurposed.
 
 Do not introduce a general app-level revision chain or current-version selector
 for staff- or system-managed Site Visit materials without observed need.
@@ -550,8 +555,9 @@ The prior registry record remains as retired/removed provenance, and native
 SharePoint version/recycle recovery protects the bytes. The minimum product has
 no applicant restore function and no dedicated Workbench restore button for
 these materials; authorized staff recover through SharePoint when needed.
-Recording, transcript, transcript summary, and staff observations remain
-staff- or system-side categories and are never manageable through this link.
+Recording, transcript, and transcript summary remain staff- or system-side
+categories and are never manageable through this link. Staff observations are
+not a file category; they remain direct edits in the Pre-Site Word workspace.
 
 The email contains one shared request-scoped bearer link. Both the **To** and
 **CC** recipients may use it and manage the same applicant-material file list.
@@ -851,10 +857,11 @@ independently of later working edits.
   including the narrow applicant-material request/upload flow, only after the
   exact metadata, token, validation, persistence, and recovery contracts are
   approved.
-- **Final Writeup:** create a distinct artifact from the latest Pre-Site
-  version at action time, preserve that lineage, and add the approved visit
-  and late-review inputs. A deliberate rare regeneration preserves the prior
-  Final version and never silently overwrites staff edits.
+- **Final Writeup:** create a distinct artifact from the exact current Pre-Site
+  row/version/hash at action time, including observations already entered in
+  Word, and preserve that lineage. A deliberate rare regeneration creates a
+  new Final row/file, preserves the prior Final, and never silently overwrites
+  staff edits.
 - **Initial Assessment scale-out:** after the designated pilot, extend the
   proven path to every in-scope J27 proposal before staff/Board advancement.
 - **Editor Dashboard:** reuse the typed registry and artifact read contract to
@@ -890,10 +897,10 @@ Owner-decided:
    milestones as required parts of the artifact contract;
 6. preserving Allison's cycle-wide review/edit workflow through a planned
    Editor Dashboard rather than requiring per-request Workbench navigation;
-7. three distinct writeup documents, with Final copied from the latest
-   Pre-Site version at action time and no separate Site Visit Writeup;
-8. the Site Visit tab as a dossier for metadata, applicant materials,
-   recording, transcript, derived summary, and staff observations;
+7. three distinct writeup documents, with Final copied from the exact current
+   Pre-Site row/version/hash at action time and no separate Site Visit Writeup;
+8. the Site Visit tab as a dossier for metadata and supporting files plus a
+   link to the same Pre-Site Word workspace, where staff enter observations;
 9. PDF attachment as the sufficient external Pre-Site distribution path;
 10. a narrow request-scoped Site Visit Materials Upload link that does not
     reopen the general applicant-intake product; and
@@ -913,11 +920,11 @@ Owner-decided:
 17. Site Visit logistics comprising date, time/time zone, format,
     location/link, lead PD, WMKF staff, applicant participants, and
     Board/consultant participants, without a separate status field;
-18. Site Visit material categories limited to applicant slides, other
-    applicant materials, recording, transcript, transcript summary, and staff
-    observations;
-19. one paste-friendly staff-observations area without a per-entry
-    author/timestamp workflow; and
+18. Site Visit file categories limited to applicant slides, other applicant
+    materials, recording, transcript, and transcript summary;
+19. site observations entered directly into the existing Pre-Site Word
+    workspace, with native SharePoint version history and no separate
+    Dataverse notes field or Site Visit Writeup; and
 20. no general app-level Site Visit revision chain or current-version picker
     absent observed need, while applicant materials support deliberate,
     recoverable delete/replace and native SharePoint history remains a
@@ -970,9 +977,10 @@ Owner-decided:
 37. no standalone applicant-upload-link revocation action is needed in the
     minimum product; normal access ends at 60 days and Reissue revokes the
     superseded link;
-38. Final Writeup creation uses the latest Pre-Site version available at action
-    time, records that exact lineage, and offers a rare deliberate regeneration
-    path that preserves prior Final content;
+38. Final Writeup creation uses the exact latest Pre-Site version available at
+    action time—including site observations entered there—records that source
+    row/version/hash, and offers a rare deliberate regeneration path that
+    creates a new Final row/file and preserves prior Final content;
 39. the Editor Dashboard audience is staff-wide, including all PDs and
     designated staff proofreaders, subject to explicit app and SharePoint file
     authorization; and

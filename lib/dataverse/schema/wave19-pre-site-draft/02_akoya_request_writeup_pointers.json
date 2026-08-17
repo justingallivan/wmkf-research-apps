@@ -1,0 +1,24 @@
+{
+  "name": "akoya_request-writeup-pointers",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Additive canonical pointers to the current Ready, non-superseded Pre-Site Visit and Final Writeup Word rows. There is intentionally no Site Visit writeup pointer: staff record site observations directly in the Pre-Site Word workspace. Dataverse metadata cannot constrain target artifact type, content type, or owning Request; each service transition must enforce those invariants and update its pointer atomically with supersession.",
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_request_currentpresitevisit",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_CurrentPreSiteVisit",
+      "lookupDisplayName": "Current Pre-Site Visit",
+      "lookupDescription": "Canonical Ready, non-superseded Pre-Site Visit Word document for this request. Updated atomically with activation and prior-document supersession."
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_request_currentfinalwriteup",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_CurrentFinalWriteup",
+      "lookupDisplayName": "Current Final Writeup",
+      "lookupDescription": "Canonical Ready, non-superseded Final Writeup Word document for this request. Updated atomically with activation and prior-document supersession."
+    }
+  ]
+}

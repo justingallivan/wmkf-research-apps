@@ -56,7 +56,7 @@ const documentSpec = JSON.parse(readFileSync(resolve(
 ), 'utf8'));
 const requestSpec = JSON.parse(readFileSync(resolve(
   process.cwd(),
-  `${ROOT}/02_akoya_request_current_pre_site_visit.json`,
+  `${ROOT}/02_akoya_request_writeup_pointers.json`,
 ), 'utf8'));
 const CAST = {
   String: 'StringAttributeMetadata',
@@ -221,14 +221,21 @@ function validateSpecs() {
   if (sectionFields.length !== 8) {
     throw new Error(`Expected eight named proposal-core section fields; found ${sectionFields.length}.`);
   }
-  if (requestSpec.relationships?.length !== 1) {
-    throw new Error('Expected one request current-pointer relationship.');
+  if (requestSpec.relationships?.length !== 2) {
+    throw new Error('Expected two request current-pointer relationships.');
   }
-  const relationship = requestSpec.relationships[0];
-  if (relationship.lookupSchemaName !== 'wmkf_CurrentPreSiteVisit'
-      || relationship.referencedEntity !== 'wmkf_requestdocument') {
-    throw new Error('The current Pre-Site pointer relationship is malformed.');
+  const expectedPointers = new Map([
+    ['wmkf_CurrentPreSiteVisit', 'wmkf_request_currentpresitevisit'],
+    ['wmkf_CurrentFinalWriteup', 'wmkf_request_currentfinalwriteup'],
+  ]);
+  for (const relationship of requestSpec.relationships) {
+    if (relationship.referencedEntity !== 'wmkf_requestdocument'
+        || expectedPointers.get(relationship.lookupSchemaName) !== relationship.schemaName) {
+      throw new Error(`Malformed writeup pointer relationship: ${relationship.schemaName}.`);
+    }
+    expectedPointers.delete(relationship.lookupSchemaName);
   }
+  if (expectedPointers.size) throw new Error('One or more required writeup pointers are absent.');
 }
 
 function runSelfTest() {
