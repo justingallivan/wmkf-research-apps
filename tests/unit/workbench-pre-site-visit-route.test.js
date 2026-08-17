@@ -8,12 +8,16 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 }));
 jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
   generatePreSiteVisitArtifact: jest.fn(),
+  getPreSiteVisitArtifactStatus: jest.fn(),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { generatePreSiteVisitArtifact } from '../../lib/services/pre-site-visit/artifact-service';
+import {
+  generatePreSiteVisitArtifact,
+  getPreSiteVisitArtifactStatus,
+} from '../../lib/services/pre-site-visit/artifact-service';
 import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -30,6 +34,10 @@ function mockRes() {
 
 function post(body = { requestId: REQUEST_ID }) {
   return { method: 'POST', body };
+}
+
+function get(requestId = REQUEST_ID) {
+  return { method: 'GET', query: { requestId } };
 }
 
 beforeEach(() => {
@@ -49,14 +57,47 @@ beforeEach(() => {
     reused: false,
     recovered: false,
   });
+  getPreSiteVisitArtifactStatus.mockResolvedValue({
+    currentArtifact: null,
+    pendingArtifact: null,
+  });
 });
-test('rejects non-POST methods before authentication', async () => {
+test('rejects methods other than GET/POST before authentication', async () => {
   const res = mockRes();
-  await handler({ method: 'GET' }, res);
+  await handler({ method: 'DELETE' }, res);
 
   expect(res.statusCode).toBe(405);
-  expect(res.headers.Allow).toBe('POST');
+  expect(res.headers.Allow).toBe('GET, POST');
   expect(requireAppAccess).not.toHaveBeenCalled();
+});
+
+test('reads current/pending status without invoking generation', async () => {
+  const currentArtifact = {
+    artifactId: '33333333-3333-3333-8333-333333333333',
+    operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+  };
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    currentArtifact,
+    pendingArtifact: null,
+  });
+  const res = mockRes();
+
+  await handler(get(), res);
+
+  expect(withDalContext).toHaveBeenCalledWith('workbench-pre-site-visit', expect.any(Function));
+  expect(getPreSiteVisitArtifactStatus).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({ success: true, currentArtifact, pendingArtifact: null });
+});
+
+test('rejects an invalid GET request id before reading status', async () => {
+  const res = mockRes();
+  await handler(get('not-a-guid'), res);
+
+  expect(res.statusCode).toBe(400);
+  expect(getPreSiteVisitArtifactStatus).not.toHaveBeenCalled();
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
 });
 
 test('short-circuits an unauthorized caller before generation', async () => {

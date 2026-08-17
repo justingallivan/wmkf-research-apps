@@ -281,8 +281,11 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 The first long Production request completed durably but the browser displayed
 `Failed to fetch`. Read-only state verification followed by an exact retry
 returned the existing Ready link without another row, run, upload, or model
-call. The tab should gain explicit current-artifact/status recovery so staff do
-not have to infer completion from a lost response.
+call. **[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]** the route now exposes
+read-only current/pending status and the tab uses bounded GET polling after a
+lost POST response without repeating POST. Template v2 adds the missing
+Recommendation-cell padding under a new generation identity; Production still
+needs promotion and a signed-in smoke.
 
 Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these

@@ -1,6 +1,7 @@
 /**
  * API: /api/workbench/pre-site-visit
  *
+ * GET ?requestId=... -> read the current/pending governed Pre-Site artifact.
  * POST { requestId } -> generate, recover, or reuse one governed Pre-Site
  * Visit Word draft and return its registry/SharePoint identity.
  */
@@ -9,7 +10,10 @@ import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
-import { generatePreSiteVisitArtifact } from '../../../lib/services/pre-site-visit/artifact-service';
+import {
+  generatePreSiteVisitArtifact,
+  getPreSiteVisitArtifactStatus,
+} from '../../../lib/services/pre-site-visit/artifact-service';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 
 export const config = {
@@ -32,8 +36,8 @@ function sendError(res, error) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+  if (!['GET', 'POST'].includes(req.method)) {
+    res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -42,6 +46,15 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-pre-site-visit', async () => {
     try {
+      if (req.method === 'GET') {
+        const requestId = String(req.query?.requestId || '').trim();
+        if (!isGuid(requestId)) {
+          return res.status(400).json({ error: 'requestId is required and must be a GUID' });
+        }
+        const status = await getPreSiteVisitArtifactStatus({ requestId });
+        return res.status(200).json({ success: true, ...status });
+      }
+
       if (!req.body
         || typeof req.body !== 'object'
         || Array.isArray(req.body)

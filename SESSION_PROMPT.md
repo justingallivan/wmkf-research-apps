@@ -46,9 +46,10 @@ duplicate or second model call.
    - That direct test intentionally created no `wmkf_ai_run`; it is now
      superseded as current evidence by the governed Production v3 run
      `ba0f42b9-849a-f111-b8db-6045bd008868` for Request `1002379`.
-   - The four-page visual inspection passed the requested name underlining. The final Methodology
-     sentence still spills to page four, and the Recommendation label/placeholder spacing remains
-     a separate minor template issue.
+   - The direct four-page visual inspection passed the requested name underlining. Its final
+     Methodology sentence spilled to page four. The later Production v1 render fit Background and
+     Methodology on page three but exposed a separate Recommendation label/value spacing issue;
+     local template v2 fixes that spacing and still awaits promotion.
 
 4. **Dataverse persistence schema and durable writer production-proved**
    - The branch now uses the Request Document registry as the editable business
@@ -113,15 +114,18 @@ duplicate or second model call.
 
 ### Verified Open
 
-1. **Improve long-running generation recovery in the tab.**
+1. **Promote and production-smoke the long-running recovery/template fix.**
    The first Production request took about 47 seconds and completed durably,
    but the browser surface displayed `Failed to fetch`. After read-only
    confirmation of the Ready row, an exact retry returned the same stable Word
-   link without another run, row, or upload. Add a load-current/status recovery
-   path or bounded polling so a lost client response discovers the completed
-   artifact without asking staff to retry blindly. Before preview/sandbox
-   runtime uses Wave 19 fields, that target must still pass the same preflight
-   and schema apply.
+   link without another run, row, or upload. **[IMPLEMENTED LOCALLY 2026-08-17;
+   NOT DEPLOYED]** the route now has a read-only GET status path, the tab loads
+   the current artifact on entry, and a lost POST response triggers bounded GET
+   polling without issuing another POST. Template v2 adds the missing
+   Recommendation value-cell padding and changes the governed generation
+   identity so a future fixed document is created rather than overwriting v1.
+   Before preview/sandbox runtime uses Wave 19 fields, that target must still
+   pass the same preflight and schema apply.
 
 2. **Use the approved cross-tab Word lifecycle.**
    `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
@@ -198,5 +202,6 @@ The exact Production Request `1002379` Word file was downloaded and rendered
 to four pages for visual inspection: page-one alignment/amount spacing/divider
 and name underlining passed; Background and Methodology fit together on page
 three; Personnel is one paragraph on page four with underlined names, PI/co-PI
-abbreviations, and no degree listings. The known minor template issue is the
-missing visual gap between `Recommendation` and its manual placeholder.
+abbreviations, and no degree listings. **[VERIFIED LOCALLY 2026-08-17; NOT
+DEPLOYED]** template v2 adds 0.1-inch left padding to the Recommendation value
+cell; a no-Claude Request `1002379` fixture rendered cleanly on all pages.

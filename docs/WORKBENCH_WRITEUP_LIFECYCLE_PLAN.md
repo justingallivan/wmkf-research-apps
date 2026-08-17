@@ -287,9 +287,13 @@ current writeup pointer always targets Word, never PDF.
    2026-08-17.** The durable writer generated Request `1002379` from the exact
    narrative, persisted its run/row/pointer, uploaded Word, and reused the same
    artifact on exact Ready retry.
-3. **Pre-Site tab — first slice live; recovery hardening open.** Generate/retry
-   and Open in Word are live. Add explicit current-artifact/status recovery for
-   a long request whose client response is lost after durable completion.
+3. **Pre-Site tab — first slice live; recovery hardening implemented locally.**
+   Generate/retry and Open in Word are live. **[IMPLEMENTED LOCALLY 2026-08-17;
+   NOT DEPLOYED]** read-only current/pending status loading and bounded GET
+   polling recover a long request whose client response is lost after durable
+   completion without another POST. Template v2 fixes Recommendation-cell
+   spacing under a new generation identity. Promotion and signed-in smoke are
+   still required.
 4. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 5. **Site Visit dossier.** Implement the Word-workspace link plus governed

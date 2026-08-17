@@ -418,7 +418,10 @@ The two named prompt surfaces do not currently have the same runtime posture:
   Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
-  fills the tracked version-1 Word template while preserving manual slots.
+  fills the tracked Word template while preserving manual slots. Production
+  currently uses version 1. **[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]**
+  version 2 adds Recommendation-cell padding under a distinct generation
+  identity, so it cannot overwrite the existing v1 Ready document.
   The Workbench now has an authenticated durable route and tab: the server
   claims a deterministic Request Document row, persists and rereads the eight
   named fields plus immutable snapshots, renders the tracked template, uploads
@@ -446,8 +449,10 @@ The two named prompt surfaces do not currently have the same runtime posture:
   QA, including Background/Methodology on page 3 and the agreed personnel
   formatting. The first long browser call displayed `Failed to fetch` after
   durable server completion; an exact retry recovered the existing Ready link
-  without a duplicate. Explicit current-artifact/status recovery and the
-  review-layer merge/distribution workflow remain unbuilt.
+  without a duplicate. **[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]**
+  explicit current/pending status loading and bounded GET polling now recover
+  a lost POST response without another POST. Promotion/signed-in smoke and the
+  review-layer merge/distribution workflow remain open.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.

@@ -160,12 +160,14 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    evidence for version limits, second-stage recovery, retention, and editor
    least privilege, and build Workbench history/admin restore plus milestone
    snapshots;
-2. harden the Production-proved Pre-Site writer's client recovery path. Request
+2. promote and smoke the locally hardened Pre-Site client recovery path. Request
    `1002379` created one Ready/Draft row, completed governed v3 AI run, current
    request pointer, and stable Word item from the exact narrative-only source;
    an exact Ready retry reused all four. The first long browser request lost its
-   response after durable server completion, so the tab should discover current
-   status/artifacts without requiring a blind retry; and
+   response after durable server completion. **[IMPLEMENTED LOCALLY 2026-08-17;
+   NOT DEPLOYED]** the tab discovers current/pending status and performs bounded
+   GET polling without a blind POST retry; template v2 also fixes
+   Recommendation-cell spacing under a new generation identity; and
 3. continue the approved Workbench lifecycle: map the Site Visit dossier and
    narrow applicant-material upload, then create Final from an exact Pre-Site
    row/version/hash. The full Editor Dashboard remains later reuse.

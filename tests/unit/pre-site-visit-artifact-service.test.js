@@ -1,5 +1,6 @@
 import {
   generatePreSiteVisitArtifact,
+  getPreSiteVisitArtifactStatus,
   SECTION_FIELDS,
 } from '../../lib/services/pre-site-visit/artifact-service.js';
 import {
@@ -275,6 +276,98 @@ test('identical Ready retry does not rerun Claude, render, or upload', async () 
   expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(firstCounts.render);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(firstCounts.upload);
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+});
+
+test('read-only status returns the current Ready artifact without generation side effects', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const sideEffectCounts = {
+    create: harness.dependencies.createDocument.mock.calls.length,
+    update: harness.dependencies.updateDocument.mock.calls.length,
+    run: harness.dependencies.runProposalCore.mock.calls.length,
+    render: harness.dependencies.renderDocx.mock.calls.length,
+    upload: harness.dependencies.uploadFile.mock.calls.length,
+  };
+
+  const status = await getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  );
+
+  expect(status).toMatchObject({
+    currentArtifact: {
+      artifactId: ARTIFACT_ID,
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    },
+    pendingArtifact: null,
+  });
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(sideEffectCounts.create);
+  expect(harness.dependencies.updateDocument).toHaveBeenCalledTimes(sideEffectCounts.update);
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(sideEffectCounts.run);
+  expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(sideEffectCounts.render);
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(sideEffectCounts.upload);
+});
+
+test('read-only status exposes an in-progress replacement alongside the current artifact', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const current = { ...harness.row };
+  const pending = {
+    ...current,
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_sharepointitemid: null,
+    wmkf_sharepointweburl: null,
+    createdon: '2026-08-18T01:00:00Z',
+  };
+  harness.dependencies.findByRequest.mockResolvedValueOnce({ records: [pending, current] });
+
+  const status = await getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  );
+
+  expect(status.currentArtifact.artifactId).toBe(ARTIFACT_ID);
+  expect(status.pendingArtifact).toMatchObject({
+    artifactId: pending.wmkf_requestdocumentid,
+    operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+  });
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+});
+
+test('read-only status ignores an older failed attempt after a newer Ready draft', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const current = { ...harness.row, createdon: '2026-08-17T20:00:00Z' };
+  const olderFailed = {
+    ...current,
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_sharepointitemid: null,
+    wmkf_sharepointweburl: null,
+    createdon: '2026-08-17T19:00:00Z',
+  };
+  harness.dependencies.findByRequest.mockResolvedValueOnce({ records: [current, olderFailed] });
+
+  const status = await getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  );
+
+  expect(status.currentArtifact.artifactId).toBe(ARTIFACT_ID);
+  expect(status.pendingArtifact).toBeNull();
+});
+
+test('read-only status fails closed when a Ready Word row has no current pointer', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  harness.request._wmkf_currentpresitevisit_value = null;
+
+  await expect(getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_visit_pointer_missing', httpStatus: 409 });
 });
 
 test('bibliography metadata does not change the PSV generation identity', async () => {

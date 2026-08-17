@@ -104,7 +104,7 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('pins title alignment and visible amount-value spacing in the retained template', async () => {
+test('pins title alignment and visible metadata-value spacing in the retained template', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
   const documentXml = await zip.file('word/document.xml').async('string');
@@ -116,6 +116,7 @@ test('pins title alignment and visible amount-value spacing in the retained temp
     'DV:RequestedAmount',
     'DV:InvitedAmount',
     'DV:TotalProjectBudget',
+    'STAFF:Recommendation',
   ]) {
     expect(cellContaining(cells, placeholder)).toMatch(
       /<w:tcMar>[\s\S]*?<w:left w:w="144" w:type="dxa"\/>[\s\S]*?<\/w:tcMar>/,
