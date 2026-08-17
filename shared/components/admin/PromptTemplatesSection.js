@@ -9,7 +9,7 @@
  * Editing is immutable-by-version: a publish creates a NEW wmkf_ai_prompt row
  * (iscurrent=true, version+1) and flips the prior row down.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 
@@ -21,6 +21,10 @@ const STATUS_COPY = {
   no_current_row:        { tone: 'red',   text: 'Prompt rows exist but none is current — use the seed --force recovery path, or resolve in Dynamics.' },
   duplicate_current_rows:{ tone: 'red',   text: 'Multiple current rows (store corruption). Resolve in Dynamics.' },
   invalid_body:          { tone: 'red',   text: 'Prompt body failed validation.' },
+  invalid_model:         { tone: 'red',   text: 'The selected model is not compatible with this prompt.' },
+  invalid_output_schema: { tone: 'red',   text: 'The stored output schema is invalid.' },
+  invalid_variables:     { tone: 'red',   text: 'The stored prompt-variable declaration is invalid.' },
+  idempotency_key_reuse: { tone: 'red',   text: 'This edit changed after publishing began. Retry the edited payload.' },
   audit_unavailable:     { tone: 'red',   text: 'Audit table unavailable; refused to publish.' },
   failed:                { tone: 'red',   text: 'Publish failed. Check server logs.' },
 };
@@ -45,21 +49,36 @@ function fmtTs(ts) {
 
 export default function PromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
+  const [modelCatalog, setModelCatalog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const loadGeneration = useRef(0);
 
   const load = () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
-    fetch('/api/admin/prompts')
-      .then((r) => {
-        if (r.status === 403) throw new Error('Admin access required');
-        if (!r.ok) throw new Error('Failed to load prompts');
-        return r.json();
+    Promise.all([
+      fetch('/api/admin/prompts'),
+      fetch('/api/admin/models'),
+    ])
+      .then(async ([promptResponse, modelResponse]) => {
+        if (promptResponse.status === 403 || modelResponse.status === 403) throw new Error('Admin access required');
+        if (!promptResponse.ok) throw new Error('Failed to load prompts');
+        if (!modelResponse.ok) throw new Error('Failed to load the reviewed model catalog');
+        return Promise.all([promptResponse.json(), modelResponse.json()]);
       })
-      .then((data) => setPrompts(data.prompts || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then(([promptData, modelData]) => {
+        if (generation !== loadGeneration.current) return;
+        setPrompts(promptData.prompts || []);
+        setModelCatalog(modelData);
+      })
+      .catch((err) => {
+        if (generation === loadGeneration.current) setError(err.message);
+      })
+      .finally(() => {
+        if (generation === loadGeneration.current) setLoading(false);
+      });
   };
   useEffect(() => { load(); }, []);
 
@@ -74,14 +93,14 @@ export default function PromptTemplatesSection() {
       </p>
       <div className="space-y-6">
         {prompts.map((p) => (
-          <PromptPanel key={p.name} prompt={p} onPublished={load} />
+          <PromptPanel key={p.name} prompt={p} modelCatalog={modelCatalog} onPublished={load} />
         ))}
       </div>
     </>
   );
 }
 
-function PromptPanel({ prompt, onPublished }) {
+function PromptPanel({ prompt, modelCatalog, onPublished }) {
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
@@ -129,6 +148,7 @@ function PromptPanel({ prompt, onPublished }) {
       {expanded && (
         <PublishForm
           prompt={prompt}
+          modelCatalog={modelCatalog}
           onSuccess={(o) => { setOutcome(o); onPublished(); setExpanded(false); }}
           onOutcome={setOutcome}
         />
@@ -179,6 +199,14 @@ function buildPromptDataverseFields(prompt) {
       row,
     },
     {
+      label: 'Model',
+      entity: 'wmkf_ai_prompt',
+      entitySet: 'wmkf_ai_prompts',
+      field: 'wmkf_ai_model',
+      row,
+      note: 'Publishing a model change creates a new immutable prompt version.',
+    },
+    {
       label: 'Prompt status',
       entity: 'wmkf_ai_prompt',
       entitySet: 'wmkf_ai_prompts',
@@ -210,22 +238,73 @@ function buildPromptDataverseFields(prompt) {
   ];
 }
 
-function PublishForm({ prompt, onSuccess, onOutcome }) {
+function parseOutputSchema(value) {
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    return null;
+  }
+}
+
+function buildModelOptions(prompt, modelCatalog) {
+  const nativeStructured = parseOutputSchema(prompt.outputSchema)?.generationMode === 'native-json-schema';
+  const statuses = modelCatalog?.modelStatuses || {};
+  const options = [];
+  if (!nativeStructured) {
+    for (const tier of modelCatalog?.tiers || []) {
+      options.push({ value: tier.key, label: `${tier.key} tier` });
+    }
+  }
+  for (const candidate of modelCatalog?.availableModels || []) {
+    const status = statuses[candidate.id];
+    if (!status?.ok) continue;
+    if (nativeStructured && status.capability?.supportsStructuredOutput !== true) continue;
+    options.push({ value: candidate.id, label: candidate.display_name || candidate.id });
+  }
+  if (prompt.model && !options.some((option) => option.value === prompt.model)) {
+    options.unshift({
+      value: prompt.model,
+      label: nativeStructured
+        ? `${prompt.model} (current — incompatible; choose another)`
+        : `${prompt.model} (current)`,
+      disabled: nativeStructured,
+    });
+  }
+  return { nativeStructured, options };
+}
+
+function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
   const [systemPrompt, setSystemPrompt] = useState(prompt.systemPrompt || '');
   const [body, setBody] = useState(prompt.body || '');
+  const [model, setModel] = useState(prompt.model || '');
   const [submitting, setSubmitting] = useState(false);
-  const [requestId] = useState(newRequestId); // stable across retries of this edit
+  const requestRef = useRef({ payloadKey: null, requestId: null });
+  const { nativeStructured, options: modelOptions } = buildModelOptions(prompt, modelCatalog);
+  const nativeModelCompatible = !nativeStructured
+    || modelOptions.some((option) => option.value === model && !option.disabled);
 
   const validation = validatePromptForSave(prompt.name, body);
-  const unchanged = body === (prompt.body || '') && systemPrompt === (prompt.systemPrompt || '');
+  const unchanged = body === (prompt.body || '')
+    && systemPrompt === (prompt.systemPrompt || '')
+    && model === (prompt.model || '');
 
   const submit = async () => {
     setSubmitting(true);
     try {
+      const payloadKey = JSON.stringify({ body, systemPrompt, model, expectedVersion: prompt.version });
+      if (requestRef.current.payloadKey !== payloadKey) {
+        requestRef.current = { payloadKey, requestId: newRequestId() };
+      }
       const r = await fetch(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body, systemPrompt, requestId }),
+        body: JSON.stringify({
+          body,
+          systemPrompt,
+          model,
+          expectedVersion: prompt.version,
+          requestId: requestRef.current.requestId,
+        }),
       });
       const data = await r.json();
       if (data.status === 'completed' || data.status === 'already_published') onSuccess(data);
@@ -239,6 +318,25 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
 
   return (
     <div className="p-4 space-y-3">
+      <label className="block text-xs text-gray-700">
+        Model
+        <select
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+        >
+          {!nativeStructured && <option value="">Use Executor fallback</option>}
+          {modelOptions.map((option) => (
+            <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>
+          ))}
+        </select>
+        <div className="mt-1 text-[10px] text-gray-400">
+          {nativeStructured
+            ? 'Native structured output: choose a reviewed compatible concrete model. Publishing creates a new prompt version.'
+            : 'Choose a reviewed tier or concrete model. Publishing creates a new prompt version.'}
+        </div>
+      </label>
+
       <label className="block text-xs text-gray-700">
         System prompt <span className="text-gray-400">(the rules / instructions; blank for none)</span>
         <textarea
@@ -279,7 +377,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
-          onClick={() => { setBody(prompt.body || ''); setSystemPrompt(prompt.systemPrompt || ''); }}
+          onClick={() => { setBody(prompt.body || ''); setSystemPrompt(prompt.systemPrompt || ''); setModel(prompt.model || ''); }}
           disabled={unchanged}
           className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
         >
@@ -287,7 +385,7 @@ function PublishForm({ prompt, onSuccess, onOutcome }) {
         </button>
         <button
           onClick={submit}
-          disabled={submitting || !validation.valid || unchanged || !prompt.hasCurrent}
+          disabled={submitting || !validation.valid || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}

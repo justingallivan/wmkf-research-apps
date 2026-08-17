@@ -15,12 +15,12 @@ jest.mock('../../lib/services/field-primer-service', () => ({
   groundPrimerExperts: jest.fn(async (experts) => experts),
 }));
 jest.mock('../../lib/services/workbench-proposal-documents', () => ({
-  getProposalText: jest.fn(),
+  getAiProposalNarrativeText: jest.fn(),
 }));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { generateFieldPrimer } from '../../lib/services/field-primer-service';
-import { getProposalText } from '../../lib/services/workbench-proposal-documents';
+import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents';
 import { FIELD_PRIMER_ENVELOPE_SCHEMA, makeFieldPrimerLease } from '../../shared/utils/field-primer-envelope';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { generateForRequest, generateStandalone } from '../../lib/services/field-primer/generate-service';
@@ -35,7 +35,7 @@ beforeEach(() => {
   grantRequestAdapter.getById.mockReset();
   grantRequestAdapter.updateById.mockReset().mockResolvedValue({});
   generateFieldPrimer.mockReset();
-  getProposalText.mockReset();
+  getAiProposalNarrativeText.mockReset();
 });
 
 describe('generateForRequest (Mode A)', () => {
@@ -83,7 +83,7 @@ describe('generateForRequest (Mode A)', () => {
     const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
     // Prior value present but regenerate:true so we pass the reuse gate.
     grantRequestAdapter.getById.mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }));
-    getProposalText.mockResolvedValue({ text: 'A'.repeat(60) });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
     generateFieldPrimer.mockRejectedValueOnce(new Error('llm down'));
     await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({ httpStatus: 500 });
     // Last write restores the PRIOR value (unconditional).
@@ -92,16 +92,16 @@ describe('generateForRequest (Mode A)', () => {
     expect(last[2]).toBeUndefined();
   });
 
-  it('missing canonical reviewer proposal restores the prior value and stops before generation', async () => {
+  it('missing AI proposal narrative restores the prior value and stops before generation', async () => {
     grantRequestAdapter.getById.mockResolvedValueOnce(row());
-    getProposalText.mockResolvedValue(null);
+    getAiProposalNarrativeText.mockResolvedValue(null);
 
     await expect(generateForRequest({ requestId: GUID })).rejects.toMatchObject({
       httpStatus: 400,
       message:
-        'No readable canonical reviewer proposal was found at Reviewer Materials/Proposal_1002900.pdf.',
+        'No readable AI proposal narrative was found at AI Materials/ProposalNarrative_1002900.pdf.',
     });
-    expect(getProposalText).toHaveBeenCalledWith(GUID, '1002900');
+    expect(getAiProposalNarrativeText).toHaveBeenCalledWith(GUID, '1002900');
     expect(generateFieldPrimer).not.toHaveBeenCalled();
     expect(grantRequestAdapter.updateById).toHaveBeenLastCalledWith(
       GUID,
@@ -120,13 +120,13 @@ describe('generateForRequest (Mode A)', () => {
       }
       return {};
     });
-    getProposalText.mockResolvedValue({ text: 'A'.repeat(60) });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
     generateFieldPrimer.mockResolvedValue({
       primer: { experts: [] }, model: 'claude-test', runId: 'run-1', promptName: 'field-primer', promptVersion: 1,
     });
 
     const r = await generateForRequest({ requestId: GUID });
-    expect(getProposalText).toHaveBeenCalledWith(GUID, '1002900');
+    expect(getAiProposalNarrativeText).toHaveBeenCalledWith(GUID, '1002900');
     expect(r.persisted).toBe(true);
     expect(r.envelope.model).toBe('claude-test');
     expect(grantRequestAdapter.updateById).toHaveBeenNthCalledWith(
@@ -140,7 +140,7 @@ describe('generateForRequest (Mode A)', () => {
     grantRequestAdapter.getById
       .mockResolvedValueOnce(row())
       .mockResolvedValueOnce({ wmkf_ai_fieldprimer: JSON.stringify(peerEnvelope), _etag: 'W/"9"' });
-    getProposalText.mockResolvedValue({ text: 'A'.repeat(60) });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
     generateFieldPrimer.mockResolvedValue({ primer: {}, model: 'm', runId: 'r', promptName: 'p' });
     const r = await generateForRequest({ requestId: GUID });
     expect(r).toEqual({ envelope: peerEnvelope, persisted: true, reused: true });

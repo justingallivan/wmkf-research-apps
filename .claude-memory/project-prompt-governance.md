@@ -4,7 +4,7 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: S269 (2026-06-19) — built + Codex pre-impl review folded
+last_verified: 2026-08-16 — Pre-Site prompt v3 live; local admin model-publication changes still unpromoted
 ---
 
 ## Recall Rule
@@ -34,8 +34,23 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
   the Codex pre-impl BLOCKER — the old seeds did an in-place overwrite + `version:1` reset.)
 - Duplicate-current → force refuses (resolve in Dynamics; no auto-repair). Post-create verification
   asserts exactly one current (no alternate key on `promptname` — probed S269).
-- Applies to the **two grantee seeds only**; the legacy upsert seeds (`phase-ii`, `reviewer-finder`,
-  `peer-review-summarizer`, `phase-i-summary`) are a **separate audited sweep**, not yet converted.
+- Current callers are the grantee title/abstract, Initial Assessment, Review
+  Synthesis, and Pre-Site Visit proposal-core seed scripts. The Pre-Site seed
+  published v1, then version-preserving `--force` published sole-current v2
+  after the first controlled document failed layout acceptance. Signed-in Admin
+  publication subsequently created sole-current v3 with the revised page-length
+  and personnel instructions; the publisher cloned the v2 variables, schema,
+  model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
+  `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
+
+**Admin model publication (local 2026-08-16):** the Prompt Templates editor
+can select `wmkf_ai_model`; a model-only change publishes a new immutable
+version. The PUT requires the editor's expected version, binds request-id
+retries to a canonical fingerprint of all effective content/model/execution
+fields, and records prior/new model values in audit JSON. Native structured
+output refuses blank/tier models and accepts only a reviewed compatible
+concrete id within its max-output-token capability. These changes are not yet
+promoted or live-probed.
 
 **Provenance / timestamps:** Dataverse auto-stamps every version row — `createdon` (version created),
 `modifiedon` (last touch — a version-flip rewrites it, so NOT authorship for history rows),

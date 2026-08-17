@@ -266,6 +266,13 @@ prompt rows may carry partial schemas intended only for the Executor's local
 required-key check. Absence means ordinary generation; any unknown non-null
 value fails closed before the Messages API call. Provider structured output
 supplements—never replaces—the termination check and local `validationSchema`.
+The Executor continues to resolve the model from the current prompt row; it
+does not consult the per-app Admin → Models override for this decision. The
+local 2026-08-16 Prompt Templates publisher changes `wmkf_ai_model` only by
+publishing a new immutable prompt version and performs the native-output
+capability/max-token check before Dataverse mutation. Direct out-of-band
+Dataverse edits remain possible, so the Executor repeats its runtime capability
+guard at invocation time.
 
 **Target kinds (Phase 0):**
 
@@ -436,6 +443,9 @@ If either assertion fails, the two implementations have drifted and must be reco
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant
-- Publish-time structural lint + test-run gate (manual review still the current process)
+- Interactive test-run gate (manual review is still required). The Admin prompt
+  publisher now performs template, output-schema, reviewed-model, native-output
+  capability, and max-token validation before mutation; it does not run the
+  model as part of publication.
 
 **Caching note:** within-prompt cache hits only. Running summary then compliance on the same request does NOT share cache on the document block — both calls pay full price. Worth revisiting when proposal-context-extraction (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) ships.

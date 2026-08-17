@@ -7,7 +7,8 @@
  * (no parent/child, no activeVersion pointer).
  *
  * GET  — current row (full editable metadata) + recent version history.
- * PUT  — publish a new version. Body: { body, systemPrompt?, variables?, requestId? }.
+ * PUT  — publish a new version. Body:
+ *        { body, systemPrompt?, variables?, model?, expectedVersion?, requestId? }.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 5): multi-verb
  * dispatch inside ONE withDalContext (the historical route had a single shared
@@ -44,10 +45,19 @@ export default async function handler(req, res) {
         }
       }
       // PUT (publish)
-      const { body, systemPrompt, variables } = req.body || {};
+      const { body, systemPrompt, variables, model, expectedVersion } = req.body || {};
       const requestId = (req.body && req.body.requestId) || undefined;
       try {
-        const outcome = await publishPrompt({ name, body, systemPrompt, variables, requestId, profileId: gate.profileId });
+        const outcome = await publishPrompt({
+          name,
+          body,
+          systemPrompt,
+          variables,
+          model,
+          expectedVersion,
+          requestId,
+          profileId: gate.profileId,
+        });
         return res.status(200).json(outcome);
       } catch (err) {
         if (err instanceof ServiceHttpError) {

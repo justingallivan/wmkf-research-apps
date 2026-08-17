@@ -5,7 +5,7 @@ legend in `docs/audits/fable-task-ledger-2026-08-14.md`.
 
 ## Scope statement
 
-Denominator: **157 route files** under `pages/api` (`.js`; no `.ts` routes) `[VERIFIED via find count,
+Denominator: **157 route files** under `pages/api` (`.js`; no `.ts` routes) `[VERIFIED via find count, <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-08-14 -->
 Scout 2 + Scout 1 agree]`. Scout 2 semantically traced 32 routes (~20%) end to end (handler → identity
 source → id flow → service); the remaining 125 were guard-mapped only (guard import + callsite proven,
 semantics not). Every route carries a recognized guard except `auth/[...nextauth].js` (the provider)

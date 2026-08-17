@@ -124,22 +124,38 @@ hood.
 The default proposal source for Initial Assessment and Workbench Field Primer
 request mode is the one exact active request file:
 
-`Reviewer Materials/Proposal_{Request#}.pdf`
+`AI Materials/ProposalNarrative_{Request#}.pdf`
 
 The file must be under the request's Dynamics-associated `akoya_request`
 SharePoint folder. An archive-only match, multiple active exact matches, a raw
-application export, or `Phase I/ProjectDescription.pdf` does not satisfy the
-contract; default automation fails before the model and before result
-persistence. Reviewer Finder's authenticated explicit `fileKey` remains a
-deliberate historical/ad-hoc staff override. Separately, Reviewer Finder's
-current-cycle default loader prefers the canonical file and falls back only to
-exactly one active `Phase I/ProjectDescription.pdf`; neither or ambiguity
-returns the server-listed picker before download/Blob write. This bounded
-staff-discovery compatibility rule does not change the governed writeup input
-or external reviewer visibility. The Workbench Proposal tab separately
-continues to display the D26 Phase I document slots.
+application export, `Reviewer Materials/Proposal_{Request#}.pdf`, or
+`Phase I/ProjectDescription.pdf` does not satisfy the contract; default
+automation fails before the model and before result persistence. Reviewer
+Finder remains a separate current-cycle surface: its authenticated explicit
+`fileKey` supports deliberate historical/ad-hoc staff selection, while its
+default loader prefers the exact outbound reviewer package and falls back only
+to exactly one active `Phase I/ProjectDescription.pdf`. Neither or ambiguity
+returns the server-listed picker before download/Blob write. The Workbench
+Proposal tab separately continues to display the D26 Phase I document slots.
 
-**[VERIFIED 2026-07-30 via live read-only Graph/Dataverse probe]** Request
+**[VERIFIED IN SOURCE 2026-08-16 via resolver tests and a read-only live
+Dataverse/Graph extraction]** Request `1002788` resolves exactly
+`AI Materials/ProposalNarrative_1002788.pdf` from the active
+Dynamics-associated request folder and returns non-empty proposal text. Field
+Primer preserves its existing stored-envelope behavior, so this source change
+applies to new generations and explicit regenerations rather than silently
+invalidating an existing primer.
+
+**[PLANNED for the next combined-submission cycle; owner direction
+2026-08-16]** Reviewer Finder should move to a version of this clean AI
+narrative that includes the proposal bibliography received at initial
+submission. The existing reviewer prompt prioritizes named researchers and
+cited authors, so the bibliography offers stronger proposal-grounded reviewer
+signals. The exact version/cutover contract remains future implementation; the
+current-cycle Reviewer Finder resolver is unchanged.
+
+**Historical proof for the superseded automated-input contract:** [VERIFIED
+2026-07-30 via live read-only Graph/Dataverse probe] Request
 `1003109` has the exact active file
 `Reviewer Materials/Proposal_1003109.pdf` in library `akoya_request`.
 Request `1002788`'s earlier Initial Assessment instead used an old Phase I
@@ -234,9 +250,24 @@ deliberate regenerate-from-latest action, but it must create a new Final
 row/file, preserve the prior Final, and never silently overwrite staff edits.
 
 The Pre-Site stable proposal core may exist before every review is received.
-It is drafted from the full proposal through an iterated governed
-`phase-ii.summarize` prompt, with authoritative request metadata supplied from
-Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
+It is drafted from the full proposal through the governed
+`pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
+of the retired Phase II summarizer while removing inferred administrative
+fields. Authoritative request metadata and the ordered PI/Co-PI roster come
+from Dataverse. **[VERIFIED IN SOURCE/TEST/LIVE CONTROLLED RUN 2026-08-16;
+application branch not production-live]** the guarded local producer,
+tracked Word template renderer, and authenticated direct-download route/UI
+exist. Request `1002379` resolved the exact narrative and every template
+metadata field. Sole-current prompt v3
+`f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
+`claude-sonnet-4-6`; latest audited Executor run
+`5bd65180-ed99-f111-b8db-7ced8d6e2f44` remains the accepted v2 output. A
+direct exact-v3 Request `1002379` model/render QA verified the revised personnel
+rules and roster-name underlining but spilled Methodology's final sentence to
+page 4; it created no `wmkf_ai_run`. The signed-in Workbench route remains
+unpromoted/unproven, and artifact upload/registry plus the review-layer merge
+remain unbuilt.
+Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 

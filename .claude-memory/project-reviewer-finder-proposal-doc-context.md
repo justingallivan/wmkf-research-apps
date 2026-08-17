@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Reviewer Finder prefers the exact canonical Reviewer Materials proposal and falls back to the exact active current-cycle Phase I/ProjectDescription.pdf before requiring a manual picker.
+description: Current-cycle Reviewer Finder keeps its exact Reviewer Materials/Phase I resolver; next cycle should use a clean narrative version containing the initial-submission bibliography.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-01 via owner correction, source, branch tests, and live read-only request 1003010 SharePoint probe
+  last_verified: 2026-08-16 via owner direction, current source, prompt source, and prior live current-cycle probe
 ---
 
 ## Recall Rule
@@ -22,8 +22,8 @@ Reviewer-finder under-delivered: asked for 12 reviewers, surfaced ~6 (all "liter
 
 ## Current contract and forward action
 
-For the final separate Phase II cycle and going forward, Power Automate
-publishes one clean proposal package at exactly:
+For the final separate Phase II cycle, Power Automate publishes the outbound
+reviewer package at exactly:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
 
@@ -49,19 +49,27 @@ selects it without staff input. [VERIFIED via source + focused tests; request
 file availability verified 2026-08-01 via owner correction + read-only
 Dataverse/SharePoint probe]
 
-The next cycle combines Phase I + Phase II into a single submission with richer
-proposal text and a separate bibliography. Power Automate should still
-assemble the canonical file as project narrative + bibliography, dropping
-budget PDF/Excel, governing board, and biosketches. More and cleaner context,
-especially the bibliography, should improve cited-author reviewer yield.
+Initial Assessment and Field Primer no longer share that source. Their exact
+internal input is `AI Materials/ProposalNarrative_{Request#}.pdf`; the
+current-cycle Reviewer Finder resolver above is intentionally unchanged.
+
+The next cycle combines Phase I + Phase II into a single submission and will
+collect a bibliography at initial submission. Reviewer Finder should then key
+off a version of the clean AI narrative that includes that bibliography,
+dropping budget PDF/Excel, governing-board material, and biosketches. The
+existing reviewer prompt ranks names mentioned in the proposal first and
+authors from references/citations second, so the bibliography should improve
+proposal-grounded reviewer yield. This is a planned source cutover; the exact
+version/path contract is not yet implemented.
 
 ## Why
 Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin, bibliography-less narrative starves Claude's named/cited reviewer sources. The combined cycle is the moment to fix the INPUT (richer text + bibliography + a PA-assembled clean doc), which is higher-leverage than tweaking the discovery code.
 
 ## How to apply
-- When the combined-cycle intake/documents are built, keep the PA output at
-  the same exact canonical path; the temporary Phase I fallback does not change
-  the outbound package contract.
+- When the combined-cycle intake/documents are built, define the exact
+  Reviewer Finder version/cutover rule for the clean narrative-plus-
+  bibliography input. Do not assume the current outbound package path remains
+  its long-term analysis source.
 - Preserve the dedicated exact Reviewer Finder selector; do not reintroduce
   cross-purpose `classifyFile` or heuristic selection. The only automatic
   compatibility fallback is the exact current-cycle

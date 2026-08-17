@@ -278,16 +278,31 @@ Initial Assessment. Each is a one-page Word document with this sequence:
    Plan**, **Team Expertise**, and **Foundation Opportunity**.
 
 The approved automated proposal input is exactly
-`Reviewer Materials/Proposal_{Request#}.pdf` in the active request's
+`AI Materials/ProposalNarrative_{Request#}.pdf` in the active request's
 Dynamics-associated `akoya_request` SharePoint folder. Initial Assessment and
 Workbench Field Primer request mode share that strict contract. They must fail
 before any model or result write when the exact active file is missing or
 ambiguous; they must not silently fall back to the D26 Proposal-tab
-`Phase I/ProjectDescription.pdf` display bridge. Reviewer Finder is a separate
-staff discovery surface: for the current cycle only, its default loader first
-prefers the same exact canonical file and then falls back to exactly one active
+`Phase I/ProjectDescription.pdf` display bridge or the outbound
+`Reviewer Materials/Proposal_{Request#}.pdf`. Reviewer Finder is a separate
+staff discovery surface: its current-cycle default loader remains the exact
+outbound reviewer package with a fallback to exactly one active
 `Phase I/ProjectDescription.pdf`. That bounded compatibility rule does not
 change the approved governed-artifact input or external reviewer visibility.
+
+**[VERIFIED IN SOURCE 2026-08-16 via focused tests and a read-only live
+Dataverse/Graph extraction]** Request `1002788` resolves
+`AI Materials/ProposalNarrative_1002788.pdf` and returns non-empty proposal
+text. Existing stored Field Primers remain cached until an explicit
+regeneration.
+
+**[PLANNED for the next combined-submission cycle; owner direction
+2026-08-16]** Reviewer Finder should key off a version of this clean narrative
+that also contains the bibliography collected at initial submission. The
+reviewer prompt already prioritizes researchers named in the proposal and
+authors from references/citations, so this is expected to improve
+proposal-grounded reviewer discovery. The current-cycle Reviewer Finder loader
+is intentionally unchanged.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a
@@ -328,11 +343,15 @@ structures can change without rewriting prior artifacts.
 
 ### Pre Site Visit input, regeneration, and template contract
 
-**[VERIFIED via owner decisions 2026-07-28; document pipeline PLANNED.]**
+**[VERIFIED via owner decisions 2026-07-28, local source/tests, live prompt
+readback, a read-only Request `1002379` probe, and a controlled model/render
+run on 2026-08-16; direct-download slice IMPLEMENTED LOCALLY, end-to-end
+durable document pipeline PARTIAL.]**
 The Pre-Site draft has two independently refreshable source layers:
 
 1. **Proposal-derived factual material.** Use the full proposal text with an
-   iterated form of the existing `phase-ii.summarize` prompt. Where the
+   iterated form of the retired Phase II summarizer, now named
+   `pre-site-visit.proposal-core.generate`. Where the
    document repeats authoritative request metadata such as institution,
    requested amount, project period, or named request relationships, source
    those values from Dataverse rather than asking the model to infer them from
@@ -385,14 +404,39 @@ Production metadata write.
 The two named prompt surfaces do not currently have the same runtime posture:
 
 - **[VERIFIED via
-  `shared/config/prompts/phase-ii-dynamics.js`, `pages/api/process.js`, and a
-  read-only production prompt inventory probe on 2026-07-28.]**
-  `phase-ii.summarize` has one current production v1 row and a tracked config,
-  but the retained sunset-candidate PDF route still calls the older
-  `createSummarizationPrompt()` builder; the row currently drives nothing.
-  The new Dataverse-native Pre-Site producer must adopt, iterate, and execute
-  the governed prompt through the shared Executor rather than extend the
-  retained PDF-upload route.
+  `lib/services/pre-site-visit/proposal-core-service.js`,
+  `lib/services/pre-site-visit/docx-renderer.js`, focused tests, retained
+  template render, live prompt readback, and controlled Request `1002379`
+  generation on 2026-08-16.]** The local producer uses the exact
+  `AI Materials/ProposalNarrative_{Request#}.pdf`, supplies authoritative
+  Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
+  `pre-site-visit.proposal-core.generate` through the shared Executor with
+  fail-closed system assertions and `requireNoPersistence:true`. The renderer
+  fills the tracked version-1 Word template while preserving manual slots.
+  The Workbench now has an authenticated interim direct-download route and tab:
+  the server performs the governed call, renders the tracked template, and
+  streams the DOCX to the PD. The current Admin-published prompt row owns the
+  Claude model; callers cannot override it. Dataverse sole-current prompt v3
+  `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
+  `claude-sonnet-4-6`. The first controlled v1 run completed but failed the
+  document acceptance gate because summary overflow displaced the intended
+  page starts. Version-preserving publication of tighter overview limits
+  produced v2, and controlled Request `1002379` run
+  `5bd65180-ed99-f111-b8db-7ced8d6e2f44` then produced a four-page DOCX that
+  passed structural and rendered-page QA. Signed-in Admin publication then
+  created v3 with shorter personnel instructions, no degree credentials,
+  PI/co-PI abbreviations, and a soft one-page target for Background/Methodology.
+  A direct exact-v3 Request `1002379` model/render QA correctly produced 145
+  personnel words and underlined only the two Dataverse roster names, but its
+  574-word Background/Methodology pair spilled the final sentence to page 4;
+  that direct QA did not create a `wmkf_ai_run`. These are local/test invocations
+  against live prompt/request data, not a deployed signed-in Workbench smoke.
+  The download remains non-durable: no SharePoint upload, registry row,
+  request pointer, business-field write, review-layer merge, or distribution
+  workflow exists.
+  The older production `phase-ii.summarize` v1 row remains unused by a route;
+  the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
+  not the new producer.
 - **[VERIFIED via
   `lib/services/review-manager/synthesize-reviews-service.js`.]**
   `review-synthesis.generate` already receives a server-composed digest of all
@@ -743,10 +787,11 @@ leave the review with this contract:
 
 Decision order:
 
-1. **Pre Site Visit Writeup** — input and regeneration behavior are
-   owner-decided. Next freeze its calendar, first versioned Word template,
-   prompt/template compatibility contract, and artifact persistence/access
-   contract.
+1. **Pre Site Visit Writeup** — input and regeneration behavior, the first
+   versioned Word template, and the proposal-core prompt/template pair are
+   owner-decided and controlled-run verified. Next promote and signed-in smoke
+   the interim direct-download slice, then freeze the durable artifact
+   persistence/access contract and review-layer merge.
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
@@ -906,9 +951,10 @@ Owner-decided:
     reopen the general applicant-intake product; and
 11. transcription-platform summary reuse before any deliberate suite LLM
     fallback;
-12. Pre-Site proposal material from an iterated `phase-ii.summarize` over the
-    full proposal, with authoritative request metadata supplied from
-    Dataverse;
+12. Pre-Site proposal material from
+    `pre-site-visit.proposal-core.generate` over the exact AI Materials
+    narrative, with authoritative request metadata and ordered PI/Co-PI roster
+    supplied from Dataverse;
 13. review analysis from `review-synthesis.generate` over every currently
     submitted review, with deliberate rerun when a late review arrives;
 14. Site Visit date—not review count—as the distribution gate, including a
@@ -1033,14 +1079,24 @@ Owner-decided:
     population: accepted suggestion affiliation first, potential-reviewer
     affiliation fallback, explicit missing state, and no dependency on the
     linked Contact's `parentcustomerid`.
+46. on 2026-08-16 the owner separated internal AI input from the outbound
+    reviewer package: Initial Assessment and Field Primer now require
+    `AI Materials/ProposalNarrative_{Request#}.pdf`; current-cycle external
+    release and Reviewer Finder behavior remain unchanged; and
+47. for the next combined-submission cycle, the owner expects Reviewer Finder
+    to consume a version of that clean narrative containing the bibliography
+    received with initial submission, so cited authors become stronger
+    reviewer-discovery signals. Exact versioning and cutover remain future work.
 
 Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
-2. first approved Pre-Site Word template and prompt/template compatibility
-   contract, implementing the decided deterministic reviewer roster alongside
-   the anonymous review narrative;
+2. production promotion and signed-in Workbench smoke of the locally
+   implemented Pre-Site direct-download slice; the proposal-core prompt is
+   live at v2 and its controlled Request `1002379` document passed render QA,
+   while the deterministic reviewer roster, anonymous review-narrative merge,
+   SharePoint upload, and registry flow remain unbuilt;
 3. administrator verification of the target library's configured version
    limit, second-stage recycle recovery, applicable site/library Purview
    retention, and ordinary-editor least-privilege policy; stable-identity

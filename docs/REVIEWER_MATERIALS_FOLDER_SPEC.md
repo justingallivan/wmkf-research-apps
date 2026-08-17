@@ -3,10 +3,10 @@ title: "Reviewer Materials — SharePoint Folder Convention"
 domain: reviewer-workbench
 kind: source-of-truth
 status: canonical
-summary: "Canonical outbound reviewer package: Reviewer Materials/Proposal_{Request#}.pdf; every other request file remains internal."
+summary: "Separate exact SharePoint contracts for the outbound reviewer package and the internal AI proposal narrative."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-16
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -15,10 +15,11 @@ related:
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)
-**Status:** Owner-confirmed 2026-07-30. External delivery, Workbench Field
-Primer request mode, and Initial Assessment generation are aligned to this
-exact folder/file contract. Reviewer Finder alone has the bounded current-cycle
-compatibility fallback documented below.
+**Status:** Owner-confirmed 2026-08-16. External delivery keeps the exact
+`Reviewer Materials` package contract. Workbench Field Primer and Initial
+Assessment now use the separate exact `AI Materials` narrative contract.
+Reviewer Finder keeps its bounded current-cycle behavior and has a documented
+next-cycle direction below.
 **Related:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` (file storage architecture)
 
 ---
@@ -36,12 +37,18 @@ akoya_request/                                                ← existing libra
       ├─ Reviewer Materials/                                    ← outbound reviewer package
       │   ├─ Proposal_1002379.pdf                               ← the ONLY reviewer-visible file
       │   └─ Research Phase I Application_2026-...pdf           ← internal; NEVER exposed
+      ├─ AI Materials/                                          ← internal AI inputs
+      │   └─ ProposalNarrative_1002379.pdf                      ← exact IA/Field Primer input
       └─ (other internal files and folders)
 ```
 
 - **`Reviewer Materials/Proposal_{Request#}.pdf`** — Connor's PA flow creates
   or replaces this compiled reviewer package. The reviewer-facing app exposes
   only this exact request-bound filename.
+- **`AI Materials/ProposalNarrative_{Request#}.pdf`** — Connor's PA flow
+  creates or replaces this clean proposal narrative for Initial Assessment and
+  Field Primer. It is an internal AI input and is never reviewer-visible merely
+  because it exists.
 
 Anything else in the request folder — including other files placed in
 `Reviewer Materials/`, admin paperwork, staff briefs, and raw application
@@ -103,7 +110,11 @@ placing another file beside the proposal does not make it reviewer-visible.
   case-insensitive, but automation and staff should use the canonical spelling.
 - **Outbound filename:** exactly `Proposal_{Request#}.pdf`, including
   capitalization and extension. Filename matching is case-sensitive.
-- **Location:** directly inside `akoya_request/{requestNumber}_{requestGuid}/`.
+- **AI input folder spelling:** exactly `AI Materials` (one space).
+- **AI input filename:** exactly `ProposalNarrative_{Request#}.pdf`, including
+  capitalization and extension. Filename matching is case-sensitive.
+- **Location:** both folders are directly inside
+  `akoya_request/{requestNumber}_{requestGuid}/`.
 - **Missing exact proposal file:** the reviewer-facing app shows no download.
   An unrelated PDF in the same folder does not satisfy the release preflight.
 
@@ -137,19 +148,27 @@ For reference — you don't need to build any of this; it's already in place.
    reviewer PDF is required. Retained legacy upload infrastructure is outside
    this outbound-materials contract.
 5. **Governed proposal analysis** — Workbench Field Primer request mode and
-   Initial Assessment generation read this same exact file from the active
-   `akoya_request` library. They do not fall back to
-   `Phase I/ProjectDescription.pdf`, a raw application export, an archive
-   library, or another PDF. Missing or duplicate active canonical files stop
+   Initial Assessment generation read exactly
+   `AI Materials/ProposalNarrative_{Request#}.pdf` from the active
+   `akoya_request` library. They do not fall back to the outbound reviewer
+   package, `Phase I/ProjectDescription.pdf`, a raw application export, an
+   archive library, or another PDF. Missing or ambiguous active input stops
    before the model call and before any artifact or Dataverse result write.
 6. **Reviewer Finder current-cycle compatibility** — Reviewer Finder prefers
-   this same exact active canonical file. Only when it is absent, its default
-   loader falls back to exactly one active
+   the exact active outbound reviewer package. Only when it is absent, its
+   default loader falls back to exactly one active
    `Phase I/ProjectDescription.pdf`. If neither exact path exists, or either
    applicable path is ambiguous, it returns the server-listed picker before
    download or Blob write. This staff-only ingestion rule does not widen the
    external reviewer package and does not apply to Field Primer or Initial
    Assessment generation.
+7. **Reviewer Finder next-cycle direction** — when the combined submission
+   begins, Reviewer Finder should key off a version of the clean AI narrative
+   that includes the bibliography received at initial submission. The current
+   prompt explicitly prioritizes named researchers and cited authors, so this
+   should provide stronger proposal-grounded reviewer signals. The exact
+   version/cutover rule is planned, not implemented in the current-cycle
+   loader.
 
 Reviewer Finder retains an explicit authenticated `fileKey` override for
 deliberate staff analysis of a historical or ad-hoc source. That manual action
@@ -164,17 +183,23 @@ external reviewer.
    create `Reviewer Materials/` under the request's SharePoint folder.
 2. **When the reviewer package is ready:** create or replace exactly
    `Reviewer Materials/Proposal_{Request#}.pdf`.
-3. **Do not rename the raw timestamped application export to the canonical
+3. **For Initial Assessment and Field Primer:** create or replace exactly
+   `AI Materials/ProposalNarrative_{Request#}.pdf` from the narrative component
+   of the assembled submission. For Request `1002788`, the exact example is
+   `AI Materials/ProposalNarrative_1002788.pdf`.
+4. **Do not rename the raw timestamped application export to the canonical
    proposal filename.** The canonical PDF must contain only the content
    approved for external reviewers.
 
 That's it. The rest happens automatically.
 
-For the current cycle this PDF contains the separate Phase II proposal. This
-is expected to be the last cycle with a separate Phase II submission. The
-stable contract for this work remains
-`Reviewer Materials/Proposal_{Request#}.pdf` when the application process
-moves to a single submission, unless the owner explicitly changes it.
+For the current cycle the outbound PDF contains the separate Phase II proposal,
+while the AI PDF contains the proposal narrative needed for analysis. This is
+expected to be the last cycle with a separate Phase II submission. For the next
+combined-submission cycle, include the initial-submission bibliography in the
+clean narrative version intended for Reviewer Finder; keep budget PDF/Excel,
+governing-board material, and biosketches out of that AI input unless a later
+owner decision explicitly changes the contract.
 
 ---
 

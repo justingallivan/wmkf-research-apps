@@ -163,6 +163,8 @@ export function buildModelRegistryStatus(modelId) {
       reviewedAt: capabilities.reviewedAt || null,
       supportsTemperature: capabilities.supportsTemperature === true,
       supportsEffort: capabilities.supportsEffort === true,
+      supportsStructuredOutput: capabilities.supportsStructuredOutput === true,
+      maxOutputTokens: capabilities.maxOutputTokens ?? null,
       refusalSemantics: capabilities.refusalSemantics || null,
       dataRetentionClass: capabilities.dataRetentionClass || null,
       source: capabilities.source || null,

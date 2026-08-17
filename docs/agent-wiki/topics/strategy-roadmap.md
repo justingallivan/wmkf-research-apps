@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-08
+last_verified: 2026-08-16
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -273,17 +273,31 @@ document inventory, and individual implementation plans do not establish priorit
   and editor permissions plus Workbench history/admin restore and milestone
   snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
-- Pre-Site input direction (owner-decided 2026-07-28): draft factual material
-  from the full proposal through an iterated governed `phase-ii.summarize`;
+- Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
+  implemented 2026-08-16): draft factual material from the exact AI Materials
+  narrative through governed `pre-site-visit.proposal-core.generate`;
   supply authoritative request metadata from Dataverse; use
   `review-synthesis.generate` over all currently submitted reviews; and allow
   distribution with zero reviews because the Site Visit date controls timing.
   Late reviews regenerate only the synthesis and mark the review-derived
   section stale; they do not silently replace staff-edited Word prose or
   regenerate the factual core. Use a versioned prompt/template pair based
-  initially on the supplied examples. The new pipeline is planned:
-  `phase-ii.summarize` currently drives no route, while the legacy retained
-  PDF route still uses `createSummarizationPrompt()`.
+  initially on the supplied examples. The guarded proposal-core service and
+  version-1 template renderer are local and tested; read-only Request `1002379`
+  resolved the exact narrative and all template metadata. An authenticated
+  Workbench tab and route now perform an interim direct DOCX download; focused
+  tests cover the binary response and stale-request cancellation. Dataverse
+  now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; the latest
+  audited Executor evidence remains accepted v2 Request `1002379` run
+  `5bd65180-ed99-f111-b8db-7ced8d6e2f44`. A direct exact-v3 model/render QA
+  correctly applied the revised personnel rules and roster-name underlining,
+  but Methodology's final sentence spilled to page 4; the direct QA created no
+  `wmkf_ai_run`. The earlier v1 run remains append-only history after layout
+  rejection. The branch and
+  signed-in Workbench route remain unpromoted; SharePoint upload/registry and
+  the review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
+  route, while the legacy retained PDF route still uses
+  `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and

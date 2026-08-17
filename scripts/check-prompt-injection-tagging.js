@@ -424,6 +424,26 @@ const SURFACES = [
       'maxChars: 100000',
     ],
   },
+  {
+    // Local draft for the future Executor-driven
+    // pre-site-visit.proposal-core.generate operation. Both the Dataverse
+    // request context and applicant-authored narrative are declared untrusted;
+    // execute-prompt.js supplies nonce wrapping + the hardening preamble. The
+    // target is kind:none, so publication alone cannot write request fields.
+    id: 'pre-site-visit-proposal-core-generate',
+    inv: 30,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/pre-site-visit-proposal-core.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+    requiredMarkers: [
+      'untrusted: true',
+      "dataClass: 'crm_record_text'",
+      "dataClass: 'proposal_text'",
+      'maxChars: 25000',
+      'maxChars: 100000',
+      "target: { kind: 'none' }",
+    ],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

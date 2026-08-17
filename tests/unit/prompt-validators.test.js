@@ -8,6 +8,7 @@ import {
   validateGenericPromptBody,
   validateReviewerPromptBody,
   validatePromptForSave,
+  validatePromptTemplatePair,
 } from '../../lib/utils/prompt-validators.js';
 import {
   parseAnalysisResponse,
@@ -17,6 +18,11 @@ import {
   ANALYZE_USER_PROMPT_TEMPLATE,
   SCORE_CANDIDATES_USER_PROMPT_TEMPLATE,
 } from '../../shared/config/prompts/reviewer-finder-dynamics.js';
+import {
+  PROMPT_NAME as PRE_SITE_NAME,
+  SYSTEM_PROMPT as PRE_SITE_SYSTEM,
+  USER_PROMPT_TEMPLATE as PRE_SITE_BODY,
+} from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 
 const ANALYZE = 'reviewer-finder.analyze';
 const SCORE = 'reviewer-finder.score-candidates';
@@ -103,5 +109,36 @@ describe('validateGenericPromptBody', () => {
   it('rejects empty + oversize bodies', () => {
     expect(validateGenericPromptBody('   ', {}).valid).toBe(false);
     expect(validateGenericPromptBody('x'.repeat(10), { maxLength: 5 }).valid).toBe(false);
+  });
+});
+
+describe('validatePromptTemplatePair', () => {
+  it('validates declared variables across system + body and the pre-site contract', () => {
+    expect(validatePromptTemplatePair(PRE_SITE_NAME, {
+      systemPrompt: PRE_SITE_SYSTEM,
+      body: PRE_SITE_BODY,
+      declaredVars: ['request_context_json', 'proposal_text'],
+    })).toEqual({ valid: true, issues: [] });
+  });
+
+  it('rejects a missing pre-site placeholder and system-prompt A7 marker', () => {
+    const result = validatePromptTemplatePair(PRE_SITE_NAME, {
+      systemPrompt: `${PRE_SITE_SYSTEM}\n[[WMKF-UNTRUSTED-CONTENT]]`,
+      body: PRE_SITE_BODY.replace('{{proposal_text}}', 'missing'),
+      declaredVars: ['request_context_json', 'proposal_text'],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.issues.join(' ')).toMatch(/System prompt must not contain A7/);
+    expect(result.issues.join(' ')).toMatch(/Missing required placeholder \{\{proposal_text\}\}/);
+  });
+
+  it('rejects placeholders when the stored variable declaration is absent', () => {
+    const result = validatePromptTemplatePair('example.prompt', {
+      systemPrompt: '',
+      body: 'Use {{proposal_text}}.',
+      declaredVars: [],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.issues).toContain('Prompt uses an undeclared variable {{proposal_text}}.');
   });
 });

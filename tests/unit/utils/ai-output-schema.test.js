@@ -16,6 +16,14 @@ describe('validateAiJson — scalars', () => {
     expect(r.errors[0]).toMatch(/max 3 characters/);
   });
 
+  test('rejects a configured forbidden string pattern', () => {
+    const schema = { type: 'string', forbidPattern: '\\r?\\n\\s*\\r?\\n' };
+    expect(validateAiJson('one paragraph', schema).ok).toBe(true);
+    const result = validateAiJson('paragraph one\n\nparagraph two', schema);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatch(/forbidden text pattern/);
+  });
+
   test('rejects a non-string for a string node', () => {
     const r = validateAiJson(42, { type: 'string' });
     expect(r.ok).toBe(false);

@@ -159,9 +159,9 @@ Pre-Site Word workspace. Exact design and deployment boundary:
 - SharePoint library: the request's single Dynamics-tracked active
   `akoya_request` drive.
 - Proposal input: exactly one active
-  `Reviewer Materials/Proposal_{Request#}.pdf`. Phase I display documents,
-  archive-only matches, neighboring PDFs, and ambiguous active matches do not
-  satisfy the producer contract.
+  `AI Materials/ProposalNarrative_{Request#}.pdf`. The outbound reviewer
+  package, Phase I display documents, archive-only matches, neighboring PDFs,
+  and ambiguous active matches do not satisfy the producer contract.
 - Request-relative destination: `Artifacts/Initial Assessment/`.
 - Prompt: `initial-assessment.generate`, version 1.
 - Template: `initial-assessment-standard-business-brief`, version `1.0.0`.

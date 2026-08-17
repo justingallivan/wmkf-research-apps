@@ -46,6 +46,8 @@ yarn-error.log*
 
 # Source documents
 *.docx
+# Versioned application templates are runtime inputs, not generated artifacts.
+!shared/templates/**/*.docx
 # Migration data files
 proposals-for-migration.csv
 # Generated schema output (may contain tokens)

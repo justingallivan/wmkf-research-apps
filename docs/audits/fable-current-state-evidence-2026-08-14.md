@@ -15,7 +15,7 @@ legend in `docs/audits/fable-task-ledger-2026-08-14.md`.
 
 Scout 1 (change/system inventory) returned 2026-08-14; Fable sampled/verified the claims below.
 
-- Inventory `[INFERRED from Scout 1 enumeration; commands recorded in scout report]`: 157 API route
+- Inventory `[INFERRED from Scout 1 enumeration; commands recorded in scout report]`: 157 API route <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-08-14 -->
   files across 19 subdirs + top level; 20 Dataverse adapters; 29 Postgres migrations (002–029, four
   `drop_*`); 19 vercel.json crons (fastest `*/2`: drain-submissions, drain-reviewer-acceptances);
   ~120 service files; 92 distinct `process.env` reads; 9 behavior flags.

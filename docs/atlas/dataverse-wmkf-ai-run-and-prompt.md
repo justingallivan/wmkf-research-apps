@@ -1,7 +1,11 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-07-30 for governed `initial-assessment.generate` v1
-production provisioning and the 20-row prompt count; 2026-07-28 for governed
+**Last verified:** 2026-08-16 for the local admin publish/model contract,
+sole-current `pre-site-visit.proposal-core.generate` v3, two governed
+Request `1002379` runs through v2, one direct exact-v3 model/render QA, and 23
+prompt rows derived from the verified 22-row snapshot plus immutable v3 publication;
+2026-07-30 for governed `initial-assessment.generate` v1 production
+provisioning; 2026-07-28 for governed
 `review-synthesis.generate` v3 and its successful controlled production execution; 2026-07-12 for the broader entity inventory via
 `scripts/reconcile-memory-claims.js`
 **Source spec:** `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` (canonical; v2 archived)
@@ -71,7 +75,39 @@ Migration plans touching either entity must preserve these foreign keys.
 **Write paths:**
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
-- **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The two grantee seeds (`seed-grantee-title-prompt.js`, `seed-grantee-abstract-prompt.js`) use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish clones the prior row's Executor metadata, and rejects an unreviewed concrete Claude `wmkf_ai_model` before writing a new version. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
+- **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The grantee title/abstract, Initial Assessment, Review Synthesis, and local Pre-Site Visit proposal-core seeds use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish can change body, system prompt, and `wmkf_ai_model` only by creating a new immutable version. It checks the editor's expected version, validates the complete template, and rejects unreviewed models; native-structured prompts additionally require a reviewed compatible concrete model whose output limit covers the stored token budget. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
+- **Pre-Site Visit proposal core (local app slice; live prompt, 2026-08-16):**
+  `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed
+  eight-field, pass-through native-JSON contract and
+  `scripts/seed-pre-site-visit-proposal-core-prompt.js` provides a create-only
+  bootstrap with concrete `claude-sonnet-4-6`. The local server caller now lives
+  at `lib/services/pre-site-visit/proposal-core-service.js`: it selects the exact
+  AI Materials narrative, supplies the authoritative Dataverse roster, passes
+  the exported `REQUIRED_SYSTEM_ASSERTIONS` as `assertSystemIncludes`, and sets
+  `requireNoPersistence:true`. The paired template renderer, authenticated
+  Workbench tab, and direct-download route are local and tested. The route
+  accepts no model override; the current Admin-published prompt version owns
+  the concrete Claude model. Create-only bootstrap published v1
+  `cbf1bc38-ec99-f111-b8db-6045bd008868`; after its completed controlled run
+  failed rendered-layout acceptance, version-preserving publication created
+  sole-current v2 `1d276948-ed99-f111-b8db-70a8a59cded0` with tighter overview
+  limits on reviewed `claude-sonnet-4-6`. Controlled Request `1002379` run
+  `5bd65180-ed99-f111-b8db-7ced8d6e2f44` then produced a four-page DOCX that
+  passed structural and rendered-page QA. Signed-in Admin publication then
+  created sole-current v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44`, preserving
+  the v2 variables, schema, model, temperature, and token budget while adding
+  the revised page-length and personnel instructions. A direct exact-v3
+  Request `1002379` model/render QA produced a 145-word degree-free Personnel
+  paragraph with only the two Dataverse roster names underlined. Its 574-word
+  Background/Methodology pair spilled the final sentence to page 4, so the
+  soft one-page target remains a tuning follow-up. Because local production
+  writes are correctly denied by the target interlock, this direct transport
+  QA intentionally created no `wmkf_ai_run`; the v2 run above remains the
+  latest governed Executor evidence. All three prompt versions and both AI
+  runs remain as governed history. The application branch/direct-download
+  route is not deployed or signed-in production-smoked, and there is no
+  SharePoint upload, request-document registry row, business-field write, or
+  durable writeup consumer.
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
 - **`initial-assessment.generate` production bootstrap (2026-07-30):**
   create-only seed published version 1
@@ -167,11 +203,11 @@ These are independent. Don't conflate them.
 
 ## `prompt_publish_audit` (Postgres — append-only)
 
-**Source of truth:** Postgres-only. Append-only audit trail for superuser-initiated `wmkf_ai_prompt` versioned publishes from the `/admin` prompt editor (S222). Modeled on `policy_publish_audit` (see `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`): Dataverse has no `$batch` transaction, so the publish (create new `iscurrent` row → flip the prior row's `iscurrent=false`) is non-atomic; a `pending` row is written before the first mutation and a `final` row after, paired by a route-minted `request_id` (also the idempotency key, with `body_hash` dedup).
+**Source of truth:** Postgres-only. Append-only audit trail for superuser-initiated `wmkf_ai_prompt` versioned publishes from the `/admin` prompt editor (S222). Modeled on `policy_publish_audit` (see `docs/atlas/dataverse-wmkf-policy-and-policy-version.md`): Dataverse has no `$batch` transaction, so the publish (create new `iscurrent` row → flip the prior row's `iscurrent=false`) is non-atomic; a `pending` row is written before the first mutation and a `final` row after, paired by a route-minted `request_id`. As of the 2026-08-16 local contract, idempotency is bound to a versioned canonical fingerprint of body, system prompt, variables, output schema, model, temperature, and max tokens. Reusing a request id for a changed payload is a 409, and recovery compares that full fingerprint rather than body text alone.
 
-**Schema:** migration `019_prompt_publish_audit.sql` (mirrored into `scripts/setup-database.js` V34). Columns: `request_id`, `prompt_name`, `target_version`, `new_prompt_id`, `prior_prompt_id`, `body_hash`, `profile_id` (→ `user_profiles`), `phase` (`pending`/`final`), `status` (incl. invariant statuses `no_current_row` / `duplicate_current_rows`), `outcome_json`, `warnings_json`, `created_at`.
+**Schema:** migration `019_prompt_publish_audit.sql` (mirrored into `scripts/setup-database.js` V34). Columns: `request_id`, `prompt_name`, `target_version`, `new_prompt_id`, `prior_prompt_id`, `body_hash`, `profile_id` (→ `user_profiles`), `phase` (`pending`/`final`), `status` (incl. invariant statuses `no_current_row` / `duplicate_current_rows`), `outcome_json`, `warnings_json`, `created_at`. The legacy-named `body_hash` column now stores fingerprint version 2's canonical publish-payload hash; `outcome_json` records `fingerprintVersion`, `priorModel`, and `newModel`. No schema migration was required.
 
-**Write path:** `pages/api/admin/prompts/[name].js` (superuser) — the versioned-publish route. The prompt BODY is not stored here (it lives on the `wmkf_ai_prompt` row); only audit metadata.
+**Write path:** `pages/api/admin/prompts/[name].js` (superuser) — the versioned-publish route. Prompt content is not stored here (it lives on the `wmkf_ai_prompt` row); only hashes and audit metadata.
 
 **Migration disposition:** stays Postgres. Parallels `policy_publish_audit`; no Dataverse counterpart.
 

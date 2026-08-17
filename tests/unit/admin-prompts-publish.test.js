@@ -27,12 +27,24 @@ import { ANALYZE_USER_PROMPT_TEMPLATE } from '../../shared/config/prompts/review
 
 const NAME = 'reviewer-finder.analyze';
 const VALID_BODY = ANALYZE_USER_PROMPT_TEMPLATE;
+const ANALYZE_VARIABLES = JSON.stringify({
+  variables: ['proposal_text', 'additional_notes_block', 'reviewer_count']
+    .map((name) => ({ name })),
+});
 
 function mockRes() {
   return { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
 }
 function currentRow({ version = 3, id = 'prior', body = VALID_BODY, model = 'sonnet' } = {}) {
-  return { wmkf_ai_promptid: id, wmkf_ai_promptname: NAME, wmkf_promptversion: version, wmkf_ai_iscurrent: true, wmkf_ai_promptbody: body, wmkf_ai_model: model };
+  return {
+    wmkf_ai_promptid: id,
+    wmkf_ai_promptname: NAME,
+    wmkf_promptversion: version,
+    wmkf_ai_iscurrent: true,
+    wmkf_ai_promptbody: body,
+    wmkf_ai_promptvariables: ANALYZE_VARIABLES,
+    wmkf_ai_model: model,
+  };
 }
 
 beforeEach(() => {
@@ -83,7 +95,7 @@ describe('/api/admin/prompts/[name] — envelope inventory gap fill (Stage 5 Pha
     expect(res.body.invariantError).toBeNull();
     expect(res.body.current).toEqual({
       id: 'cur', name: NAME, version: 4, isCurrent: true, status: null,
-      systemPrompt: '', body: 'B4', variables: null, outputSchema: null,
+      systemPrompt: '', body: 'B4', variables: ANALYZE_VARIABLES, outputSchema: null,
       model: 'sonnet', temperature: null, maxTokens: null,
       createdOn: null, publishedAt: null, modifiedOn: null, modifiedById: null, modifiedByName: null,
     });
@@ -133,7 +145,15 @@ describe('PUT /api/admin/prompts/[name]', () => {
       .mockResolvedValueOnce({ records: [currentRow({ version: 3, id: 'prior', model: 'Sonnet' })] })
       .mockResolvedValueOnce({ records: [{ wmkf_ai_promptid: 'new-row', wmkf_promptversion: 4 }] });
     const res = mockRes();
-    await handler({ method: 'PUT', query: { name: NAME }, body: { body: `${VALID_BODY}\nEDIT` } }, res);
+    await handler({
+      method: 'PUT',
+      query: { name: NAME },
+      body: {
+        body: `${VALID_BODY}\nEDIT`,
+        model: 'claude-opus-4-6',
+        expectedVersion: 3,
+      },
+    }, res);
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe('completed');
     expect(res.body.targetVersion).toBe(4);
@@ -142,7 +162,7 @@ describe('PUT /api/admin/prompts/[name]', () => {
     const created = DynamicsService.createRecord.mock.calls[0][1];
     expect(created.wmkf_ai_iscurrent).toBe(true);
     expect(created.wmkf_promptversion).toBe(4);
-    expect(created.wmkf_ai_model).toBe('sonnet');
+    expect(created.wmkf_ai_model).toBe('claude-opus-4-6');
     // S269: every admin-published version carries a domain publish time (parity w/ seed).
     expect(typeof created.wmkf_ai_publisheddatetime).toBe('string');
     expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
@@ -158,7 +178,7 @@ describe('PUT /api/admin/prompts/[name]', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.status).toBe('invalid_model');
     expect(res.body.code).toBe('unreviewed_claude_model');
-    expect(sql).toHaveBeenCalledTimes(1); // idempotency preflight only; no pending/final audit row.
+    expect(sql).not.toHaveBeenCalled(); // invalid before pending/final audit.
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });

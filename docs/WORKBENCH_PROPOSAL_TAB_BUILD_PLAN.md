@@ -18,9 +18,11 @@ related:
 
 > **Current routing:** Historical S258 implementation record. Its statements
 > that Field Primer and Reviewer Finder ingest `ProjectDescription.pdf` are
-> superseded: automated request-bound analysis now requires
-> `Reviewer Materials/Proposal_{Request#}.pdf`. The Proposal tab itself still
-> displays the D26 Phase I slots. Use
+> superseded: Initial Assessment and Field Primer now require
+> `AI Materials/ProposalNarrative_{Request#}.pdf`; the current-cycle Reviewer
+> Finder independently prefers the outbound reviewer package and has one exact
+> Phase I fallback. The Proposal tab itself still displays the D26 Phase I
+> slots. Use
 > `shared/components/workbench/ProposalTab.js` and the current Workbench roadmap
 > for live behavior and follow-up work.
 
