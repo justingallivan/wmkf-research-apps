@@ -88,7 +88,7 @@ test('generates through the governed service and streams a safe DOCX attachment'
   expect(generatePreSiteVisitProposalCore).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
     actingUserSystemId: '22222222-2222-2222-2222-222222222222',
-    runSource: 'Request Workbench - Pre-Site Visit',
+    runSource: 'Vercel User',
   });
   expect(generatePreSiteVisitProposalCore.mock.calls[0][0]).not.toHaveProperty('model');
   expect(renderPreSiteVisitDocx).toHaveBeenCalledWith({

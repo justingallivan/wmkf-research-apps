@@ -67,7 +67,7 @@ export default async function handler(req, res) {
       const generated = await generatePreSiteVisitProposalCore({
         requestId,
         actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
-        runSource: 'Request Workbench - Pre-Site Visit',
+        runSource: 'Vercel User',
       });
       const document = await renderPreSiteVisitDocx({
         documentFields: generated.context.documentFields,
