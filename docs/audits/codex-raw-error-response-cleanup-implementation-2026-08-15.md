@@ -113,7 +113,7 @@ Sweep result:
   repository's documented main baselines (`reconcile-probe-entity-set-count` stale expected count
   and `notification-trust-model-pushup` reviewer-reminder fixture), previously recorded in the
   Stage 1 and Stage 2 Workbench implementation records. The changed BILL test passes when selected.
-- `check:api-routes` + self-test: passed; all 157 route files covered.
+- `check:api-routes` + self-test: passed; all 157 route files covered. <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-08-15 -->
 - `check:types`: passed.
 - `check:secret-scan`, `check:doc-currency`, `check:fact-consistency`,
   `check:canonical-pointers`, `check:doc-symbol-refs`, and `check:build-claim-freshness`, each

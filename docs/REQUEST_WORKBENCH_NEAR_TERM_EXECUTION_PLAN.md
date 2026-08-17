@@ -379,8 +379,14 @@ The two named prompt surfaces do not currently have the same runtime posture:
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
   fills the tracked version-1 Word template while preserving manual slots.
-  The create-only prompt seed has not been executed and no model call, route,
-  Workbench UI, SharePoint upload, registry row, or review-layer merge exists.
+  The Workbench now has an authenticated interim direct-download route and tab:
+  the server performs the governed call, renders the tracked template, and
+  streams the DOCX to the PD. The current Admin-published prompt row owns the
+  Claude model; callers cannot override it. A read-only live dry-run on
+  2026-08-16 returned `action=create version=1`, so the create-only prompt seed
+  has not been executed and no model call has run. The download is not a
+  durable artifact: no SharePoint upload, registry row, request pointer,
+  review-layer merge, or distribution workflow exists.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.

@@ -3,7 +3,7 @@ title: Pre-Site Visit proposal-core local implementation record
 domain: request-workbench
 kind: audit
 status: current
-summary: Guarded local proposal-core producer, retained-template renderer, and read-only Request 1002379 source evidence; no prompt seed or model call.
+summary: Guarded local proposal-core producer, retained-template renderer, authenticated direct download, and read-only live evidence; no prompt seed or model call.
 owner: product-engineering
 ---
 
@@ -11,9 +11,10 @@ owner: product-engineering
 
 ## Scope
 
-Sweep mode: Mode A (changed implementation fact). The proposal-derived core and
-Word renderer are now implemented locally. This record does not claim that the
-full Pre-Site document lifecycle is production-live.
+Sweep mode: Mode A (changed implementation fact). The proposal-derived core,
+Word renderer, authenticated API route, and Workbench direct-download tab are
+now implemented locally. This record does not claim that the full Pre-Site
+document lifecycle is production-live.
 
 ## Evidence matrix
 
@@ -24,7 +25,8 @@ full Pre-Site document lifecycle is production-live.
 | Eight-field governed call | `generatePreSiteVisitProposalCore` | current prompt row when later provisioned; normal `wmkf_ai_run` attempt | returned `proposalCore` | source/tests assert prompt name, security substrings, and `requireNoPersistence:true` | VERIFIED in source/test; prompt row PLANNED |
 | Version-1 Word render | `renderPreSiteVisitDocx` | tracked retained DOCX template; returned Buffer only | future artifact producer | original/final 30-part package inventory, focused tests, three-page LibreOffice render | VERIFIED locally |
 | Manual sections preserved | DOCX renderer | retained template placeholders | PD in Word | rendered pages retain graphical abstract/caption, recommendation, referee, presentation, and funding-history slots | VERIFIED |
-| Full lifecycle | none yet | no writeup registry row/upload/pointer | no Workbench route/UI | absence search plus source inventory | PARTIAL |
+| Interim staff download | `PreSiteVisitTab` → `POST /api/workbench/pre-site-visit` | returned DOCX bytes; normal Executor AI-run audit attempt only | browser download | route/component focused tests cover access, strict input, binary response, errors, and request-switch cancellation | VERIFIED locally |
+| Full lifecycle | direct download only | no writeup registry row/upload/pointer | no shared artifact consumer | source inventory and negative contract tests | PARTIAL |
 
 ## Probe result
 
@@ -34,14 +36,18 @@ resolved one active request and the exact file
 `Memphis, TN`, found one PI and one Co-PI in order, and found every Word
 metadata field populated. The probe is read-only and does not call a model.
 
+On the same date, the create-only prompt seed's live `--dry-run` returned
+`action=create version=1`. This verifies that Dataverse has no existing row for
+`pre-site-visit.proposal-core.generate`; it made no write and called no model.
+
 ## Deliberately not performed
 
 - The create-only prompt seed was not executed.
 - Claude was not called.
-- No Dataverse business field, request-document registry row, or SharePoint
-  output was created.
-- No route, Workbench control, review-layer merge, or distribution workflow was
-  added.
+- No Dataverse business field, request-document registry row, request pointer,
+  or SharePoint output was created.
+- No review-layer merge or distribution workflow was added. The new Workbench
+  control downloads the generated DOCX locally and is not a durable artifact.
 
 The local file `outputs/pre-site-visit-1002379/Phase II Pre-Site Visit Writeup
 TEST 1002379.docx` is a layout fixture whose generated sections explicitly say

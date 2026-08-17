@@ -166,10 +166,11 @@ def build_pd():
 
     section_slide(prs, "3", SPINE[2])
     content_slide(prs, "STEP 3", "The tab strip", [
-        "Seven tabs are implemented in source:",
-        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Status · Awardee"),
-        "Three remain placeholders for the later request lifecycle:",
-        (1, "Pre Site Visit · Site Visit · Final Writeup — they say \"coming in a later update.\""),
+        "Eight tabs are implemented in source:",
+        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Pre Site Visit · Status · Awardee"),
+        "Two remain placeholders for the later request lifecycle:",
+        (1, "Site Visit · Final Writeup — they say \"coming in a later update.\""),
+        ("", "Pre Site Visit currently generates a Word file for local download; it is not yet saved back to SharePoint."),
         "You'll spend most of your time on the Reviewers tab.",
     ])
 

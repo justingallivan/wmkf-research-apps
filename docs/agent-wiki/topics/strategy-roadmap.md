@@ -281,9 +281,12 @@ document inventory, and individual implementation plans do not establish priorit
   regenerate the factual core. Use a versioned prompt/template pair based
   initially on the supplied examples. The guarded proposal-core service and
   version-1 template renderer are local and tested; read-only Request `1002379`
-  resolved the exact narrative and all template metadata. The prompt seed/model
-  call, Workbench route/UI, SharePoint upload/registry, and review-layer merge
-  remain unexecuted/unbuilt. The older `phase-ii.summarize` row still drives no
+  resolved the exact narrative and all template metadata. An authenticated
+  Workbench tab and route now perform an interim direct DOCX download; focused
+  tests cover the binary response and stale-request cancellation. A live
+  read-only seed dry-run returned `action=create version=1`, so the prompt seed
+  and model call remain unexecuted. SharePoint upload/registry and the
+  review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
