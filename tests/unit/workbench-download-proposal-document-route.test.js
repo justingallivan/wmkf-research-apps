@@ -29,6 +29,8 @@ import handler from '../../pages/api/workbench/download-proposal-document';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const GUID_SUFFIX = REQUEST_ID.replace(/-/g, '').toUpperCase();
+const AI_FOLDER = `1002794_${GUID_SUFFIX}/AI Materials`;
+const AI_FILENAME = 'ProposalNarrative_1002794.pdf';
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -60,6 +62,7 @@ beforeEach(() => {
   });
   listProposalDocuments.mockReset().mockResolvedValue({
     slots: [{ found: true, library: 'Documents', folder: `1002794_${GUID_SUFFIX}/Phase I`, name: 'proposal.pdf' }],
+    aiMaterials: [{ found: true, library: 'Documents', folder: AI_FOLDER, name: AI_FILENAME }],
     otherDocuments: [],
   });
   GraphService.downloadFileByPath.mockReset().mockResolvedValue({
@@ -105,6 +108,22 @@ test('?disposition=inline on a safe MIME type serves inline; unsafe types stay a
   const res = mockRes();
   await handler(reqOf({ ...query(), disposition: 'inline' }), res);
   expect(res.headers['Content-Disposition']).toBe('inline; filename="proposal.pdf"');
+});
+
+test('canonical AI Materials path passes request ownership and membership checks', async () => {
+  GraphService.downloadFileByPath.mockResolvedValueOnce({
+    buffer: Buffer.from('ai-pdf'),
+    mimeType: 'application/pdf',
+    filename: AI_FILENAME,
+    size: 6,
+  });
+  const res = mockRes();
+  await handler(reqOf(query({ folder: AI_FOLDER, filename: AI_FILENAME })), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(GraphService.downloadFileByPath).toHaveBeenCalledWith('Documents', AI_FOLDER, AI_FILENAME);
+  expect(res.headers['Content-Disposition']).toBe(`attachment; filename="${AI_FILENAME}"`);
+  expect(res.body).toEqual(Buffer.from('ai-pdf'));
 });
 
 test('folder GUID suffix mismatch → 403 before the wrapped scope check runs', async () => {

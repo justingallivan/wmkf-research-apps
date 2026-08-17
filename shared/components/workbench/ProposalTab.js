@@ -3,7 +3,7 @@
  *
  * Three stacked sections per docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md:
  *   Top    — Dataverse proposal info (PI, Co-PIs, abstract, amounts)
- *   Middle — Phase I documents (slot-matched + other; download via the scoped proxy)
+ *   Middle — canonical AI Materials plus Phase I documents (download via the scoped proxy)
  *   Bottom — AI content (existing fit rationale / summary / extracted data; the
  *            Field Primer generate/persist lands in a later phase)
  *
@@ -287,22 +287,44 @@ function DocumentsSection({ requestId, docs, error }) {
   if (!docs) {
     return <p className="text-sm text-gray-500">Loading documents…</p>;
   }
+  const aiMaterials = Array.isArray(docs.aiMaterials) ? docs.aiMaterials : [];
   const slots = Array.isArray(docs.slots) ? docs.slots : [];
   const others = Array.isArray(docs.otherDocuments) ? docs.otherDocuments : [];
   return (
     <div className="space-y-4">
-      <ul className="divide-y divide-gray-100">
-        {slots.map((s) => (
-          <li key={s.key} className="flex items-center justify-between gap-3 py-2">
-            <span className="text-sm text-gray-700">{s.label}</span>
-            {s.found ? (
-              <DocActions requestId={requestId} file={s} />
-            ) : (
-              <span className="text-xs text-gray-400">not found</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      {aiMaterials.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Materials</p>
+          <ul className="divide-y divide-gray-100">
+            {aiMaterials.map((material) => (
+              <li key={material.key} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm text-gray-700">{material.label}</span>
+                {material.found ? (
+                  <DocActions requestId={requestId} file={material} />
+                ) : (
+                  <span className="text-xs text-gray-400">not found</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Phase I documents</p>
+        <ul className="divide-y divide-gray-100">
+          {slots.map((s) => (
+            <li key={s.key} className="flex items-center justify-between gap-3 py-2">
+              <span className="text-sm text-gray-700">{s.label}</span>
+              {s.found ? (
+                <DocActions requestId={requestId} file={s} />
+              ) : (
+                <span className="text-xs text-gray-400">not found</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {others.length > 0 && (
         <div>

@@ -43,6 +43,7 @@ beforeEach(() => {
   });
   listProposalDocuments.mockReset().mockResolvedValue({
     slots: [{ found: true, library: 'Documents', folder: 'x', name: 'proposal.pdf' }],
+    aiMaterials: [],
     otherDocuments: [],
     libraries: ['Documents'],
     errors: [],
@@ -85,6 +86,7 @@ test('golden path: resolves scope from the record, not the raw query param', asy
   expect(res.body).toEqual({
     success: true,
     slots: [{ found: true, library: 'Documents', folder: 'x', name: 'proposal.pdf' }],
+    aiMaterials: [],
     otherDocuments: [],
     libraries: ['Documents'],
     errors: [],

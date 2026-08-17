@@ -24,7 +24,9 @@ const REQ = '11111111-1111-1111-1111-111111111111';
 beforeEach(() => {
   jest.clearAllMocks();
   getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
-  listProposalDocuments.mockResolvedValue({ slots: [], otherDocuments: [], libraries: ['Documents'], errors: [] });
+  listProposalDocuments.mockResolvedValue({
+    slots: [], aiMaterials: [], otherDocuments: [], libraries: ['Documents'], errors: [],
+  });
 });
 
 test('unresolvable request → ServiceHttpError 404; no listing attempted', async () => {
@@ -40,7 +42,14 @@ test('derives scope from the resolved record (id/number/cycle) and spreads the r
   const body = await listWorkbenchProposalDocuments({ requestId: REQ });
   expect(getById).toHaveBeenCalledWith(REQ, { select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate' });
   expect(listProposalDocuments).toHaveBeenCalledWith(REQ, '1002794', 'J26');
-  expect(body).toEqual({ success: true, slots: [], otherDocuments: [], libraries: ['Documents'], errors: [] });
+  expect(body).toEqual({
+    success: true,
+    slots: [],
+    aiMaterials: [],
+    otherDocuments: [],
+    libraries: ['Documents'],
+    errors: [],
+  });
 });
 
 test('null meeting date → null cycle code passed through', async () => {
