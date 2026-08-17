@@ -1,10 +1,10 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: The D26 Proposal tab retains its Phase I display bridge; Initial Assessment and Field Primer require the exact AI Materials narrative, while current-cycle Reviewer Finder remains separate.
+description: The D26 Proposal tab retains its Phase I display bridge; internal AI inputs use separately named narrative and bibliography PDFs, while current-cycle Reviewer Finder remains separate.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-08-16 via owner direction, source/tests, and live read-only Request 1002788 narrative extraction; historical artifact mechanics via production readback
+last_verified: 2026-08-17 via owner direction, integration source/tests, and prior live read-only Request 1002788 narrative extraction; historical artifact mechanics via production readback
 ---
 
 ## Recall Rule
@@ -41,10 +41,13 @@ default prefers the exact outbound reviewer package and falls back only to exact
 picker before download/Blob write. The fallback does not alter the governed or
 external-reviewer contracts.
 
-For the next combined-submission cycle, Reviewer Finder is planned to consume
-a version of the clean AI narrative that includes the bibliography received at
-initial submission. The prompt already prioritizes named researchers and cited
-authors; the exact version/cutover contract remains future work.
+For multi-source analysis, Power Automate publishes two separate exact files:
+`AI Materials/ProposalNarrative_{Request#}.pdf` and
+`AI Materials/ProposalBibliography_{Request#}.pdf`. The application—not Power
+Automate—keeps them separately labeled for Claude and fingerprints both source
+identities/versions/hashes. Pre-Site integration source implements this
+contract locally. Reviewer Finder adopts it at the next combined-submission
+cycle cutover; its current-cycle resolver remains unchanged.
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 

@@ -73,7 +73,7 @@ const recordData = {
   wmkf_ai_maxtokens: 16384,
   wmkf_ai_promptstatus: PROMPTSTATUS_PUBLISHED,
   wmkf_ai_notes:
-    'Pre-Site Visit proposal-core tracked bootstrap/recovery contract. Two untrusted overrides; eight pass-through narrative fields; '
+    'Pre-Site Visit proposal-core tracked bootstrap/recovery contract. Three untrusted overrides; exact narrative and bibliography inputs; eight pass-through narrative fields; '
     + 'target kind:none; full raw output retention. Caller must use requireNoPersistence:true and '
     + 'assertSystemIncludes from shared/config/prompts/pre-site-visit-proposal-core.js.',
 };

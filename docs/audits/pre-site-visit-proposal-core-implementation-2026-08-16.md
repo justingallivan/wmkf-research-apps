@@ -3,7 +3,7 @@ title: Pre-Site Visit proposal-core controlled implementation record
 domain: request-workbench
 kind: audit
 status: current
-summary: Guarded proposal-core producer, governed prompt v3, controlled Request 1002379 generation and render evidence, and an unpromoted direct-download slice.
+summary: Guarded proposal-core producer, historical governed prompt v3 evidence, and the later unpromoted two-file narrative/bibliography revision.
 owner: product-engineering
 ---
 
@@ -13,7 +13,7 @@ owner: product-engineering
 
 Sweep mode: Mode A (changed implementation and live prompt facts). The
 proposal-derived core, Word renderer, authenticated API route, and Workbench
-direct-download tab are implemented locally. The governed prompt is live and
+direct-download tab are implemented locally. Governed prompt v3 is live and
 a controlled Request `1002379` model/render run passed acceptance. This record
 does not claim that the branch, signed-in route, or full Pre-Site document
 lifecycle is production-live.
@@ -22,7 +22,7 @@ lifecycle is production-live.
 
 | Claim | Producer/entry point | Persistence/source | Consumer | Strongest evidence | Status |
 |---|---|---|---|---|---|
-| Exact proposal input | `loadPreSiteVisitInputs` | SharePoint `akoya_request/AI Materials/ProposalNarrative_{Request#}.pdf` | prompt override | shared exact-file helper plus read-only Request `1002379` probe (33,011 extracted characters) | VERIFIED |
+| Exact proposal inputs | `loadPreSiteVisitInputs` | Separate SharePoint `AI Materials/ProposalNarrative_{Request#}.pdf` and `ProposalBibliography_{Request#}.pdf` | separate prompt overrides | shared two-file helper plus focused tests; only the earlier narrative has live Request `1002379` probe evidence | PARTIAL |
 | Authoritative metadata and roster | `loadPreSiteVisitInputs` | `akoya_request`, applicant `account`, Co-PI junction | prompt context and DOCX fields | source, focused tests, live read-only Request `1002379` (Christoph Gorgulla; Daniel Blair) | VERIFIED |
 | Eight-field governed call | `generatePreSiteVisitProposalCore` | sole-current prompt v3 plus append-only `wmkf_ai_run` on Executor calls | returned `proposalCore` | exact live v3 prompt readback; latest controlled completed Executor run `5bd65180-ed99-f111-b8db-7ced8d6e2f44` used v2; source/tests assert prompt name, security substrings, and `requireNoPersistence:true` | VERIFIED |
 | Versioned Word render | `renderPreSiteVisitDocx` | tracked retained DOCX template; returned Buffer only | direct browser download | 30-part package inventory, focused tests, canonical four-page render, placeholder scan | VERIFIED locally |
@@ -30,7 +30,23 @@ lifecycle is production-live.
 | Interim staff download | `PreSiteVisitTab` → `POST /api/workbench/pre-site-visit` | returned DOCX bytes; normal Executor AI-run audit attempt only | browser download | route/component focused tests cover access, strict input, binary response, errors, and request-switch cancellation | VERIFIED locally |
 | Full lifecycle | direct download only | no writeup registry row/upload/pointer | no shared artifact consumer | source inventory, negative contract tests, and controlled-run write inventory | PARTIAL |
 
-## Probe result
+## 2026-08-17 two-file follow-on
+
+**[IMPLEMENTED LOCALLY; NOT PUBLISHED OR DEPLOYED.]** Owner direction retained
+the narrative and bibliography as separate canonical SharePoint inputs. The
+integration branch now requires both exact case-sensitive filenames, extracts
+and hashes them independently, passes separately bounded
+`proposal_narrative` and `proposal_bibliography` variables, and returns a
+source manifest with both roles and stable identities/versions/hashes. Missing
+either source stops before the model call. Focused tests cover the positive
+two-file path and missing-bibliography complement.
+
+Live prompt v3 remains the single-narrative contract described below. The
+tracked two-input prompt must be published as a new immutable version and read
+back exactly before the integration branch is promotable. No live bibliography
+probe or model run has yet been performed.
+
+## Historical single-narrative probe result
 
 On 2026-08-16, `scripts/probe-pre-site-visit-source.mjs --request 1002379`
 resolved one active request and the exact file
@@ -63,8 +79,9 @@ and the four-page render remained stable.
 
 On 2026-08-16, a further local prompt/renderer revision was implemented,
 verified, and published through the signed-in Admin versioning path as
-sole-current v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44`. The exact live v3
-system prompt and body matched the tracked recovery source; the publisher
+sole-current v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44`. At publication time,
+the exact live v3 system prompt and body matched the then-current tracked
+recovery source; the publisher
 cloned v2's variables, output schema, model (`claude-sonnet-4-6`), temperature,
 and token budget. The prompt asks
 `backgroundAndImpact` and `detailedMethodology` to aim for 500-600 words
@@ -108,6 +125,8 @@ evidence.
 - No Dataverse business field, request-document registry row, request pointer,
   or SharePoint output was created.
 - No v3 `wmkf_ai_run` was created by the direct transport/render QA.
+- No two-input prompt version, live bibliography probe, or two-input
+  `wmkf_ai_run` has been created.
 - The branch was not promoted and the signed-in Workbench route was not
   production-smoked.
 - No review-layer merge or distribution workflow was added. The new Workbench

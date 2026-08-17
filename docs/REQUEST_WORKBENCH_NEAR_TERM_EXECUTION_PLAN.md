@@ -296,13 +296,12 @@ Dataverse/Graph extraction]** Request `1002788` resolves
 text. Existing stored Field Primers remain cached until an explicit
 regeneration.
 
-**[PLANNED for the next combined-submission cycle; owner direction
-2026-08-16]** Reviewer Finder should key off a version of this clean narrative
-that also contains the bibliography collected at initial submission. The
-reviewer prompt already prioritizes researchers named in the proposal and
-authors from references/citations, so this is expected to improve
-proposal-grounded reviewer discovery. The current-cycle Reviewer Finder loader
-is intentionally unchanged.
+**[OWNER DECISION 2026-08-17; PRE-SITE INTEGRATION SOURCE BUILT LOCALLY;
+REVIEWER FINDER CUTOVER PLANNED.]** Keep the narrative and bibliography as
+separate exact AI Materials PDFs. Multi-source callers label them separately
+for Claude and fingerprint both identities/versions/hashes; they do not depend
+on a Power Automate-produced combined PDF. The current-cycle Reviewer Finder
+loader is intentionally unchanged and adopts this contract next cycle.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a
@@ -349,7 +348,8 @@ run on 2026-08-16; direct-download slice IMPLEMENTED LOCALLY, end-to-end
 durable document pipeline PARTIAL.]**
 The Pre-Site draft has two independently refreshable source layers:
 
-1. **Proposal-derived factual material.** Use the full proposal text with an
+1. **Proposal-derived factual material.** Use the exact separate proposal
+   narrative and bibliography with an
    iterated form of the retired Phase II summarizer, now named
    `pre-site-visit.proposal-core.generate`. Where the
    document repeats authoritative request metadata such as institution,
@@ -407,8 +407,10 @@ The two named prompt surfaces do not currently have the same runtime posture:
   `lib/services/pre-site-visit/proposal-core-service.js`,
   `lib/services/pre-site-visit/docx-renderer.js`, focused tests, retained
   template render, live prompt readback, and controlled Request `1002379`
-  generation on 2026-08-16.]** The local producer uses the exact
-  `AI Materials/ProposalNarrative_{Request#}.pdf`, supplies authoritative
+  generation on 2026-08-16, plus two-file source tests on 2026-08-17.]** The
+  integration producer uses the exact
+  `AI Materials/ProposalNarrative_{Request#}.pdf` and
+  `AI Materials/ProposalBibliography_{Request#}.pdf`, supplies authoritative
   Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
@@ -426,6 +428,8 @@ The two named prompt surfaces do not currently have the same runtime posture:
   passed structural and rendered-page QA. Signed-in Admin publication then
   created v3 with shorter personnel instructions, no degree credentials,
   PI/co-PI abbreviations, and a soft one-page target for Background/Methodology.
+  The tracked two-input prompt contract is newer than live v3 and must be
+  published as a new immutable prompt version before promotion.
   A direct exact-v3 Request `1002379` model/render QA correctly produced 145
   personnel words and underlined only the two Dataverse roster names, but its
   574-word Background/Methodology pair spilled the final sentence to page 4;
@@ -1083,10 +1087,12 @@ Owner-decided:
     reviewer package: Initial Assessment and Field Primer now require
     `AI Materials/ProposalNarrative_{Request#}.pdf`; current-cycle external
     release and Reviewer Finder behavior remain unchanged; and
-47. for the next combined-submission cycle, the owner expects Reviewer Finder
-    to consume a version of that clean narrative containing the bibliography
-    received with initial submission, so cited authors become stronger
-    reviewer-discovery signals. Exact versioning and cutover remain future work.
+47. on 2026-08-17 the owner chose two separate canonical AI inputs—
+    `ProposalNarrative_{Request#}.pdf` and
+    `ProposalBibliography_{Request#}.pdf`—instead of a combined PDF. Claude
+    callers keep the inputs separately labeled and preserve both source
+    identities/versions/hashes; Reviewer Finder adopts them at the next-cycle
+    cutover.
 
 Still required:
 

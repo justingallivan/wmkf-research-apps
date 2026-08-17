@@ -121,8 +121,8 @@ hood.
 
 ### Automated proposal input contract
 
-The default proposal source for Initial Assessment and Workbench Field Primer
-request mode is the one exact active request file:
+The current proposal source for Initial Assessment and Workbench Field Primer
+request mode remains the one exact active request file:
 
 `AI Materials/ProposalNarrative_{Request#}.pdf`
 
@@ -146,13 +146,14 @@ Primer preserves its existing stored-envelope behavior, so this source change
 applies to new generations and explicit regenerations rather than silently
 invalidating an existing primer.
 
-**[PLANNED for the next combined-submission cycle; owner direction
-2026-08-16]** Reviewer Finder should move to a version of this clean AI
-narrative that includes the proposal bibliography received at initial
-submission. The existing reviewer prompt prioritizes named researchers and
-cited authors, so the bibliography offers stronger proposal-grounded reviewer
-signals. The exact version/cutover contract remains future implementation; the
-current-cycle Reviewer Finder resolver is unchanged.
+**[OWNER DECISION 2026-08-17; PRE-SITE INTEGRATION SOURCE BUILT LOCALLY;
+REVIEWER FINDER CUTOVER PLANNED.]** Multi-source analysis uses two separate
+exact files: `AI Materials/ProposalNarrative_{Request#}.pdf` and
+`AI Materials/ProposalBibliography_{Request#}.pdf`. Do not combine them into a
+third canonical PDF. The application supplies separately labeled untrusted
+inputs to Claude and fingerprints both stable identities, versions, and hashes.
+The current-cycle Reviewer Finder resolver is unchanged; it adopts this
+two-file contract for the next combined-submission cycle.
 
 **Historical proof for the superseded automated-input contract:** [VERIFIED
 2026-07-30 via live read-only Graph/Dataverse probe] Request
@@ -250,7 +251,8 @@ deliberate regenerate-from-latest action, but it must create a new Final
 row/file, preserve the prior Final, and never silently overwrite staff edits.
 
 The Pre-Site stable proposal core may exist before every review is received.
-It is drafted from the full proposal through the governed
+It is drafted from the exact separate proposal narrative and bibliography
+through the governed
 `pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
 of the retired Phase II summarizer while removing inferred administrative
 fields. Authoritative request metadata and the ordered PI/Co-PI roster come
@@ -266,7 +268,11 @@ direct exact-v3 Request `1002379` model/render QA verified the revised personnel
 rules and roster-name underlining but spilled Methodology's final sentence to
 page 4; it created no `wmkf_ai_run`. The signed-in Workbench route remains
 unpromoted/unproven, and artifact upload/registry plus the review-layer merge
-remain unbuilt.
+remain unbuilt. **[IMPLEMENTED LOCALLY 2026-08-17; NOT PUBLISHED OR
+DEPLOYED]** the integration branch now requires both exact AI Materials files,
+passes them as separate bounded Claude variables, and returns a two-source
+identity/version/hash manifest. Live prompt v3 remains single-source, so a new
+version must be deliberately published before this code can be promoted.
 Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.

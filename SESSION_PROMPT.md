@@ -3,9 +3,9 @@
 ## Session 443 Summary
 
 Session 443 established the final-cycle Phase I/Phase II proposal-source rules, built and tested
-the Pre-Site Visit Word draft on `codex/ai-proposal-narrative-source`, published the governed v3
-prompt, and recorded the owner's Dataverse persistence direction. The feature branch has not been
-merged or deployed. At the Session 443 close there was no Pre-Site Draft schema or business-data
+the Pre-Site Visit Word draft, published the governed v3 prompt, and recorded the owner's
+Dataverse persistence direction. The feature branch is now merged into the local
+`codex/pre-site-draft-schema` integration branch but is not deployed. At the Session 443 close there was no Pre-Site Draft schema or business-data
 write path; the current Session 444 state now includes an un-applied Wave 19 schema proposal and
 read-only preflight, while the business-data writer remains unbuilt.
 
@@ -14,11 +14,13 @@ read-only preflight, while the business-data writer remains unbuilt.
 1. **Canonical AI narrative source established**
    - Initial Assessment and Field Primer use the exact
      `AI Materials/ProposalNarrative_{Request#}.pdf` convention for this final two-phase cycle.
-   - The next-cycle Reviewer Finder requirement—use the narrative plus the newly available
-     bibliography to identify cited experts—remains parked for later implementation.
+   - Owner decision 2026-08-17 established a second exact file,
+     `AI Materials/ProposalBibliography_{Request#}.pdf`. Multi-source Claude callers keep it
+     separate from the narrative and fingerprint both exact sources. Pre-Site integration source
+     now implements that reader; Reviewer Finder adoption remains next-cycle work.
 
-2. **Pre-Site proposal core and Word renderer built on the feature branch**
-   - The proposal core combines the exact proposal narrative with read-only Dataverse request,
+2. **Pre-Site proposal core and Word renderer built on the integration branch**
+   - The proposal core combines the exact separate narrative and bibliography with read-only Dataverse request,
      organization, budget, and personnel data and validates eight named output sections.
    - The authenticated interim route renders a Word download from in-memory validated output; it
      does not yet persist a business draft or artifact.
@@ -27,11 +29,11 @@ read-only preflight, while the business-data writer remains unbuilt.
    - Personnel output is one paragraph, omits degrees, uses PI/co-PI, and underlines personnel
      names in both the first-page overview and detailed section.
 
-3. **Governed prompt v3 published and tested**
+3. **Governed single-source prompt v3 published and tested**
    - Sole-current prompt `pre-site-visit.proposal-core.generate` v3 has Dataverse id
      `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` and model `claude-sonnet-4-6`; inherited runtime
      settings were retained from v2.
-   - A controlled Request 1002379 direct application-LLM test used the exact live v3 prompt and
+   - A controlled Request 1002379 direct application-LLM test used the exact live single-source v3 prompt and
      normal untrusted-input boundaries. It produced 574 combined Background/Methodology words and
      145 Personnel words, with no degrees and correct PI/co-PI formatting.
    - The test intentionally created no `wmkf_ai_run`: the local-to-Production Dataverse audit write
@@ -85,6 +87,12 @@ read-only preflight, while the business-data writer remains unbuilt.
    `scripts/preflight-pre-site-draft-schema.mjs` now define the proposed additive fields and
    current Pre-Site/Final pointers. Nothing is applied, and no adapter/writer may select the fields before an
    approved target apply and exact metadata readback.
+   The revised proposal has 12 Request Document fields plus two Request pointers. Exact external
+   narrative/bibliography provenance lives in the versioned input-snapshot source manifest rather
+   than ambiguous single-source Graph columns.
+   The 2026-08-17 self-test passed; the read-only Production preflight classified all 14 proposed
+   metadata items as absent with zero divergences. The Production schema dry-run also completed
+   without `--execute`; it made no metadata changes.
 
 2. **Use the approved cross-tab Word lifecycle.**
    `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
@@ -93,9 +101,11 @@ read-only preflight, while the business-data writer remains unbuilt.
    exact current Pre-Site row/version/hash into a new governed Word document. There is no Site
    Visit Writeup or Dataverse staff-observations field.
 
-3. **Review and deliberately promote the feature branch.**
-   `codex/ai-proposal-narrative-source` is 15 commits ahead of `main`; its focused tests, gates,
-   types, and webpack build passed, but the authenticated route is not Production-live.
+3. **Review and deliberately promote the integration branch.**
+   `codex/pre-site-draft-schema` now contains the former proposal feature branch plus the unapplied
+   schema/lifecycle plan and two-input reader. The authenticated route is not Production-live.
+   Live prompt v3 is still single-source; publish and verify a new immutable two-input prompt
+   version before promotion.
 
 4. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
    17:53:40 PDT).**
@@ -116,14 +126,14 @@ read-only preflight, while the business-data writer remains unbuilt.
 
 ### Parked
 
-1. **Next-cycle Reviewer Finder narrative-plus-bibliography sourcing.**
+1. **Next-cycle Reviewer Finder cutover to the decided two-file AI Materials contract.**
 2. **Phase II applicant-intake portal pending the GOApply evaluation.**
 
 ### Verify Before Acting
 
-1. Do not apply Wave 19 from this handoff alone. Run the read-only target preflight, obtain
-   explicit approval for the Dataverse metadata write, apply the wave, and require exact readback
-   before runtime code selects the new fields.
+1. Do not apply Wave 19 from this handoff alone. The read-only Production preflight already passed
+   with 14 absent and 0 divergent; obtain explicit approval for the Dataverse metadata write,
+   apply the wave, and require exact readback before runtime code selects the new fields.
 2. Do not treat the direct v3 Request 1002379 test as a governed Production Executor run.
 
 ### Do Not Reopen Without New Decision

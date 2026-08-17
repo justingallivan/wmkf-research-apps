@@ -75,6 +75,13 @@ milestone snapshots remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
+**2026-08-17 proposal-input contract:** Power Automate creates separate exact
+`AI Materials/ProposalNarrative_{Request#}.pdf` and
+`AI Materials/ProposalBibliography_{Request#}.pdf` files. Multi-source Claude
+callers retain their boundary and fingerprint both identities/versions/hashes;
+there is no combined canonical AI PDF. Pre-Site integration source implements
+the reader locally, while Reviewer Finder's adoption remains next-cycle work.
+
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. During the Site

@@ -71,7 +71,7 @@
       "type": "Memo",
       "schemaName": "wmkf_PreSiteInputSnapshotJson",
       "displayName": "Pre-Site Input Snapshot (JSON)",
-      "description": "Write-once, versioned snapshot of authoritative structured Dataverse inputs and proposal-source identity used for this draft. It excludes credentials and proposal file text.",
+      "description": "Write-once, versioned snapshot of authoritative structured Dataverse inputs and the exact narrative/bibliography source manifest used for this draft. It excludes credentials and proposal file text.",
       "maxLength": 1048576
     },
     {
@@ -87,27 +87,6 @@
       "displayName": "Content Type",
       "description": "IANA media type of the registered SharePoint file, such as application/vnd.openxmlformats-officedocument.wordprocessingml.document or application/pdf.",
       "maxLength": 255
-    },
-    {
-      "type": "String",
-      "schemaName": "wmkf_SourceSharePointSiteId",
-      "displayName": "Source SharePoint Site ID",
-      "description": "Stable Microsoft Graph site ID of a source file that is not itself represented by a Request Document row.",
-      "maxLength": 300
-    },
-    {
-      "type": "String",
-      "schemaName": "wmkf_SourceSharePointDriveId",
-      "displayName": "Source SharePoint Drive ID",
-      "description": "Stable Microsoft Graph drive ID of a source file that is not itself represented by a Request Document row.",
-      "maxLength": 300
-    },
-    {
-      "type": "String",
-      "schemaName": "wmkf_SourceSharePointItemId",
-      "displayName": "Source SharePoint Item ID",
-      "description": "Stable Microsoft Graph item ID of the exact proposal-source file when no governed Request Document source row exists.",
-      "maxLength": 300
     }
   ]
 }

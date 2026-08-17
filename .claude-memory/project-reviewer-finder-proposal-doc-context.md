@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Current-cycle Reviewer Finder keeps its exact Reviewer Materials/Phase I resolver; next cycle should use a clean narrative version containing the initial-submission bibliography.
+description: Current-cycle Reviewer Finder keeps its exact Reviewer Materials/Phase I resolver; next cycle uses separate exact AI Materials narrative and bibliography inputs.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-16 via owner direction, current source, prompt source, and prior live current-cycle probe
+  last_verified: 2026-08-17 via owner direction, integration source/tests, prompt source, and prior live current-cycle probe
 ---
 
 ## Recall Rule
@@ -54,21 +54,22 @@ internal input is `AI Materials/ProposalNarrative_{Request#}.pdf`; the
 current-cycle Reviewer Finder resolver above is intentionally unchanged.
 
 The next cycle combines Phase I + Phase II into a single submission and will
-collect a bibliography at initial submission. Reviewer Finder should then key
-off a version of the clean AI narrative that includes that bibliography,
-dropping budget PDF/Excel, governing-board material, and biosketches. The
-existing reviewer prompt ranks names mentioned in the proposal first and
-authors from references/citations second, so the bibliography should improve
-proposal-grounded reviewer yield. This is a planned source cutover; the exact
-version/path contract is not yet implemented.
+collect a bibliography at initial submission. The exact forward contract is
+two separate files: `AI Materials/ProposalNarrative_{Request#}.pdf` and
+`AI Materials/ProposalBibliography_{Request#}.pdf`. Reviewer Finder will load
+and separately label both for Claude, dropping budget PDF/Excel,
+governing-board material, and biosketches. The existing reviewer prompt ranks
+names mentioned in the proposal first and authors from references/citations
+second, so the bibliography should improve proposal-grounded reviewer yield.
+The filenames are decided; the Reviewer Finder cutover remains planned.
 
 ## Why
-Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin, bibliography-less narrative starves Claude's named/cited reviewer sources. The combined cycle is the moment to fix the INPUT (richer text + bibliography + a PA-assembled clean doc), which is higher-leverage than tweaking the discovery code.
+Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin, bibliography-less narrative starves Claude's named/cited reviewer sources. The combined cycle is the moment to fix the inputs with a clean narrative plus a separately governed bibliography, which is higher-leverage than tweaking discovery code.
 
 ## How to apply
 - When the combined-cycle intake/documents are built, define the exact
-  Reviewer Finder version/cutover rule for the clean narrative-plus-
-  bibliography input. Do not assume the current outbound package path remains
+  Reviewer Finder version/cutover rule for the two decided AI Materials inputs.
+  Do not assume the current outbound package path remains
   its long-term analysis source.
 - Preserve the dedicated exact Reviewer Finder selector; do not reintroduce
   cross-purpose `classifyFile` or heuristic selection. The only automatic

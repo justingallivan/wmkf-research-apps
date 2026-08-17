@@ -205,8 +205,8 @@ function validateSpecs() {
       || requestSpec.entityLogicalName !== 'akoya_request') {
     throw new Error('The request spec must extend akoya_request.');
   }
-  if (documentSpec.attributes.length !== 15) {
-    throw new Error(`Expected 15 request-document attributes; found ${documentSpec.attributes.length}.`);
+  if (documentSpec.attributes.length !== 12) {
+    throw new Error(`Expected 12 request-document attributes; found ${documentSpec.attributes.length}.`);
   }
   const names = documentSpec.attributes.map((attribute) => attribute.schemaName.toLowerCase());
   if (new Set(names).size !== names.length) throw new Error('Duplicate attribute schema name.');

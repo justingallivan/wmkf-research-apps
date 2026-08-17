@@ -3,10 +3,10 @@ title: "Reviewer Materials — SharePoint Folder Convention"
 domain: reviewer-workbench
 kind: source-of-truth
 status: canonical
-summary: "Separate exact SharePoint contracts for the outbound reviewer package and the internal AI proposal narrative."
+summary: "Exact SharePoint contracts for the outbound reviewer package and separate internal narrative and bibliography PDFs."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-16
+last_verified: 2026-08-17
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -15,11 +15,11 @@ related:
 # Reviewer Materials — SharePoint Folder Convention
 
 **Audience:** Connor (PowerAutomate / file generation owner)
-**Status:** Owner-confirmed 2026-08-16. External delivery keeps the exact
+**Status:** Owner-confirmed 2026-08-17. External delivery keeps the exact
 `Reviewer Materials` package contract. Workbench Field Primer and Initial
-Assessment now use the separate exact `AI Materials` narrative contract.
-Reviewer Finder keeps its bounded current-cycle behavior and has a documented
-next-cycle direction below.
+Assessment retain the separate exact `AI Materials` narrative contract. The
+Pre-Site proposal-core integration and next-cycle Reviewer Finder contract use
+the narrative and bibliography as two independently versioned inputs.
 **Related:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` (file storage architecture)
 
 ---
@@ -38,7 +38,8 @@ akoya_request/                                                ← existing libra
       │   ├─ Proposal_1002379.pdf                               ← the ONLY reviewer-visible file
       │   └─ Research Phase I Application_2026-...pdf           ← internal; NEVER exposed
       ├─ AI Materials/                                          ← internal AI inputs
-      │   └─ ProposalNarrative_1002379.pdf                      ← exact IA/Field Primer input
+      │   ├─ ProposalNarrative_1002379.pdf                      ← proposal narrative only
+      │   └─ ProposalBibliography_1002379.pdf                   ← bibliography only
       └─ (other internal files and folders)
 ```
 
@@ -47,8 +48,15 @@ akoya_request/                                                ← existing libra
   only this exact request-bound filename.
 - **`AI Materials/ProposalNarrative_{Request#}.pdf`** — Connor's PA flow
   creates or replaces this clean proposal narrative for Initial Assessment and
-  Field Primer. It is an internal AI input and is never reviewer-visible merely
-  because it exists.
+  Field Primer and as one input to multi-source analysis.
+- **`AI Materials/ProposalBibliography_{Request#}.pdf`** — Connor's PA flow
+  creates or replaces the separate proposal bibliography used alongside the
+  narrative by multi-source analysis. Neither AI Materials file is
+  reviewer-visible merely because it exists.
+
+Do not merge the narrative and bibliography into a third canonical PDF. Code
+loads the two exact files independently, labels them separately for Claude,
+and fingerprints both identities/versions/hashes together.
 
 Anything else in the request folder — including other files placed in
 `Reviewer Materials/`, admin paperwork, staff briefs, and raw application
@@ -111,8 +119,9 @@ placing another file beside the proposal does not make it reviewer-visible.
 - **Outbound filename:** exactly `Proposal_{Request#}.pdf`, including
   capitalization and extension. Filename matching is case-sensitive.
 - **AI input folder spelling:** exactly `AI Materials` (one space).
-- **AI input filename:** exactly `ProposalNarrative_{Request#}.pdf`, including
-  capitalization and extension. Filename matching is case-sensitive.
+- **AI input filenames:** exactly `ProposalNarrative_{Request#}.pdf` and
+  `ProposalBibliography_{Request#}.pdf`, including capitalization and
+  extension. Filename matching is case-sensitive.
 - **Location:** both folders are directly inside
   `akoya_request/{requestNumber}_{requestGuid}/`.
 - **Missing exact proposal file:** the reviewer-facing app shows no download.
@@ -162,13 +171,11 @@ For reference — you don't need to build any of this; it's already in place.
    download or Blob write. This staff-only ingestion rule does not widen the
    external reviewer package and does not apply to Field Primer or Initial
    Assessment generation.
-7. **Reviewer Finder next-cycle direction** — when the combined submission
-   begins, Reviewer Finder should key off a version of the clean AI narrative
-   that includes the bibliography received at initial submission. The current
-   prompt explicitly prioritizes named researchers and cited authors, so this
-   should provide stronger proposal-grounded reviewer signals. The exact
-   version/cutover rule is planned, not implemented in the current-cycle
-   loader.
+7. **Pre-Site and Reviewer Finder multi-source direction** — the Pre-Site
+   integration branch resolves both exact AI Materials files and supplies them
+   to Claude as separately bounded untrusted inputs. Reviewer Finder will adopt
+   the same two-source contract for the next combined-submission cycle. Its
+   current-cycle loader is unchanged.
 
 Reviewer Finder retains an explicit authenticated `fileKey` override for
 deliberate staff analysis of a historical or ad-hoc source. That manual action
@@ -183,21 +190,26 @@ external reviewer.
    create `Reviewer Materials/` under the request's SharePoint folder.
 2. **When the reviewer package is ready:** create or replace exactly
    `Reviewer Materials/Proposal_{Request#}.pdf`.
-3. **For Initial Assessment and Field Primer:** create or replace exactly
+3. **For internal AI analysis:** create or replace exactly
    `AI Materials/ProposalNarrative_{Request#}.pdf` from the narrative component
-   of the assembled submission. For Request `1002788`, the exact example is
-   `AI Materials/ProposalNarrative_1002788.pdf`.
-4. **Do not rename the raw timestamped application export to the canonical
+   and `AI Materials/ProposalBibliography_{Request#}.pdf` from the bibliography
+   component. For Request `1002788`, the exact examples are
+   `AI Materials/ProposalNarrative_1002788.pdf` and
+   `AI Materials/ProposalBibliography_1002788.pdf`.
+4. **Keep the two AI inputs separate.** Do not create a combined canonical PDF;
+   the application composes the Claude input while preserving the boundary and
+   provenance of each source.
+5. **Do not rename the raw timestamped application export to the canonical
    proposal filename.** The canonical PDF must contain only the content
    approved for external reviewers.
 
 That's it. The rest happens automatically.
 
 For the current cycle the outbound PDF contains the separate Phase II proposal,
-while the AI PDF contains the proposal narrative needed for analysis. This is
+while the two AI PDFs contain the narrative and bibliography needed for analysis. This is
 expected to be the last cycle with a separate Phase II submission. For the next
-combined-submission cycle, include the initial-submission bibliography in the
-clean narrative version intended for Reviewer Finder; keep budget PDF/Excel,
+combined-submission cycle, retain the initial-submission bibliography as its
+own canonical AI Materials file; keep budget PDF/Excel,
 governing-board material, and biosketches out of that AI input unless a later
 owner decision explicitly changes the contract.
 

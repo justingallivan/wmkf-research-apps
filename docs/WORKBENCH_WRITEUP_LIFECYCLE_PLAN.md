@@ -39,11 +39,12 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-The three Workbench tabs are placeholders in the current mainline source. The
-Pre-Site prompt/renderer work exists on the unmerged
-`codex/ai-proposal-narrative-source` branch. Wave 19 is an unapplied local
-schema proposal. This document does not authorize or record any live
-Dataverse metadata or record write.
+The three Workbench tabs remain placeholders in current `main`. The Pre-Site
+prompt/renderer and exact two-file input reader are combined locally on
+`codex/pre-site-draft-schema`; they are not deployed. Wave 19 is an unapplied
+local schema proposal. Its 2026-08-17 read-only Production preflight found all
+14 proposed metadata items absent and no divergences. This document does not
+authorize or record any live Dataverse metadata or record write.
 
 ## Evidence boundary
 
@@ -55,7 +56,7 @@ Dataverse metadata or record write.
 | Production contains no Pre-Site Request Document rows as of 2026-08-17 | Read-only Production inventory | VERIFIED |
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
-| Current Pre-Site and Final request lookups exist | Wave 19 read-only preflight | PLANNED; ABSENT UNTIL APPLY |
+| Current Pre-Site and Final request lookups exist | 2026-08-17 Wave 19 read-only Production preflight: both absent; all 14 proposed items absent and 0 divergent | VERIFIED ABSENT / PLANNED APPLY |
 
 ## Ownership model
 
@@ -79,7 +80,7 @@ migration or retirement, inventory populated rows and live callers.
 ## Lifecycle and lineage
 
 ```text
-Dataverse facts + AI Materials narrative + review evidence
+Dataverse facts + AI Materials narrative/bibliography + review evidence
                          │
                          ▼
        Pre-Site Request Document row ─── stable SharePoint DOCX
@@ -105,7 +106,7 @@ version/hash captured when the action runs.
 
 ### Minimum interface
 
-- Show source readiness for the proposal narrative, authoritative Dataverse
+- Show source readiness for the separate proposal narrative and bibliography, authoritative Dataverse
   metadata, governed prompt/model configuration, and Word template.
 - Generate or retry the Pre-Site draft through one durable operation.
 - Show the current Ready Word document, its lifecycle status, generated time,
@@ -120,9 +121,10 @@ version/hash captured when the action runs.
 ### Creation transaction
 
 1. Resolve the Request and authoritative related Dataverse records.
-2. Resolve the exact `AI Materials/ProposalNarrative_{Request#}.pdf` by stable
-   Graph site/drive/item/version identity; the path is a discovery convention,
-   not the durable key.
+2. Resolve the exact `AI Materials/ProposalNarrative_{Request#}.pdf` and
+   `AI Materials/ProposalBibliography_{Request#}.pdf` by stable Graph
+   site/drive/item/version identity; paths are discovery conventions, not the
+   durable keys.
 3. Build a bounded input snapshot and deterministic generation key.
 4. Execute the admin-configured governed prompt through the shared Executor,
    persisting the `wmkf_ai_run` audit.
@@ -228,9 +230,8 @@ silent rewrite.
 
 Wave 19 remains additive and unapplied. It proposes:
 
-- 15 fields on `wmkf_requestdocument`: eight named proposal-core Memo fields,
-  two immutable JSON snapshots, render fingerprint, content type, and three
-  stable source-Graph identity fields; and
+- 12 fields on `wmkf_requestdocument`: eight named proposal-core Memo fields,
+  two immutable JSON snapshots, render fingerprint, and content type; and
 - two N:1 Request lookups: `wmkf_CurrentPreSiteVisit` and
   `wmkf_CurrentFinalWriteup`.
 
@@ -280,7 +281,7 @@ current writeup pointer always targets Word, never PDF.
    exact readback. No runtime `$select` may reference a field before it exists.
 2. **Pre-Site persistence and generation.** Merge the approved prompt/renderer
    work, add adapter fields and the durable writer, then exercise Request
-   `1002379` with the newly supplied AI Materials narrative.
+   `1002379` after both exact AI Materials inputs are supplied.
 3. **Pre-Site tab.** Add status, source-readiness, generate/retry, provenance,
    and Open in Word UI around the durable operation.
 4. **Site Visit logistics design.** Inventory and map every desired logistics

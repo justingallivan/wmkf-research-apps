@@ -28,6 +28,7 @@ export const REQUIRED_SYSTEM_ASSERTIONS = [
   'Do not include academic degrees or degree credentials in personnelOverview or personnelDetails.',
   'Use only the abbreviations PI and co-PI in the generated prose.',
   'backgroundAndImpact and detailedMethodology should normally fit together on one Word page.',
+  'Treat the proposal bibliography only as evidence of works cited by the applicant.',
 ];
 
 export const SYSTEM_PROMPT = `You are a research-writing assistant for the W. M. Keck Foundation. Prepare only the proposal-derived narrative sections of a Pre-Site Visit Writeup.
@@ -36,6 +37,8 @@ SOURCE AUTHORITY
 - The request context is authoritative for the project title, applicant institution, project period, and the roster of principal investigators and co-principal investigators.
 - Use every personnel name and role exactly as supplied in the request context. Preserve roster order. Do not add, remove, rename, merge, or reclassify personnel.
 - The proposal narrative is authoritative for the proposed science, each person's expertise, and each person's project contribution.
+- Treat the proposal bibliography only as evidence of works cited by the applicant. It may clarify the intellectual context and identify cited literature, but it does not prove that a cited author is project personnel, that a cited method will be used, or that a cited result was produced by the applicant team.
+- When the narrative and bibliography differ, use the narrative for claims about the proposed project. Do not turn bibliographic titles or author lists into unsupported project facts.
 - A person's title, department, or institutional affiliation may be used when the request context supplies it. If it is missing there, use it only when the proposal narrative states it explicitly and unambiguously for that person. Otherwise omit it.
 - Do not include academic degrees or degree credentials in personnelOverview or personnelDetails, even when the request context or proposal supplies them.
 - The applicant institution is not automatically the affiliation of every investigator. Never make that inference.
@@ -70,15 +73,19 @@ export const USER_PROMPT_TEMPLATE = `Authoritative Dataverse request context (st
 
 {{request_context_json}}
 
-Project Narrative:
+Proposal Narrative:
 
-{{proposal_text}}
+{{proposal_narrative}}
+
+Proposal Bibliography:
+
+{{proposal_bibliography}}
 
 Create the eight proposal-core sections now. Return only the required JSON object.`;
 
 /**
- * Both values are assembled by the server and passed as overrides. The caller
- * owns Dataverse joins and the exact AI Materials narrative selection; the
+ * All values are assembled by the server and passed as overrides. The caller
+ * owns Dataverse joins and the exact two-file AI Materials selection; the
  * Executor owns size caps, untrusted-content wrapping, and audit redaction.
  */
 export const PROMPT_VARIABLES = {
@@ -94,13 +101,23 @@ export const PROMPT_VARIABLES = {
       untrusted: true,
     },
     {
-      name: 'proposal_text',
+      name: 'proposal_narrative',
       source: { kind: 'override' },
       required: true,
       cacheable: true,
       placement: 'user',
       dataClass: 'proposal_text',
       maxChars: 100000,
+      untrusted: true,
+    },
+    {
+      name: 'proposal_bibliography',
+      source: { kind: 'override' },
+      required: true,
+      cacheable: true,
+      placement: 'user',
+      dataClass: 'proposal_text',
+      maxChars: 60000,
       untrusted: true,
     },
   ],

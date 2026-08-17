@@ -48,9 +48,25 @@ function dependencies(overrides = {}) {
       address1_stateorprovince: 'Georgia',
     }),
     getCoPIs: jest.fn().mockResolvedValue(['Dr. First Co-PI', 'Dr. Second Co-PI']),
-    getProposalNarrative: jest.fn().mockResolvedValue({
-      filename: 'ProposalNarrative_1002379.pdf',
-      text: 'Proposal narrative content '.repeat(20),
+    getProposalMaterials: jest.fn().mockResolvedValue({
+      narrative: {
+        filename: 'ProposalNarrative_1002379.pdf',
+        text: 'Proposal narrative content '.repeat(20),
+        siteId: 'site-id',
+        driveId: 'drive-id',
+        itemId: 'narrative-item',
+        versionId: 'narrative-v1',
+        contentHash: 'a'.repeat(64),
+      },
+      bibliography: {
+        filename: 'ProposalBibliography_1002379.pdf',
+        text: 'Bibliography content '.repeat(10),
+        siteId: 'site-id',
+        driveId: 'drive-id',
+        itemId: 'bibliography-item',
+        versionId: 'bibliography-v1',
+        contentHash: 'b'.repeat(64),
+      },
     }),
     runPrompt: jest.fn().mockResolvedValue({
       parsed: { proposalCore },
@@ -68,12 +84,15 @@ test('formats city/state and meeting date without local-time drift', () => {
   expect(formatMeetingDate('2026-12-01')).toBe('December 2026');
 });
 
-test('loads authoritative Dataverse fields and the exact AI Materials narrative', async () => {
+test('loads authoritative Dataverse fields and both exact AI Materials inputs', async () => {
   const deps = dependencies();
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
 
-  expect(deps.getProposalNarrative).toHaveBeenCalledWith(REQUEST_ID, '1002379');
-  expect(result.proposal.filename).toBe('ProposalNarrative_1002379.pdf');
+  expect(deps.getProposalMaterials).toHaveBeenCalledWith(REQUEST_ID, '1002379');
+  expect(result.proposalMaterials).toMatchObject({
+    narrative: { filename: 'ProposalNarrative_1002379.pdf' },
+    bibliography: { filename: 'ProposalBibliography_1002379.pdf' },
+  });
   expect(result.context).toMatchObject({
     requestNumber: '1002379',
     projectTitle: 'A test project',
@@ -103,7 +122,26 @@ test('calls the governed prompt with ordered personnel and fail-closed safeguard
     runSource: 'Vercel Test',
   }, deps);
 
-  expect(result.source).toEqual({ filename: 'ProposalNarrative_1002379.pdf' });
+  expect(result.sources).toEqual([
+    {
+      role: 'proposalNarrative',
+      filename: 'ProposalNarrative_1002379.pdf',
+      siteId: 'site-id',
+      driveId: 'drive-id',
+      itemId: 'narrative-item',
+      versionId: 'narrative-v1',
+      contentHash: 'a'.repeat(64),
+    },
+    {
+      role: 'proposalBibliography',
+      filename: 'ProposalBibliography_1002379.pdf',
+      siteId: 'site-id',
+      driveId: 'drive-id',
+      itemId: 'bibliography-item',
+      versionId: 'bibliography-v1',
+      contentHash: 'b'.repeat(64),
+    },
+  ]);
   expect(result.runId).toBe('33333333-3333-4333-8333-333333333333');
   expect(deps.runPrompt).toHaveBeenCalledTimes(1);
   const call = deps.runPrompt.mock.calls[0][0];
@@ -122,13 +160,28 @@ test('calls the governed prompt with ordered personnel and fail-closed safeguard
   ]);
   expect(promptContext).not.toHaveProperty('requestedAmount');
   expect(promptContext).not.toHaveProperty('invitedAmount');
-  expect(call.overrideVariables.proposal_text).toContain('Proposal narrative content');
+  expect(call.overrideVariables.proposal_narrative).toContain('Proposal narrative content');
+  expect(call.overrideVariables.proposal_bibliography).toContain('Bibliography content');
 });
 
 test('fails before the prompt call when the exact narrative is unavailable', async () => {
-  const deps = dependencies({ getProposalNarrative: jest.fn().mockResolvedValue(null) });
+  const deps = dependencies({ getProposalMaterials: jest.fn().mockResolvedValue(null) });
   await expect(generatePreSiteVisitProposalCore({ requestId: REQUEST_ID }, deps))
     .rejects.toMatchObject({ code: 'proposal_narrative_unavailable', httpStatus: 409 });
+  expect(deps.runPrompt).not.toHaveBeenCalled();
+});
+
+test('fails before the prompt call when the exact bibliography is unavailable', async () => {
+  const deps = dependencies();
+  deps.getProposalMaterials.mockResolvedValueOnce({
+    narrative: {
+      filename: 'ProposalNarrative_1002379.pdf',
+      text: 'Proposal narrative content '.repeat(20),
+    },
+    bibliography: null,
+  });
+  await expect(generatePreSiteVisitProposalCore({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'proposal_bibliography_unavailable', httpStatus: 409 });
   expect(deps.runPrompt).not.toHaveBeenCalled();
 });
 

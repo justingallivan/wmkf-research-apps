@@ -24,8 +24,9 @@ related:
 
 **[PLANNED 2026-08-17; NOT APPLIED.]** Wave 19 is an implementation-ready,
 additive schema proposal. Its JSON specifications and read-only preflight are
-tracked locally, but no Dataverse metadata, records, application adapter, or
-runtime writer has been changed.
+tracked locally. The 2026-08-17 read-only Production preflight classified all
+14 proposed metadata items as absent with zero divergences; no Dataverse
+metadata, records, application adapter, or runtime writer has been changed.
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -63,11 +64,11 @@ akoya_request
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
 | Production has three Request Document rows, all Initial Assessments, and no Pre-Site rows | Read-only production inventory on 2026-08-17 | VERIFIED |
-| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current and uses `claude-sonnet-4-6` | Read-only production prompt inventory on 2026-08-17 | VERIFIED |
+| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current and uses `claude-sonnet-4-6`; the two-input tracked contract requires a future v4 publication before promotion | Read-only production prompt inventory on 2026-08-17 plus integration-branch source | VERIFIED LIVE / PLANNED PUBLICATION |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The current Workbench Pre-Site route persists a business draft | The feature branch renders validated output from memory; only the normal AI-run audit persists | PARTIAL |
-| Wave 19 fields and current pointers exist in Dataverse | Read-only preflight is the required falsification check; until an approved apply and readback, they are absent | PLANNED |
+| Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 read-only Production preflight: 14 absent, 0 divergent, 0 exact | VERIFIED ABSENT / PLANNED APPLY |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -99,17 +100,18 @@ Additional fields:
 | Logical name | Type / limit | Contract |
 |---|---|---|
 | `wmkf_presiteproposalcorejson` | Memo / 1,048,576 | Write-once exact validated Claude proposal-core object, before staff changes. It is audit/reproducibility evidence, not the only working representation. |
-| `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and proposal-source identity. It excludes credentials and the full proposal text. |
+| `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and the exact two-source proposal manifest. It excludes credentials and full PDF text. |
 | `wmkf_renderinputfingerprint` | String / 64 | SHA-256 of the exact named draft fields and deterministic document inputs used for a render. A mismatch means the registered file does not represent the current draft fields. |
 | `wmkf_contenttype` | String / 255 | IANA media type for the one SharePoint file represented by the row. This distinguishes Word and PDF without another closed option set. |
-| `wmkf_sourcesharepointsiteid` | String / 300 | Stable Graph site identity for an unregistered external source such as the AI Materials narrative. |
-| `wmkf_sourcesharepointdriveid` | String / 300 | Stable Graph drive identity for that source. |
-| `wmkf_sourcesharepointitemid` | String / 300 | Stable Graph item identity for that source. Existing `wmkf_sourceversionid` and `wmkf_sourcecontenthash` complete the source identity. |
 
-The source Graph fields are necessary because a filename or folder convention
-is not a durable identity, while the existing `wmkf_SourceDocument` lookup can
-only reference another governed Request Document row. The Phase II narrative
-in `AI Materials` is not currently registered as one.
+The two AI Materials inputs are not currently separate governed Request
+Document rows. Their bounded source manifest therefore records each role,
+filename, stable Graph site/drive/item identity, exact version, and content
+hash inside the immutable input snapshot. Fixed single-source Graph columns
+were removed from the unapplied proposal because they could not represent both
+inputs without ambiguity. The existing `wmkf_SourceDocument` lookup and source
+version/hash remain reserved for lineage from one governed output artifact to
+another, such as Word → PDF or Pre-Site → Final.
 
 ### `akoya_request` relationships
 
@@ -173,7 +175,7 @@ unlabelled object:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "proposalCore": {
     "executiveSummary": "...",
     "impactOverview": "...",
@@ -207,14 +209,26 @@ source identity:
     "projectPeriod": { "startDate": "...", "endDate": "..." },
     "personnel": []
   },
-  "proposalSource": {
-    "filename": "ProposalNarrative_1002379.pdf",
-    "siteId": "...",
-    "driveId": "...",
-    "itemId": "...",
-    "versionId": "...",
-    "contentHash": "..."
-  }
+  "proposalSources": [
+    {
+      "role": "proposalNarrative",
+      "filename": "ProposalNarrative_1002379.pdf",
+      "siteId": "...",
+      "driveId": "...",
+      "itemId": "...",
+      "versionId": "...",
+      "contentHash": "..."
+    },
+    {
+      "role": "proposalBibliography",
+      "filename": "ProposalBibliography_1002379.pdf",
+      "siteId": "...",
+      "driveId": "...",
+      "itemId": "...",
+      "versionId": "...",
+      "contentHash": "..."
+    }
+  ]
 }
 ```
 
@@ -226,11 +240,12 @@ The source file remains authoritative for proposal content.
 The runtime implementation is a later, separately reviewed slice. It must:
 
 1. load the authoritative request/account/budget/personnel data and the exact
-   `AI Materials/ProposalNarrative_{Request#}.pdf` identity and bytes;
+   `AI Materials/ProposalNarrative_{Request#}.pdf` plus
+   `AI Materials/ProposalBibliography_{Request#}.pdf` identities and bytes;
 2. calculate the input fingerprint and deterministic generation key before
    creating or claiming a row;
-3. execute the admin-configured governed prompt through the shared Executor and
-   require a persisted `wmkf_ai_run` audit;
+3. execute a two-input published version of the admin-configured governed prompt
+   through the shared Executor and require a persisted `wmkf_ai_run` audit;
 4. validate exactly eight sections, then persist the named fields, immutable
    JSON snapshots, prompt/run lookups, and source identity under the owned
    claim;
@@ -250,14 +265,13 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 
 1. Run the self-test and the read-only target preflight.
 2. Obtain explicit approval for the target Dataverse metadata write.
-3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 17
+3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 14
    declared artifacts are exact.
 4. Only after schema readback, add the new fields to the request-document
    adapter and request lookup selects.
 5. Implement the writer/renderer transition and focused tests.
-6. Exercise Request `1002379` as the controlled old-request testbed, using a
-   newly created AI Materials narrative and without altering unrelated request
-   data.
+6. Exercise Request `1002379` as the controlled old-request testbed only after
+   both exact AI Materials files exist, without altering unrelated request data.
 7. Verify the exact row, run, Word item/version, current pointer, retry, and one
    safe partial-failure recovery before promotion.
 

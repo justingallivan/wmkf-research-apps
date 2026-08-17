@@ -176,8 +176,10 @@ Pre-Site Word workspace. Exact design and deployment boundary:
 - One Word file per versioned draft row; the row carries all eight named
   proposal-core fields and the exact validated Claude/input snapshots.
 - The source proposal is exactly
-  `AI Materials/ProposalNarrative_{Request#}.pdf`, with stable Graph identity,
-  version, and content hash captured on the draft row.
+  `AI Materials/ProposalNarrative_{Request#}.pdf` plus
+  `AI Materials/ProposalBibliography_{Request#}.pdf`, with both roles, stable
+  Graph identities, versions, and content hashes captured in the immutable
+  input snapshot.
 - The governed prompt remains admin-configured through
   `pre-site-visit.proposal-core.generate`; `wmkf_ai_run` remains the execution
   audit rather than the editable business record.
@@ -190,9 +192,11 @@ Pre-Site Word workspace. Exact design and deployment boundary:
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
-This contract is schema/design only. The feature-branch pass-through producer
-and DOCX renderer do not persist these business fields or create governed
-registry rows.
+This persistence contract is schema/design only. The integration-branch
+pass-through producer requires and separately labels both exact inputs, but it
+and the DOCX renderer do not persist these business fields or create governed
+registry rows. Live prompt v3 remains single-source; the tracked two-input
+contract requires a new published prompt version before promotion.
 
 ## Retry and partial-success behavior
 

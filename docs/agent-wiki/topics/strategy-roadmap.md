@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-16
+last_verified: 2026-08-17
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -274,8 +274,9 @@ document inventory, and individual implementation plans do not establish priorit
   snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
-  implemented 2026-08-16): draft factual material from the exact AI Materials
-  narrative through governed `pre-site-visit.proposal-core.generate`;
+  implemented 2026-08-16; two-source input revised locally 2026-08-17): draft
+  factual material from the exact separate AI Materials narrative and
+  bibliography through governed `pre-site-visit.proposal-core.generate`;
   supply authoritative request metadata from Dataverse; use
   `review-synthesis.generate` over all currently submitted reviews; and allow
   distribution with zero reviews because the Site Visit date controls timing.
@@ -287,7 +288,9 @@ document inventory, and individual implementation plans do not establish priorit
   resolved the exact narrative and all template metadata. An authenticated
   Workbench tab and route now perform an interim direct DOCX download; focused
   tests cover the binary response and stale-request cancellation. Dataverse
-  now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; the latest
+  now has sole-current single-source prompt v3 on reviewed
+  `claude-sonnet-4-6`; the tracked two-input prompt must be published as a new
+  immutable version before code promotion. The latest
   audited Executor evidence remains accepted v2 Request `1002379` run
   `5bd65180-ed99-f111-b8db-7ced8d6e2f44`. A direct exact-v3 model/render QA
   correctly applied the revised personnel rules and roster-name underlining,
