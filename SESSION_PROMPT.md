@@ -49,7 +49,8 @@ duplicate or second model call.
    - The direct four-page visual inspection passed the requested name underlining. Its final
      Methodology sentence spilled to page four. The later Production v1 render fit Background and
      Methodology on page three but exposed a separate Recommendation label/value spacing issue;
-     deployed template v2 fixes that spacing and awaits a signed-in generation smoke.
+     deployed template v2 fixed that spacing; the later signed-in generation exposed
+     a separate width-sensitive Word Online alignment defect now targeted by local template v3.
 
 4. **Dataverse persistence schema and durable writer production-proved**
    - The branch now uses the Request Document registry as the editable business
@@ -123,9 +124,15 @@ duplicate or second model call.
    deployment `dpl_EzNRXmcG2NVQawGNKMMdUN3crpZg`; the route has a read-only
    GET status path, the tab loads
    the current artifact on entry, and a lost POST response triggers bounded GET
-   polling without issuing another POST. Template v2 adds the missing
-   Recommendation value-cell padding and changes the governed generation
-   identity so a future fixed document is created rather than overwriting v1.
+   polling without issuing another POST. Production template v2 added the missing
+   Recommendation value-cell padding and created artifact
+   `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, but Word Online exposed a second
+   width-sensitive alignment defect despite explicit centered-cell formatting.
+   **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
+   remaining layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17;
+   PRODUCTION PROMOTION PENDING]** template v3 makes that label explicitly
+   non-wrapping and changes the governed generation identity again, preserving
+   both earlier Ready documents.
    Before preview/sandbox runtime uses Wave 19 fields, that target must still
    pass the same preflight and schema apply.
 
@@ -205,8 +212,11 @@ to four pages for visual inspection: page-one alignment/amount spacing/divider
 and name underlining passed; Background and Methodology fit together on page
 three; Personnel is one paragraph on page four with underlined names, PI/co-PI
 abbreviations, and no degree listings. **[DEPLOYED TO PRODUCTION 2026-08-17;
-SIGNED-IN FEATURE SMOKE OPEN]** template v2 adds 0.1-inch left padding to the
-Recommendation value cell; a no-Claude Request `1002379` fixture rendered
-cleanly on all pages before deployment. The public sign-in page and protected
-route boundary passed after deployment, but no new Production Word draft was
-generated during the release smoke.
+SIGNED-IN FEATURE SMOKE OPEN]** production template v2 added 0.1-inch left
+padding to the Recommendation value cell. A later controlled generation created
+artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`; its exact SharePoint file
+rendered cleanly locally, but Word Online shifted the width-constrained
+Recommendation label despite explicit centered-cell formatting. Template
+v3 is implemented and locally verified with an explicit no-wrap label; its
+no-Claude Request `1002379` fixture rendered cleanly on all three fixture pages.
+Production promotion and a Word Online v3 smoke remain open.

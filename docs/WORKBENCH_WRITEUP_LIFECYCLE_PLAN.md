@@ -291,9 +291,15 @@ current writeup pointer always targets Word, never PDF.
    Generate/retry and Open in Word are live. **[DEPLOYED TO PRODUCTION
    2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** read-only current/pending status loading and bounded GET
    polling recover a long request whose client response is lost after durable
-   completion without another POST. Template v2 fixes Recommendation-cell
-   spacing under a new generation identity. Signed-in current-status and
-   controlled v2 generation proof remain open.
+   completion without another POST. Production template v2 fixed
+   Recommendation-cell spacing under a new generation identity and created
+   Ready artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, but Word Online
+   exposed a width-sensitive Recommendation-label alignment defect.
+   **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
+   remaining layout variable. **[IMPLEMENTED AND
+   LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]** template v3
+   makes the label explicitly non-wrapping under another generation identity.
+   Signed-in current-status and Word Online v3 proof remain open.
 4. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 5. **Site Visit dossier.** Implement the Word-workspace link plus governed

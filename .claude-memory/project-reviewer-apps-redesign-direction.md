@@ -98,9 +98,15 @@ no new prompt publication is required. The first long client request displayed
 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes read-only
 current/pending status, and the
 tab loads current state and uses bounded GET polling after a lost POST response
-without repeating POST. Template v2 also adds Recommendation-cell padding
-under a distinct generation identity. The public sign-in/auth boundary passed;
-signed-in current-status and template-v2 generation proof remain open.
+without repeating POST. Production template v2 added Recommendation-cell
+padding under a distinct generation identity, and a controlled generation
+created artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`. Word Online then
+exposed a width-sensitive alignment defect in the Recommendation label.
+**[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the remaining
+layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION
+PENDING]** template v3 makes that label explicitly non-wrapping under another
+distinct generation identity. The public sign-in/auth boundary passed;
+signed-in current-status and Word Online v3 proof remain open.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,

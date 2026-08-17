@@ -167,8 +167,13 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    response after durable server completion. **[DEPLOYED TO PRODUCTION
    2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the tab discovers current/pending
    status and performs bounded
-   GET polling without a blind POST retry; template v2 also fixes
-   Recommendation-cell spacing under a new generation identity; and
+   GET polling without a blind POST retry. Production template v2 fixed
+   Recommendation-cell spacing under a new generation identity and produced a
+   Ready artifact, but Word Online exposed a width-sensitive
+   Recommendation-label alignment defect. **[INFERRED FROM SCREENSHOT + OOXML
+   WIDTH]** implicit wrapping was the remaining layout variable. Template v3 is implemented and
+   locally verified with an explicit no-wrap label; production promotion and a
+   Word Online v3 smoke remain open; and
 3. continue the approved Workbench lifecycle: map the Site Visit dossier and
    narrow applicant-material upload, then create Final from an exact Pre-Site
    row/version/hash. The full Editor Dashboard remains later reuse.

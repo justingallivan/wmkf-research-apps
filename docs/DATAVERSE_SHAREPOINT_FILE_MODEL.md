@@ -276,9 +276,15 @@ matches the narrative-only runtime contract; no new prompt publication is
 required for this change.
 **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the Workbench loads
 read-only current/pending status and uses bounded GET polling after a lost POST
-response without repeating POST. Template v2 adds Recommendation-cell padding
-under a new generation identity, leaving the existing Production v1 Ready
-row/file untouched until staff deliberately generates a v2 draft.
+response without repeating POST. Production template v2 added
+Recommendation-cell padding under a new generation identity and created Ready
+artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, leaving the Production v1
+row/file untouched. Its exact SharePoint file exposed a Word Online-only
+width-sensitive alignment defect in the Recommendation label. **[INFERRED FROM
+SCREENSHOT + OOXML WIDTH]** implicit wrapping was the remaining layout variable.
+**[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]**
+template v3 makes that label explicitly non-wrapping under another generation
+identity.
 Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.

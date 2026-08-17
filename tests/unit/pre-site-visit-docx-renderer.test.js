@@ -112,6 +112,7 @@ test('pins title alignment and visible metadata-value spacing in the retained te
 
   expect(cellContaining(cells, 'Project Title')).toContain('<w:vAlign w:val="top"/>');
   expect(cellContaining(cells, 'DV:ProjectTitle')).toContain('<w:vAlign w:val="top"/>');
+  expect(cellContaining(cells, '>Recommendation<')).toContain('<w:noWrap/>');
   for (const placeholder of [
     'DV:RequestedAmount',
     'DV:InvitedAmount',

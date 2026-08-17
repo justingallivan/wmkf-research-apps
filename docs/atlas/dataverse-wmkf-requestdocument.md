@@ -212,10 +212,16 @@ another model call or upload. The first long client request displayed `Failed
 to fetch` after durable server completion. **[DEPLOYED TO PRODUCTION
 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** GET status reads the current pointer plus the newest later
 pending operation without mutation, and the tab performs bounded GET polling
-after a lost POST response without repeating POST. Template v2 adds
-Recommendation-cell padding under a new generation identity, leaving the v1
-Ready row/file untouched. Signed-in current-status and v2 generation proof
-remain open; this was never a registry consistency failure.
+after a lost POST response without repeating POST. Production template v2 added
+Recommendation-cell padding under a new generation identity and created Ready
+artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, leaving the v1 row/file
+untouched. Its exact SharePoint file exposed a width-sensitive Word Online
+alignment defect in the Recommendation label. **[INFERRED FROM SCREENSHOT +
+OOXML WIDTH]** implicit wrapping was the remaining layout variable. **[IMPLEMENTED AND LOCALLY
+VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]** template v3 makes that
+label explicitly non-wrapping under another generation identity. Signed-in
+current-status and Word Online v3 proof remain open; this was never a registry
+consistency failure.
 
 ## Retry and partial-success behavior
 

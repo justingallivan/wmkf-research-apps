@@ -283,9 +283,15 @@ The first long Production request completed durably but the browser displayed
 returned the existing Ready link without another row, run, upload, or model
 call. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes
 read-only current/pending status and the tab uses bounded GET polling after a
-lost POST response without repeating POST. Template v2 adds the missing
-Recommendation-cell padding under a new generation identity; signed-in
-current-status and controlled v2 generation proof remain open.
+lost POST response without repeating POST. Production template v2 added the
+missing Recommendation-cell padding under a new generation identity and
+created Ready artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`. Its exact
+SharePoint file exposed a width-sensitive Word Online alignment defect in the
+Recommendation label. **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit
+wrapping was the remaining layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED
+2026-08-17; PRODUCTION PROMOTION PENDING]** template v3 explicitly prevents
+that label from wrapping under another generation identity. Signed-in
+current-status and Word Online v3 proof remain open.
 
 Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these

@@ -314,10 +314,15 @@ document inventory, and individual implementation plans do not establish priorit
   displayed `Failed to fetch` after durable server completion; exact retry
   recovered the existing Ready link. **[DEPLOYED TO PRODUCTION 2026-08-17;
   SIGNED-IN FEATURE SMOKE OPEN]** read-only current/pending status loading plus bounded GET polling
-  now recover a lost POST response without repeating POST, and template v2
-  adds Recommendation-cell padding under a distinct generation identity.
-  The public sign-in/auth boundary passed; signed-in current-status and v2
-  generation proof remain open. The older `phase-ii.summarize` row still drives no
+  now recover a lost POST response without repeating POST. Production template
+  v2 added Recommendation-cell padding and created a distinct Ready artifact,
+  but Word Online exposed a width-sensitive Recommendation-label alignment
+  defect. **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was
+  the remaining layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17;
+  PRODUCTION PROMOTION PENDING]** template v3 makes that label explicitly
+  non-wrapping under another generation identity. The public sign-in/auth
+  boundary passed; signed-in current-status and Word Online v3 proof remain
+  open. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a

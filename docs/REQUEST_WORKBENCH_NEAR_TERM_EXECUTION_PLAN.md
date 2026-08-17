@@ -419,9 +419,16 @@ The two named prompt surfaces do not currently have the same runtime posture:
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
   fills the tracked Word template while preserving manual slots. **[DEPLOYED TO
-  PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** version 2 adds
-  Recommendation-cell padding under a distinct generation
-  identity, so it cannot overwrite the existing v1 Ready document.
+  PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** version 2 added
+  Recommendation-cell padding under a distinct generation identity, so it did
+  not overwrite the existing v1 Ready document. A controlled v2 generation
+  created Ready artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`; Word Online
+  then exposed a width-sensitive Recommendation-label alignment defect.
+  **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
+  remaining layout variable.
+  **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION
+  PENDING]** template v3 makes that label explicitly non-wrapping under another
+  generation identity.
   The Workbench now has an authenticated durable route and tab: the server
   claims a deterministic Request Document row, persists and rereads the eight
   named fields plus immutable snapshots, renders the tracked template, uploads
@@ -451,8 +458,8 @@ The two named prompt surfaces do not currently have the same runtime posture:
   durable server completion; an exact retry recovered the existing Ready link
   without a duplicate. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]**
   explicit current/pending status loading and bounded GET polling now recover
-  a lost POST response without another POST. Signed-in current-status/v2
-  generation smoke and the review-layer merge/distribution workflow remain open.
+  a lost POST response without another POST. Signed-in current-status/Word
+  Online v3 smoke and the review-layer merge/distribution workflow remain open.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.
