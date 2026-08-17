@@ -3,7 +3,7 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19 schema and planned writer contract for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
+summary: "Production-live Wave 19 schema and locally implemented writer contract for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-17
@@ -28,8 +28,10 @@ owner-approved metadata-only apply created 12 additive
 relationships. Independent post-apply readback classified all 14 items as
 exact with zero absent and zero divergent. A separate read-only inventory
 still reports three Request Document rows, all Initial Assessments, so the
-apply created no Pre-Site business row. No application adapter, runtime
-writer, or SharePoint artifact was added by this schema operation.
+apply created no Pre-Site business row. No application runtime or SharePoint
+artifact was added by the schema operation. **[VERIFIED LOCALLY 2026-08-17;
+NOT DEPLOYED]** the branch now includes the adapter, durable writer, JSON route,
+and stable Word-link UI that use this schema.
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -70,7 +72,7 @@ akoya_request
 | Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current and uses `claude-sonnet-4-6`; the two-input tracked contract requires a future v4 publication before promotion | Read-only production prompt inventory on 2026-08-17 plus integration-branch source | VERIFIED LIVE / PLANNED PUBLICATION |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
-| The current Workbench Pre-Site route persists a business draft | The feature branch renders validated output from memory; only the normal AI-run audit persists | PARTIAL |
+| The branch-local Workbench Pre-Site route persists a business draft | Source and focused tests show claim → eight fields/snapshots → Dataverse readback render → SharePoint upload → atomic Ready/current activation | VERIFIED LOCALLY / NOT DEPLOYED |
 | Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
 | Wave 19 created a Pre-Site business row | Post-apply read-only inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE |
 
@@ -273,9 +275,11 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
    metadata write.
 3. **Completed 2026-08-17:** apply only `wave19-pre-site-draft`; independent
    readback reports all 14 declared artifacts exact.
-4. **Next:** add the new fields to the request-document
-   adapter and request lookup selects.
-5. Implement the writer/renderer transition and focused tests.
+4. **Completed locally 2026-08-17:** add the new fields to the
+   request-document adapter and request lookup selects.
+5. **Completed locally 2026-08-17:** implement the durable writer, registry-
+   returning route/UI, persisted-readback renderer transition, and focused
+   claim/retry/recovery/race tests.
 6. Exercise Request `1002379` as the controlled old-request testbed only after
    both exact AI Materials files exist, without altering unrelated request data.
 7. Verify the exact row, run, Word item/version, current pointer, retry, and one
@@ -287,9 +291,10 @@ fields; Dataverse rejects a `$select` containing an absent attribute.
 
 ## Remaining decisions
 
-- Whether the first production slice creates the Word document inside the
-  application or delegates rendering to a Power Automate flow. Either producer
-  must honor the same claim, fingerprint, Ready, and failure contracts.
+- The first slice now creates the Word document inside the application.
+  Power Automate remains responsible for supplying the two exact AI Materials
+  inputs; changing producer ownership would require a new owner decision and
+  the same claim, fingerprint, Ready, and failure contracts.
 - Whether PDF export is required in the first slice or can follow after the
   Word row is proven. Its lineage shape is decided above either way.
 - Which staff-facing Dataverse form, if any, exposes the named fields before

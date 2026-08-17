@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
+import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
 
-function filenameFromDisposition(disposition) {
-  const match = String(disposition || '').match(/filename="([^"]+)"/i);
-  return match?.[1] || 'Phase II Pre-Site Visit Writeup.docx';
-}
 export default function PreSiteVisitTab({ requestId }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const [completedFilename, setCompletedFilename] = useState(null);
+  const [artifact, setArtifact] = useState(null);
   const generationSequence = useRef(0);
   const activeController = useRef(null);
 
@@ -18,7 +15,7 @@ export default function PreSiteVisitTab({ requestId }) {
     activeController.current = null;
     setGenerating(false);
     setError(null);
-    setCompletedFilename(null);
+    setArtifact(null);
     return () => {
       generationSequence.current += 1;
       activeController.current?.abort();
@@ -35,7 +32,7 @@ export default function PreSiteVisitTab({ requestId }) {
     activeController.current = controller;
     setGenerating(true);
     setError(null);
-    setCompletedFilename(null);
+    setArtifact(null);
 
     try {
       const response = await fetch('/api/workbench/pre-site-visit', {
@@ -48,22 +45,10 @@ export default function PreSiteVisitTab({ requestId }) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || `Generation failed (${response.status})`);
       }
-      const blob = await response.blob();
+      const body = await response.json().catch(() => ({}));
       if (generationSequence.current !== sequence || id !== requestId) return;
-
-      const filename = filenameFromDisposition(response.headers.get('Content-Disposition'));
-      const url = URL.createObjectURL(blob);
-      try {
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = filename;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-      setCompletedFilename(filename);
+      if (!body.artifact) throw new Error('Generation returned no artifact identity.');
+      setArtifact(body.artifact);
     } catch (generationError) {
       if (generationError?.name !== 'AbortError'
         && generationSequence.current === sequence
@@ -99,8 +84,8 @@ export default function PreSiteVisitTab({ requestId }) {
               presentation, and institutional funding history remain marked for staff completion.
             </p>
             <p className="text-sm text-amber-800 mt-2">
-              This version downloads the draft to your computer. It records the normal AI run audit
-              but does not yet save the Word file in SharePoint.
+              The generated sections and exact input snapshot are registered in Dataverse. The Word
+              draft is saved in SharePoint and becomes the working document for the Site Visit stage.
             </p>
           </div>
           <button
@@ -113,9 +98,23 @@ export default function PreSiteVisitTab({ requestId }) {
           </button>
         </div>
         <div aria-live="polite">
-          {completedFilename && (
+          {artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && (
+            <p className="mt-4 text-sm text-amber-800">
+              This draft is already being generated. Try again shortly to retrieve the completed Word link.
+            </p>
+          )}
+          {artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && artifact.file?.webUrl && (
             <p className="mt-4 text-sm text-green-800">
-              Downloaded {completedFilename}. Open it in Word to complete the staff-owned sections.
+              Ready: {' '}
+              <a
+                href={artifact.file.webUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline"
+              >
+                Open {artifact.file.name || 'the Pre-Site Visit draft'} in Word
+              </a>
+              {' '}to complete the staff-owned sections.
             </p>
           )}
         </div>

@@ -16,30 +16,33 @@ function successResponse() {
   return {
     ok: true,
     status: 200,
-    headers: {
-      get: () => 'attachment; filename="Phase II Pre-Site Visit Writeup 1002379.docx"',
-    },
-    blob: async () => new Blob(['docx']),
+    json: async () => ({
+      success: true,
+      artifact: {
+        operationStatus: 100000001,
+        file: {
+          name: '1002379 Pre-Site Visit.docx',
+          webUrl: 'https://sharepoint.test/pre-site.docx',
+        },
+      },
+    }),
   };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn(async () => successResponse());
-  global.URL.createObjectURL = jest.fn(() => 'blob:pre-site-visit');
-  global.URL.revokeObjectURL = jest.fn();
-  jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 });
 afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('downloads a generated Word draft for the current request', async () => {
+test('shows the governed SharePoint Word link for the current request', async () => {
   render(<PreSiteVisitTab requestId={REQUEST_ID} />);
 
   expect(screen.getByText(/current published prompt version in Admin controls the Claude model/i))
     .toBeInTheDocument();
-  expect(screen.getByText(/does not yet save the Word file in SharePoint/i)).toBeInTheDocument();
+  expect(screen.getByText(/saved in SharePoint/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word draft' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -50,12 +53,11 @@ test('downloads a generated Word draft for the current request', async () => {
       signal: expect.any(AbortSignal),
     }),
   ));
-  await screen.findByText(/Downloaded Phase II Pre-Site Visit Writeup 1002379\.docx/);
-  expect(global.URL.createObjectURL).toHaveBeenCalled();
-  expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('blob:pre-site-visit');
+  const link = await screen.findByRole('link', { name: /Open 1002379 Pre-Site Visit\.docx in Word/i });
+  expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
 });
 
-test('shows a server error without creating a download', async () => {
+test('shows a server error without creating a Word link', async () => {
   global.fetch.mockResolvedValueOnce({
     ok: false,
     status: 409,
@@ -68,10 +70,10 @@ test('shows a server error without creating a download', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'No usable AI proposal narrative was found.',
   );
-  expect(global.URL.createObjectURL).not.toHaveBeenCalled();
+  expect(screen.queryByRole('link', { name: /Open .* in Word/i })).not.toBeInTheDocument();
 });
 
-test('a late response for a prior request cannot trigger a stale download', async () => {
+test('a late response for a prior request cannot publish a stale Word link', async () => {
   let resolveFirst;
   global.fetch.mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }));
   const { rerender } = render(<PreSiteVisitTab requestId={REQUEST_ID} />);
@@ -81,6 +83,5 @@ test('a late response for a prior request cannot trigger a stale download', asyn
   await act(async () => { resolveFirst(successResponse()); });
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word draft' })).toBeEnabled());
-  expect(global.URL.createObjectURL).not.toHaveBeenCalled();
-  expect(screen.queryByText(/Downloaded Phase II/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Open .* in Word/i })).not.toBeInTheDocument();
 });

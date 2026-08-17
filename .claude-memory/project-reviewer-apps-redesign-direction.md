@@ -82,12 +82,15 @@ callers retain their boundary and fingerprint both identities/versions/hashes;
 there is no combined canonical AI PDF. Pre-Site integration source implements
 the reader locally, while Reviewer Finder's adoption remains next-cycle work.
 
-**2026-08-17 Pre-Site persistence schema:** Owner-approved Wave 19 is live in
+**2026-08-17 Pre-Site persistence schema and local writer:** Owner-approved Wave 19 is live in
 Production with 12 exact `wmkf_requestdocument` fields and two exact current-
 writeup lookups on `akoya_request`. Independent post-apply inventory remained
-three Initial Assessment rows and no Pre-Site row. No adapter/writer consumes
-the new fields yet; live schema is not evidence that durable Pre-Site
-generation is implemented.
+three Initial Assessment rows and no Pre-Site row. The integration branch now
+has a focused-tested durable adapter/writer, JSON route, and stable Word-link
+UI; none is deployed or production-proved. Sole-current prompt v3 is still
+single-source, so the writer blocks before row claim until a new immutable
+two-input prompt is published. Live schema alone remains no evidence of a
+durable Production Pre-Site generation.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
@@ -153,9 +156,11 @@ planned. Current authority is
 
 ## Current source-backed state (2026-07-29)
 
-- Ten top-level tabs; seven implemented in source (Overview, Proposal, Initial
-  Assessment, Reviewers, Reviews, Status, Awardee) and three placeholders (Pre
-  Site Visit Writeup, Site Visit, Final Writeup). Initial Assessment production
+- Ten top-level tabs; seven implemented on current mainline (Overview, Proposal,
+  Initial Assessment, Reviewers, Reviews, Status, Awardee) and three mainline
+  placeholders. **[LOCAL BRANCH 2026-08-17]** Pre Site Visit Writeup now has a
+  durable registry-backed route/UI on `codex/pre-site-draft-schema`; Site Visit
+  and Final Writeup remain placeholders. Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,
   while Request `1003109` proves canonical-input generation, linked-run

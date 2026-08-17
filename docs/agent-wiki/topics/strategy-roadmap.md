@@ -278,8 +278,10 @@ document inventory, and individual implementation plans do not establish priorit
   `akoya_request.wmkf_CurrentPreSiteVisit` / `wmkf_CurrentFinalWriteup`
   lookups. Independent post-apply metadata readback reported 14 exact and zero
   divergent; the row inventory remained three Initial Assessments and no
-  Pre-Site artifact. The adapter/writer is still unbuilt, so live schema does
-  not imply a durable Pre-Site generation flow.
+  Pre-Site artifact. **[VERIFIED LOCALLY 2026-08-17; NOT DEPLOYED]** the
+  adapter/writer, registry-returning route, and stable Word-link UI are now
+  built and focused-tested. Live schema still does not imply a durable
+  Production Pre-Site generation flow.
 - Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
   implemented 2026-08-16; two-source input revised locally 2026-08-17): draft
   factual material from the exact separate AI Materials narrative and
@@ -292,9 +294,10 @@ document inventory, and individual implementation plans do not establish priorit
   regenerate the factual core. Use a versioned prompt/template pair based
   initially on the supplied examples. The guarded proposal-core service and
   version-1 template renderer are local and tested; read-only Request `1002379`
-  resolved the exact narrative and all template metadata. An authenticated
-  Workbench tab and route now perform an interim direct DOCX download; focused
-  tests cover the binary response and stale-request cancellation. Dataverse
+  resolved the exact narrative and all template metadata. The authenticated
+  Workbench route now drives the durable Request Document writer and returns a
+  registry DTO; the tab exposes its stable Word link and retains stale-request
+  cancellation. Dataverse
   now has sole-current single-source prompt v3 on reviewed
   `claude-sonnet-4-6`; the tracked two-input prompt must be published as a new
   immutable version before code promotion. The latest

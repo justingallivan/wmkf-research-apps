@@ -21,7 +21,8 @@ related:
 
 ## Decision and current status
 
-**[OWNER DECISION 2026-08-17; IMPLEMENTATION PLANNED.]** The three Workbench
+**[OWNER DECISION 2026-08-17; PRE-SITE WRITER IMPLEMENTED LOCALLY; SITE VISIT
+AND FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -39,20 +40,22 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-The three Workbench tabs remain placeholders in current `main`. The Pre-Site
-prompt/renderer and exact two-file input reader are combined locally on
-`codex/pre-site-draft-schema`; they are not deployed. Wave 19 is now live in
+Site Visit and Final remain placeholders in current `main`. On
+`codex/pre-site-draft-schema`, the Pre-Site tab now calls a durable writer and
+shows the stable Word link returned from the registry; it is not deployed.
+Wave 19 is now live in
 Production: its owner-approved metadata-only apply created all 12 attributes
 and two request lookups, and independent readback found 14 exact with no
 absence or divergence. The post-apply inventory still contains only the three
-pre-existing Initial Assessment registry rows. No Pre-Site business row,
-adapter, writer, or SharePoint artifact was created.
+pre-existing Initial Assessment registry rows. No Production Pre-Site business
+row or SharePoint artifact was created. The branch-local adapter/writer is
+focused-tested but has not been production-smoked.
 
 ## Evidence boundary
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs, but none is implemented on mainline | `pages/workbench/[requestId].js` | VERIFIED |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site is implemented only on the integration branch, while Site Visit and Final remain placeholders | Workbench source on `codex/pre-site-draft-schema` and current mainline history | VERIFIED LOCALLY / NOT DEPLOYED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Production contains no Pre-Site Request Document rows as of 2026-08-17 | Read-only Production inventory | VERIFIED |

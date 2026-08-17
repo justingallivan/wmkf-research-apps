@@ -344,8 +344,8 @@ structures can change without rewriting prior artifacts.
 
 **[VERIFIED via owner decisions 2026-07-28, local source/tests, live prompt
 readback, a read-only Request `1002379` probe, and a controlled model/render
-run on 2026-08-16; direct-download slice IMPLEMENTED LOCALLY, end-to-end
-durable document pipeline PARTIAL.]**
+run on 2026-08-16; durable Request Document writer IMPLEMENTED LOCALLY,
+Production deployment/proof PENDING.]**
 The Pre-Site draft has two independently refreshable source layers:
 
 1. **Proposal-derived factual material.** Use the exact separate proposal
@@ -399,7 +399,9 @@ The exact schema, transition, and cross-tab contracts are in
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The owner-approved Production apply
 completed on 2026-08-17; independent readback reports all 14 metadata items
 exact, and the post-apply inventory confirms no Pre-Site business row was
-created. No adapter, writer, or consumer uses the new fields yet.
+created by that apply. **[VERIFIED LOCALLY 2026-08-17; NOT DEPLOYED]** the
+adapter, durable writer, registry-returning route, and stable Word-link consumer
+now use the fields on `codex/pre-site-draft-schema`.
 
 The two named prompt surfaces do not currently have the same runtime posture:
 
@@ -415,9 +417,11 @@ The two named prompt surfaces do not currently have the same runtime posture:
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
   fills the tracked version-1 Word template while preserving manual slots.
-  The Workbench now has an authenticated interim direct-download route and tab:
-  the server performs the governed call, renders the tracked template, and
-  streams the DOCX to the PD. The current Admin-published prompt row owns the
+  The Workbench now has an authenticated durable route and tab: the server
+  claims a deterministic Request Document row, persists and rereads the eight
+  named fields plus immutable snapshots, renders the tracked template, uploads
+  one stable Word item, atomically activates the current Ready row, and returns
+  its registry DTO/Open-in-Word link. The current Admin-published prompt row owns the
   Claude model; callers cannot override it. Dataverse sole-current prompt v3
   `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
   `claude-sonnet-4-6`. The first controlled v1 run completed but failed the
@@ -435,9 +439,9 @@ The two named prompt surfaces do not currently have the same runtime posture:
   574-word Background/Methodology pair spilled the final sentence to page 4;
   that direct QA did not create a `wmkf_ai_run`. These are local/test invocations
   against live prompt/request data, not a deployed signed-in Workbench smoke.
-  The download remains non-durable: no SharePoint upload, registry row,
-  request pointer, business-field write, review-layer merge, or distribution
-  workflow exists.
+  The durable writer is focused-tested but has created no Production
+  SharePoint upload, registry row, request pointer, or business-field write.
+  The review-layer merge and distribution workflow remain unbuilt.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.
@@ -792,10 +796,11 @@ leave the review with this contract:
 Decision order:
 
 1. **Pre Site Visit Writeup** — input and regeneration behavior, the first
-   versioned Word template, and the proposal-core prompt/template pair are
-   owner-decided and controlled-run verified. Next promote and signed-in smoke
-   the interim direct-download slice, then freeze the durable artifact
-   persistence/access contract and review-layer merge.
+   versioned Word template, the proposal-core prompt/template pair, and the
+   durable artifact persistence/access contract are implemented locally. Next
+   publish the new two-input prompt, preflight the runtime Dataverse target,
+   review/promote the branch, and signed-in smoke exact generation/retry plus
+   one recovery path. The review-layer merge remains later work.
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
    behavior are owner-decided. The materials request is a manual staff action,
@@ -1098,11 +1103,11 @@ Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
-2. production promotion and signed-in Workbench smoke of the locally
-   implemented Pre-Site direct-download slice; the proposal-core prompt is
-   live at v2 and its controlled Request `1002379` document passed render QA,
-   while the deterministic reviewer roster, anonymous review-narrative merge,
-   SharePoint upload, and registry flow remain unbuilt;
+2. publication of a reviewed two-input Pre-Site prompt, runtime-target Wave 19
+   preflight/apply, and production promotion plus signed-in Workbench smoke of
+   the locally implemented durable writer; the controlled Request `1002379`
+   document passed historical render QA, while the deterministic reviewer
+   roster and anonymous review-narrative merge remain unbuilt;
 3. administrator verification of the target library's configured version
    limit, second-stage recycle recovery, applicable site/library Purview
    retention, and ordinary-editor least-privilege policy; stable-identity

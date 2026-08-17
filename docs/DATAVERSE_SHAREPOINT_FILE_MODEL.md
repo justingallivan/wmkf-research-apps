@@ -257,9 +257,9 @@ through the governed
 of the retired Phase II summarizer while removing inferred administrative
 fields. Authoritative request metadata and the ordered PI/Co-PI roster come
 from Dataverse. **[VERIFIED IN SOURCE/TEST/LIVE CONTROLLED RUN 2026-08-16;
-application branch not production-live]** the guarded local producer,
-tracked Word template renderer, and authenticated direct-download route/UI
-exist. Request `1002379` resolved the exact narrative and every template
+application branch not production-live]** the guarded local proposal-core
+helper and tracked Word template renderer exist. Request `1002379` resolved the
+exact narrative and every template
 metadata field. Sole-current prompt v3
 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
 `claude-sonnet-4-6`; latest audited Executor run
@@ -267,12 +267,15 @@ metadata field. Sole-current prompt v3
 direct exact-v3 Request `1002379` model/render QA verified the revised personnel
 rules and roster-name underlining but spilled Methodology's final sentence to
 page 4; it created no `wmkf_ai_run`. The signed-in Workbench route remains
-unpromoted/unproven, and artifact upload/registry plus the review-layer merge
-remain unbuilt. **[IMPLEMENTED LOCALLY 2026-08-17; NOT PUBLISHED OR
-DEPLOYED]** the integration branch now requires both exact AI Materials files,
-passes them as separate bounded Claude variables, and returns a two-source
-identity/version/hash manifest. Live prompt v3 remains single-source, so a new
-version must be deliberately published before this code can be promoted.
+unpromoted/unproven, and the review-layer merge remains unbuilt.
+**[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]** the integration branch now
+requires both exact AI Materials files, passes them as separate bounded Claude
+variables, persists their two-source identity/version/hash manifest and all
+eight named fields in Wave 19, renders from Dataverse readback, uploads one
+stable Word item to `Artifacts/Pre-Site Visit/`, and atomically activates the
+current Ready row. The route returns a registry DTO and the tab exposes its
+stable Word link. Live prompt v3 remains single-source, so the writer blocks
+before row claim until a new version is deliberately published.
 Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
@@ -301,8 +304,9 @@ transition, and cross-tab contracts:
 
 All 12 Wave 19 attributes and both request-pointer relationships are live and
 exact in Production. The post-apply inventory still reports only three Initial
-Assessment registry rows, so no Pre-Site business row was created. The adapter,
-writer, and consumer remain unbuilt. SharePoint Word remains authoritative for
+Assessment registry rows, so no Pre-Site business row was created there. The
+adapter, writer, and consumer are implemented and focused-tested only on the
+integration branch. SharePoint Word remains authoritative for
 staff prose after document creation; the named Dataverse fields are the
 structured generation/automation representation and do not claim automatic
 synchronization from later Word edits.

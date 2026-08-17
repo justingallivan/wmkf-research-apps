@@ -7,8 +7,10 @@ the Pre-Site Visit Word draft, published the governed v3 prompt, and recorded th
 Dataverse persistence direction. The feature branch is now merged into the local
 `codex/pre-site-draft-schema` integration branch but is not deployed. At the Session 443 close there was no Pre-Site Draft schema or business-data
 write path. In Session 444, owner-approved Wave 19 was applied to Production
-and independently read back as 14 exact metadata items; the business-data
-writer remains unbuilt and no Pre-Site row was created.
+and independently read back as 14 exact metadata items. The durable
+business-data writer, JSON-returning Workbench route, and stable Word-link UI
+are now implemented and focused-tested on `codex/pre-site-draft-schema`, but
+they are not deployed and no Pre-Site row was created in Production.
 
 ### What Was Completed
 
@@ -23,8 +25,10 @@ writer remains unbuilt and no Pre-Site row was created.
 2. **Pre-Site proposal core and Word renderer built on the integration branch**
    - The proposal core combines the exact separate narrative and bibliography with read-only Dataverse request,
      organization, budget, and personnel data and validates eight named output sections.
-   - The authenticated interim route renders a Word download from in-memory validated output; it
-     does not yet persist a business draft or artifact.
+   - The earlier authenticated direct-download route was replaced locally by a
+     durable writer. It claims a Request Document row, persists the eight named
+     sections and immutable snapshots, renders from Dataverse readback, uploads
+     a stable Word item, and returns a registry DTO with an Open-in-Word link.
    - Formatting fixes cover metadata alignment and spacing, the 1 pt Executive Summary divider,
      first-page bullet spacing, and the stray pre-break paragraph.
    - Personnel output is one paragraph, omits degrees, uses PI/co-PI, and underlines personnel
@@ -44,9 +48,10 @@ writer remains unbuilt and no Pre-Site row was created.
      sentence still spills to page four, and the Recommendation label/placeholder spacing remains
      a separate minor template issue.
 
-4. **Dataverse persistence schema applied; writer still planned**
-   - Current branch behavior remains pass-through-only: target kind `none`, in-memory rendering,
-     and the normal Executor's raw `wmkf_ai_run` audit are not an editable business record.
+4. **Dataverse persistence schema applied; durable writer implemented locally**
+   - The branch now uses the Request Document registry as the editable business
+     record. The Executor audit remains append-only provenance rather than the
+     business-data source.
    - Owner direction is Request parent → versioned Pre-Site Draft child → exact-version Word/PDF
      artifacts. The eight generated sections are sibling editable Multiline Text columns on one
      draft row, not one child row per section.
@@ -55,6 +60,11 @@ writer remains unbuilt and no Pre-Site row was created.
      request lookups in Production. Post-apply readback reported 14 exact and 0
      divergent; inventory remained three Initial Assessment rows and no
      Pre-Site row.
+   - The writer fails before claiming a row when either exact source is missing
+     or when the current governed prompt does not declare both narrative and
+     bibliography variables. Exact Ready retries reuse the existing row/run/file;
+     later partial failures retain a retryable row and recover a matching upload
+     without another Claude call or duplicate upload.
 
 5. **Session evidence bookkeeping attempted**
    - `report:claim-evidence-pilot -- --current` ran during `/stop`, but local state was unavailable.
@@ -82,15 +92,17 @@ writer remains unbuilt and no Pre-Site row was created.
 
 ### Verified Open
 
-1. **Build the durable Pre-Site adapter/writer on the live Production schema.**
+1. **Review, promote, and production-prove the durable Pre-Site writer.**
    The 2026-08-17 owner-approved Wave 19 apply created 12 Request Document
    fields plus two Request pointers. Independent Production readback reported
    14 exact, 0 absent, and 0 divergent. Exact external narrative/bibliography
    provenance belongs in the versioned input-snapshot source manifest rather
-   than ambiguous single-source Graph columns. No adapter or writer selects the
-   fields yet, and the post-apply inventory confirmed no Pre-Site row was
-   created. Before preview/sandbox runtime uses these fields, that target must
-   pass the same preflight and schema apply.
+   than ambiguous single-source Graph columns. The fields are now selected and
+   written on this branch; focused tests cover the
+   claim, persisted readback, exact retry, failed-audit retry, upload recovery,
+   prompt race, and alternate-key race. The post-apply Production inventory
+   still confirms no Pre-Site row was created. Before preview/sandbox runtime
+   uses these fields, that target must pass the same preflight and schema apply.
 
 2. **Use the approved cross-tab Word lifecycle.**
    `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
@@ -101,7 +113,8 @@ writer remains unbuilt and no Pre-Site row was created.
 
 3. **Review and deliberately promote the integration branch.**
    `codex/pre-site-draft-schema` now contains the former proposal feature branch plus the
-   production-applied schema contract, lifecycle plan, and two-input reader. The authenticated route is not Production-live.
+   production-applied schema contract, lifecycle plan, two-input reader, durable
+   writer, and registry-backed route/UI. The authenticated route is not Production-live.
    Live prompt v3 is still single-source; publish and verify a new immutable two-input prompt
    version before promotion.
 
@@ -113,10 +126,12 @@ writer remains unbuilt and no Pre-Site row was created.
 
 ### Owner Decision Needed
 
-1. **Accept the v3 page spill or tighten a v4 prompt.**
-   Decide whether the soft one-page Background/Methodology goal is adequate or whether to target
-   roughly 500–540 combined words and publish v4. The Recommendation spacing fix can proceed
-   independently of prompt content.
+1. **Publish a reviewed two-input prompt version.**
+   The locally tracked prompt contract includes both exact AI Materials inputs,
+   but sole-current Production v3 declares only the narrative variable. The
+   writer intentionally refuses to claim a row or call Claude until a new
+   immutable two-input version is published. Any further page-length tightening
+   can be included in that reviewed version.
 
 2. **Optional Stage 1 browser-bundle guards.**
    Retain the prior choice only if desired; these guards are unrelated to Pre-Site persistence and
@@ -154,7 +169,10 @@ writer remains unbuilt and no Pre-Site row was created.
 
 ## Testing
 
-The feature branch passed focused Pre-Site unit and integration tests, type checking, prompt gates
-and self-tests, API-route gates and self-tests, documentation gates and self-tests, and a webpack
-production build. The rendered Request 1002379 Word draft received four-page visual inspection.
-Only the repository's previously documented dynamic-import build warnings remained.
+The earlier feature branch passed focused Pre-Site unit and integration tests,
+type checking, prompt/API/documentation gates and self-tests, and a webpack
+production build. The rendered Request 1002379 Word draft received four-page
+visual inspection. The durable-writer increment adds focused service, route,
+and UI tests plus type checking; the complete gate/build results are recorded
+with the resulting branch commit. Only the repository's previously documented
+dynamic-import build warnings remained in the earlier build.

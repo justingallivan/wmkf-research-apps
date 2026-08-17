@@ -67,6 +67,16 @@ export const INITIAL_ASSESSMENT_CONTRACT = Object.freeze({
   producer: 'request-workbench',
 });
 
+export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
+  artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+  promptName: 'pre-site-visit.proposal-core.generate',
+  templateId: 'phase-ii-pre-site-visit',
+  templateVersion: '1',
+  relativeFolder: 'Artifacts/Pre-Site Visit',
+  producer: 'request-workbench',
+  contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+});
+
 export function requestDocumentLabel(map, value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);

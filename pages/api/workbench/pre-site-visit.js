@@ -1,20 +1,16 @@
 /**
  * API: /api/workbench/pre-site-visit
  *
- * POST { requestId } -> generate and download one governed Pre-Site Visit
- * Word draft. This minimum slice is pass-through-only: it records the normal
- * wmkf_ai_run audit but does not upload to SharePoint or write request-document
- * registry/business fields.
+ * POST { requestId } -> generate, recover, or reuse one governed Pre-Site
+ * Visit Word draft and return its registry/SharePoint identity.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
-import { generatePreSiteVisitProposalCore } from '../../../lib/services/pre-site-visit/proposal-core-service';
-import { renderPreSiteVisitDocx } from '../../../lib/services/pre-site-visit/docx-renderer';
-
-const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+import { generatePreSiteVisitArtifact } from '../../../lib/services/pre-site-visit/artifact-service';
+import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 
 export const config = {
   api: {
@@ -24,13 +20,6 @@ export const config = {
   maxDuration: 300,
 };
 
-function downloadFilename(requestNumber) {
-  const safeNumber = String(requestNumber || 'Request')
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'Request';
-  return `Phase II Pre-Site Visit Writeup ${safeNumber}.docx`;
-}
 function sendError(res, error) {
   if (error instanceof ServiceHttpError) {
     return res.status(error.httpStatus).json(error.body ?? { error: error.message });
@@ -64,24 +53,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'requestId is required and must be a GUID' });
       }
 
-      const generated = await generatePreSiteVisitProposalCore({
+      const result = await generatePreSiteVisitArtifact({
         requestId,
         actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
-        runSource: 'Vercel User',
       });
-      const document = await renderPreSiteVisitDocx({
-        documentFields: generated.context.documentFields,
-        proposalCore: generated.proposalCore,
-        personnelNames: generated.context.personnel.map((person) => person.name),
-      });
-      const filename = downloadFilename(generated.context.requestNumber);
-
-      res.setHeader('Content-Type', DOCX_MIME);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', document.length);
-      res.setHeader('Cache-Control', 'private, no-store');
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      return res.status(200).send(document);
+      const generating = result.artifact.operationStatus
+        === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
+      return res.status(generating ? 202 : 200).json({ success: true, ...result });
     } catch (error) {
       return sendError(res, error);
     }

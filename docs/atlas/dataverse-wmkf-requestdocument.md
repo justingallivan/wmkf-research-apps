@@ -127,9 +127,11 @@ fields, exact generated/input snapshots, render/source identity, and
 `akoya_request.wmkf_CurrentFinalWriteup`. The owner-approved metadata-only
 Production apply completed on 2026-08-17; independent readback reports all 14
 items exact and zero divergent. Post-apply inventory still reports only the
-three existing Initial Assessment rows. No adapter selection, runtime writer,
-or Pre-Site artifact exists yet. There is intentionally no Site Visit writeup
-pointer: staff observations remain direct edits in the Pre-Site Word workspace.
+three existing Initial Assessment rows. **[VERIFIED LOCALLY 2026-08-17; NOT
+DEPLOYED]** the Request Document adapter and Pre-Site writer now consume these
+fields; no Production Pre-Site row or SharePoint artifact exists yet. There is
+intentionally no Site Visit writeup pointer: staff observations remain direct
+edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
@@ -143,9 +145,9 @@ Exact design and deployment boundary:
   prompt/run/input/template/content provenance.
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
-- `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and will
-  provide the equivalent current-pointer/fence once the writer is built. It is
-  currently unpopulated because no Pre-Site row exists.
+- `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and the
+  local writer uses it as the current-pointer/fence. It was unpopulated in the
+  2026-08-17 Production inventory because no Pre-Site row existed there.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
   independent Final Word row. Final will record the exact source Pre-Site
   row/version/hash; no writer populates this lookup yet.
@@ -173,7 +175,7 @@ Exact design and deployment boundary:
 - Staff-owned field: Foundation Opportunity. It is absent from the prompt
   output schema and visibly marked `STAFF INPUT REQUIRED` by the DOCX template.
 
-## Production schema / planned Pre-Site Visit runtime contract
+## Production schema / locally implemented Pre-Site Visit runtime contract
 
 - Artifact type: `Pre Site Visit` (already live in the Wave 16 option set).
 - One Word file per versioned draft row; the row carries all eight named
@@ -195,12 +197,14 @@ Exact design and deployment boundary:
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
-The persistence schema is live in Production, while the runtime contract
-remains planned. The integration-branch pass-through producer requires and
-separately labels both exact inputs, but it and the DOCX renderer do not persist
-these business fields or create governed registry rows. Live prompt v3 remains
-single-source; the tracked two-input contract requires a new published prompt
-version before promotion.
+The persistence schema is live in Production. **[VERIFIED LOCALLY 2026-08-17;
+NOT DEPLOYED]** the runtime writer requires and separately labels both exact
+inputs, persists the eight named fields and immutable snapshots under its
+claim, renders only from Dataverse readback, uploads one Word file to
+`Artifacts/Pre-Site Visit/`, and atomically activates the current Ready row.
+Live prompt v3 remains single-source; the tracked two-input contract requires a
+new published prompt version, and the writer blocks before row claim until one
+is current.
 
 ## Retry and partial-success behavior
 

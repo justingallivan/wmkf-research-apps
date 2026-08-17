@@ -6,22 +6,18 @@ jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
-jest.mock('../../lib/services/pre-site-visit/proposal-core-service', () => ({
-  generatePreSiteVisitProposalCore: jest.fn(),
-}));
-jest.mock('../../lib/services/pre-site-visit/docx-renderer', () => ({
-  renderPreSiteVisitDocx: jest.fn(),
+jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
+  generatePreSiteVisitArtifact: jest.fn(),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { generatePreSiteVisitProposalCore } from '../../lib/services/pre-site-visit/proposal-core-service';
-import { renderPreSiteVisitDocx } from '../../lib/services/pre-site-visit/docx-renderer';
+import { generatePreSiteVisitArtifact } from '../../lib/services/pre-site-visit/artifact-service';
 import handler from '../../pages/api/workbench/pre-site-visit';
+import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
-const DOCX = Buffer.from('docx-bytes');
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -41,18 +37,18 @@ beforeEach(() => {
   requireAppAccess.mockResolvedValue({
     session: { user: { dynamicsSystemuserId: '22222222-2222-2222-2222-222222222222' } },
   });
-  generatePreSiteVisitProposalCore.mockResolvedValue({
-    proposalCore: { executiveSummary: 'Generated core.' },
-    context: {
-      requestNumber: '1002379',
-      documentFields: { institutionName: 'St. Jude Childrens Research Hospital' },
-      personnel: [
-        { name: 'Ada Lovelace', role: 'Principal Investigator' },
-        { name: 'Grace Hopper', role: 'Co-Principal Investigator' },
-      ],
+  generatePreSiteVisitArtifact.mockResolvedValue({
+    artifact: {
+      artifactId: '33333333-3333-3333-3333-333333333333',
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      file: {
+        name: '1002379 Pre-Site Visit.docx',
+        webUrl: 'https://sharepoint.test/pre-site.docx',
+      },
     },
+    reused: false,
+    recovered: false,
   });
-  renderPreSiteVisitDocx.mockResolvedValue(DOCX);
 });
 test('rejects non-POST methods before authentication', async () => {
   const res = mockRes();
@@ -67,8 +63,7 @@ test('short-circuits an unauthorized caller before generation', async () => {
   requireAppAccess.mockResolvedValueOnce(null);
   await handler(post(), mockRes());
 
-  expect(generatePreSiteVisitProposalCore).not.toHaveBeenCalled();
-  expect(renderPreSiteVisitDocx).not.toHaveBeenCalled();
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
 });
 
 test.each([
@@ -80,39 +75,43 @@ test.each([
   await handler(post(body), res);
 
   expect(res.statusCode).toBe(400);
-  expect(generatePreSiteVisitProposalCore).not.toHaveBeenCalled();
-  expect(renderPreSiteVisitDocx).not.toHaveBeenCalled();
+  expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
 });
 
-test('generates through the governed service and streams a safe DOCX attachment', async () => {
+test('generates through the durable service and returns the governed artifact identity', async () => {
   const res = mockRes();
   await handler(post(), res);
 
   expect(withDalContext).toHaveBeenCalledWith('workbench-pre-site-visit', expect.any(Function));
-  expect(generatePreSiteVisitProposalCore).toHaveBeenCalledWith({
+  expect(generatePreSiteVisitArtifact).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
     actingUserSystemId: '22222222-2222-2222-2222-222222222222',
-    runSource: 'Vercel User',
-  });
-  expect(generatePreSiteVisitProposalCore.mock.calls[0][0]).not.toHaveProperty('model');
-  expect(renderPreSiteVisitDocx).toHaveBeenCalledWith({
-    documentFields: { institutionName: 'St. Jude Childrens Research Hospital' },
-    proposalCore: { executiveSummary: 'Generated core.' },
-    personnelNames: ['Ada Lovelace', 'Grace Hopper'],
   });
   expect(res.statusCode).toBe(200);
-  expect(res.headers).toMatchObject({
-    'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'Content-Disposition': 'attachment; filename="Phase II Pre-Site Visit Writeup 1002379.docx"',
-    'Content-Length': DOCX.length,
-    'Cache-Control': 'private, no-store',
-    'X-Content-Type-Options': 'nosniff',
+  expect(res.body).toMatchObject({
+    success: true,
+    artifact: {
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      file: { webUrl: 'https://sharepoint.test/pre-site.docx' },
+    },
   });
-  expect(res.body).toBe(DOCX);
 });
 
-test('maps governed service errors without attempting a render', async () => {
-  generatePreSiteVisitProposalCore.mockRejectedValueOnce(new ServiceHttpError(
+test('returns 202 when another owned generation is still active', async () => {
+  generatePreSiteVisitArtifact.mockResolvedValueOnce({
+    artifact: { operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING },
+    reused: true,
+    recovered: false,
+  });
+  const res = mockRes();
+  await handler(post(), res);
+
+  expect(res.statusCode).toBe(202);
+  expect(res.body.success).toBe(true);
+});
+
+test('maps governed service errors', async () => {
+  generatePreSiteVisitArtifact.mockRejectedValueOnce(new ServiceHttpError(
     'The governed prompt is unavailable.',
     { httpStatus: 409, code: 'prompt_unavailable' },
   ));
@@ -121,5 +120,4 @@ test('maps governed service errors without attempting a render', async () => {
 
   expect(res.statusCode).toBe(409);
   expect(res.body).toEqual({ error: 'The governed prompt is unavailable.' });
-  expect(renderPreSiteVisitDocx).not.toHaveBeenCalled();
 });
