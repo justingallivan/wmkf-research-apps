@@ -39,14 +39,14 @@ if (records.length !== 1) {
   process.exit(1);
 }
 
-const { context, proposal } = await loadPreSiteVisitInputs({
+const { context, proposalNarrative } = await loadPreSiteVisitInputs({
   requestId: records[0].akoya_requestid,
 });
 console.log(JSON.stringify({
   requestId: context.requestId,
   requestNumber: context.requestNumber,
-  proposalFilename: proposal.filename,
-  proposalTextChars: proposal.text.length,
+  proposalFilename: proposalNarrative.filename,
+  proposalTextChars: proposalNarrative.text.length,
   projectTitlePresent: Boolean(context.projectTitle),
   applicantInstitutionPresent: Boolean(context.applicantInstitution),
   cityState: context.documentFields.cityState,

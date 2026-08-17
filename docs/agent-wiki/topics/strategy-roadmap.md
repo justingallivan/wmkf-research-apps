@@ -282,10 +282,9 @@ document inventory, and individual implementation plans do not establish priorit
   adapter/writer, registry-returning route, and stable Word-link UI are now
   built and focused-tested. Live schema still does not imply a durable
   Production Pre-Site generation flow.
-- Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
-  implemented 2026-08-16; two-source input revised locally 2026-08-17): draft
-  factual material from the exact separate AI Materials narrative and
-  bibliography through governed `pre-site-visit.proposal-core.generate`;
+- Pre-Site input direction (owner-decided 2026-08-17; source/test contract
+  revised 2026-08-17): draft factual material from the exact AI Materials
+  narrative only through governed `pre-site-visit.proposal-core.generate`;
   supply authoritative request metadata from Dataverse; use
   `review-synthesis.generate` over all currently submitted reviews; and allow
   distribution with zero reviews because the Site Visit date controls timing.
@@ -298,9 +297,10 @@ document inventory, and individual implementation plans do not establish priorit
   Workbench route now drives the durable Request Document writer and returns a
   registry DTO; the tab exposes its stable Word link and retains stale-request
   cancellation. Dataverse
-  now has sole-current single-source prompt v3 on reviewed
-  `claude-sonnet-4-6`; the tracked two-input prompt must be published as a new
-  immutable version before code promotion. The latest
+  now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; read-only
+  comparison confirms it matches the tracked narrative-only runtime contract,
+  so no new prompt publication is required. The bibliography remains reserved
+  for next-cycle Reviewer Finder. The latest
   audited Executor evidence remains accepted v2 Request `1002379` run
   `5bd65180-ed99-f111-b8db-7ced8d6e2f44`. A direct exact-v3 model/render QA
   correctly applied the revised personnel rules and roster-name underlining,

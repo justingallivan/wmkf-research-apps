@@ -85,7 +85,7 @@ migration or retirement, inventory populated rows and live callers.
 ## Lifecycle and lineage
 
 ```text
-Dataverse facts + AI Materials narrative/bibliography + review evidence
+Dataverse facts + AI Materials narrative + review evidence
                          │
                          ▼
        Pre-Site Request Document row ─── stable SharePoint DOCX
@@ -111,7 +111,7 @@ version/hash captured when the action runs.
 
 ### Minimum interface
 
-- Show source readiness for the separate proposal narrative and bibliography, authoritative Dataverse
+- Show source readiness for the exact proposal narrative, authoritative Dataverse
   metadata, governed prompt/model configuration, and Word template.
 - Generate or retry the Pre-Site draft through one durable operation.
 - Show the current Ready Word document, its lifecycle status, generated time,
@@ -126,10 +126,9 @@ version/hash captured when the action runs.
 ### Creation transaction
 
 1. Resolve the Request and authoritative related Dataverse records.
-2. Resolve the exact `AI Materials/ProposalNarrative_{Request#}.pdf` and
-   `AI Materials/ProposalBibliography_{Request#}.pdf` by stable Graph
-   site/drive/item/version identity; paths are discovery conventions, not the
-   durable keys.
+2. Resolve the exact `AI Materials/ProposalNarrative_{Request#}.pdf` by stable
+   Graph site/drive/item/version identity; the path is a discovery convention,
+   not the durable key.
 3. Build a bounded input snapshot and deterministic generation key.
 4. Execute the admin-configured governed prompt through the shared Executor,
    persisting the `wmkf_ai_run` audit.
@@ -287,7 +286,7 @@ current writeup pointer always targets Word, never PDF.
    their own preflight/apply before runtime `$select` references these fields.
 2. **Pre-Site persistence and generation.** Merge the approved prompt/renderer
    work, add adapter fields and the durable writer, then exercise Request
-   `1002379` after both exact AI Materials inputs are supplied.
+   `1002379` after the exact Proposal Narrative is supplied.
 3. **Pre-Site tab.** Add status, source-readiness, generate/retry, provenance,
    and Open in Word UI around the durable operation.
 4. **Site Visit logistics design.** Inventory and map every desired logistics

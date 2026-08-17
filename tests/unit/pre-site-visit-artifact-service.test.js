@@ -52,34 +52,22 @@ function inputFixture(overrides = {}) {
       },
       ...overrides.context,
     },
-    proposalMaterials: {
-      narrative: {
-        filename: 'ProposalNarrative_1002379.pdf',
-        text: 'Narrative text '.repeat(20),
-        siteId: 'site-id',
-        driveId: 'drive-id',
-        itemId: 'narrative-item',
-        versionId: '1.0',
-        contentHash: 'a'.repeat(64),
-      },
-      bibliography: {
-        filename: 'ProposalBibliography_1002379.pdf',
-        text: 'Bibliography text '.repeat(10),
-        siteId: 'site-id',
-        driveId: 'drive-id',
-        itemId: 'bibliography-item',
-        versionId: '1.0',
-        contentHash: 'b'.repeat(64),
-      },
-      ...overrides.proposalMaterials,
+    proposalNarrative: {
+      filename: 'ProposalNarrative_1002379.pdf',
+      text: 'Narrative text '.repeat(20),
+      siteId: 'site-id',
+      driveId: 'drive-id',
+      itemId: 'narrative-item',
+      versionId: '1.0',
+      contentHash: 'a'.repeat(64),
+      ...overrides.proposalNarrative,
     },
   };
 }
 
 function promptFixture(variableNames = [
   'request_context_json',
-  'proposal_narrative',
-  'proposal_bibliography',
+  'proposal_text',
 ]) {
   return {
     wmkf_ai_promptid: PROMPT_ID,
@@ -214,7 +202,7 @@ function createHarness({ mutatePersistedDraft = false } = {}) {
 test('missing exact source identity stops before claim, Claude, render, or upload', async () => {
   const harness = createHarness();
   harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
-    proposalMaterials: { bibliography: null },
+    proposalNarrative: { versionId: null },
   }));
 
   await expect(generatePreSiteVisitArtifact(
@@ -228,11 +216,12 @@ test('missing exact source identity stops before claim, Claude, render, or uploa
   expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
 });
 
-test('single-source current prompt stops before claim or Claude', async () => {
+test('legacy prompt with a bibliography variable stops before claim or Claude', async () => {
   const harness = createHarness();
   harness.dependencies.getCurrentPrompt.mockResolvedValueOnce(promptFixture([
     'request_context_json',
-    'proposal_narrative',
+    'proposal_text',
+    'proposal_bibliography',
   ]));
 
   await expect(generatePreSiteVisitArtifact(
@@ -286,6 +275,26 @@ test('identical Ready retry does not rerun Claude, render, or upload', async () 
   expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(firstCounts.render);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(firstCounts.upload);
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+});
+
+test('bibliography metadata does not change the PSV generation identity', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  harness.dependencies.loadInputs.mockResolvedValueOnce({
+    ...inputFixture(),
+    proposalBibliography: {
+      filename: 'ProposalBibliography_1002379.pdf',
+      versionId: 'changed-bibliography-version',
+      contentHash: 'b'.repeat(64),
+    },
+  });
+
+  const retry = await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  expect(retry.reused).toBe(true);
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
 });
 
 test('failed upload retry reuses persisted Claude output and remains retryable', async () => {

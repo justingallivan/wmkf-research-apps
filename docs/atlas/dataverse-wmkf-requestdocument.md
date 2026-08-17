@@ -181,10 +181,10 @@ Exact design and deployment boundary:
 - One Word file per versioned draft row; the row carries all eight named
   proposal-core fields and the exact validated Claude/input snapshots.
 - The source proposal is exactly
-  `AI Materials/ProposalNarrative_{Request#}.pdf` plus
-  `AI Materials/ProposalBibliography_{Request#}.pdf`, with both roles, stable
-  Graph identities, versions, and content hashes captured in the immutable
-  input snapshot.
+  `AI Materials/ProposalNarrative_{Request#}.pdf`, with its stable Graph
+  identity, version, and content hash captured in the immutable input snapshot.
+  The bibliography is excluded from PSV generation identity and is reserved
+  for next-cycle Reviewer Finder.
 - The governed prompt remains admin-configured through
   `pre-site-visit.proposal-core.generate`; `wmkf_ai_run` remains the execution
   audit rather than the editable business record.
@@ -197,14 +197,13 @@ Exact design and deployment boundary:
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
-The persistence schema is live in Production. **[VERIFIED LOCALLY 2026-08-17;
-NOT DEPLOYED]** the runtime writer requires and separately labels both exact
-inputs, persists the eight named fields and immutable snapshots under its
+The persistence schema is live in Production. **[VERIFIED IN SOURCE/TESTS
+2026-08-17; PRODUCTION GENERATION NOT YET PROVED]** the runtime writer requires
+the exact narrative, persists the eight named fields and immutable snapshots under its
 claim, renders only from Dataverse readback, uploads one Word file to
 `Artifacts/Pre-Site Visit/`, and atomically activates the current Ready row.
-Live prompt v3 remains single-source; the tracked two-input contract requires a
-new published prompt version, and the writer blocks before row claim until one
-is current.
+Read-only comparison confirms sole-current prompt v3 already matches the
+narrative-only runtime contract; no new prompt publication is required.
 
 ## Retry and partial-success behavior
 

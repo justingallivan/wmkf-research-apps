@@ -82,7 +82,7 @@ Migration plans touching either entity must preserve these foreign keys.
   `scripts/seed-pre-site-visit-proposal-core-prompt.js` provides a create-only
   bootstrap with concrete `claude-sonnet-4-6`. The local proposal helper lives
   at `lib/services/pre-site-visit/proposal-core-service.js`: it selects the exact
-  separate AI Materials narrative and bibliography, supplies the authoritative Dataverse roster, passes
+  AI Materials narrative, supplies the authoritative Dataverse roster, passes
   the exported `REQUIRED_SYSTEM_ASSERTIONS` as `assertSystemIncludes`, and sets
   `requireNoPersistence:true` at the Executor target boundary. The durable
   `pre-site-visit/artifact-service.js`, paired template renderer, authenticated
@@ -108,9 +108,9 @@ Migration plans touching either entity must preserve these foreign keys.
   runs remain as governed history. **[VERIFIED LOCALLY 2026-08-17; NOT
   DEPLOYED]** the new writer persists the run link, eight named business fields,
   immutable source/output snapshots, stable SharePoint identity, and current
-  request pointer before reporting Ready. Sole-current v3 lacks the new
-  bibliography variable, so the writer blocks before row claim until a new
-  immutable two-input prompt is published. There is still no Production
+  request pointer before reporting Ready. Read-only comparison confirms
+  sole-current v3 matches the tracked narrative-only variables, body, system,
+  output schema, model, and required assertions. There is still no Production
   SharePoint upload, Pre-Site row, or signed-in smoke.
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
 - **`initial-assessment.generate` production bootstrap (2026-07-30):**

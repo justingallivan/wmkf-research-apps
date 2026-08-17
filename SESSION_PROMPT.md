@@ -18,12 +18,12 @@ they are not deployed and no Pre-Site row was created in Production.
    - Initial Assessment and Field Primer use the exact
      `AI Materials/ProposalNarrative_{Request#}.pdf` convention for this final two-phase cycle.
    - Owner decision 2026-08-17 established a second exact file,
-     `AI Materials/ProposalBibliography_{Request#}.pdf`. Multi-source Claude callers keep it
-     separate from the narrative and fingerprint both exact sources. Pre-Site integration source
-     now implements that reader; Reviewer Finder adoption remains next-cycle work.
+     `AI Materials/ProposalBibliography_{Request#}.pdf`. Pre-Site, Initial Assessment, and Field
+     Primer use and fingerprint only the narrative. Reviewer Finder will use the separate
+     bibliography at the next-cycle cutover to draw reviewer leads from cited authors.
 
 2. **Pre-Site proposal core and Word renderer built on the integration branch**
-   - The proposal core combines the exact separate narrative and bibliography with read-only Dataverse request,
+   - The proposal core combines the exact Proposal Narrative with read-only Dataverse request,
      organization, budget, and personnel data and validates eight named output sections.
    - The earlier authenticated direct-download route was replaced locally by a
      durable writer. It claims a Request Document row, persists the eight named
@@ -60,9 +60,9 @@ they are not deployed and no Pre-Site row was created in Production.
      request lookups in Production. Post-apply readback reported 14 exact and 0
      divergent; inventory remained three Initial Assessment rows and no
      Pre-Site row.
-   - The writer fails before claiming a row when either exact source is missing
-     or when the current governed prompt does not declare both narrative and
-     bibliography variables. Exact Ready retries reuse the existing row/run/file;
+   - The writer fails before claiming a row when the exact narrative is missing
+     or when the current governed prompt does not declare exactly the context
+     and narrative variables. Exact Ready retries reuse the existing row/run/file;
      later partial failures retain a retryable row and recover a matching upload
      without another Claude call or duplicate upload.
 
@@ -127,10 +127,10 @@ they are not deployed and no Pre-Site row was created in Production.
 
 3. **Review and deliberately promote the integration branch.**
    `codex/pre-site-draft-schema` now contains the former proposal feature branch plus the
-   production-applied schema contract, lifecycle plan, two-input reader, durable
+   production-applied schema contract, lifecycle plan, narrative-only reader, durable
    writer, and registry-backed route/UI. The authenticated route is not Production-live.
-   Live prompt v3 is still single-source; publish and verify a new immutable two-input prompt
-   version before promotion.
+   Read-only comparison confirms live prompt v3 already matches the narrative-only
+   variables, body, system, output schema, and required assertions; no new prompt publication is needed.
 
 4. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
    17:53:40 PDT).**
@@ -140,12 +140,11 @@ they are not deployed and no Pre-Site row was created in Production.
 
 ### Owner Decision Needed
 
-1. **Publish a reviewed two-input prompt version.**
-   The locally tracked prompt contract includes both exact AI Materials inputs,
-   but sole-current Production v3 declares only the narrative variable. The
-   writer intentionally refuses to claim a row or call Claude until a new
-   immutable two-input version is published. Any further page-length tightening
-   can be included in that reviewed version.
+1. **No prompt publication is required for the narrative-only change.**
+   Sole-current Production v3 already declares the exact context and
+   `proposal_text` variables and matches the tracked body, system, output
+   schema, model, and required safety assertions. Any future page-length
+   tightening should still publish a new immutable version through Admin.
 
 2. **Optional Stage 1 browser-bundle guards.**
    Retain the prior choice only if desired; these guards are unrelated to Pre-Site persistence and

@@ -61,11 +61,12 @@ AI Materials/ProposalBibliography_1002379.pdf
 
 ## Application behavior
 
-- Pre-Site Visit generation requires both exact files in `AI Materials` and
-  stops before calling Claude when either file is missing, renamed, or placed
-  elsewhere.
-- Initial Assessment and Field Primer currently use only the exact proposal
-  narrative file.
+- Pre-Site Visit, Initial Assessment, and Field Primer generation use only the
+  exact proposal narrative file and stop before calling Claude when it is
+  missing, renamed, ambiguous, or placed elsewhere.
+- The separate bibliography is retained for the next-cycle Reviewer Finder,
+  where cited authors can provide useful reviewer-discovery leads. It is not a
+  Pre-Site Visit input.
 - The reviewer release process uses the complete proposal package in
   `Reviewer Materials`.
 - The PDF bytes remain in SharePoint. Dataverse will store document provenance

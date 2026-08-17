@@ -19,12 +19,11 @@ const sampleProposalCore = Object.fromEntries(
   PROPOSAL_CORE_KEYS.map((key) => [key, `${key} content`]),
 );
 
-test('declares bounded untrusted inputs for context, narrative, and bibliography', () => {
+test('declares bounded untrusted inputs for context and narrative only', () => {
   expect(PROMPT_NAME).toBe('pre-site-visit.proposal-core.generate');
   expect(PROMPT_VARIABLES.variables.map((variable) => variable.name)).toEqual([
     'request_context_json',
-    'proposal_narrative',
-    'proposal_bibliography',
+    'proposal_text',
   ]);
 
   const requestContext = PROMPT_VARIABLES.variables[0];
@@ -43,17 +42,9 @@ test('declares bounded untrusted inputs for context, narrative, and bibliography
     untrusted: true,
   });
 
-  const proposalBibliography = PROMPT_VARIABLES.variables[2];
-  expect(proposalBibliography).toMatchObject({
-    source: { kind: 'override' },
-    dataClass: 'proposal_text',
-    maxChars: 60000,
-    untrusted: true,
-  });
-
   expect(USER_PROMPT_TEMPLATE).toContain('{{request_context_json}}');
-  expect(USER_PROMPT_TEMPLATE).toContain('{{proposal_narrative}}');
-  expect(USER_PROMPT_TEMPLATE).toContain('{{proposal_bibliography}}');
+  expect(USER_PROMPT_TEMPLATE).toContain('{{proposal_text}}');
+  expect(USER_PROMPT_TEMPLATE).not.toMatch(/bibliograph/i);
 });
 
 test('keeps Dataverse personnel authoritative without assuming affiliations', () => {
@@ -67,8 +58,7 @@ test('keeps Dataverse personnel authoritative without assuming affiliations', ()
   expect(SYSTEM_PROMPT).toContain('Use only the abbreviations PI and co-PI');
   expect(SYSTEM_PROMPT).toContain('backgroundAndImpact and detailedMethodology should normally fit together on one Word page');
   expect(SYSTEM_PROMPT).toContain('approximately 500-600 words combined');
-  expect(SYSTEM_PROMPT).toContain('bibliography only as evidence of works cited');
-  expect(SYSTEM_PROMPT).toContain('does not prove that a cited author is project personnel');
+  expect(SYSTEM_PROMPT).not.toMatch(/bibliograph/i);
   expect(SYSTEM_PROMPT).not.toContain('One short paragraph per person');
   expect(SYSTEM_PROMPT).not.toContain('title, department, degree');
   expect(SYSTEM_PROMPT).not.toContain('<u>');
@@ -81,8 +71,10 @@ test('exports the load-bearing caller assertions', () => {
     expect.stringContaining('Do not include academic degrees or degree credentials'),
     expect.stringContaining('Use only the abbreviations PI and co-PI'),
     expect.stringContaining('should normally fit together on one Word page'),
-    expect.stringContaining('bibliography only as evidence of works cited'),
   ]);
+  for (const assertion of REQUIRED_SYSTEM_ASSERTIONS) {
+    expect(SYSTEM_PROMPT).toContain(assertion);
+  }
 });
 
 test('leaves runtime model selection to the governed prompt row', () => {

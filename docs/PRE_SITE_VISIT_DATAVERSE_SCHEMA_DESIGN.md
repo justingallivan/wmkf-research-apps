@@ -69,7 +69,7 @@ akoya_request
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
 | Production has three Request Document rows, all Initial Assessments, and no Pre-Site rows | Read-only production inventory on 2026-08-17 | VERIFIED |
-| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current and uses `claude-sonnet-4-6`; the two-input tracked contract requires a future v4 publication before promotion | Read-only production prompt inventory on 2026-08-17 plus integration-branch source | VERIFIED LIVE / PLANNED PUBLICATION |
+| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current on `claude-sonnet-4-6` and matches the tracked narrative-only variables, body, system, output schema, and required assertions | Read-only production prompt comparison on 2026-08-17 plus current source | VERIFIED LIVE |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The branch-local Workbench Pre-Site route persists a business draft | Source and focused tests show claim → eight fields/snapshots → Dataverse readback render → SharePoint upload → atomic Ready/current activation | VERIFIED LOCALLY / NOT DEPLOYED |
@@ -106,18 +106,17 @@ Additional fields:
 | Logical name | Type / limit | Contract |
 |---|---|---|
 | `wmkf_presiteproposalcorejson` | Memo / 1,048,576 | Write-once exact validated Claude proposal-core object, before staff changes. It is audit/reproducibility evidence, not the only working representation. |
-| `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and the exact two-source proposal manifest. It excludes credentials and full PDF text. |
+| `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and the exact Proposal Narrative manifest. It excludes credentials and full PDF text. |
 | `wmkf_renderinputfingerprint` | String / 64 | SHA-256 of the exact named draft fields and deterministic document inputs used for a render. A mismatch means the registered file does not represent the current draft fields. |
 | `wmkf_contenttype` | String / 255 | IANA media type for the one SharePoint file represented by the row. This distinguishes Word and PDF without another closed option set. |
 
-The two AI Materials inputs are not currently separate governed Request
-Document rows. Their bounded source manifest therefore records each role,
-filename, stable Graph site/drive/item identity, exact version, and content
-hash inside the immutable input snapshot. Fixed single-source Graph columns
-were removed from the pre-apply proposal because they could not represent both
-inputs without ambiguity. The existing `wmkf_SourceDocument` lookup and source
-version/hash remain reserved for lineage from one governed output artifact to
-another, such as Word → PDF or Pre-Site → Final.
+The Proposal Narrative is not currently a governed Request Document row. Its
+bounded source manifest therefore records the role, filename, stable Graph
+site/drive/item identity, exact version, and content hash inside the immutable
+input snapshot. The separate Proposal Bibliography is not included because it
+does not govern PSV generation identity. The existing `wmkf_SourceDocument`
+lookup and source version/hash remain reserved for lineage from one governed
+output artifact to another, such as Word → PDF or Pre-Site → Final.
 
 ### `akoya_request` relationships
 
@@ -200,7 +199,7 @@ source identity:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "request": {
     "requestId": "guid",
     "requestNumber": "1002379",
@@ -224,15 +223,6 @@ source identity:
       "itemId": "...",
       "versionId": "...",
       "contentHash": "..."
-    },
-    {
-      "role": "proposalBibliography",
-      "filename": "ProposalBibliography_1002379.pdf",
-      "siteId": "...",
-      "driveId": "...",
-      "itemId": "...",
-      "versionId": "...",
-      "contentHash": "..."
     }
   ]
 }
@@ -246,11 +236,10 @@ The source file remains authoritative for proposal content.
 The runtime implementation is a later, separately reviewed slice. It must:
 
 1. load the authoritative request/account/budget/personnel data and the exact
-   `AI Materials/ProposalNarrative_{Request#}.pdf` plus
-   `AI Materials/ProposalBibliography_{Request#}.pdf` identities and bytes;
+   `AI Materials/ProposalNarrative_{Request#}.pdf` identity and bytes;
 2. calculate the input fingerprint and deterministic generation key before
    creating or claiming a row;
-3. execute a two-input published version of the admin-configured governed prompt
+3. execute a narrative-only published version of the admin-configured governed prompt
    through the shared Executor and require a persisted `wmkf_ai_run` audit;
 4. validate exactly eight sections, then persist the named fields, immutable
    JSON snapshots, prompt/run lookups, and source identity under the owned
@@ -281,7 +270,7 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
    returning route/UI, persisted-readback renderer transition, and focused
    claim/retry/recovery/race tests.
 6. Exercise Request `1002379` as the controlled old-request testbed only after
-   both exact AI Materials files exist, without altering unrelated request data.
+   the exact Proposal Narrative exists, without altering unrelated request data.
 7. Verify the exact row, run, Word item/version, current pointer, retry, and one
    safe partial-failure recovery before promotion.
 
@@ -292,8 +281,8 @@ fields; Dataverse rejects a `$select` containing an absent attribute.
 ## Remaining decisions
 
 - The first slice now creates the Word document inside the application.
-  Power Automate remains responsible for supplying the two exact AI Materials
-  inputs; changing producer ownership would require a new owner decision and
+  Power Automate remains responsible for supplying the exact Proposal Narrative
+  input; changing producer ownership would require a new owner decision and
   the same claim, fingerprint, Ready, and failure contracts.
 - Whether PDF export is required in the first slice or can follow after the
   Word row is proven. Its lineage shape is decided above either way.

@@ -426,8 +426,8 @@ const SURFACES = [
   },
   {
     // Local draft for the future Executor-driven
-    // pre-site-visit.proposal-core.generate operation. Both the Dataverse
-    // request context, applicant-authored narrative, and bibliography are declared untrusted;
+    // pre-site-visit.proposal-core.generate operation. The Dataverse request
+    // context and applicant-authored narrative are both declared untrusted;
     // execute-prompt.js supplies nonce wrapping + the hardening preamble. The
     // target is kind:none, so publication alone cannot write request fields.
     id: 'pre-site-visit-proposal-core-generate',
@@ -441,7 +441,6 @@ const SURFACES = [
       "dataClass: 'proposal_text'",
       'maxChars: 25000',
       'maxChars: 100000',
-      'maxChars: 60000',
       "target: { kind: 'none' }",
     ],
   },

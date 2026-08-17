@@ -77,20 +77,20 @@ remains the rationale record.
 
 **2026-08-17 proposal-input contract:** Power Automate creates separate exact
 `AI Materials/ProposalNarrative_{Request#}.pdf` and
-`AI Materials/ProposalBibliography_{Request#}.pdf` files. Multi-source Claude
-callers retain their boundary and fingerprint both identities/versions/hashes;
-there is no combined canonical AI PDF. Pre-Site integration source implements
-the reader locally, while Reviewer Finder's adoption remains next-cycle work.
+`AI Materials/ProposalBibliography_{Request#}.pdf` files. Pre-Site, Initial
+Assessment, and Field Primer use and fingerprint the narrative only. Reviewer
+Finder will use both sources next cycle so cited authors can inform discovery;
+there is no combined canonical AI PDF.
 
 **2026-08-17 Pre-Site persistence schema and local writer:** Owner-approved Wave 19 is live in
 Production with 12 exact `wmkf_requestdocument` fields and two exact current-
 writeup lookups on `akoya_request`. Independent post-apply inventory remained
-three Initial Assessment rows and no Pre-Site row. The integration branch now
+three Initial Assessment rows and no Pre-Site row. The source now
 has a focused-tested durable adapter/writer, JSON route, and stable Word-link
-UI; none is deployed or production-proved. Sole-current prompt v3 is still
-single-source, so the writer blocks before row claim until a new immutable
-two-input prompt is published. Live schema alone remains no evidence of a
-durable Production Pre-Site generation.
+UI; Production generation is not yet proved. Read-only comparison confirms
+sole-current prompt v3 already matches the narrative-only runtime contract, so
+no new prompt publication is required. Live schema alone remains no evidence
+of a durable Production Pre-Site generation.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,

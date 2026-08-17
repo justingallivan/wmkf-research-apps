@@ -296,12 +296,12 @@ Dataverse/Graph extraction]** Request `1002788` resolves
 text. Existing stored Field Primers remain cached until an explicit
 regeneration.
 
-**[OWNER DECISION 2026-08-17; PRE-SITE INTEGRATION SOURCE BUILT LOCALLY;
-REVIEWER FINDER CUTOVER PLANNED.]** Keep the narrative and bibliography as
-separate exact AI Materials PDFs. Multi-source callers label them separately
-for Claude and fingerprint both identities/versions/hashes; they do not depend
-on a Power Automate-produced combined PDF. The current-cycle Reviewer Finder
-loader is intentionally unchanged and adopts this contract next cycle.
+**[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER CUTOVER
+PLANNED.]** Keep the narrative and bibliography as separate exact AI Materials
+PDFs. Pre-Site, Initial Assessment, and Field Primer use and fingerprint only
+the narrative. The current-cycle Reviewer Finder loader is intentionally
+unchanged; next cycle it will label and fingerprint both files so cited authors
+can inform reviewer discovery. No caller depends on a combined PDF.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a
@@ -348,8 +348,7 @@ run on 2026-08-16; durable Request Document writer IMPLEMENTED LOCALLY,
 Production deployment/proof PENDING.]**
 The Pre-Site draft has two independently refreshable source layers:
 
-1. **Proposal-derived factual material.** Use the exact separate proposal
-   narrative and bibliography with an
+1. **Proposal-derived factual material.** Use the exact Proposal Narrative with an
    iterated form of the retired Phase II summarizer, now named
    `pre-site-visit.proposal-core.generate`. Where the
    document repeats authoritative request metadata such as institution,
@@ -409,10 +408,9 @@ The two named prompt surfaces do not currently have the same runtime posture:
   `lib/services/pre-site-visit/proposal-core-service.js`,
   `lib/services/pre-site-visit/docx-renderer.js`, focused tests, retained
   template render, live prompt readback, and controlled Request `1002379`
-  generation on 2026-08-16, plus two-file source tests on 2026-08-17.]** The
-  integration producer uses the exact
-  `AI Materials/ProposalNarrative_{Request#}.pdf` and
-  `AI Materials/ProposalBibliography_{Request#}.pdf`, supplies authoritative
+  generation on 2026-08-16, plus narrative-only source tests on 2026-08-17.]**
+  The producer uses the exact
+  `AI Materials/ProposalNarrative_{Request#}.pdf`, supplies authoritative
   Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
   `pre-site-visit.proposal-core.generate` through the shared Executor with
   fail-closed system assertions and `requireNoPersistence:true`. The renderer
@@ -432,8 +430,9 @@ The two named prompt surfaces do not currently have the same runtime posture:
   passed structural and rendered-page QA. Signed-in Admin publication then
   created v3 with shorter personnel instructions, no degree credentials,
   PI/co-PI abbreviations, and a soft one-page target for Background/Methodology.
-  The tracked two-input prompt contract is newer than live v3 and must be
-  published as a new immutable prompt version before promotion.
+  Read-only comparison confirms live v3 matches the tracked narrative-only
+  variables, body, system, output schema, model, and required assertions; no
+  new prompt publication is needed.
   A direct exact-v3 Request `1002379` model/render QA correctly produced 145
   personnel words and underlined only the two Dataverse roster names, but its
   574-word Background/Methodology pair spilled the final sentence to page 4;
@@ -798,8 +797,8 @@ Decision order:
 1. **Pre Site Visit Writeup** — input and regeneration behavior, the first
    versioned Word template, the proposal-core prompt/template pair, and the
    durable artifact persistence/access contract are implemented locally. Next
-   publish the new two-input prompt, preflight the runtime Dataverse target,
-   review/promote the branch, and signed-in smoke exact generation/retry plus
+   preflight the runtime Dataverse target, review/promote the branch, and
+   signed-in smoke exact generation/retry plus
    one recovery path. The review-layer merge remains later work.
 2. **Site Visit** — the dossier metadata, six material categories,
    paste-friendly observations shape, and basic applicant file-management
@@ -1094,17 +1093,16 @@ Owner-decided:
     release and Reviewer Finder behavior remain unchanged; and
 47. on 2026-08-17 the owner chose two separate canonical AI inputs—
     `ProposalNarrative_{Request#}.pdf` and
-    `ProposalBibliography_{Request#}.pdf`—instead of a combined PDF. Claude
-    callers keep the inputs separately labeled and preserve both source
-    identities/versions/hashes; Reviewer Finder adopts them at the next-cycle
-    cutover.
+    `ProposalBibliography_{Request#}.pdf`—instead of a combined PDF. Pre-Site,
+    Initial Assessment, and Field Primer use and fingerprint the narrative
+    only; Reviewer Finder adopts both at the next-cycle cutover so cited
+    authors can inform discovery.
 
 Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
-2. publication of a reviewed two-input Pre-Site prompt, runtime-target Wave 19
-   preflight/apply, and production promotion plus signed-in Workbench smoke of
+2. runtime-target Wave 19 preflight/apply and production promotion plus signed-in Workbench smoke of
    the locally implemented durable writer; the controlled Request `1002379`
    document passed historical render QA, while the deterministic reviewer
    roster and anonymous review-narrative merge remain unbuilt;

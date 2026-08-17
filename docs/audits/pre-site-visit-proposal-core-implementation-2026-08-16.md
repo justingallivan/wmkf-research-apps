@@ -2,12 +2,19 @@
 title: Pre-Site Visit proposal-core controlled implementation record
 domain: request-workbench
 kind: audit
-status: current
-summary: Guarded proposal-core producer, historical governed prompt v3 evidence, and the later unpromoted two-file narrative/bibliography revision.
+status: historical
+summary: Historical controlled-render record; superseded for current PSV inputs by the 2026-08-17 narrative-only contract.
 owner: product-engineering
 ---
 
 # Pre-Site Visit proposal-core controlled implementation record
+
+> **Historical boundary:** this audit records the 2026-08-16 controlled render
+> and the briefly implemented two-file follow-on. The current PSV contract uses
+> only the exact Proposal Narrative plus Dataverse; the bibliography is reserved
+> for next-cycle Reviewer Finder. Current operating guidance lives in
+> `docs/CURRENT_WORK_QUEUE.md` and
+> `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
 
 ## Scope
 
@@ -22,7 +29,7 @@ lifecycle is production-live.
 
 | Claim | Producer/entry point | Persistence/source | Consumer | Strongest evidence | Status |
 |---|---|---|---|---|---|
-| Exact proposal inputs | `loadPreSiteVisitInputs` | Separate SharePoint `AI Materials/ProposalNarrative_{Request#}.pdf` and `ProposalBibliography_{Request#}.pdf` | separate prompt overrides | shared two-file helper plus focused tests; only the earlier narrative has live Request `1002379` probe evidence | PARTIAL |
+| Exact proposal input | `loadPreSiteVisitInputs` | SharePoint `AI Materials/ProposalNarrative_{Request#}.pdf` | narrative prompt override | current source and focused tests; earlier narrative has live Request `1002379` probe evidence | VERIFIED IN CURRENT SOURCE / HISTORICAL LIVE PROBE |
 | Authoritative metadata and roster | `loadPreSiteVisitInputs` | `akoya_request`, applicant `account`, Co-PI junction | prompt context and DOCX fields | source, focused tests, live read-only Request `1002379` (Christoph Gorgulla; Daniel Blair) | VERIFIED |
 | Eight-field governed call | `generatePreSiteVisitProposalCore` | sole-current prompt v3 plus append-only `wmkf_ai_run` on Executor calls | returned `proposalCore` | exact live v3 prompt readback; latest controlled completed Executor run `5bd65180-ed99-f111-b8db-7ced8d6e2f44` used v2; source/tests assert prompt name, security substrings, and `requireNoPersistence:true` | VERIFIED |
 | Versioned Word render | `renderPreSiteVisitDocx` | tracked retained DOCX template; returned Buffer only | direct browser download | 30-part package inventory, focused tests, canonical four-page render, placeholder scan | VERIFIED locally |
@@ -30,9 +37,9 @@ lifecycle is production-live.
 | Interim staff download | `PreSiteVisitTab` → `POST /api/workbench/pre-site-visit` | returned DOCX bytes; normal Executor AI-run audit attempt only | browser download | route/component focused tests cover access, strict input, binary response, errors, and request-switch cancellation | VERIFIED locally |
 | Full lifecycle | direct download only | no writeup registry row/upload/pointer | no shared artifact consumer | source inventory, negative contract tests, and controlled-run write inventory | PARTIAL |
 
-## 2026-08-17 two-file follow-on
+## Superseded 2026-08-17 two-file follow-on
 
-**[IMPLEMENTED LOCALLY; NOT PUBLISHED OR DEPLOYED.]** Owner direction retained
+**[HISTORICAL; SUPERSEDED LATER 2026-08-17.]** Owner direction briefly retained
 the narrative and bibliography as separate canonical SharePoint inputs. The
 integration branch now requires both exact case-sensitive filenames, extracts
 and hashes them independently, passes separately bounded
@@ -41,10 +48,9 @@ source manifest with both roles and stable identities/versions/hashes. Missing
 either source stops before the model call. Focused tests cover the positive
 two-file path and missing-bibliography complement.
 
-Live prompt v3 remains the single-narrative contract described below. The
-tracked two-input prompt must be published as a new immutable version and read
-back exactly before the integration branch is promotable. No live bibliography
-probe or model run has yet been performed.
+No two-file prompt was published and no live bibliography model run was
+performed. The later owner decision removed bibliography from PSV: the current
+tracked prompt, input snapshot, and generation key are narrative-only.
 
 ## Historical single-narrative probe result
 
@@ -120,7 +126,7 @@ direct QA did not use `executePrompt`, it created no `wmkf_ai_run`; accepted v2
 run `5bd65180-ed99-f111-b8db-7ced8d6e2f44` remains the latest governed Executor
 evidence.
 
-## Deliberately not performed
+## Deliberately not performed in this historical audit
 
 - No Dataverse business field, request-document registry row, request pointer,
   or SharePoint output was created.

@@ -76,8 +76,8 @@ export default function PreSiteVisitTab({ requestId }) {
             <h2 className="text-lg font-semibold text-gray-900">Pre Site Visit Writeup</h2>
             <p className="text-sm text-gray-600 mt-1">
               Creates a Word draft from the exact <code>AI Materials/ProposalNarrative_&#123;Request#&#125;.pdf</code>
-              {' '}and <code>ProposalBibliography_&#123;Request#&#125;.pdf</code> files, plus authoritative
-              Dataverse request fields. The current published prompt version in Admin controls the Claude model.
+              {' '}file plus authoritative Dataverse request fields. The current published prompt version
+              in Admin controls the Claude model.
             </p>
             <p className="text-sm text-gray-600 mt-2">
               The graphical abstract, caption, recommendation, referee comments, scientific
