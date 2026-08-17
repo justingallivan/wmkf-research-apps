@@ -5,7 +5,9 @@
 Session 443 established the final-cycle Phase I/Phase II proposal-source rules, built and tested
 the Pre-Site Visit Word draft on `codex/ai-proposal-narrative-source`, published the governed v3
 prompt, and recorded the owner's Dataverse persistence direction. The feature branch has not been
-merged or deployed, and no Pre-Site Draft schema or business-data write path exists yet.
+merged or deployed. At the Session 443 close there was no Pre-Site Draft schema or business-data
+write path; the current Session 444 state now includes an un-applied Wave 19 schema proposal and
+read-only preflight, while the business-data writer remains unbuilt.
 
 ### What Was Completed
 
@@ -75,11 +77,14 @@ merged or deployed, and no Pre-Site Draft schema or business-data write path exi
 
 ### Verified Open
 
-1. **Inventory Dataverse before proposing a Pre-Site schema.**
-   Read `docs/APPLICATION_STATE_ATLAS.md`, the relevant `docs/atlas/` pages, and the two design
-   documents listed below; probe existing writeup, artifact, and version records. Then use
-   `/contract-reconcile` across caller → persistence → renderer → artifact. No table name, column
-   name, status model, or writer is approved yet.
+1. **Review Wave 19 and obtain explicit approval before any Dataverse apply.**
+   The 2026-08-17 read-only Production inventory established that `wmkf_requestdocument` is the
+   reusable version/artifact spine; `wmkf_sitevisit` and `wmkf_researchwriteuptype` are not draft
+   stores. `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`, the two
+   `lib/dataverse/schema/wave19-pre-site-draft/` specs, and
+   `scripts/preflight-pre-site-draft-schema.mjs` now define the proposed additive fields and
+   current pointer. Nothing is applied, and no adapter/writer may select the fields before an
+   approved target apply and exact metadata readback.
 
 2. **Review and deliberately promote the feature branch.**
    `codex/ai-proposal-narrative-source` is 15 commits ahead of `main`; its focused tests, gates,
@@ -109,8 +114,9 @@ merged or deployed, and no Pre-Site Draft schema or business-data write path exi
 
 ### Verify Before Acting
 
-1. Do not implement schema from this handoff alone; inventory live Dataverse and reconcile the
-   ownership/write contract first.
+1. Do not apply Wave 19 from this handoff alone. Run the read-only target preflight, obtain
+   explicit approval for the Dataverse metadata write, apply the wave, and require exact readback
+   before runtime code selects the new fields.
 2. Do not treat the direct v3 Request 1002379 test as a governed Production Executor run.
 
 ### Do Not Reopen Without New Decision

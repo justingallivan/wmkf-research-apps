@@ -1,0 +1,264 @@
+---
+title: Pre-Site Visit Dataverse Schema Design
+domain: dataverse
+kind: spec
+status: draft
+summary: "Implementation-ready additive Wave 19 design for versioned Pre-Site proposal-core drafts on the governed Request Document registry."
+canonical: false
+cataloged: 2026-08-17
+last_verified: 2026-08-17
+owner: product-engineering
+related:
+  - docs/atlas/dataverse-wmkf-requestdocument.md
+  - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
+  - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
+  - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
+  - lib/dataverse/schema/wave19-pre-site-draft/02_akoya_request_current_pre_site_visit.json
+  - scripts/preflight-pre-site-draft-schema.mjs
+---
+
+# Pre-Site Visit Dataverse Schema Design
+
+## Status and outcome
+
+**[PLANNED 2026-08-17; NOT APPLIED.]** Wave 19 is an implementation-ready,
+additive schema proposal. Its JSON specifications and read-only preflight are
+tracked locally, but no Dataverse metadata, records, application adapter, or
+runtime writer has been changed.
+
+Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
+Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
+Document row beneath its Request. That row owns the eight named proposal-core
+fields, immutable generation snapshots, prompt/run/template provenance, and
+the stable SharePoint identity of the Word document. The Request has one
+canonical-current lookup to the active Word row.
+
+A PDF distribution copy is a separate Request Document row because one
+registry row must identify exactly one SharePoint file. Its
+`wmkf_SourceDocument` lookup points to the Word row, and the existing source
+version/hash fields identify the exact Word version exported to PDF.
+
+```text
+akoya_request
+  ├── wmkf_CurrentPreSiteVisit ───────────────┐
+  └── wmkf_requestdocument (Pre Site Visit, Word, current)
+        ├── eight named proposal-core fields │
+        ├── exact generated/input snapshots  │
+        ├── prompt + AI run + template       │
+        ├── stable Word file identity ◀──────┘
+        └── wmkf_requestdocument (Pre Site Visit, PDF)
+              └── SourceDocument + exact source version/hash
+```
+
+## Evidence and rejected alternatives
+
+| Claim | Strongest evidence | Status |
+|---|---|---|
+| `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
+| Production has three Request Document rows, all Initial Assessments, and no Pre-Site rows | Read-only production inventory on 2026-08-17 | VERIFIED |
+| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current and uses `claude-sonnet-4-6` | Read-only production prompt inventory on 2026-08-17 | VERIFIED |
+| `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
+| `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
+| The current Workbench Pre-Site route persists a business draft | The feature branch renders validated output from memory; only the normal AI-run audit persists | PARTIAL |
+| Wave 19 fields and current pointer exist in Dataverse | Read-only preflight is the required falsification check; until an approved apply and readback, they are absent | PLANNED |
+
+The reproducible inventory is
+`scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
+`scripts/preflight-pre-site-draft-schema.mjs`.
+
+## Additive schema
+
+### `wmkf_requestdocument` attributes
+
+All eight narrative fields are optional Memo columns with a 32,000-character
+limit. The governed prompt currently imposes much smaller validation limits;
+the larger Dataverse capacity prevents ordinary staff revision from requiring
+a schema change. The application validates that all eight are non-empty before
+rendering a Pre-Site Word document.
+
+| Prompt JSON key | Dataverse logical name | Purpose |
+|---|---|---|
+| `executiveSummary` | `wmkf_presiteexecutivesummary` | First-page executive summary |
+| `impactOverview` | `wmkf_presiteimpactoverview` | First-page impact bullet |
+| `methodologyOverview` | `wmkf_presitemethodologyoverview` | First-page methodology bullet |
+| `personnelOverview` | `wmkf_presitepersonneloverview` | First-page personnel bullet |
+| `keckFundingRationale` | `wmkf_presitekeckfundingrationale` | First-page Keck-funding rationale |
+| `backgroundAndImpact` | `wmkf_presitebackgroundandimpact` | Detailed background and impact |
+| `detailedMethodology` | `wmkf_presitedetailedmethodology` | Detailed methodology |
+| `personnelDetails` | `wmkf_presitepersonneldetails` | Detailed one-paragraph personnel section |
+
+Additional fields:
+
+| Logical name | Type / limit | Contract |
+|---|---|---|
+| `wmkf_presiteproposalcorejson` | Memo / 1,048,576 | Write-once exact validated Claude proposal-core object, before staff changes. It is audit/reproducibility evidence, not the only working representation. |
+| `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and proposal-source identity. It excludes credentials and the full proposal text. |
+| `wmkf_renderinputfingerprint` | String / 64 | SHA-256 of the exact named draft fields and deterministic document inputs used for a render. A mismatch means the registered file does not represent the current draft fields. |
+| `wmkf_contenttype` | String / 255 | IANA media type for the one SharePoint file represented by the row. This distinguishes Word and PDF without another closed option set. |
+| `wmkf_sourcesharepointsiteid` | String / 300 | Stable Graph site identity for an unregistered external source such as the AI Materials narrative. |
+| `wmkf_sourcesharepointdriveid` | String / 300 | Stable Graph drive identity for that source. |
+| `wmkf_sourcesharepointitemid` | String / 300 | Stable Graph item identity for that source. Existing `wmkf_sourceversionid` and `wmkf_sourcecontenthash` complete the source identity. |
+
+The source Graph fields are necessary because a filename or folder convention
+is not a durable identity, while the existing `wmkf_SourceDocument` lookup can
+only reference another governed Request Document row. The Phase II narrative
+in `AI Materials` is not currently registered as one.
+
+### `akoya_request` relationship
+
+Add the optional N:1 lookup `wmkf_CurrentPreSiteVisit` through relationship
+`wmkf_request_currentpresitevisit`. It points only to the canonical Ready,
+non-superseded Pre-Site Word row for that Request.
+
+Dataverse relationship metadata cannot enforce the target row's owning
+Request, artifact type, operation status, lifecycle, or content type. The
+service must enforce all five and update the pointer atomically with prior-row
+supersession, mirroring the Initial Assessment transition.
+
+## Row and version semantics
+
+### Word draft/document row
+
+A Pre-Site Word row has:
+
+- `wmkf_artifacttype = 100000001` (`Pre Site Visit`);
+- `wmkf_contenttype = application/vnd.openxmlformats-officedocument.wordprocessingml.document`;
+- all eight named sections;
+- the proposal-core and input-snapshot JSON;
+- request, AI prompt, AI run, template, source-file, and generation-key provenance; and
+- one stable SharePoint Word identity.
+
+An exact retry reuses the same generation-key row. A changed authoritative
+input, prompt version, or template version creates a new row. The Ready
+transition supersedes the prior current row and changes the Request pointer in
+one Dataverse changeset. `createdon`, the deterministic generation key, and
+native SharePoint versions provide the version trail; no separately allocated
+human revision integer is required.
+
+The generated JSON and input snapshot are write-once application fields. The
+eight named fields are the Power Automate/form-friendly representation. Before
+Word creation they may be revised through a governed draft action. Once the
+Word row is Ready, the SharePoint Word document is the authoritative staff-
+edited prose. A later Dataverse-field revision must be a deliberate new
+version/rerender operation; it must never silently overwrite a staff-edited
+Word file.
+
+### PDF row
+
+A PDF row also uses artifact type `Pre Site Visit`, but has
+`wmkf_contenttype = application/pdf` and normally leaves the eight proposal-
+core fields empty. Its `wmkf_SourceDocument` lookup targets the exact Word row;
+`wmkf_sourceversionid` and `wmkf_sourcecontenthash` record the exact Word
+version exported. Its generation key includes the Word row ID, source version,
+source content hash, PDF renderer/version, and content type. The Request's
+current pointer never targets the PDF row.
+
+## Structured snapshot contracts
+
+`wmkf_PreSiteProposalCoreJson` stores a versioned envelope rather than an
+unlabelled object:
+
+```json
+{
+  "schemaVersion": 1,
+  "proposalCore": {
+    "executiveSummary": "...",
+    "impactOverview": "...",
+    "methodologyOverview": "...",
+    "personnelOverview": "...",
+    "keckFundingRationale": "...",
+    "backgroundAndImpact": "...",
+    "detailedMethodology": "...",
+    "personnelDetails": "..."
+  }
+}
+```
+
+`wmkf_PreSiteInputSnapshotJson` stores only bounded structured metadata and
+source identity:
+
+```json
+{
+  "schemaVersion": 1,
+  "request": {
+    "requestId": "guid",
+    "requestNumber": "1002379",
+    "projectTitle": "...",
+    "applicantInstitution": "...",
+    "cityState": "City, ST",
+    "meetingDate": "...",
+    "requestedAmount": "...",
+    "invitedAmount": "...",
+    "totalProjectBudget": "...",
+    "programDirector": "...",
+    "projectPeriod": { "startDate": "...", "endDate": "..." },
+    "personnel": []
+  },
+  "proposalSource": {
+    "filename": "ProposalNarrative_1002379.pdf",
+    "siteId": "...",
+    "driveId": "...",
+    "itemId": "...",
+    "versionId": "...",
+    "contentHash": "..."
+  }
+}
+```
+
+The JSON never contains credentials, access tokens, or the full proposal text.
+The source file remains authoritative for proposal content.
+
+## Required writer contract
+
+The runtime implementation is a later, separately reviewed slice. It must:
+
+1. load the authoritative request/account/budget/personnel data and the exact
+   `AI Materials/ProposalNarrative_{Request#}.pdf` identity and bytes;
+2. calculate the input fingerprint and deterministic generation key before
+   creating or claiming a row;
+3. execute the admin-configured governed prompt through the shared Executor and
+   require a persisted `wmkf_ai_run` audit;
+4. validate exactly eight sections, then persist the named fields, immutable
+   JSON snapshots, prompt/run lookups, and source identity under the owned
+   claim;
+5. render only from the persisted row and exact input snapshot, calculate the
+   render-input fingerprint, and upload one Word file;
+6. transition to Ready only after Graph upload and Dataverse readback agree;
+7. atomically supersede the prior current Word row and set
+   `wmkf_CurrentPreSiteVisit`; and
+8. preserve a failed row, exact run linkage, uploaded-item cleanup work, and a
+   safe retry path when any later hop fails.
+
+The service must not report success after only the Claude call, only the
+Dataverse draft write, or only the SharePoint upload. Existing claim-token,
+ETag, operation-status, error, and orphan-cleanup fields are reused.
+
+## Deployment and compatibility sequence
+
+1. Run the self-test and the read-only target preflight.
+2. Obtain explicit approval for the target Dataverse metadata write.
+3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 16
+   declared artifacts are exact.
+4. Only after schema readback, add the new fields to the request-document
+   adapter and request lookup selects.
+5. Implement the writer/renderer transition and focused tests.
+6. Exercise Request `1002379` as the controlled old-request testbed, using a
+   newly created AI Materials narrative and without altering unrelated request
+   data.
+7. Verify the exact row, run, Word item/version, current pointer, retry, and one
+   safe partial-failure recovery before promotion.
+
+Do not merge runtime code that selects Wave 19 fields before the target
+environment has them; Dataverse rejects a `$select` containing an absent
+attribute. The schema files and preflight are safe to review before apply.
+
+## Remaining decisions
+
+- Whether the first production slice creates the Word document inside the
+  application or delegates rendering to a Power Automate flow. Either producer
+  must honor the same claim, fingerprint, Ready, and failure contracts.
+- Whether PDF export is required in the first slice or can follow after the
+  Word row is proven. Its lineage shape is decided above either way.
+- Which staff-facing Dataverse form, if any, exposes the named fields before
+  Word creation. Direct unrestricted edits to Ready rows are not part of this
+  design.

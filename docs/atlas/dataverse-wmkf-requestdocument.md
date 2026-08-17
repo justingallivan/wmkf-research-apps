@@ -8,9 +8,11 @@ canonical: false
 owner: product-engineering
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
+  - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
+  - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
 ---
 
 # `wmkf_requestdocument`
@@ -115,6 +117,16 @@ from the Ready registry row and never from the caller. **Administrator restore a
 immutable milestone snapshots remain open**, restore because it depends on the
 permission evidence above.
 
+**[VERIFIED INVENTORY / PLANNED SCHEMA 2026-08-17]** A read-only Production
+inventory confirmed that the registry already has a `Pre Site Visit` artifact
+type but has no Pre-Site rows. The legacy `wmkf_sitevisit` activity and
+`akoya_request.wmkf_researchwriteuptype` classification are not suitable draft
+stores. Additive Wave 19 now specifies eight named Pre-Site proposal-core Memo
+fields, exact generated/input snapshots, render/source identity, and
+`akoya_request.wmkf_CurrentPreSiteVisit`. The wave is **not applied**; no live
+field, pointer, adapter selection, or writer exists yet. Exact design and
+deployment boundary: `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
+
 ## Ownership
 
 - SharePoint owns editable Word bytes and native version history.
@@ -124,6 +136,9 @@ permission evidence above.
   prompt/run/input/template/content provenance.
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
+- Planned `akoya_request.wmkf_CurrentPreSiteVisit` provides the equivalent
+  current-pointer/fence for a Ready Pre-Site Word row after Wave 19 is applied
+  and the writer is built. It is not live yet.
 - Workbench and the pilot locator consume the same registry row; neither joins
   by filename. The planned full Editor Dashboard will reuse this identity
   contract.
@@ -144,6 +159,26 @@ permission evidence above.
   Expertise.
 - Staff-owned field: Foundation Opportunity. It is absent from the prompt
   output schema and visibly marked `STAFF INPUT REQUIRED` by the DOCX template.
+
+## Planned Pre-Site Visit contract
+
+- Artifact type: `Pre Site Visit` (already live in the Wave 16 option set).
+- One Word file per versioned draft row; the row carries all eight named
+  proposal-core fields and the exact validated Claude/input snapshots.
+- The source proposal is exactly
+  `AI Materials/ProposalNarrative_{Request#}.pdf`, with stable Graph identity,
+  version, and content hash captured on the draft row.
+- The governed prompt remains admin-configured through
+  `pre-site-visit.proposal-core.generate`; `wmkf_ai_run` remains the execution
+  audit rather than the editable business record.
+- A PDF distribution copy is a second Request Document row linked through
+  `wmkf_SourceDocument` to the exact Word row and source version/hash.
+- SharePoint Word becomes authoritative for staff prose once the row is Ready;
+  no automatic Word-to-Dataverse section synchronization is claimed.
+
+This contract is schema/design only. The feature-branch pass-through producer
+and DOCX renderer do not persist these business fields or create governed
+registry rows.
 
 ## Retry and partial-success behavior
 

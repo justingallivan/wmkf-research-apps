@@ -6,13 +6,14 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-10
+last_verified: 2026-08-17
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
   - docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md
   - docs/CURRENT_WORK_QUEUE.md
   - docs/GROUP_B_WRITEUP_SPINE_DESIGN.md
+  - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
 ---
 
 # Request Workbench — near-term execution plan
@@ -351,26 +352,30 @@ The Pre-Site draft has two independently refreshable source layers:
 
 #### Pre-Site Draft persistence direction
 
-**[OWNER DIRECTION 2026-08-16; SCHEMA NOT YET APPROVED OR BUILT.]** Treat the
-Request as the parent and each versioned Pre-Site Draft as one child row. Do
-not create one child row per generated section. The working Dataverse shape is
-one draft row with eight editable Multiline Text columns for the proposal-core
-sections (executive summary, impact overview, methodology overview, personnel
-overview, Keck funding rationale, background and impact, detailed methodology,
-and personnel details), plus prompt/run/source/template provenance. An optional
-Multiline Text JSON column may retain Claude's exact validated response as an
-immutable troubleshooting/reproducibility snapshot, but JSON is not the sole
-working copy: Dataverse views, forms, and Power Automate should consume the
-named columns directly. `wmkf_ai_run` remains an append-only execution audit,
-not the business-data source for an editable draft. Rendered Word/PDF artifacts
-link to the exact draft version that produced them.
+**[VERIFIED INVENTORY / PROPOSED SCHEMA 2026-08-17; NOT APPLIED.]** Treat the
+Request as the parent and reuse the existing `wmkf_requestdocument` registry
+for each versioned Pre-Site Word draft; do not create a separate draft table or
+one child row per generated section. The Production inventory found the live
+`Pre Site Visit` artifact option and no Pre-Site rows. It also falsified the
+legacy `wmkf_sitevisit` activity and
+`akoya_request.wmkf_researchwriteuptype` classification as suitable content
+stores.
 
-Before creating any table or column, inventory the existing Dataverse
-writeup/artifact tables and Atlas ownership pages to determine whether a
-suitable draft/version record already exists. Reconcile the full
-caller→persistence→renderer→artifact contract with `/contract-reconcile`; no
-schema name, relationship, status model, or write path was approved in this
-session.
+Additive Wave 19 now specifies one Word row with eight editable Multiline Text
+columns for the proposal-core sections (executive summary, impact overview,
+methodology overview, personnel overview, Keck funding rationale, background
+and impact, detailed methodology, and personnel details), exact generated and
+structured-input JSON snapshots, render/source identity, and prompt/run/source/
+template provenance. `wmkf_ai_run` remains the append-only execution audit, not
+the business-data source. A PDF is a separate Request Document row linked to
+the exact Word row and source SharePoint version/hash; the Request's planned
+`wmkf_CurrentPreSiteVisit` pointer targets only the current Ready Word row.
+
+The exact schema and transition contract are in
+`docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`. The JSON specifications and
+read-only preflight exist locally, but no Dataverse metadata, adapter, writer,
+or consumer has been changed. Applying the wave remains a separately approved
+Production metadata write.
 
 The two named prompt surfaces do not currently have the same runtime posture:
 

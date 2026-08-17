@@ -6,11 +6,12 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-08-17
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
+  - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
 ---
 
 # Dataverse / SharePoint File Storage Model
@@ -235,19 +236,28 @@ Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 
-**[OWNER DIRECTION 2026-08-16; SCHEMA NOT YET APPROVED OR BUILT.]** The working
-persistence model places versioned Pre-Site Draft rows beneath the Request. The
-eight proposal-core sections are sibling editable Multiline Text columns on a
-draft row, not eight child records. The row also carries prompt/run/source and
-template provenance. A separate Multiline Text JSON snapshot may preserve the
-exact validated Claude response for troubleshooting and reproducibility, but
-JSON is not the only working representation because Dataverse forms, views,
-and Power Automate need direct section access. `wmkf_ai_run` remains the
-append-only execution audit rather than the editable business record. Each
-rendered Word/PDF artifact links to the exact draft version used for rendering.
-Before schema work, probe the existing Dataverse writeup/artifact inventory and
-Atlas ownership contracts for a reusable record; the table name, field names,
-relationships, statuses, and writer remain undecided.
+**[VERIFIED INVENTORY / PROPOSED SCHEMA 2026-08-17; NOT APPLIED.]** Versioned
+Pre-Site drafts reuse `wmkf_requestdocument` beneath the Request. The live
+registry already has a `Pre Site Visit` artifact option and the necessary
+request, prompt, run, template, lifecycle, retry, and SharePoint identity
+spine. The legacy `wmkf_sitevisit` activity has no suitable content fields,
+and `akoya_request.wmkf_researchwriteuptype` is only a Phase I/Phase II-style
+classification.
+
+Additive Wave 19 specifies the eight proposal-core sections as sibling editable
+Multiline Text columns on the Pre-Site Word row, not eight child records. It
+also specifies exact validated-output and structured-input JSON snapshots,
+render/source identity, and `akoya_request.wmkf_CurrentPreSiteVisit` as the
+canonical Ready Word pointer. `wmkf_ai_run` remains the append-only execution
+audit rather than the editable business record. A PDF is a separate registry
+row whose `wmkf_SourceDocument`, source version, and source hash identify the
+exact Word version exported. Full field and transition contract:
+`docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`.
+
+No Wave 19 field, pointer, adapter, writer, or consumer is live yet. SharePoint
+Word remains authoritative for staff prose after document creation; the named
+Dataverse fields are the structured generation/automation representation and
+do not claim automatic synchronization from later Word edits.
 
 The review-derived portion has two presentation channels over that same exact
 submitted-review population. Application/template code renders a named reviewer

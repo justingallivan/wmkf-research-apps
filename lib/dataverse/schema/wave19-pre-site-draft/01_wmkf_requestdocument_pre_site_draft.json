@@ -1,0 +1,113 @@
+{
+  "name": "wmkf_requestdocument-pre-site-draft",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Additive Pre-Site Visit draft fields on the existing governed request-document registry. Apply only after scripts/preflight-pre-site-draft-schema.mjs reports no divergent metadata. Runtime readers/writers must not select these fields until the target environment has this wave.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteExecutiveSummary",
+      "displayName": "Pre-Site Executive Summary",
+      "description": "Editable proposal-core executive summary for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteImpactOverview",
+      "displayName": "Pre-Site Impact Overview",
+      "description": "Editable plain-language impact overview for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteMethodologyOverview",
+      "displayName": "Pre-Site Methodology Overview",
+      "description": "Editable plain-language methodology overview for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSitePersonnelOverview",
+      "displayName": "Pre-Site Personnel Overview",
+      "description": "Editable one-paragraph personnel overview for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteKeckFundingRationale",
+      "displayName": "Pre-Site Keck Funding Rationale",
+      "description": "Editable proposal-derived rationale for why Keck Foundation support may be important.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteBackgroundAndImpact",
+      "displayName": "Pre-Site Background and Impact",
+      "description": "Editable detailed background and impact section for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteDetailedMethodology",
+      "displayName": "Pre-Site Detailed Methodology",
+      "description": "Editable detailed methodology section for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSitePersonnelDetails",
+      "displayName": "Pre-Site Personnel Details",
+      "description": "Editable one-paragraph personnel details section for this exact Pre-Site Visit Word version.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteProposalCoreJson",
+      "displayName": "Pre-Site Proposal Core (JSON)",
+      "description": "Write-once, versioned snapshot of the exact validated Claude proposal-core object before staff edits. Named section columns remain the working copy.",
+      "maxLength": 1048576
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PreSiteInputSnapshotJson",
+      "displayName": "Pre-Site Input Snapshot (JSON)",
+      "description": "Write-once, versioned snapshot of authoritative structured Dataverse inputs and proposal-source identity used for this draft. It excludes credentials and proposal file text.",
+      "maxLength": 1048576
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_RenderInputFingerprint",
+      "displayName": "Render Input Fingerprint",
+      "description": "SHA-256 of the exact named draft fields and deterministic document inputs used to render the registered Word or PDF file. A mismatch with current fields means rerendering is required.",
+      "maxLength": 64
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ContentType",
+      "displayName": "Content Type",
+      "description": "IANA media type of the registered SharePoint file, such as application/vnd.openxmlformats-officedocument.wordprocessingml.document or application/pdf.",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SourceSharePointSiteId",
+      "displayName": "Source SharePoint Site ID",
+      "description": "Stable Microsoft Graph site ID of a source file that is not itself represented by a Request Document row.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SourceSharePointDriveId",
+      "displayName": "Source SharePoint Drive ID",
+      "description": "Stable Microsoft Graph drive ID of a source file that is not itself represented by a Request Document row.",
+      "maxLength": 300
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SourceSharePointItemId",
+      "displayName": "Source SharePoint Item ID",
+      "description": "Stable Microsoft Graph item ID of the exact proposal-source file when no governed Request Document source row exists.",
+      "maxLength": 300
+    }
+  ]
+}
