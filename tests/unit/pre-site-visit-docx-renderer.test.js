@@ -104,7 +104,7 @@ test('pins title alignment and visible amount-value spacing in the retained temp
   }
 });
 
-test('pins the compact 2pt single divider above the executive summary', async () => {
+test('pins the compact 1pt single divider above the executive summary', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
   const documentXml = await zip.file('word/document.xml').async('string');
@@ -113,7 +113,7 @@ test('pins the compact 2pt single divider above the executive summary', async ()
   expect(divider).toBeDefined();
   expect(divider).toContain('<w:trHeight w:val="40" w:hRule="exact"/>');
   expect(divider).toContain(
-    '<w:top w:val="single" w:sz="16" w:space="0" w:color="000000"/>',
+    '<w:top w:val="single" w:sz="8" w:space="0" w:color="000000"/>',
   );
   for (const side of ['left', 'bottom', 'right']) {
     expect(divider).toContain(`<w:${side} w:val="nil"/>`);
