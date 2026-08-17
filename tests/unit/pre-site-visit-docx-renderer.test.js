@@ -43,6 +43,11 @@ function wordTableCells(documentXml) {
     .map((match) => match[0]);
 }
 
+function wordTables(documentXml) {
+  return Array.from(documentXml.matchAll(/<w:tbl(?:\s[^>]*)?>[\s\S]*?<\/w:tbl>/g))
+    .map((match) => match[0]);
+}
+
 function cellContaining(cells, text) {
   const cell = cells.find((candidate) => candidate.includes(text));
   if (!cell) throw new Error(`Could not find Word table cell containing ${text}`);
@@ -97,6 +102,28 @@ test('pins title alignment and visible amount-value spacing in the retained temp
       /<w:tcMar>[\s\S]*?<w:left w:w="144" w:type="dxa"\/>[\s\S]*?<\/w:tcMar>/,
     );
   }
+});
+
+test('pins the compact 2pt single divider above the executive summary', async () => {
+  const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+  const zip = await JSZip.loadAsync(template);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  const divider = wordTables(documentXml).find((table) => table.includes('<w:tcBorders>'));
+
+  expect(divider).toBeDefined();
+  expect(divider).toContain('<w:trHeight w:val="40" w:hRule="exact"/>');
+  expect(divider).toContain(
+    '<w:top w:val="single" w:sz="16" w:space="0" w:color="000000"/>',
+  );
+  for (const side of ['left', 'bottom', 'right']) {
+    expect(divider).toContain(`<w:${side} w:val="nil"/>`);
+  }
+  expect(divider).toContain(
+    '<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>',
+  );
+  expect(documentXml.match(
+    /<w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"\/>/g,
+  )).toHaveLength(2);
 });
 
 test('expands the two long-form AI slots into multiple Word paragraphs', async () => {
