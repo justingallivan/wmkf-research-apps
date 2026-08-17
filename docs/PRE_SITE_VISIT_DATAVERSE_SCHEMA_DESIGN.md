@@ -281,11 +281,11 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 The first long Production request completed durably but the browser displayed
 `Failed to fetch`. Read-only state verification followed by an exact retry
 returned the existing Ready link without another row, run, upload, or model
-call. **[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]** the route now exposes
+call. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes
 read-only current/pending status and the tab uses bounded GET polling after a
 lost POST response without repeating POST. Template v2 adds the missing
-Recommendation-cell padding under a new generation identity; Production still
-needs promotion and a signed-in smoke.
+Recommendation-cell padding under a new generation identity; signed-in
+current-status and controlled v2 generation proof remain open.
 
 Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these

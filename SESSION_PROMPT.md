@@ -49,7 +49,7 @@ duplicate or second model call.
    - The direct four-page visual inspection passed the requested name underlining. Its final
      Methodology sentence spilled to page four. The later Production v1 render fit Background and
      Methodology on page three but exposed a separate Recommendation label/value spacing issue;
-     local template v2 fixes that spacing and still awaits promotion.
+     deployed template v2 fixes that spacing and awaits a signed-in generation smoke.
 
 4. **Dataverse persistence schema and durable writer production-proved**
    - The branch now uses the Request Document registry as the editable business
@@ -114,12 +114,14 @@ duplicate or second model call.
 
 ### Verified Open
 
-1. **Promote and production-smoke the long-running recovery/template fix.**
+1. **Complete the signed-in smoke of the deployed recovery/template fix.**
    The first Production request took about 47 seconds and completed durably,
    but the browser surface displayed `Failed to fetch`. After read-only
    confirmation of the Ready row, an exact retry returned the same stable Word
-   link without another run, row, or upload. **[IMPLEMENTED LOCALLY 2026-08-17;
-   NOT DEPLOYED]** the route now has a read-only GET status path, the tab loads
+   link without another run, row, or upload. **[DEPLOYED TO PRODUCTION
+   2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** commit `1ac01405` reached Ready
+   deployment `dpl_EzNRXmcG2NVQawGNKMMdUN3crpZg`; the route has a read-only
+   GET status path, the tab loads
    the current artifact on entry, and a lost POST response triggers bounded GET
    polling without issuing another POST. Template v2 adds the missing
    Recommendation value-cell padding and changes the governed generation
@@ -202,6 +204,9 @@ The exact Production Request `1002379` Word file was downloaded and rendered
 to four pages for visual inspection: page-one alignment/amount spacing/divider
 and name underlining passed; Background and Methodology fit together on page
 three; Personnel is one paragraph on page four with underlined names, PI/co-PI
-abbreviations, and no degree listings. **[VERIFIED LOCALLY 2026-08-17; NOT
-DEPLOYED]** template v2 adds 0.1-inch left padding to the Recommendation value
-cell; a no-Claude Request `1002379` fixture rendered cleanly on all pages.
+abbreviations, and no degree listings. **[DEPLOYED TO PRODUCTION 2026-08-17;
+SIGNED-IN FEATURE SMOKE OPEN]** template v2 adds 0.1-inch left padding to the
+Recommendation value cell; a no-Claude Request `1002379` fixture rendered
+cleanly on all pages before deployment. The public sign-in page and protected
+route boundary passed after deployment, but no new Production Word draft was
+generated during the release smoke.

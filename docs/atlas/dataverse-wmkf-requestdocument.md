@@ -209,13 +209,13 @@ rendered only from Dataverse readback, uploaded one Word file to
 `Artifacts/Pre-Site Visit/`, and atomically activated the current Ready row for
 Request `1002379`. Exact Ready retry returned the same row/run/item without
 another model call or upload. The first long client request displayed `Failed
-to fetch` after durable server completion. **[IMPLEMENTED LOCALLY 2026-08-17;
-NOT DEPLOYED]** GET status now reads the current pointer plus the newest later
+to fetch` after durable server completion. **[DEPLOYED TO PRODUCTION
+2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** GET status reads the current pointer plus the newest later
 pending operation without mutation, and the tab performs bounded GET polling
 after a lost POST response without repeating POST. Template v2 adds
 Recommendation-cell padding under a new generation identity, leaving the v1
-Ready row/file untouched. Promotion and a signed-in Production smoke remain
-open; this was never a registry consistency failure.
+Ready row/file untouched. Signed-in current-status and v2 generation proof
+remain open; this was never a registry consistency failure.
 
 ## Retry and partial-success behavior
 

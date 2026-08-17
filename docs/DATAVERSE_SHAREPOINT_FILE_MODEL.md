@@ -274,11 +274,11 @@ stable Word link. Request `1002379` exact Ready retry reused the same
 row/run/item without another model call or upload. Read-only comparison confirms sole-current prompt v3 already
 matches the narrative-only runtime contract; no new prompt publication is
 required for this change.
-**[IMPLEMENTED LOCALLY 2026-08-17; NOT DEPLOYED]** the Workbench now loads
+**[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the Workbench loads
 read-only current/pending status and uses bounded GET polling after a lost POST
 response without repeating POST. Template v2 adds Recommendation-cell padding
 under a new generation identity, leaving the existing Production v1 Ready
-row/file untouched until deliberate promotion.
+row/file untouched until staff deliberately generates a v2 draft.
 Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.

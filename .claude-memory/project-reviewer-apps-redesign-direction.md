@@ -94,12 +94,13 @@ item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Its input manifest contains only
 the Proposal Narrative; exact Ready retry reused the same identities. Read-only comparison confirms
 sole-current prompt v3 already matches the narrative-only runtime contract, so
 no new prompt publication is required. The first long client request displayed
-`Failed to fetch` after durable completion. **[IMPLEMENTED LOCALLY 2026-08-17;
-NOT DEPLOYED]** the route now exposes read-only current/pending status, and the
+`Failed to fetch` after durable completion. **[DEPLOYED TO PRODUCTION
+2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes read-only
+current/pending status, and the
 tab loads current state and uses bounded GET polling after a lost POST response
 without repeating POST. Template v2 also adds Recommendation-cell padding
-under a distinct generation identity; Production remains on the prior
-UI/template pending promotion and a signed-in smoke.
+under a distinct generation identity. The public sign-in/auth boundary passed;
+signed-in current-status and template-v2 generation proof remain open.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
