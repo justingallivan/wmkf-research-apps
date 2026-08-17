@@ -7,7 +7,9 @@ import {
 import { PROPOSAL_CORE_KEYS } from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
 function proposalCoreFixture() {
-  return Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, `${key} test content.`]));
+  const core = Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, `${key} test content.`]));
+  core.personnelOverview = 'personnelOverview test content. Ada Lovelace (PI) and Grace Hopper (co-PI) provide complementary expertise.';
+  return core;
 }
 
 function documentFieldsFixture() {
@@ -224,7 +226,7 @@ test('replaces unavailable optional Dataverse fields with blanks rather than inv
   expect(xml).not.toContain('null');
 });
 
-test('underlines only authoritative roster names in the detailed Personnel section', async () => {
+test('underlines only authoritative roster names in both Personnel sections', async () => {
   const core = proposalCoreFixture();
   core.personnelOverview = 'Ada Lovelace and Grace Hopper provide complementary expertise.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
@@ -240,12 +242,26 @@ test('underlines only authoritative roster names in the detailed Personnel secti
   const details = paragraphs.find((paragraph) => paragraph.includes('leads modeling'));
 
   expect(overview).toBeDefined();
-  expect(overview).not.toContain('<w:u w:val="single"/>');
+  expect(overview).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Ada Lovelace<\/w:t>/);
+  expect(overview).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Grace Hopper<\/w:t>/);
+  expect(overview).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*and/);
   expect(details).toBeDefined();
   expect(details).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Ada Lovelace<\/w:t>/);
   expect(details).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Grace Hopper<\/w:t>/);
   expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*\(PI\)/);
   expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*leads/);
+});
+
+test('rejects a page-one Personnel summary that omits an authoritative roster name', async () => {
+  const core = proposalCoreFixture();
+  core.personnelOverview = 'Ada Lovelace (PI) provides complementary expertise.';
+  core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
+
+  await expect(renderPreSiteVisitDocx({
+    documentFields: documentFieldsFixture(),
+    proposalCore: core,
+    personnelNames: personnelNamesFixture(),
+  })).rejects.toThrow('Grace Hopper');
 });
 
 test('rejects a detailed Personnel section that omits an authoritative roster name', async () => {

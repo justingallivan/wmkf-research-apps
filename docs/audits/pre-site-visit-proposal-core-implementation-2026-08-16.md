@@ -74,11 +74,11 @@ approximately 140-180 words, prohibits academic degree credentials, and
 requires the role abbreviations `PI` and `co-PI`.
 
 The renderer now receives the authoritative Dataverse roster separately from
-the model output. It underlines exact roster names only in the detailed
-Personnel paragraph, fails if that paragraph omits a roster member, and leaves
-surrounding prose, role abbreviations, and the first-page Personnel overview
-un-underlined. Focused tests, prompt/API gates, TypeScript, and the production
-build passed. A read-only Request `1002379` fixture rendered three clean pages
+the model output. It underlines exact roster names in both the first-page
+Personnel overview and the detailed Personnel paragraph, fails if either
+section omits a roster member, and leaves surrounding prose and role
+abbreviations un-underlined. Focused tests, prompt/API gates, TypeScript, and
+the production build passed. A read-only Request `1002379` fixture rendered three clean pages
 and structurally showed underlines only on Christoph Gorgulla and Daniel Blair.
 
 The version-preserving publication dry run first resolved the next Dataverse
@@ -91,8 +91,8 @@ local Dataverse audit write. It produced 574 words across Background & Impact
 and Methodology and 145 words for Personnel. The personnel output contained
 both authoritative names in order, used PI/co-PI, and contained no degrees or
 spelled-out role names. OOXML and rendered-page inspection confirmed that only
-Christoph Gorgulla and Daniel Blair were underlined in the detailed Personnel
-paragraph.
+Christoph Gorgulla and Daniel Blair were underlined in both the first-page
+Personnel overview and the detailed Personnel paragraph.
 
 The v3 DOCX otherwise rendered cleanly on four Letter pages, but the final
 Methodology sentence spilled from page 3 onto page 4. The one-page
@@ -122,6 +122,6 @@ It is a local controlled draft, not a registered or distributed artifact.
 The owner-inspection v3 output is
 `outputs/pre-site-visit-1002379/Phase II Pre-Site Visit Writeup CONTROLLED v3
 1002379.docx` (SHA-256
-`8ab2341929058d3b2d9377bec451b57ec3881e944ac80a328ebc4b02484727fe`).
+`dab712ba62f75ba244354a5bd92b2dc6813bf3d2c603611c975ec47d835f7d64`).
 It is likewise local and non-durable, and its observed Methodology spill is
 recorded above rather than hidden as an accepted result.
