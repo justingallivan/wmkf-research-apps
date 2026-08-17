@@ -270,17 +270,22 @@ document inventory, and individual implementation plans do not establish priorit
   and editor permissions plus Workbench history/admin restore and milestone
   snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
-- Pre-Site input direction (owner-decided 2026-07-28): draft factual material
-  from the full proposal through an iterated governed `phase-ii.summarize`;
+- Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
+  implemented 2026-08-16): draft factual material from the exact AI Materials
+  narrative through governed `pre-site-visit.proposal-core.generate`;
   supply authoritative request metadata from Dataverse; use
   `review-synthesis.generate` over all currently submitted reviews; and allow
   distribution with zero reviews because the Site Visit date controls timing.
   Late reviews regenerate only the synthesis and mark the review-derived
   section stale; they do not silently replace staff-edited Word prose or
   regenerate the factual core. Use a versioned prompt/template pair based
-  initially on the supplied examples. The new pipeline is planned:
-  `phase-ii.summarize` currently drives no route, while the legacy retained
-  PDF route still uses `createSummarizationPrompt()`.
+  initially on the supplied examples. The guarded proposal-core service and
+  version-1 template renderer are local and tested; read-only Request `1002379`
+  resolved the exact narrative and all template metadata. The prompt seed/model
+  call, Workbench route/UI, SharePoint upload/registry, and review-layer merge
+  remain unexecuted/unbuilt. The older `phase-ii.summarize` row still drives no
+  route, while the legacy retained PDF route still uses
+  `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and

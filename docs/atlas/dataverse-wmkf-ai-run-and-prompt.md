@@ -77,10 +77,13 @@ Migration plans touching either entity must preserve these foreign keys.
   `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed
   eight-field, pass-through native-JSON contract and
   `scripts/seed-pre-site-visit-proposal-core-prompt.js` provides a create-only
-  bootstrap with concrete `claude-sonnet-4-6`. Neither `--execute` nor a runtime
-  caller has been run/built in this change. The eventual caller must select the
-  exact AI Materials narrative, pass the exported `REQUIRED_SYSTEM_ASSERTIONS`
-  as `assertSystemIncludes`, and set `requireNoPersistence:true`.
+  bootstrap with concrete `claude-sonnet-4-6`. The local server caller now lives
+  at `lib/services/pre-site-visit/proposal-core-service.js`: it selects the exact
+  AI Materials narrative, supplies the authoritative Dataverse roster, passes
+  the exported `REQUIRED_SYSTEM_ASSERTIONS` as `assertSystemIncludes`, and sets
+  `requireNoPersistence:true`. The paired template renderer is also local and
+  tested. The seed `--execute` and application model call have still not run;
+  there is no current prompt row, route/UI, upload, or writeup-registry consumer.
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
 - **`initial-assessment.generate` production bootstrap (2026-07-30):**
   create-only seed published version 1

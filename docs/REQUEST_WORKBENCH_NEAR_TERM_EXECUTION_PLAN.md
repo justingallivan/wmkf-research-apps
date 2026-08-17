@@ -340,11 +340,14 @@ structures can change without rewriting prior artifacts.
 
 ### Pre Site Visit input, regeneration, and template contract
 
-**[VERIFIED via owner decisions 2026-07-28; document pipeline PLANNED.]**
+**[VERIFIED via owner decisions 2026-07-28 and local source/tests plus a
+read-only Request `1002379` probe on 2026-08-16; proposal-core producer and
+template renderer IMPLEMENTED LOCALLY, end-to-end document pipeline PARTIAL.]**
 The Pre-Site draft has two independently refreshable source layers:
 
 1. **Proposal-derived factual material.** Use the full proposal text with an
-   iterated form of the existing `phase-ii.summarize` prompt. Where the
+   iterated form of the retired Phase II summarizer, now named
+   `pre-site-visit.proposal-core.generate`. Where the
    document repeats authoritative request metadata such as institution,
    requested amount, project period, or named request relationships, source
    those values from Dataverse rather than asking the model to infer them from
@@ -367,14 +370,20 @@ The Pre-Site draft has two independently refreshable source layers:
 The two named prompt surfaces do not currently have the same runtime posture:
 
 - **[VERIFIED via
-  `shared/config/prompts/phase-ii-dynamics.js`, `pages/api/process.js`, and a
-  read-only production prompt inventory probe on 2026-07-28.]**
-  `phase-ii.summarize` has one current production v1 row and a tracked config,
-  but the retained sunset-candidate PDF route still calls the older
-  `createSummarizationPrompt()` builder; the row currently drives nothing.
-  The new Dataverse-native Pre-Site producer must adopt, iterate, and execute
-  the governed prompt through the shared Executor rather than extend the
-  retained PDF-upload route.
+  `lib/services/pre-site-visit/proposal-core-service.js`,
+  `lib/services/pre-site-visit/docx-renderer.js`, focused tests, retained
+  template render, and the read-only Request `1002379` source probe on
+  2026-08-16.]** The local producer now uses the exact
+  `AI Materials/ProposalNarrative_{Request#}.pdf`, supplies authoritative
+  Dataverse metadata and ordered PI/Co-PI names/roles, and invokes
+  `pre-site-visit.proposal-core.generate` through the shared Executor with
+  fail-closed system assertions and `requireNoPersistence:true`. The renderer
+  fills the tracked version-1 Word template while preserving manual slots.
+  The create-only prompt seed has not been executed and no model call, route,
+  Workbench UI, SharePoint upload, registry row, or review-layer merge exists.
+  The older production `phase-ii.summarize` v1 row remains unused by a route;
+  the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
+  not the new producer.
 - **[VERIFIED via
   `lib/services/review-manager/synthesize-reviews-service.js`.]**
   `review-synthesis.generate` already receives a server-composed digest of all
@@ -886,9 +895,10 @@ Owner-decided:
     reopen the general applicant-intake product; and
 11. transcription-platform summary reuse before any deliberate suite LLM
     fallback;
-12. Pre-Site proposal material from an iterated `phase-ii.summarize` over the
-    full proposal, with authoritative request metadata supplied from
-    Dataverse;
+12. Pre-Site proposal material from
+    `pre-site-visit.proposal-core.generate` over the exact AI Materials
+    narrative, with authoritative request metadata and ordered PI/Co-PI roster
+    supplied from Dataverse;
 13. review analysis from `review-synthesis.generate` over every currently
     submitted review, with deliberate rerun when a late review arrives;
 14. Site Visit date—not review count—as the distribution gate, including a
@@ -1025,9 +1035,9 @@ Still required:
 
 1. production dummy request IDs and representative content shape, named human
    testers, the exact pilot schedule, and deadlines for later lifecycle stages;
-2. first approved Pre-Site Word template and prompt/template compatibility
-   contract, implementing the decided deterministic reviewer roster alongside
-   the anonymous review narrative;
+2. production approval/promotion of the locally implemented version-1 Pre-Site
+   Word template and proposal-core prompt, plus the still-unbuilt deterministic
+   reviewer roster and anonymous review-narrative merge;
 3. administrator verification of the target library's configured version
    limit, second-stage recycle recovery, applicable site/library Purview
    retention, and ordinary-editor least-privilege policy; stable-identity

@@ -245,9 +245,16 @@ regenerate-from-latest action, but it must preserve the prior Final version and
 must never silently overwrite staff edits.
 
 The Pre-Site stable proposal core may exist before every review is received.
-It is drafted from the full proposal through an iterated governed
-`phase-ii.summarize` prompt, with authoritative request metadata supplied from
-Dataverse. Its review-derived portion uses `review-synthesis.generate` over all
+It is drafted from the full proposal through the governed
+`pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
+of the retired Phase II summarizer while removing inferred administrative
+fields. Authoritative request metadata and the ordered PI/Co-PI roster come
+from Dataverse. **[VERIFIED IN SOURCE/TEST 2026-08-16; not production-live]**
+the guarded local producer and version-1 Word template renderer exist, and a
+read-only Request `1002379` probe resolved the exact narrative plus every
+template metadata field. The prompt bootstrap, model execution, route/UI,
+artifact upload/registry, and review-layer merge remain unexecuted/unbuilt.
+Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 
