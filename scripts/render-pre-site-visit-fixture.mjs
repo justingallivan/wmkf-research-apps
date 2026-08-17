@@ -63,12 +63,13 @@ const proposalCore = {
   keckFundingRationale: 'Fixture text verifies wrapping and spacing for the rationale bullet.',
   backgroundAndImpact: `${marker} This paragraph verifies the first long-form section.\n\nA second fixture paragraph verifies template-preserving paragraph expansion.`,
   detailedMethodology: `${marker} This paragraph verifies the detailed-methodology section.\n\nA second fixture paragraph verifies long-form text flow without a live model call.`,
-  personnelDetails: `Fixture text keeps the full Dataverse roster in one paragraph: ${context.personnel.map((person) => `${person.name} (${person.role})`).join('; ')}.`,
+  personnelDetails: `Fixture text keeps the full Dataverse roster in one paragraph: ${context.personnel.map((person) => `${person.name} (${person.role === 'Principal Investigator' ? 'PI' : 'co-PI'})`).join('; ')}.`,
 };
 
 const output = await renderPreSiteVisitDocx({
   documentFields: context.documentFields,
   proposalCore,
+  personnelNames: context.personnel.map((person) => person.name),
 });
 await fsPromises.mkdir(path.dirname(outputArg), { recursive: true });
 await fsPromises.writeFile(outputArg, output);

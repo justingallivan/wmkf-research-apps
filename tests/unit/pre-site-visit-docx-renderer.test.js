@@ -24,6 +24,10 @@ function documentFieldsFixture() {
   };
 }
 
+function personnelNamesFixture() {
+  return ['Ada Lovelace', 'Grace Hopper'];
+}
+
 async function wordXml(zip) {
   const names = Object.keys(zip.files).filter((name) => name.startsWith('word/') && name.endsWith('.xml'));
   const xml = (await Promise.all(names.map((name) => zip.file(name)?.async('string')))).filter(Boolean);
@@ -64,7 +68,11 @@ test('fills split-run Dataverse and AI placeholders while retaining the template
   const original = await JSZip.loadAsync(template);
   const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
-    proposalCore: proposalCoreFixture(),
+    proposalCore: {
+      ...proposalCoreFixture(),
+      personnelDetails: 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.',
+    },
+    personnelNames: personnelNamesFixture(),
     templateBuffer: template,
   });
   const rendered = await JSZip.loadAsync(output);
@@ -83,7 +91,11 @@ test('fills split-run Dataverse and AI placeholders while retaining the template
 test('produces byte-identical DOCX output for identical inputs', async () => {
   const input = {
     documentFields: documentFieldsFixture(),
-    proposalCore: proposalCoreFixture(),
+    proposalCore: {
+      ...proposalCoreFixture(),
+      personnelDetails: 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.',
+    },
+    personnelNames: personnelNamesFixture(),
   };
   const first = await renderPreSiteVisitDocx(input);
   const second = await renderPreSiteVisitDocx(input);
@@ -134,7 +146,11 @@ test('pins the compact 1pt single divider above the executive summary', async ()
 test('adds 6pt after the four first-page list paragraphs and removes the blank before the page break', async () => {
   const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
-    proposalCore: proposalCoreFixture(),
+    proposalCore: {
+      ...proposalCoreFixture(),
+      personnelDetails: 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.',
+    },
+    personnelNames: personnelNamesFixture(),
   });
   const rendered = await JSZip.loadAsync(output);
   const documentXml = await rendered.file('word/document.xml').async('string');
@@ -162,9 +178,11 @@ test('expands the two long-form AI slots into multiple Word paragraphs', async (
   const core = proposalCoreFixture();
   core.backgroundAndImpact = 'Background paragraph one.\n\nBackground paragraph two.';
   core.detailedMethodology = 'Methods paragraph one.\n\nMethods paragraph two.';
+  core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
   const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
+    personnelNames: personnelNamesFixture(),
   });
   const rendered = await JSZip.loadAsync(output);
   const documentXml = await rendered.file('word/document.xml').async('string');
@@ -181,6 +199,7 @@ test('rejects a multi-paragraph personnel section before opening the template', 
   await expect(renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
+    personnelNames: personnelNamesFixture(),
   })).rejects.toThrow('personnelDetails');
 });
 
@@ -190,7 +209,11 @@ test('replaces unavailable optional Dataverse fields with blanks rather than inv
   fields.totalProjectBudget = null;
   const output = await renderPreSiteVisitDocx({
     documentFields: fields,
-    proposalCore: proposalCoreFixture(),
+    proposalCore: {
+      ...proposalCoreFixture(),
+      personnelDetails: 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.',
+    },
+    personnelNames: personnelNamesFixture(),
   });
   const rendered = await JSZip.loadAsync(output);
   const xml = await wordXml(rendered);
@@ -199,4 +222,39 @@ test('replaces unavailable optional Dataverse fields with blanks rather than inv
   expect(xml).not.toContain('[[DV:TotalProjectBudget]]');
   expect(xml).not.toContain('undefined');
   expect(xml).not.toContain('null');
+});
+
+test('underlines only authoritative roster names in the detailed Personnel section', async () => {
+  const core = proposalCoreFixture();
+  core.personnelOverview = 'Ada Lovelace and Grace Hopper provide complementary expertise.';
+  core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
+  const output = await renderPreSiteVisitDocx({
+    documentFields: documentFieldsFixture(),
+    proposalCore: core,
+    personnelNames: personnelNamesFixture(),
+  });
+  const rendered = await JSZip.loadAsync(output);
+  const documentXml = await rendered.file('word/document.xml').async('string');
+  const paragraphs = wordParagraphs(documentXml);
+  const overview = paragraphs.find((paragraph) => paragraph.includes('provide complementary expertise'));
+  const details = paragraphs.find((paragraph) => paragraph.includes('leads modeling'));
+
+  expect(overview).toBeDefined();
+  expect(overview).not.toContain('<w:u w:val="single"/>');
+  expect(details).toBeDefined();
+  expect(details).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Ada Lovelace<\/w:t>/);
+  expect(details).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Grace Hopper<\/w:t>/);
+  expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*\(PI\)/);
+  expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*leads/);
+});
+
+test('rejects a detailed Personnel section that omits an authoritative roster name', async () => {
+  const core = proposalCoreFixture();
+  core.personnelDetails = 'Ada Lovelace (PI) leads modeling.';
+
+  await expect(renderPreSiteVisitDocx({
+    documentFields: documentFieldsFixture(),
+    proposalCore: core,
+    personnelNames: personnelNamesFixture(),
+  })).rejects.toThrow('Grace Hopper');
 });

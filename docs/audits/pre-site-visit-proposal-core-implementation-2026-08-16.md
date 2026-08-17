@@ -59,6 +59,31 @@ list paragraphs and removed the empty paragraph immediately before the first
 manual page break; package comparison showed only `word/document.xml` changed
 and the four-page render remained stable.
 
+## Pending prompt v3 follow-up
+
+On 2026-08-16, a further local prompt/renderer revision was implemented and
+verified but not published. The tracked recovery prompt now asks
+`backgroundAndImpact` and `detailedMethodology` to aim for 500-600 words
+combined so they normally fit together on one Word page, while preserving
+scientific clarity as the higher priority. It limits `personnelDetails` to
+approximately 140-180 words, prohibits academic degree credentials, and
+requires the role abbreviations `PI` and `co-PI`.
+
+The renderer now receives the authoritative Dataverse roster separately from
+the model output. It underlines exact roster names only in the detailed
+Personnel paragraph, fails if that paragraph omits a roster member, and leaves
+surrounding prose, role abbreviations, and the first-page Personnel overview
+un-underlined. Focused tests, prompt/API gates, TypeScript, and the production
+build passed. A read-only Request `1002379` fixture rendered three clean pages
+and structurally showed underlines only on Christoph Gorgulla and Daniel Blair.
+
+The version-preserving publication dry run resolved the next Dataverse prompt
+version as v3. The subsequent local-to-production write was denied by the
+Dataverse target interlock (`local deployment must not write production`), as
+designed. Therefore sole-current live prompt v2 and its controlled run above
+remain the authoritative live state. Publishing v3 through the signed-in Admin
+publisher and performing a new controlled Claude/render run remain pending.
+
 ## Deliberately not performed
 
 - No Dataverse business field, request-document registry row, request pointer,

@@ -72,6 +72,7 @@ export default async function handler(req, res) {
       const document = await renderPreSiteVisitDocx({
         documentFields: generated.context.documentFields,
         proposalCore: generated.proposalCore,
+        personnelNames: generated.context.personnel.map((person) => person.name),
       });
       const filename = downloadFilename(generated.context.requestNumber);
 

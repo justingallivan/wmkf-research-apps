@@ -46,6 +46,10 @@ beforeEach(() => {
     context: {
       requestNumber: '1002379',
       documentFields: { institutionName: 'St. Jude Childrens Research Hospital' },
+      personnel: [
+        { name: 'Ada Lovelace', role: 'Principal Investigator' },
+        { name: 'Grace Hopper', role: 'Co-Principal Investigator' },
+      ],
     },
   });
   renderPreSiteVisitDocx.mockResolvedValue(DOCX);
@@ -94,6 +98,7 @@ test('generates through the governed service and streams a safe DOCX attachment'
   expect(renderPreSiteVisitDocx).toHaveBeenCalledWith({
     documentFields: { institutionName: 'St. Jude Childrens Research Hospital' },
     proposalCore: { executiveSummary: 'Generated core.' },
+    personnelNames: ['Ada Lovelace', 'Grace Hopper'],
   });
   expect(res.statusCode).toBe(200);
   expect(res.headers).toMatchObject({
