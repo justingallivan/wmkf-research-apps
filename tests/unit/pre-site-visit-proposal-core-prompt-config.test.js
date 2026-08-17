@@ -4,6 +4,7 @@
  */
 
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
+import * as promptConfig from '../../shared/config/prompts/pre-site-visit-proposal-core';
 import {
   PROMPT_NAME,
   SYSTEM_PROMPT,
@@ -48,7 +49,16 @@ test('keeps Dataverse personnel authoritative without assuming affiliations', ()
   expect(SYSTEM_PROMPT).toContain('Use every personnel name and role exactly as supplied');
   expect(SYSTEM_PROMPT).toContain('The applicant institution is not automatically the affiliation of every investigator');
   expect(SYSTEM_PROMPT).toContain('Otherwise omit it');
+  expect(SYSTEM_PROMPT).toContain('personnelDetails: One paragraph total');
+  expect(SYSTEM_PROMPT).toContain('Do not insert paragraph breaks between people');
+  expect(SYSTEM_PROMPT).not.toContain('One short paragraph per person');
   expect(SYSTEM_PROMPT).not.toContain('<u>');
+});
+
+test('leaves runtime model selection to the governed prompt row', () => {
+  expect(promptConfig).not.toHaveProperty('MODEL_TIER');
+  expect(promptConfig).not.toHaveProperty('TEMPERATURE');
+  expect(promptConfig).not.toHaveProperty('MAX_TOKENS');
 });
 
 test('returns one strict pass-through proposalCore object', () => {
@@ -104,4 +114,3 @@ test('local validation rejects missing and injected sections', () => {
   expect(injectedResult.ok).toBe(false);
   expect(injectedResult.errors).toContain('$.proposalCore: unexpected key "staffRecommendation".');
 });
-

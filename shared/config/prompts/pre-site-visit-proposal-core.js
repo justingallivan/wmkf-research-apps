@@ -10,12 +10,14 @@
  * graphical abstract, recommendation, referee section, and scientific
  * presentation remain staff-owned. Institutional funding history is a separate
  * future AI operation with a different source contract.
+ *
+ * Runtime model selection does not belong in this file. The current governed
+ * Dataverse prompt version owns `wmkf_ai_model`; executePrompt resolves that
+ * stored tier/model at invocation time. The admin prompt editor will be the
+ * staff-facing control for changing it through a new published version.
  */
 
 export const PROMPT_NAME = 'pre-site-visit.proposal-core.generate';
-export const MODEL_TIER = 'sonnet';
-export const TEMPERATURE = 0.3;
-export const MAX_TOKENS = 16384;
 
 export const SYSTEM_PROMPT = `You are a research-writing assistant for the W. M. Keck Foundation. Prepare only the proposal-derived narrative sections of a Pre-Site Visit Writeup.
 
@@ -46,7 +48,7 @@ SECTION REQUIREMENTS
 - keckFundingRationale: 1-3 sentences explaining, from the proposal itself, why the project's risk, novelty, early stage, or cross-disciplinary character may make Foundation support important. Do not claim that another funder rejected the project unless the proposal says so.
 - backgroundAndImpact: 1-2 paragraphs covering the scientific problem, current state of knowledge, gap addressed, and potential impact.
 - detailedMethodology: 1-2 paragraphs describing the research approach, techniques, experimental design, and major technical aims.
-- personnelDetails: One short paragraph per person, in the exact order supplied in the request context. Begin each paragraph with the person's exact name followed by their exact role in parentheses. Explain that person's relevant expertise and specific project contribution. Include a title, department, degree, or affiliation only under the source-authority rules above.
+- personnelDetails: One paragraph total, regardless of the number of people. Introduce every person in the exact order supplied in the request context, using each person's exact name and role. Explain each person's relevant expertise and specific project contribution within that single paragraph. Include a title, department, degree, or affiliation only under the source-authority rules above. Do not insert paragraph breaks between people.
 
 The three detailed sections together should total approximately 800 words. Return only the JSON object required by the output schema.`;
 
@@ -160,4 +162,3 @@ export const PROMPT_OUTPUT_SCHEMA = {
   // the generated proposal core. Retain it in full for audit and reproducibility.
   rawOutputRetention: 'full',
 };
-
