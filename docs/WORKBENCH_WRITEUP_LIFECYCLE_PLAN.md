@@ -41,8 +41,12 @@ field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
 Site Visit and Final remain placeholders in current `main`. The Pre-Site tab
-now calls the Production durable writer and shows the stable Word link returned
-from the registry. Wave 19 is live in Production: its owner-approved
+now calls the Production durable writer and shows the stable Word file returned
+from the registry. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION
+PROMOTION PENDING]** its compact action panel shows Generate before a draft
+exists and Edit, Download, and confirmation-guarded Regenerate actions when a
+Ready draft exists; detailed workflow guidance is behind an accessible help
+control. Wave 19 is live in Production: its owner-approved
 metadata-only apply created all 12 attributes and two request lookups, and
 independent readback found 14 exact with no absence or divergence. Request
 `1002379` later created the first Ready Pre-Site row, completed governed v3 AI
@@ -113,8 +117,10 @@ version/hash captured when the action runs.
 - Show source readiness for the exact proposal narrative, authoritative Dataverse
   metadata, governed prompt/model configuration, and Word template.
 - Generate or retry the Pre-Site draft through one durable operation.
-- Show the current Ready Word document, its lifecycle status, generated time,
-  prompt/template provenance, and an Open in Word action.
+- Show the current Ready Word document with a compact status plus Edit,
+  Download, and confirmation-guarded Regenerate actions. Keep detailed source,
+  provenance, and manual-completion guidance available through contextual help
+  rather than permanently occupying the panel.
 - Identify manual Word tasks: graphical abstract image/caption and staff
   recommendation. Institutional funding history remains visibly unavailable
   until its governed Dataverse producer exists.
@@ -288,7 +294,7 @@ current writeup pointer always targets Word, never PDF.
    narrative, persisted its run/row/pointer, uploaded Word, and reused the same
    artifact on exact Ready retry.
 3. **Pre-Site tab — first slice and recovery hardening deployed.**
-   Generate/retry and Open in Word are live. **[DEPLOYED TO PRODUCTION
+   Generate/retry and the stable Word link are live. **[DEPLOYED TO PRODUCTION
    2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** read-only current/pending status loading and bounded GET
    polling recover a long request whose client response is lost after durable
    completion without another POST. Production template v2 fixed
@@ -299,7 +305,10 @@ current writeup pointer always targets Word, never PDF.
    remaining layout variable. **[IMPLEMENTED AND
    LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]** template v3
    makes the label explicitly non-wrapping under another generation identity.
-   Signed-in current-status and Word Online v3 proof remain open.
+   The same pending promotion also includes the compact help/action panel:
+   Generate before a draft exists; Edit, Download, and confirmation-guarded
+   Regenerate when Ready. Signed-in current-status, action-panel, download, and
+   Word Online v3 proof remain open.
 4. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 5. **Site Visit dossier.** Implement the Word-workspace link plus governed

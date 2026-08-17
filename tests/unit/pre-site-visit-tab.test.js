@@ -59,13 +59,14 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test('shows the governed SharePoint Word link for the current request', async () => {
+test('shows compact actions and keeps generation details behind help', async () => {
   render(<PreSiteVisitTab requestId={REQUEST_ID} />);
 
-  expect(screen.getByText(/current published prompt version in Admin controls the Claude model/i))
-    .toBeInTheDocument();
+  expect(screen.queryByText(/current published Admin prompt/i)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'About Pre Site Visit Word drafts' }));
+  expect(screen.getByText(/current published Admin prompt/i)).toBeInTheDocument();
   expect(screen.getByText(/saved in SharePoint/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Generate Word draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/pre-site-visit',
@@ -75,16 +76,23 @@ test('shows the governed SharePoint Word link for the current request', async ()
       signal: expect.any(AbortSignal),
     }),
   ));
-  const link = await screen.findByRole('link', { name: /Open 1002379 Pre-Site Visit\.docx in Word/i });
-  expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  const edit = await screen.findByRole('link', { name: 'Edit' });
+  expect(edit).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(edit).toHaveAttribute('target', '_blank');
+  expect(screen.getByRole('link', { name: 'Download' }))
+    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
+  expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeEnabled();
+  expect(screen.getByText('Draft ready · 1002379 Pre-Site Visit.docx')).toBeInTheDocument();
 });
 
-test('loads an existing Ready Word link without another generation request', async () => {
+test('loads existing Ready actions without another generation request', async () => {
   global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
   render(<PreSiteVisitTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: /Open 1002379 Pre-Site Visit\.docx in Word/i });
+  const link = await screen.findByRole('link', { name: 'Edit' });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(
     `/api/workbench/pre-site-visit?requestId=${REQUEST_ID}`,
@@ -104,9 +112,9 @@ test('recovers a Ready Word link after the generation connection is interrupted'
   render(<PreSiteVisitTab requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Generate Word draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
 
-  const link = await screen.findByRole('link', { name: /Open 1002379 Pre-Site Visit\.docx in Word/i });
+  const link = await screen.findByRole('link', { name: 'Edit' });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'POST')).toHaveLength(1);
@@ -124,12 +132,23 @@ test('shows a server error without creating a Word link', async () => {
   });
   render(<PreSiteVisitTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Generate Word draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'No usable AI proposal narrative was found.',
   );
-  expect(screen.queryByRole('link', { name: /Open .* in Word/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+});
+
+test('requires confirmation before regenerating an existing draft', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Regenerate Word Draft' }));
+
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Edits in the current Word file'));
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
 test('a late response for a prior request cannot publish a stale Word link', async () => {
@@ -141,10 +160,10 @@ test('a late response for a prior request cannot publish a stale Word link', asy
   const { rerender } = render(<PreSiteVisitTab requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole('button', { name: 'Generate Word draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
   rerender(<PreSiteVisitTab requestId={OTHER_REQUEST_ID} />);
   await act(async () => { resolveFirst(successResponse()); });
 
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word draft' })).toBeEnabled());
-  expect(screen.queryByRole('link', { name: /Open .* in Word/i })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeEnabled());
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
 });

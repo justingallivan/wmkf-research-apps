@@ -43,6 +43,7 @@ export default function PreSiteVisitTab({ requestId }) {
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const generationSequence = useRef(0);
   const activeController = useRef(null);
 
@@ -55,6 +56,7 @@ export default function PreSiteVisitTab({ requestId }) {
     setArtifact(null);
     setPendingArtifact(null);
     setRecoveryMessage(null);
+    setShowHelp(false);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
@@ -199,6 +201,31 @@ export default function PreSiteVisitTab({ requestId }) {
     }
   };
 
+  const readyFile = artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY
+    && artifact.file?.webUrl
+    ? artifact.file
+    : null;
+  const downloadUrl = readyFile
+    ? (() => {
+      try {
+        const url = new URL(readyFile.webUrl);
+        url.searchParams.set('download', '1');
+        return url.toString();
+      } catch {
+        const separator = readyFile.webUrl.includes('?') ? '&' : '?';
+        return `${readyFile.webUrl}${separator}download=1`;
+      }
+    })()
+    : null;
+
+  const generateWithConfirmation = () => {
+    if (readyFile && !window.confirm(
+      'Regenerate the Word draft using the latest source data? '
+      + 'Edits in the current Word file will not be carried into a newly generated draft.',
+    )) return;
+    generate();
+  };
+
   return (
     <div className="space-y-4">
       {error && (
@@ -212,31 +239,74 @@ export default function PreSiteVisitTab({ requestId }) {
         </div>
       )}
       <Card hover={false}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="relative flex items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">Pre Site Visit Writeup</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Creates a Word draft from the exact <code>AI Materials/ProposalNarrative_&#123;Request#&#125;.pdf</code>
-              {' '}file plus authoritative Dataverse request fields. The current published prompt version
-              in Admin controls the Claude model.
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              The graphical abstract, caption, recommendation, referee comments, scientific
-              presentation, and institutional funding history remain marked for staff completion.
-            </p>
-            <p className="text-sm text-amber-800 mt-2">
-              The generated sections and exact input snapshot are registered in Dataverse. The Word
-              draft is saved in SharePoint and becomes the working document for the Site Visit stage.
-            </p>
+            <button
+              type="button"
+              aria-label="About Pre Site Visit Word drafts"
+              aria-expanded={showHelp}
+              aria-controls="pre-site-visit-help"
+              onClick={() => setShowHelp((visible) => !visible)}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            >
+              ?
+            </button>
+            {showHelp && (
+              <div
+                id="pre-site-visit-help"
+                role="note"
+                className="absolute left-0 top-full z-10 mt-2 w-[min(34rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-lg"
+              >
+                <p>
+                  The draft uses the exact <code>AI Materials/ProposalNarrative_&#123;Request#&#125;.pdf</code>
+                  {' '}file, authoritative Dataverse fields, and the current published Admin prompt.
+                </p>
+                <p className="mt-2">
+                  The graphical abstract, caption, recommendation, referee comments, scientific
+                  presentation, and institutional funding history remain marked for staff completion.
+                </p>
+                <p className="mt-2">
+                  Generated sections and the input snapshot are registered in Dataverse. The Word file
+                  is saved in SharePoint and becomes the Site Visit working document. Regeneration uses
+                  the latest governed inputs; unchanged inputs may reuse the current draft.
+                </p>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={generate}
-            disabled={generating || !requestId}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-50"
-          >
-            {generating ? 'Generating Word draft…' : 'Generate Word draft'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {readyFile && (
+              <>
+                <a
+                  href={readyFile.webUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
+                >
+                  Edit
+                </a>
+                <a
+                  href={downloadUrl}
+                  download={readyFile.name || true}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                >
+                  Download
+                </a>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={generateWithConfirmation}
+              disabled={generating || !requestId}
+              className={readyFile
+                ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50'
+                : 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'}
+            >
+              {generating
+                ? 'Generating…'
+                : readyFile ? 'Regenerate Word Draft' : 'Generate Word Draft'}
+            </button>
+          </div>
         </div>
         <div aria-live="polite">
           {checkingStatus && !artifact && !pendingArtifact && (
@@ -247,18 +317,9 @@ export default function PreSiteVisitTab({ requestId }) {
               This draft is being generated. The Word link will be available when generation finishes.
             </p>
           )}
-          {artifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY && artifact.file?.webUrl && (
-            <p className="mt-4 text-sm text-green-800">
-              Ready: {' '}
-              <a
-                href={artifact.file.webUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium underline"
-              >
-                Open {artifact.file.name || 'the Pre-Site Visit draft'} in Word
-              </a>
-              {' '}to complete the staff-owned sections.
+          {readyFile && (
+            <p className="mt-4 text-sm font-medium text-green-800">
+              Draft ready{readyFile.name ? ` · ${readyFile.name}` : ''}
             </p>
           )}
         </div>

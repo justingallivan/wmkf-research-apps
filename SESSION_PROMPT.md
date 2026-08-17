@@ -30,7 +30,7 @@ duplicate or second model call.
    - The earlier authenticated direct-download route was replaced locally by a
      durable writer. It claims a Request Document row, persists the eight named
      sections and immutable snapshots, renders from Dataverse readback, uploads
-     a stable Word item, and returns a registry DTO with an Open-in-Word link.
+     a stable Word item, and returns a registry DTO with the governed file identity.
    - Formatting fixes cover metadata alignment and spacing, the 1 pt Executive Summary divider,
      first-page bullet spacing, and the stray pre-break paragraph.
    - Personnel output is one paragraph, omits degrees, uses PI/co-PI, and underlines personnel
@@ -133,6 +133,13 @@ duplicate or second model call.
    PRODUCTION PROMOTION PENDING]** template v3 makes that label explicitly
    non-wrapping and changes the governed generation identity again, preserving
    both earlier Ready documents.
+   **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION
+   PENDING]** the Pre-Site panel now hides the long workflow explanation behind
+   an accessible help control. Before a draft exists it shows Generate Word
+   Draft; when Ready it shows Edit, Download, and confirmation-guarded
+   Regenerate Word Draft actions plus one compact status line. Regeneration
+   preserves the existing deterministic reuse contract: unchanged governed
+   inputs may return the current artifact rather than forcing another model run.
    Before preview/sandbox runtime uses Wave 19 fields, that target must still
    pass the same preflight and schema apply.
 
