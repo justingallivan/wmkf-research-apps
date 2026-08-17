@@ -39,6 +39,19 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 
+- **Historical Workbench discovery:** **[IMPLEMENTED LOCALLY 2026-08-17; NOT
+  DEPLOYED]** the Workbench dashboard now opens an exact active or historical
+  request number through the existing authenticated `resolve-request` route;
+  this does not change the active-cycle dashboard filter or request status.
+  **[OWNER-DECIDED FUTURE WORK 2026-08-17; PLANNED]** add a broader historical
+  locator/search by institution, PI, proposal title, cycle, and request status.
+  Results should open the existing per-request Workbench rather than create a
+  separate workflow/data silo. Pagination, query bounds, result fields, and
+  exact authorization/search semantics must be designed before implementation.
+  The existing Expertise Finder historical-proposals query already projects
+  request number, title, institution, PI, cycle/program, and Phase I/II status,
+  but it is guarded by a different app grant and loads a whole fiscal-year set;
+  treat it as reusable design/source material, not as the Workbench endpoint.
 - **Retired-table operational scripts:** 25 non-archive scripts mention the
   dropped `reviewer_suggestions` table. `scripts/README.md` now blocks the
   copy-pasteable commands, but code quarantine/removal requires an owner-approved

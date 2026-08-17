@@ -66,7 +66,21 @@ they are not deployed and no Pre-Site row was created in Production.
      later partial failures retain a retryable row and recover a matching upload
      without another Claude call or duplicate upload.
 
-5. **Session evidence bookkeeping attempted**
+5. **Historical request entry added locally**
+   - The Workbench dashboard now has an exact “Open request by number” launcher
+     backed by the existing authenticated `resolve-request` route. It opens
+     active or historical requests in the same per-request Workbench without
+     changing their status or the active-cycle dashboard population.
+   - Broader historical discovery by institution, PI, proposal title, cycle,
+     and request status is owner-decided future work. It should be a Workbench
+     locator/search whose results open the existing request page; pagination,
+     query bounds, result projection, and authorization semantics remain to be
+     designed. The existing Expertise Finder historical-proposals service
+     supplies a useful projection and fiscal-year/program query precedent, but
+     it uses the separate `expertise-finder` grant and is not itself the
+     Workbench search contract.
+
+6. **Session evidence bookkeeping attempted**
    - `report:claim-evidence-pilot -- --current` ran during `/stop`, but local state was unavailable.
      No canonical observation row was added.
 
@@ -141,6 +155,9 @@ they are not deployed and no Pre-Site row was created in Production.
 
 1. **Next-cycle Reviewer Finder cutover to the decided two-file AI Materials contract.**
 2. **Phase II applicant-intake portal pending the GOApply evaluation.**
+3. **Broader historical Workbench search by institution, PI, title, cycle, and status.**
+   Exact request-number opening is already implemented locally; this item is
+   the bounded multi-field browse/search experience, not a new standalone app.
 
 ### Verify Before Acting
 

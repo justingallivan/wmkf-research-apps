@@ -8,8 +8,8 @@
  * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
  * (per-request command center) + Status (read-only akoya_requeststatus
  * reflection), Awardee (grantee-deliverables workflow), and Initial Assessment
- * (governed DOCX producer/read model), and Pre Site Visit Writeup (governed
- * proposal-core generation + direct DOCX download). The other 2 tabs are placeholders for the rest of the request
+ * (governed DOCX producer/read model), and Pre Site Visit Writeup (durable
+ * Dataverse/SharePoint Word producer). The other 2 tabs are placeholders for the rest of the request
  * lifecycle. The default landing is Overview. Tab + sub-tab selection is
  * query-string driven (?tab=reviewers&sub=track) for deep-links.
  */
@@ -34,7 +34,8 @@ import PreSiteVisitTab from '../../shared/components/workbench/PreSiteVisitTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
-// Status, Awardee. The other 2 are placeholders for the full request lifecycle.
+// Pre Site Visit Writeup, Status, and Awardee. The other 2 are placeholders for
+// the full request lifecycle.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
