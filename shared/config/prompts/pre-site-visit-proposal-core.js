@@ -121,11 +121,11 @@ const validationStringFields = {
   executiveSummary: { type: 'string', maxLength: 700 },
   impactOverview: { type: 'string', maxLength: 420 },
   methodologyOverview: { type: 'string', maxLength: 500 },
-  personnelOverview: { type: 'string', maxLength: 360, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
+  personnelOverview: { type: 'string', maxLength: 520, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
   keckFundingRationale: { type: 'string', maxLength: 480 },
   backgroundAndImpact: { type: 'string', maxLength: 9000 },
   detailedMethodology: { type: 'string', maxLength: 9000 },
-  personnelDetails: { type: 'string', maxLength: 1500, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
+  personnelDetails: { type: 'string', maxLength: 6000, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
 };
 
 const jsonStringProperties = Object.fromEntries(

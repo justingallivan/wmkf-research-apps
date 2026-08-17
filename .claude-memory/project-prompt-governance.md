@@ -4,7 +4,7 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-08-16 — Pre-Site prompt v2 live; local admin model-publication changes still unpromoted
+last_verified: 2026-08-16 — Pre-Site prompt v3 live; local admin model-publication changes still unpromoted
 ---
 
 ## Recall Rule
@@ -37,7 +37,10 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
 - Current callers are the grantee title/abstract, Initial Assessment, Review
   Synthesis, and Pre-Site Visit proposal-core seed scripts. The Pre-Site seed
   published v1, then version-preserving `--force` published sole-current v2
-  after the first controlled document failed layout acceptance. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
+  after the first controlled document failed layout acceptance. Signed-in Admin
+  publication subsequently created sole-current v3 with the revised page-length
+  and personnel instructions; the publisher cloned the v2 variables, schema,
+  model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
   `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
 
 **Admin model publication (local 2026-08-16):** the Prompt Templates editor

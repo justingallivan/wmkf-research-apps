@@ -253,11 +253,13 @@ from Dataverse. **[VERIFIED IN SOURCE/TEST/LIVE CONTROLLED RUN 2026-08-16;
 application branch not production-live]** the guarded local producer,
 tracked Word template renderer, and authenticated direct-download route/UI
 exist. Request `1002379` resolved the exact narrative and every template
-metadata field. Sole-current prompt v2
-`1d276948-ed99-f111-b8db-70a8a59cded0` uses reviewed
-`claude-sonnet-4-6`; controlled run
-`5bd65180-ed99-f111-b8db-7ced8d6e2f44` produced a four-page DOCX that passed
-structural and rendered-page QA. The signed-in Workbench route remains
+metadata field. Sole-current prompt v3
+`f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
+`claude-sonnet-4-6`; latest audited Executor run
+`5bd65180-ed99-f111-b8db-7ced8d6e2f44` remains the accepted v2 output. A
+direct exact-v3 Request `1002379` model/render QA verified the revised personnel
+rules and roster-name underlining but spilled Methodology's final sentence to
+page 4; it created no `wmkf_ai_run`. The signed-in Workbench route remains
 unpromoted/unproven, and artifact upload/registry plus the review-layer merge
 remain unbuilt.
 Its future review-derived portion uses `review-synthesis.generate` over all

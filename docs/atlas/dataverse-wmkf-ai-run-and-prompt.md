@@ -1,8 +1,9 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
 **Last verified:** 2026-08-16 for the local admin publish/model contract,
-sole-current `pre-site-visit.proposal-core.generate` v2, two controlled
-Request `1002379` runs, and live counts of 22 prompt rows / 380 run rows;
+sole-current `pre-site-visit.proposal-core.generate` v3, two governed
+Request `1002379` runs through v2, one direct exact-v3 model/render QA, and 23
+prompt rows derived from the verified 22-row snapshot plus immutable v3 publication;
 2026-07-30 for governed `initial-assessment.generate` v1 production
 provisioning; 2026-07-28 for governed
 `review-synthesis.generate` v3 and its successful controlled production execution; 2026-07-12 for the broader entity inventory via
@@ -92,7 +93,17 @@ Migration plans touching either entity must preserve these foreign keys.
   sole-current v2 `1d276948-ed99-f111-b8db-70a8a59cded0` with tighter overview
   limits on reviewed `claude-sonnet-4-6`. Controlled Request `1002379` run
   `5bd65180-ed99-f111-b8db-7ced8d6e2f44` then produced a four-page DOCX that
-  passed structural and rendered-page QA. Both prompt versions and both AI
+  passed structural and rendered-page QA. Signed-in Admin publication then
+  created sole-current v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44`, preserving
+  the v2 variables, schema, model, temperature, and token budget while adding
+  the revised page-length and personnel instructions. A direct exact-v3
+  Request `1002379` model/render QA produced a 145-word degree-free Personnel
+  paragraph with only the two Dataverse roster names underlined. Its 574-word
+  Background/Methodology pair spilled the final sentence to page 4, so the
+  soft one-page target remains a tuning follow-up. Because local production
+  writes are correctly denied by the target interlock, this direct transport
+  QA intentionally created no `wmkf_ai_run`; the v2 run above remains the
+  latest governed Executor evidence. All three prompt versions and both AI
   runs remain as governed history. The application branch/direct-download
   route is not deployed or signed-in production-smoked, and there is no
   SharePoint upload, request-document registry row, business-field write, or

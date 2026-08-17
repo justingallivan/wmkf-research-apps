@@ -383,14 +383,20 @@ The two named prompt surfaces do not currently have the same runtime posture:
   The Workbench now has an authenticated interim direct-download route and tab:
   the server performs the governed call, renders the tracked template, and
   streams the DOCX to the PD. The current Admin-published prompt row owns the
-  Claude model; callers cannot override it. Dataverse sole-current prompt v2
-  `1d276948-ed99-f111-b8db-70a8a59cded0` uses reviewed
+  Claude model; callers cannot override it. Dataverse sole-current prompt v3
+  `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
   `claude-sonnet-4-6`. The first controlled v1 run completed but failed the
   document acceptance gate because summary overflow displaced the intended
   page starts. Version-preserving publication of tighter overview limits
   produced v2, and controlled Request `1002379` run
   `5bd65180-ed99-f111-b8db-7ced8d6e2f44` then produced a four-page DOCX that
-  passed structural and rendered-page QA. These are local/test invocations
+  passed structural and rendered-page QA. Signed-in Admin publication then
+  created v3 with shorter personnel instructions, no degree credentials,
+  PI/co-PI abbreviations, and a soft one-page target for Background/Methodology.
+  A direct exact-v3 Request `1002379` model/render QA correctly produced 145
+  personnel words and underlined only the two Dataverse roster names, but its
+  574-word Background/Methodology pair spilled the final sentence to page 4;
+  that direct QA did not create a `wmkf_ai_run`. These are local/test invocations
   against live prompt/request data, not a deployed signed-in Workbench smoke.
   The download remains non-durable: no SharePoint upload, registry row,
   request pointer, business-field write, review-layer merge, or distribution

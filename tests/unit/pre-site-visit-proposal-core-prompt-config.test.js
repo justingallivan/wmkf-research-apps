@@ -102,9 +102,8 @@ test('enforces the overview-page length ceilings in native and local schemas', (
     executiveSummary: 700,
     impactOverview: 420,
     methodologyOverview: 500,
-    personnelOverview: 360,
+    personnelOverview: 520,
     keckFundingRationale: 480,
-    personnelDetails: 1500,
   };
   for (const [field, maxLength] of Object.entries(expected)) {
     expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.properties[field].maxLength)

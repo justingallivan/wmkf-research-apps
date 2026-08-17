@@ -284,10 +284,13 @@ document inventory, and individual implementation plans do not establish priorit
   resolved the exact narrative and all template metadata. An authenticated
   Workbench tab and route now perform an interim direct DOCX download; focused
   tests cover the binary response and stale-request cancellation. Dataverse
-  now has sole-current prompt v2 on reviewed `claude-sonnet-4-6`; controlled
-  Request `1002379` run `5bd65180-ed99-f111-b8db-7ced8d6e2f44` produced a
-  four-page DOCX that passed structural and rendered-page QA. The earlier v1
-  run remains append-only history after layout rejection. The branch and
+  now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; the latest
+  audited Executor evidence remains accepted v2 Request `1002379` run
+  `5bd65180-ed99-f111-b8db-7ced8d6e2f44`. A direct exact-v3 model/render QA
+  correctly applied the revised personnel rules and roster-name underlining,
+  but Methodology's final sentence spilled to page 4; the direct QA created no
+  `wmkf_ai_run`. The earlier v1 run remains append-only history after layout
+  rejection. The branch and
   signed-in Workbench route remain unpromoted; SharePoint upload/registry and
   the review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
