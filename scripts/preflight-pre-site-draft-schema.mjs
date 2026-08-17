@@ -281,11 +281,15 @@ async function main() {
     process.exit(1);
   }
   console.log('READ-ONLY PREFLIGHT COMPLETE: no metadata changes were made.');
-  console.log(
-    'CREATION-COMPATIBLE: after explicit approval, the apply command would be '
-      + `node scripts/apply-dataverse-schema.js --target=${target} `
-      + '--wave=19-pre-site-draft --execute',
-  );
+  if (absent.length > 0) {
+    console.log(
+      'CREATION-COMPATIBLE: after explicit approval, the apply command would be '
+        + `node scripts/apply-dataverse-schema.js --target=${target} `
+        + '--wave=19-pre-site-draft --execute',
+    );
+  } else {
+    console.log('ALREADY EXACT: no schema apply is required for this target.');
+  }
 }
 
 if (selfTest) runSelfTest();

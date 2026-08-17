@@ -273,6 +273,13 @@ document inventory, and individual implementation plans do not establish priorit
   and editor permissions plus Workbench history/admin restore and milestone
   snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
+- Pre-Site persistence schema (owner-approved and Production-live 2026-08-17):
+  Wave 19 adds 12 `wmkf_requestdocument` fields and the optional
+  `akoya_request.wmkf_CurrentPreSiteVisit` / `wmkf_CurrentFinalWriteup`
+  lookups. Independent post-apply metadata readback reported 14 exact and zero
+  divergent; the row inventory remained three Initial Assessments and no
+  Pre-Site artifact. The adapter/writer is still unbuilt, so live schema does
+  not imply a durable Pre-Site generation flow.
 - Pre-Site input direction (owner-decided 2026-07-28; local producer/renderer
   implemented 2026-08-16; two-source input revised locally 2026-08-17): draft
   factual material from the exact separate AI Materials narrative and

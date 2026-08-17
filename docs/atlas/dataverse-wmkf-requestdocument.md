@@ -117,17 +117,20 @@ from the Ready registry row and never from the caller. **Administrator restore a
 immutable milestone snapshots remain open**, restore because it depends on the
 permission evidence above.
 
-**[VERIFIED INVENTORY / PLANNED SCHEMA 2026-08-17]** A read-only Production
+**[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17]** A read-only Production
 inventory confirmed that the registry already has a `Pre Site Visit` artifact
 type but has no Pre-Site rows. The legacy `wmkf_sitevisit` activity and
 `akoya_request.wmkf_researchwriteuptype` classification are not suitable draft
-stores. Additive Wave 19 now specifies eight named Pre-Site proposal-core Memo
+stores. Additive Wave 19 now provides eight named Pre-Site proposal-core Memo
 fields, exact generated/input snapshots, render/source identity, and
 `akoya_request.wmkf_CurrentPreSiteVisit` plus
-`akoya_request.wmkf_CurrentFinalWriteup`. The wave is **not applied**; no live
-field, pointer, adapter selection, or writer exists yet. There is intentionally
-no Site Visit writeup pointer: staff observations remain direct edits in the
-Pre-Site Word workspace. Exact design and deployment boundary:
+`akoya_request.wmkf_CurrentFinalWriteup`. The owner-approved metadata-only
+Production apply completed on 2026-08-17; independent readback reports all 14
+items exact and zero divergent. Post-apply inventory still reports only the
+three existing Initial Assessment rows. No adapter selection, runtime writer,
+or Pre-Site artifact exists yet. There is intentionally no Site Visit writeup
+pointer: staff observations remain direct edits in the Pre-Site Word workspace.
+Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
@@ -140,12 +143,12 @@ Pre-Site Word workspace. Exact design and deployment boundary:
   prompt/run/input/template/content provenance.
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
-- Planned `akoya_request.wmkf_CurrentPreSiteVisit` provides the equivalent
-  current-pointer/fence for a Ready Pre-Site Word row after Wave 19 is applied
-  and the writer is built. It is not live yet.
-- Planned `akoya_request.wmkf_CurrentFinalWriteup` provides the equivalent
-  current-pointer/fence for the independent Final Word row. Final records the
-  exact source Pre-Site row/version/hash. It is not live yet.
+- `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and will
+  provide the equivalent current-pointer/fence once the writer is built. It is
+  currently unpopulated because no Pre-Site row exists.
+- `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
+  independent Final Word row. Final will record the exact source Pre-Site
+  row/version/hash; no writer populates this lookup yet.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
@@ -170,7 +173,7 @@ Pre-Site Word workspace. Exact design and deployment boundary:
 - Staff-owned field: Foundation Opportunity. It is absent from the prompt
   output schema and visibly marked `STAFF INPUT REQUIRED` by the DOCX template.
 
-## Planned Pre-Site Visit contract
+## Production schema / planned Pre-Site Visit runtime contract
 
 - Artifact type: `Pre Site Visit` (already live in the Wave 16 option set).
 - One Word file per versioned draft row; the row carries all eight named
@@ -192,11 +195,12 @@ Pre-Site Word workspace. Exact design and deployment boundary:
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
-This persistence contract is schema/design only. The integration-branch
-pass-through producer requires and separately labels both exact inputs, but it
-and the DOCX renderer do not persist these business fields or create governed
-registry rows. Live prompt v3 remains single-source; the tracked two-input
-contract requires a new published prompt version before promotion.
+The persistence schema is live in Production, while the runtime contract
+remains planned. The integration-branch pass-through producer requires and
+separately labels both exact inputs, but it and the DOCX renderer do not persist
+these business fields or create governed registry rows. Live prompt v3 remains
+single-source; the tracked two-input contract requires a new published prompt
+version before promotion.
 
 ## Retry and partial-success behavior
 

@@ -41,10 +41,12 @@ Word back into the eight generated Dataverse narrative fields.
 
 The three Workbench tabs remain placeholders in current `main`. The Pre-Site
 prompt/renderer and exact two-file input reader are combined locally on
-`codex/pre-site-draft-schema`; they are not deployed. Wave 19 is an unapplied
-local schema proposal. Its 2026-08-17 read-only Production preflight found all
-14 proposed metadata items absent and no divergences. This document does not
-authorize or record any live Dataverse metadata or record write.
+`codex/pre-site-draft-schema`; they are not deployed. Wave 19 is now live in
+Production: its owner-approved metadata-only apply created all 12 attributes
+and two request lookups, and independent readback found 14 exact with no
+absence or divergence. The post-apply inventory still contains only the three
+pre-existing Initial Assessment registry rows. No Pre-Site business row,
+adapter, writer, or SharePoint artifact was created.
 
 ## Evidence boundary
 
@@ -56,7 +58,7 @@ authorize or record any live Dataverse metadata or record write.
 | Production contains no Pre-Site Request Document rows as of 2026-08-17 | Read-only Production inventory | VERIFIED |
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
-| Current Pre-Site and Final request lookups exist | 2026-08-17 Wave 19 read-only Production preflight: both absent; all 14 proposed items absent and 0 divergent | VERIFIED ABSENT / PLANNED APPLY |
+| Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
 
 ## Ownership model
 
@@ -226,9 +228,9 @@ silent rewrite.
 
 ## Dataverse schema impact
 
-### Wave 19: apply before Pre-Site runtime integration
+### Wave 19: Production schema live
 
-Wave 19 remains additive and unapplied. It proposes:
+Wave 19 was applied to Production on 2026-08-17. It provides:
 
 - 12 fields on `wmkf_requestdocument`: eight named proposal-core Memo fields,
   two immutable JSON snapshots, render fingerprint, and content type; and
@@ -276,9 +278,10 @@ current writeup pointer always targets Word, never PDF.
 
 ## Delivery slices and gates
 
-1. **Schema review and apply.** Review Wave 19, run its self-test and target
-   read-only preflight, obtain explicit approval, apply metadata, and verify
-   exact readback. No runtime `$select` may reference a field before it exists.
+1. **Schema review and apply — completed for Production 2026-08-17.** The
+   self-test passed, the owner approved the metadata write, and post-apply
+   readback reported 14 exact and 0 divergent. Other environments still require
+   their own preflight/apply before runtime `$select` references these fields.
 2. **Pre-Site persistence and generation.** Merge the approved prompt/renderer
    work, add adapter fields and the durable writer, then exercise Request
    `1002379` after both exact AI Materials inputs are supplied.

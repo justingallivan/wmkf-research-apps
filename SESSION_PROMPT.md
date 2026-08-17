@@ -6,8 +6,9 @@ Session 443 established the final-cycle Phase I/Phase II proposal-source rules, 
 the Pre-Site Visit Word draft, published the governed v3 prompt, and recorded the owner's
 Dataverse persistence direction. The feature branch is now merged into the local
 `codex/pre-site-draft-schema` integration branch but is not deployed. At the Session 443 close there was no Pre-Site Draft schema or business-data
-write path; the current Session 444 state now includes an un-applied Wave 19 schema proposal and
-read-only preflight, while the business-data writer remains unbuilt.
+write path. In Session 444, owner-approved Wave 19 was applied to Production
+and independently read back as 14 exact metadata items; the business-data
+writer remains unbuilt and no Pre-Site row was created.
 
 ### What Was Completed
 
@@ -43,15 +44,17 @@ read-only preflight, while the business-data writer remains unbuilt.
      sentence still spills to page four, and the Recommendation label/placeholder spacing remains
      a separate minor template issue.
 
-4. **Dataverse persistence direction recorded**
+4. **Dataverse persistence schema applied; writer still planned**
    - Current branch behavior remains pass-through-only: target kind `none`, in-memory rendering,
      and the normal Executor's raw `wmkf_ai_run` audit are not an editable business record.
    - Owner direction is Request parent → versioned Pre-Site Draft child → exact-version Word/PDF
      artifacts. The eight generated sections are sibling editable Multiline Text columns on one
      draft row, not one child row per section.
-   - An optional Multiline Text JSON snapshot may retain the exact validated Claude response, but
-     named columns remain the working representation for Dataverse forms, views, and Power
-     Automate. Existing Dataverse writeup/artifact tables must be inventoried before schema work.
+   - Wave 19 now supplies the eight named Multiline Text fields, two JSON
+     snapshots, render fingerprint, content type, and the current Pre-Site/Final
+     request lookups in Production. Post-apply readback reported 14 exact and 0
+     divergent; inventory remained three Initial Assessment rows and no
+     Pre-Site row.
 
 5. **Session evidence bookkeeping attempted**
    - `report:claim-evidence-pilot -- --current` ran during `/stop`, but local state was unavailable.
@@ -79,20 +82,15 @@ read-only preflight, while the business-data writer remains unbuilt.
 
 ### Verified Open
 
-1. **Review Wave 19 and obtain explicit approval before any Dataverse apply.**
-   The 2026-08-17 read-only Production inventory established that `wmkf_requestdocument` is the
-   reusable version/artifact spine; `wmkf_sitevisit` and `wmkf_researchwriteuptype` are not draft
-   stores. `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md`, the two
-   `lib/dataverse/schema/wave19-pre-site-draft/` specs, and
-   `scripts/preflight-pre-site-draft-schema.mjs` now define the proposed additive fields and
-   current Pre-Site/Final pointers. Nothing is applied, and no adapter/writer may select the fields before an
-   approved target apply and exact metadata readback.
-   The revised proposal has 12 Request Document fields plus two Request pointers. Exact external
-   narrative/bibliography provenance lives in the versioned input-snapshot source manifest rather
-   than ambiguous single-source Graph columns.
-   The 2026-08-17 self-test passed; the read-only Production preflight classified all 14 proposed
-   metadata items as absent with zero divergences. The Production schema dry-run also completed
-   without `--execute`; it made no metadata changes.
+1. **Build the durable Pre-Site adapter/writer on the live Production schema.**
+   The 2026-08-17 owner-approved Wave 19 apply created 12 Request Document
+   fields plus two Request pointers. Independent Production readback reported
+   14 exact, 0 absent, and 0 divergent. Exact external narrative/bibliography
+   provenance belongs in the versioned input-snapshot source manifest rather
+   than ambiguous single-source Graph columns. No adapter or writer selects the
+   fields yet, and the post-apply inventory confirmed no Pre-Site row was
+   created. Before preview/sandbox runtime uses these fields, that target must
+   pass the same preflight and schema apply.
 
 2. **Use the approved cross-tab Word lifecycle.**
    `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
@@ -102,8 +100,8 @@ read-only preflight, while the business-data writer remains unbuilt.
    Visit Writeup or Dataverse staff-observations field.
 
 3. **Review and deliberately promote the integration branch.**
-   `codex/pre-site-draft-schema` now contains the former proposal feature branch plus the unapplied
-   schema/lifecycle plan and two-input reader. The authenticated route is not Production-live.
+   `codex/pre-site-draft-schema` now contains the former proposal feature branch plus the
+   production-applied schema contract, lifecycle plan, and two-input reader. The authenticated route is not Production-live.
    Live prompt v3 is still single-source; publish and verify a new immutable two-input prompt
    version before promotion.
 
@@ -131,9 +129,9 @@ read-only preflight, while the business-data writer remains unbuilt.
 
 ### Verify Before Acting
 
-1. Do not apply Wave 19 from this handoff alone. The read-only Production preflight already passed
-   with 14 absent and 0 divergent; obtain explicit approval for the Dataverse metadata write,
-   apply the wave, and require exact readback before runtime code selects the new fields.
+1. Production Wave 19 is already applied and exact. Do not assume sandbox or
+   another Dataverse target has it; preflight and apply that target before
+   runtime `$select` includes the new fields there.
 2. Do not treat the direct v3 Request 1002379 test as a governed Production Executor run.
 
 ### Do Not Reopen Without New Decision

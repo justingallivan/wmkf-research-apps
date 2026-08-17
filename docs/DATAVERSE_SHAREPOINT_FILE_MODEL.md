@@ -277,7 +277,7 @@ Its future review-derived portion uses `review-synthesis.generate` over all
 currently submitted reviews; staff do not select a subset. The two layers have
 independent prompt/run provenance and refresh behavior.
 
-**[VERIFIED INVENTORY / PROPOSED SCHEMA 2026-08-17; NOT APPLIED.]** Versioned
+**[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17.]** Versioned
 Pre-Site drafts reuse `wmkf_requestdocument` beneath the Request. The live
 registry already has a `Pre Site Visit` artifact option and the necessary
 request, prompt, run, template, lifecycle, retry, and SharePoint identity
@@ -285,7 +285,7 @@ spine. The legacy `wmkf_sitevisit` activity has no suitable content fields,
 and `akoya_request.wmkf_researchwriteuptype` is only a Phase I/Phase II-style
 classification.
 
-Additive Wave 19 specifies the eight proposal-core sections as sibling editable
+Production-live Wave 19 provides the eight proposal-core sections as sibling editable
 Multiline Text columns on the Pre-Site Word row, not eight child records. It
 also specifies exact validated-output and structured-input JSON snapshots,
 render/source identity, `akoya_request.wmkf_CurrentPreSiteVisit` as the
@@ -299,10 +299,13 @@ transition, and cross-tab contracts:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
-No Wave 19 field, pointer, adapter, writer, or consumer is live yet. SharePoint
-Word remains authoritative for staff prose after document creation; the named
-Dataverse fields are the structured generation/automation representation and
-do not claim automatic synchronization from later Word edits.
+All 12 Wave 19 attributes and both request-pointer relationships are live and
+exact in Production. The post-apply inventory still reports only three Initial
+Assessment registry rows, so no Pre-Site business row was created. The adapter,
+writer, and consumer remain unbuilt. SharePoint Word remains authoritative for
+staff prose after document creation; the named Dataverse fields are the
+structured generation/automation representation and do not claim automatic
+synchronization from later Word edits.
 
 The review-derived portion has two presentation channels over that same exact
 submitted-review population. Application/template code renders a named reviewer

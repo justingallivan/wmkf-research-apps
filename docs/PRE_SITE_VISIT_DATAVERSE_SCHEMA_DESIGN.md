@@ -2,8 +2,8 @@
 title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
-status: draft
-summary: "Additive Wave 19 design for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
+status: active
+summary: "Production-live Wave 19 schema and planned writer contract for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-17
@@ -22,11 +22,14 @@ related:
 
 ## Status and outcome
 
-**[PLANNED 2026-08-17; NOT APPLIED.]** Wave 19 is an implementation-ready,
-additive schema proposal. Its JSON specifications and read-only preflight are
-tracked locally. The 2026-08-17 read-only Production preflight classified all
-14 proposed metadata items as absent with zero divergences; no Dataverse
-metadata, records, application adapter, or runtime writer has been changed.
+**[VERIFIED APPLIED 2026-08-17.]** Wave 19 is live in Production. The
+owner-approved metadata-only apply created 12 additive
+`wmkf_requestdocument` attributes and two `akoya_request` lookup
+relationships. Independent post-apply readback classified all 14 items as
+exact with zero absent and zero divergent. A separate read-only inventory
+still reports three Request Document rows, all Initial Assessments, so the
+apply created no Pre-Site business row. No application adapter, runtime
+writer, or SharePoint artifact was added by this schema operation.
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -68,7 +71,8 @@ akoya_request
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The current Workbench Pre-Site route persists a business draft | The feature branch renders validated output from memory; only the normal AI-run audit persists | PARTIAL |
-| Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 read-only Production preflight: 14 absent, 0 divergent, 0 exact | VERIFIED ABSENT / PLANNED APPLY |
+| Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
+| Wave 19 created a Pre-Site business row | Post-apply read-only inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -108,18 +112,18 @@ The two AI Materials inputs are not currently separate governed Request
 Document rows. Their bounded source manifest therefore records each role,
 filename, stable Graph site/drive/item identity, exact version, and content
 hash inside the immutable input snapshot. Fixed single-source Graph columns
-were removed from the unapplied proposal because they could not represent both
+were removed from the pre-apply proposal because they could not represent both
 inputs without ambiguity. The existing `wmkf_SourceDocument` lookup and source
 version/hash remain reserved for lineage from one governed output artifact to
 another, such as Word → PDF or Pre-Site → Final.
 
 ### `akoya_request` relationships
 
-Add the optional N:1 lookup `wmkf_CurrentPreSiteVisit` through relationship
+The optional N:1 lookup `wmkf_CurrentPreSiteVisit` is live through relationship
 `wmkf_request_currentpresitevisit`. It points only to the canonical Ready,
 non-superseded Pre-Site Word row for that Request.
 
-Add the optional N:1 lookup `wmkf_CurrentFinalWriteup` through relationship
+The optional N:1 lookup `wmkf_CurrentFinalWriteup` is live through relationship
 `wmkf_request_currentfinalwriteup`. It points only to the canonical Ready,
 non-superseded Final Writeup Word row for that Request. Final creation copies
 the exact current Pre-Site Word version at action time and records the source
@@ -263,11 +267,13 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 
 ## Deployment and compatibility sequence
 
-1. Run the self-test and the read-only target preflight.
-2. Obtain explicit approval for the target Dataverse metadata write.
-3. Apply only `wave19-pre-site-draft` and rerun the preflight until all 14
-   declared artifacts are exact.
-4. Only after schema readback, add the new fields to the request-document
+1. **Completed 2026-08-17:** run the self-test and read-only Production
+   preflight; all 14 items were absent and none divergent.
+2. **Completed 2026-08-17:** obtain explicit owner approval for the Production
+   metadata write.
+3. **Completed 2026-08-17:** apply only `wave19-pre-site-draft`; independent
+   readback reports all 14 declared artifacts exact.
+4. **Next:** add the new fields to the request-document
    adapter and request lookup selects.
 5. Implement the writer/renderer transition and focused tests.
 6. Exercise Request `1002379` as the controlled old-request testbed only after
@@ -275,9 +281,9 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 7. Verify the exact row, run, Word item/version, current pointer, retry, and one
    safe partial-failure recovery before promotion.
 
-Do not merge runtime code that selects Wave 19 fields before the target
-environment has them; Dataverse rejects a `$select` containing an absent
-attribute. The schema files and preflight are safe to review before apply.
+Production now has Wave 19. Other target environments must still pass the
+same preflight and apply before runtime code deployed there selects these
+fields; Dataverse rejects a `$select` containing an absent attribute.
 
 ## Remaining decisions
 

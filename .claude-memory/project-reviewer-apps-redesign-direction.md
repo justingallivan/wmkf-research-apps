@@ -82,6 +82,13 @@ callers retain their boundary and fingerprint both identities/versions/hashes;
 there is no combined canonical AI PDF. Pre-Site integration source implements
 the reader locally, while Reviewer Finder's adoption remains next-cycle work.
 
+**2026-08-17 Pre-Site persistence schema:** Owner-approved Wave 19 is live in
+Production with 12 exact `wmkf_requestdocument` fields and two exact current-
+writeup lookups on `akoya_request`. Independent post-apply inventory remained
+three Initial Assessment rows and no Pre-Site row. No adapter/writer consumes
+the new fields yet; live schema is not evidence that durable Pre-Site
+generation is implemented.
+
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. During the Site

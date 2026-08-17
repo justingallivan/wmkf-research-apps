@@ -373,7 +373,7 @@ The Pre-Site draft has two independently refreshable source layers:
 
 #### Pre-Site Draft persistence direction
 
-**[VERIFIED INVENTORY / PROPOSED SCHEMA 2026-08-17; NOT APPLIED.]** Treat the
+**[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17.]** Treat the
 Request as the parent and reuse the existing `wmkf_requestdocument` registry
 for each versioned Pre-Site Word draft; do not create a separate draft table or
 one child row per generated section. The Production inventory found the live
@@ -382,7 +382,7 @@ legacy `wmkf_sitevisit` activity and
 `akoya_request.wmkf_researchwriteuptype` classification as suitable content
 stores.
 
-Additive Wave 19 now specifies one Word row with eight editable Multiline Text
+Production-live Wave 19 provides one Word row with eight editable Multiline Text
 columns for the proposal-core sections (executive summary, impact overview,
 methodology overview, personnel overview, Keck funding rationale, background
 and impact, detailed methodology, and personnel details), exact generated and
@@ -396,10 +396,10 @@ pointer.
 
 The exact schema, transition, and cross-tab contracts are in
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
-`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The JSON specifications and
-read-only preflight exist locally, but no Dataverse metadata, adapter, writer,
-or consumer has been changed. Applying the wave remains a separately approved
-Production metadata write.
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The owner-approved Production apply
+completed on 2026-08-17; independent readback reports all 14 metadata items
+exact, and the post-apply inventory confirms no Pre-Site business row was
+created. No adapter, writer, or consumer uses the new fields yet.
 
 The two named prompt surfaces do not currently have the same runtime posture:
 
