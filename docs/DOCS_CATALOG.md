@@ -117,6 +117,12 @@ related:
 | [SERVICE_AND_UTILITY_CATALOG.md](SERVICE_AND_UTILITY_CATALOG.md) | source-of-truth | canonical | yes | If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your... | 2026-07-02 |
 | [WISHLIST.md](WISHLIST.md) | plan | draft |  | Working collection of ideas, observations, and future directions for the app suite. Not commitments — just things we've thought about and want to... | 2026-07-02 |
 
+## document-workflows
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md](POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md) | spec | active | yes | Required SharePoint folders and exact proposal PDF filenames for Power Automate. | 2026-08-17 |
+
 ## email
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
