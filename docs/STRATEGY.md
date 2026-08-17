@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-10
+last_verified: 2026-08-17
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-07-30.** This document owns long-term direction and principles. The
+**Last verified: 2026-08-17.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -160,13 +160,15 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    evidence for version limits, second-stage recovery, retention, and editor
    least privilege, and build Workbench history/admin restore plus milestone
    snapshots;
-2. finish the user/input/storage/access/deadline contract for the remaining
-   Workbench lifecycle tabs, including the three-document writeup lineage,
-   Site Visit dossier, narrow request-scoped applicant-material upload, and
-   transcript-summary provenance; and
-3. reuse the proven artifact registry/read contract for Pre Site Visit, Final
-   Writeup, and Initial Assessment scale-out. That pilot is draft-functional
-   proof rather than production readiness.
+2. harden the Production-proved Pre-Site writer's client recovery path. Request
+   `1002379` created one Ready/Draft row, completed governed v3 AI run, current
+   request pointer, and stable Word item from the exact narrative-only source;
+   an exact Ready retry reused all four. The first long browser request lost its
+   response after durable server completion, so the tab should discover current
+   status/artifacts without requiring a blind retry; and
+3. continue the approved Workbench lifecycle: map the Site Visit dossier and
+   narrow applicant-material upload, then create Final from an exact Pre-Site
+   row/version/hash. The full Editor Dashboard remains later reuse.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became

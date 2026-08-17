@@ -255,25 +255,23 @@ It is drafted from the exact Proposal Narrative through the governed
 `pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
 of the retired Phase II summarizer while removing inferred administrative
 fields. Authoritative request metadata and the ordered PI/Co-PI roster come
-from Dataverse. **[VERIFIED IN SOURCE/TEST/LIVE CONTROLLED RUN 2026-08-16;
-application branch not production-live]** the guarded local proposal-core
-helper and tracked Word template renderer exist. Request `1002379` resolved the
-exact narrative and every template
-metadata field. Sole-current prompt v3
+from Dataverse. **[VERIFIED IN PRODUCTION 2026-08-17]** the guarded
+proposal-core helper and tracked Word template renderer are live. Request
+`1002379` resolved the exact narrative and every template metadata field,
+completed the governed writer, and produced the stable Word artifact.
+Sole-current prompt v3
 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
-`claude-sonnet-4-6`; latest audited Executor run
-`5bd65180-ed99-f111-b8db-7ced8d6e2f44` remains the accepted v2 output. A
-direct exact-v3 Request `1002379` model/render QA verified the revised personnel
-rules and roster-name underlining but spilled Methodology's final sentence to
-page 4; it created no `wmkf_ai_run`. The signed-in Workbench route remains
-unpromoted/unproven, and the review-layer merge remains unbuilt.
-**[VERIFIED IN SOURCE/TESTS 2026-08-17; PRODUCTION GENERATION NOT YET PROVED]**
-the writer requires the exact Proposal Narrative, passes it as a bounded Claude
+`claude-sonnet-4-6`; latest audited Executor evidence is governed v3 run
+`ba0f42b9-849a-f111-b8db-6045bd008868`. The Production renderer fits
+Background and Methodology on page 3 and applies the revised personnel rules
+and roster-name underlining. The writer requires the exact Proposal Narrative,
+passes it as a bounded Claude
 variable, persists its identity/version/hash manifest and all
 eight named fields in Wave 19, renders from Dataverse readback, uploads one
 stable Word item to `Artifacts/Pre-Site Visit/`, and atomically activates the
 current Ready row. The route returns a registry DTO and the tab exposes its
-stable Word link. Read-only comparison confirms sole-current prompt v3 already
+stable Word link. Request `1002379` exact Ready retry reused the same
+row/run/item without another model call or upload. Read-only comparison confirms sole-current prompt v3 already
 matches the narrative-only runtime contract; no new prompt publication is
 required for this change.
 Its future review-derived portion uses `review-synthesis.generate` over all
@@ -303,10 +301,13 @@ transition, and cross-tab contracts:
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 All 12 Wave 19 attributes and both request-pointer relationships are live and
-exact in Production. The post-apply inventory still reports only three Initial
-Assessment registry rows, so no Pre-Site business row was created there. The
-adapter, writer, and consumer are implemented and focused-tested only on the
-integration branch. SharePoint Word remains authoritative for
+exact in Production. The immediate post-apply inventory reported only three
+Initial Assessment registry rows, so the schema apply itself created no
+business row. The deployed writer later created Ready/Draft Request `1002379`
+row `aeb223a2-849a-f111-b8db-70a8a59cded0`, stable SharePoint item
+`01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Current
+inventory is four rows: three Initial Assessments and one Pre Site Visit.
+SharePoint Word remains authoritative for
 staff prose after document creation; the named Dataverse fields are the
 structured generation/automation representation and do not claim automatic
 synchronization from later Word edits.

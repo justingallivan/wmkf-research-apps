@@ -21,7 +21,7 @@ related:
 
 ## Decision and current status
 
-**[OWNER DECISION 2026-08-17; PRE-SITE WRITER IMPLEMENTED LOCALLY; SITE VISIT
+**[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 AND FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
@@ -40,25 +40,24 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-Site Visit and Final remain placeholders in current `main`. On
-`codex/pre-site-draft-schema`, the Pre-Site tab now calls a durable writer and
-shows the stable Word link returned from the registry; it is not deployed.
-Wave 19 is now live in
-Production: its owner-approved metadata-only apply created all 12 attributes
-and two request lookups, and independent readback found 14 exact with no
-absence or divergence. The post-apply inventory still contains only the three
-pre-existing Initial Assessment registry rows. No Production Pre-Site business
-row or SharePoint artifact was created. The branch-local adapter/writer is
-focused-tested but has not been production-smoked.
+Site Visit and Final remain placeholders in current `main`. The Pre-Site tab
+now calls the Production durable writer and shows the stable Word link returned
+from the registry. Wave 19 is live in Production: its owner-approved
+metadata-only apply created all 12 attributes and two request lookups, and
+independent readback found 14 exact with no absence or divergence. Request
+`1002379` later created the first Ready Pre-Site row, completed governed v3 AI
+run, populated the request pointer, and uploaded the stable Word item. Exact
+Ready retry reused those same identities. Current inventory is four Request
+Documents: three Initial Assessments and one Pre Site Visit.
 
 ## Evidence boundary
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site is implemented only on the integration branch, while Site Visit and Final remain placeholders | Workbench source on `codex/pre-site-draft-schema` and current mainline history | VERIFIED LOCALLY / NOT DEPLOYED |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site is Production-live, while Site Visit and Final remain placeholders | Workbench source, commit `abfe5529`, Ready deployment `dpl_CF7ia9TYyT5ZU5hyv2TNWUYnPb3H`, and signed-in Request `1002379` test | VERIFIED LIVE |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
-| Production contains no Pre-Site Request Document rows as of 2026-08-17 | Read-only Production inventory | VERIFIED |
+| Production contains one Ready/Draft Pre-Site Request Document row for Request `1002379` | Read-only Production inventory and exact row/pointer readback | VERIFIED LIVE |
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
 | Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
@@ -284,11 +283,13 @@ current writeup pointer always targets Word, never PDF.
    self-test passed, the owner approved the metadata write, and post-apply
    readback reported 14 exact and 0 divergent. Other environments still require
    their own preflight/apply before runtime `$select` references these fields.
-2. **Pre-Site persistence and generation.** Merge the approved prompt/renderer
-   work, add adapter fields and the durable writer, then exercise Request
-   `1002379` after the exact Proposal Narrative is supplied.
-3. **Pre-Site tab.** Add status, source-readiness, generate/retry, provenance,
-   and Open in Word UI around the durable operation.
+2. **Pre-Site persistence and generation — completed and Production-proved
+   2026-08-17.** The durable writer generated Request `1002379` from the exact
+   narrative, persisted its run/row/pointer, uploaded Word, and reused the same
+   artifact on exact Ready retry.
+3. **Pre-Site tab — first slice live; recovery hardening open.** Generate/retry
+   and Open in Word are live. Add explicit current-artifact/status recovery for
+   a long request whose client response is lost after durable completion.
 4. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 5. **Site Visit dossier.** Implement the Word-workspace link plus governed

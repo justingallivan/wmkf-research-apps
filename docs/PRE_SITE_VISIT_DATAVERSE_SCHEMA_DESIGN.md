@@ -3,7 +3,7 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19 schema and locally implemented writer contract for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
+summary: "Production-live Wave 19 schema and production-proved writer contract for governed Pre-Site drafts and current Pre-Site/Final Request pointers."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-17
@@ -29,9 +29,11 @@ relationships. Independent post-apply readback classified all 14 items as
 exact with zero absent and zero divergent. A separate read-only inventory
 still reports three Request Document rows, all Initial Assessments, so the
 apply created no Pre-Site business row. No application runtime or SharePoint
-artifact was added by the schema operation. **[VERIFIED LOCALLY 2026-08-17;
-NOT DEPLOYED]** the branch now includes the adapter, durable writer, JSON route,
-and stable Word-link UI that use this schema.
+artifact was added by the schema operation. **[VERIFIED IN PRODUCTION
+2026-08-17]** commit `abfe5529` deployed the adapter, durable writer, JSON
+route, and stable Word-link UI. Request `1002379` then created the first Ready
+Pre-Site business row and SharePoint Word item; current inventory is four
+Request Documents: three Initial Assessments and one Pre Site Visit.
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -68,13 +70,14 @@ akoya_request
 | Claim | Strongest evidence | Status |
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
-| Production has three Request Document rows, all Initial Assessments, and no Pre-Site rows | Read-only production inventory on 2026-08-17 | VERIFIED |
+| Production has four Request Document rows: three Initial Assessments and one Ready/Draft Pre Site Visit | Read-only production inventory after Request `1002379` generation on 2026-08-17 | VERIFIED LIVE |
 | Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current on `claude-sonnet-4-6` and matches the tracked narrative-only variables, body, system, output schema, and required assertions | Read-only production prompt comparison on 2026-08-17 plus current source | VERIFIED LIVE |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
-| The branch-local Workbench Pre-Site route persists a business draft | Source and focused tests show claim → eight fields/snapshots → Dataverse readback render → SharePoint upload → atomic Ready/current activation | VERIFIED LOCALLY / NOT DEPLOYED |
+| The Workbench Pre-Site route persists a business draft | Request `1002379` created Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer | VERIFIED LIVE |
 | Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
-| Wave 19 created a Pre-Site business row | Post-apply read-only inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE |
+| The metadata-only Wave 19 apply itself created a Pre-Site business row | Immediate post-apply inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE (historical apply boundary) |
+| The deployed writer later created the first Pre-Site business row | Post-generation inventory plus exact row/run/item/pointer readback for Request `1002379` | VERIFIED LIVE |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -231,9 +234,9 @@ source identity:
 The JSON never contains credentials, access tokens, or the full proposal text.
 The source file remains authoritative for proposal content.
 
-## Required writer contract
+## Production writer contract
 
-The runtime implementation is a later, separately reviewed slice. It must:
+The deployed runtime implementation:
 
 1. load the authoritative request/account/budget/personnel data and the exact
    `AI Materials/ProposalNarrative_{Request#}.pdf` identity and bytes;
@@ -269,10 +272,17 @@ ETag, operation-status, error, and orphan-cleanup fields are reused.
 5. **Completed locally 2026-08-17:** implement the durable writer, registry-
    returning route/UI, persisted-readback renderer transition, and focused
    claim/retry/recovery/race tests.
-6. Exercise Request `1002379` as the controlled old-request testbed only after
-   the exact Proposal Narrative exists, without altering unrelated request data.
-7. Verify the exact row, run, Word item/version, current pointer, retry, and one
-   safe partial-failure recovery before promotion.
+6. **Completed 2026-08-17:** exercise Request `1002379` as the controlled
+   old-request testbed after the exact Proposal Narrative was supplied.
+7. **Completed 2026-08-17 for normal generation and exact Ready retry:** verify
+   the exact row, governed run, Word item/version, current pointer, and
+   no-duplicate retry. A controlled partial-failure recovery remains unproved.
+
+The first long Production request completed durably but the browser displayed
+`Failed to fetch`. Read-only state verification followed by an exact retry
+returned the existing Ready link without another row, run, upload, or model
+call. The tab should gain explicit current-artifact/status recovery so staff do
+not have to infer completion from a lost response.
 
 Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these

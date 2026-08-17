@@ -277,11 +277,15 @@ document inventory, and individual implementation plans do not establish priorit
   Wave 19 adds 12 `wmkf_requestdocument` fields and the optional
   `akoya_request.wmkf_CurrentPreSiteVisit` / `wmkf_CurrentFinalWriteup`
   lookups. Independent post-apply metadata readback reported 14 exact and zero
-  divergent; the row inventory remained three Initial Assessments and no
-  Pre-Site artifact. **[VERIFIED LOCALLY 2026-08-17; NOT DEPLOYED]** the
-  adapter/writer, registry-returning route, and stable Word-link UI are now
-  built and focused-tested. Live schema still does not imply a durable
-  Production Pre-Site generation flow.
+  divergent; the immediate post-apply row inventory remained three Initial
+  Assessments and no Pre-Site artifact. **[VERIFIED IN PRODUCTION 2026-08-17]**
+  commit `abfe5529` deployed the adapter/writer, registry-returning route, and
+  stable Word-link UI. Request `1002379` then created Ready/Draft row
+  `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run
+  `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item
+  `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Exact
+  Ready retry reused the same identities; current inventory is four Request
+  Documents, including one Pre Site Visit.
 - Pre-Site input direction (owner-decided 2026-08-17; source/test contract
   revised 2026-08-17): draft factual material from the exact AI Materials
   narrative only through governed `pre-site-visit.proposal-core.generate`;
@@ -292,23 +296,24 @@ document inventory, and individual implementation plans do not establish priorit
   section stale; they do not silently replace staff-edited Word prose or
   regenerate the factual core. Use a versioned prompt/template pair based
   initially on the supplied examples. The guarded proposal-core service and
-  version-1 template renderer are local and tested; read-only Request `1002379`
-  resolved the exact narrative and all template metadata. The authenticated
-  Workbench route now drives the durable Request Document writer and returns a
-  registry DTO; the tab exposes its stable Word link and retains stale-request
-  cancellation. Dataverse
+  version-1 template renderer are Production-live; Request `1002379` proved
+  exact narrative resolution, governed generation, registry persistence,
+  stable Word upload, current pointer activation, and no-duplicate Ready retry.
+  The authenticated Workbench route returns a registry DTO; the tab exposes its
+  stable Word link and retains stale-request cancellation. Dataverse
   now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; read-only
   comparison confirms it matches the tracked narrative-only runtime contract,
   so no new prompt publication is required. The bibliography remains reserved
-  for next-cycle Reviewer Finder. The latest
-  audited Executor evidence remains accepted v2 Request `1002379` run
-  `5bd65180-ed99-f111-b8db-7ced8d6e2f44`. A direct exact-v3 model/render QA
+  for next-cycle Reviewer Finder. The latest audited Executor evidence is the
+  completed governed v3 Request `1002379` run
+  `ba0f42b9-849a-f111-b8db-6045bd008868`. A prior direct exact-v3 model/render QA
   correctly applied the revised personnel rules and roster-name underlining,
   but Methodology's final sentence spilled to page 4; the direct QA created no
-  `wmkf_ai_run`. The earlier v1 run remains append-only history after layout
-  rejection. The branch and
-  signed-in Workbench route remain unpromoted; SharePoint upload/registry and
-  the review-layer merge remain unbuilt. The older `phase-ii.summarize` row still drives no
+  `wmkf_ai_run`. The Production render now fits Background and Methodology on
+  page 3 and passes the agreed personnel layout. The initial long browser call
+  displayed `Failed to fetch` after durable server completion; exact retry
+  recovered the existing Ready link, so current-artifact/status recovery is a
+  UI follow-up. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a

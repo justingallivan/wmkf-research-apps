@@ -117,19 +117,24 @@ from the Ready registry row and never from the caller. **Administrator restore a
 immutable milestone snapshots remain open**, restore because it depends on the
 permission evidence above.
 
-**[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17]** A read-only Production
-inventory confirmed that the registry already has a `Pre Site Visit` artifact
-type but has no Pre-Site rows. The legacy `wmkf_sitevisit` activity and
+**[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17]** The pre-generation
+read-only Production inventory confirmed that the registry already had a
+`Pre Site Visit` artifact type but no Pre-Site rows. The legacy
+`wmkf_sitevisit` activity and
 `akoya_request.wmkf_researchwriteuptype` classification are not suitable draft
 stores. Additive Wave 19 now provides eight named Pre-Site proposal-core Memo
 fields, exact generated/input snapshots, render/source identity, and
 `akoya_request.wmkf_CurrentPreSiteVisit` plus
 `akoya_request.wmkf_CurrentFinalWriteup`. The owner-approved metadata-only
 Production apply completed on 2026-08-17; independent readback reports all 14
-items exact and zero divergent. Post-apply inventory still reports only the
-three existing Initial Assessment rows. **[VERIFIED LOCALLY 2026-08-17; NOT
-DEPLOYED]** the Request Document adapter and Pre-Site writer now consume these
-fields; no Production Pre-Site row or SharePoint artifact exists yet. There is
+items exact and zero divergent. **[VERIFIED IN PRODUCTION 2026-08-17]** commit
+`abfe5529` deployed the Request Document adapter and Pre-Site writer. Request
+`1002379` created Ready/Draft row `aeb223a2-849a-f111-b8db-70a8a59cded0`,
+governed v3 AI run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable SharePoint
+item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Its
+input manifest has exactly one Proposal Narrative source and no bibliography.
+Exact retry reused the same row/run/item. Current inventory reports four rows:
+three Initial Assessments and one Pre Site Visit, all Ready/Draft. There is
 intentionally no Site Visit writeup pointer: staff observations remain direct
 edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
@@ -146,8 +151,8 @@ Exact design and deployment boundary:
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
 - `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and the
-  local writer uses it as the current-pointer/fence. It was unpopulated in the
-  2026-08-17 Production inventory because no Pre-Site row existed there.
+  Production writer uses it as the current-pointer/fence. Request `1002379`
+  points to Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
   independent Final Word row. Final will record the exact source Pre-Site
   row/version/hash; no writer populates this lookup yet.
@@ -175,7 +180,7 @@ Exact design and deployment boundary:
 - Staff-owned field: Foundation Opportunity. It is absent from the prompt
   output schema and visibly marked `STAFF INPUT REQUIRED` by the DOCX template.
 
-## Production schema / locally implemented Pre-Site Visit runtime contract
+## Production Pre-Site Visit runtime contract
 
 - Artifact type: `Pre Site Visit` (already live in the Wave 16 option set).
 - One Word file per versioned draft row; the row carries all eight named
@@ -197,13 +202,15 @@ Exact design and deployment boundary:
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
-The persistence schema is live in Production. **[VERIFIED IN SOURCE/TESTS
-2026-08-17; PRODUCTION GENERATION NOT YET PROVED]** the runtime writer requires
-the exact narrative, persists the eight named fields and immutable snapshots under its
-claim, renders only from Dataverse readback, uploads one Word file to
-`Artifacts/Pre-Site Visit/`, and atomically activates the current Ready row.
-Read-only comparison confirms sole-current prompt v3 already matches the
-narrative-only runtime contract; no new prompt publication is required.
+The persistence schema and writer are live in Production. **[VERIFIED IN
+PRODUCTION 2026-08-17]** the runtime writer required the exact narrative,
+persisted the eight named fields and immutable snapshots under its claim,
+rendered only from Dataverse readback, uploaded one Word file to
+`Artifacts/Pre-Site Visit/`, and atomically activated the current Ready row for
+Request `1002379`. Exact Ready retry returned the same row/run/item without
+another model call or upload. The first long client request displayed `Failed
+to fetch` after durable server completion; current-artifact/status recovery is
+the remaining UI hardening item, not a registry consistency failure.
 
 ## Retry and partial-success behavior
 

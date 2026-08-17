@@ -375,8 +375,8 @@ The Pre-Site draft has two independently refreshable source layers:
 **[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17.]** Treat the
 Request as the parent and reuse the existing `wmkf_requestdocument` registry
 for each versioned Pre-Site Word draft; do not create a separate draft table or
-one child row per generated section. The Production inventory found the live
-`Pre Site Visit` artifact option and no Pre-Site rows. It also falsified the
+one child row per generated section. The pre-generation Production inventory
+found the live `Pre Site Visit` artifact option and no Pre-Site rows. It also falsified the
 legacy `wmkf_sitevisit` activity and
 `akoya_request.wmkf_researchwriteuptype` classification as suitable content
 stores.
@@ -397,10 +397,14 @@ The exact schema, transition, and cross-tab contracts are in
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The owner-approved Production apply
 completed on 2026-08-17; independent readback reports all 14 metadata items
-exact, and the post-apply inventory confirms no Pre-Site business row was
-created by that apply. **[VERIFIED LOCALLY 2026-08-17; NOT DEPLOYED]** the
-adapter, durable writer, registry-returning route, and stable Word-link consumer
-now use the fields on `codex/pre-site-draft-schema`.
+exact, and the immediate post-apply inventory confirms no Pre-Site business row
+was created by that metadata apply. **[VERIFIED IN PRODUCTION 2026-08-17]**
+commit `abfe5529` deployed the adapter, durable writer, registry-returning
+route, and stable Word-link consumer. Request `1002379` then created Ready row
+`aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run
+`ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item
+`01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Exact
+Ready retry reused the same identities.
 
 The two named prompt surfaces do not currently have the same runtime posture:
 
@@ -433,14 +437,17 @@ The two named prompt surfaces do not currently have the same runtime posture:
   Read-only comparison confirms live v3 matches the tracked narrative-only
   variables, body, system, output schema, model, and required assertions; no
   new prompt publication is needed.
-  A direct exact-v3 Request `1002379` model/render QA correctly produced 145
+  A prior direct exact-v3 Request `1002379` model/render QA correctly produced 145
   personnel words and underlined only the two Dataverse roster names, but its
   574-word Background/Methodology pair spilled the final sentence to page 4;
-  that direct QA did not create a `wmkf_ai_run`. These are local/test invocations
-  against live prompt/request data, not a deployed signed-in Workbench smoke.
-  The durable writer is focused-tested but has created no Production
-  SharePoint upload, registry row, request pointer, or business-field write.
-  The review-layer merge and distribution workflow remain unbuilt.
+  that direct QA did not create a `wmkf_ai_run`. The later signed-in Production
+  generation created the governed v3 run, registry row, request pointer, and
+  SharePoint upload listed above. Its exact four-page Word file passed visual
+  QA, including Background/Methodology on page 3 and the agreed personnel
+  formatting. The first long browser call displayed `Failed to fetch` after
+  durable server completion; an exact retry recovered the existing Ready link
+  without a duplicate. Explicit current-artifact/status recovery and the
+  review-layer merge/distribution workflow remain unbuilt.
   The older production `phase-ii.summarize` v1 row remains unused by a route;
   the sunset-candidate PDF app still uses `createSummarizationPrompt()` and is
   not the new producer.

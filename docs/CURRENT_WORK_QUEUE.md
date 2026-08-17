@@ -35,12 +35,12 @@ sequence.
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
 | 1 | Close the remaining Initial Assessment pilot gates | **[VERIFIED IN SOURCE 2026-08-16]** Initial Assessment and Field Primer now require the exact active `AI Materials/ProposalNarrative_{Request#}.pdf`; a read-only live Request `1002788` extraction returned non-empty text. No governed artifact was generated from that new source in this change. Earlier Requests `1002788` and `1003109` remain production evidence for artifact mechanics, lineage, exact-input reuse, interrupted-finalization recovery, and attributed editing, but their older Phase I/Reviewer Materials inputs are superseded. Both artifact consumers still resolve the same stable item. Graph-current metadata display is live; a disposable production-library probe also proved previous-version inspection/restore and signed-in first-stage recycle recovery. Before declaring the pilot gate complete, obtain administrator evidence for version limits, second-stage recovery, Purview retention, and editor least privilege, then implement Workbench administrator restore and milestone snapshots. **Connor replied 2026-08-10 (S413) and the evidence is still not closed:** major versioning confirmed on but the configured limit unanswered; no second-stage recycle bin reported (unusual for SharePoint Online — confirm with a site-collection admin before relying on it); Purview unanswered and rerouted to an M365 compliance admin; site members' "limited control" is not a built-in permission level, so editor delete rights are unresolved. See `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` item 5. | Current metadata, native version restore, and first-stage recovery are proven; administrator policy/access evidence and product history/milestone controls are recorded or completed. |
-| 2 | First deadline-bound writeup slice | **[VERIFIED IN SOURCE/TESTS AND READ-ONLY LIVE PROBES 2026-08-17; PRODUCTION SCHEMA LIVE; production generation not yet proved]** The Workbench Pre Site Visit flow uses only the exact `AI Materials/ProposalNarrative_{Request#}.pdf` plus authoritative Dataverse data. Its frozen input snapshot and generation identity exclude the bibliography. It persists the eight named fields, exact snapshots, and prompt/run lineage; renders from Dataverse readback; uploads a stable Word item; and atomically activates the current Ready row. Focused tests cover narrative-source failure, exact prompt-variable enforcement, bibliography-independent retry identity, persisted-output retry, matching upload recovery, prompt/claim races, and fail-closed unknown state. Owner-approved Wave 19 is live in Production with 12 exact Request Document fields and two exact current-document lookups; the last inventory found no Pre-Site row. Sole-current prompt v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` already has the exact narrative-only variable and schema contract on `claude-sonnet-4-6`; no prompt publication is required. The separate bibliography remains a next-cycle Reviewer Finder input. | Have Connor supply the exact Proposal Narrative, then exercise Request `1002379`, including exact retry and one controlled partial-failure recovery. The full Editor Dashboard contract remains later reuse. |
+| 2 | First deadline-bound writeup slice | **[VERIFIED IN PRODUCTION 2026-08-17]** The Workbench Pre Site Visit flow uses only the exact `AI Materials/ProposalNarrative_{Request#}.pdf` plus authoritative Dataverse data. Its frozen input snapshot and generation identity exclude the bibliography. Production Request `1002379` created Ready/Draft row `aeb223a2-849a-f111-b8db-70a8a59cded0`, completed governed v3 AI run `ba0f42b9-849a-f111-b8db-6045bd008868`, set the request current pointer, and uploaded stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Readback found exactly one narrative source and no bibliography; exact Ready retry returned the same row/run/item without another model call or upload. Current inventory is four Request Documents: three Initial Assessments and one Pre Site Visit, all Ready/Draft. The four-page Production document passed visual inspection for the agreed layout and personnel rules. Sole-current prompt v3 `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` remains on `claude-sonnet-4-6`; no prompt publication is required. | Improve client recovery for a generation whose HTTP response is lost after durable completion—the first run displayed `Failed to fetch`, while a later exact retry safely discovered the Ready file. Controlled partial-failure recovery and the full Editor Dashboard remain later proof/reuse. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
-- **Historical Workbench discovery:** **[IMPLEMENTED LOCALLY 2026-08-17; NOT
-  DEPLOYED]** the Workbench dashboard now opens an exact active or historical
+- **Historical Workbench discovery:** **[PRODUCTION-LIVE 2026-08-17]** the
+  Workbench dashboard now opens an exact active or historical
   request number through the existing authenticated `resolve-request` route;
   this does not change the active-cycle dashboard filter or request status.
   **[OWNER-DECIDED FUTURE WORK 2026-08-17; PLANNED]** add a broader historical
@@ -78,6 +78,15 @@ sequence.
   Full record with slot/junction ids: `outputs/phantom-copi-incident-2026-08-12.md`.
 
 ## Completed in this execution
+
+- Pre-Site durable-generation production proof: commit `abfe5529` reached Ready
+  Vercel deployment `dpl_CF7ia9TYyT5ZU5hyv2TNWUYnPb3H`. Signed-in Request
+  `1002379` created one Ready/Draft Request Document, one completed governed
+  v3 AI run, one stable Word item, and the current request pointer from the
+  narrative-only source. Exact Ready retry produced no duplicate; the exact
+  four-page Word file passed visual QA. The initial long request completed on
+  the server but displayed `Failed to fetch` in the browser, so artifact-status
+  recovery remains the next UI hardening item.
 
 - Initial Assessment substantive human edit: Request `1003109`'s canonical
   SharePoint item advanced to version `2.0`, attributed to Justin Gallivan.

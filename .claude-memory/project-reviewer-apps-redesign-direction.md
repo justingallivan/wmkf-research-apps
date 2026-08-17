@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has seven implemented tabs and three placeholders; Initial Assessment and native first-stage recovery are production-proved, while administrator and milestone controls remain open.
+description: The unified Request Workbench has a Production-proved Pre-Site writer plus the Initial Assessment lifecycle; Site Visit and Final remain planned.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-07-30 via source/live probes, production deployment 84155a5a, signed-in Request 1003109 generation/retry/recovery, and Dataverse/SharePoint lineage readback
+  last_verified: 2026-08-17 via source/live probes, signed-in Request 1002379 Pre-Site generation/retry, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -82,15 +82,20 @@ Assessment, and Field Primer use and fingerprint the narrative only. Reviewer
 Finder will use both sources next cycle so cited authors can inform discovery;
 there is no combined canonical AI PDF.
 
-**2026-08-17 Pre-Site persistence schema and local writer:** Owner-approved Wave 19 is live in
+**2026-08-17 Pre-Site persistence schema and Production writer:** Owner-approved Wave 19 is live in
 Production with 12 exact `wmkf_requestdocument` fields and two exact current-
-writeup lookups on `akoya_request`. Independent post-apply inventory remained
-three Initial Assessment rows and no Pre-Site row. The source now
-has a focused-tested durable adapter/writer, JSON route, and stable Word-link
-UI; Production generation is not yet proved. Read-only comparison confirms
+writeup lookups on `akoya_request`. The immediate post-apply inventory remained
+three Initial Assessment rows and no Pre-Site row. Commit `abfe5529` then
+deployed the durable adapter/writer, JSON route, and stable Word-link UI.
+Signed-in Request `1002379` created Ready/Draft row
+`aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 AI run
+`ba0f42b9-849a-f111-b8db-6045bd008868`, the request pointer, and stable Word
+item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Its input manifest contains only
+the Proposal Narrative; exact Ready retry reused the same identities. Read-only comparison confirms
 sole-current prompt v3 already matches the narrative-only runtime contract, so
-no new prompt publication is required. Live schema alone remains no evidence
-of a durable Production Pre-Site generation.
+no new prompt publication is required. The first long client request displayed
+`Failed to fetch` after durable completion, so current-artifact/status recovery
+remains UI follow-up.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
@@ -157,10 +162,11 @@ planned. Current authority is
 ## Current source-backed state (2026-07-29)
 
 - Ten top-level tabs; seven implemented on current mainline (Overview, Proposal,
-  Initial Assessment, Reviewers, Reviews, Status, Awardee) and three mainline
-  placeholders. **[LOCAL BRANCH 2026-08-17]** Pre Site Visit Writeup now has a
-  durable registry-backed route/UI on `codex/pre-site-draft-schema`; Site Visit
-  and Final Writeup remain placeholders. Initial Assessment production
+  Initial Assessment, Pre Site Visit Writeup, Reviewers, Reviews, Status,
+  Awardee) and two mainline placeholders. **[PRODUCTION-LIVE 2026-08-17]** Pre
+  Site Visit Writeup has a durable registry-backed route/UI and controlled
+  Request `1002379` proof; Site Visit and Final Writeup remain placeholders.
+  Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,
   while Request `1003109` proves canonical-input generation, linked-run
