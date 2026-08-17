@@ -53,7 +53,11 @@ tracked body/system/variables/schema/model/settings readback. Controlled run
 `1002379` DOCX. Canonical rendering produced four Letter pages with the
 summary contained on page 1, graphical-abstract placeholders on page 2, and
 detailed content beginning on page 3. The package retained all 30 OOXML parts,
-and only the intentionally manual/future placeholders remained.
+and only the intentionally manual/future placeholders remained. A subsequent
+formatting correction set explicit 6 pt after-spacing on all four first-page
+list paragraphs and removed the empty paragraph immediately before the first
+manual page break; package comparison showed only `word/document.xml` changed
+and the four-page render remained stable.
 
 ## Deliberately not performed
 
@@ -67,5 +71,5 @@ and only the intentionally manual/future placeholders remained.
 The accepted controlled output is
 `outputs/pre-site-visit-1002379/Phase II Pre-Site Visit Writeup CONTROLLED v2
 1002379.docx` (SHA-256
-`41937e2aaefc035797b7e1736894a2497ff60009c403392d37e45be191be3840`).
+`0ff05a0304ca69d9fb3a4789911dedc26354120a3af007819db9ff96da1205d3`).
 It is a local controlled draft, not a registered or distributed artifact.

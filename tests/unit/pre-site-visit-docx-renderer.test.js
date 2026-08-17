@@ -48,6 +48,11 @@ function wordTables(documentXml) {
     .map((match) => match[0]);
 }
 
+function wordParagraphs(documentXml) {
+  return Array.from(documentXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g))
+    .map((match) => match[0]);
+}
+
 function cellContaining(cells, text) {
   const cell = cells.find((candidate) => candidate.includes(text));
   if (!cell) throw new Error(`Could not find Word table cell containing ${text}`);
@@ -124,6 +129,33 @@ test('pins the compact 1pt single divider above the executive summary', async ()
   expect(documentXml.match(
     /<w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"\/>/g,
   )).toHaveLength(2);
+});
+
+test('adds 6pt after the four first-page list paragraphs and removes the blank before the page break', async () => {
+  const output = await renderPreSiteVisitDocx({
+    documentFields: documentFieldsFixture(),
+    proposalCore: proposalCoreFixture(),
+  });
+  const rendered = await JSZip.loadAsync(output);
+  const documentXml = await rendered.file('word/document.xml').async('string');
+  const paragraphs = wordParagraphs(documentXml);
+
+  for (const field of [
+    'impactOverview',
+    'methodologyOverview',
+    'personnelOverview',
+    'keckFundingRationale',
+  ]) {
+    const paragraph = paragraphs.find((candidate) => candidate.includes(`${field} test content.`));
+    expect(paragraph).toBeDefined();
+    expect(paragraph).toMatch(/<w:spacing\b[^>]*w:after="120"[^>]*\/>/);
+  }
+
+  const firstPageBreak = paragraphs.findIndex((paragraph) => (
+    /<w:br\b[^>]*w:type="page"[^>]*\/>/.test(paragraph)
+  ));
+  expect(firstPageBreak).toBeGreaterThan(0);
+  expect(paragraphs[firstPageBreak - 1]).toContain('keckFundingRationale test content.');
 });
 
 test('expands the two long-form AI slots into multiple Word paragraphs', async () => {
