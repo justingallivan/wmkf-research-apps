@@ -38,6 +38,17 @@ async function wordXml(zip) {
     .join('');
 }
 
+function wordTableCells(documentXml) {
+  return Array.from(documentXml.matchAll(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g))
+    .map((match) => match[0]);
+}
+
+function cellContaining(cells, text) {
+  const cell = cells.find((candidate) => candidate.includes(text));
+  if (!cell) throw new Error(`Could not find Word table cell containing ${text}`);
+  return cell;
+}
+
 test('fills split-run Dataverse and AI placeholders while retaining the template package', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const original = await JSZip.loadAsync(template);
@@ -67,6 +78,25 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   const first = await renderPreSiteVisitDocx(input);
   const second = await renderPreSiteVisitDocx(input);
   expect(second.equals(first)).toBe(true);
+});
+
+test('pins title alignment and visible amount-value spacing in the retained template', async () => {
+  const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+  const zip = await JSZip.loadAsync(template);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  const cells = wordTableCells(documentXml);
+
+  expect(cellContaining(cells, 'Project Title')).toContain('<w:vAlign w:val="top"/>');
+  expect(cellContaining(cells, 'DV:ProjectTitle')).toContain('<w:vAlign w:val="top"/>');
+  for (const placeholder of [
+    'DV:RequestedAmount',
+    'DV:InvitedAmount',
+    'DV:TotalProjectBudget',
+  ]) {
+    expect(cellContaining(cells, placeholder)).toMatch(
+      /<w:tcMar>[\s\S]*?<w:left w:w="144" w:type="dxa"\/>[\s\S]*?<\/w:tcMar>/,
+    );
+  }
 });
 
 test('expands the two long-form AI slots into multiple Word paragraphs', async () => {
