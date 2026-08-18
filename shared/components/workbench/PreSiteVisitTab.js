@@ -319,7 +319,15 @@ export default function PreSiteVisitTab({ requestId }) {
           )}
           {readyFile && (
             <p className="mt-4 text-sm font-medium text-green-800">
-              Draft ready{readyFile.name ? ` · ${readyFile.name}` : ''}
+              Latest draft:{' '}
+              <a
+                href={readyFile.webUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {readyFile.name || 'Open Word draft'}
+              </a>
             </p>
           )}
         </div>

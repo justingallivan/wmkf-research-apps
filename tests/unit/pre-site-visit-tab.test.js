@@ -82,7 +82,11 @@ test('shows compact actions and keeps generation details behind help', async () 
   expect(screen.getByRole('link', { name: 'Download' }))
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
   expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeEnabled();
-  expect(screen.getByText('Draft ready · 1002379 Pre-Site Visit.docx')).toBeInTheDocument();
+  expect(screen.getByText('Latest draft:')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' }))
+    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' }))
+    .toHaveAttribute('target', '_blank');
 });
 
 test('loads existing Ready actions without another generation request', async () => {
