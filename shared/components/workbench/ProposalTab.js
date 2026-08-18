@@ -3,7 +3,8 @@
  *
  * Three stacked sections per docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md:
  *   Top    — Dataverse proposal info (PI, Co-PIs, abstract, amounts)
- *   Middle — canonical AI Materials plus Phase I and Phase II documents (download via the scoped proxy)
+ *   Middle — Reviewer Materials, canonical AI Materials, and Phase I/II documents
+ *            (download via the scoped proxy)
  *   Bottom — AI content (existing fit rationale / summary / extracted data; the
  *            Field Primer generate/persist lands in a later phase)
  *
@@ -287,12 +288,32 @@ function DocumentsSection({ requestId, docs, error }) {
   if (!docs) {
     return <p className="text-sm text-gray-500">Loading documents…</p>;
   }
+  const reviewerMaterials = Array.isArray(docs.reviewerMaterials) ? docs.reviewerMaterials : [];
   const aiMaterials = Array.isArray(docs.aiMaterials) ? docs.aiMaterials : [];
   const slots = Array.isArray(docs.slots) ? docs.slots : [];
   const phaseIIDocuments = Array.isArray(docs.phaseIIDocuments) ? docs.phaseIIDocuments : [];
   const others = Array.isArray(docs.otherDocuments) ? docs.otherDocuments : [];
   return (
     <div className="space-y-4">
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Reviewer Materials</p>
+        {reviewerMaterials.length > 0 ? (
+          <ul className="divide-y divide-gray-100">
+            {reviewerMaterials.map((document) => (
+              <li
+                key={`${document.library}/${document.folder}/${document.name}`}
+                className="flex items-center justify-between gap-3 py-2"
+              >
+                <span className="text-sm text-gray-700 truncate">{document.name}</span>
+                <DocActions requestId={requestId} file={document} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-400 py-2">No documents found.</p>
+        )}
+      </div>
+
       {aiMaterials.length > 0 && (
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Materials</p>

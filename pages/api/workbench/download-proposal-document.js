@@ -12,9 +12,10 @@
  *   2. The folder's top-level segment MUST be a request folder whose GUID suffix
  *      matches `requestId` — blocks downloading arbitrary SharePoint content or
  *      probing other requests' folders.
- *   3. The (library, folder, filename) triple must be a Proposal-tab document
- *      the list service surfaces for this request (authoritative membership
- *      check in the service); library allowlisting via GraphService.getDriveId.
+ *   3. The (library, folder, filename) triple must be a Proposal-tab Reviewer
+ *      Materials, Phase I/II, or canonical AI Materials document surfaced by
+ *      the list service for this request (authoritative membership check in the
+ *      service); library allowlisting via GraphService.getDriveId.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
  * dispatch → auth guard → input validation → withDalContext → one service

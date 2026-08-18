@@ -1,10 +1,11 @@
 /**
  * API: /api/workbench/proposal-documents
  *
- * GET ?requestId=<akoya_requestid GUID> → { slots, aiMaterials, otherDocuments, libraries, errors }
+ * GET ?requestId=<akoya_requestid GUID> → { slots, reviewerMaterials, aiMaterials, otherDocuments, libraries, errors }
  *
- * Lists the request's Phase I and canonical AI Materials SharePoint documents
- * for the Workbench Proposal tab. Read-only, gated `reviewers`.
+ * Lists the request's exact Reviewer Materials PDF, Phase I/II documents, and
+ * canonical AI Materials for the Workbench Proposal tab. Read-only, gated
+ * `reviewers`.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 4 wave): method
  * dispatch → auth guard → GUID validation → withDalContext → one service

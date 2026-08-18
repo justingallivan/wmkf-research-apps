@@ -21,8 +21,10 @@ related:
 > superseded: Initial Assessment and Field Primer now require
 > `AI Materials/ProposalNarrative_{Request#}.pdf`; the current-cycle Reviewer
 > Finder independently prefers the outbound reviewer package and has one exact
-> Phase I fallback. The Proposal tab itself displays the D26 Phase I slots and
-> separately lists files beneath the request's `Phase II` folder. Use
+> Phase I fallback. The Proposal tab itself displays the exact external-reviewer
+> `Reviewer Materials/Proposal_{Request#}.pdf` first, followed by the canonical
+> AI Materials, D26 Phase I slots, and files beneath the request's `Phase II`
+> folder. Use
 > `shared/components/workbench/ProposalTab.js` and the current Workbench roadmap
 > for live behavior and follow-up work.
 

@@ -25,7 +25,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002794', wmkf_meetingdate: '2026-06-01' });
   listProposalDocuments.mockResolvedValue({
-    slots: [], aiMaterials: [], otherDocuments: [], libraries: ['Documents'], errors: [],
+    slots: [], reviewerMaterials: [], aiMaterials: [], otherDocuments: [], libraries: ['Documents'], errors: [],
   });
 });
 
@@ -45,6 +45,7 @@ test('derives scope from the resolved record (id/number/cycle) and spreads the r
   expect(body).toEqual({
     success: true,
     slots: [],
+    reviewerMaterials: [],
     aiMaterials: [],
     otherDocuments: [],
     libraries: ['Documents'],

@@ -116,7 +116,7 @@ SharePoint `Phase II` files to the Proposal tab. Production is at commit
 
 | File | Purpose |
 |---|---|
-| `shared/components/workbench/ProposalTab.js` | Phase I, Phase II, and AI Materials display |
+| `shared/components/workbench/ProposalTab.js` | Reviewer Materials, AI Materials, Phase I, and Phase II display |
 | `lib/services/workbench-proposal-documents.js` | Scoped SharePoint Proposal document classification |
 | `lib/services/workbench/download-proposal-document-service.js` | Exact listed-file download authorization |
 | `shared/components/workbench/PreSiteVisitTab.js` | Pre-Site actions and Site Visit confirmation UI |

@@ -17,6 +17,14 @@ const context = {
 function responseBody(overrides = {}) {
   return {
     success: true,
+    reviewerMaterials: [
+      {
+        library: 'akoya_request',
+        folder: `${ROOT}/Reviewer Materials`,
+        name: 'Proposal_1002379.pdf',
+        mimeType: 'application/pdf',
+      },
+    ],
     aiMaterials: [
       {
         key: 'proposalNarrative',
@@ -61,10 +69,13 @@ beforeEach(() => {
   });
 });
 
-test('renders canonical AI Materials separately with scoped view and download links', async () => {
+test('renders Reviewer Materials first, followed by canonical AI Materials, with scoped view and download links', async () => {
   render(<ProposalTab context={context} />);
 
   await waitFor(() => expect(screen.getByText('Proposal Narrative')).toBeInTheDocument());
+  const reviewerHeading = screen.getByText('Reviewer Materials');
+  const aiHeading = screen.getByText('AI Materials');
+  expect(reviewerHeading.compareDocumentPosition(aiHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText('AI Materials')).toBeInTheDocument();
   expect(screen.getByText('Phase I documents')).toBeInTheDocument();
   expect(screen.getByText('Phase II documents')).toBeInTheDocument();
@@ -77,12 +88,32 @@ test('renders canonical AI Materials separately with scoped view and download li
   expect(view).toHaveAttribute('href', expect.stringContaining('disposition=inline'));
   expect(download).toHaveAttribute('href', expect.stringContaining('ProposalNarrative_1002379.pdf'));
 
-  const phaseIIRow = screen.getByText('Proposal_1002379.pdf').closest('li');
+  const reviewerSection = reviewerHeading.parentElement;
+  const reviewerRow = within(reviewerSection).getByText('Proposal_1002379.pdf').closest('li');
+  expect(within(reviewerRow).getByRole('link', { name: 'View' }))
+    .toHaveAttribute('href', expect.stringContaining('Reviewer+Materials'));
+  expect(within(reviewerRow).getByRole('link', { name: 'Download' }))
+    .toHaveAttribute('href', expect.stringContaining('Proposal_1002379.pdf'));
+
+  const phaseIISection = screen.getByText('Phase II documents').parentElement;
+  const phaseIIRow = within(phaseIISection).getByText('Proposal_1002379.pdf').closest('li');
   const phaseIIView = within(phaseIIRow).getByRole('link', { name: 'View' });
   const phaseIIViewUrl = new URL(phaseIIView.getAttribute('href'), 'http://localhost');
   expect(phaseIIViewUrl.searchParams.get('folder')).toBe(`${ROOT}/Phase II`);
   expect(within(phaseIIRow).getByRole('link', { name: 'Download' }))
     .toHaveAttribute('href', expect.stringContaining('Proposal_1002379.pdf'));
+});
+
+test('shows a clear empty state when no Reviewer Materials document exists', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => responseBody({ reviewerMaterials: [] }),
+  });
+
+  render(<ProposalTab context={context} />);
+
+  const heading = await screen.findByText('Reviewer Materials');
+  expect(within(heading.parentElement).getByText('No documents found.')).toBeInTheDocument();
 });
 
 test('shows a clear empty state when no Phase II documents exist', async () => {

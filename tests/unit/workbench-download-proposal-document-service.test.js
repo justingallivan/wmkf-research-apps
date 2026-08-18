@@ -29,6 +29,7 @@ import { ServiceHttpError } from '../../lib/services/service-http-error';
 const REQ = '11111111-1111-1111-1111-111111111111';
 const FOLDER = '1002794_X/Phase I';
 const PHASE_II_FOLDER = '1002794_X/Phase II';
+const REVIEWER_FOLDER = '1002794_X/Reviewer Materials';
 const AI_FOLDER = '1002794_X/AI Materials';
 const args = (over = {}) => ({ requestId: REQ, library: 'Documents', folder: FOLDER, filename: 'proposal.pdf', ...over });
 
@@ -39,6 +40,9 @@ beforeEach(() => {
     slots: [
       { found: true, library: 'Documents', folder: FOLDER, name: 'proposal.pdf' },
       { found: false, library: 'Documents', folder: FOLDER, name: 'missing.pdf' }, // not-found slots excluded
+    ],
+    reviewerMaterials: [
+      { library: 'Documents', folder: REVIEWER_FOLDER, name: 'Proposal_1002794.pdf' },
     ],
     phaseIIDocuments: [
       { library: 'Documents', folder: PHASE_II_FOLDER, name: 'PhaseIIProposal.pdf' },
@@ -61,8 +65,12 @@ test('request not found → 404, no listing/download attempted', async () => {
   expect(listProposalDocuments).not.toHaveBeenCalled();
 });
 
-test('membership: Phase I + Phase II + AI Materials + otherDocuments allowed; unlisted or found:false → 403 pre-download', async () => {
+test('membership: Reviewer Materials + Phase I/II + AI Materials + otherDocuments allowed; unlisted or found:false → 403 pre-download', async () => {
   await expect(downloadProposalDocument(args({ filename: 'other.docx' }))).resolves.toBeTruthy();
+  await expect(downloadProposalDocument(args({
+    folder: REVIEWER_FOLDER,
+    filename: 'Proposal_1002794.pdf',
+  }))).resolves.toBeTruthy();
   await expect(downloadProposalDocument(args({
     folder: PHASE_II_FOLDER,
     filename: 'PhaseIIProposal.pdf',
@@ -74,13 +82,14 @@ test('membership: Phase I + Phase II + AI Materials + otherDocuments allowed; un
   for (const candidate of [
     { filename: 'missing.pdf' },
     { filename: 'not-listed.pdf' },
+    { folder: REVIEWER_FOLDER, filename: 'Research Phase I Application_20260818.pdf' },
     { folder: AI_FOLDER, filename: 'ProposalBibliography_1002794.pdf' },
   ]) {
     const err = await downloadProposalDocument(args(candidate)).catch((e) => e);
     expect(err.httpStatus).toBe(403);
     expect(err.message).toBe('File is not a Proposal-tab document for this request');
   }
-  expect(downloadFileByPath).toHaveBeenCalledTimes(3);
+  expect(downloadFileByPath).toHaveBeenCalledTimes(4);
 });
 
 test('golden path returns the plain file descriptor (never touches res)', async () => {

@@ -29,6 +29,8 @@ import handler from '../../pages/api/workbench/download-proposal-document';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const GUID_SUFFIX = REQUEST_ID.replace(/-/g, '').toUpperCase();
+const REVIEWER_FOLDER = `1002794_${GUID_SUFFIX}/Reviewer Materials`;
+const REVIEWER_FILENAME = 'Proposal_1002794.pdf';
 const AI_FOLDER = `1002794_${GUID_SUFFIX}/AI Materials`;
 const AI_FILENAME = 'ProposalNarrative_1002794.pdf';
 
@@ -62,6 +64,7 @@ beforeEach(() => {
   });
   listProposalDocuments.mockReset().mockResolvedValue({
     slots: [{ found: true, library: 'Documents', folder: `1002794_${GUID_SUFFIX}/Phase I`, name: 'proposal.pdf' }],
+    reviewerMaterials: [{ library: 'Documents', folder: REVIEWER_FOLDER, name: REVIEWER_FILENAME }],
     aiMaterials: [{ found: true, library: 'Documents', folder: AI_FOLDER, name: AI_FILENAME }],
     otherDocuments: [],
   });
@@ -124,6 +127,22 @@ test('canonical AI Materials path passes request ownership and membership checks
   expect(GraphService.downloadFileByPath).toHaveBeenCalledWith('Documents', AI_FOLDER, AI_FILENAME);
   expect(res.headers['Content-Disposition']).toBe(`attachment; filename="${AI_FILENAME}"`);
   expect(res.body).toEqual(Buffer.from('ai-pdf'));
+});
+
+test('canonical Reviewer Materials path passes request ownership and membership checks', async () => {
+  GraphService.downloadFileByPath.mockResolvedValueOnce({
+    buffer: Buffer.from('reviewer-pdf'),
+    mimeType: 'application/pdf',
+    filename: REVIEWER_FILENAME,
+    size: 12,
+  });
+  const res = mockRes();
+  await handler(reqOf(query({ folder: REVIEWER_FOLDER, filename: REVIEWER_FILENAME })), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(GraphService.downloadFileByPath).toHaveBeenCalledWith('Documents', REVIEWER_FOLDER, REVIEWER_FILENAME);
+  expect(res.headers['Content-Disposition']).toBe(`attachment; filename="${REVIEWER_FILENAME}"`);
+  expect(res.body).toEqual(Buffer.from('reviewer-pdf'));
 });
 
 test('folder GUID suffix mismatch → 403 before the wrapped scope check runs', async () => {

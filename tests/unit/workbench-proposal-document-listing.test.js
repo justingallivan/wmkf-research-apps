@@ -101,6 +101,28 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
   expect(result.otherDocuments).toEqual([]);
 });
 
+test('surfaces only the exact reviewer PDF while excluding internal and wrong-request files beside it', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+  listFiles.mockResolvedValue([
+    { name: 'Proposal_1002379.pdf', folder: `${ROOT}/Reviewer Materials`, size: 40, mimeType: 'application/pdf' },
+    { name: 'Research Phase I Application_20260818.pdf', folder: `${ROOT}/Reviewer Materials`, size: 50, mimeType: 'application/pdf' },
+    { name: 'Proposal_1009999.pdf', folder: `${ROOT}/Reviewer Materials`, size: 60, mimeType: 'application/pdf' },
+    { name: 'Proposal_1002379.pdf', folder: `${ROOT}/Reviewer Materials/Internal`, size: 70, mimeType: 'application/pdf' },
+  ]);
+
+  const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
+
+  expect(result.reviewerMaterials).toEqual([
+    {
+      name: 'Proposal_1002379.pdf',
+      library: 'akoya_request',
+      folder: `${ROOT}/Reviewer Materials`,
+      size: 40,
+      mimeType: 'application/pdf',
+    },
+  ]);
+});
+
 test('returns an empty Phase II collection when the folder has no files', async () => {
   getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
   listFiles.mockResolvedValue([
