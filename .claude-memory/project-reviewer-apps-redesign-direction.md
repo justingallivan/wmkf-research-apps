@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has a Production-proved Pre-Site writer plus the Initial Assessment lifecycle; Site Visit and Final remain planned.
+description: The unified Request Workbench has Production-proved Pre-Site and Initial Assessment writers plus a source-verified Site Visit handoff; Final remains planned.
 metadata:
   type: project
   status: active
@@ -109,6 +109,20 @@ distinct generation identity. The public sign-in/auth boundary passed;
 signed-in current-status, compact actions/download, and Word Online v3 proof
 remain open.
 
+**2026-08-17 Site Visit handoff implementation (feature branch; not
+deployed):** the Site Visit tab now shows the current Ready/Draft Pre-Site Word
+item and owns a confirmation-guarded `Start Site Visit Stage` action. The
+server independently resolves `wmkf_CurrentPreSiteVisit`, treats the client
+artifact id only as a stale-screen fence, verifies the same stable Graph item
+and publication version before/after DOCX download/hash, then ETag-conditionally
+sets lifecycle Review and writes the `wmkf_milestone*` version/hash/time. It
+does not copy or mutate the Word file. The Pre-Site producer rejects
+regeneration after promotion before input/prompt/AI/claim/render/upload work.
+Exact Review retries are idempotent; stale identity, file/version races,
+unknown/incomplete states, and ETag conflicts fail closed. Production
+deployment and a signed-in handoff smoke remain open; logistics/supporting
+files and Final remain later slices.
+
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,
 Pre-Site, and Final are three separate governed Word documents. During the Site
@@ -173,11 +187,13 @@ planned. Current authority is
 
 ## Current source-backed state (2026-07-29)
 
-- Ten top-level tabs; seven implemented on current mainline (Overview, Proposal,
+- Ten top-level tabs; nine implemented in current feature-branch source (Overview, Proposal,
   Initial Assessment, Pre Site Visit Writeup, Reviewers, Reviews, Status,
-  Awardee) and two mainline placeholders. **[PRODUCTION-LIVE 2026-08-17]** Pre
+  Awardee, and Site Visit) and one placeholder (Final Writeup). **[PRODUCTION-LIVE 2026-08-17]** Pre
   Site Visit Writeup has a durable registry-backed route/UI and controlled
-  Request `1002379` proof; Site Visit and Final Writeup remain placeholders.
+  Request `1002379` proof. **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]**
+  Site Visit has the guarded same-item handoff/workspace UI; Final remains a
+  placeholder.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

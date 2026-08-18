@@ -318,7 +318,7 @@ test('read-only status exposes an in-progress replacement alongside the current 
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
     wmkf_sharepointitemid: null,
     wmkf_sharepointweburl: null,
-    createdon: '2026-08-18T01:00:00Z',
+    createdon: new Date(Date.parse(current.createdon) + 60_000).toISOString(),
   };
   harness.dependencies.findByRequest.mockResolvedValueOnce({ records: [pending, current] });
 
@@ -486,9 +486,33 @@ test('unknown artifact type fails closed instead of falling through as reusable'
   await expect(generatePreSiteVisitArtifact(
     { requestId: REQUEST_ID },
     harness.dependencies,
-  )).rejects.toThrow('not a governed Pre-Site Word document');
+  )).rejects.toMatchObject({ code: 'pre_site_visit_pointer_invalid', httpStatus: 409 });
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
 });
+
+test('Site Visit promotion locks regeneration before inputs, prompt, Claude, render, or upload', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  harness.row.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+  jest.clearAllMocks();
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({
+    code: 'pre_site_visit_regeneration_locked',
+    httpStatus: 409,
+  });
+
+  expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
+  expect(harness.dependencies.getCurrentPrompt).not.toHaveBeenCalled();
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
 
 test('alternate-key create race returns the winning claim without a second Claude call', async () => {
   const harness = createHarness();

@@ -151,11 +151,21 @@ duplicate or second model call.
    exact current Pre-Site row/version/hash into a new governed Word document. There is no Site
    Visit Writeup or Dataverse staff-observations field.
 
-3. **Continue the approved Site Visit and Final lifecycle.**
+   **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the first Site Visit
+   handoff slice is now built on `codex/pre-site-to-site-visit`: the Site Visit
+   tab confirms the exact current Pre-Site artifact, records the stable
+   SharePoint version/governed hash/time while changing lifecycle Draft→Review,
+   reuses the same Word item for Edit/Download, and locks Pre-Site regeneration.
+   Focused service/route/component coverage includes stale UI, SharePoint edit
+   races, ETag conflicts, idempotent retry, and request-switch cancellation.
+
+3. **Deploy and signed-in smoke the Site Visit handoff, then continue the dossier and Final lifecycle.**
    The Pre-Site producer is Production-live and proven. Site Visit and Final
-   remain planned: first map the logistics data and supporting-file registry,
-   then implement the exact-version Final copy transaction without replacing
-   the Pre-Site Word workspace.
+   logistics/supporting files and Final remain planned. Promote the feature
+   branch deliberately, confirm Request `1002379` (or another approved
+   disposable target) moves to Review with an exact milestone and still opens
+   the same Word item, then map logistics/supporting files and implement the
+   exact-version Final copy transaction without replacing the workspace.
 
 4. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
    17:53:40 PDT).**

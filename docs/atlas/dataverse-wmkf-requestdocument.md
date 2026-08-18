@@ -114,8 +114,10 @@ least privilege still open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
 from the Ready registry row and never from the caller. **Administrator restore and
-immutable milestone snapshots remain open**, restore because it depends on the
-permission evidence above.
+immutable Board snapshot copies remain open**, restore because it depends on the
+permission evidence above. The Site Visit handoff milestone is a distinct
+source-verified writer described below; it records version/hash/time on the
+working Pre-Site row but does not retain Board-distribution bytes.
 
 **[VERIFIED INVENTORY / PRODUCTION SCHEMA 2026-08-17]** The pre-generation
 read-only Production inventory confirmed that the registry already had a
@@ -159,6 +161,13 @@ Exact design and deployment boundary:
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
+- **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the Site Visit transition
+  resolves that current pointer, requires Ready/Draft Word state and a matching
+  expected artifact id, verifies one stable SharePoint publication version
+  around DOCX download/hash, then ETag-conditionally sets lifecycle Review and
+  writes `wmkf_milestoneversionid`, `wmkf_milestonecontenthash`, and
+  `wmkf_milestonecreatedat` on the same row. Exact completed retries are
+  idempotent; no SharePoint copy or mutation occurs.
 - Workbench and the pilot locator consume the same registry row; neither joins
   by filename. The planned full Editor Dashboard will reuse this identity
   contract.
@@ -198,7 +207,9 @@ Exact design and deployment boundary:
 - SharePoint Word becomes authoritative for staff prose once the row is Ready;
   no automatic Word-to-Dataverse section synchronization is claimed.
 - The Site Visit tab reuses that stable Word item for staff observations while
-  registering supporting files separately. Final creation copies an exact
+  registering supporting files separately. The built handoff changes Draft to
+  Review, records the exact current version/hash/time, and locks Pre-Site
+  regeneration before any AI or write side effects. Final creation copies an exact
   Pre-Site item version to a new Final row/file and sets the separate planned
   current-Final pointer.
 
@@ -292,6 +303,8 @@ transition.
    `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native version restore and first-stage
    recycle recovery also pass. Workbench version-history display shipped S413
    (2026-08-10, read-only). Administrator policy/access evidence, administrator
-   restore, and milestone snapshots remain open.
+   restore, and retained Board snapshot copies remain open. The separate
+   Pre-Site→Site Visit lifecycle milestone writer is built/tested in source but
+   not deployed.
 
 No live command in this sequence is authorized merely by this page.

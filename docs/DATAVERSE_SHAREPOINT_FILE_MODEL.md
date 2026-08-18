@@ -88,6 +88,10 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
+- **Site Visit handoff (verified in source 2026-08-17; not deployed):** keeps
+  the same stable Pre-Site Word item, verifies one exact current SharePoint
+  publication version around a DOCX download/hash, records the version/hash/time
+  on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
 - **Initial Assessment pilot locator (deployed and exercised):** queries the
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
@@ -250,6 +254,16 @@ do not keep the two documents synchronized. Staff may rarely invoke a
 deliberate regenerate-from-latest action, but it must create a new Final
 row/file, preserve the prior Final, and never silently overwrite staff edits.
 
+The Pre-Site→Site Visit handoff is now a concrete lifecycle operation in
+source. The request pointer remains authoritative; the browser artifact id is
+only a stale-view fence. The transition requires a Ready/Draft Word row and a
+stable Graph drive/item/publication version before and after content download,
+records `wmkf_milestoneversionid`, `wmkf_milestonecontenthash`, and
+`wmkf_milestonecreatedat`, and sets lifecycle Review in one ETag-conditional
+PATCH. It performs no SharePoint write or copy. Review locks the Pre-Site
+producer before it loads inputs, resolves a prompt, calls Claude, claims a row,
+renders, or uploads. Exact completed retries are idempotent.
+
 The Pre-Site stable proposal core may exist before every review is received.
 It is drafted from the exact Proposal Narrative through the governed
 `pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
@@ -392,8 +406,9 @@ version.
 
 ### Site Visit dossier and transcript-derived artifacts
 
-The planned Site Visit tab combines a pointer to the existing Pre-Site Word
-workspace with a structured logistics and supporting-file dossier. It joins:
+The Site Visit Word-workspace handoff is built and locally verified but not
+deployed. The structured logistics and supporting-file dossier remains planned.
+The full tab joins:
 
 - visit date;
 - start and end time, with time zone;
@@ -664,9 +679,11 @@ records controls are verified:
    version-deletion authority;
 4. expose current version, last-modified identity/time, and version history in
    the Workbench; restrict restore to an approved administrative role; and
-5. freeze every official Board milestone with request/artifact identity,
-   SharePoint item and version ID, timestamp, actor, content hash, and retained
-   DOCX and/or PDF snapshot.
+5. freeze every official Board milestone as a separate retained Request
+   Document snapshot row/item with source request/artifact identity, SharePoint
+   item and version ID, timestamp, actor, content hash, and retained DOCX and/or
+   PDF bytes. Do not overwrite the working Pre-Site row's Site Visit handoff
+   milestone.
 
 Working prose remains editable and recoverable. An official milestone remains
 identifiable even after later edits to the working document. The current app
@@ -884,18 +901,19 @@ The remaining controls are deliberately not collapsed into that pass:
 - **[PARTIAL] Workbench recovery UI.** Current version and last-modified
   metadata are live. Version-history navigation and an administrator-only
   restore action are not implemented.
-- **[PLANNED] Board milestone freeze.** No immutable milestone snapshot
-  operation exists yet. The provisioned fields (`wmkf_milestoneversionid`,
-  `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat` —
-  `lib/dataverse/adapters/request-document.js:38-40`, read at
-  `lib/services/initial-assessment/artifact-service.js:257-259`, written
-  nowhere) describe a **pointer to a SharePoint version plus a drift hash, not a
-  copy of the bytes.**
+- **[PARTIAL 2026-08-17] Site Visit handoff built; Board milestone freeze
+  planned.** The existing fields (`wmkf_milestoneversionid`,
+  `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`) now have one
+  source-verified writer: the Pre-Site→Site Visit transition records the exact
+  working-document handoff version/hash/time before lifecycle becomes Review.
+  This is a **pointer to a SharePoint version plus a drift hash, not a copy of
+  the bytes**, and it does not satisfy the separate Board-retention contract.
 
   **DECIDED 2026-08-10 (S413): copy the bytes.** The owner chose copy; the three
-  provisioned fields are kept as identity/provenance **beside** a retained
-  snapshot rather than instead of one. Nothing is sunk in the pointer design —
-  those fields are written nowhere — so the switch costs no migration. Note that
+  Site Visit handoff fields remain working-document provenance, while a Board
+  freeze creates a separate retained snapshot Request Document row/item linked
+  to the exact source row/version/hash. Nothing requires overwriting the handoff
+  fields or migrating the working row. Note that
   copy is also what roadmap requirement 5 above already asked for ("retained
   DOCX and/or PDF snapshot"); the fields were provisioned ahead of the decision,
   not as the decision.

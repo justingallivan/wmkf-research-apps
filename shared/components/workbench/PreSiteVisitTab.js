@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
-import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument';
+import {
+  REQUEST_DOCUMENT_LIFECYCLE_STATE,
+  REQUEST_DOCUMENT_OPERATION_STATUS,
+} from '../../config/requestDocument';
 
 const STATUS_POLL_INTERVAL_MS = 3000;
 const STATUS_POLL_ATTEMPTS = 20;
@@ -36,7 +39,7 @@ function waitForNextPoll(signal) {
   });
 }
 
-export default function PreSiteVisitTab({ requestId }) {
+export default function PreSiteVisitTab({ requestId, onSelectTab }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [artifact, setArtifact] = useState(null);
@@ -205,6 +208,8 @@ export default function PreSiteVisitTab({ requestId }) {
     && artifact.file?.webUrl
     ? artifact.file
     : null;
+  const promotedToSiteVisit = artifact?.lifecycleState
+    === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const downloadUrl = readyFile
     ? (() => {
       try {
@@ -294,18 +299,20 @@ export default function PreSiteVisitTab({ requestId }) {
                 </a>
               </>
             )}
-            <button
-              type="button"
-              onClick={generateWithConfirmation}
-              disabled={generating || !requestId}
-              className={readyFile
-                ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50'
-                : 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'}
-            >
-              {generating
-                ? 'Generating…'
-                : readyFile ? 'Regenerate Word Draft' : 'Generate Word Draft'}
-            </button>
+            {!promotedToSiteVisit && (
+              <button
+                type="button"
+                onClick={generateWithConfirmation}
+                disabled={generating || !requestId}
+                className={readyFile
+                  ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50'
+                  : 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'}
+              >
+                {generating
+                  ? 'Generating…'
+                  : readyFile ? 'Regenerate Word Draft' : 'Generate Word Draft'}
+              </button>
+            )}
           </div>
         </div>
         <div aria-live="polite">
@@ -318,17 +325,39 @@ export default function PreSiteVisitTab({ requestId }) {
             </p>
           )}
           {readyFile && (
-            <p className="mt-4 text-sm font-medium text-green-800">
-              Latest draft:{' '}
-              <a
-                href={readyFile.webUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                {readyFile.name || 'Open Word draft'}
-              </a>
-            </p>
+            <div className="mt-4 text-sm font-medium text-green-800">
+              <p>
+                Latest draft:{' '}
+                <a
+                  href={readyFile.webUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  {readyFile.name || 'Open Word draft'}
+                </a>
+              </p>
+              {promotedToSiteVisit ? (
+                <p className="mt-2 font-normal text-gray-700">
+                  This draft is now the Site Visit workspace and can no longer be regenerated here.{' '}
+                  <button
+                    type="button"
+                    onClick={() => onSelectTab?.('site-visit')}
+                    className="font-medium text-gray-900 underline"
+                  >
+                    Continue in Site Visit →
+                  </button>
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelectTab?.('site-visit')}
+                  className="mt-2 font-medium text-gray-900 underline"
+                >
+                  Continue to Site Visit →
+                </button>
+              )}
+            </div>
           )}
         </div>
       </Card>

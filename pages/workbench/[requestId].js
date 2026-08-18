@@ -9,8 +9,9 @@
  * (per-request command center) + Status (read-only akoya_requeststatus
  * reflection), Awardee (grantee-deliverables workflow), and Initial Assessment
  * (governed DOCX producer/read model), and Pre Site Visit Writeup (durable
- * Dataverse/SharePoint Word producer). The other 2 tabs are placeholders for the rest of the request
- * lifecycle. The default landing is Overview. Tab + sub-tab selection is
+ * Dataverse/SharePoint Word producer), and Site Visit (guarded promotion of
+ * the same Word item into the staff workspace). Final Writeup remains the one
+ * placeholder. The default landing is Overview. Tab + sub-tab selection is
  * query-string driven (?tab=reviewers&sub=track) for deep-links.
  */
 
@@ -31,11 +32,12 @@ import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
 import PreSiteVisitTab from '../../shared/components/workbench/PreSiteVisitTab';
+import SiteVisitTab from '../../shared/components/workbench/SiteVisitTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
-// Pre Site Visit Writeup, Status, and Awardee. The other 2 are placeholders for
-// the full request lifecycle.
+// Pre Site Visit Writeup, Site Visit, Status, and Awardee. Final Writeup remains
+// the one placeholder in the full request lifecycle.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
@@ -175,6 +177,13 @@ function WorkbenchRequest() {
         <PreSiteVisitTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          onSelectTab={selectTab}
+        />
+      ) : activeTab === 'site-visit' ? (
+        <SiteVisitTab
+          key={typeof requestId === 'string' ? requestId : ''}
+          requestId={typeof requestId === 'string' ? requestId : ''}
+          onSelectTab={selectTab}
         />
       ) : activeTab === 'status' ? (
         <StatusTab context={ctx} />

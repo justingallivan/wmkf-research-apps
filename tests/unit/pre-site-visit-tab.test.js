@@ -21,6 +21,7 @@ function successResponse() {
       artifact: {
         artifactId: '22222222-2222-2222-8222-222222222222',
         operationStatus: 100000001,
+        lifecycleState: 100000000,
         file: {
           name: '1002379 Pre-Site Visit.docx',
           webUrl: 'https://sharepoint.test/pre-site.docx',
@@ -42,6 +43,7 @@ function readyArtifact() {
   return {
     artifactId: '22222222-2222-2222-8222-222222222222',
     operationStatus: 100000001,
+    lifecycleState: 100000000,
     file: {
       name: '1002379 Pre-Site Visit.docx',
       webUrl: 'https://sharepoint.test/pre-site.docx',
@@ -87,6 +89,7 @@ test('shows compact actions and keeps generation details behind help', async () 
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' }))
     .toHaveAttribute('target', '_blank');
+  expect(screen.getByRole('button', { name: 'Continue to Site Visit →' })).toBeInTheDocument();
 });
 
 test('loads existing Ready actions without another generation request', async () => {
@@ -154,6 +157,29 @@ test('requires confirmation before regenerating an existing draft', async () => 
   expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Edits in the current Word file'));
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
+
+test('a promoted draft cannot be regenerated and links to the Site Visit workspace', async () => {
+  const promoted = {
+    ...readyArtifact(),
+    lifecycleState: 100000001,
+    milestone: {
+      versionId: '2.0',
+      contentHash: 'gdc1:handoff',
+      createdAt: '2026-08-17T21:05:00Z',
+    },
+  };
+  const onSelectTab = jest.fn();
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: promoted }));
+  render(<PreSiteVisitTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  expect(await screen.findByText(/now the Site Visit workspace/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Continue in Site Visit →' }));
+  expect(onSelectTab).toHaveBeenCalledWith('site-visit');
+});
+
 
 test('a late response for a prior request cannot publish a stale Word link', async () => {
   let resolveFirst;
