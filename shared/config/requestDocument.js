@@ -71,8 +71,8 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
   promptName: 'pre-site-visit.proposal-core.generate',
   templateId: 'phase-ii-pre-site-visit',
-  // Render-contract v6 uses v5 OOXML with fixed first-page metadata columns.
-  templateVersion: '6',
+  // Render-contract v7 uses v6 OOXML with a zero-inset left value column.
+  templateVersion: '7',
   relativeFolder: 'Artifacts/Pre-Site Visit',
   producer: 'request-workbench',
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

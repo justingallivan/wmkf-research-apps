@@ -111,11 +111,11 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects render-contract v6 over the fixed-column v5 template bytes', () => {
+test('selects render-contract v7 over the zero-inset v6 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 6,
-    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v5.docx',
+    version: 7,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
@@ -134,12 +134,33 @@ test('pins top title alignment and visible metadata-value spacing in the retaine
     'DV:RequestedAmount',
     'DV:InvitedAmount',
     'DV:TotalProjectBudget',
-    'STAFF:Recommendation',
   ]) {
     expect(cellContaining(cells, placeholder)).toMatch(
       /<w:tcMar>[\s\S]*?<w:left w:w="144" w:type="dxa"\/>[\s\S]*?<\/w:tcMar>/,
     );
   }
+});
+
+test('pins every left metadata value to zero cell inset and zero paragraph indent', async () => {
+  const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+  const zip = await JSZip.loadAsync(template);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  const metadataTable = wordTables(documentXml).find((table) => table.includes('Project Title'));
+  const rows = wordTableRows(metadataTable);
+
+  expect(rows).toHaveLength(5);
+  for (const row of rows) {
+    const valueCell = wordTableCells(row)[1];
+    expect(valueCell).toMatch(
+      /<w:tcMar>[\s\S]*?<w:left w:w="0" w:type="dxa"\/>[\s\S]*?<\/w:tcMar>/,
+    );
+    for (const paragraph of wordParagraphs(valueCell)) {
+      expect(paragraph).toMatch(/<w:ind\b[^>]*w:left="0"[^>]*w:firstLine="0"[^>]*\/>/);
+    }
+  }
+  expect(cellContaining(wordTableCells(metadataTable), 'STAFF:Recommendation')).not.toContain(
+    '<w:left w:w="144" w:type="dxa"/>',
+  );
 });
 
 test('pins one blank line after Project Title and single-spaced metadata rows', async () => {
