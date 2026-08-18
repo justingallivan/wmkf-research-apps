@@ -318,11 +318,11 @@ document inventory, and individual implementation plans do not establish priorit
   v2 added Recommendation-cell padding and created a distinct Ready artifact,
   but Word Online exposed a width-sensitive Recommendation-label alignment
   defect. **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was
-  the remaining layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17;
-  PRODUCTION PROMOTION PENDING]** template v3 makes that label explicitly
+  the remaining layout variable. **[DEPLOYED TO PRODUCTION 2026-08-17;
+  SIGNED-IN FEATURE SMOKE OPEN]** template v3 makes that label explicitly
   non-wrapping under another generation identity. The public sign-in/auth
-  boundary passed; signed-in current-status and Word Online v3 proof remain
-  open. The older `phase-ii.summarize` row still drives no
+  boundary passed; signed-in current-status, compact actions/download, and Word
+  Online v3 proof remain open. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a

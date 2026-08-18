@@ -42,8 +42,8 @@ Word back into the eight generated Dataverse narrative fields.
 
 Site Visit and Final remain placeholders in current `main`. The Pre-Site tab
 now calls the Production durable writer and shows the stable Word file returned
-from the registry. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION
-PROMOTION PENDING]** its compact action panel shows Generate before a draft
+from the registry. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE
+SMOKE OPEN]** its compact action panel shows Generate before a draft
 exists and Edit, Download, and confirmation-guarded Regenerate actions when a
 Ready draft exists; detailed workflow guidance is behind an accessible help
 control. Wave 19 is live in Production: its owner-approved
@@ -302,10 +302,10 @@ current writeup pointer always targets Word, never PDF.
    Ready artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, but Word Online
    exposed a width-sensitive Recommendation-label alignment defect.
    **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
-   remaining layout variable. **[IMPLEMENTED AND
-   LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]** template v3
+   remaining layout variable. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN
+   FEATURE SMOKE OPEN]** template v3
    makes the label explicitly non-wrapping under another generation identity.
-   The same pending promotion also includes the compact help/action panel:
+   Ready deployment `dpl_58hstAQNBP8ATqfBXtYczC9tFziE` also includes the compact help/action panel:
    Generate before a draft exists; Edit, Download, and confirmation-guarded
    Regenerate when Ready. Signed-in current-status, action-panel, download, and
    Word Online v3 proof remain open.

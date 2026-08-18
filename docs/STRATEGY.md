@@ -171,9 +171,10 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    Recommendation-cell spacing under a new generation identity and produced a
    Ready artifact, but Word Online exposed a width-sensitive
    Recommendation-label alignment defect. **[INFERRED FROM SCREENSHOT + OOXML
-   WIDTH]** implicit wrapping was the remaining layout variable. Template v3 is implemented and
-   locally verified with an explicit no-wrap label; production promotion and a
-   Word Online v3 smoke remain open; and
+   WIDTH]** implicit wrapping was the remaining layout variable. **[DEPLOYED TO
+   PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
+   explicit no-wrap label, and the compact panel exposes Edit, Download, and
+   confirmation-guarded Regenerate actions; their signed-in smoke remains open; and
 3. continue the approved Workbench lifecycle: map the Site Visit dossier and
    narrow applicant-material upload, then create Final from an exact Pre-Site
    row/version/hash. The full Editor Dashboard remains later reuse.

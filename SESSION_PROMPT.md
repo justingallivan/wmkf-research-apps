@@ -129,12 +129,13 @@ duplicate or second model call.
    `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, but Word Online exposed a second
    width-sensitive alignment defect despite explicit centered-cell formatting.
    **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
-   remaining layout variable. **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17;
-   PRODUCTION PROMOTION PENDING]** template v3 makes that label explicitly
+   remaining layout variable. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN
+   FEATURE SMOKE OPEN]** template v3 makes that label explicitly
    non-wrapping and changes the governed generation identity again, preserving
    both earlier Ready documents.
-   **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION
-   PENDING]** the Pre-Site panel now hides the long workflow explanation behind
+   The same Ready production deployment, `dpl_58hstAQNBP8ATqfBXtYczC9tFziE`
+   from main commit `96c63f0f`, includes the compact Pre-Site panel: it hides the
+   long workflow explanation behind
    an accessible help control. Before a draft exists it shows Generate Word
    Draft; when Ready it shows Edit, Download, and confirmation-guarded
    Regenerate Word Draft actions plus one compact status line. Regeneration
@@ -224,6 +225,6 @@ padding to the Recommendation value cell. A later controlled generation created
 artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`; its exact SharePoint file
 rendered cleanly locally, but Word Online shifted the width-constrained
 Recommendation label despite explicit centered-cell formatting. Template
-v3 is implemented and locally verified with an explicit no-wrap label; its
+v3 is deployed and locally verified with an explicit no-wrap label; its
 no-Claude Request `1002379` fixture rendered cleanly on all three fixture pages.
-Production promotion and a Word Online v3 smoke remain open.
+The signed-in Word Online v3 and compact-action/download smoke remain open.

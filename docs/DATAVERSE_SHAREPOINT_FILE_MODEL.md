@@ -282,7 +282,7 @@ artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, leaving the Production v1
 row/file untouched. Its exact SharePoint file exposed a Word Online-only
 width-sensitive alignment defect in the Recommendation label. **[INFERRED FROM
 SCREENSHOT + OOXML WIDTH]** implicit wrapping was the remaining layout variable.
-**[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION PENDING]**
+**[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]**
 template v3 makes that label explicitly non-wrapping under another generation
 identity.
 Its future review-derived portion uses `review-synthesis.generate` over all

@@ -426,14 +426,16 @@ The two named prompt surfaces do not currently have the same runtime posture:
   then exposed a width-sensitive Recommendation-label alignment defect.
   **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
   remaining layout variable.
-  **[IMPLEMENTED AND LOCALLY VERIFIED 2026-08-17; PRODUCTION PROMOTION
-  PENDING]** template v3 makes that label explicitly non-wrapping under another
+  **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template
+  v3 makes that label explicitly non-wrapping under another
   generation identity.
   The Workbench now has an authenticated durable route and tab: the server
   claims a deterministic Request Document row, persists and rereads the eight
   named fields plus immutable snapshots, renders the tracked template, uploads
   one stable Word item, atomically activates the current Ready row, and returns
-  its registry DTO/Open-in-Word link. The current Admin-published prompt row owns the
+  its registry DTO/file identity. The compact Ready-state UI exposes Edit,
+  Download, and confirmation-guarded Regenerate actions, while detailed
+  workflow guidance is behind help. The current Admin-published prompt row owns the
   Claude model; callers cannot override it. Dataverse sole-current prompt v3
   `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
   `claude-sonnet-4-6`. The first controlled v1 run completed but failed the
