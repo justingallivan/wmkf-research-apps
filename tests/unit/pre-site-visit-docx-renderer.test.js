@@ -2,9 +2,11 @@ import fs from 'fs/promises';
 import JSZip from 'jszip';
 import {
   defaultPreSiteVisitTemplatePath,
+  PRE_SITE_VISIT_TEMPLATE,
   renderPreSiteVisitDocx,
 } from '../../lib/services/pre-site-visit/docx-renderer';
 import { PROPOSAL_CORE_KEYS } from '../../shared/config/prompts/pre-site-visit-proposal-core';
+import { PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument';
 
 function proposalCoreFixture() {
   const core = Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, `${key} test content.`]));
@@ -51,6 +53,11 @@ function wordTableCells(documentXml) {
 
 function wordTables(documentXml) {
   return Array.from(documentXml.matchAll(/<w:tbl(?:\s[^>]*)?>[\s\S]*?<\/w:tbl>/g))
+    .map((match) => match[0]);
+}
+
+function wordTableRows(tableXml) {
+  return Array.from(tableXml.matchAll(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g))
     .map((match) => match[0]);
 }
 
@@ -104,6 +111,16 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
+test('selects the governed v4 template artifact', () => {
+  expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
+    id: 'phase-ii-pre-site-visit',
+    version: 4,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v4.docx',
+  });
+  expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
+  expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
+});
+
 test('pins title alignment and visible metadata-value spacing in the retained template', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
@@ -125,26 +142,50 @@ test('pins title alignment and visible metadata-value spacing in the retained te
   }
 });
 
-test('pins the compact 1pt single divider above the executive summary', async () => {
+test('pins one blank line after Project Title and single-spaced metadata rows', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
   const documentXml = await zip.file('word/document.xml').async('string');
-  const divider = wordTables(documentXml).find((table) => table.includes('<w:tcBorders>'));
+  const metadataTable = wordTables(documentXml).find((table) => table.includes('Project Title'));
+  const rows = wordTableRows(metadataTable);
+  const singleSpacing = /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"\/>/g;
+
+  expect(rows).toHaveLength(5);
+  expect(rows[0]).toContain('Project Title');
+  expect(rows[1]).not.toMatch(/<w:t(?:\s|>)/);
+  expect(rows[1]).not.toContain('<w:hideMark/>');
+  expect(rows[2]).toContain('Meeting Date');
+  expect(rows[3]).toContain('Staff Lead');
+  expect(rows[4]).toContain('Recommendation');
+  for (const row of rows) {
+    const cellCount = (row.match(/<w:tc(?:\s[^>]*)?>/g) || []).length;
+    expect(row.match(singleSpacing)).toHaveLength(cellCount);
+  }
+});
+
+test('pins one blank line followed by the divider above the executive summary', async () => {
+  const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+  const zip = await JSZip.loadAsync(template);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  const metadataTable = wordTables(documentXml).find((table) => table.includes('Project Title'));
+  const paragraphs = wordParagraphs(documentXml);
+  const dividerIndex = paragraphs.findIndex((paragraph) => paragraph.includes('<w:pBdr>'));
+  const divider = paragraphs[dividerIndex];
+  const afterMetadata = documentXml.slice(documentXml.indexOf(metadataTable) + metadataTable.length);
+  const afterDivider = afterMetadata.slice(afterMetadata.indexOf(divider) + divider.length);
 
   expect(divider).toBeDefined();
-  expect(divider).toContain('<w:trHeight w:val="40" w:hRule="exact"/>');
   expect(divider).toContain(
+    '<w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/>',
+  );
+  expect(divider).toContain(
+    '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>',
+  );
+  expect(afterMetadata).toMatch(/^\s*<w:p[\s\S]*?<w:pBdr>/);
+  expect(afterDivider).toMatch(/^\s*<w:p[\s\S]*?Executive Summary/);
+  expect(wordTables(documentXml).find((table) => table.includes(
     '<w:top w:val="single" w:sz="8" w:space="0" w:color="000000"/>',
-  );
-  for (const side of ['left', 'bottom', 'right']) {
-    expect(divider).toContain(`<w:${side} w:val="nil"/>`);
-  }
-  expect(divider).toContain(
-    '<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>',
-  );
-  expect(documentXml.match(
-    /<w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"\/>/g,
-  )).toHaveLength(2);
+  ))).toBeUndefined();
 });
 
 test('adds 6pt after the four first-page list paragraphs and removes the blank before the page break', async () => {
