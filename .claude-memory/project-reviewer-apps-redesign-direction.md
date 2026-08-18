@@ -120,11 +120,18 @@ sets lifecycle Review and writes the `wmkf_milestone*` version/hash/time. It
 does not copy or mutate the Word file. The Pre-Site producer rejects
 regeneration after promotion before input/prompt/AI/claim/render/upload work.
 Exact Review retries are idempotent; stale identity, file/version races,
-unknown/incomplete states, and ETag conflicts fail closed. A clearer Pre-Site
-next-stage panel and explanatory consequence modal call the same guarded route
-on `codex/site-visit-cta-modal`; that UI refinement is source-verified but not
-yet deployed. The first signed-in handoff smoke remains open;
+unknown/incomplete states, and ETag conflicts fail closed. Commit `5f316a29`
+deployed the clearer Pre-Site next-stage panel and explanatory consequence
+modal through Ready deployment `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`; it calls
+the same guarded route. The first signed-in handoff smoke remains open;
 logistics/supporting files and Final remain later slices.
+
+**2026-08-17 Proposal-tab Phase II documents (deployed at `83b9c68a`,
+`dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`):** the Proposal tab now displays every
+file beneath the request's SharePoint `Phase II` folder in a separate section.
+The scoped download proxy admits only the Phase I, Phase II, and canonical AI
+Materials entries re-derived by the listing service. A signed-in live-folder
+display smoke remains open.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,

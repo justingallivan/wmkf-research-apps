@@ -43,7 +43,7 @@ Word back into the eight generated Dataverse narrative fields.
 Final remains a placeholder. **[DEPLOYED TO PRODUCTION 2026-08-17]**
 the Site Visit tab and authenticated transition route implement the guarded
 handoff of the current Ready/Draft Pre-Site item into the Site Visit workspace.
-**[VERIFIED IN SOURCE 2026-08-17; NOT YET DEPLOYED]** the Pre-Site tab now adds a
+The Pre-Site tab also adds a
 visually separate next-stage panel and explanatory confirmation modal that call
 the same guarded route, then navigate to the Site Visit tab after success. The Pre-Site tab
 now calls the Production durable writer and shows the stable Word file returned
@@ -63,7 +63,7 @@ Documents: three Initial Assessments and one Pre Site Visit.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site and the Site Visit handoff are Production-deployed, the clearer Pre-Site handoff modal is source-verified, and Final remains a placeholder | Workbench source, Ready deployment `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, focused service/route/component tests, and signed-in Request `1002379` Pre-Site evidence | HANDOFF DEPLOYED / MODAL NOT YET DEPLOYED |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site, the Site Visit handoff, and the clearer Pre-Site handoff modal are Production-deployed, while Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, and signed-in Request `1002379` Pre-Site evidence | DEPLOYED / SIGNED-IN HANDOFF SMOKE OPEN |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Production contains one Ready/Draft Pre-Site Request Document row for Request `1002379` | Read-only Production inventory and exact row/pointer readback | VERIFIED LIVE |
@@ -174,8 +174,7 @@ ordinary SharePoint/Word version history. The application does not create:
 
 **[DEPLOYED TO PRODUCTION 2026-08-17]** the first handoff slice is built and
 live. Before promotion, the Site Visit tab shows the current Ready/Draft filename
-and a `Start Site Visit Stage` confirmation action. **[VERIFIED IN SOURCE
-2026-08-17; NOT YET DEPLOYED]** the Pre-Site tab also offers a visually separate
+and a `Start Site Visit Stage` confirmation action. The Pre-Site tab also offers a visually separate
 `Start Site Visit` panel whose modal states the lifecycle consequences before it
 calls the same endpoint. The server resolves the current
 request pointer independently, requires the browser's artifact id to match,
@@ -339,8 +338,8 @@ current writeup pointer always targets Word, never PDF.
    `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`. The Site Visit tab confirms the action,
    records the exact stable Word version/hash/time under an ETag fence, reuses
    the same item for Edit/Download, and locks Pre-Site regeneration. A clearer
-   Pre-Site next-stage panel and consequence modal are source-verified on
-   `codex/site-visit-cta-modal` but not yet deployed. The controlled signed-in
+   Pre-Site next-stage panel and consequence modal are deployed in commit
+   `5f316a29`. The controlled signed-in
    Draft→Review handoff and Dataverse/SharePoint readback remain open.
 5. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.

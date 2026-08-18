@@ -10,6 +10,21 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Pre-Site-to-Site-Visit handoff and Phase II proposal access are Production-live (Session 444)
+
+**Milestone:** The Workbench now carries one governed Pre-Site Word workspace into the Site Visit
+stage and displays the final two-phase cycle's Phase II proposal files alongside Phase I.
+**Sessions:** 443–444 (schema/prompt/template production proof, guarded lifecycle build, UI refinement,
+document-listing expansion, owner-directed promotion).
+**Ship state:** `main` reached `83b9c68a`; the handoff records an exact SharePoint version/hash/time,
+changes Draft→Review under ETag, locks regeneration, and keeps the same Word item. The Proposal tab
+lists exact `Phase II` folder files with scoped View/Download; deployment
+`dpl_BiottKiZuBra2xpfv8quSaZ8jjVM` is READY. Signed-in handoff and live-folder display smokes remain.
+**Why it matters:** PDs can continue editing one Word workspace through the visit without a parallel
+Site Visit memo, while staff can finally read both Phase I and Phase II submissions in one request.
+**Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`;
+commits `32b16f5f`, `5f316a29`, `83b9c68a`.
+
 ## August 2026 — Workbench duplicate Dataverse reads coalesced in Production (Session 440)
 
 **Milestone:** Three source-certain sibling `wmkf_potentialreviewerses` read pairs now execute as

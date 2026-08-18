@@ -1,246 +1,137 @@
-# Session 444 Prompt: Production-Prove and Continue the Pre-Site Lifecycle
+# Session 445 Prompt: Production-Smoke the Site Visit and Proposal Document Flows
 
-## Session 443 Summary
+## Session 444 Summary
 
-Session 443 established the final-cycle Phase I/Phase II proposal-source rules, built and tested
-the Pre-Site Visit Word draft, published the governed v3 prompt, and recorded the owner's
-Dataverse persistence direction. At the Session 443 close there was no Pre-Site
-Draft schema or business-data write path. In Session 444, owner-approved Wave
-19 was applied to Production and independently read back as 14 exact metadata
-items. The durable business-data writer, JSON-returning Workbench route, stable
-Word-link UI, and narrative-only source contract were promoted to `main` in
-commit `abfe5529`. Production Request `1002379` then created the first Ready
-Pre-Site row, linked AI run, request pointer, and stable SharePoint Word
-document. An exact Ready retry returned the same row/run/item without a
-duplicate or second model call.
+Session 444 finished the Pre-Site Word experience, deployed the guarded
+Pre-Site→Site Visit handoff and its confirmation UI, and added the request's
+SharePoint `Phase II` files to the Proposal tab. Production is at commit
+`83b9c68a`; the latest deployment and branded sign-in health check are Ready.
 
 ### What Was Completed
 
-1. **Canonical AI narrative source established**
-   - Initial Assessment and Field Primer use the exact
-     `AI Materials/ProposalNarrative_{Request#}.pdf` convention for this final two-phase cycle.
-   - Owner decision 2026-08-17 established a second exact file,
-     `AI Materials/ProposalBibliography_{Request#}.pdf`. Pre-Site, Initial Assessment, and Field
-     Primer use and fingerprint only the narrative. Reviewer Finder will use the separate
-     bibliography at the next-cycle cutover to draw reviewer leads from cited authors.
+1. **Pre-Site Word draft production UX completed**
+   - Added read-only recovery/status polling after a lost long-running POST so
+     the browser does not repeat generation after durable completion.
+   - Corrected the Recommendation layout for Word Online, simplified the panel
+     to Generate/Regenerate, Edit, and Download actions, and linked the latest
+     draft filename directly to Word.
+   - Request `1002379` remains the production-proved narrative-only generation
+     and exact-reuse fixture.
 
-2. **Pre-Site proposal core and Word renderer built on the integration branch**
-   - The proposal core combines the exact Proposal Narrative with read-only Dataverse request,
-     organization, budget, and personnel data and validates eight named output sections.
-   - The earlier authenticated direct-download route was replaced locally by a
-     durable writer. It claims a Request Document row, persists the eight named
-     sections and immutable snapshots, renders from Dataverse readback, uploads
-     a stable Word item, and returns a registry DTO with the governed file identity.
-   - Formatting fixes cover metadata alignment and spacing, the 1 pt Executive Summary divider,
-     first-page bullet spacing, and the stray pre-break paragraph.
-   - Personnel output is one paragraph, omits degrees, uses PI/co-PI, and underlines personnel
-     names in both the first-page overview and detailed section.
+2. **Guarded Site Visit handoff deployed**
+   - The transition independently resolves the current Pre-Site row, verifies
+     one stable SharePoint item/version before and after DOCX download, records
+     the governed hash/version/time, and ETag-conditionally changes Draft→Review.
+   - Site Visit continues to use the same Word file; Pre-Site regeneration is
+     locked after promotion. No separate Site Visit Writeup or Dataverse
+     observations memo was introduced.
+   - The Pre-Site tab now presents this as a distinct `Start Site Visit` action
+     with a confirmation modal explaining the consequences before mutation.
 
-3. **Governed single-source prompt v3 published and tested**
-   - Sole-current prompt `pre-site-visit.proposal-core.generate` v3 has Dataverse id
-     `f2c9ce97-f499-f111-b8db-7ced8d6e2f44` and model `claude-sonnet-4-6`; inherited runtime
-     settings were retained from v2.
-   - A controlled Request 1002379 direct application-LLM test used the exact live single-source v3 prompt and
-     normal untrusted-input boundaries. It produced 574 combined Background/Methodology words and
-     145 Personnel words, with no degrees and correct PI/co-PI formatting.
-   - That direct test intentionally created no `wmkf_ai_run`; it is now
-     superseded as current evidence by the governed Production v3 run
-     `ba0f42b9-849a-f111-b8db-6045bd008868` for Request `1002379`.
-   - The direct four-page visual inspection passed the requested name underlining. Its final
-     Methodology sentence spilled to page four. The later Production v1 render fit Background and
-     Methodology on page three but exposed a separate Recommendation label/value spacing issue;
-     deployed template v2 fixed that spacing; the later signed-in generation exposed
-     a separate width-sensitive Word Online alignment defect now targeted by local template v3.
+3. **Phase II Proposal documents deployed**
+   - The Proposal tab now has a separate Phase II Documents section containing
+     every file beneath the request's SharePoint `Phase II` folder.
+   - View/Download remain behind the request-scoped proxy. The proxy authorizes
+     only files re-derived by the Proposal listing service; unrelated request
+     files remain excluded.
+   - Phase I slot matching and the exact AI Materials display are unchanged.
 
-4. **Dataverse persistence schema and durable writer production-proved**
-   - The branch now uses the Request Document registry as the editable business
-     record. The Executor audit remains append-only provenance rather than the
-     business-data source.
-   - Owner direction is Request parent → versioned Pre-Site Draft child → exact-version Word/PDF
-     artifacts. The eight generated sections are sibling editable Multiline Text columns on one
-     draft row, not one child row per section.
-   - Wave 19 supplies the eight named Multiline Text fields, two JSON snapshots,
-     render fingerprint, content type, and the current Pre-Site/Final request
-     lookups in Production. Post-generation inventory now reports four Request
-     Document rows: three Initial Assessments and one Ready/Draft Pre-Site row.
-   - Request `1002379` row `aeb223a2-849a-f111-b8db-70a8a59cded0` is the current
-     pointer target and owns Ready Word file
-     `1002379 Pre-Site Visit 33abef48-077dddbd.docx`. Its immutable source
-     manifest contains exactly `ProposalNarrative_1002379.pdf`; no bibliography
-     source is present.
-   - The writer fails before claiming a row when the exact narrative is missing
-     or when the current governed prompt does not declare exactly the context
-     and narrative variables. Exact Ready retries reuse the existing row/run/file;
-     later partial failures retain a retryable row and recover a matching upload
-     without another Claude call or duplicate upload.
+4. **Documentation reconciled**
+   - Updated the writeup lifecycle plan, SharePoint model, API security matrix,
+     Proposal-tab documentation, agent memory, and Workbench onboarding copy.
+   - Added a Session 444 milestone entry because the handoff and Phase II
+     document access are new Production capabilities.
 
-5. **Historical request entry deployed**
-   - The Production Workbench dashboard now has an exact “Open request by number” launcher
-     backed by the existing authenticated `resolve-request` route. It opens
-     active or historical requests in the same per-request Workbench without
-     changing their status or the active-cycle dashboard population.
-   - Broader historical discovery by institution, PI, proposal title, cycle,
-     and request status is owner-decided future work. It should be a Workbench
-     locator/search whose results open the existing request page; pagination,
-     query bounds, result projection, and authorization semantics remain to be
-     designed. The existing Expertise Finder historical-proposals service
-     supplies a useful projection and fiscal-year/program query precedent, but
-     it uses the separate `expertise-finder` grant and is not itself the
-     Workbench search contract.
+5. **Claim-evidence bookkeeping attempted**
+   - `report:claim-evidence-pilot -- --current` reported unavailable local
+     state, so no observation row was added.
 
-6. **Session evidence bookkeeping attempted**
-   - `report:claim-evidence-pilot -- --current` ran during `/stop`, but local state was unavailable.
-     No canonical observation row was added.
+### Commits
 
-### Feature-Branch Commits
-
-- `badc0d1b` — Use AI proposal narrative for governed analysis
-- `2b0d0e0a` — Draft pre-site visit proposal core prompt
-- `739e2480` — Refine pre-site visit personnel and model ownership
-- `f10dff3f` — Harden pre-site prompt model publishing
-- `e16bfea9` — Build guarded pre-site proposal core renderer
-- `39f129ea` — Fix pre-site metadata table spacing
-- `cdd2d766` — Refine pre-site summary divider
-- `e77f44e6` — Make pre-site divider 1pt
-- `c979156c` — Add Pre-Site Visit Word draft download
-- `abda6686` — Use valid Pre-Site AI run source
-- `4048159a` — Validate Pre-Site proposal prompt output
-- `4b71fecf` — Fix Pre-Site first-page paragraph spacing
-- `2023671a` — Refine Pre-Site narrative and personnel output
-- `fd8dbfd7` — Record Pre-Site prompt v3 controlled render
-- `b19d27ee` — Underline personnel names in both summaries
-- `abfe5529` — Use narrative only for Pre-Site drafts and deploy the durable writer
+- `5dc45b7d` — Document Pre-Site production proof
+- `1ac01405` — Recover Pre-Site generation status
+- `0f5ce787` — Record Pre-Site production deployment
+- `6eeae054` — Fix Pre-Site Recommendation alignment
+- `96c63f0f` — Simplify Pre-Site draft actions
+- `12648053` — Record Pre-Site UI production deployment
+- `27b88275` — Link latest Pre-Site draft filename
+- `32b16f5f` — Build guarded Site Visit handoff
+- `5f316a29` — Clarify Site Visit stage transition
+- `83b9c68a` — Show Phase II documents in Proposal tab
 
 ## Next Items
 
 ### Verified Open
 
-1. **Complete the signed-in smoke of the deployed recovery/template fix.**
-   The first Production request took about 47 seconds and completed durably,
-   but the browser surface displayed `Failed to fetch`. After read-only
-   confirmation of the Ready row, an exact retry returned the same stable Word
-   link without another run, row, or upload. **[DEPLOYED TO PRODUCTION
-   2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** commit `1ac01405` reached Ready
-   deployment `dpl_EzNRXmcG2NVQawGNKMMdUN3crpZg`; the route has a read-only
-   GET status path, the tab loads
-   the current artifact on entry, and a lost POST response triggers bounded GET
-   polling without issuing another POST. Production template v2 added the missing
-   Recommendation value-cell padding and created artifact
-   `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, but Word Online exposed a second
-   width-sensitive alignment defect despite explicit centered-cell formatting.
-   **[INFERRED FROM SCREENSHOT + OOXML WIDTH]** implicit wrapping was the
-   remaining layout variable. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN
-   FEATURE SMOKE OPEN]** template v3 makes that label explicitly
-   non-wrapping and changes the governed generation identity again, preserving
-   both earlier Ready documents.
-   The same Ready production deployment, `dpl_58hstAQNBP8ATqfBXtYczC9tFziE`
-   from main commit `96c63f0f`, includes the compact Pre-Site panel: it hides the
-   long workflow explanation behind
-   an accessible help control. Before a draft exists it shows Generate Word
-   Draft; when Ready it shows Edit, Download, and confirmation-guarded
-   Regenerate Word Draft actions plus one compact status line. Regeneration
-   preserves the existing deterministic reuse contract: unchanged governed
-   inputs may return the current artifact rather than forcing another model run.
-   Before preview/sandbox runtime uses Wave 19 fields, that target must still
-   pass the same preflight and schema apply.
+1. **Read-only smoke the Phase II document display.**
+   Evidence: commit `83b9c68a`, Ready deployment
+   `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`, and focused listing/UI/download tests.
+   Open a request with known `Phase II` files and confirm filenames plus
+   View/Download in the signed-in Workbench. This does not mutate the request.
 
-2. **Use the approved cross-tab Word lifecycle.**
-   `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` records the 2026-08-17 owner decision: the Pre-Site
-   Word document remains the PD workspace during the Site Visit stage; staff enter observations
-   directly in Word; Site Visit supporting files are separately registered; and Final copies the
-   exact current Pre-Site row/version/hash into a new governed Word document. There is no Site
-   Visit Writeup or Dataverse staff-observations field.
+2. **Run the elapsed Track A passive-safety closeout.**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` records
+   the 48-hour window opened at `2026-08-16 00:53:40Z`; that interval has
+   elapsed. Measure total dependency events/day, malformed/invalid events,
+   throttling/truncation, visible cost, and unexpected `unknown` classifications.
+   Absence of target-route traffic is explicitly not a failure.
 
-   **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the first Site Visit
-   handoff slice shipped in commit `32b16f5f` and Ready deployment
-   `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`: the Site Visit
-   tab confirms the exact current Pre-Site artifact, records the stable
-   SharePoint version/governed hash/time while changing lifecycle Draft→Review,
-   reuses the same Word item for Edit/Download, and locks Pre-Site regeneration.
-   Focused service/route/component coverage includes stale UI, SharePoint edit
-   races, ETag conflicts, idempotent retry, and request-switch cancellation.
-
-   **[VERIFIED IN SOURCE; NOT YET DEPLOYED]** `codex/site-visit-cta-modal`
-   replaces the Pre-Site text link with a separate next-stage panel and an
-   explanatory modal; confirmation calls the same guarded route and navigates
-   only after success.
-
-3. **Deploy the clearer Pre-Site CTA and signed-in smoke the Site Visit handoff, then continue the dossier and Final lifecycle.**
-   The Pre-Site producer is Production-live and proven. Site Visit and Final
-   logistics/supporting files and Final remain planned. Promote the CTA branch
-   deliberately, confirm Request `1002379` (or another approved
-   disposable target) moves to Review with an exact milestone and still opens
-   the same Word item, then map logistics/supporting files and implement the
-   exact-version Final copy transaction without replacing the workspace.
-
-4. **Close the Track A passive safety window after 2026-08-18 00:53:40Z (2026-08-17
-   17:53:40 PDT).**
-   Retain the Session 442 closeout contract in
-   `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`. This remains a safety observation,
-   not a campaign-launch blocker.
+3. **Plan the next Site Visit dossier slice and Final copy transaction.**
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` and
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`. First map existing Dataverse
+   logistics fields/relationships and the five registered file categories;
+   then design the exact-version Final copy without overwriting the Pre-Site
+   workspace.
 
 ### Owner Decision Needed
 
-1. **No prompt publication is required for the narrative-only change.**
-   Sole-current Production v3 already declares the exact context and
-   `proposal_text` variables and matches the tracked body, system, output
-   schema, model, and required safety assertions. Any future page-length
-   tightening should still publish a new immutable version through Admin.
-
-2. **Optional Stage 1 browser-bundle guards.**
-   Retain the prior choice only if desired; these guards are unrelated to Pre-Site persistence and
-   are not required for the campaign or Track A closeout.
+1. **Choose an approved request for the signed-in Site Visit handoff smoke.**
+   Evidence: commits `32b16f5f`/`5f316a29` and the deployed guarded route.
+   The action is a durable Draft→Review transition that records a milestone and
+   locks Pre-Site regeneration, so do not click it on a request without explicit
+   approval. Confirm that Edit/Download still target the same Word item afterward.
 
 ### Parked
 
-1. **Next-cycle Reviewer Finder cutover to the decided two-file AI Materials contract.**
-2. **Phase II applicant-intake portal pending the GOApply evaluation.**
-3. **Broader historical Workbench search by institution, PI, title, cycle, and status.**
-   Exact request-number opening is already implemented locally; this item is
-   the bounded multi-field browse/search experience, not a new standalone app.
+1. Next-cycle Reviewer Finder cutover to the separate Proposal Narrative and
+   Bibliography AI Materials inputs.
+2. Broader historical Workbench search by institution, PI, title, cycle, and
+   status. Exact request-number opening is already Production-live.
+3. Phase II applicant-intake portal pending the GOApply evaluation.
 
 ### Verify Before Acting
 
-1. Production Wave 19 is already applied and exact. Do not assume sandbox or
-   another Dataverse target has it; preflight and apply that target before
-   runtime `$select` includes the new fields there.
-2. The current governed Production proof is AI run
-   `ba0f42b9-849a-f111-b8db-6045bd008868` and Request Document
-   `aeb223a2-849a-f111-b8db-70a8a59cded0`. Preserve the earlier direct v3 test
-   only as pre-deployment layout history.
+1. Wave 19 is exact in Production, but another Dataverse target must pass the
+   same preflight and schema apply before runtime uses its Pre-Site fields.
+2. Site Visit logistics/supporting-file persistence and Final creation remain
+   planned; do not describe their schemas or routes as provisioned.
 
 ### Do Not Reopen Without New Decision
 
-1. One child record per generated section; the working owner direction is one versioned draft row
-   with named section columns.
-2. Closed Session 442 security and applicant-intake items except where explicitly retained above.
+1. A separate Site Visit Writeup or Dataverse staff-observations memo.
+2. Combining Proposal Narrative and Bibliography into one canonical AI PDF.
+3. One child Dataverse record per generated Pre-Site section.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` | Pre-Site source, generation, and persistence direction |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Dataverse/SharePoint draft and artifact ownership model |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Cross-tab Pre-Site → Site Visit workspace → Final lineage plan |
-| `docs/APPLICATION_STATE_ATLAS.md` | Required entry point for live data ownership inventory |
-| `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` | Prompt and execution-audit contracts |
-| `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` | Branch, test, and promotion rules |
-| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A closeout contract |
+| `shared/components/workbench/ProposalTab.js` | Phase I, Phase II, and AI Materials display |
+| `lib/services/workbench-proposal-documents.js` | Scoped SharePoint Proposal document classification |
+| `lib/services/workbench/download-proposal-document-service.js` | Exact listed-file download authorization |
+| `shared/components/workbench/PreSiteVisitTab.js` | Pre-Site actions and Site Visit confirmation UI |
+| `lib/services/workbench/pre-site-visit-service.js` | Governed Pre-Site writer and lifecycle guards |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Pre-Site→Site Visit→Final contract |
+| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | SharePoint/Dataverse document ownership model |
 
 ## Testing
 
-The feature passed focused Pre-Site unit and integration tests, type checking,
-prompt/API/documentation gates and self-tests, and a webpack production build.
-The exact Production Request `1002379` Word file was downloaded and rendered
-to four pages for visual inspection: page-one alignment/amount spacing/divider
-and name underlining passed; Background and Methodology fit together on page
-three; Personnel is one paragraph on page four with underlined names, PI/co-PI
-abbreviations, and no degree listings. **[DEPLOYED TO PRODUCTION 2026-08-17;
-SIGNED-IN FEATURE SMOKE OPEN]** production template v2 added 0.1-inch left
-padding to the Recommendation value cell. A later controlled generation created
-artifact `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`; its exact SharePoint file
-rendered cleanly locally, but Word Online shifted the width-constrained
-Recommendation label despite explicit centered-cell formatting. Template
-v3 is deployed and locally verified with an explicit no-wrap label; its
-no-Claude Request `1002379` fixture rendered cleanly on all three fixture pages.
-The signed-in Word Online v3 and compact-action/download smoke remain open.
+The Phase II change passed 30 focused listing, service, route, download-security,
+and UI tests; API-security/documentation gates and self-tests passed; the webpack
+production build passed. The Site Visit handoff passed focused service, route,
+and component coverage for exact success, idempotent retry, stale UI, SharePoint
+version races, ETag conflicts, regeneration lock, modal cancellation, and
+request-switch cancellation. Vercel deployments for `5f316a29` and `83b9c68a`
+reached Ready; `https://applications.wmkeck.org/auth/signin` returned HTTP 200,
+and the deployment error scans were clean. Signed-in handoff and live Phase II
+folder display smokes remain open.
