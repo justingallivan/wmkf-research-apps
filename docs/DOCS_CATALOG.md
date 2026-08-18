@@ -255,6 +255,12 @@ related:
 | [DEAD_CODE_DELETION_MANIFEST.md](DEAD_CODE_DELETION_MANIFEST.md) | audit | active |  | SAFE dead-code bucket applied 2026-07-03; owner-confirmation deletion candidates remain parked for explicit approval. |  |
 | [DOCS_DRIFT_AUDIT_S322.md](DOCS_DRIFT_AUDIT_S322.md) | audit | historical |  | Historical S322 docs-vs-code audit; approved fixes were applied in 2026-07 and current truth lives in source and canonical docs. | 2026-07-26 |
 
+## request-workbench
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md](PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md) | plan | draft |  | Plan to replace editorial generation failures with durable warnings while preserving source, lineage, template, and upload safeguards. | 2026-08-18 |
+
 ## review-manager
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
