@@ -296,8 +296,9 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
 
   const generateWithConfirmation = () => {
     if (readyFile && !window.confirm(
-      'Regenerate the Word draft using the latest source data? '
-      + 'Edits in the current Word file will not be carried into a newly generated draft.',
+      'Regenerating starts a new Claude call and creates new AI-generated content from '
+      + 'the latest proposal source and Dataverse data. Edits in the current Word file '
+      + 'will not be carried into the new draft. Continue?',
     )) return;
     generate();
   };

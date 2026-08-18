@@ -211,7 +211,11 @@ test('requires confirmation before regenerating an existing draft', async () => 
 
   fireEvent.click(await screen.findByRole('button', { name: 'Regenerate Word Draft' }));
 
-  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Edits in the current Word file'));
+  expect(confirm).toHaveBeenCalledWith(
+    'Regenerating starts a new Claude call and creates new AI-generated content from '
+    + 'the latest proposal source and Dataverse data. Edits in the current Word file '
+    + 'will not be carried into the new draft. Continue?',
+  );
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
