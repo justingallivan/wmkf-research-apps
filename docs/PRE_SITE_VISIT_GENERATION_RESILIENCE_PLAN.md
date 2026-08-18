@@ -3,7 +3,7 @@ title: Pre-Site Visit Generation Resilience Plan
 domain: request-workbench
 kind: plan
 status: active
-summary: "Implemented Pre-Site resilience change with durable editorial warnings and preserved integrity gates; paired Production release remains pending."
+summary: "Production-deployed Pre-Site resilience change with durable editorial warnings and preserved integrity gates; controlled generation smoke remains open."
 canonical: false
 cataloged: 2026-08-18
 last_verified: 2026-08-18
@@ -23,12 +23,14 @@ related:
 
 ## Status
 
-**[IMPLEMENTED IN SOURCE 2026-08-18; NOT DEPLOYED.]** The application,
-tests, prompt publication tooling, and durable documentation are implemented on
-`codex/pre-site-generation-resilience`. No governed prompt was published, no
-Dataverse or SharePoint write was performed, and Production remains on the
-incident-era contract. Prompt publication, application deployment, and signed-
-in smoke testing require separate owner approval and deliberate release timing.
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]**
+Application commit `46903bc4` is Ready in deployment
+`dpl_HGogbJnprevoYKLaxevamxdajtC4`. The audited Admin publisher created
+sole-current governed prompt v4 row
+`74409f95-509b-f111-b8db-6045bd008868`; exact readback matched the tracked
+body, system prompt, variables, complete output schema, model, temperature,
+and token budget with zero mismatches. No request generation or SharePoint
+write was performed during release verification.
 
 ## Owner decision and product boundary
 
@@ -150,9 +152,9 @@ not alter Word text and do not insert review banners into the document.
 ### Sink-oriented ceilings
 
 Replace layout-sized schema ceilings with generous technical ceilings aligned
-below the 32,000-character named-field capacity. The implementation uses a
-tested 30,000-character technical ceiling for each section. This value is built
-in the branch but is not live until the paired prompt/application release.
+below the 32,000-character named-field capacity. The Production implementation
+uses a tested 30,000-character technical ceiling for each section. Prompt v4
+and the paired application preflight enforce the same tracked contract.
 Word/character targets remain explicit in the prompt and warning policy.
 
 Define the word, character, and paragraph targets once in a tracked
@@ -270,10 +272,9 @@ Repeating the same prompt without new information is prohibited.
 
 ## Implementation sequence
 
-**Source status 2026-08-18:** Phases 0–4 are implemented and covered by the
-focused regression suite. Phase 5's tracked contract, strict runtime preflight,
-and exact publication-readback tooling are implemented, but no governed prompt
-version has been published. Phase 6 is entirely pending.
+**Production status 2026-08-18:** Phases 0–5 are deployed and exact prompt-v4
+readback is verified. Phase 6 steps 1–4 are complete; controlled signed-in
+generation, hard-failure, and durable artifact readback smokes remain pending.
 
 ### Phase 0 — Pin the failure matrix
 
@@ -394,11 +395,12 @@ coordinated release window with no active Pre-Site generation:
 
 1. deploy the complete backward-compatible application, renderer contract,
    warning projection, and prompt-contract preflight as one release;
-2. confirm the deployed preflight blocks generation with
-   `prompt_contract_not_ready` while prompt v3 remains current;
-3. publish the complete new governed prompt version;
-4. verify exact sole-current prompt state, schema equality, and deployment
-   identity before re-enabling generation;
+2. **Completed 2026-08-18:** confirm the deployed preflight blocks generation
+   with `prompt_contract_not_ready` while prompt v3 remains current;
+3. **Completed 2026-08-18:** publish complete governed prompt v4 through the
+   audited Admin publisher;
+4. **Completed 2026-08-18:** verify exact sole-current prompt state, schema
+   equality, and Ready deployment identity;
 5. run a signed-in controlled request that intentionally exceeds one soft
    target and confirm Ready-with-warning plus a valid Word link;
 6. confirm a hard source/template failure still returns no Ready artifact;
@@ -485,8 +487,8 @@ are confirmed, and only with owner approval.
   helper; shared validator behavior for unrelated prompts must not change.
 - **Durable surface:** no new database surface; existing envelope compatibility,
   Atlas/service catalog, and docs catalog are required.
-- **Doc reconciliation:** completed for the source-built state, with Production
-  facts explicitly preserved as unchanged until release.
+- **Doc reconciliation:** updated after the paired Production application and
+  prompt-v4 release; controlled generation evidence remains explicitly open.
 - **Symbol fan-out:** no new status/option value; the new `warnings` DTO field
   must be traced through POST, GET, UI, fixtures, and tests.
 

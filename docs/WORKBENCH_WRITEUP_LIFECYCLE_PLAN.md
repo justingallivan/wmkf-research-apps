@@ -59,12 +59,13 @@ run, populated the request pointer, and uploaded the stable Word item. Exact
 Ready retry reused those same identities. Current inventory is four Request
 Documents: three Initial Assessments and one Pre Site Visit.
 
-**[IMPLEMENTED IN SOURCE 2026-08-18; NOT DEPLOYED.]** The Pre-Site producer
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]** The Pre-Site producer
 now distinguishes editorial deviations from integrity failures: usable drafts
 reach Ready with durable edit-check warnings, while malformed, empty,
 placeholder-bearing, unreconciled, or authority/lineage-invalid content remains
-blocking. The branch preserves v2 reads and does not change the live prompt or
-Production runtime until a deliberate paired release.
+blocking. It preserves v2 reads and is paired with sole-current governed prompt
+v4; exact prompt readback and Ready deployment were verified without generating
+or changing a request artifact.
 
 ## Evidence boundary
 

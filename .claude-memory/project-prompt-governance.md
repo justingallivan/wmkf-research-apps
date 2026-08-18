@@ -4,7 +4,7 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-08-18 — Pre-Site prompt v3 remains Production-live on the prior schema; resilience source adds exact preflight and full post-publication readback but has not been published or deployed
+last_verified: 2026-08-18 — Pre-Site prompt v4 is sole-current and exact-readback matched to the Production resilience deployment; controlled signed-in generation smoke remains open
 ---
 
 ## Recall Rule
@@ -39,18 +39,19 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
   published v1, then version-preserving `--force` published sole-current v2
   after the first controlled document failed layout acceptance. Signed-in Admin
   publication subsequently created sole-current v3 with the revised page-length
-  and personnel instructions; the publisher cloned the v2 variables, schema,
-  model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
+  and personnel instructions. On 2026-08-18 the audited Admin publisher created
+  sole-current v4 with the tracked resilience output schema and preserved body,
+  system prompt, variables, model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
   `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
 
-**Pre-Site resilience boundary (source-built; not live):** runtime now checks
+**Pre-Site resilience boundary (Production-live 2026-08-18; signed-in generation smoke open):** runtime checks
 the governed body, variables, full schema, and assertions before side effects;
-force publication verifies full readback. The tracked schema differs from live
-v3 until a paired prompt/application release; mixed state blocks generation.
+force publication verifies full readback. Sole-current v4 exactly matches the
+tracked schema; any future mixed state blocks generation.
 
-**Admin model publication (Production-live source 2026-08-17; route smoke still
-open):** the Prompt Templates editor
-can select `wmkf_ai_model`; a model-only change publishes a new immutable
+**Admin model/schema publication (Production-live 2026-08-18):** the Prompt Templates editor
+can select `wmkf_ai_model` and edit the validated output-schema JSON; either
+change publishes a new immutable
 version. The PUT requires the editor's expected version, binds request-id
 retries to a canonical fingerprint of all effective content/model/execution
 fields, and records prior/new model values in audit JSON. Native structured

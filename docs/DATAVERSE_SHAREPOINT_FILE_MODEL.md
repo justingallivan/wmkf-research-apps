@@ -275,9 +275,8 @@ from Dataverse. **[VERIFIED IN PRODUCTION 2026-08-17]** the guarded
 proposal-core helper and tracked Word template renderer are live. Request
 `1002379` resolved the exact narrative and every template metadata field,
 completed the governed writer, and produced the stable Word artifact.
-Sole-current prompt v3
-`f2c9ce97-f499-f111-b8db-7ced8d6e2f44` uses reviewed
-`claude-sonnet-4-6`; latest audited Executor evidence is governed v3 run
+The governed history includes prompt v3
+`f2c9ce97-f499-f111-b8db-7ced8d6e2f44`; latest audited Executor evidence is governed v3 run
 `ba0f42b9-849a-f111-b8db-6045bd008868`. The Production renderer fits
 Background and Methodology on page 3 and applies the revised personnel rules
 and roster-name underlining. The writer requires the exact Proposal Narrative,
@@ -287,9 +286,11 @@ eight named fields in Wave 19, renders from Dataverse readback, uploads one
 stable Word item to `Artifacts/Pre-Site Visit/`, and atomically activates the
 current Ready row. The route returns a registry DTO and the tab exposes its
 stable Word link. Request `1002379` exact Ready retry reused the same
-row/run/item without another model call or upload. Read-only comparison confirms sole-current prompt v3 already
-matches the narrative-only runtime contract; no new prompt publication is
-required for this change.
+row/run/item without another model call or upload. **[DEPLOYED TO PRODUCTION
+2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]** sole-current prompt v4
+`74409f95-509b-f111-b8db-6045bd008868` on `claude-sonnet-4-6` exact-readback
+matches the tracked resilience contract paired with Ready deployment
+`dpl_HGogbJnprevoYKLaxevamxdajtC4`.
 **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the Workbench loads
 read-only current/pending status and uses bounded GET polling after a lost POST
 response without repeating POST. Production template v2 added

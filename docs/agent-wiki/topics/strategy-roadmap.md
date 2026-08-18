@@ -300,10 +300,11 @@ document inventory, and individual implementation plans do not establish priorit
   exact narrative resolution, governed generation, registry persistence,
   stable Word upload, current pointer activation, and no-duplicate Ready retry.
   The authenticated Workbench route returns a registry DTO; the tab exposes its
-  stable Word link and retains stale-request cancellation. Dataverse
-  now has sole-current prompt v3 on reviewed `claude-sonnet-4-6`; read-only
-  comparison confirms it matches the tracked narrative-only runtime contract,
-  so no new prompt publication is required. The bibliography remains reserved
+  stable Word link and retains stale-request cancellation. Dataverse now has
+  sole-current prompt v4 `74409f95-509b-f111-b8db-6045bd008868` on reviewed
+  `claude-sonnet-4-6`; exact readback confirms it matches the tracked resilience
+  contract paired with Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4`.
+  Controlled signed-in generation proof remains open. The bibliography remains reserved
   for next-cycle Reviewer Finder. The latest audited Executor evidence is the
   completed governed v3 Request `1002379` run
   `ba0f42b9-849a-f111-b8db-6045bd008868`. A prior direct exact-v3 model/render QA

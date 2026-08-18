@@ -1,9 +1,9 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-08-17 for the Production-live admin publish/model
-contract, sole-current `pre-site-visit.proposal-core.generate` v3, completed
+**Last verified:** 2026-08-18 for the Production-live admin publish/model/schema
+contract, sole-current `pre-site-visit.proposal-core.generate` v4 exact readback, completed
 governed Request `1002379` v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`,
-the earlier governed runs/direct QA, and 23 prompt rows;
+the earlier governed runs/direct QA, and 24 prompt rows;
 2026-07-30 for governed `initial-assessment.generate` v1 production
 provisioning; 2026-07-28 for governed
 `review-synthesis.generate` v3 and its successful controlled production execution; 2026-07-12 for the broader entity inventory via
@@ -75,7 +75,7 @@ Migration plans touching either entity must preserve these foreign keys.
 **Write paths:**
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
-- **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The grantee title/abstract, Initial Assessment, Review Synthesis, and local Pre-Site Visit proposal-core seeds use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish can change body, system prompt, and `wmkf_ai_model` only by creating a new immutable version. It checks the editor's expected version, validates the complete template, and rejects unreviewed models; native-structured prompts additionally require a reviewed compatible concrete model whose output limit covers the stored token budget. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
+- **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The grantee title/abstract, Initial Assessment, Review Synthesis, and local Pre-Site Visit proposal-core seeds use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish can change body, system prompt, validated output-schema JSON, and `wmkf_ai_model` only by creating a new immutable version. It checks the editor's expected version, validates the complete template/schema, and rejects unreviewed models; native-structured prompts additionally require a reviewed compatible concrete model whose output limit covers the stored token budget. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
 - **Pre-Site Visit proposal core (Production-live durable app slice and prompt,
   2026-08-17):**
   `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed
@@ -115,6 +115,14 @@ Migration plans touching either entity must preserve these foreign keys.
   bibliography. Exact Ready retry reused the same run/row/item. The rendered
   Production document fits Background and Methodology on page 3 and passes the
   agreed personnel rules.
+  **[VERIFIED IN PRODUCTION 2026-08-18]** Application commit `46903bc4` reached
+  Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4`; the audited Admin
+  publisher then created sole-current v4
+  `74409f95-509b-f111-b8db-6045bd008868`. Readback selected exactly one current
+  row and matched the tracked body, system prompt, variables, complete output
+  schema, `claude-sonnet-4-6`, temperature `0.3`, and token budget `16384` with
+  zero mismatches. No request generation or SharePoint write was used for this
+  release verification; the controlled signed-in generation smoke remains open.
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
 - **`initial-assessment.generate` production bootstrap (2026-07-30):**
   create-only seed published version 1

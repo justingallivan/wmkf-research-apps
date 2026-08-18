@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-17 via source/live probes, signed-in Request 1002379 Pre-Site generation/retry, and Dataverse/SharePoint lineage readback
+  last_verified: 2026-08-18 via Ready resilience deployment, sole-current prompt-v4 exact readback, prior signed-in Request 1002379 generation/retry, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -91,9 +91,12 @@ Signed-in Request `1002379` created Ready/Draft row
 `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 AI run
 `ba0f42b9-849a-f111-b8db-6045bd008868`, the request pointer, and stable Word
 item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Its input manifest contains only
-the Proposal Narrative; exact Ready retry reused the same identities. Read-only comparison confirms
-sole-current prompt v3 already matches the narrative-only runtime contract, so
-no new prompt publication is required. The first long client request displayed
+the Proposal Narrative; exact Ready retry reused the same identities.
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]**
+Application commit `46903bc4` is paired with sole-current prompt v4
+`74409f95-509b-f111-b8db-6045bd008868`; exact readback matched the tracked
+body, system prompt, variables, output schema, model, temperature, and token
+budget. Release verification generated no request artifact. The first long client request displayed
 `Failed to fetch` after durable completion. **[DEPLOYED TO PRODUCTION
 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes read-only
 current/pending status, and the
