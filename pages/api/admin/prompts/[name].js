@@ -8,7 +8,7 @@
  *
  * GET  — current row (full editable metadata) + recent version history.
  * PUT  — publish a new version. Body:
- *        { body, systemPrompt?, variables?, model?, expectedVersion?, requestId? }.
+ *        { body, systemPrompt?, variables?, outputSchema?, model?, expectedVersion?, requestId? }.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 5): multi-verb
  * dispatch inside ONE withDalContext (the historical route had a single shared
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
         }
       }
       // PUT (publish)
-      const { body, systemPrompt, variables, model, expectedVersion } = req.body || {};
+      const { body, systemPrompt, variables, outputSchema, model, expectedVersion } = req.body || {};
       const requestId = (req.body && req.body.requestId) || undefined;
       try {
         const outcome = await publishPrompt({
@@ -53,6 +53,7 @@ export default async function handler(req, res) {
           body,
           systemPrompt,
           variables,
+          outputSchema,
           model,
           expectedVersion,
           requestId,

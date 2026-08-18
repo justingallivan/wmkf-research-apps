@@ -246,6 +246,15 @@ function parseOutputSchema(value) {
   }
 }
 
+function validateOutputSchemaText(value) {
+  if (value === '') return { valid: true, issue: null };
+  const parsed = parseOutputSchema(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { valid: false, issue: 'Output schema must be blank or a valid JSON object.' };
+  }
+  return { valid: true, issue: null };
+}
+
 function buildModelOptions(prompt, modelCatalog) {
   const nativeStructured = parseOutputSchema(prompt.outputSchema)?.generationMode === 'native-json-schema';
   const statuses = modelCatalog?.modelStatuses || {};
@@ -276,22 +285,31 @@ function buildModelOptions(prompt, modelCatalog) {
 function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
   const [systemPrompt, setSystemPrompt] = useState(prompt.systemPrompt || '');
   const [body, setBody] = useState(prompt.body || '');
+  const [outputSchema, setOutputSchema] = useState(prompt.outputSchema || '');
   const [model, setModel] = useState(prompt.model || '');
   const [submitting, setSubmitting] = useState(false);
   const requestRef = useRef({ payloadKey: null, requestId: null });
   const { nativeStructured, options: modelOptions } = buildModelOptions(prompt, modelCatalog);
   const nativeModelCompatible = !nativeStructured
     || modelOptions.some((option) => option.value === model && !option.disabled);
+  const outputSchemaValidation = validateOutputSchemaText(outputSchema);
 
   const validation = validatePromptForSave(prompt.name, body);
   const unchanged = body === (prompt.body || '')
     && systemPrompt === (prompt.systemPrompt || '')
+    && outputSchema === (prompt.outputSchema || '')
     && model === (prompt.model || '');
 
   const submit = async () => {
     setSubmitting(true);
     try {
-      const payloadKey = JSON.stringify({ body, systemPrompt, model, expectedVersion: prompt.version });
+      const payloadKey = JSON.stringify({
+        body,
+        systemPrompt,
+        outputSchema,
+        model,
+        expectedVersion: prompt.version,
+      });
       if (requestRef.current.payloadKey !== payloadKey) {
         requestRef.current = { payloadKey, requestId: newRequestId() };
       }
@@ -301,6 +319,7 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
         body: JSON.stringify({
           body,
           systemPrompt,
+          outputSchema,
           model,
           expectedVersion: prompt.version,
           requestId: requestRef.current.requestId,
@@ -336,6 +355,23 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
             : 'Choose a reviewed tier or concrete model. Publishing creates a new prompt version.'}
         </div>
       </label>
+
+      <label className="block text-xs text-gray-700">
+        Output schema <span className="text-gray-400">(JSON object; blank for none)</span>
+        <textarea
+          value={outputSchema}
+          onChange={(e) => setOutputSchema(e.target.value)}
+          rows={16}
+          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono text-xs"
+        />
+        <div className="mt-1 text-[10px] text-gray-400">{outputSchema.length} chars</div>
+      </label>
+
+      {!outputSchemaValidation.valid && (
+        <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+          {outputSchemaValidation.issue}
+        </div>
+      )}
 
       <label className="block text-xs text-gray-700">
         System prompt <span className="text-gray-400">(the rules / instructions; blank for none)</span>
@@ -377,7 +413,12 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
       <div className="flex items-center justify-end gap-3">
         <button
           type="button"
-          onClick={() => { setBody(prompt.body || ''); setSystemPrompt(prompt.systemPrompt || ''); setModel(prompt.model || ''); }}
+          onClick={() => {
+            setBody(prompt.body || '');
+            setSystemPrompt(prompt.systemPrompt || '');
+            setOutputSchema(prompt.outputSchema || '');
+            setModel(prompt.model || '');
+          }}
           disabled={unchanged}
           className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
         >
@@ -385,7 +426,8 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
         </button>
         <button
           onClick={submit}
-          disabled={submitting || !validation.valid || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
+          disabled={submitting || !validation.valid || !outputSchemaValidation.valid
+            || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}

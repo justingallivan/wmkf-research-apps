@@ -144,12 +144,14 @@ describe('PUT /api/admin/prompts/[name]', () => {
     DynamicsService.queryRecords
       .mockResolvedValueOnce({ records: [currentRow({ version: 3, id: 'prior', model: 'Sonnet' })] })
       .mockResolvedValueOnce({ records: [{ wmkf_ai_promptid: 'new-row', wmkf_promptversion: 4 }] });
+    const outputSchema = JSON.stringify({ outputs: [{ name: 'answer', maxLength: 30000 }] });
     const res = mockRes();
     await handler({
       method: 'PUT',
       query: { name: NAME },
       body: {
         body: `${VALID_BODY}\nEDIT`,
+        outputSchema,
         model: 'claude-opus-4-6',
         expectedVersion: 3,
       },
@@ -162,6 +164,7 @@ describe('PUT /api/admin/prompts/[name]', () => {
     const created = DynamicsService.createRecord.mock.calls[0][1];
     expect(created.wmkf_ai_iscurrent).toBe(true);
     expect(created.wmkf_promptversion).toBe(4);
+    expect(created.wmkf_ai_promptoutputschema).toBe(outputSchema);
     expect(created.wmkf_ai_model).toBe('claude-opus-4-6');
     // S269: every admin-published version carries a domain publish time (parity w/ seed).
     expect(typeof created.wmkf_ai_publisheddatetime).toBe('string');

@@ -150,6 +150,50 @@ describe('publishPrompt', () => {
     }));
   });
 
+  it('publishes an output-schema edit as a new immutable version', async () => {
+    const priorSchema = JSON.stringify({ outputs: [{ name: 'answer' }] });
+    const nextSchema = JSON.stringify({ outputs: [{ name: 'answer', maxLength: 30000 }] });
+    aiPrompt.queryCurrentRows.mockResolvedValue({
+      records: [currentRow({ outputSchema: priorSchema })],
+    });
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({
+      records: [{ wmkf_ai_promptid: 'new-row' }],
+    });
+
+    const result = await publishPrompt(args({
+      body: VALID_BODY,
+      outputSchema: nextSchema,
+      expectedVersion: 3,
+    }));
+
+    expect(result).toMatchObject({ status: 'completed', targetVersion: 4 });
+    expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_ai_promptoutputschema: nextSchema,
+      wmkf_promptversion: 4,
+    }));
+  });
+
+  it('rejects a malformed edited output schema before audit or write', async () => {
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+
+    await expect(publishPrompt(args({ outputSchema: '{not json' }))).rejects.toMatchObject({
+      httpStatus: 400,
+      body: expect.objectContaining({ status: 'invalid_output_schema' }),
+    });
+    expect(sql).not.toHaveBeenCalled();
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-string edited output schema instead of silently preserving the prior schema', async () => {
+    await expect(publishPrompt(args({ outputSchema: { outputs: [] } }))).rejects.toMatchObject({
+      httpStatus: 400,
+      body: expect.objectContaining({ status: 'invalid_output_schema' }),
+    });
+    expect(aiPrompt.queryCurrentRows).not.toHaveBeenCalled();
+    expect(sql).not.toHaveBeenCalled();
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
   it('rejects a stale expectedVersion before audit or write', async () => {
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow({ version: 4 })] });
     await expect(publishPrompt(args({ expectedVersion: 3 }))).rejects.toMatchObject({
