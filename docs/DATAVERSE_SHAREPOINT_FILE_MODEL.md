@@ -88,7 +88,7 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
-- **Site Visit handoff (verified in source 2026-08-17; not deployed):** keeps
+- **Site Visit handoff (deployed 2026-08-17; signed-in handoff smoke open):** keeps
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.

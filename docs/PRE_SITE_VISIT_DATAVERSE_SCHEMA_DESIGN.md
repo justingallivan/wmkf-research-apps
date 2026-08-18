@@ -3,7 +3,7 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19 schema, production-proved Pre-Site writer, and source-verified Site Visit handoff contract."
+summary: "Production-live Wave 19 schema, production-proved Pre-Site writer, and deployed Site Visit handoff contract."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-17
@@ -44,7 +44,7 @@ canonical-current lookups to its active Pre-Site and Final Word rows. There is
 no Site Visit writeup lookup because staff add Site Visit observations directly
 to the Pre-Site Word workspace.
 
-**[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the current Ready/Draft
+**[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the current Ready/Draft
 Pre-Site row now has a guarded Site Visit handoff writer. It changes that same
 row's lifecycle to Review and records the exact verified SharePoint publication
 version, governed DOCX hash, and handoff timestamp in the existing
@@ -277,12 +277,12 @@ The service must not report success after only the Claude call, only the
 Dataverse draft write, or only the SharePoint upload. Existing claim-token,
 ETag, operation-status, error, and orphan-cleanup fields are reused.
 
-The source-verified Site Visit transition is a separate authenticated service
+The deployed Site Visit transition is a separate authenticated service
 and route. It reads the current pointer and stable SharePoint item, performs no
 AI or SharePoint write, and updates only the current Request Document row. It
 also makes `generatePreSiteVisitArtifact` reject a promoted current row before
-input loading or any model/claim/render/upload side effect. Deployment and a
-signed-in Production handoff smoke remain open.
+input loading or any model/claim/render/upload side effect. The first signed-in
+Production handoff smoke remains open.
 
 ## Deployment and compatibility sequence
 

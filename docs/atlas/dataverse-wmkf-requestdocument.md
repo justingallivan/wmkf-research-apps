@@ -161,7 +161,7 @@ Exact design and deployment boundary:
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
-- **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the Site Visit transition
+- **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version
   around DOCX download/hash, then ETag-conditionally sets lifecycle Review and
@@ -304,7 +304,7 @@ transition.
    recycle recovery also pass. Workbench version-history display shipped S413
    (2026-08-10, read-only). Administrator policy/access evidence, administrator
    restore, and retained Board snapshot copies remain open. The separate
-   Pre-Site→Site Visit lifecycle milestone writer is built/tested in source but
-   not deployed.
+   Pre-Site→Site Visit lifecycle milestone writer is deployed; the first
+   controlled signed-in Draft→Review transition and readback remain open.
 
 No live command in this sequence is authorized merely by this page.

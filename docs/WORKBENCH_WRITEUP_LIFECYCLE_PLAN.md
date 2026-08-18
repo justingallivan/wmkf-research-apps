@@ -22,7 +22,7 @@ related:
 ## Decision and current status
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
-HANDOFF VERIFIED IN SOURCE BUT NOT DEPLOYED; FINAL PLANNED.]** The three Workbench
+HANDOFF DEPLOYED; SIGNED-IN HANDOFF SMOKE OPEN; FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -40,9 +40,12 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-Final remains a placeholder. **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]**
-the Site Visit tab now implements the guarded handoff of the current Ready/Draft
-Pre-Site item into the Site Visit workspace. The Pre-Site tab
+Final remains a placeholder. **[DEPLOYED TO PRODUCTION 2026-08-17]**
+the Site Visit tab and authenticated transition route implement the guarded
+handoff of the current Ready/Draft Pre-Site item into the Site Visit workspace.
+**[VERIFIED IN SOURCE 2026-08-17; NOT YET DEPLOYED]** the Pre-Site tab now adds a
+visually separate next-stage panel and explanatory confirmation modal that call
+the same guarded route, then navigate to the Site Visit tab after success. The Pre-Site tab
 now calls the Production durable writer and shows the stable Word file returned
 from the registry. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE
 SMOKE OPEN]** its compact action panel shows Generate before a draft
@@ -60,7 +63,7 @@ Documents: three Initial Assessments and one Pre Site Visit.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site is Production-live, Site Visit handoff is built/tested on the feature branch, and Final remains a placeholder | Workbench source, focused Site Visit service/route/component tests, Pre-Site deployment evidence, and signed-in Request `1002379` test | VERIFIED IN SOURCE / NOT DEPLOYED |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site and the Site Visit handoff are Production-deployed, the clearer Pre-Site handoff modal is source-verified, and Final remains a placeholder | Workbench source, Ready deployment `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, focused service/route/component tests, and signed-in Request `1002379` Pre-Site evidence | HANDOFF DEPLOYED / MODAL NOT YET DEPLOYED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Production contains one Ready/Draft Pre-Site Request Document row for Request `1002379` | Read-only Production inventory and exact row/pointer readback | VERIFIED LIVE |
@@ -123,6 +126,10 @@ version/hash captured when the action runs.
   Download, and confirmation-guarded Regenerate actions. Keep detailed source,
   provenance, and manual-completion guidance available through contextual help
   rather than permanently occupying the panel.
+- Show the Draft→Review handoff as a separate next-stage panel, not as a document
+  action. Its confirmation modal must explain same-file reuse, exact-version
+  recording, continued Word editing, and the regeneration lock before calling
+  the shared guarded transition.
 - Identify manual Word tasks: graphical abstract image/caption and staff
   recommendation. Institutional funding history remains visibly unavailable
   until its governed Dataverse producer exists.
@@ -165,9 +172,12 @@ ordinary SharePoint/Word version history. The application does not create:
 - a staff-observations Dataverse Memo field; or
 - a field-by-field synchronization job that parses staff-edited Word prose.
 
-**[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the first handoff slice is
-built. Before promotion, the tab shows the current Ready/Draft filename and a
-`Start Site Visit Stage` confirmation action. The server resolves the current
+**[DEPLOYED TO PRODUCTION 2026-08-17]** the first handoff slice is built and
+live. Before promotion, the Site Visit tab shows the current Ready/Draft filename
+and a `Start Site Visit Stage` confirmation action. **[VERIFIED IN SOURCE
+2026-08-17; NOT YET DEPLOYED]** the Pre-Site tab also offers a visually separate
+`Start Site Visit` panel whose modal states the lifecycle consequences before it
+calls the same endpoint. The server resolves the current
 request pointer independently, requires the browser's artifact id to match,
 reads the same stable SharePoint item before and after download, hashes the
 verified DOCX, and performs one ETag-conditional lifecycle transition from
@@ -324,11 +334,14 @@ current writeup pointer always targets Word, never PDF.
    Generate before a draft exists; Edit, Download, and confirmation-guarded
    Regenerate when Ready. Signed-in current-status, action-panel, download, and
    Word Online v3 proof remain open.
-4. **Site Visit Word-workspace handoff — built and locally verified
-   2026-08-17; not deployed.** The Site Visit tab now owns the confirmation,
+4. **Site Visit Word-workspace handoff — deployed 2026-08-17; signed-in handoff
+   smoke open.** Commit `32b16f5f` reached Ready production deployment
+   `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`. The Site Visit tab confirms the action,
    records the exact stable Word version/hash/time under an ETag fence, reuses
-   the same item for Edit/Download, and locks Pre-Site regeneration. Production
-   promotion and a signed-in handoff smoke remain open.
+   the same item for Edit/Download, and locks Pre-Site regeneration. A clearer
+   Pre-Site next-stage panel and consequence modal are source-verified on
+   `codex/site-visit-cta-modal` but not yet deployed. The controlled signed-in
+   Draft→Review handoff and Dataverse/SharePoint readback remain open.
 5. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 6. **Site Visit dossier.** Implement governed supporting-file listing/upload

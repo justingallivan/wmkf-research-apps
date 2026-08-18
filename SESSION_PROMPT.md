@@ -151,18 +151,24 @@ duplicate or second model call.
    exact current Pre-Site row/version/hash into a new governed Word document. There is no Site
    Visit Writeup or Dataverse staff-observations field.
 
-   **[VERIFIED IN SOURCE 2026-08-17; NOT DEPLOYED]** the first Site Visit
-   handoff slice is now built on `codex/pre-site-to-site-visit`: the Site Visit
+   **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the first Site Visit
+   handoff slice shipped in commit `32b16f5f` and Ready deployment
+   `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`: the Site Visit
    tab confirms the exact current Pre-Site artifact, records the stable
    SharePoint version/governed hash/time while changing lifecycle Draft→Review,
    reuses the same Word item for Edit/Download, and locks Pre-Site regeneration.
    Focused service/route/component coverage includes stale UI, SharePoint edit
    races, ETag conflicts, idempotent retry, and request-switch cancellation.
 
-3. **Deploy and signed-in smoke the Site Visit handoff, then continue the dossier and Final lifecycle.**
+   **[VERIFIED IN SOURCE; NOT YET DEPLOYED]** `codex/site-visit-cta-modal`
+   replaces the Pre-Site text link with a separate next-stage panel and an
+   explanatory modal; confirmation calls the same guarded route and navigates
+   only after success.
+
+3. **Deploy the clearer Pre-Site CTA and signed-in smoke the Site Visit handoff, then continue the dossier and Final lifecycle.**
    The Pre-Site producer is Production-live and proven. Site Visit and Final
-   logistics/supporting files and Final remain planned. Promote the feature
-   branch deliberately, confirm Request `1002379` (or another approved
+   logistics/supporting files and Final remain planned. Promote the CTA branch
+   deliberately, confirm Request `1002379` (or another approved
    disposable target) moves to Review with an exact milestone and still opens
    the same Word item, then map logistics/supporting files and implement the
    exact-version Final copy transaction without replacing the workspace.

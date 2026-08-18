@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PreSiteVisitTab from '../../shared/components/workbench/PreSiteVisitTab';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -89,7 +89,8 @@ test('shows compact actions and keeps generation details behind help', async () 
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' }))
     .toHaveAttribute('target', '_blank');
-  expect(screen.getByRole('button', { name: 'Continue to Site Visit →' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Ready for the Site Visit stage?' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Start Site Visit' })).toBeInTheDocument();
 });
 
 test('loads existing Ready actions without another generation request', async () => {
@@ -158,6 +159,119 @@ test('requires confirmation before regenerating an existing draft', async () => 
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
+test('opens an explanatory Site Visit modal and cancel performs no transition', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+
+  const dialog = screen.getByRole('dialog', { name: 'Start the Site Visit stage?' });
+  expect(dialog).toHaveTextContent('This exact Word document will become the Site Visit workspace.');
+  expect(dialog).toHaveTextContent('current SharePoint version will be recorded in Dataverse');
+  expect(dialog).toHaveTextContent('Staff can continue editing this same document in Word.');
+  expect(dialog).toHaveTextContent('can no longer be regenerated after this change');
+  expect(within(dialog).getByRole('button', { name: 'Start Site Visit' })).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Tab' });
+  expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+  expect(within(dialog).getByRole('button', { name: 'Start Site Visit' })).toHaveFocus();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test('confirms the displayed artifact through the guarded route and opens Site Visit', async () => {
+  const promoted = {
+    ...readyArtifact(),
+    lifecycleState: 100000001,
+    milestone: {
+      versionId: '2.0',
+      contentHash: 'gdc1:handoff',
+      createdAt: '2026-08-17T21:05:00Z',
+    },
+  };
+  global.fetch
+    .mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }))
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, artifact: promoted, reused: false }),
+    });
+  const onSelectTab = jest.fn();
+  render(<PreSiteVisitTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start Site Visit' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/pre-site-visit/start-site-visit',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: REQUEST_ID,
+        expectedArtifactId: '22222222-2222-2222-8222-222222222222',
+      }),
+      signal: expect.any(AbortSignal),
+    }),
+  ));
+  await waitFor(() => expect(onSelectTab).toHaveBeenCalledWith('site-visit'));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('keeps the modal open and shows a transition failure for retry', async () => {
+  global.fetch
+    .mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }))
+    .mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: 'The Word draft changed. Reload and retry.' }),
+    });
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start Site Visit' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'The Word draft changed. Reload and retry.',
+  );
+  const dialog = screen.getByRole('dialog');
+  expect(dialog).toBeInTheDocument();
+  expect(within(dialog).getByRole('button', { name: 'Start Site Visit' })).toBeEnabled();
+});
+
+test('a late Site Visit transition cannot navigate after the request changes', async () => {
+  let resolvePromotion;
+  global.fetch.mockImplementation((_url, options = {}) => {
+    if (options.method !== 'POST') {
+      return Promise.resolve(statusResponse({ currentArtifact: readyArtifact() }));
+    }
+    return new Promise((resolve) => { resolvePromotion = resolve; });
+  });
+  const onSelectTab = jest.fn();
+  const { rerender } = render(
+    <PreSiteVisitTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start Site Visit' }));
+  rerender(<PreSiteVisitTab requestId={OTHER_REQUEST_ID} onSelectTab={onSelectTab} />);
+  await act(async () => {
+    resolvePromotion({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        artifact: { ...readyArtifact(), lifecycleState: 100000001 },
+      }),
+    });
+  });
+
+  await screen.findByRole('heading', { name: 'Ready for the Site Visit stage?' });
+  expect(onSelectTab).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
 test('a promoted draft cannot be regenerated and links to the Site Visit workspace', async () => {
   const promoted = {
     ...readyArtifact(),
@@ -176,7 +290,8 @@ test('a promoted draft cannot be regenerated and links to the Site Visit workspa
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Continue in Site Visit →' }));
+  expect(screen.getByRole('heading', { name: 'Site Visit in progress' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Site Visit workspace' }));
   expect(onSelectTab).toHaveBeenCalledWith('site-visit');
 });
 

@@ -47,8 +47,14 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [startingSiteVisit, setStartingSiteVisit] = useState(false);
+  const [siteVisitError, setSiteVisitError] = useState(null);
   const generationSequence = useRef(0);
   const activeController = useRef(null);
+  const startButtonRef = useRef(null);
+  const cancelStartButtonRef = useRef(null);
+  const confirmStartButtonRef = useRef(null);
 
   useEffect(() => {
     generationSequence.current += 1;
@@ -60,6 +66,9 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
     setPendingArtifact(null);
     setRecoveryMessage(null);
     setShowHelp(false);
+    setShowStartModal(false);
+    setStartingSiteVisit(false);
+    setSiteVisitError(null);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
@@ -95,6 +104,34 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
       activeController.current = null;
     };
   }, [requestId]);
+
+  useEffect(() => {
+    if (!showStartModal) return undefined;
+    const previouslyFocused = document.activeElement;
+    confirmStartButtonRef.current?.focus();
+    const handleModalKey = (event) => {
+      if (event.key === 'Escape' && !startingSiteVisit) {
+        setShowStartModal(false);
+        setSiteVisitError(null);
+      }
+      if (event.key === 'Tab') {
+        const first = cancelStartButtonRef.current;
+        const last = confirmStartButtonRef.current;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleModalKey);
+    return () => {
+      document.removeEventListener('keydown', handleModalKey);
+      if (previouslyFocused?.focus) previouslyFocused.focus();
+    };
+  }, [showStartModal, startingSiteVisit]);
 
   const pollForArtifact = async ({ id, sequence, controller, targetArtifactId, baselineArtifactId }) => {
     for (let attempt = 0; attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
@@ -210,6 +247,8 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
     : null;
   const promotedToSiteVisit = artifact?.lifecycleState
     === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+  const readyForSiteVisit = artifact?.lifecycleState
+    === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const downloadUrl = readyFile
     ? (() => {
       try {
@@ -229,6 +268,46 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
       + 'Edits in the current Word file will not be carried into a newly generated draft.',
     )) return;
     generate();
+  };
+
+  const startSiteVisit = async () => {
+    if (!requestId || !readyFile || !readyForSiteVisit || startingSiteVisit) return;
+    const id = requestId;
+    const expectedArtifactId = artifact.artifactId;
+    const sequence = ++generationSequence.current;
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    setStartingSiteVisit(true);
+    setSiteVisitError(null);
+    setError(null);
+    try {
+      const response = await fetch('/api/workbench/pre-site-visit/start-site-visit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, expectedArtifactId }),
+        signal: controller.signal,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `Site Visit handoff failed (${response.status})`);
+      if (generationSequence.current !== sequence || id !== requestId) return;
+      if (!body.artifact) throw new Error('Site Visit handoff returned no artifact identity.');
+      setArtifact(body.artifact);
+      setPendingArtifact(null);
+      setShowStartModal(false);
+      onSelectTab?.('site-visit');
+    } catch (startError) {
+      if (startError?.name !== 'AbortError'
+        && generationSequence.current === sequence
+        && id === requestId) {
+        setSiteVisitError(startError.message);
+      }
+    } finally {
+      if (generationSequence.current === sequence && id === requestId) {
+        if (activeController.current === controller) activeController.current = null;
+        setStartingSiteVisit(false);
+      }
+    }
   };
 
   return (
@@ -325,42 +404,111 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
             </p>
           )}
           {readyFile && (
-            <div className="mt-4 text-sm font-medium text-green-800">
+            <div className="mt-4 text-sm text-gray-700">
               <p>
                 Latest draft:{' '}
                 <a
                   href={readyFile.webUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline"
+                  className="font-medium text-green-800 underline"
                 >
                   {readyFile.name || 'Open Word draft'}
                 </a>
               </p>
               {promotedToSiteVisit ? (
-                <p className="mt-2 font-normal text-gray-700">
-                  This draft is now the Site Visit workspace and can no longer be regenerated here.{' '}
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                  <h3 className="font-semibold text-green-900">Site Visit in progress</h3>
+                  <p className="mt-1">
+                    This draft is now the Site Visit workspace and can no longer be regenerated here.
+                  </p>
                   <button
                     type="button"
                     onClick={() => onSelectTab?.('site-visit')}
-                    className="font-medium text-gray-900 underline"
+                    className="mt-3 rounded-lg border border-green-300 bg-white px-4 py-2 font-medium text-green-900 hover:bg-green-100"
                   >
-                    Continue in Site Visit →
+                    Open Site Visit workspace
                   </button>
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onSelectTab?.('site-visit')}
-                  className="mt-2 font-medium text-gray-900 underline"
-                >
-                  Continue to Site Visit →
-                </button>
-              )}
+                </div>
+              ) : readyForSiteVisit ? (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <h3 className="font-semibold text-gray-900">Ready for the Site Visit stage?</h3>
+                  <p className="mt-1">
+                    Use this Word draft as the working document for the Site Visit.
+                  </p>
+                  <button
+                    ref={startButtonRef}
+                    type="button"
+                    onClick={() => {
+                      setSiteVisitError(null);
+                      setShowStartModal(true);
+                    }}
+                    className="mt-3 rounded-lg bg-gray-900 px-4 py-2 font-medium text-white hover:bg-gray-800"
+                  >
+                    Start Site Visit
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
       </Card>
+
+      {showStartModal && readyFile && readyForSiteVisit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-site-visit-title"
+            aria-describedby="start-site-visit-description"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="start-site-visit-title" className="text-xl font-semibold text-gray-900">
+              Start the Site Visit stage?
+            </h2>
+            <div id="start-site-visit-description" className="mt-3 text-sm text-gray-700">
+              <p>
+                You are about to use <span className="font-medium">{readyFile.name || 'this Word draft'}</span>
+                {' '}as the Site Visit workspace.
+              </p>
+              <ul className="mt-3 list-disc space-y-2 pl-5">
+                <li>This exact Word document will become the Site Visit workspace.</li>
+                <li>Its current SharePoint version will be recorded in Dataverse.</li>
+                <li>Staff can continue editing this same document in Word.</li>
+                <li>The Pre-Site draft can no longer be regenerated after this change.</li>
+              </ul>
+            </div>
+            {siteVisitError && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                {siteVisitError}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                ref={cancelStartButtonRef}
+                type="button"
+                disabled={startingSiteVisit}
+                onClick={() => {
+                  setShowStartModal(false);
+                  setSiteVisitError(null);
+                }}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                ref={confirmStartButtonRef}
+                type="button"
+                disabled={startingSiteVisit}
+                onClick={startSiteVisit}
+                className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              >
+                {startingSiteVisit ? 'Starting…' : 'Start Site Visit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
