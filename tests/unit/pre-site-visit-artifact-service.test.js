@@ -1,4 +1,6 @@
 import {
+  buildPreSiteVisitIdentity,
+  buildPreSiteVisitInputSnapshot,
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
   SECTION_FIELDS,
@@ -79,6 +81,39 @@ function promptFixture(variableNames = [
     }),
   };
 }
+
+test('institution changes alter the immutable Pre-Site artifact identity', () => {
+  const formalInputs = inputFixture();
+  const akaInputs = inputFixture({
+    context: {
+      ...formalInputs.context,
+      applicantInstitution: 'Applicant U',
+      documentFields: {
+        ...formalInputs.context.documentFields,
+        institutionName: 'Applicant U',
+      },
+    },
+  });
+  const promptIdentity = {
+    promptId: PROMPT_ID,
+    promptName: PRE_SITE_VISIT_CONTRACT.promptName,
+    promptVersion: 4,
+  };
+
+  const formal = buildPreSiteVisitIdentity({
+    requestId: REQUEST_ID,
+    inputSnapshot: buildPreSiteVisitInputSnapshot(formalInputs),
+    promptIdentity,
+  });
+  const aka = buildPreSiteVisitIdentity({
+    requestId: REQUEST_ID,
+    inputSnapshot: buildPreSiteVisitInputSnapshot(akaInputs),
+    promptIdentity,
+  });
+
+  expect(aka.inputFingerprint).not.toBe(formal.inputFingerprint);
+  expect(aka.generationKey).not.toBe(formal.generationKey);
+});
 
 function createHarness({ mutatePersistedDraft = false } = {}) {
   let row = null;

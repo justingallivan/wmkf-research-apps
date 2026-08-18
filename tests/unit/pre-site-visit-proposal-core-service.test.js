@@ -43,6 +43,7 @@ function dependencies(overrides = {}) {
   return {
     getRequest: jest.fn().mockResolvedValue(requestFixture()),
     getApplicant: jest.fn().mockResolvedValue({
+      akoya_aka: 'Applicant U',
       name: 'Applicant University',
       address1_city: 'Atlanta',
       address1_stateorprovince: 'Georgia',
@@ -84,7 +85,7 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
   expect(result.context).toMatchObject({
     requestNumber: '1002379',
     projectTitle: 'A test project',
-    applicantInstitution: 'Applicant University',
+    applicantInstitution: 'Applicant U',
     projectPeriod: { startDate: '2027-01-01', endDate: '2029-12-31' },
     personnel: [
       { name: 'Dr. Ada Principal', role: 'Principal Investigator' },
@@ -92,6 +93,7 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
       { name: 'Dr. Second Co-PI', role: 'Co-Principal Investigator' },
     ],
     documentFields: {
+      institutionName: 'Applicant U',
       cityState: 'Atlanta, GA',
       internalProgram: 'Medical Research',
       meetingDate: 'December 2026',
@@ -100,6 +102,66 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
       totalProjectBudget: '$3,500,000',
     },
   });
+});
+
+test('uses account AKA for DV:InstitutionName when AKA and account name differ', async () => {
+  const deps = dependencies();
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.applicantInstitution).toBe('Applicant U');
+  expect(result.context.documentFields.institutionName).toBe('Applicant U');
+});
+
+test.each(['  ', 'N/A', 'unknown'])(
+  'falls back from unusable AKA %p to account name',
+  async (akoyaAka) => {
+    const deps = dependencies({
+      getApplicant: jest.fn().mockResolvedValue({
+        akoya_aka: akoyaAka,
+        name: 'Applicant University',
+        address1_city: 'Atlanta',
+        address1_stateorprovince: 'Georgia',
+      }),
+    });
+    const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+    expect(result.context.documentFields.institutionName).toBe('Applicant University');
+  },
+);
+
+test('uses the formatted applicant lookup when the account read fails, never the Request Bill.com field', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const deps = dependencies({
+    getApplicant: jest.fn().mockRejectedValue(new Error('account unavailable')),
+    getRequest: jest.fn().mockResolvedValue(requestFixture({
+      _akoya_applicantid_value_formatted: 'Formatted University',
+      wmkf_organizationname: 'Bill.com Placeholder University',
+    })),
+  });
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.documentFields.institutionName).toBe('Formatted University');
+  expect(result.context.documentFields.institutionName).not.toBe('Bill.com Placeholder University');
+  warnSpy.mockRestore();
+});
+
+test('fails closed when account and formatted applicant names are unusable even if the Request Bill.com field is populated', async () => {
+  const deps = dependencies({
+    getApplicant: jest.fn().mockResolvedValue({
+      akoya_aka: 'N/A',
+      name: 'unknown',
+      address1_city: 'Atlanta',
+      address1_stateorprovince: 'Georgia',
+    }),
+    getRequest: jest.fn().mockResolvedValue(requestFixture({
+      _akoya_applicantid_value_formatted: 'N/A',
+      wmkf_organizationname: 'Bill.com Placeholder University',
+    })),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_context_incomplete', httpStatus: 409 });
 });
 
 test('calls the governed prompt with ordered personnel and fail-closed safeguards', async () => {
