@@ -111,10 +111,10 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects the governed v4 template artifact', () => {
+test('selects render-contract v5 over the retained v4 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 4,
+    version: 5,
     relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v4.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
@@ -221,8 +221,8 @@ test('adds 6pt after the four first-page list paragraphs and removes the blank b
 
 test('expands the two long-form AI slots into multiple Word paragraphs', async () => {
   const core = proposalCoreFixture();
-  core.backgroundAndImpact = 'Background paragraph one.\n\nBackground paragraph two.';
-  core.detailedMethodology = 'Methods paragraph one.\n\nMethods paragraph two.';
+  core.backgroundAndImpact = 'Background paragraph one.\n\nBackground paragraph two.\n\nBackground paragraph three.';
+  core.detailedMethodology = 'Methods paragraph one.\n\nMethods paragraph two.\n\nMethods paragraph three.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
   const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
@@ -234,18 +234,21 @@ test('expands the two long-form AI slots into multiple Word paragraphs', async (
 
   expect(documentXml).toContain('Background paragraph one.');
   expect(documentXml).toContain('Background paragraph two.');
-  expect((documentXml.match(/Background paragraph/g) || [])).toHaveLength(2);
-  expect((documentXml.match(/Methods paragraph/g) || [])).toHaveLength(2);
+  expect((documentXml.match(/Background paragraph/g) || [])).toHaveLength(3);
+  expect((documentXml.match(/Methods paragraph/g) || [])).toHaveLength(3);
 });
 
-test('rejects a multi-paragraph personnel section before opening the template', async () => {
+test('collapses a multi-paragraph personnel section instead of rejecting the draft', async () => {
   const core = proposalCoreFixture();
-  core.personnelDetails = 'First person.\n\nSecond person.';
-  await expect(renderPreSiteVisitDocx({
+  core.personnelDetails = 'Ada Lovelace (PI) leads modeling.\n\nGrace Hopper (co-PI) leads experiments.';
+  const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
-  })).rejects.toThrow('personnelDetails');
+  });
+  const rendered = await JSZip.loadAsync(output);
+  const xml = await wordXml(rendered);
+  expect(xml).toContain('Ada Lovelace (PI) leads modeling. Grace Hopper (co-PI) leads experiments.');
 });
 
 test('replaces unavailable optional Dataverse fields with blanks rather than inventing values', async () => {
@@ -295,25 +298,27 @@ test('underlines only authoritative roster names in both Personnel sections', as
   expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*leads/);
 });
 
-test('rejects a page-one Personnel summary that omits an authoritative roster name', async () => {
+test('renders a page-one Personnel summary that omits a roster name without underlining it', async () => {
   const core = proposalCoreFixture();
   core.personnelOverview = 'Ada Lovelace (PI) provides complementary expertise.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
 
-  await expect(renderPreSiteVisitDocx({
+  const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
-  })).rejects.toThrow('Grace Hopper');
+  });
+  expect(output).toBeInstanceOf(Buffer);
 });
 
-test('rejects a detailed Personnel section that omits an authoritative roster name', async () => {
+test('renders a detailed Personnel section that omits a roster name', async () => {
   const core = proposalCoreFixture();
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling.';
 
-  await expect(renderPreSiteVisitDocx({
+  const output = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
-  })).rejects.toThrow('Grace Hopper');
+  });
+  expect(output).toBeInstanceOf(Buffer);
 });

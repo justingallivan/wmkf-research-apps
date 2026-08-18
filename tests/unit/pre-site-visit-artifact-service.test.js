@@ -11,6 +11,12 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
+import {
+  PROMPT_OUTPUT_SCHEMA,
+  PROMPT_VARIABLES,
+  REQUIRED_SYSTEM_ASSERTIONS,
+  USER_PROMPT_TEMPLATE,
+} from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
@@ -76,9 +82,13 @@ function promptFixture(variableNames = [
     wmkf_ai_promptid: PROMPT_ID,
     wmkf_ai_promptname: PRE_SITE_VISIT_CONTRACT.promptName,
     wmkf_promptversion: 4,
-    wmkf_ai_promptvariables: JSON.stringify({
-      variables: variableNames.map((name) => ({ name })),
-    }),
+    wmkf_ai_promptvariables: variableNames.length === PROMPT_VARIABLES.variables.length
+      && variableNames.every((name, index) => name === PROMPT_VARIABLES.variables[index].name)
+      ? JSON.stringify(PROMPT_VARIABLES)
+      : JSON.stringify({ variables: variableNames.map((name) => ({ name })) }),
+    wmkf_ai_promptoutputschema: JSON.stringify(PROMPT_OUTPUT_SCHEMA),
+    wmkf_ai_promptbody: USER_PROMPT_TEMPLATE,
+    wmkf_ai_systemprompt: REQUIRED_SYSTEM_ASSERTIONS.join('\n'),
   };
 }
 
@@ -269,8 +279,27 @@ test('legacy prompt with a bibliography variable stops before claim or Claude', 
   expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
 });
 
+test('a current prompt with the retired 700-character schema stops before claim or Claude', async () => {
+  const harness = createHarness();
+  const staleSchema = JSON.parse(JSON.stringify(PROMPT_OUTPUT_SCHEMA));
+  staleSchema.jsonSchema.properties.proposalCore.properties.executiveSummary.maxLength = 700;
+  staleSchema.validationSchema.fields.proposalCore.fields.executiveSummary.maxLength = 700;
+  harness.dependencies.getCurrentPrompt.mockResolvedValueOnce({
+    ...promptFixture(),
+    wmkf_ai_promptoutputschema: JSON.stringify(staleSchema),
+  });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_visit_prompt_not_ready', httpStatus: 409 });
+
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
+});
+
 test('persists eight sections and snapshots, renders the Dataverse read-back, then activates', async () => {
-  const harness = createHarness({ mutatePersistedDraft: true });
+  const harness = createHarness();
   const result = await generatePreSiteVisitArtifact(
     { requestId: REQUEST_ID },
     harness.dependencies,
@@ -287,12 +316,26 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
       provenance: { runId: RUN_ID, promptId: PROMPT_ID },
     },
   });
-  expect(harness.row.wmkf_presiteproposalcorejson).toContain('"schemaVersion":2');
+  expect(harness.row.wmkf_presiteproposalcorejson).toContain('"schemaVersion":3');
   expect(harness.row.wmkf_presiteinputsnapshotjson).not.toContain('Narrative text');
   expect(harness.row.wmkf_presiteinputsnapshotjson).toContain('ProposalNarrative_1002379.pdf');
   expect(harness.row.wmkf_renderinputfingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+});
+
+test('fails closed when named fields diverge from the audited proposal-core envelope', async () => {
+  const harness = createHarness({ mutatePersistedDraft: true });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({
+    code: 'pre_site_visit_core_reconciliation_required',
+    httpStatus: 409,
+  });
+  expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
+  expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
 });
 
 test('identical Ready retry does not rerun Claude, render, or upload', async () => {
@@ -341,6 +384,58 @@ test('read-only status returns the current Ready artifact without generation sid
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(sideEffectCounts.run);
   expect(harness.dependencies.renderDocx).toHaveBeenCalledTimes(sideEffectCounts.render);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(sideEffectCounts.upload);
+});
+
+test('schema-v2 proposal cores remain readable and derive available warnings', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  harness.row.wmkf_presiteproposalcorejson = JSON.stringify({
+    schemaVersion: 2,
+    proposalCore,
+  });
+
+  const status = await getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  );
+
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: 'personnel_name_not_matched' }),
+  ]));
+  expect(status.currentArtifact.warnings)
+    .not.toEqual(expect.arrayContaining([expect.objectContaining({ code: 'proposal_input_truncated' })]));
+});
+
+test('schema-v3 warnings project consistently on completion and Ready reuse', async () => {
+  const harness = createHarness();
+  harness.dependencies.runProposalCore.mockResolvedValueOnce({
+    proposalCore: {
+      ...proposalCore,
+      executiveSummary: 'Long but usable. '.repeat(60),
+    },
+    diagnostics: [{
+      code: 'proposal_input_truncated',
+      originalChars: 120000,
+      transmittedChars: 100000,
+    }],
+    runId: RUN_ID,
+    meta: {
+      promptId: PROMPT_ID,
+      promptName: PRE_SITE_VISIT_CONTRACT.promptName,
+      promptVersion: 4,
+    },
+  });
+
+  const first = await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const retry = await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  for (const result of [first, retry]) {
+    expect(result.artifact.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'section_over_target', section: 'executiveSummary' }),
+      expect.objectContaining({ code: 'proposal_input_truncated', originalChars: 120000 }),
+    ]));
+  }
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
 });
 
 test('read-only status exposes an in-progress replacement alongside the current artifact', async () => {
@@ -469,6 +564,83 @@ test('failed Executor audit can retry instead of becoming an incomplete-draft de
   const retry = await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
   expect(retry.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(2);
+});
+
+test.each([
+  ['whitespace-only content', { executiveSummary: '  \n\t ' }, 'pre_site_visit_prompt_empty_section'],
+  ['literal reserved token', { executiveSummary: 'Text [[DV:ProjectTitle]]' }, 'pre_site_visit_prompt_reserved_token'],
+])('%s never becomes a reusable persisted core', async (_label, coreOverride, code) => {
+  const harness = createHarness();
+  harness.dependencies.runProposalCore.mockResolvedValueOnce({
+    proposalCore: { ...proposalCore, ...coreOverride },
+    runId: RUN_ID,
+    meta: {
+      promptId: PROMPT_ID,
+      promptName: PRE_SITE_VISIT_CONTRACT.promptName,
+      promptVersion: 4,
+    },
+  });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code });
+  expect(harness.row.wmkf_presiteproposalcorejson).toBeUndefined();
+  expect(harness.row.wmkf_operationstatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+  expect(harness.row.wmkf_lasterrorcode).toBe(code);
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_visit_retry_requires_change' });
+  expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  'pre_site_visit_draft_incomplete',
+  'pre_site_visit_snapshot_mismatch',
+])('%s blocks an unchanged retry before claim or Claude', async (code) => {
+  const harness = createHarness();
+  const inputs = inputFixture();
+  const inputSnapshot = buildPreSiteVisitInputSnapshot(inputs);
+  const identity = buildPreSiteVisitIdentity({
+    requestId: REQUEST_ID,
+    inputSnapshot,
+    promptIdentity: {
+      promptId: PROMPT_ID,
+      promptName: PRE_SITE_VISIT_CONTRACT.promptName,
+      promptVersion: 4,
+    },
+  });
+  harness.setRow({
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: identity.generationKey,
+    wmkf_inputfingerprint: identity.inputFingerprint,
+    wmkf_lasterrorcode: code,
+    wmkf_lasterrormessage: 'Persisted draft state requires reconciliation.',
+    wmkf_lastfailedat: '2026-08-18T12:00:00Z',
+    _etag: 'row-1',
+    createdon: '2026-08-18T12:00:00Z',
+    modifiedon: '2026-08-18T12:00:00Z',
+  });
+
+  await expect(getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).resolves.toMatchObject({ pendingArtifact: { retryable: false } });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_visit_retry_requires_change' });
+  expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.runProposalCore).not.toHaveBeenCalled();
 });
 
 test('post-upload finalization retry recovers the same item without Claude or a second upload', async () => {

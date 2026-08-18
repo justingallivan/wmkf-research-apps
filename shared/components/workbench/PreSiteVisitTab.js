@@ -39,6 +39,16 @@ function waitForNextPoll(signal) {
   });
 }
 
+function failureMessage(artifact, fallback, explicitReference = null) {
+  const message = artifact?.lastError?.message || fallback;
+  const reference = artifact?.lastError?.supportReference
+    || artifact?.provenance?.runId
+    || explicitReference
+    || artifact?.artifactId
+    || null;
+  return reference ? `${message} Support reference: ${reference}.` : message;
+}
+
 export default function PreSiteVisitTab({ requestId, onSelectTab }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -81,7 +91,10 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
-            setError(status.pendingArtifact.lastError?.message || 'The latest Word-draft attempt failed.');
+            setError(failureMessage(
+              status.pendingArtifact,
+              'The latest Word-draft attempt failed.',
+            ));
           }
         })
         .catch((statusError) => {
@@ -147,7 +160,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
       setPendingArtifact(pending);
 
       if (pending?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
-        throw new Error(pending.lastError?.message || 'The latest Word-draft attempt failed.');
+        throw new Error(failureMessage(pending, 'The latest Word-draft attempt failed.'));
       }
       if (targetArtifactId && current?.artifactId === targetArtifactId) return current;
       if (!targetArtifactId && current && (
@@ -187,7 +200,22 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
       receivedResponse = true;
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || `Generation failed (${response.status})`);
+        const fallback = body.error || `Generation failed (${response.status})`;
+        let status = null;
+        try {
+          status = await readArtifactStatus(id, controller.signal);
+        } catch (statusError) {
+          if (statusError?.name === 'AbortError') throw statusError;
+          throw new Error(failureMessage(null, fallback, body.runId || body.artifactId));
+        }
+        if (generationSequence.current !== sequence || id !== requestId) return;
+        setArtifact(status.currentArtifact || null);
+        setPendingArtifact(status.pendingArtifact || null);
+        const failed = status.pendingArtifact?.operationStatus
+          === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
+          ? status.pendingArtifact
+          : null;
+        throw new Error(failureMessage(failed, fallback, body.runId || body.artifactId));
       }
       const body = await response.json().catch(() => ({}));
       if (generationSequence.current !== sequence || id !== requestId) return;
@@ -245,6 +273,10 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
     && artifact.file?.webUrl
     ? artifact.file
     : null;
+  const warnings = Array.isArray(artifact?.warnings) ? artifact.warnings : [];
+  const unchangedRetryBlocked = pendingArtifact?.operationStatus
+    === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED
+    && pendingArtifact.retryable === false;
   const promotedToSiteVisit = artifact?.lifecycleState
     === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const readyForSiteVisit = artifact?.lifecycleState
@@ -382,7 +414,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
               <button
                 type="button"
                 onClick={generateWithConfirmation}
-                disabled={generating || !requestId}
+                disabled={generating || !requestId || unchangedRetryBlocked}
                 className={readyFile
                   ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50'
                   : 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'}
@@ -403,6 +435,11 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
               This draft is being generated. The Word link will be available when generation finishes.
             </p>
           )}
+          {unchangedRetryBlocked && (
+            <p className="mt-4 text-sm text-amber-900">
+              This attempt needs a prompt or application change before it can be retried.
+            </p>
+          )}
           {readyFile && (
             <div className="mt-4 text-sm text-gray-700">
               <p>
@@ -416,6 +453,18 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                   {readyFile.name || 'Open Word draft'}
                 </a>
               </p>
+              {warnings.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
+                  <h3 className="font-semibold">Draft needs a quick edit check</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {warnings.map((warning, index) => (
+                      <li key={`${warning.code || 'warning'}-${index}`}>
+                        {warning.message || 'The draft completed with a review warning.'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {promotedToSiteVisit ? (
                 <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
                   <h3 className="font-semibold text-green-900">Site Visit in progress</h3>

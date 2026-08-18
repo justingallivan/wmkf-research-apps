@@ -259,7 +259,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md](PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md) | plan | draft |  | Plan to replace editorial generation failures with durable warnings while preserving source, lineage, template, and upload safeguards. | 2026-08-18 |
+| [PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md](PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md) | plan | active |  | Implemented Pre-Site resilience change with durable editorial warnings and preserved integrity gates; paired Production release remains pending. | 2026-08-18 |
 
 ## review-manager
 

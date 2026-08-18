@@ -2,8 +2,8 @@
 title: Pre-Site Visit Generation Resilience Plan
 domain: request-workbench
 kind: plan
-status: draft
-summary: "Plan to replace editorial generation failures with durable warnings while preserving source, lineage, template, and upload safeguards."
+status: active
+summary: "Implemented Pre-Site resilience change with durable editorial warnings and preserved integrity gates; paired Production release remains pending."
 canonical: false
 cataloged: 2026-08-18
 last_verified: 2026-08-18
@@ -23,10 +23,12 @@ related:
 
 ## Status
 
-**Draft plan only. No code, prompt, Dataverse, template, SharePoint, or
-Production change is authorized by this document.** Production prompt
-publication, deployment, and signed-in smoke testing require separate owner
-approval and deliberate release timing.
+**[IMPLEMENTED IN SOURCE 2026-08-18; NOT DEPLOYED.]** The application,
+tests, prompt publication tooling, and durable documentation are implemented on
+`codex/pre-site-generation-resilience`. No governed prompt was published, no
+Dataverse or SharePoint write was performed, and Production remains on the
+incident-era contract. Prompt publication, application deployment, and signed-
+in smoke testing require separate owner approval and deliberate release timing.
 
 ## Owner decision and product boundary
 
@@ -62,7 +64,7 @@ controlled overview overflowed the intended first-page region and displaced
 later page starts. That was a layout-quality concern, not a Dataverse storage
 limit. Each named narrative field is a 32,000-character Memo column.
 
-## Current contract and evidence
+## Triggering Production contract and evidence
 
 | Current behavior | Producer / gate | Persistence | Consumer | Status |
 |---|---|---|---|---|
@@ -148,10 +150,10 @@ not alter Word text and do not insert review banners into the document.
 ### Sink-oriented ceilings
 
 Replace layout-sized schema ceilings with generous technical ceilings aligned
-below the 32,000-character named-field capacity. The exact ceiling must be
-chosen and tested during implementation; **30,000 characters is the proposed
-default, not an implemented value**. Word/character targets remain explicit in
-the prompt and warning policy.
+below the 32,000-character named-field capacity. The implementation uses a
+tested 30,000-character technical ceiling for each section. This value is built
+in the branch but is not live until the paired prompt/application release.
+Word/character targets remain explicit in the prompt and warning policy.
 
 Define the word, character, and paragraph targets once in a tracked
 Pre-Site-specific configuration object. Build the corresponding prompt section
@@ -267,6 +269,11 @@ Repeating the same prompt without new information is prohibited.
   generated narrative text.
 
 ## Implementation sequence
+
+**Source status 2026-08-18:** Phases 0–4 are implemented and covered by the
+focused regression suite. Phase 5's tracked contract, strict runtime preflight,
+and exact publication-readback tooling are implemented, but no governed prompt
+version has been published. Phase 6 is entirely pending.
 
 ### Phase 0 — Pin the failure matrix
 
@@ -478,15 +485,15 @@ are confirmed, and only with owner approval.
   helper; shared validator behavior for unrelated prompts must not change.
 - **Durable surface:** no new database surface; existing envelope compatibility,
   Atlas/service catalog, and docs catalog are required.
-- **Doc reconciliation:** required after implementation changes current facts;
-  this draft plan does not claim them as built.
+- **Doc reconciliation:** completed for the source-built state, with Production
+  facts explicitly preserved as unchanged until release.
 - **Symbol fan-out:** no new status/option value; the new `warnings` DTO field
   must be traced through POST, GET, UI, fixtures, and tests.
 
 ## Plan acceptance criteria
 
-This plan is ready for implementation only after an independent adversarial
-review confirms or corrects:
+The implementation is ready for release consideration only after an
+independent adversarial review of the actual diff confirms or corrects:
 
 1. the hard-versus-warning boundary;
 2. the persisted-core retry invariant;
@@ -525,3 +532,20 @@ revision:
 The reviewer found no new authorization, secret-handling, source-selection, or
 SharePoint identity weakening in the proposed direction. This review validates
 the plan's risk coverage; it does not authorize implementation or deployment.
+
+### Implementation adversarial review
+
+**[COMPLETED 2026-08-18]** Claude Sonnet reviewed the source-built diff
+read-only through the user's OAuth subscription with the Request `1002852`
+incident and hard-versus-warning policy included in the brief. It found no P0
+issue and no material defect in shared Executor validation, prompt rollout,
+envelope v2/v3 compatibility, warning projection, UI request guards, or render
+identity. It identified one P1 and one defensive P2 retry classification gap:
+`pre_site_visit_draft_incomplete` and `pre_site_visit_snapshot_mismatch` could
+recur deterministically while still advertising retryability. Both codes now
+block unchanged retry before claim or model execution, with focused fixtures
+proving `retryable: false` and zero claim/model calls. The reviewer also
+confirmed that drop-plus-warning for undeclared Pre-Site output keys is an
+intentional prompt-local policy, not a shared-validator weakening.
+Claude's narrow post-fix re-review confirmed both gaps closed and found no new
+blocker.

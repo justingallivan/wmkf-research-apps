@@ -117,19 +117,19 @@ describe('validatePromptTemplatePair', () => {
     expect(validatePromptTemplatePair(PRE_SITE_NAME, {
       systemPrompt: PRE_SITE_SYSTEM,
       body: PRE_SITE_BODY,
-      declaredVars: ['request_context_json', 'proposal_narrative', 'proposal_bibliography'],
+      declaredVars: ['request_context_json', 'proposal_text'],
     })).toEqual({ valid: true, issues: [] });
   });
 
   it('rejects a missing pre-site placeholder and system-prompt A7 marker', () => {
     const result = validatePromptTemplatePair(PRE_SITE_NAME, {
       systemPrompt: `${PRE_SITE_SYSTEM}\n[[WMKF-UNTRUSTED-CONTENT]]`,
-      body: PRE_SITE_BODY.replace('{{proposal_bibliography}}', 'missing'),
-      declaredVars: ['request_context_json', 'proposal_narrative', 'proposal_bibliography'],
+      body: PRE_SITE_BODY.replace('{{proposal_text}}', 'missing'),
+      declaredVars: ['request_context_json', 'proposal_text'],
     });
     expect(result.valid).toBe(false);
     expect(result.issues.join(' ')).toMatch(/System prompt must not contain A7/);
-    expect(result.issues.join(' ')).toMatch(/Missing required placeholder \{\{proposal_bibliography\}\}/);
+    expect(result.issues.join(' ')).toMatch(/Missing required placeholder \{\{proposal_text\}\}/);
   });
 
   it('rejects placeholders when the stored variable declaration is absent', () => {

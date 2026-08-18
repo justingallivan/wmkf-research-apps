@@ -6,7 +6,7 @@ status: active
 summary: "Production-live Wave 19 schema, production-proved Pre-Site writer, and deployed Site Visit handoff contract."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-17
+last_verified: 2026-08-18
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -34,6 +34,14 @@ artifact was added by the schema operation. **[VERIFIED IN PRODUCTION
 route, and stable Word-link UI. Request `1002379` then created the first Ready
 Pre-Site business row and SharePoint Word item; current inventory is four
 Request Documents: three Initial Assessments and one Pre Site Visit.
+
+**[IMPLEMENTED IN SOURCE 2026-08-18; NOT DEPLOYED.]** Branch
+`codex/pre-site-generation-resilience` normalizes valid provider output,
+stores content-free editorial diagnostics in proposal-core envelope v3, and
+returns those diagnostics as non-blocking Workbench warnings. It retains v2
+read compatibility and the deployed v4 DOCX bytes while advancing the render
+contract identity to v5. Production and its governed prompt remain unchanged
+until a separately approved paired prompt/application release.
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -78,7 +86,7 @@ akoya_request
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
 | Production has four Request Document rows: three Initial Assessments and one Ready/Draft Pre Site Visit | Read-only production inventory after Request `1002379` generation on 2026-08-17 | VERIFIED LIVE |
-| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current on `claude-sonnet-4-6` and matches the tracked narrative-only variables, body, system, output schema, and required assertions | Read-only production prompt comparison on 2026-08-17 plus current source | VERIFIED LIVE |
+| Prompt `pre-site-visit.proposal-core.generate` v3 is sole-current on `claude-sonnet-4-6` and matches the previously deployed narrative-only contract; the 2026-08-18 resilience branch intentionally changes its tracked validation schema and has not published it | Read-only production prompt comparison on 2026-08-17 plus 2026-08-18 source diff | VERIFIED LIVE / SOURCE CHANGE NOT PUBLISHED |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The Workbench Pre-Site route persists a business draft | Request `1002379` created Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer | VERIFIED LIVE |
@@ -95,10 +103,13 @@ The reproducible inventory is
 ### `wmkf_requestdocument` attributes
 
 All eight narrative fields are optional Memo columns with a 32,000-character
-limit. The governed prompt currently imposes much smaller validation limits;
-the larger Dataverse capacity prevents ordinary staff revision from requiring
-a schema change. The application validates that all eight are non-empty before
-rendering a Pre-Site Word document.
+limit. Production's governed prompt still imposes smaller layout-sized
+validation limits. The pending resilience branch instead uses a 30,000-
+character technical sink ceiling and treats the prior word, character, and
+paragraph sizes as editorial warning targets. The larger Dataverse capacity
+prevents ordinary staff revision from requiring a schema change. The
+application still requires all eight normalized sections to be non-empty and
+free of unresolved reserved placeholders before persistence and rendering.
 
 | Prompt JSON key | Dataverse logical name | Purpose |
 |---|---|---|
@@ -115,7 +126,7 @@ Additional fields:
 
 | Logical name | Type / limit | Contract |
 |---|---|---|
-| `wmkf_presiteproposalcorejson` | Memo / 1,048,576 | Write-once exact validated Claude proposal-core object, before staff changes. It is audit/reproducibility evidence, not the only working representation. |
+| `wmkf_presiteproposalcorejson` | Memo / 1,048,576 | Write-once canonical proposal-core envelope. Source-built envelope v3 contains the normalized eight-field render core and content-free diagnostics; existing v2 envelopes remain readable. Raw provider output stays on the governed AI run. |
 | `wmkf_presiteinputsnapshotjson` | Memo / 1,048,576 | Write-once structured snapshot of authoritative request metadata, personnel, budget, and the exact Proposal Narrative manifest. It excludes credentials and full PDF text. |
 | `wmkf_renderinputfingerprint` | String / 64 | SHA-256 of the exact named draft fields and deterministic document inputs used for a render. A mismatch means the registered file does not represent the current draft fields. |
 | `wmkf_contenttype` | String / 255 | IANA media type for the one SharePoint file represented by the row. This distinguishes Word and PDF without another closed option set. |
@@ -201,7 +212,7 @@ unlabelled object:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "proposalCore": {
     "executiveSummary": "...",
     "impactOverview": "...",
@@ -211,9 +222,22 @@ unlabelled object:
     "backgroundAndImpact": "...",
     "detailedMethodology": "...",
     "personnelDetails": "..."
-  }
+  },
+  "diagnostics": [
+    {
+      "code": "section_over_target",
+      "section": "executiveSummary",
+      "observedChars": 734,
+      "targetChars": 700
+    }
+  ]
 }
 ```
+
+Envelope v2 remains readable and receives any warning that can be derived from
+its canonical text. It cannot reconstruct provider-boundary metadata such as
+input truncation, so no such historical warning is invented. The bounded input
+snapshot remains schema version 2.
 
 `wmkf_PreSiteInputSnapshotJson` stores only bounded structured metadata and
 source identity:
@@ -252,7 +276,7 @@ source identity:
 The JSON never contains credentials, access tokens, or the full proposal text.
 The source file remains authoritative for proposal content.
 
-## Production writer contract
+## Production writer contract and pending resilience release
 
 The deployed runtime implementation:
 
@@ -272,6 +296,15 @@ The deployed runtime implementation:
    `wmkf_CurrentPreSiteVisit`; and
 8. preserve a failed row, exact run linkage, uploaded-item cleanup work, and a
    safe retry path when any later hop fails.
+
+The source-built 2026-08-18 release adds a strict prompt-contract preflight
+before claim or model execution, normalizes valid proposal-core text before it
+becomes reusable, persists envelope-v3 diagnostics, and projects the same
+warnings from both POST and later GET/reuse paths. Deterministic content
+failures are marked non-retryable for an unchanged generation key and include
+a durable AI-run or artifact support reference. Editorial target deviations
+continue to Ready. These behaviors are not Production facts until the paired
+prompt/application release is deployed and proved.
 
 The service must not report success after only the Claude call, only the
 Dataverse draft write, or only the SharePoint upload. Existing claim-token,
@@ -302,6 +335,11 @@ Production handoff smoke remains open.
 7. **Completed 2026-08-17 for normal generation and exact Ready retry:** verify
    the exact row, governed run, Word item/version, current pointer, and
    no-duplicate retry. A controlled partial-failure recovery remains unproved.
+8. **Implemented in source 2026-08-18; release pending:** resilience policy,
+   envelope v3 with v2 reads, warning projection, guarded unchanged retry,
+   typed failure responses, prompt publication readback, and render contract
+   v5 over the unchanged v4 DOCX bytes. No prompt was published and no
+   deployment was performed by this implementation step.
 
 The first long Production request completed durably but the browser displayed
 `Failed to fetch`. Read-only state verification followed by an exact retry

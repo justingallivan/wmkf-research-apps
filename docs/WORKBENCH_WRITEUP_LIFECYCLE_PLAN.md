@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-17
+last_verified: 2026-08-18
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -59,6 +59,13 @@ run, populated the request pointer, and uploaded the stable Word item. Exact
 Ready retry reused those same identities. Current inventory is four Request
 Documents: three Initial Assessments and one Pre Site Visit.
 
+**[IMPLEMENTED IN SOURCE 2026-08-18; NOT DEPLOYED.]** The Pre-Site producer
+now distinguishes editorial deviations from integrity failures: usable drafts
+reach Ready with durable edit-check warnings, while malformed, empty,
+placeholder-bearing, unreconciled, or authority/lineage-invalid content remains
+blocking. The branch preserves v2 reads and does not change the live prompt or
+Production runtime until a deliberate paired release.
+
 ## Evidence boundary
 
 | Claim | Evidence | Status |
@@ -77,7 +84,7 @@ Documents: three Initial Assessments and one Pre Site Visit.
 |---|---|---|
 | Request, institution, location, meeting, staff lead, invited/requested amounts, project budget, personnel | Dataverse source entities | Read-only inputs to document creation |
 | Eight proposal-core narrative sections | Named fields on the Pre-Site `wmkf_requestdocument` row | Generated and reviewable before Word activation; frozen as the render inputs for that row |
-| Exact Claude proposal-core output and bounded input snapshot | Pre-Site `wmkf_requestdocument` JSON snapshot fields | Write-once audit/reproducibility evidence |
+| Canonical normalized proposal core, content-free diagnostics, and bounded input snapshot | Pre-Site `wmkf_requestdocument` JSON snapshot fields | Write-once render/audit evidence; raw provider output remains on the governed AI run |
 | Reviewer roster and review narrative | Submitted-review roster plus current `wmkf_reviewsynthesisjson` | Deterministically rendered at the selected evidence timestamp; no duplicate Pre-Site review store initially |
 | Graphical abstract image/caption and staff recommendation | The Word document | Manually pasted or entered by the PD |
 | Institutional funding history | Future governed AI result in Dataverse | Requires an approved Dataverse field and producer before automatic insertion |
@@ -126,6 +133,10 @@ version/hash captured when the action runs.
   Download, and confirmation-guarded Regenerate actions. Keep detailed source,
   provenance, and manual-completion guidance available through contextual help
   rather than permanently occupying the panel.
+- When a Ready artifact has editorial diagnostics, show a compact “Draft needs
+  a quick edit check” warning panel beside the document link. A handled failure
+  must refresh status once, display the durable support reference, and never
+  repeat the generation POST automatically.
 - Show the Draft→Review handoff as a separate next-stage panel, not as a document
   action. Its confirmation modal must explain same-file reuse, exact-version
   recording, continued Word editing, and the regeneration lock before calling
@@ -146,8 +157,11 @@ version/hash captured when the action runs.
 3. Build a bounded input snapshot and deterministic generation key.
 4. Execute the admin-configured governed prompt through the shared Executor,
    persisting the `wmkf_ai_run` audit.
-5. Validate all eight proposal-core sections and write the named fields plus
-   immutable output/input snapshots to the claimed Request Document row.
+5. Validate and deterministically normalize all eight proposal-core sections,
+   reject empty or unresolved reserved placeholders, compute content-free
+   editorial diagnostics, reconcile the named fields exactly with the
+   canonical core, and write envelope v3 plus the immutable input snapshot to
+   the claimed Request Document row.
 6. Render Word only from that persisted row and deterministic supporting data.
 7. Upload the DOCX, read it back, and transition the row to Ready.
 8. In one Dataverse changeset, supersede the prior current Pre-Site row and set
@@ -302,6 +316,9 @@ current writeup pointer always targets Word, never PDF.
   changeset.
 - A retry with the same generation key reuses its row; a materially changed
   input creates a new row.
+- A deterministic content-contract failure is non-retryable under the unchanged
+  generation key. Staff receive its durable support reference and must wait for
+  a prompt/application or input change; the browser never blindly repeats POST.
 - Never overwrite a Ready staff-edited Word item during generation,
   regeneration, review refresh, or Final creation.
 - Treat SharePoint native versions as the human-edit history. Do not allocate a

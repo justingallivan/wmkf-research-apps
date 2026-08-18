@@ -26,7 +26,10 @@ export const config = {
 
 function sendError(res, error) {
   if (error instanceof ServiceHttpError) {
-    return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+    return res.status(error.httpStatus).json(error.body ?? {
+      error: error.message,
+      code: error.code || 'pre_site_visit_failed',
+    });
   }
   console.error('workbench pre-site-visit error:', error);
   return res.status(500).json({

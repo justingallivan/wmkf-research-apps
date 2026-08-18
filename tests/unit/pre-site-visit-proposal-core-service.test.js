@@ -3,6 +3,7 @@ import {
   formatMeetingDate,
   generatePreSiteVisitProposalCore,
   loadPreSiteVisitInputs,
+  prepareGeneratedCore,
 } from '../../lib/services/pre-site-visit/proposal-core-service';
 import { REQUIRED_SYSTEM_ASSERTIONS } from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
@@ -243,4 +244,58 @@ test('rejects a drifted live prompt result that does not match the local eight-f
   });
   await expect(generatePreSiteVisitProposalCore({ requestId: REQUEST_ID }, deps))
     .rejects.toMatchObject({ code: 'pre_site_visit_prompt_invalid', httpStatus: 502 });
+});
+
+test('normalizes editorial deviations and returns deterministic warnings without failing', () => {
+  const raw = {
+    executiveSummary: 'Long but usable. '.repeat(60),
+    impactOverview: 'Impact overview.',
+    methodologyOverview: 'Methodology overview.',
+    personnelOverview: 'Ada Principal.\n\nCasey Collaborator.',
+    keckFundingRationale: 'Rationale.',
+    backgroundAndImpact: 'One.\n\nTwo.\n\nThree.',
+    detailedMethodology: 'Detailed methodology.',
+    personnelDetails: 'Ada Principal.\n\nCasey Collaborator.',
+    staffRecommendation: 'Fund it.',
+  };
+
+  const result = prepareGeneratedCore(raw, {
+    personnelNames: ['Ada Principal', 'Casey Collaborator'],
+    aiPayloadBoundaries: [{
+      dataClass: 'proposal_text',
+      truncated: true,
+      originalChars: 120000,
+      transmittedChars: 100000,
+    }],
+  });
+
+  expect(result.proposalCore.personnelOverview).toBe('Ada Principal. Casey Collaborator.');
+  expect(result.proposalCore.personnelDetails).toBe('Ada Principal. Casey Collaborator.');
+  expect(result.proposalCore).not.toHaveProperty('staffRecommendation');
+  expect(result.diagnostics).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: 'section_over_target', section: 'executiveSummary' }),
+    expect.objectContaining({ code: 'paragraphs_over_target', section: 'backgroundAndImpact' }),
+    expect.objectContaining({ code: 'proposal_input_truncated', originalChars: 120000 }),
+    expect.objectContaining({ code: 'extra_output_key_dropped', path: '$.proposalCore.staffRecommendation' }),
+  ]));
+});
+
+test.each([
+  ['whitespace-only content', { executiveSummary: ' \n\t ' }, 'pre_site_visit_prompt_empty_section'],
+  ['reserved AI token', { executiveSummary: 'Text [[AI:ExecutiveSummary]]' }, 'pre_site_visit_prompt_reserved_token'],
+  ['reserved staff token', { personnelDetails: 'Text [[STAFF:Recommendation]]' }, 'pre_site_visit_prompt_reserved_token'],
+])('rejects %s before persistence', (_label, overrides, code) => {
+  const base = {
+    executiveSummary: 'Executive summary.',
+    impactOverview: 'Impact overview.',
+    methodologyOverview: 'Methodology overview.',
+    personnelOverview: 'Personnel overview.',
+    keckFundingRationale: 'Rationale.',
+    backgroundAndImpact: 'Background and impact.',
+    detailedMethodology: 'Detailed methodology.',
+    personnelDetails: 'Personnel details.',
+  };
+  expect(() => prepareGeneratedCore({ ...base, ...overrides })).toThrow(
+    expect.objectContaining({ code }),
+  );
 });

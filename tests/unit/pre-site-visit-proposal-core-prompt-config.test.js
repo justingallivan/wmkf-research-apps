@@ -10,6 +10,7 @@ import {
   SYSTEM_PROMPT,
   USER_PROMPT_TEMPLATE,
   PROMPT_VARIABLES,
+  PRE_SITE_VISIT_CONTENT_POLICY,
   PROPOSAL_CORE_KEYS,
   PROMPT_OUTPUT_SCHEMA,
   REQUIRED_SYSTEM_ASSERTIONS,
@@ -102,20 +103,30 @@ test('returns one strict pass-through proposalCore object', () => {
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.additionalProperties).toBe(false);
 });
 
-test('enforces the overview-page length ceilings in native and local schemas', () => {
-  const expected = {
+test('keeps layout targets separate from the 30,000-character sink ceiling', () => {
+  const targets = {
     executiveSummary: 700,
     impactOverview: 420,
     methodologyOverview: 500,
     personnelOverview: 520,
     keckFundingRationale: 480,
   };
-  for (const [field, maxLength] of Object.entries(expected)) {
+  for (const [field, targetChars] of Object.entries(targets)) {
+    expect(PRE_SITE_VISIT_CONTENT_POLICY.sections[field].targetChars).toBe(targetChars);
     expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.proposalCore.properties[field].maxLength)
-      .toBe(maxLength);
+      .toBe(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars);
     expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields[field].maxLength)
-      .toBe(maxLength);
+      .toBe(PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars);
   }
+  expect(Object.values(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields))
+    .toHaveLength(PROPOSAL_CORE_KEYS.length);
+  expect(PROMPT_OUTPUT_SCHEMA.validationSchema).not.toHaveProperty('allowExtra');
+  expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore)
+    .not.toHaveProperty('allowExtra');
+  expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields.personnelOverview)
+    .not.toHaveProperty('forbidPattern');
+  expect(PROMPT_OUTPUT_SCHEMA.validationSchema.fields.proposalCore.fields.personnelDetails)
+    .not.toHaveProperty('forbidPattern');
 });
 
 test('local validation accepts the exact eight-section shape', () => {
@@ -130,7 +141,7 @@ test('local validation accepts the exact eight-section shape', () => {
   });
 });
 
-test('local validation rejects missing and injected sections', () => {
+test('local validation rejects missing sections and drops injected sections', () => {
   const missing = { ...sampleProposalCore };
   delete missing.personnelDetails;
   const missingResult = validateAiJson(
@@ -149,12 +160,14 @@ test('local validation rejects missing and injected sections', () => {
     },
     PROMPT_OUTPUT_SCHEMA.validationSchema,
   );
-  expect(injectedResult.ok).toBe(false);
-  expect(injectedResult.errors).toContain('$.proposalCore: unexpected key "staffRecommendation".');
+  expect(injectedResult).toEqual({
+    ok: true,
+    value: { proposalCore: sampleProposalCore },
+  });
 });
 
 test.each(['personnelOverview', 'personnelDetails'])(
-  'local validation rejects multiple paragraphs in %s',
+  'local validation accepts multiple paragraphs in %s for later normalization',
   (field) => {
     const result = validateAiJson(
       {
@@ -165,7 +178,17 @@ test.each(['personnelOverview', 'personnelDetails'])(
       },
       PROMPT_OUTPUT_SCHEMA.validationSchema,
     );
-    expect(result.ok).toBe(false);
-    expect(result.errors).toContain(`$.proposalCore.${field}: contains a forbidden text pattern.`);
+    expect(result.ok).toBe(true);
   },
 );
+
+test('local validation accepts content above the retired 700-character layout gate', () => {
+  const result = validateAiJson({
+    proposalCore: {
+      ...sampleProposalCore,
+      executiveSummary: 'Long but usable. '.repeat(60),
+    },
+  }, PROMPT_OUTPUT_SCHEMA.validationSchema);
+
+  expect(result.ok).toBe(true);
+});

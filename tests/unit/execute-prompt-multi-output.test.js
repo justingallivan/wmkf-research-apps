@@ -77,6 +77,10 @@ afterAll(() => { global.fetch = originalFetch; });
 
 import { executePrompt } from '../../lib/services/execute-prompt';
 import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
+import {
+  PROMPT_OUTPUT_SCHEMA as PRE_SITE_OUTPUT_SCHEMA,
+  PROPOSAL_CORE_KEYS as PRE_SITE_CORE_KEYS,
+} from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
 function buildPromptRow(outputs) {
   return {
@@ -324,18 +328,49 @@ describe('parseClaudeOutput — validationSchema (A7 step 3)', () => {
   test('drops an injected key the validationSchema does not declare', async () => {
     const result = await runWithSchema(SCHEMA, { summary: 'S', injected: 'rm -rf /' });
     expect(result.parsed).toEqual({ summary: 'S' });
+    expect(result.meta.droppedOutputPaths).toEqual(['$.injected']);
     const patch = updateCalls.find(c => c.entitySet === 'akoya_requests');
     expect(patch.payload).toEqual({ wmkf_ai_summary: 'S' });
   });
 
   test('a type-invalid output (invalid-but-parseable JSON) fails the run', async () => {
-    await expect(runWithSchema(SCHEMA, { summary: 12345 }))
-      .rejects.toThrow(/failed schema validation/);
+    const error = await runWithSchema(SCHEMA, { summary: 12345 }).catch((caught) => caught);
+    expect(error.code).toBe('claude_output_schema_invalid');
+    expect(error.message).toMatch(/failed schema validation/);
   });
 
   test('no validationSchema → parsed passes through unchanged (backward compat)', async () => {
     const result = await runWithSchema(undefined, { summary: 'S', extra: 'kept' });
     expect(result.parsed).toEqual({ summary: 'S', extra: 'kept' });
+  });
+
+  test('the stored Pre-Site schema accepts over-target prose and drops extras', async () => {
+    const proposalCore = Object.fromEntries(
+      PRE_SITE_CORE_KEYS.map((key) => [key, `${key} content.`]),
+    );
+    proposalCore.executiveSummary = 'Long but usable. '.repeat(60);
+    proposalCore.personnelOverview = 'First paragraph.\n\nSecond paragraph.';
+    proposalCore.backgroundAndImpact = 'One.\n\nTwo.\n\nThree.';
+    proposalCore.staffRecommendation = 'Fund it.';
+    promptRow = buildPromptRow([]);
+    promptRow.wmkf_ai_promptname = 'test.pre-site-stored-schema';
+    promptRow.wmkf_ai_promptoutputschema = JSON.stringify(PRE_SITE_OUTPUT_SCHEMA);
+    setClaudeJson({ proposalCore });
+    getRecordImpl = async () => REQUEST_ROW;
+
+    const result = await executePrompt({
+      promptName: promptRow.wmkf_ai_promptname,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      overrideVariables: { x: 'value' },
+      requireNoPersistence: true,
+    });
+
+    expect(result.parsed.proposalCore.executiveSummary.length).toBeGreaterThan(700);
+    expect(result.parsed.proposalCore.personnelOverview).toContain('\n\n');
+    expect(result.parsed.proposalCore.backgroundAndImpact).toContain('Three.');
+    expect(result.parsed.proposalCore).not.toHaveProperty('staffRecommendation');
+    expect(result.meta.droppedOutputPaths).toContain('$.proposalCore.staffRecommendation');
   });
 });
 

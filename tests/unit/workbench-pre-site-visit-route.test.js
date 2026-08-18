@@ -160,5 +160,8 @@ test('maps governed service errors', async () => {
   await handler(post(), res);
 
   expect(res.statusCode).toBe(409);
-  expect(res.body).toEqual({ error: 'The governed prompt is unavailable.' });
+  expect(res.body).toEqual({
+    error: 'The governed prompt is unavailable.',
+    code: 'prompt_unavailable',
+  });
 });

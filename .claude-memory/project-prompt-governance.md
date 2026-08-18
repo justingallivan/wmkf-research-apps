@@ -4,7 +4,7 @@ description: Tier-1 system prompts (Dataverse wmkf_ai_prompts, versioned, create
 type: project
 status: active
 scope: prompts
-last_verified: 2026-08-17 — Pre-Site prompt v3 and admin model-publication code are Production-live; admin publish route still lacks a post-deploy smoke
+last_verified: 2026-08-18 — Pre-Site prompt v3 remains Production-live on the prior schema; resilience source adds exact preflight and full post-publication readback but has not been published or deployed
 ---
 
 ## Recall Rule
@@ -43,6 +43,11 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
   model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
   `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
 
+**Pre-Site resilience boundary (source-built; not live):** runtime now checks
+the governed body, variables, full schema, and assertions before side effects;
+force publication verifies full readback. The tracked schema differs from live
+v3 until a paired prompt/application release; mixed state blocks generation.
+
 **Admin model publication (Production-live source 2026-08-17; route smoke still
 open):** the Prompt Templates editor
 can select `wmkf_ai_model`; a model-only change publishes a new immutable
@@ -62,7 +67,8 @@ these (S269).
 
 ⚠️ **Open hazard (separate from this work):** the admin `PUT` can edit a prompt's `variables`, and
 neither the file config-pin test nor the A7 gate validates the LIVE row's untrusted declarations — so a
-superuser edit could weaken the A7 boundary on the live path undetected. Tracked as a follow-up, not
-fixed here.
+superuser edit could weaken the A7 boundary on most live paths undetected.
+Tracked as a follow-up; the source-built Pre-Site producer is now an explicit
+exception because it performs the exact preflight described above.
 
 Related: [[project-dynamics-as-prompt-ground-truth]], [[project-phaseistatus-decision-lifecycle]].

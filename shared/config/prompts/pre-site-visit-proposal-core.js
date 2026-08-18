@@ -117,16 +117,30 @@ export const PROPOSAL_CORE_KEYS = [
   'personnelDetails',
 ];
 
-const validationStringFields = {
-  executiveSummary: { type: 'string', maxLength: 700 },
-  impactOverview: { type: 'string', maxLength: 420 },
-  methodologyOverview: { type: 'string', maxLength: 500 },
-  personnelOverview: { type: 'string', maxLength: 520, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
-  keckFundingRationale: { type: 'string', maxLength: 480 },
-  backgroundAndImpact: { type: 'string', maxLength: 9000 },
-  detailedMethodology: { type: 'string', maxLength: 9000 },
-  personnelDetails: { type: 'string', maxLength: 6000, forbidPattern: '\\r?\\n\\s*\\r?\\n' },
-};
+export const PRE_SITE_VISIT_CONTENT_POLICY = Object.freeze({
+  sinkMaxChars: 30000,
+  sections: Object.freeze({
+    executiveSummary: Object.freeze({ targetChars: 700, targetWords: Object.freeze({ min: 80, max: 90 }), maxParagraphs: 1 }),
+    impactOverview: Object.freeze({ targetChars: 420, targetWords: Object.freeze({ min: 35, max: 55 }), maxParagraphs: 1 }),
+    methodologyOverview: Object.freeze({ targetChars: 500, targetWords: Object.freeze({ min: 45, max: 65 }), maxParagraphs: 1 }),
+    personnelOverview: Object.freeze({ targetChars: 520, targetWords: Object.freeze({ min: 30, max: 45 }), maxParagraphs: 1 }),
+    keckFundingRationale: Object.freeze({ targetChars: 480, targetWords: Object.freeze({ min: 45, max: 60 }), maxParagraphs: 1 }),
+    backgroundAndImpact: Object.freeze({ targetChars: 9000, maxParagraphs: 2 }),
+    detailedMethodology: Object.freeze({ targetChars: 9000, maxParagraphs: 2 }),
+    personnelDetails: Object.freeze({ targetChars: 6000, targetWords: Object.freeze({ min: 140, max: 180 }), maxParagraphs: 1 }),
+  }),
+  combinedLongForm: Object.freeze({
+    fields: Object.freeze(['backgroundAndImpact', 'detailedMethodology']),
+    targetWords: 600,
+  }),
+});
+
+const validationStringFields = Object.fromEntries(
+  PROPOSAL_CORE_KEYS.map((key) => [key, {
+    type: 'string',
+    maxLength: PRE_SITE_VISIT_CONTENT_POLICY.sinkMaxChars,
+  }]),
+);
 
 const jsonStringProperties = Object.fromEntries(
   Object.entries(validationStringFields).map(([key, value]) => [key, {
@@ -139,7 +153,9 @@ const jsonStringProperties = Object.fromEntries(
  * Pass-through structured output. No request field is written: the caller gets
  * the validated object and the normal Executor run audit, then a later Word
  * renderer consumes it. Native JSON Schema constrains generation; the local
- * validation schema independently bounds strings and rejects extra keys.
+ * validation schema independently bounds strings and drops undeclared keys.
+ * Layout-sized targets remain prompt guidance and deterministic warnings, not
+ * availability gates.
  */
 export const PROMPT_OUTPUT_SCHEMA = {
   generationMode: 'native-json-schema',
@@ -166,11 +182,9 @@ export const PROMPT_OUTPUT_SCHEMA = {
   },
   validationSchema: {
     type: 'object',
-    allowExtra: 'error',
     fields: {
       proposalCore: {
         type: 'object',
-        allowExtra: 'error',
         fields: validationStringFields,
       },
     },

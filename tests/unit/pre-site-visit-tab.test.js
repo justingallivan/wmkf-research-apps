@@ -108,6 +108,24 @@ test('loads existing Ready actions without another generation request', async ()
   );
 });
 
+test('shows durable Ready warnings beside the Word link', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: {
+      ...readyArtifact(),
+      warnings: [{
+        code: 'section_over_target',
+        message: 'A generated section is longer than suggested and may need editing.',
+      }],
+    },
+  }));
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Draft needs a quick edit check' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
+});
+
 test('recovers a Ready Word link after the generation connection is interrupted', async () => {
   let getCount = 0;
   global.fetch.mockImplementation(async (_url, options = {}) => {
@@ -146,6 +164,44 @@ test('shows a server error without creating a Word link', async () => {
     'No usable AI proposal narrative was found.',
   );
   expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'POST')).toHaveLength(1);
+  expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'GET')).toHaveLength(2);
+});
+
+test('refreshes durable failure state once and shows its support reference', async () => {
+  let getCount = 0;
+  global.fetch.mockImplementation(async (_url, options = {}) => {
+    if (options.method === 'POST') {
+      return {
+        ok: false,
+        status: 502,
+        json: async () => ({ error: 'Pre-Site Visit generation did not complete.', runId: 'run-from-post' }),
+      };
+    }
+    getCount += 1;
+    return getCount === 1 ? statusResponse() : statusResponse({
+      pendingArtifact: {
+        artifactId: 'failed-artifact',
+        operationStatus: 100000002,
+        retryable: false,
+        lastError: {
+          message: 'The governed output was invalid.',
+          supportReference: 'durable-run-id',
+        },
+      },
+    });
+  });
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('The governed output was invalid.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Support reference: durable-run-id');
+  expect(screen.getByText(/needs a prompt or application change/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeDisabled();
+  expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'POST')).toHaveLength(1);
+  expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'GET')).toHaveLength(2);
 });
 
 test('requires confirmation before regenerating an existing draft', async () => {

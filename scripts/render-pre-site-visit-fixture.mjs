@@ -61,8 +61,8 @@ const proposalCore = {
   methodologyOverview: 'Fixture text verifies wrapping and spacing for the methodology bullet.',
   personnelOverview: `Fixture text verifies one-paragraph personnel formatting for ${context.personnel.map((person) => person.name).join(', ')}.`,
   keckFundingRationale: 'Fixture text verifies wrapping and spacing for the rationale bullet.',
-  backgroundAndImpact: `${marker} This paragraph verifies the first long-form section.\n\nA second fixture paragraph verifies template-preserving paragraph expansion.`,
-  detailedMethodology: `${marker} This paragraph verifies the detailed-methodology section.\n\nA second fixture paragraph verifies long-form text flow without a live model call.`,
+  backgroundAndImpact: `${marker} This paragraph verifies the first long-form section.\n\nA second fixture paragraph verifies template-preserving paragraph expansion.\n\nA third paragraph verifies that editorial paragraph targets no longer block rendering.`,
+  detailedMethodology: `${marker} This paragraph verifies the detailed-methodology section.\n\nA second fixture paragraph verifies long-form text flow without a live model call.\n\nA third paragraph verifies content-tolerant rendering.`,
   personnelDetails: `Fixture text keeps the full Dataverse roster in one paragraph: ${context.personnel.map((person) => `${person.name} (${person.role === 'Principal Investigator' ? 'PI' : 'co-PI'})`).join('; ')}.`,
 };
 

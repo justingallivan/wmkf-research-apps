@@ -93,7 +93,38 @@ if (DRY) {
 
 try {
   const result = await seedPromptRow({ promptName: PROMPT_NAME, recordData, force: FORCE });
-  console.log(`✓ ${result.action} → v${result.version} (current row ${result.id})`);
+  const { fetchCurrentPrompt } = await import('../lib/services/prompt-store.js');
+  const readback = await fetchCurrentPrompt(PROMPT_NAME);
+  const mismatches = [];
+  for (const field of [
+    'wmkf_ai_promptname',
+    'wmkf_ai_systemprompt',
+    'wmkf_ai_promptbody',
+    'wmkf_ai_model',
+    'wmkf_ai_temperature',
+    'wmkf_ai_maxtokens',
+  ]) {
+    if (readback[field] !== recordData[field]) mismatches.push(field);
+  }
+  for (const field of ['wmkf_ai_promptvariables', 'wmkf_ai_promptoutputschema']) {
+    let actual = null;
+    let expected = null;
+    try {
+      actual = JSON.stringify(JSON.parse(readback[field]));
+      expected = JSON.stringify(JSON.parse(recordData[field]));
+    } catch {
+      mismatches.push(field);
+      continue;
+    }
+    if (actual !== expected) mismatches.push(field);
+  }
+  if (Number(readback.wmkf_promptversion) !== result.version) mismatches.push('wmkf_promptversion');
+  if (String(readback.wmkf_ai_promptid || '').toLowerCase()
+    !== String(result.id || '').toLowerCase()) mismatches.push('wmkf_ai_promptid');
+  if (mismatches.length) {
+    throw new Error(`Published Pre-Site prompt readback mismatch: ${[...new Set(mismatches)].join(', ')}`);
+  }
+  console.log(`✓ ${result.action} → v${result.version} (current row ${result.id}); exact readback verified`);
 } catch (err) {
   if (err instanceof SeedRefused) {
     console.error(`✗ ${err.message}`);

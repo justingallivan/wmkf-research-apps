@@ -71,7 +71,8 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
   promptName: 'pre-site-visit.proposal-core.generate',
   templateId: 'phase-ii-pre-site-visit',
-  templateVersion: '4',
+  // Render-contract v5 intentionally retains the v4 OOXML template bytes.
+  templateVersion: '5',
   relativeFolder: 'Artifacts/Pre-Site Visit',
   producer: 'request-workbench',
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
