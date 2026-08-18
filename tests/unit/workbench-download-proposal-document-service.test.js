@@ -28,6 +28,7 @@ import { ServiceHttpError } from '../../lib/services/service-http-error';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 const FOLDER = '1002794_X/Phase I';
+const PHASE_II_FOLDER = '1002794_X/Phase II';
 const AI_FOLDER = '1002794_X/AI Materials';
 const args = (over = {}) => ({ requestId: REQ, library: 'Documents', folder: FOLDER, filename: 'proposal.pdf', ...over });
 
@@ -38,6 +39,9 @@ beforeEach(() => {
     slots: [
       { found: true, library: 'Documents', folder: FOLDER, name: 'proposal.pdf' },
       { found: false, library: 'Documents', folder: FOLDER, name: 'missing.pdf' }, // not-found slots excluded
+    ],
+    phaseIIDocuments: [
+      { library: 'Documents', folder: PHASE_II_FOLDER, name: 'PhaseIIProposal.pdf' },
     ],
     aiMaterials: [
       { found: true, library: 'Documents', folder: AI_FOLDER, name: 'ProposalNarrative_1002794.pdf' },
@@ -57,8 +61,12 @@ test('request not found → 404, no listing/download attempted', async () => {
   expect(listProposalDocuments).not.toHaveBeenCalled();
 });
 
-test('membership: found slots + AI Materials + otherDocuments allowed; unlisted or found:false → 403 pre-download', async () => {
+test('membership: Phase I + Phase II + AI Materials + otherDocuments allowed; unlisted or found:false → 403 pre-download', async () => {
   await expect(downloadProposalDocument(args({ filename: 'other.docx' }))).resolves.toBeTruthy();
+  await expect(downloadProposalDocument(args({
+    folder: PHASE_II_FOLDER,
+    filename: 'PhaseIIProposal.pdf',
+  }))).resolves.toBeTruthy();
   await expect(downloadProposalDocument(args({
     folder: AI_FOLDER,
     filename: 'ProposalNarrative_1002794.pdf',
@@ -72,7 +80,7 @@ test('membership: found slots + AI Materials + otherDocuments allowed; unlisted 
     expect(err.httpStatus).toBe(403);
     expect(err.message).toBe('File is not a Proposal-tab document for this request');
   }
-  expect(downloadFileByPath).toHaveBeenCalledTimes(2);
+  expect(downloadFileByPath).toHaveBeenCalledTimes(3);
 });
 
 test('golden path returns the plain file descriptor (never touches res)', async () => {

@@ -40,6 +40,14 @@ function responseBody(overrides = {}) {
       },
     ],
     slots: [{ key: 'projectDescription', label: 'Project Description', found: false }],
+    phaseIIDocuments: [
+      {
+        library: 'akoya_request',
+        folder: `${ROOT}/Phase II`,
+        name: 'Proposal_1002379.pdf',
+        mimeType: 'application/pdf',
+      },
+    ],
     otherDocuments: [],
     errors: [],
     ...overrides,
@@ -59,6 +67,7 @@ test('renders canonical AI Materials separately with scoped view and download li
   await waitFor(() => expect(screen.getByText('Proposal Narrative')).toBeInTheDocument());
   expect(screen.getByText('AI Materials')).toBeInTheDocument();
   expect(screen.getByText('Phase I documents')).toBeInTheDocument();
+  expect(screen.getByText('Phase II documents')).toBeInTheDocument();
   expect(screen.queryByText('Some document folders couldn’t be read.')).not.toBeInTheDocument();
 
   const narrativeRow = screen.getByText('Proposal Narrative').closest('li');
@@ -67,6 +76,25 @@ test('renders canonical AI Materials separately with scoped view and download li
   expect(view).toHaveAttribute('href', expect.stringContaining('ProposalNarrative_1002379.pdf'));
   expect(view).toHaveAttribute('href', expect.stringContaining('disposition=inline'));
   expect(download).toHaveAttribute('href', expect.stringContaining('ProposalNarrative_1002379.pdf'));
+
+  const phaseIIRow = screen.getByText('Proposal_1002379.pdf').closest('li');
+  const phaseIIView = within(phaseIIRow).getByRole('link', { name: 'View' });
+  const phaseIIViewUrl = new URL(phaseIIView.getAttribute('href'), 'http://localhost');
+  expect(phaseIIViewUrl.searchParams.get('folder')).toBe(`${ROOT}/Phase II`);
+  expect(within(phaseIIRow).getByRole('link', { name: 'Download' }))
+    .toHaveAttribute('href', expect.stringContaining('Proposal_1002379.pdf'));
+});
+
+test('shows a clear empty state when no Phase II documents exist', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => responseBody({ phaseIIDocuments: [] }),
+  });
+
+  render(<ProposalTab context={context} />);
+
+  await waitFor(() => expect(screen.getByText('Phase II documents')).toBeInTheDocument());
+  expect(screen.getByText('No documents found.')).toBeInTheDocument();
 });
 
 test('still warns when the API reports a real folder-read failure', async () => {

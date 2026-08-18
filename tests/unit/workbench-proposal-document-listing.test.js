@@ -54,6 +54,8 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
     }
     return [
       { name: 'ProjectDescription.pdf', folder: `${ROOT}/Phase I`, size: 10, mimeType: 'application/pdf' },
+      { name: 'Proposal_1002379.pdf', folder: `${ROOT}/Phase II`, size: 15, mimeType: 'application/pdf' },
+      { name: 'Appendix.pdf', folder: `${ROOT}/Phase II/Supporting`, size: 16, mimeType: 'application/pdf' },
       { name: 'ProposalNarrative_1002379.pdf', folder: `${ROOT}/AI Materials`, size: 20, mimeType: 'application/pdf' },
       { name: 'ProposalBibliography_1002379.pdf', folder: `${ROOT}/AI Materials`, size: 30, mimeType: 'application/pdf' },
       { name: 'Proposal_1002379.pdf', folder: `${ROOT}/AI Materials`, size: 40, mimeType: 'application/pdf' },
@@ -64,6 +66,18 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
 
   expect(result.errors).toEqual([]);
   expect(result.slots[0]).toMatchObject({ found: true, name: 'ProjectDescription.pdf' });
+  expect(result.phaseIIDocuments).toEqual([
+    expect.objectContaining({
+      name: 'Proposal_1002379.pdf',
+      library: 'akoya_request',
+      folder: `${ROOT}/Phase II`,
+    }),
+    expect.objectContaining({
+      name: 'Appendix.pdf',
+      library: 'akoya_request',
+      folder: `${ROOT}/Phase II/Supporting`,
+    }),
+  ]);
   expect(result.aiMaterials).toEqual([
     expect.objectContaining({
       key: 'proposalNarrative',
@@ -85,6 +99,17 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
     }),
   ]);
   expect(result.otherDocuments).toEqual([]);
+});
+
+test('returns an empty Phase II collection when the folder has no files', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+  listFiles.mockResolvedValue([
+    { name: 'ProjectDescription.pdf', folder: `${ROOT}/Phase I`, mimeType: 'application/pdf' },
+  ]);
+
+  const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
+
+  expect(result.phaseIIDocuments).toEqual([]);
 });
 
 test('wrong filename casing or a nested folder does not masquerade as a canonical AI input', async () => {

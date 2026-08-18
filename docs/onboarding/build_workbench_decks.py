@@ -142,7 +142,7 @@ def build_pd():
     content_slide(prs, "AGENDA", "What you'll be able to do", [
         "Open any request and see, in one place, where it stands and what to do next.",
         "Run the whole reviewer cycle — find, invite, chase, track — without leaving the request.",
-        "Read the proposal, its Phase I documents, and the AI summaries side by side.",
+        "Read the proposal, its Phase I and Phase II documents, and the AI summaries side by side.",
         "Send grantee-deliverable invitations to awardees.",
         ("", "We'll walk one proposal from open → reviewers engaged → reviews in. Same step order Connor's technical deck uses."),
     ])
@@ -187,7 +187,7 @@ def build_pd():
     content_slide(prs, "STEP 5", "Proposal tab", [
         "Everything about the proposal itself, stacked top to bottom:",
         (1, "Proposal info — PI, Co-PIs, abstract, amounts."),
-        (1, "Phase I documents — view/download the submitted files."),
+        (1, "Phase I and Phase II documents — view/download the submitted files."),
         (1, "AI content — fit rationale, summary, extracted data (Field Primer expands here over time)."),
         ("", "This is your read-the-proposal surface while you decide who should review it."),
     ])

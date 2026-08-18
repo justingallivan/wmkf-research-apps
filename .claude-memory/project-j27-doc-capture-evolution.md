@@ -1,6 +1,6 @@
 ---
 name: J27 document capture & Proposal-tab evolution
-description: The D26 Proposal tab retains its Phase I display bridge; writeups use the exact narrative PDF, while the bibliography is reserved for next-cycle Reviewer Finder.
+description: The D26 Proposal tab displays its Phase I bridge plus files from Phase II; writeups use the exact narrative PDF, while the bibliography is reserved for next-cycle Reviewer Finder.
 type: project
 status: active
 scope: strategy
@@ -25,7 +25,10 @@ permanent.** The Proposal tab lists the request's SharePoint **`Phase I`
 subfolder** and matches the cycle filenames `ProjectDescription.pdf`,
 `Biosketches.pdf`, `ProjectBudget.pdf`, and
 `Project Budget spreadsheet.xlsx`; `Application Cover Page.docx` is excluded
-because its content comes from the Dataverse-derived top panel.
+because its content comes from the Dataverse-derived top panel. It also lists
+every file found beneath the request's **`Phase II` subfolder** in a separate
+Phase II Documents section; those entries use their SharePoint filenames rather
+than the D26 Phase I slot map.
 
 **Governed proposal analysis has a separate internal input as of 2026-08-16.**
 Initial Assessment and Workbench Field Primer request mode require the exact

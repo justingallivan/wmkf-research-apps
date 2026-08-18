@@ -140,7 +140,9 @@ Finder remains a separate current-cycle surface: its authenticated explicit
 default loader prefers the exact outbound reviewer package and falls back only
 to exactly one active `Phase I/ProjectDescription.pdf`. Neither or ambiguity
 returns the server-listed picker before download/Blob write. The Workbench
-Proposal tab separately continues to display the D26 Phase I document slots.
+Proposal tab separately displays the D26 Phase I document slots and every file
+beneath the request's `Phase II` folder; these display/download collections do
+not change the automated proposal-input contract above.
 
 **[VERIFIED IN SOURCE 2026-08-16 via resolver tests and a read-only live
 Dataverse/Graph extraction]** Request `1002788` resolves exactly
