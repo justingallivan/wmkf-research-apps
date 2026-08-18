@@ -111,11 +111,11 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects render-contract v5 over the retained v4 template bytes', () => {
+test('selects render-contract v6 over the fixed-column v5 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 5,
-    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v4.docx',
+    version: 6,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v5.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
@@ -161,6 +161,34 @@ test('pins one blank line after Project Title and single-spaced metadata rows', 
     const cellCount = (row.match(/<w:tc(?:\s[^>]*)?>/g) || []).length;
     expect(row.match(zeroAfterSpacing)).toHaveLength(cellCount);
   }
+});
+
+test('pins a fixed 1.5-inch metadata label column across every first-page row', async () => {
+  const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+  const zip = await JSZip.loadAsync(template);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  const metadataTable = wordTables(documentXml).find((table) => table.includes('Project Title'));
+  const rows = wordTableRows(metadataTable);
+  const expectedGrid = [2160, 4090, 2520, 1310];
+  const expectedRows = [
+    [2160, 7920],
+    expectedGrid,
+    expectedGrid,
+    expectedGrid,
+    expectedGrid,
+  ];
+
+  expect(metadataTable).toContain('<w:tblW w:w="10080" w:type="dxa"/>');
+  expect(metadataTable).toContain('<w:tblLayout w:type="fixed"/>');
+  expect(Array.from(metadataTable.matchAll(/<w:gridCol\b[^>]*w:w="(\d+)"[^>]*\/>/g))
+    .map((match) => Number(match[1]))).toEqual(expectedGrid);
+  expect(expectedGrid.reduce((sum, width) => sum + width, 0)).toBe(10080);
+
+  expect(rows.map((row) => (
+    Array.from(row.matchAll(/<w:tcW\b[^>]*w:w="(\d+)"[^>]*w:type="dxa"[^>]*\/>/g))
+      .map((match) => Number(match[1]))
+  ))).toEqual(expectedRows);
+  expect(rows.every((row) => !/<w:tcW\b[^>]*w:type="(?:auto|pct)"/.test(row))).toBe(true);
 });
 
 test('pins the divider and one blank line above the executive summary', async () => {
