@@ -121,14 +121,14 @@ test('selects the governed v4 template artifact', () => {
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
 });
 
-test('pins title alignment and visible metadata-value spacing in the retained template', async () => {
+test('pins top title alignment and visible metadata-value spacing in the retained template', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
   const documentXml = await zip.file('word/document.xml').async('string');
   const cells = wordTableCells(documentXml);
 
-  expect(cellContaining(cells, 'Project Title')).toContain('<w:vAlign w:val="top"/>');
-  expect(cellContaining(cells, 'DV:ProjectTitle')).toContain('<w:vAlign w:val="top"/>');
+  expect(cellContaining(cells, 'Project Title')).not.toMatch(/<w:vAlign w:val="(?:center|bottom)"\/>/);
+  expect(cellContaining(cells, 'DV:ProjectTitle')).not.toMatch(/<w:vAlign w:val="(?:center|bottom)"\/>/);
   expect(cellContaining(cells, '>Recommendation<')).toContain('<w:noWrap/>');
   for (const placeholder of [
     'DV:RequestedAmount',
@@ -148,7 +148,7 @@ test('pins one blank line after Project Title and single-spaced metadata rows', 
   const documentXml = await zip.file('word/document.xml').async('string');
   const metadataTable = wordTables(documentXml).find((table) => table.includes('Project Title'));
   const rows = wordTableRows(metadataTable);
-  const singleSpacing = /<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"\/>/g;
+  const zeroAfterSpacing = /<w:spacing w:after="0"\/>/g;
 
   expect(rows).toHaveLength(5);
   expect(rows[0]).toContain('Project Title');
@@ -159,11 +159,11 @@ test('pins one blank line after Project Title and single-spaced metadata rows', 
   expect(rows[4]).toContain('Recommendation');
   for (const row of rows) {
     const cellCount = (row.match(/<w:tc(?:\s[^>]*)?>/g) || []).length;
-    expect(row.match(singleSpacing)).toHaveLength(cellCount);
+    expect(row.match(zeroAfterSpacing)).toHaveLength(cellCount);
   }
 });
 
-test('pins one blank line followed by the divider above the executive summary', async () => {
+test('pins the divider and one blank line above the executive summary', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const zip = await JSZip.loadAsync(template);
   const documentXml = await zip.file('word/document.xml').async('string');
@@ -179,10 +179,10 @@ test('pins one blank line followed by the divider above the executive summary', 
     '<w:bottom w:val="single" w:sz="12" w:space="1" w:color="auto"/>',
   );
   expect(divider).toContain(
-    '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>',
+    '<w:spacing w:after="0"/>',
   );
   expect(afterMetadata).toMatch(/^\s*<w:p[\s\S]*?<w:pBdr>/);
-  expect(afterDivider).toMatch(/^\s*<w:p[\s\S]*?Executive Summary/);
+  expect(afterDivider).toMatch(/^\s*<w:p(?:(?!<w:t).)*<\/w:p>\s*<w:p[\s\S]*?Executive Summary/);
   expect(wordTables(documentXml).find((table) => table.includes(
     '<w:top w:val="single" w:sz="8" w:space="0" w:color="000000"/>',
   ))).toBeUndefined();
