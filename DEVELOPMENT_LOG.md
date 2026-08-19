@@ -10,6 +10,22 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Durable operational observability is Production-live (operational_events + Log Drain endpoint)
+
+**Milestone:** Application failures now persist as structured, sanitized `operational_events` rows
+that outlive Vercel's log-retention window, with recovery tracking that distinguishes
+transient/recovered failures from unresolved ones.
+**Sessions:** one worktree session on `codex/operational-observability` (2026-08-19), merged via PR #123.
+**Ship state:** `main` at `9de8b348`, deployment READY, migration 030 applied and probe-verified
+(23 cols / 8 idx / tracker 29). LIVE: notify() error/critical mirror, reviewer-acceptance
+honorarium failure enrichment + recovered/superseded settling, superuser admin surface, daily
+retention. DORMANT: the HMAC drain endpoint awaits `VERCEL_LOG_DRAIN_SECRET` + drain creation.
+**Why it matters:** operators can open `/admin` after an alert, find the durable event by request
+number or entity id, and see whether it recovered — the honorarium-alert incident class is closed.
+Hardened by six Codex adversarial cycles (nine findings fixed) ending READY TO MERGE.
+**Pointers:** `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`;
+`docs/OPERATIONAL_OBSERVABILITY_HANDOFF_2026-08-19.md`; commits `ad9f1d79`…`2b1f59a2`, merge `9de8b348`.
+
 ## August 2026 — Pre-Site-to-Site-Visit handoff and Phase II proposal access are Production-live (Session 444)
 
 **Milestone:** The Workbench now carries one governed Pre-Site Word workspace into the Site Visit

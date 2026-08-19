@@ -144,7 +144,7 @@ returned zero eligible/enqueued/claimed/failed.
 **Source of truth:** Postgres-only.
 Cron-driven health checks (7 services), alert log, cron audit trail. `maintenance-service.js` writes; admin dashboard reads.
 
-### `operational_events` (new — migration 030, not yet applied to production as of 2026-08-19)
+### `operational_events` (0 rows at creation — migration 030 applied to production 2026-08-19)
 **Source of truth:** Postgres-only.
 **Schema:** durable structured operational events: `source` ('app' | 'vercel-drain'),
 `environment`, `event_type`, `subsystem`, `severity`, `status`
