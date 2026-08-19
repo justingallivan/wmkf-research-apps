@@ -3,7 +3,7 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Stage 1 boolean comparison is shipped; the accepted next phase replaces pair-sameness with source-aware organization relationships and conditional neutrality."
+summary: "The source-aware conditional-neutrality contract passes its 25-case shadow gate; production still uses the incumbent boolean contract."
 canonical: false
 cataloged: 2026-08-08
 last_verified: 2026-08-19
@@ -21,7 +21,7 @@ related:
 
 ## Current decision
 
-**REWORKED AND APPROVED IN PRINCIPLE, 2026-08-19.** The owner accepted
+**STAGE 1 SHADOW CONTRACT IMPLEMENTED, 2026-08-19.** The owner accepted
 **conditional neutrality** as the governing policy for unresolved affiliation
 evidence:
 
@@ -33,9 +33,10 @@ evidence:
 
 This supersedes the prior future-stage framing in this document that embedded
 consumer actions in relationship labels such as `related-autoclear` and
-`related-surface`. It does **not** change the frozen Stage 1 fixture vocabulary
-or any current runtime behavior. No implementation was authorized or performed
-as part of the 2026-08-19 planning decision.
+`related-surface`. The typed relationship/policy services and source-aware
+25-case evaluation are now implemented in shadow mode. They do **not** change
+the frozen boolean-fixture vocabulary, current runtime behavior, candidate
+selectability, or durable-write authority.
 
 The strategic correction is broader than a threshold adjustment:
 
@@ -55,13 +56,15 @@ two people are the same by itself.
 | Pair result exposed to consumers | **VERIFIED boolean only.** `areConsistent()` returns `true` or `false`; it does not expose relationship, currentness, or remedy. | `institution-affiliation-consistency.js:335-369` |
 | Enrichment authority | **VERIFIED high authority.** A false/error comparison contributes to `institutionContradicted`, which combines with the independent identity status in `identityNeedsReview` and gates researcher, ORCID, metrics, and COI writes. | `enrich-recommended-service.js:684-767,933-1005` |
 | ROR relationship substrate | **VERIFIED present but not available to pair consumers.** The candidate/decision layer reads typed ROR relationships and detects sibling conflicts; the identity wrapper returns only a hydrated identity or `null`, discarding the decision provenance needed for pair policy. | `ror-institution-decision.js`; `ror-institution-identity-resolver.js:63-114` |
-| Source/time-aware affiliation assessment | **PLANNED, not built.** Current enrichment reduces the verifier history to institution strings before comparison. | `enrich-recommended-service.js:693-730` |
-| Typed consumer policy | **PLANNED, not built.** Existing cards and write gates consume booleans and legacy flags. | source fan-out of `institutionMismatch` / `institutionContradicted` |
+| Source/time-aware affiliation assessment | **VERIFIED, built in shadow only.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Current enrichment still reduces verifier history to strings and does not call the shadow service. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; caller search |
+| Typed consumer policy | **VERIFIED, built in shadow only.** A total versioned evaluator covers five consumers and fails closed for unknown/high-authority inputs. Existing cards and write gates still consume booleans and legacy flags. | `institution-affiliation-assessment.js`; focused tests; caller search |
+| Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
+| Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
-The shipped Stage 1 comparator remains the incumbent until every consumer in
+The shipped boolean comparator remains the incumbent until every consumer in
 this plan is deliberately migrated. The stop-rule remains in force: do not add
 another string-side guard or a third enrichment checker. New work proceeds
-through the typed Stage 2 contract below.
+through the typed shadow contract below.
 
 ## Problem statement
 
@@ -289,6 +292,10 @@ not available on that card.
 - The shadow `institution-structural-sameness` experiment on branch
   `codex/institution-decision-harness` is not a production candidate. Its value
   is proving that a narrower string classifier cannot satisfy this contract.
+- The replacement source-aware v1 fixture, normalized ROR snapshot, runner, and
+  passing artifact live under
+  `benchmarks/institution-affiliation-compatibility/`. Its go verdict permits
+  continued shadow evaluation only.
 
 Existing frozen files remain immutable. Revised cases and labels use a new
 versioned directory/result slug.
@@ -361,6 +368,14 @@ safety evidence. They supplement rather than replace the source-complete 25.
 ### Stage 1 — typed shadow contract and adjudication
 
 **Authority:** none; shadow only.
+
+**Status: IMPLEMENTED AND PASSING, 2026-08-19.** The v1 artifact reports 25/25
+relationship matches, 25/25 action matches, zero sibling collapses, zero unsafe
+clears, zero manufactured reviews, all three challenged regressions
+nonblocking, five revised old labels out of sixteen old-labeled rows, and zero
+provider failures in the final live ROR capture. The production independent-
+identity execution-point contract remains insufficient for an authority flip,
+so Stage 2/3 are not authorized by this result.
 
 Deliver:
 
@@ -483,10 +498,11 @@ Stage 1 remains the falsification record for the current boolean comparator:
   binds; and
 - repeated adversarial review produced explicit checker and seam stop-rules.
 
-Detailed frozen artifacts and fixture semantics remain under
+Detailed frozen boolean artifacts and fixture semantics remain under
 `benchmarks/institution-pair-consistency/`. They prove the current Stage 1
-behavior; they do not prove the new source-aware relationship or conditional-
-neutrality contract.
+boolean behavior. The separate source-aware v1 artifact proves the new shadow
+relationship/policy contract only; neither artifact proves that production
+consumers have migrated.
 
 ## Remaining implementation decisions
 

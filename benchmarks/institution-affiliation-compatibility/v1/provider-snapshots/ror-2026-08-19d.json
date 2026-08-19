@@ -1,0 +1,5240 @@
+{
+  "schemaVersion": "institution-affiliation-provider-snapshot/v1",
+  "capturedAt": "2026-08-19T14:08:20.382Z",
+  "authority": "read_only_ror_snapshot_shadow_only",
+  "casesSha256": "3c08f8e9ea1fc837ce065d370ce7c0b32ed355c5e10fe3ad6a9a26f390dfb20a",
+  "provider": {
+    "adapterVersion": "ror-api-claim-candidates/v1",
+    "affiliationStrategy": "single_search",
+    "apiVersion": "v2",
+    "endpoint": "https://api.ror.org/v2/organizations",
+    "observedOn": "2026-08-19",
+    "strategies": [
+      "affiliation-single-search",
+      "ordinary-query",
+      "successor-hydration",
+      "parent-hydration"
+    ]
+  },
+  "metrics": {
+    "affiliationLookups": 46,
+    "cacheHits": 15,
+    "candidateSets": 46,
+    "candidatesReturned": 466,
+    "maxCandidatesReturned": 29,
+    "malformedResponses": 0,
+    "ordinaryQueryLookups": 4,
+    "parentHydrations": 0,
+    "providerFailures": 0,
+    "providerLatencyMs": 18396,
+    "providerRequests": 37,
+    "providerTimeouts": 0,
+    "response2xx": 37,
+    "response3xx": 0,
+    "response4xx": 0,
+    "response5xx": 0,
+    "retries": 0,
+    "singleFlightHits": 0,
+    "successorHydrations": 2,
+    "transportFailures": 0,
+    "cacheSize": 37,
+    "inFlightSize": 0
+  },
+  "cases": [
+    {
+      "caseId": "source25-83ce8914d857",
+      "evidenceAssertion": {
+        "rawText": "Department of Biochemistry and Biophysics, University of California, San Francisco, San Francisco, CA, USA; Howard Hughes Medical Institute",
+        "segments": [
+          {
+            "rawText": "University of California, San Francisco",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/043mz5j54",
+              "canonicalRorId": "https://ror.org/043mz5j54",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01r4tcq81"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05yndxy10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00knt4f32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04n1n3n22"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0570qwq18"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058sgvn64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/038321296"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/014gzk937"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/038jxf238"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05j8x4n38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/049peqw80"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03hwe2705"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01t8svj65"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/027790w81"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02bjh0167"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "e74703d91da1a1b5b5b10c934c37112d8a9e84da5380e3e441db056390f4a490"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "e74703d91da1a1b5b5b10c934c37112d8a9e84da5380e3e441db056390f4a490",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          },
+          {
+            "rawText": "Howard Hughes Medical Institute",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/006w34k90",
+              "canonicalRorId": "https://ror.org/006w34k90",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/013sk6x84"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-83ce8914d857",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 2,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California, San Francisco",
+        "segments": [
+          {
+            "rawText": "University of California, San Francisco",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/043mz5j54",
+              "canonicalRorId": "https://ror.org/043mz5j54",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01r4tcq81"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05yndxy10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00knt4f32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04n1n3n22"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0570qwq18"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058sgvn64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/038321296"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/014gzk937"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/038jxf238"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05j8x4n38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/049peqw80"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03hwe2705"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01t8svj65"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/027790w81"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02bjh0167"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "e74703d91da1a1b5b5b10c934c37112d8a9e84da5380e3e441db056390f4a490"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "e74703d91da1a1b5b5b10c934c37112d8a9e84da5380e3e441db056390f4a490",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-83ce8914d857",
+        "observedAt": "2026-08-13",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-97d16b3bdc69",
+      "evidenceAssertion": {
+        "rawText": "Department of Chemistry and Biomolecular Sciences, University of Ottawa, 10 Marie-Curie, Ottawa, ON K1N 6N5, Canada",
+        "segments": [
+          {
+            "rawText": "University of Ottawa",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03c4mmv16",
+              "canonicalRorId": "https://ror.org/03c4mmv16",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04z45pv75"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05y2jpg52"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00wazyk32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/058rwr454"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05jtef216"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00rzr5v92"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04c794867"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01m7n4g71"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/051pmyn62"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/022knwr79"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035wq2m82"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03ypxpx75"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/048tf4023"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05vdb2m56"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0236dma10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/037s0tq36"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01ss0kv69"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05q526p85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02xk45068"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02vb93k64"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/033xefj97"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00qf78c11"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05g0swy93"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00r5mc782"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02gsv2389"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00h533452"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/047xz1e88"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/044tjxx32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02gzkyr25"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00kmnzb51"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/036s2ns10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/042cm9p56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05nsbhw27"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02crzj551"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03c62dg59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/056vnsb08"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0279hm646"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "3fd43460ce9e6b3792ac256ad6133f7a816f56abee6bc6094445fc68c6e263d1"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "3fd43460ce9e6b3792ac256ad6133f7a816f56abee6bc6094445fc68c6e263d1",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-97d16b3bdc69",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of Ottawa",
+        "segments": [
+          {
+            "rawText": "University of Ottawa",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03c4mmv16",
+              "canonicalRorId": "https://ror.org/03c4mmv16",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04z45pv75"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05y2jpg52"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00wazyk32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/058rwr454"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05jtef216"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00rzr5v92"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04c794867"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01m7n4g71"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/051pmyn62"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/022knwr79"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035wq2m82"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03ypxpx75"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/048tf4023"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05vdb2m56"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0236dma10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/037s0tq36"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01ss0kv69"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05q526p85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02xk45068"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02vb93k64"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/033xefj97"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00qf78c11"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05g0swy93"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00r5mc782"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02gsv2389"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00h533452"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/047xz1e88"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/044tjxx32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02gzkyr25"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00kmnzb51"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/036s2ns10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/042cm9p56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05nsbhw27"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02crzj551"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03c62dg59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/056vnsb08"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0279hm646"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "3fd43460ce9e6b3792ac256ad6133f7a816f56abee6bc6094445fc68c6e263d1"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "3fd43460ce9e6b3792ac256ad6133f7a816f56abee6bc6094445fc68c6e263d1",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-97d16b3bdc69",
+        "observedAt": "2026-08-06",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-24810991224e",
+      "evidenceAssertion": {
+        "rawText": "Department of Biochemistry, Duke University School of Medicine, Durham, NC, USA",
+        "segments": [
+          {
+            "rawText": "Duke University School of Medicine",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "sourceRorId": null,
+              "canonicalRorId": "https://ror.org/00py81415",
+              "organizationScope": "subunit",
+              "parentRorId": "https://ror.org/00py81415",
+              "relationships": [],
+              "provider": "manual_adjudication_overlay",
+              "reason": "adjudicated_organization_scope",
+              "confidence": "adjudicated",
+              "provenance": {
+                "resolverVersion": "manual-adjudication-overlay/v1",
+                "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-24810991224e"
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-24810991224e",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "manual-adjudication-overlay/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Duke University",
+        "segments": [
+          {
+            "rawText": "Duke University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00py81415",
+              "canonicalRorId": "https://ror.org/00py81415",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04sr5ys16"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02j1m6098"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yjqwr70"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01s91ey96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03vnj0h28"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03wfqwh68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04bct7p84"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/034adnw64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mkh7345"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01txfgz53"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-24810991224e",
+        "observedAt": "2026-08-18",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-f9b213526332",
+      "evidenceAssertion": {
+        "rawText": "Lamont-Doherty Earth Observatory, Columbia University, Palisades, NY 10964",
+        "segments": [
+          {
+            "rawText": "Lamont-Doherty Earth Observatory",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02e2tgs60",
+              "canonicalRorId": "https://ror.org/02e2tgs60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04knth696"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00hj8s172"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "aacd8e42869897fcd773b3d535c45456e5b6e9a7fb971f0f0fd3422ba809f0e2"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "aacd8e42869897fcd773b3d535c45456e5b6e9a7fb971f0f0fd3422ba809f0e2",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-f9b213526332",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Columbia University",
+        "segments": [
+          {
+            "rawText": "Columbia University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00hj8s172",
+              "canonicalRorId": "https://ror.org/00hj8s172",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02e2tgs60"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01f0vkh84"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0263t7p64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04qvzh720"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05fk0de79"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01esghr10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/036qtaj98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00tz4k675"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02k4w3g59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05fnpxf31"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/008a4de11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gzbrs57"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0378zg266"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mj4n083"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05jr4qt09"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05jesdm52"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/032x9hy18"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "16b78db7787a4836819657314b1016d4be798eaa4d4841894768a52141cfc55d"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "16b78db7787a4836819657314b1016d4be798eaa4d4841894768a52141cfc55d",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-f9b213526332",
+        "observedAt": "2026-08-18",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-a84e6c6e46e5",
+      "evidenceAssertion": {
+        "rawText": "Department of Earth, Atmospheric, and Planetary Science, Purdue University, West Lafayette, IN 47907",
+        "segments": [
+          {
+            "rawText": "Purdue University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "sourceRorId": "https://ror.org/02dqehb95",
+              "canonicalRorId": "https://ror.org/02dqehb95",
+              "organizationScope": "ror_entity",
+              "relationships": [],
+              "provider": "manual_adjudication_overlay",
+              "reason": "adjudicated_organization_scope",
+              "confidence": "adjudicated",
+              "provenance": {
+                "resolverVersion": "manual-adjudication-overlay/v1",
+                "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/39094170"
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/39094170",
+        "observedAt": "2024",
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "manual-adjudication-overlay/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Purdue University",
+        "segments": [
+          {
+            "rawText": "Purdue University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "sourceRorId": "https://ror.org/02dqehb95",
+              "canonicalRorId": "https://ror.org/02dqehb95",
+              "organizationScope": "ror_entity",
+              "relationships": [],
+              "provider": "manual_adjudication_overlay",
+              "reason": "adjudicated_organization_scope",
+              "confidence": "adjudicated",
+              "provenance": {
+                "resolverVersion": "manual-adjudication-overlay/v1",
+                "sourceReference": "legacy-roster-capture:unresolved-a84e6c6e46e5"
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-a84e6c6e46e5",
+        "observedAt": "2026-08-18",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "manual-adjudication-overlay/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-d70586a585f6",
+      "evidenceAssertion": {
+        "rawText": "Department of Microbiology, Harvard Medical School, Boston, MA, USA",
+        "segments": [
+          {
+            "rawText": "Harvard Medical School",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03vek6s52",
+              "canonicalRorId": "https://ror.org/03vek6s52",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/032q5ym94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03hj6c016"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03c3r2d17"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05r3dyn47"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04wsv7966"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/004y4rj95"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kj1hn59"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/006v7bf86"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053tmcn30"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053r20n13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04r5ess67"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04pvzz946"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05xsxgs79"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/059cpzx98"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/008cfmj78"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03pvyf116"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05b0g2v72"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04drvxt59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00dvg7y05"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05xckek43"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04rkbns44"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03w44ff23"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04b6nzv94"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05a0ya142"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/059c3mv67"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02jzgtq86"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01zxdeg39"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00jjeh629"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02vptss42"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/044hpwe09"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0280a3n32"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05tby3y60"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03mbq3y29"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04g3dn724"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/002pd6e78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05par7p11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01kta7d96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03hrxmf69"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/023pf5e38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/011dvr318"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "c4df7ad69ff672ed90f2d6a3c585ab22aead56559d8dd04283a6afa9f7bd468a"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "c4df7ad69ff672ed90f2d6a3c585ab22aead56559d8dd04283a6afa9f7bd468a",
+                  "strategies": [
+                    "affiliation-single-search",
+                    "ordinary-query",
+                    "successor-hydration"
+                  ],
+                  "request_count": 3,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-d70586a585f6",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Harvard Medical School",
+        "segments": [
+          {
+            "rawText": "Harvard Medical School",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03vek6s52",
+              "canonicalRorId": "https://ror.org/03vek6s52",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/032q5ym94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03hj6c016"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03c3r2d17"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05r3dyn47"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04wsv7966"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/004y4rj95"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kj1hn59"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/006v7bf86"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053tmcn30"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053r20n13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04r5ess67"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04pvzz946"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05xsxgs79"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/059cpzx98"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/008cfmj78"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03pvyf116"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05b0g2v72"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04drvxt59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00dvg7y05"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05xckek43"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04rkbns44"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03w44ff23"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04b6nzv94"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05a0ya142"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/059c3mv67"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02jzgtq86"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01zxdeg39"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00jjeh629"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02vptss42"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/044hpwe09"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0280a3n32"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05tby3y60"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03mbq3y29"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04g3dn724"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/002pd6e78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05par7p11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01kta7d96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03hrxmf69"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/023pf5e38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/011dvr318"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "c4df7ad69ff672ed90f2d6a3c585ab22aead56559d8dd04283a6afa9f7bd468a"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "c4df7ad69ff672ed90f2d6a3c585ab22aead56559d8dd04283a6afa9f7bd468a",
+                  "strategies": [
+                    "affiliation-single-search",
+                    "ordinary-query",
+                    "successor-hydration"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-d70586a585f6",
+        "observedAt": "2026-08-18",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-30ef5475b6e0",
+      "evidenceAssertion": {
+        "rawText": "University of Texas Institute for Geophysics, Jackson School of Geosciences, University of Texas at Austin",
+        "segments": [
+          {
+            "rawText": "University of Texas Institute for Geophysics",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "sourceRorId": null,
+              "canonicalRorId": "https://ror.org/00hj54h04",
+              "organizationScope": "subunit",
+              "parentRorId": "https://ror.org/00hj54h04",
+              "relationships": [],
+              "provider": "manual_adjudication_overlay",
+              "reason": "adjudicated_organization_scope",
+              "confidence": "adjudicated",
+              "provenance": {
+                "resolverVersion": "manual-adjudication-overlay/v1",
+                "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-30ef5475b6e0"
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-30ef5475b6e0",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "manual-adjudication-overlay/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "The University of Texas at Austin",
+        "segments": [
+          {
+            "rawText": "The University of Texas at Austin",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00hj54h04",
+              "canonicalRorId": "https://ror.org/00hj54h04",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05k1jx057"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/055a54548"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05v0sks95"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053wph561"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00xg4bh43"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/034bxn811"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/01gek1696"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02dcp1550"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02e0efw43"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "6577177c4204a00212a25292a72c08da498285bb098086d7556554278280646c"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "6577177c4204a00212a25292a72c08da498285bb098086d7556554278280646c",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-30ef5475b6e0",
+        "observedAt": "2026-08-11",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-5c277235d507",
+      "evidenceAssertion": {
+        "rawText": "Department of Bioengineering, Stanford University, Stanford, CA 94305",
+        "segments": [
+          {
+            "rawText": "Stanford University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00f54p054",
+              "canonicalRorId": "https://ror.org/00f54p054",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02awzbn54"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03djjyk45"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05j5wde68"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00pwqz914"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03hj69t32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00knt4f32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03mtd9a03"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01s3y9g58"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05gzmn429"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02vzbm991"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/023py8175"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0551gkb08"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04c524341"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03zms7281"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02v7qv571"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00nr17z89"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "fdd9cab24114b8cb8fe9c64781ac39e356dba350331e329ab4bd47936013a581"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "fdd9cab24114b8cb8fe9c64781ac39e356dba350331e329ab4bd47936013a581",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-5c277235d507",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Stanford University",
+        "segments": [
+          {
+            "rawText": "Stanford University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00f54p054",
+              "canonicalRorId": "https://ror.org/00f54p054",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02awzbn54"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03djjyk45"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05j5wde68"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00pwqz914"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03hj69t32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00knt4f32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03mtd9a03"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01s3y9g58"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05gzmn429"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02vzbm991"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/023py8175"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0551gkb08"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04c524341"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03zms7281"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02v7qv571"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00nr17z89"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "fdd9cab24114b8cb8fe9c64781ac39e356dba350331e329ab4bd47936013a581"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "fdd9cab24114b8cb8fe9c64781ac39e356dba350331e329ab4bd47936013a581",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-5c277235d507",
+        "observedAt": "2026-08-07",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-69090881d690",
+      "evidenceAssertion": {
+        "rawText": "Department of Biomedical Engineering, Duke University, Durham, NC, USA",
+        "segments": [
+          {
+            "rawText": "Duke University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00py81415",
+              "canonicalRorId": "https://ror.org/00py81415",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04sr5ys16"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02j1m6098"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yjqwr70"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01s91ey96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03vnj0h28"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03wfqwh68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04bct7p84"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/034adnw64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mkh7345"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01txfgz53"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-69090881d690",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Duke University",
+        "segments": [
+          {
+            "rawText": "Duke University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00py81415",
+              "canonicalRorId": "https://ror.org/00py81415",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04sr5ys16"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02j1m6098"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yjqwr70"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01s91ey96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03vnj0h28"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03wfqwh68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04bct7p84"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/034adnw64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mkh7345"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01txfgz53"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "ad18676136d0ecdb9c38e566f4dec8f491031f3a60dafa21bc40585f4b43f2e0",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-69090881d690",
+        "observedAt": "2026-08-07",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-365d3af38651",
+      "evidenceAssertion": {
+        "rawText": "Department of Chemistry and Biochemistry, University of California, Santa Barbara",
+        "segments": [
+          {
+            "rawText": "University of California, Santa Barbara",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02t274463",
+              "canonicalRorId": "https://ror.org/02t274463",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0146z4r19"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05hnkta08"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kz4p343"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yt0vw44"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03d5jvw89"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03f1rr013"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/039kwqk96"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "5ec38da311f0bac04ad41d2c68c05de13d8d069fc747e8b1be5acb92f29f8ffb"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "5ec38da311f0bac04ad41d2c68c05de13d8d069fc747e8b1be5acb92f29f8ffb",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-365d3af38651",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California Santa Barbara",
+        "segments": [
+          {
+            "rawText": "University of California Santa Barbara",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02t274463",
+              "canonicalRorId": "https://ror.org/02t274463",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0146z4r19"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05hnkta08"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kz4p343"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yt0vw44"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03d5jvw89"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03f1rr013"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/039kwqk96"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "03cb8872eca13bde3321556d894c1b03bd86b6524bcafa0c79d3beedbc4fed35"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "03cb8872eca13bde3321556d894c1b03bd86b6524bcafa0c79d3beedbc4fed35",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-365d3af38651",
+        "observedAt": "2026-08-06",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-a6e6bd5c0fab",
+      "evidenceAssertion": {
+        "rawText": "Department of Mechanical and Aerospace Engineering, University of California at Los Angeles",
+        "segments": [
+          {
+            "rawText": "University of California at Los Angeles",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/046rm7j60",
+              "canonicalRorId": "https://ror.org/046rm7j60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kpwcf85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035jch041"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02pammg90"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gkbdq83"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hm6ny55"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05h4zj272"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01eyb5f38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/025j2nd68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0253es752"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04p5baq95"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03b66rp04"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k3jt835"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0466fwq98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01d88se56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04vq5kb54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058p1kn93"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01xfgtq85"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05976ta47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hnkta08"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "d0013dbf54c4c3189fdabb45b8a8cad41f26cbe4c45b2e2a853898fc6e76ad10"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "d0013dbf54c4c3189fdabb45b8a8cad41f26cbe4c45b2e2a853898fc6e76ad10",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-a6e6bd5c0fab",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California, Los Angeles",
+        "segments": [
+          {
+            "rawText": "University of California, Los Angeles",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/046rm7j60",
+              "canonicalRorId": "https://ror.org/046rm7j60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kpwcf85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035jch041"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02pammg90"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gkbdq83"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hm6ny55"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05h4zj272"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01eyb5f38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/025j2nd68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0253es752"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04p5baq95"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03b66rp04"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k3jt835"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0466fwq98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01d88se56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04vq5kb54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058p1kn93"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01xfgtq85"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05976ta47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hnkta08"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-a6e6bd5c0fab",
+        "observedAt": "2026-08-05",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-888808befc3f",
+      "evidenceAssertion": {
+        "rawText": "Department of Molecular Biology and Genetics, Cornell University",
+        "segments": [
+          {
+            "rawText": "Cornell University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/05bnh6r87",
+              "canonicalRorId": "https://ror.org/05bnh6r87",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/031m8s392"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03ycy6g75"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00j52pq61"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04r17kf39"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00zg6dt46"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/047g2xp14"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02r109517"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00k86w020"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03h0qhk21"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04pw1zg89"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/012qsrr25"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00m2zh467"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04qscbg47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02sp1z620"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04dnsc767"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/027zt9171"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/035a72598"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01skxn174"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02yrq0923"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/016m8pd54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03f91xw18"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01j17xg39"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04929s478"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gzbrs57"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05dvpaj72"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05v5hg569"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00yzb1d91"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mkh7345"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05cshtm26"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "039408be75cf91e07f7df6b00aeab4b65ccf3929603d5b37c31aed7fbee4308c"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "039408be75cf91e07f7df6b00aeab4b65ccf3929603d5b37c31aed7fbee4308c",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-888808befc3f",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Yale University",
+        "segments": [
+          {
+            "rawText": "Yale University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03v76x132",
+              "canonicalRorId": "https://ror.org/03v76x132",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/004x7d471"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03db5ay71"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04jddh448"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0263t7p64"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/046q6xz26"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/000yct867"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04t2rv460"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05j82jr52"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/036qtaj98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/008rtte29"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/003j5cv40"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/005xhc966"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/050cwzy61"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03j7sze86"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01s1hsq14"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05tszed37"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "68ad2f6beb37b2db7c1310ff1bdec20ddb1b72ea2a5ccbca08e8d7f0e5e5b3b2"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "68ad2f6beb37b2db7c1310ff1bdec20ddb1b72ea2a5ccbca08e8d7f0e5e5b3b2",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-888808befc3f",
+        "observedAt": "2026-08-13",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-9eb2d6bb6876",
+      "evidenceAssertion": {
+        "rawText": "Department of Geology, University of Kansas",
+        "segments": [
+          {
+            "rawText": "University of Kansas",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/001tmjg57",
+              "canonicalRorId": "https://ror.org/001tmjg57",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05g3bg079"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04t2m2598"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04mxhn923"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04zfmcq84"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03jb9b006"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/050mdr969"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05kg11974"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/036c9yv20"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00ftebr67"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02wavzm11"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "5c01ca8fa30abcd5711c06479fda2eaf599692d34bd1ab015098831b556cdbac"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "5c01ca8fa30abcd5711c06479fda2eaf599692d34bd1ab015098831b556cdbac",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-9eb2d6bb6876",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of Pennsylvania",
+        "segments": [
+          {
+            "rawText": "University of Pennsylvania",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00b30xv10",
+              "canonicalRorId": "https://ror.org/00b30xv10",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/047939x15"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hs3x327"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01z7r7q48"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02917wp91"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00swv7d52"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03mvdc478"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03j05zz84"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04h81rw26"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03xwa9562"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "384f8eb751100e1e42cd9dcf3bdd08faea717d723763ec84c822ff55677625d3"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "384f8eb751100e1e42cd9dcf3bdd08faea717d723763ec84c822ff55677625d3",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-9eb2d6bb6876",
+        "observedAt": "2026-08-11",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-2569b1946dd0",
+      "evidenceAssertion": {
+        "rawText": "Department of Cancer Biology, Dana-Farber Cancer Institute, Boston, MA",
+        "segments": [
+          {
+            "rawText": "Dana-Farber Cancer Institute",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02jzgtq86",
+              "canonicalRorId": "https://ror.org/02jzgtq86",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05k11pb55"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05rgrbr06"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03pvyf116"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00dvg7y05"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03vek6s52"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/002pd6e78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/008cfmj78"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "ab675b4a539ab0db9b87b987717d8b272e90e0ed218fff3e316d251c0681c751"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "ab675b4a539ab0db9b87b987717d8b272e90e0ed218fff3e316d251c0681c751",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-2569b1946dd0",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Harvard University",
+        "segments": [
+          {
+            "rawText": "Harvard University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/03vek6s52",
+              "canonicalRorId": "https://ror.org/03vek6s52",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/032q5ym94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03hj6c016"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03c3r2d17"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05r3dyn47"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04wsv7966"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/004y4rj95"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kj1hn59"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/006v7bf86"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053tmcn30"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053r20n13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04r5ess67"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04pvzz946"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05xsxgs79"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/059cpzx98"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/008cfmj78"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03pvyf116"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05b0g2v72"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04drvxt59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00dvg7y05"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05xckek43"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04rkbns44"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03w44ff23"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04b6nzv94"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05a0ya142"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/059c3mv67"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02jzgtq86"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01zxdeg39"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00jjeh629"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02vptss42"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/044hpwe09"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0280a3n32"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05tby3y60"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03mbq3y29"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04g3dn724"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/002pd6e78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05par7p11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01kta7d96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03hrxmf69"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/023pf5e38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/011dvr318"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "ae6fc3af403333c11840a558c6178699b636d1c3dee0c743a5dd2e427b6c5dc3"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "ae6fc3af403333c11840a558c6178699b636d1c3dee0c743a5dd2e427b6c5dc3",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-2569b1946dd0",
+        "observedAt": "2026-08-07",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-0e43e7bca20d",
+      "evidenceAssertion": {
+        "rawText": "Icahn School of Medicine at Mount Sinai, New York",
+        "segments": [
+          {
+            "rawText": "Icahn School of Medicine at Mount Sinai",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/04a9tmd77",
+              "canonicalRorId": "https://ror.org/04a9tmd77",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0317dzj93"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/04kfn4587"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05mg61p80"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05jwhyp78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01742jq13"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00tcb9k97"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/011t2cn48"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "177ce4b453af62d931c66f25cf2342d089ca31cc44ed84f26ccc31c1cda38b1e"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "177ce4b453af62d931c66f25cf2342d089ca31cc44ed84f26ccc31c1cda38b1e",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-0e43e7bca20d",
+        "observedAt": null,
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Howard Hughes Medical Institute",
+        "segments": [
+          {
+            "rawText": "Howard Hughes Medical Institute",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/006w34k90",
+              "canonicalRorId": "https://ror.org/006w34k90",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/013sk6x84"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "applicant_record",
+        "sourceReference": "legacy-roster-capture:unresolved-0e43e7bca20d",
+        "observedAt": "2026-08-07",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-ucla-ucsd-current",
+      "evidenceAssertion": {
+        "rawText": "University of California, Los Angeles",
+        "segments": [
+          {
+            "rawText": "University of California, Los Angeles",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/046rm7j60",
+              "canonicalRorId": "https://ror.org/046rm7j60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kpwcf85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035jch041"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02pammg90"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gkbdq83"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hm6ny55"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05h4zj272"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01eyb5f38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/025j2nd68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0253es752"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04p5baq95"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03b66rp04"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k3jt835"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0466fwq98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01d88se56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04vq5kb54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058p1kn93"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01xfgtq85"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05976ta47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hnkta08"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "official_profile",
+        "sourceReference": "benchmark-adversarial:uc-siblings-ucla",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California, San Diego",
+        "segments": [
+          {
+            "rawText": "University of California, San Diego",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/0168r3w48",
+              "canonicalRorId": "https://ror.org/0168r3w48",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02yn1nr06"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05ffhwq07"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04mg3nk07"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04v7hvq31"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00t7axd27"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04b57z061"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02whst089"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01bt2qm76"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00414dg76"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03xez1567"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k4h9k07"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03aw5sn18"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00znqwq11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/027790w81"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/017vyhs10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04n07f274"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "477da0d822aaf3273c964358d096bdf1d96a94c83c56fb3b13ad2456c7e9e255"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "477da0d822aaf3273c964358d096bdf1d96a94c83c56fb3b13ad2456c7e9e255",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "benchmark-adversarial:uc-siblings-ucsd",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-ucb-ucla-current",
+      "evidenceAssertion": {
+        "rawText": "University of California, Berkeley",
+        "segments": [
+          {
+            "rawText": "University of California, Berkeley",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/01an7q238",
+              "canonicalRorId": "https://ror.org/01an7q238",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03djjyk45"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04sk0et52"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01r4tcq81"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03rafms67"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02hhwwz98"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00knt4f32"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04n1n3n22"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02cq2e244"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/048400679"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01rq3ht76"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02whst089"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/015yfqq31"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00xs48965"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05rfek682"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02wyv8x71"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mkh7345"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01ewh7m12"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "66c43f71456f6b4be20f74b5227546956cd0d64b1edb74c77e9b2428c41ec94e"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "66c43f71456f6b4be20f74b5227546956cd0d64b1edb74c77e9b2428c41ec94e",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "official_profile",
+        "sourceReference": "benchmark-adversarial:uc-siblings-ucb",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California, Los Angeles",
+        "segments": [
+          {
+            "rawText": "University of California, Los Angeles",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/046rm7j60",
+              "canonicalRorId": "https://ror.org/046rm7j60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kpwcf85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035jch041"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02pammg90"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gkbdq83"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hm6ny55"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05h4zj272"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01eyb5f38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/025j2nd68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0253es752"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04p5baq95"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03b66rp04"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k3jt835"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0466fwq98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01d88se56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04vq5kb54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058p1kn93"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01xfgtq85"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05976ta47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hnkta08"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "benchmark-adversarial:uc-siblings-ucla",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-columbia-nyu-current",
+      "evidenceAssertion": {
+        "rawText": "Columbia University",
+        "segments": [
+          {
+            "rawText": "Columbia University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/00hj8s172",
+              "canonicalRorId": "https://ror.org/00hj8s172",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02e2tgs60"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01f0vkh84"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0263t7p64"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04qvzh720"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05fk0de79"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01esghr10"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/036qtaj98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00tz4k675"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02k4w3g59"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05fnpxf31"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/008a4de11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gzbrs57"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0378zg266"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00mj4n083"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05jr4qt09"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05jesdm52"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/032x9hy18"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "16b78db7787a4836819657314b1016d4be798eaa4d4841894768a52141cfc55d"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "16b78db7787a4836819657314b1016d4be798eaa4d4841894768a52141cfc55d",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "official_profile",
+        "sourceReference": "benchmark-adversarial:current-columbia",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "New York University",
+        "segments": [
+          {
+            "rawText": "New York University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/0190ak572",
+              "canonicalRorId": "https://ror.org/0190ak572",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/037tm7f56"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00e5k0821"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02pthyn77"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05mq03431"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01rz15025"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02vpsdb40"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04w8msd94"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01ky34z31"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0065vkd37"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05j5k1t23"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/005dvqh91"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05d789537"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05bk0c386"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03s5r4e84"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "bf0561ec7a7f1c6cc36e5b6ed91f203cd72e05150c976c274dcade1c0451051a"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "bf0561ec7a7f1c6cc36e5b6ed91f203cd72e05150c976c274dcade1c0451051a",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "benchmark-adversarial:current-nyu",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-vumc-vanderbilt",
+      "evidenceAssertion": {
+        "rawText": "Vanderbilt University Medical Center",
+        "segments": [
+          {
+            "rawText": "Vanderbilt University Medical Center",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/05dq2gs74",
+              "canonicalRorId": "https://ror.org/05dq2gs74",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00y64dx33"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0118bqm57"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02rjj2m04"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/05grhsk96"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02vm5rt34"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "df500cddc02a8fa0f69545e1a72226b7ffa063aeb50fe8ae7e3754515e1eb48f"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "df500cddc02a8fa0f69545e1a72226b7ffa063aeb50fe8ae7e3754515e1eb48f",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "institution-pair-consistency/cases/named-relationship-pairs.jsonl#named-rel-vumc-vanderbilt",
+        "observedAt": "2024",
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Vanderbilt University",
+        "segments": [
+          {
+            "rawText": "Vanderbilt University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02vm5rt34",
+              "canonicalRorId": "https://ror.org/02vm5rt34",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03h2q9n18"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00y64dx33"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05dq2gs74"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "93a25874b7dae60b526e8b13118811c6bcc83b52a4c949be5d1651db9a784cf8"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "93a25874b7dae60b526e8b13118811c6bcc83b52a4c949be5d1651db9a784cf8",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "benchmark-adversarial:vanderbilt-current",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-baylor-cmu-current",
+      "evidenceAssertion": {
+        "rawText": "Baylor College of Medicine",
+        "segments": [
+          {
+            "rawText": "Baylor College of Medicine",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02pttbw34",
+              "canonicalRorId": "https://ror.org/02pttbw34",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04hfg7v94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02nre0x31"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/04m8z4n60"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/042ze4p12"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/027zt9171"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0499w7e46"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/037v8w471"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/052qqbc08"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05cz92x43"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00dqsbj20"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04twxam07"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02zda6x08"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/037hnxh06"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "d0434622fa22001862d17a4d11c3a269bc5f59fcd81296545ae9e6304d00fef7"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "d0434622fa22001862d17a4d11c3a269bc5f59fcd81296545ae9e6304d00fef7",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "official_profile",
+        "sourceReference": "reviewer-roster-audit:shadow-source-f35c43216363",
+        "observedAt": "2026-07-21",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Carnegie Mellon University",
+        "segments": [
+          {
+            "rawText": "Carnegie Mellon University",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/05x2bcf33",
+              "canonicalRorId": "https://ror.org/05x2bcf33",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02f33m021"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00ds41r10"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00az5dt38"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00jfeg660"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01xqjjn94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01v6d0b34"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02mxx0b77"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02w30ae27"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03bw34a45"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01txfgz53"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00j0kqj60"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "f57b683a73258600c872c6cf139da8a81c376b91de142336d1952c2e05f68276"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "f57b683a73258600c872c6cf139da8a81c376b91de142336d1952c2e05f68276",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "reviewer-roster-audit:shadow-source-f35c43216363",
+        "observedAt": "2026-07-21",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-genentech-mit-history",
+      "evidenceAssertion": {
+        "rawText": "Genentech, Inc",
+        "segments": [
+          {
+            "rawText": "Genentech",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/04gndp242",
+              "canonicalRorId": "https://ror.org/04gndp242",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03nkpwc05"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/011qkaj49"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "53405310cc784a1114dc425bdd6059043f81a720aeee7f108e620f8cc3187210"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "53405310cc784a1114dc425bdd6059043f81a720aeee7f108e620f8cc3187210",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/37261953",
+        "observedAt": "2023",
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Massachusetts Institute of Technology",
+        "segments": [
+          {
+            "rawText": "Massachusetts Institute of Technology",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/042nb2s44",
+              "canonicalRorId": "https://ror.org/042nb2s44",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/032q5ym94"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00rj4dg52"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01t9bgr30"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/022z6jk58"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/03fg5ns40"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053tmcn30"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0071sjj14"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/05ymca674"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02dgwnb72"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/053r20n13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04pvzz946"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04vqm6w82"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kz4p343"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01xd6q208"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/01e85r662"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05a0ya142"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/00jjeh629"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01wp8zh54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05par7p11"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03db3by08"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05yb3w112"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/008cfmj78"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02tpwnr26"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "d5a6e550c275fc8923b0ba7b92ecb5429151d4ab462e7093733589b6353f109f"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "d5a6e550c275fc8923b0ba7b92ecb5429151d4ab462e7093733589b6353f109f",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "reviewer-roster-audit:shadow-source-58d9991a27aa",
+        "observedAt": "2026-06-25",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-fred-hutch-hhmi-additional",
+      "evidenceAssertion": {
+        "rawText": "Fred Hutchinson Cancer Center; Howard Hughes Medical Institute",
+        "segments": [
+          {
+            "rawText": "Fred Hutchinson Cancer Center",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/007ps6h72",
+              "canonicalRorId": "https://ror.org/007ps6h72",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00wdsp051"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/018f2hw88"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/009tqys91"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "c6f1884295b17e1fb5ee9f95315cbfad5993133a59bfcae6b10342baca94d2d9"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "c6f1884295b17e1fb5ee9f95315cbfad5993133a59bfcae6b10342baca94d2d9",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          },
+          {
+            "rawText": "Howard Hughes Medical Institute",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/006w34k90",
+              "canonicalRorId": "https://ror.org/006w34k90",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/013sk6x84"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "cbc4329a18274f30958ff6e8449936e1fec771f59645d32700cc1c299e8ecf02",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/35080919",
+        "observedAt": "2022",
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 2,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Fred Hutchinson Cancer Center",
+        "segments": [
+          {
+            "rawText": "Fred Hutchinson Cancer Center",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/007ps6h72",
+              "canonicalRorId": "https://ror.org/007ps6h72",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00wdsp051"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/018f2hw88"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/009tqys91"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "c6f1884295b17e1fb5ee9f95315cbfad5993133a59bfcae6b10342baca94d2d9"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "c6f1884295b17e1fb5ee9f95315cbfad5993133a59bfcae6b10342baca94d2d9",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "reviewer-roster-audit:shadow-source-e8a7efbdac68",
+        "observedAt": "2026-06-24",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-epfl-decoration",
+      "evidenceAssertion": {
+        "rawText": "Global Health Institute, Swiss Federal Institute of Technology Lausanne (EPFL)",
+        "segments": [
+          {
+            "rawText": "Swiss Federal Institute of Technology Lausanne",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02s376052",
+              "canonicalRorId": "https://ror.org/02s376052",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/033f9yy33"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02hdt9m26"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/01rvn4p91"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05932h694"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02z9ca723"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03qf6ek79"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "0ad80046f382483af6ee54192da1dc66c1fdc13687292e6dd61126c15de814b4"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "0ad80046f382483af6ee54192da1dc66c1fdc13687292e6dd61126c15de814b4",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 1,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "publication",
+        "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/36510011",
+        "observedAt": "2022",
+        "currentness": "historical",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "EPFL (École Polytechnique Fédérale de Lausanne)",
+        "segments": [
+          {
+            "rawText": "EPFL",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/02s376052",
+              "canonicalRorId": "https://ror.org/02s376052",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/033f9yy33"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/02hdt9m26"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/01rvn4p91"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05932h694"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02z9ca723"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03qf6ek79"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "2443490f939b89462578d1a6f6de4a2ace18937ca071671c75ed8cabf790ba23"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "2443490f939b89462578d1a6f6de4a2ace18937ca071671c75ed8cabf790ba23",
+                  "strategies": [
+                    "affiliation-single-search",
+                    "ordinary-query"
+                  ],
+                  "request_count": 2,
+                  "retry_count": 0,
+                  "cache_hit": false,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "reviewer-roster-audit:shadow-source-2d8d208f7351",
+        "observedAt": "2026-07-21",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    },
+    {
+      "caseId": "source25-provider-failure-neutral",
+      "evidenceAssertion": {
+        "rawText": "Provider unavailable university",
+        "segments": [
+          {
+            "rawText": "Provider unavailable university",
+            "resolution": {
+              "status": "unresolved",
+              "reason": "provider_failure",
+              "provider": "forced-offline-fixture",
+              "confidence": "unresolved"
+            }
+          }
+        ],
+        "sourceType": "official_profile",
+        "sourceReference": "offline-provider-failure-fixture",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "forced-offline-fixture/v1",
+          "resolvedSegments": 0,
+          "unresolvedSegments": 1
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "Known University",
+        "segments": [
+          {
+            "rawText": "Known University",
+            "resolution": {
+              "status": "unresolved",
+              "reason": "provider_failure",
+              "provider": "forced-offline-fixture",
+              "confidence": "unresolved"
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "offline-provider-failure-fixture",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "forced-offline-fixture/v1",
+          "resolvedSegments": 0,
+          "unresolvedSegments": 1
+        }
+      }
+    },
+    {
+      "caseId": "source25-ambiguous-parent-hold",
+      "evidenceAssertion": {
+        "rawText": "University of California",
+        "segments": [
+          {
+            "rawText": "University of California",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "unresolved",
+              "reason": "parent_granularity_ambiguous",
+              "provider": "ror-api-v2-union",
+              "confidence": "unresolved"
+            }
+          }
+        ],
+        "sourceType": "reviewer_self_report",
+        "sourceReference": "benchmark-adversarial:bare-uc-parent",
+        "observedAt": null,
+        "currentness": "unknown",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 0,
+          "unresolvedSegments": 1
+        }
+      },
+      "recordedAssertion": {
+        "rawText": "University of California, Los Angeles",
+        "segments": [
+          {
+            "rawText": "University of California, Los Angeles",
+            "role": "primary_or_unknown",
+            "resolution": {
+              "status": "resolved",
+              "reason": "unique_scored_candidate",
+              "provider": "ror-api-v2-union",
+              "sourceRorId": "https://ror.org/046rm7j60",
+              "canonicalRorId": "https://ror.org/046rm7j60",
+              "canonicalization": null,
+              "relationships": [
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/00q7fqf35"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/04kpwcf85"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/0424mzx13"
+                },
+                {
+                  "type": "child",
+                  "rorId": "https://ror.org/035jch041"
+                },
+                {
+                  "type": "parent",
+                  "rorId": "https://ror.org/00pjdza24"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/02pammg90"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03gkbdq83"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hm6ny55"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05h4zj272"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01eyb5f38"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/025j2nd68"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0253es752"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04p5baq95"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/03b66rp04"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04k3jt835"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/0466fwq98"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01d88se56"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/04vq5kb54"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/058p1kn93"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/01xfgtq85"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05976ta47"
+                },
+                {
+                  "type": "related",
+                  "rorId": "https://ror.org/05hnkta08"
+                }
+              ],
+              "confidence": "resolver_threshold_passed",
+              "provenance": {
+                "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+                "decision": {
+                  "resolver_version": "ror-claim-resolver/v1",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc"
+                },
+                "candidateSet": {
+                  "api_version": "v2",
+                  "adapter_version": "ror-api-claim-candidates/v1",
+                  "observed_on": "2026-08-19",
+                  "input_hash": "96ebd5cd94e16294e128d35665c312c7360876258dac16c62f97fc04f4fefffc",
+                  "strategies": [
+                    "affiliation-single-search"
+                  ],
+                  "request_count": 0,
+                  "retry_count": 0,
+                  "cache_hit": true,
+                  "single_flight_hit": false
+                }
+              }
+            }
+          }
+        ],
+        "sourceType": "staff_record",
+        "sourceReference": "benchmark-adversarial:ucla-current",
+        "observedAt": "2026-08-19",
+        "currentness": "current",
+        "authorSpecific": true,
+        "resolutionSummary": {
+          "resolverVersion": "ror-affiliation-assertion-resolver/v1",
+          "resolvedSegments": 1,
+          "unresolvedSegments": 0
+        }
+      }
+    }
+  ]
+}
