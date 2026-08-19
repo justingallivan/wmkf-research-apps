@@ -1,12 +1,13 @@
-# Session 446 Prompt: Review the Institution Shadow Contract and Choose the Next Authority Boundary
+# Session 446 Handoff: Validate Stage 2 Institution Presentation in Preview
 
 ## Session 445 Summary
 
 Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
 then moved the institution-affiliation strategy onto
-`codex/institution-decision-harness`. The reviewed code tip is `947fb46`; its
-new relationship/policy implementation is shadow-only and has no production
-caller.
+`codex/institution-decision-harness`. The current local code tip is `6b2f259`.
+The owner authorized Stage 2 notification and explanatory-card presentation;
+it is implemented behind a default-off flag with no identity, selectability, or
+Dataverse-write authority.
 
 ### What Was Completed
 
@@ -59,6 +60,18 @@ caller.
    - Corrected explicit server identity-review reasoning so it cannot render
      beneath the positive `Suggested because:` label.
 
+5. **Stage 2 institution presentation implemented, default off**
+   - Added source-aware typed projections for post-acceptance staff
+     notifications and reviewer candidate-card explanations/remedies.
+   - Preserved the incumbent boolean as the only selection, identity, and write
+     authority. Typed compatible results cannot clear an existing hold.
+   - Added a versioned, sanitized roster DTO, stale-cache refresh when enabled,
+     provider-failure retry copy, legacy fallback on unexpected failure, and an
+     exact flag-off rollback path.
+   - Corrected runtime provenance so PubMed history is historical publication
+     evidence, compact ORCID employment history remains time-unknown, and
+     untyped evidence remains unknown rather than gaining false specificity.
+
 ### Commits
 
 - `45ea7456` — Add reviewer materials to Proposal tab
@@ -84,16 +97,20 @@ caller.
 - `0d163998` — Document Session 445 and create Session 446 prompt
 - `c8c67aae` — Finalize Session 445 handoff cleanup
 - `947fb46` — Harden institution shadow decision boundaries
+- `82160a0f` — Document institution promotion review hardening
+- `6b2f259` — Add Stage 2 institution presentation
 
 ## Next Items
 
 ### Verified Open
 
-1. **Complete owner review of the revised Stage 1 artifact before promotion.**
-   Evidence: `947fb46`, the unchanged frozen v1 report, and the caller search in
-   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Engineering promotion
-   review is complete and its four falsified boundaries are covered; owner
-   acceptance and the Stage 2 authority decision remain open.
+1. **Run signed-in Preview acceptance for Stage 2 presentation.**
+   Evidence: `6b2f259` implements the bounded consumer projections behind
+   `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`; 194 focused tests and the
+   flag-on webpack production build pass. Deploy a Preview with the flag on and
+   sample compatible/additional, historical, current-conflict, unresolved, and
+   retryable-failure copy. Confirm every held card exposes an action actually
+   available on that card and unresolved never reads as a mismatch.
 
 2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
    Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
@@ -110,11 +127,11 @@ caller.
 
 ### Owner Decision Needed
 
-1. **Authorize or decline Stage 2 institution rollout.**
-   Evidence: the Stage 1 report passes only `GO_FOR_SHADOW_CONTRACT`.
-   Stage 2 is limited to notifications and explanatory card UI, with no identity,
-   selectability, or Dataverse-write authority. It still requires an explicit
-   owner decision and a rollback-preserving implementation plan.
+1. **After Preview evidence, authorize or decline Production flag enablement.**
+   Evidence: Stage 2 is implemented but not promoted or enabled in Production.
+   Production enablement requires a new build because the flag is
+   `NEXT_PUBLIC`; the exact unset/`off` path independently restores incumbent
+   presentation.
 
 ### Parked
 
@@ -135,9 +152,8 @@ caller.
    internal subunits that ROR does not model independently. Do not lower the
    production resolver threshold or overwrite the snapshot; use a new versioned
    capture and re-adjudication.
-2. `origin/main` was `e82dfba4` when the review fixes were committed. The feature
-   branch was seven commits ahead and three commits behind; fetch and verify both
-   tips before merging or making a production release.
+2. Fetch and verify `origin/main` plus the feature-branch tip before merging or
+   making a production release. Local `6b2f259` has not yet been pushed.
 3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
    handles, then moved them out of the worktree to
    `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
@@ -159,6 +175,8 @@ caller.
 | `benchmarks/institution-affiliation-compatibility/v1/cases/source-aware-25.json` | Frozen relationship/action adjudications |
 | `lib/services/institution-affiliation-assessment.js` | Typed relationship and total consumer policy |
 | `lib/services/ror-affiliation-assertion-resolver.js` | Source/canonical ROR resolution with partial success |
+| `lib/services/institution-affiliation-stage2.js` | Bounded notification/card evaluation and presentation projection |
+| `shared/utils/institution-stage2-presentation.js` | Exact rollout flag and versioned presentation DTO identity |
 | `scripts/audit-institution-affiliation-shadow-cases.js` | Read-only, PII-bounded roster inventory |
 | `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Authority stages, gates, and current status |
 | `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Durable contact edit and identity-remediation contract |
@@ -166,9 +184,17 @@ caller.
 ## Testing
 
 ```bash
-npx jest tests/unit/institution-affiliation-assessment.test.js \
+npm test -- --runInBand \
+  tests/unit/institution-affiliation-stage2.test.js \
+  tests/unit/institution-affiliation-assessment.test.js \
   tests/unit/ror-affiliation-assertion-resolver.test.js \
-  tests/unit/benchmarks/institution-affiliation-shadow-v1.test.js --runInBand
+  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
+  tests/unit/alert-reviewer-affiliation-mismatch-dal-context.test.js \
+  tests/unit/workbench-enrich-recommended-service.test.js \
+  tests/unit/reviewer-search-logic.test.js \
+  tests/unit/reviewer-search-mismatch-banner.test.js \
+  tests/unit/institution-checker-consumer-scope.test.js \
+  tests/unit/benchmarks/institution-affiliation-shadow-v1.test.js
 npm run check:doc-symbol-refs
 npm run check:fact-consistency
 npm run check:docs-catalog
@@ -176,7 +202,7 @@ npm run check:secret-scan
 npm run check:types
 ```
 
-The expanded institution and reasoning suites passed 59/59; targeted ESLint,
-TypeScript, documentation/fact/memory/secret gates, and their required self-tests passed.
-The webpack production build passed. The default Turbopack build could not bind
-its local worker port on this host and failed before compiling application code.
+The expanded Stage 1 plus Stage 2 matrix passed 194/194. Targeted ESLint,
+TypeScript, documentation symbol/currency/fact/catalog gates, secret scan, and
+the required gate self-tests passed. The flag-on webpack production build
+passed with the repository's existing dynamic-dependency warnings.
