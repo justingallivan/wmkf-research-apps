@@ -1,0 +1,1288 @@
+{
+  "title": "Source-aware institution affiliation Stage 1 shadow evaluation",
+  "generatedAt": "2026-08-19T14:16:05.771Z",
+  "authority": "shadow_only_no_runtime_callers",
+  "result": "GO_FOR_SHADOW_CONTRACT",
+  "selection": "Fifteen re-adjudicated production captures from the 2026-08-18 diagnostic set plus ten production-shaped temporal, sibling, additional-affiliation, and failure complements.",
+  "summary": {
+    "totalCases": 25,
+    "sourceCompleteCases": 25,
+    "currentBooleanObservedFalse": 16,
+    "relationshipMatches": 25,
+    "actionMatches": 25,
+    "siblingEntityCollapses": 0,
+    "unsafeActionClears": 0,
+    "manufacturedReviews": 0,
+    "providerFailureCases": 1,
+    "providerFailureCasesWithHonestCopy": 1,
+    "heldCases": 5,
+    "heldCasesWithRemedy": 5,
+    "oldLabelRevisions": 5,
+    "oldLabeledCases": 16,
+    "challengedCasesNonblocking": 3,
+    "providerFailuresInLiveCapture": 0,
+    "relationships": {
+      "same": 10,
+      "parent_child": 3,
+      "distinct": 6,
+      "related_other": 2,
+      "sibling": 2,
+      "unresolved": 2
+    },
+    "evidenceContexts": {
+      "compatible_with_additional": 2,
+      "compatible": 11,
+      "historical_difference": 4,
+      "historical_related": 2,
+      "current_conflict": 4,
+      "unresolved": 2
+    }
+  },
+  "rows": [
+    {
+      "caseId": "source25-83ce8914d857",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-83ce8914d857",
+        "legacy-roster-capture:unresolved-83ce8914d857"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "multiple_organizations_require_review",
+      "oldLabelRevision": true,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "The UCSF segment matches; HHMI is an additional affiliation, not a contradiction."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible_with_additional",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [
+          "Howard Hughes Medical Institute"
+        ],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible_with_additional",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-97d16b3bdc69",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-97d16b3bdc69",
+        "legacy-roster-capture:unresolved-97d16b3bdc69"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Department and address text decorate the same university."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-24810991224e",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-24810991224e",
+        "legacy-roster-capture:unresolved-24810991224e"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "organization_granularity_requires_review",
+      "oldLabelRevision": true,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "parent_child",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "The medical school is a constituent unit of Duke University."
+      },
+      "after": {
+        "relationship": "parent_child",
+        "direction": "left_child_of_right",
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-f9b213526332",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-f9b213526332",
+        "legacy-roster-capture:unresolved-f9b213526332"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_location_decoration",
+      "oldLabelRevision": true,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "parent_child",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Lamont-Doherty is a Columbia research unit; added location does not create a different person."
+      },
+      "after": {
+        "relationship": "parent_child",
+        "direction": "left_child_of_right",
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-a84e6c6e46e5",
+      "sourceReferences": [
+        "https://pubmed.ncbi.nlm.nih.gov/39094170",
+        "legacy-roster-capture:unresolved-a84e6c6e46e5"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Department and address decorate Purdue University."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-d70586a585f6",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-d70586a585f6",
+        "legacy-roster-capture:unresolved-d70586a585f6"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "The two assertions name Harvard Medical School."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-30ef5475b6e0",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-30ef5475b6e0",
+        "legacy-roster-capture:unresolved-30ef5475b6e0"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "organization_granularity_requires_review",
+      "oldLabelRevision": true,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "parent_child",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "medium",
+        "rationale": "The institute is a constituent research unit of UT Austin."
+      },
+      "after": {
+        "relationship": "parent_child",
+        "direction": "left_child_of_right",
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-5c277235d507",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-5c277235d507",
+        "legacy-roster-capture:unresolved-5c277235d507"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Department and location decorate Stanford University."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-69090881d690",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-69090881d690",
+        "legacy-roster-capture:unresolved-69090881d690"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Department and location decorate Duke University."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-365d3af38651",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-365d3af38651",
+        "legacy-roster-capture:unresolved-365d3af38651"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Punctuation variation names the same UCSB campus."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-a6e6bd5c0fab",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-a6e6bd5c0fab",
+        "legacy-roster-capture:unresolved-a6e6bd5c0fab"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Both forms name UCLA."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-888808befc3f",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-888808befc3f",
+        "legacy-roster-capture:unresolved-888808befc3f"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "distinct_organizations",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Distinct institutions at different times are compatible with career history."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "historical_difference",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_difference",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-9eb2d6bb6876",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-9eb2d6bb6876",
+        "legacy-roster-capture:unresolved-9eb2d6bb6876"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "distinct_organizations",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Historical and current institutions may differ without contradiction."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "historical_difference",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_difference",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-2569b1946dd0",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-2569b1946dd0",
+        "legacy-roster-capture:unresolved-2569b1946dd0"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "related_independent_organizations",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "related_other",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "medium",
+        "rationale": "The organizations are affiliated but neither should be treated as the other; historical evidence remains neutral."
+      },
+      "after": {
+        "relationship": "related_other",
+        "direction": null,
+        "evidenceContext": "historical_related",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_related",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-0e43e7bca20d",
+      "sourceReferences": [
+        "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-0e43e7bca20d",
+        "legacy-roster-capture:unresolved-0e43e7bca20d"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "multiple_organizations_require_review",
+      "oldLabelRevision": true,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "A historical publication institution and current HHMI appointment can coexist."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "historical_difference",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_difference",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-ucla-ucsd-current",
+      "sourceReferences": [
+        "benchmark-adversarial:uc-siblings-ucla",
+        "benchmark-adversarial:uc-siblings-ucsd"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "sibling",
+        "action": "hold_for_identity_or_institution_correction",
+        "confidence": "high",
+        "rationale": "UCLA and UCSD are sibling campuses, not the same institution."
+      },
+      "after": {
+        "relationship": "sibling",
+        "direction": null,
+        "evidenceContext": "current_conflict",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "hold_for_identity_or_institution_correction",
+        "effect": "veto",
+        "reason": "current_conflict",
+        "remedies": [
+          "confirm_identity",
+          "correct_current_institution",
+          "record_joint_appointment",
+          "not_a_fit"
+        ]
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-ucb-ucla-current",
+      "sourceReferences": [
+        "benchmark-adversarial:uc-siblings-ucb",
+        "benchmark-adversarial:uc-siblings-ucla"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "sibling",
+        "action": "hold_for_identity_or_institution_correction",
+        "confidence": "high",
+        "rationale": "Berkeley and UCLA share a system parent but are distinct campuses."
+      },
+      "after": {
+        "relationship": "sibling",
+        "direction": null,
+        "evidenceContext": "current_conflict",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "hold_for_identity_or_institution_correction",
+        "effect": "veto",
+        "reason": "current_conflict",
+        "remedies": [
+          "confirm_identity",
+          "correct_current_institution",
+          "record_joint_appointment",
+          "not_a_fit"
+        ]
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-columbia-nyu-current",
+      "sourceReferences": [
+        "benchmark-adversarial:current-columbia",
+        "benchmark-adversarial:current-nyu"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "hold_for_identity_or_institution_correction",
+        "confidence": "high",
+        "rationale": "Two conflicting current university assertions require reconciliation."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "current_conflict",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "hold_for_identity_or_institution_correction",
+        "effect": "veto",
+        "reason": "current_conflict",
+        "remedies": [
+          "confirm_identity",
+          "correct_current_institution",
+          "record_joint_appointment",
+          "not_a_fit"
+        ]
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-vumc-vanderbilt",
+      "sourceReferences": [
+        "institution-pair-consistency/cases/named-relationship-pairs.jsonl#named-rel-vumc-vanderbilt",
+        "benchmark-adversarial:vanderbilt-current"
+      ],
+      "currentBooleanObserved": false,
+      "oldLabel": "related-surface",
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "related_other",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "medium",
+        "rationale": "The medical center and university are related but distinct; historical evidence is neutral."
+      },
+      "after": {
+        "relationship": "related_other",
+        "direction": null,
+        "evidenceContext": "historical_related",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_related",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-baylor-cmu-current",
+      "sourceReferences": [
+        "reviewer-roster-audit:shadow-source-f35c43216363",
+        "reviewer-roster-audit:shadow-source-f35c43216363"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "hold_for_identity_or_institution_correction",
+        "confidence": "high",
+        "rationale": "Concurrent distinct institutions need a joint-appointment or correction explanation."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "current_conflict",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "hold_for_identity_or_institution_correction",
+        "effect": "veto",
+        "reason": "current_conflict",
+        "remedies": [
+          "confirm_identity",
+          "correct_current_institution",
+          "record_joint_appointment",
+          "not_a_fit"
+        ]
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-genentech-mit-history",
+      "sourceReferences": [
+        "https://pubmed.ncbi.nlm.nih.gov/37261953",
+        "reviewer-roster-audit:shadow-source-58d9991a27aa"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "distinct",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "A historical industry affiliation does not contradict a current university affiliation."
+      },
+      "after": {
+        "relationship": "distinct",
+        "direction": null,
+        "evidenceContext": "historical_difference",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "historical_difference",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-fred-hutch-hhmi-additional",
+      "sourceReferences": [
+        "https://pubmed.ncbi.nlm.nih.gov/35080919",
+        "reviewer-roster-audit:shadow-source-e8a7efbdac68"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Fred Hutch matches and HHMI remains an additional COI-relevant affiliation."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible_with_additional",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [
+          "Howard Hughes Medical Institute"
+        ],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible_with_additional",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-epfl-decoration",
+      "sourceReferences": [
+        "https://pubmed.ncbi.nlm.nih.gov/36510011",
+        "reviewer-roster-audit:shadow-source-2d8d208f7351"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "same",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "The English name and EPFL acronym identify the same organization."
+      },
+      "after": {
+        "relationship": "same",
+        "direction": null,
+        "evidenceContext": "compatible",
+        "matchedSegments": {
+          "evidenceIndex": 0,
+          "recordedIndex": 0
+        },
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "compatible",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-provider-failure-neutral",
+      "sourceReferences": [
+        "offline-provider-failure-fixture",
+        "offline-provider-failure-fixture"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": true,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "exact_orcid_and_name"
+        ]
+      },
+      "adjudication": {
+        "relationship": "unresolved",
+        "action": "allow_if_other_identity_gates_pass",
+        "confidence": "high",
+        "rationale": "Provider failure is neutral when independent identity is sufficient."
+      },
+      "after": {
+        "relationship": "unresolved",
+        "direction": null,
+        "evidenceContext": "unresolved",
+        "matchedSegments": null,
+        "additionalAffiliations": [],
+        "action": "allow_if_other_identity_gates_pass",
+        "effect": "neutral",
+        "reason": "provider_failure_neutral",
+        "remedies": []
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": true,
+      "honestProviderFailureCopy": true,
+      "remedyCovered": true
+    },
+    {
+      "caseId": "source25-ambiguous-parent-hold",
+      "sourceReferences": [
+        "benchmark-adversarial:bare-uc-parent",
+        "benchmark-adversarial:ucla-current"
+      ],
+      "currentBooleanObserved": null,
+      "oldLabel": null,
+      "oldLabelRevision": false,
+      "independentIdentity": {
+        "sufficient": false,
+        "excludesAffiliation": true,
+        "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1",
+        "evidence": [
+          "name_only"
+        ]
+      },
+      "adjudication": {
+        "relationship": "unresolved",
+        "action": "hold_for_independent_identity",
+        "confidence": "high",
+        "rationale": "The bare system claim is ambiguous and identity is not otherwise sufficient."
+      },
+      "after": {
+        "relationship": "unresolved",
+        "direction": null,
+        "evidenceContext": "unresolved",
+        "matchedSegments": null,
+        "additionalAffiliations": [],
+        "action": "hold_for_independent_identity",
+        "effect": "hold",
+        "reason": "independent_identity_insufficient",
+        "remedies": [
+          "confirm_identity",
+          "add_authoritative_evidence",
+          "not_a_fit"
+        ]
+      },
+      "sourceComplete": true,
+      "relationshipMatch": true,
+      "actionMatch": true,
+      "siblingCollapse": false,
+      "unsafeActionClear": false,
+      "manufacturedReview": false,
+      "providerFailureCase": false,
+      "honestProviderFailureCopy": false,
+      "remedyCovered": true
+    }
+  ],
+  "provenance": {
+    "gitHead": null,
+    "casesSha256": "3c08f8e9ea1fc837ce065d370ce7c0b32ed355c5e10fe3ad6a9a26f390dfb20a",
+    "providerSnapshotSha256": "590ace9f7b112c5ec537eb3d4497afe96080a8aea36f5719766d252e9bd60683",
+    "providerCapturedAt": "2026-08-19T14:08:20.382Z",
+    "provider": {
+      "adapterVersion": "ror-api-claim-candidates/v1",
+      "affiliationStrategy": "single_search",
+      "apiVersion": "v2",
+      "endpoint": "https://api.ror.org/v2/organizations",
+      "observedOn": "2026-08-19",
+      "strategies": [
+        "affiliation-single-search",
+        "ordinary-query",
+        "successor-hydration",
+        "parent-hydration"
+      ]
+    },
+    "providerMetrics": {
+      "affiliationLookups": 46,
+      "cacheHits": 15,
+      "candidateSets": 46,
+      "candidatesReturned": 466,
+      "maxCandidatesReturned": 29,
+      "malformedResponses": 0,
+      "ordinaryQueryLookups": 4,
+      "parentHydrations": 0,
+      "providerFailures": 0,
+      "providerLatencyMs": 18396,
+      "providerRequests": 37,
+      "providerTimeouts": 0,
+      "response2xx": 37,
+      "response3xx": 0,
+      "response4xx": 0,
+      "response5xx": 0,
+      "retries": 0,
+      "singleFlightHits": 0,
+      "successorHydrations": 2,
+      "transportFailures": 0,
+      "cacheSize": 37,
+      "inFlightSize": 0
+    }
+  },
+  "limitations": [
+    "The benchmark independent-identity input is an explicit counterfactual policy input, not a production runtime authority receipt.",
+    "The live roster retains a machine-verifiable non-affiliation identity breakdown for only a small subset of current mismatch rows; Stage 3 remains blocked until that execution-point contract exists.",
+    "Publication observation dates are null where the legacy production capture did not retain an exact work reference; currentness is explicitly historical rather than inferred as current."
+  ]
+}

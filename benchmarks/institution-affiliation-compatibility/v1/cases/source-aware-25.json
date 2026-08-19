@@ -1,0 +1,208 @@
+{
+  "schemaVersion": "institution-affiliation-benchmark/v1",
+  "adjudicatedBeforeClassifierRun": true,
+  "selection": "Fifteen re-adjudicated production captures from the 2026-08-18 diagnostic set plus ten production-shaped temporal, sibling, additional-affiliation, and failure complements.",
+  "cases": [
+    {
+      "caseId": "source25-83ce8914d857",
+      "oldLabel": "multiple_organizations_require_review",
+      "evidenceAssertion": { "rawText": "Department of Biochemistry and Biophysics, University of California, San Francisco, San Francisco, CA, USA; Howard Hughes Medical Institute", "segments": [{ "rawText": "University of California, San Francisco" }, { "rawText": "Howard Hughes Medical Institute", "role": "additional" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-83ce8914d857", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California, San Francisco", "segments": [{ "rawText": "University of California, San Francisco" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-83ce8914d857", "observedAt": "2026-08-13", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "The UCSF segment matches; HHMI is an additional affiliation, not a contradiction." }
+    },
+    {
+      "caseId": "source25-97d16b3bdc69",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Chemistry and Biomolecular Sciences, University of Ottawa, 10 Marie-Curie, Ottawa, ON K1N 6N5, Canada", "segments": [{ "rawText": "University of Ottawa" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-97d16b3bdc69", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of Ottawa", "segments": [{ "rawText": "University of Ottawa" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-97d16b3bdc69", "observedAt": "2026-08-06", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Department and address text decorate the same university." }
+    },
+    {
+      "caseId": "source25-24810991224e",
+      "oldLabel": "organization_granularity_requires_review",
+      "evidenceAssertion": { "rawText": "Department of Biochemistry, Duke University School of Medicine, Durham, NC, USA", "segments": [{ "rawText": "Duke University School of Medicine", "resolutionOverride": { "status": "resolved", "sourceRorId": null, "canonicalRorId": "https://ror.org/00py81415", "organizationScope": "subunit", "parentRorId": "https://ror.org/00py81415", "relationships": [] } }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-24810991224e", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Duke University", "segments": [{ "rawText": "Duke University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-24810991224e", "observedAt": "2026-08-18", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "parent_child", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "The medical school is a constituent unit of Duke University." }
+    },
+    {
+      "caseId": "source25-f9b213526332",
+      "oldLabel": "same_organization_with_location_decoration",
+      "evidenceAssertion": { "rawText": "Lamont-Doherty Earth Observatory, Columbia University, Palisades, NY 10964", "segments": [{ "rawText": "Lamont-Doherty Earth Observatory" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-f9b213526332", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Columbia University", "segments": [{ "rawText": "Columbia University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-f9b213526332", "observedAt": "2026-08-18", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "parent_child", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Lamont-Doherty is a Columbia research unit; added location does not create a different person." }
+    },
+    {
+      "caseId": "source25-a84e6c6e46e5",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Earth, Atmospheric, and Planetary Science, Purdue University, West Lafayette, IN 47907", "segments": [{ "rawText": "Purdue University", "resolutionOverride": { "status": "resolved", "sourceRorId": "https://ror.org/02dqehb95", "canonicalRorId": "https://ror.org/02dqehb95", "organizationScope": "ror_entity", "relationships": [] } }], "sourceType": "publication", "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/39094170", "observedAt": "2024", "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Purdue University", "segments": [{ "rawText": "Purdue University", "resolutionOverride": { "status": "resolved", "sourceRorId": "https://ror.org/02dqehb95", "canonicalRorId": "https://ror.org/02dqehb95", "organizationScope": "ror_entity", "relationships": [] } }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-a84e6c6e46e5", "observedAt": "2026-08-18", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Department and address decorate Purdue University." }
+    },
+    {
+      "caseId": "source25-d70586a585f6",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Microbiology, Harvard Medical School, Boston, MA, USA", "segments": [{ "rawText": "Harvard Medical School" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-d70586a585f6", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Harvard Medical School", "segments": [{ "rawText": "Harvard Medical School" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-d70586a585f6", "observedAt": "2026-08-18", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "The two assertions name Harvard Medical School." }
+    },
+    {
+      "caseId": "source25-30ef5475b6e0",
+      "oldLabel": "organization_granularity_requires_review",
+      "evidenceAssertion": { "rawText": "University of Texas Institute for Geophysics, Jackson School of Geosciences, University of Texas at Austin", "segments": [{ "rawText": "University of Texas Institute for Geophysics", "resolutionOverride": { "status": "resolved", "sourceRorId": null, "canonicalRorId": "https://ror.org/00hj54h04", "organizationScope": "subunit", "parentRorId": "https://ror.org/00hj54h04", "relationships": [] } }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-30ef5475b6e0", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "The University of Texas at Austin", "segments": [{ "rawText": "The University of Texas at Austin" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-30ef5475b6e0", "observedAt": "2026-08-11", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "parent_child", "action": "allow_if_other_identity_gates_pass", "confidence": "medium", "rationale": "The institute is a constituent research unit of UT Austin." }
+    },
+    {
+      "caseId": "source25-5c277235d507",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Bioengineering, Stanford University, Stanford, CA 94305", "segments": [{ "rawText": "Stanford University" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-5c277235d507", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Stanford University", "segments": [{ "rawText": "Stanford University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-5c277235d507", "observedAt": "2026-08-07", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Department and location decorate Stanford University." }
+    },
+    {
+      "caseId": "source25-69090881d690",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Biomedical Engineering, Duke University, Durham, NC, USA", "segments": [{ "rawText": "Duke University" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-69090881d690", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Duke University", "segments": [{ "rawText": "Duke University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-69090881d690", "observedAt": "2026-08-07", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Department and location decorate Duke University." }
+    },
+    {
+      "caseId": "source25-365d3af38651",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Chemistry and Biochemistry, University of California, Santa Barbara", "segments": [{ "rawText": "University of California, Santa Barbara" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-365d3af38651", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California Santa Barbara", "segments": [{ "rawText": "University of California Santa Barbara" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-365d3af38651", "observedAt": "2026-08-06", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Punctuation variation names the same UCSB campus." }
+    },
+    {
+      "caseId": "source25-a6e6bd5c0fab",
+      "oldLabel": "same_organization_with_department_and_location_decoration",
+      "evidenceAssertion": { "rawText": "Department of Mechanical and Aerospace Engineering, University of California at Los Angeles", "segments": [{ "rawText": "University of California at Los Angeles" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-a6e6bd5c0fab", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California, Los Angeles", "segments": [{ "rawText": "University of California, Los Angeles" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-a6e6bd5c0fab", "observedAt": "2026-08-05", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Both forms name UCLA." }
+    },
+    {
+      "caseId": "source25-888808befc3f",
+      "oldLabel": "distinct_organizations",
+      "evidenceAssertion": { "rawText": "Department of Molecular Biology and Genetics, Cornell University", "segments": [{ "rawText": "Cornell University" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-888808befc3f", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Yale University", "segments": [{ "rawText": "Yale University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-888808befc3f", "observedAt": "2026-08-13", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Distinct institutions at different times are compatible with career history." }
+    },
+    {
+      "caseId": "source25-9eb2d6bb6876",
+      "oldLabel": "distinct_organizations",
+      "evidenceAssertion": { "rawText": "Department of Geology, University of Kansas", "segments": [{ "rawText": "University of Kansas" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-9eb2d6bb6876", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of Pennsylvania", "segments": [{ "rawText": "University of Pennsylvania" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-9eb2d6bb6876", "observedAt": "2026-08-11", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Historical and current institutions may differ without contradiction." }
+    },
+    {
+      "caseId": "source25-2569b1946dd0",
+      "oldLabel": "related_independent_organizations",
+      "evidenceAssertion": { "rawText": "Department of Cancer Biology, Dana-Farber Cancer Institute, Boston, MA", "segments": [{ "rawText": "Dana-Farber Cancer Institute" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-2569b1946dd0", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Harvard University", "segments": [{ "rawText": "Harvard University" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-2569b1946dd0", "observedAt": "2026-08-07", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "related_other", "action": "allow_if_other_identity_gates_pass", "confidence": "medium", "rationale": "The organizations are affiliated but neither should be treated as the other; historical evidence remains neutral." }
+    },
+    {
+      "caseId": "source25-0e43e7bca20d",
+      "oldLabel": "multiple_organizations_require_review",
+      "evidenceAssertion": { "rawText": "Icahn School of Medicine at Mount Sinai, New York", "segments": [{ "rawText": "Icahn School of Medicine at Mount Sinai" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/smoke/unresolved-25-2026-08-18.json#unresolved-0e43e7bca20d", "observedAt": null, "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Howard Hughes Medical Institute", "segments": [{ "rawText": "Howard Hughes Medical Institute" }], "sourceType": "applicant_record", "sourceReference": "legacy-roster-capture:unresolved-0e43e7bca20d", "observedAt": "2026-08-07", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "A historical publication institution and current HHMI appointment can coexist." }
+    },
+    {
+      "caseId": "source25-ucla-ucsd-current",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "University of California, Los Angeles", "segments": [{ "rawText": "University of California, Los Angeles" }], "sourceType": "official_profile", "sourceReference": "benchmark-adversarial:uc-siblings-ucla", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California, San Diego", "segments": [{ "rawText": "University of California, San Diego" }], "sourceType": "staff_record", "sourceReference": "benchmark-adversarial:uc-siblings-ucsd", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "sibling", "action": "hold_for_identity_or_institution_correction", "confidence": "high", "rationale": "UCLA and UCSD are sibling campuses, not the same institution." }
+    },
+    {
+      "caseId": "source25-ucb-ucla-current",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "University of California, Berkeley", "segments": [{ "rawText": "University of California, Berkeley" }], "sourceType": "official_profile", "sourceReference": "benchmark-adversarial:uc-siblings-ucb", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California, Los Angeles", "segments": [{ "rawText": "University of California, Los Angeles" }], "sourceType": "staff_record", "sourceReference": "benchmark-adversarial:uc-siblings-ucla", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "sibling", "action": "hold_for_identity_or_institution_correction", "confidence": "high", "rationale": "Berkeley and UCLA share a system parent but are distinct campuses." }
+    },
+    {
+      "caseId": "source25-columbia-nyu-current",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Columbia University", "segments": [{ "rawText": "Columbia University" }], "sourceType": "official_profile", "sourceReference": "benchmark-adversarial:current-columbia", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "New York University", "segments": [{ "rawText": "New York University" }], "sourceType": "staff_record", "sourceReference": "benchmark-adversarial:current-nyu", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "hold_for_identity_or_institution_correction", "confidence": "high", "rationale": "Two conflicting current university assertions require reconciliation." }
+    },
+    {
+      "caseId": "source25-vumc-vanderbilt",
+      "oldLabel": "related-surface",
+      "evidenceAssertion": { "rawText": "Vanderbilt University Medical Center", "segments": [{ "rawText": "Vanderbilt University Medical Center" }], "sourceType": "publication", "sourceReference": "institution-pair-consistency/cases/named-relationship-pairs.jsonl#named-rel-vumc-vanderbilt", "observedAt": "2024", "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Vanderbilt University", "segments": [{ "rawText": "Vanderbilt University" }], "sourceType": "staff_record", "sourceReference": "benchmark-adversarial:vanderbilt-current", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "related_other", "action": "allow_if_other_identity_gates_pass", "confidence": "medium", "rationale": "The medical center and university are related but distinct; historical evidence is neutral." }
+    },
+    {
+      "caseId": "source25-baylor-cmu-current",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Baylor College of Medicine", "segments": [{ "rawText": "Baylor College of Medicine" }], "sourceType": "official_profile", "sourceReference": "reviewer-roster-audit:shadow-source-f35c43216363", "observedAt": "2026-07-21", "currentness": "current", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Carnegie Mellon University", "segments": [{ "rawText": "Carnegie Mellon University" }], "sourceType": "staff_record", "sourceReference": "reviewer-roster-audit:shadow-source-f35c43216363", "observedAt": "2026-07-21", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "hold_for_identity_or_institution_correction", "confidence": "high", "rationale": "Concurrent distinct institutions need a joint-appointment or correction explanation." }
+    },
+    {
+      "caseId": "source25-genentech-mit-history",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Genentech, Inc", "segments": [{ "rawText": "Genentech" }], "sourceType": "publication", "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/37261953", "observedAt": "2023", "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Massachusetts Institute of Technology", "segments": [{ "rawText": "Massachusetts Institute of Technology" }], "sourceType": "staff_record", "sourceReference": "reviewer-roster-audit:shadow-source-58d9991a27aa", "observedAt": "2026-06-25", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "distinct", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "A historical industry affiliation does not contradict a current university affiliation." }
+    },
+    {
+      "caseId": "source25-fred-hutch-hhmi-additional",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Fred Hutchinson Cancer Center; Howard Hughes Medical Institute", "segments": [{ "rawText": "Fred Hutchinson Cancer Center" }, { "rawText": "Howard Hughes Medical Institute", "role": "additional" }], "sourceType": "publication", "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/35080919", "observedAt": "2022", "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Fred Hutchinson Cancer Center", "segments": [{ "rawText": "Fred Hutchinson Cancer Center" }], "sourceType": "staff_record", "sourceReference": "reviewer-roster-audit:shadow-source-e8a7efbdac68", "observedAt": "2026-06-24", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Fred Hutch matches and HHMI remains an additional COI-relevant affiliation." }
+    },
+    {
+      "caseId": "source25-epfl-decoration",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Global Health Institute, Swiss Federal Institute of Technology Lausanne (EPFL)", "segments": [{ "rawText": "Swiss Federal Institute of Technology Lausanne" }], "sourceType": "publication", "sourceReference": "https://pubmed.ncbi.nlm.nih.gov/36510011", "observedAt": "2022", "currentness": "historical", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "EPFL (École Polytechnique Fédérale de Lausanne)", "segments": [{ "rawText": "EPFL" }], "sourceType": "staff_record", "sourceReference": "reviewer-roster-audit:shadow-source-2d8d208f7351", "observedAt": "2026-07-21", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "same", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "The English name and EPFL acronym identify the same organization." }
+    },
+    {
+      "caseId": "source25-provider-failure-neutral",
+      "providerMode": "forced_failure",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "Provider unavailable university", "segments": [{ "rawText": "Provider unavailable university" }], "sourceType": "official_profile", "sourceReference": "offline-provider-failure-fixture", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "Known University", "segments": [{ "rawText": "Known University" }], "sourceType": "staff_record", "sourceReference": "offline-provider-failure-fixture", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": true, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["exact_orcid_and_name"] },
+      "adjudication": { "relationship": "unresolved", "action": "allow_if_other_identity_gates_pass", "confidence": "high", "rationale": "Provider failure is neutral when independent identity is sufficient." }
+    },
+    {
+      "caseId": "source25-ambiguous-parent-hold",
+      "oldLabel": null,
+      "evidenceAssertion": { "rawText": "University of California", "segments": [{ "rawText": "University of California" }], "sourceType": "reviewer_self_report", "sourceReference": "benchmark-adversarial:bare-uc-parent", "observedAt": null, "currentness": "unknown", "authorSpecific": true },
+      "recordedAssertion": { "rawText": "University of California, Los Angeles", "segments": [{ "rawText": "University of California, Los Angeles" }], "sourceType": "staff_record", "sourceReference": "benchmark-adversarial:ucla-current", "observedAt": "2026-08-19", "currentness": "current", "authorSpecific": true },
+      "independentIdentity": { "sufficient": false, "excludesAffiliation": true, "evaluatorVersion": "benchmark-counterfactual-non-affiliation/v1", "evidence": ["name_only"] },
+      "adjudication": { "relationship": "unresolved", "action": "hold_for_independent_identity", "confidence": "high", "rationale": "The bare system claim is ambiguous and identity is not otherwise sufficient." }
+    }
+  ]
+}

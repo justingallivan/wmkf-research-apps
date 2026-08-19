@@ -1,137 +1,250 @@
-# Session 445 Prompt: Production-Smoke the Site Visit and Proposal Document Flows
+# Session 446 Handoff: Stage 2 Synthetic Preview Acceptance Complete
 
-## Session 444 Summary
+## Session 445 Summary
 
-Session 444 finished the Pre-Site Word experience, deployed the guarded
-Pre-Site→Site Visit handoff and its confirmation UI, and added the request's
-SharePoint `Phase II` files to the Proposal tab. Production is at commit
-`83b9c68a`; the latest deployment and branded sign-in health check are Ready.
+Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
+then moved the institution-affiliation strategy onto
+`codex/institution-decision-harness`. The Preview smoke harness commit is
+`80f2d739`.
+The owner authorized Stage 2 notification and explanatory-card presentation;
+it is implemented behind a default-off flag with no identity, selectability, or
+Dataverse-write authority.
 
 ### What Was Completed
 
-1. **Pre-Site Word draft production UX completed**
-   - Added read-only recovery/status polling after a lost long-running POST so
-     the browser does not repeat generation after durable completion.
-   - Corrected the Recommendation layout for Word Online, simplified the panel
-     to Generate/Regenerate, Edit, and Download actions, and linked the latest
-     draft filename directly to Word.
-   - Request `1002379` remains the production-proved narrative-only generation
-     and exact-reuse fixture.
+1. **Proposal and Pre-Site production workflow refined**
+   - Added Reviewer Materials to the Proposal tab and changed the Pre-Site
+     institution value to the applicant organization's AKA.
+   - Published template v4 with the owner-directed line spacing, 1.5-inch
+     metadata label column, and zero value-column indent.
+   - Removed brittle narrative length gates, preserved raw/provider diagnostics,
+     improved generation failure messages, clarified regeneration as a new AI
+     call, and allowed audited prompt-schema/model publication through Admin.
 
-2. **Guarded Site Visit handoff deployed**
-   - The transition independently resolves the current Pre-Site row, verifies
-     one stable SharePoint item/version before and after DOCX download, records
-     the governed hash/version/time, and ETag-conditionally changes Draft→Review.
-   - Site Visit continues to use the same Word file; Pre-Site regeneration is
-     locked after promotion. No separate Site Visit Writeup or Dataverse
-     observations memo was introduced.
-   - The Pre-Site tab now presents this as a distinct `Start Site Visit` action
-     with a confirmation modal explaining the consequences before mutation.
+2. **Reviewer identity remediation made actionable**
+   - Added durable, request-scoped contact-draft editing with compare-and-swap,
+     strict HTTP(S) individual-profile URL validation, and explicit invalidation
+     of stale automated/staff identity authority after an ordinary contact edit.
+   - Repaired applicant-row error correlation and made malformed response
+     correlation fail closed.
+   - Reworked reviewer cards so evidence, warnings, status, and the next action
+     are not presented as contradictory independent boxes. Held cards now expose
+     a relevant confirmation, correction, retry, repair-request, or not-a-fit
+     remedy where available.
 
-3. **Phase II Proposal documents deployed**
-   - The Proposal tab now has a separate Phase II Documents section containing
-     every file beneath the request's SharePoint `Phase II` folder.
-   - View/Download remain behind the request-scoped proxy. The proxy authorizes
-     only files re-derived by the Proposal listing service; unrelated request
-     files remain excluded.
-   - Phase I slot matching and the exact AI Materials display are unchanged.
+3. **Institution-affiliation strategy rebuilt around conditional neutrality**
+   - Re-adjudicated the 25 unresolved cases with source, currentness,
+     author-specificity, typed ROR relationships, and separate relationship and
+     consumer-action labels.
+   - Added a provenance-preserving ROR assertion resolver and a total five-
+     consumer policy evaluator. Unknown enum values fail closed for
+     high-authority consumers; sibling organizations never collapse to the same
+     entity; historical and additional affiliations remain distinct from current
+     conflicts.
+   - The frozen Stage 1 artifact passes 25/25 relationship and action decisions,
+     1/1 provider-failure copy checks, and 5/5 held-case remedy checks, with zero
+     sibling collapses, unsafe clears, or manufactured reviews. The three
+     challenged cases are compatible/nonblocking under explicit independent-
+     identity sufficiency.
+   - A read-only roster audit found 46 source-ready mismatch rows but only two
+     with the compact non-affiliation identity anchors inspected. Therefore the
+     benchmark's identity-sufficiency value is a counterfactual policy input,
+     not production authority.
 
-4. **Documentation reconciled**
-   - Updated the writeup lifecycle plan, SharePoint model, API security matrix,
-     Proposal-tab documentation, agent memory, and Workbench onboarding copy.
-   - Added a Session 444 milestone entry because the handoff and Phase II
-     document access are new Production capabilities.
+4. **Promotion-review boundaries hardened**
+   - Prevented non-author-specific publication evidence from creating identity
+     weight or a current-conflict veto.
+   - Made same-parent internal subunits without independent identifiers abstain
+     instead of collapsing to parent/child compatibility.
+   - Prevented a named organization before an address from being ignored as
+     location decoration.
+   - Corrected explicit server identity-review reasoning so it cannot render
+     beneath the positive `Suggested because:` label.
 
-5. **Claim-evidence bookkeeping attempted**
-   - `report:claim-evidence-pilot -- --current` reported unavailable local
-     state, so no observation row was added.
+5. **Stage 2 institution presentation implemented, default off**
+   - Added source-aware typed projections for post-acceptance staff
+     notifications and reviewer candidate-card explanations/remedies.
+   - Preserved the incumbent boolean as the only selection, identity, and write
+     authority. Typed compatible results cannot clear an existing hold.
+   - Added a versioned, sanitized roster DTO, stale-cache refresh when enabled,
+     provider-failure retry copy, legacy fallback on unexpected failure, and an
+     exact flag-off rollback path.
+   - Corrected runtime provenance so PubMed history is historical publication
+     evidence, compact ORCID employment history remains time-unknown, and
+     untyped evidence remains unknown rather than gaining false specificity.
+   - Claude Fable's fresh adversarial review returned REWORK with two pre-enable
+     findings: deceased rows could invalidate the Stage 2 cache forever, and a
+     PubMed-without-affiliation fallback could mislabel applicant text as
+     publication evidence. Both are fixed; an additional stale DTO edit
+     affordance now obeys the same rollout gate as the notice. Informational
+     alert volume remains a named Preview observation. Fable's fresh post-fix
+     review returned APPROVE with no P0/P1/P2 findings; its only residuals are
+     sticky incumbent copy after a deterministic fallback until re-enrichment
+     or version bump, and helper-level rather than component-level coverage for
+     the edit-affordance rollback.
+
+6. **Signed-in synthetic Preview acceptance completed**
+   - Added `/workbench/institution-stage2-smoke`, a server-rendered Preview-only
+     page behind the existing signed-in `reviewers` access guard. Production,
+     local, and unknown deployment environments return `notFound` after auth.
+   - The page renders the production `CandidateCard` with six projector-pinned,
+     synthetic cases: compatible, additional, historical, current conflict,
+     unresolved, and provider failure. Its action handlers update component
+     state only; focused coverage clicks all eight notice actions and proves no
+     `fetch` call occurs.
+   - The owner confirmed all six cases and `Stage II flag: On` in signed-in
+     Preview deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`, then completed the
+     local action check. Unresolved/provider-failure copy did not claim a
+     mismatch, and every held synthetic case exposed a mapped card action.
+   - This was necessarily synthetic: a read-only Production roster audit found
+     952 rows and zero persisted Stage 2 presentation DTOs. The smoke therefore
+     proves rendering, access, rollback, and action wiring, but not organic
+     false-clear rates, alert volume, or material review reduction.
+   - Cleanup is complete. The temporary branch flag and immutable Entra callback
+     were removed, the four permanent callbacks were verified, and clean
+     default-off Preview deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
 
 ### Commits
 
-- `5dc45b7d` — Document Pre-Site production proof
-- `1ac01405` — Recover Pre-Site generation status
-- `0f5ce787` — Record Pre-Site production deployment
-- `6eeae054` — Fix Pre-Site Recommendation alignment
-- `96c63f0f` — Simplify Pre-Site draft actions
-- `12648053` — Record Pre-Site UI production deployment
-- `27b88275` — Link latest Pre-Site draft filename
-- `32b16f5f` — Build guarded Site Visit handoff
-- `5f316a29` — Clarify Site Visit stage transition
-- `83b9c68a` — Show Phase II documents in Proposal tab
+- `45ea7456` — Add reviewer materials to Proposal tab
+- `33e8771f` — Use applicant AKA in Pre-Site writeups
+- `db9dfef1` — Format Pre-Site Visit template v4
+- `a1ea0d01` — Refine Pre-Site template line spacing
+- `36a33edb` — Record Pre-Site v4 production release
+- `19af2c3e` — Plan Pre-Site generation resilience
+- `24decb85` — Harden Pre-Site Visit generation resilience
+- `46903bc4` — Allow audited prompt schema publication
+- `73d8cb80` — Record Pre-Site resilience production release
+- `f9d614ff` — Fix Pre-Site metadata column geometry
+- `32b92d51` — Clarify Pre-Site draft regeneration
+- `bbde2536` — Remove Pre-Site value-column indent
+- `d9c29c7d` — Fix reviewer identity remediation flow
+- `c644808d` — Harden reviewer identity remediation
+- `f061e08c` — Clarify reviewer evidence and invite actions
+- `5fcd913c` — Clarify reviewer identity remediation cards
+- `55eafa13` — Add unresolved institution decision smoke harness
+- `8723aa9c` — Record unresolved institution smoke results
+- `dbafd2ec` — Rework institution compatibility plan
+- `23a40e89` — Implement source-aware institution shadow contract
+- `0d163998` — Document Session 445 and create Session 446 prompt
+- `c8c67aae` — Finalize Session 445 handoff cleanup
+- `947fb46` — Harden institution shadow decision boundaries
+- `82160a0f` — Document institution promotion review hardening
+- `6b2f259` — Add Stage 2 institution presentation
+- `e217f6ef` — Hand off Stage 2 institution validation
+- `0089822` — Address Stage 2 adversarial findings
+- `80f2d739` — Add signed-in Stage 2 Preview smoke page
 
 ## Next Items
 
 ### Verified Open
 
-1. **Read-only smoke the Phase II document display.**
-   Evidence: commit `83b9c68a`, Ready deployment
-   `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`, and focused listing/UI/download tests.
-   Open a request with known `Phase II` files and confirm filenames plus
-   View/Download in the signed-in Workbench. This does not mutate the request.
+1. **Choose an evidence threshold for Stage 2 Production enablement.**
+   Evidence: signed-in synthetic Preview acceptance now proves all six card
+   presentations, all eight mapped notice actions, the no-write boundary, and
+   exact flag rollback. Production currently has zero persisted Stage 2 DTOs,
+   so no organic false-clear, alert-volume, or manual-review-reduction sample
+   exists. Keep the Production flag off unless the owner explicitly accepts the
+   synthetic evidence or chooses a non-mutating observation period that can
+   produce real rows.
 
-2. **Run the elapsed Track A passive-safety closeout.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` records
-   the 48-hour window opened at `2026-08-16 00:53:40Z`; that interval has
-   elapsed. Measure total dependency events/day, malformed/invalid events,
-   throttling/truncation, visible cost, and unexpected `unknown` classifications.
-   Absence of target-route traffic is explicitly not a failure.
+2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
+   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
+   renewed confirmation contract; commits `d9c29c7d` through `5fcd913c` are on
+   `origin/main`. Use Peter Reiners or another reviewer who is genuinely intended
+   for an invite list; confirm that the card names the problem and exposes the
+   exact next action before performing a durable promotion.
 
-3. **Plan the next Site Visit dossier slice and Final copy transaction.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` and
-   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`. First map existing Dataverse
-   logistics fields/relationships and the five registered file categories;
-   then design the exact-version Final copy without overwriting the Pre-Site
-   workspace.
+3. **Close the previously verified operational smokes.**
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` still marks the signed-in
+   Site Visit handoff and Phase II live-folder display smokes open;
+   `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still records the
+   passive Track A closeout separately from the already-passed Stage 2 baseline.
 
 ### Owner Decision Needed
 
-1. **Choose an approved request for the signed-in Site Visit handoff smoke.**
-   Evidence: commits `32b16f5f`/`5f316a29` and the deployed guarded route.
-   The action is a durable Draft→Review transition that records a milestone and
-   locks Pre-Site regeneration, so do not click it on a request without explicit
-   approval. Confirm that Edit/Download still target the same Word item afterward.
+1. **Authorize, defer, or decline Production flag enablement.**
+   Evidence: Stage 2 is implemented and synthetic Preview acceptance passed,
+   but real-world effectiveness and alert-volume evidence remain unavailable.
+   Production enablement requires a new build because the flag is
+   `NEXT_PUBLIC`; the exact unset/`off` path independently restores incumbent
+   presentation.
 
 ### Parked
 
-1. Next-cycle Reviewer Finder cutover to the separate Proposal Narrative and
-   Bibliography AI Materials inputs.
-2. Broader historical Workbench search by institution, PI, title, cycle, and
-   status. Exact request-number opening is already Production-live.
-3. Phase II applicant-intake portal pending the GOApply evaluation.
+1. **Stage 3 institution identity authority.**
+   Evidence: the production roster audit found sparse machine-verifiable
+   non-affiliation identity inputs. Candidate selectability, write vetoes, and
+   identity-anchor weighting remain blocked until that execution-point contract
+   exists and the owner approves each consumer separately.
+
+2. **Site Visit dossier/logistics and Final copy transaction.**
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. Inventory the existing
+   Dataverse fields and registered SharePoint categories before proposing more
+   schema or upload paths.
 
 ### Verify Before Acting
 
-1. Wave 19 is exact in Production, but another Dataverse target must pass the
-   same preflight and schema apply before runtime uses its Pre-Site fields.
-2. Site Visit logistics/supporting-file persistence and Final creation remain
-   planned; do not describe their schemas or routes as provisioned.
+1. The frozen ROR snapshot contains explicit manual adjudication overlays for
+   internal subunits that ROR does not model independently. Do not lower the
+   production resolver threshold or overwrite the snapshot; use a new versioned
+   capture and re-adjudication.
+2. Fetch and verify `origin/main` plus the feature-branch tip before merging or
+   making a production release. `80f2d739` is pushed to
+   `origin/codex/institution-decision-harness`; no merge or Production flag
+   change has been made.
+3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
+   handles, then moved them out of the worktree to
+   `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
+   changed, and the repository ended clean.
 
 ### Do Not Reopen Without New Decision
 
-1. A separate Site Visit Writeup or Dataverse staff-observations memo.
-2. Combining Proposal Narrative and Bibliography into one canonical AI PDF.
-3. One child Dataverse record per generated Pre-Site section.
+1. Another string-side institution checker or a rule that treats UCLA/UCSD-style
+   siblings as the same organization.
+2. Any production identity/selectability/write flip based only on the 25-case
+   shadow pass.
+3. A separate Site Visit Writeup or Dataverse staff-observations memo.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `shared/components/workbench/ProposalTab.js` | Reviewer Materials, AI Materials, Phase I, and Phase II display |
-| `lib/services/workbench-proposal-documents.js` | Scoped SharePoint Proposal document classification |
-| `lib/services/workbench/download-proposal-document-service.js` | Exact listed-file download authorization |
-| `shared/components/workbench/PreSiteVisitTab.js` | Pre-Site actions and Site Visit confirmation UI |
-| `lib/services/workbench/pre-site-visit-service.js` | Governed Pre-Site writer and lifecycle guards |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Pre-Site→Site Visit→Final contract |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | SharePoint/Dataverse document ownership model |
+| `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` | Readable Stage 1 before/after report |
+| `benchmarks/institution-affiliation-compatibility/v1/cases/source-aware-25.json` | Frozen relationship/action adjudications |
+| `lib/services/institution-affiliation-assessment.js` | Typed relationship and total consumer policy |
+| `lib/services/ror-affiliation-assertion-resolver.js` | Source/canonical ROR resolution with partial success |
+| `lib/services/institution-affiliation-stage2.js` | Bounded notification/card evaluation and presentation projection |
+| `shared/utils/institution-stage2-presentation.js` | Exact rollout flag and versioned presentation DTO identity |
+| `pages/workbench/institution-stage2-smoke.js` | Signed-in Preview-only synthetic presentation harness; no persistence |
+| `scripts/audit-institution-affiliation-shadow-cases.js` | Read-only, PII-bounded roster inventory |
+| `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Authority stages, gates, and current status |
+| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Durable contact edit and identity-remediation contract |
 
 ## Testing
 
-The Phase II change passed 30 focused listing, service, route, download-security,
-and UI tests; API-security/documentation gates and self-tests passed; the webpack
-production build passed. The Site Visit handoff passed focused service, route,
-and component coverage for exact success, idempotent retry, stale UI, SharePoint
-version races, ETag conflicts, regeneration lock, modal cancellation, and
-request-switch cancellation. Vercel deployments for `5f316a29` and `83b9c68a`
-reached Ready; `https://applications.wmkeck.org/auth/signin` returned HTTP 200,
-and the deployment error scans were clean. Signed-in handoff and live Phase II
-folder display smokes remain open.
+```bash
+npm test -- --runInBand \
+  tests/unit/institution-affiliation-stage2.test.js \
+  tests/unit/institution-affiliation-assessment.test.js \
+  tests/unit/ror-affiliation-assertion-resolver.test.js \
+  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
+  tests/unit/alert-reviewer-affiliation-mismatch-dal-context.test.js \
+  tests/unit/workbench-enrich-recommended-service.test.js \
+  tests/unit/reviewer-search-logic.test.js \
+  tests/unit/reviewer-search-mismatch-banner.test.js \
+  tests/unit/institution-stage2-smoke-page.test.js \
+  tests/unit/institution-checker-consumer-scope.test.js \
+  tests/unit/benchmarks/institution-affiliation-shadow-v1.test.js
+npm run check:doc-symbol-refs
+npm run check:fact-consistency
+npm run check:docs-catalog
+npm run check:secret-scan
+npm run check:types
+```
+
+The expanded Stage 1 plus Stage 2 matrix, including the Preview harness, passes
+202/202 across 11 suites. Targeted ESLint,
+TypeScript, documentation symbol/currency/fact/catalog gates, secret scan, and
+the required gate self-tests passed. The flag-on webpack production build
+passed with the repository's existing dynamic-dependency warnings.

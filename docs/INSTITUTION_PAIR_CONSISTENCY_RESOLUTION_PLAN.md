@@ -1,856 +1,592 @@
 ---
-title: Institution Pair Consistency Resolution Plan
+title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Staged plan to auto-resolve manufactured institution conflicts. Stage 1 landed (alert + enrichment, Wave 6 2026-08-09); Stages 2-3 not yet built."
+summary: "Stage 2 source-aware notifications and reviewer-card explanations are implemented behind a default-off flag; boolean identity and write authority is unchanged."
 canonical: false
 cataloged: 2026-08-08
+last_verified: 2026-08-19
 owner: product-engineering
 related:
   - docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md
   - docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
-  - outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md
   - lib/services/institution-affiliation-consistency.js
   - lib/services/ror-institution-identity-resolver.js
+  - benchmarks/institution-pair-consistency/README.md
 ---
 
-# Institution Pair Consistency Resolution Plan
+# Institution Affiliation Compatibility Resolution Plan
 
-<!-- [RECHECKED after lib/services/workbench/enrich-recommended-service.js change: Wave 2 branch diff is one display string in institutionVerdictReason (+1/−1); identity gate, checker construction, and write branches untouched; consumer set machine-enforced by tests/unit/institution-checker-consumer-scope.test.js] -->
-<!-- [SUPERSEDED 2026-08-09, Wave 6: the Wave 2 "checker construction ... untouched" claim above is now HISTORICAL, true only as of Wave 2. Wave 6 deliberately changed the enrichment checker construction to createInstitutionConsistencyChecker({ segmentComparison: true }) — the owner-approved landing of the S400 "accepted future fix." The identity gate (identityConfirmed AND institutionContradicted at identityNeedsReview), the fail-closed comparison_error catch, and reviewer-identity-evidence.js's checker (still legacy default) remain untouched. See the dated "Wave 6 — enrichment seam opt-in landed" section under Stage 1 and the updated owner decision 3 for the full reconciliation.] -->
+## Current decision
 
-## Status
+**STAGE 2 LOW-AUTHORITY PRESENTATION IMPLEMENTED BEHIND A DEFAULT-OFF FLAG,
+2026-08-19.** The owner accepted
+**conditional neutrality** as the governing policy for unresolved affiliation
+evidence:
 
-**APPROVED WITH SCOPE, 2026-08-08 — Stage 1 is authorized.** The four owner
-decisions below were resolved in Session 409; see "Owner decisions —
-resolved." Stages proceed in order on a branch per the rollout section; every
-stage gate must be runnable headlessly by an agent (see "Agent-runnable
-evaluation harness") — no production UI searches are part of any gate.
+> Unresolved affiliation evidence contributes neither corroboration nor
+> contradiction. It does not veto a reviewer identity that is independently
+> sufficient without that affiliation evidence. When independent identity
+> authority is not sufficient, the workflow holds and gives the user a concrete
+> identity remedy.
 
-**Amended 2026-08-08 after Codex adversarial review (GPT-5; verdict
-needs-attention).** All four findings were verified against source and
-accepted: (1) the enrichment consumer's checker verdict feeds
-`identityNeedsReview`, which gates durable researcher writes, ORCID
-back-propagation, and COI writes — not only display [VERIFIED via
-`lib/services/workbench/enrich-recommended-service.js` identity gate and
-`upsertByPotentialReviewer` branch]; (2) the production ROR resolver returns
-only the hydrated canonical identity, so successor canonicalization is
-invisible to a same-ID pair verdict; (3) ROR's `related` type does not
-distinguish constituent links from cross-system links; (4) the originally
-named gate evidence was partly untracked or mismatched. The decision-3
-rescope, Stage 2 operand contract, relationship-policy table, and fixture
-requirements below are the accepted remediations. [RECHECKED after
-lib/services/workbench/enrich-recommended-service.js change: finding 1's
-identity-gate/write-branch claims are unaffected by the Wave 2 branch diff,
-which is a single display string in `institutionVerdictReason` (+1/−1);
-see the decision-3 recheck marker for detail.]
+This supersedes the prior future-stage framing in this document that embedded
+consumer actions in relationship labels such as `related-autoclear` and
+`related-surface`. The typed relationship/policy services and source-aware
+25-case evaluation are implemented. The owner subsequently authorized a Stage
+2 implementation limited to notification and explanatory reviewer-card
+presentation. That implementation is gated by
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`, defaults off, and does **not**
+change the frozen boolean-fixture vocabulary, candidate selectability, identity
+authority, or durable-write authority.
 
-**Wave 6, 2026-08-09 — enrichment segment-comparison opt-in landed
-(owner-approved).** The `identityNeedsReview` gate, `upsertByPotentialReviewer`
-write branch, and every other write branch finding 1 named above are still
-unaffected — only the checker's construction options changed
-(`createInstitutionConsistencyChecker({ segmentComparison: true })`), not the
-gate logic around it. This is the checker-verdict authority change decision
-3 originally deferred behind a frozen-40 zero-regression gate plus owner
-sign-off; both conditions are now met (frozen-40 rerun identical to the
-2026-08-08 arm-1 baseline, per the updated decision 3 below) and the owner
-approved this landing directly. See "Wave 6 — enrichment seam opt-in landed"
-under Stage 1 for the full mechanism and gate evidence.
+Signed-in synthetic Preview acceptance completed on 2026-08-19. The
+Preview-only harness rendered six projector-pinned cases through the production
+candidate card and exercised all mapped notice actions without an API or
+persistence call. This proves the low-authority UI contract and exact rollback;
+it does not supply organic false-clear, alert-volume, or review-reduction
+evidence because all 952 audited Production roster rows carried zero persisted
+Stage 2 presentation DTOs. Production remains default off pending an explicit
+owner decision on that evidence boundary.
 
-Drafted 2026-08-08 (Session 409) from the owner's problem statement: staff spend
-substantial effort resolving conflicts that should be automatic — "Harvard
-University" vs "Harvard Medical School," "University of Illinois" vs
-"University of Illinois Department of Chemistry" — including clicking
-verification confirmations against websites they then have to cite.
+A 2026-08-19 promotion review then falsified four untested boundaries. Commit
+`947fb46` hardened them before promotion: non-author-specific evidence cannot
+corroborate or contradict identity, two unidentifiable internal subunits sharing
+a parent abstain instead of becoming parent/child, a named organization before
+an address suffix is not discarded as location decoration, and explicit server
+identity-review copy cannot inherit the positive candidate-suggestion label.
 
-This plan resolves the strategic-reset question in
-`docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md` differently than a
-resolver promotion: the product goal is **pair consistency** (are these two
-institution strings the same organization, related organizations, or genuinely
-different?), not resolve-one-string-to-one-id, and not identity-arm
-authority. The dormant production ROR stack is reused here as a substrate, at
-lower risk than the identity-promotion path it was originally built toward.
+The strategic correction is broader than a threshold adjustment:
 
-## Problem
+1. determine the relationship between resolved organizations;
+2. retain the source, date, currentness, and author attribution of each
+   affiliation assertion; and
+3. apply a policy specific to the authority of each consumer.
 
-### The contract nobody named
+Affiliation compatibility is one identity signal. It never establishes that
+two people are the same by itself.
 
-The strategic reset separated reviewer relevance, person identity, and
-institution normalization. The staff pain sits in a fourth contract:
+## Current implementation truth
 
-> `pairConsistency(left, right) → same | related | distinct | insufficient`
-> (with `related` policy-split into `related-autoclear` / `related-surface`
-> per the Stage 2 relationship-policy table)
+| Capability | Current state | Evidence |
+|---|---|---|
+| Stage 1 decorated-byline comparison | **VERIFIED, shipped.** The alert uses the staged segment comparator; enrichment composes the legacy and staged boolean checkers. | `alert-reviewer-affiliation-mismatch.js`; `enrich-recommended-service.js` |
+| Pair result exposed to consumers | **VERIFIED boolean only.** `areConsistent()` returns `true` or `false`; it does not expose relationship, currentness, or remedy. | `institution-affiliation-consistency.js:335-369` |
+| Enrichment authority | **VERIFIED high authority.** A false/error comparison contributes to `institutionContradicted`, which combines with the independent identity status in `identityNeedsReview` and gates researcher, ORCID, metrics, and COI writes. | `enrich-recommended-service.js:684-767,933-1005` |
+| ROR relationship substrate | **VERIFIED present but not available to pair consumers.** The candidate/decision layer reads typed ROR relationships and detects sibling conflicts; the identity wrapper returns only a hydrated identity or `null`, discarding the decision provenance needed for pair policy. | `ror-institution-decision.js`; `ror-institution-identity-resolver.js:63-114` |
+| Source/time-aware affiliation assessment | **VERIFIED at Stage 2 low-authority consumers behind a default-off flag.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Enrichment supplies publication/applicant and recorded-institution provenance to card presentation; the post-acceptance alert supplies reviewer-self-report and staff-record provenance. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; `institution-affiliation-stage2.js`; Stage 2 focused tests |
+| Typed consumer policy | **VERIFIED at Stage 2 presentation authority only.** The total evaluator still covers all five consumers and fails closed for unknown/high-authority inputs. Only candidate-card and staff-notification projections consume it; selectability and write gates continue to consume booleans and legacy flags. | `institution-affiliation-assessment.js`; `institution-affiliation-stage2.js`; focused tests |
+| Stage 2 runtime presentation | **VERIFIED implemented and synthetically accepted in signed-in Preview; default off, not promoted.** The versioned DTO is sanitized before roster persistence, stale caches re-enrich when the flag is on, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. The Preview-only harness pins six DTOs to the production projector and routes card actions to local state only. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; `pages/workbench/institution-stage2-smoke.js`; focused tests; flag-on build and signed-in Preview smoke |
+| Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
+| Promotion-review falsification | **VERIFIED hardened on branch.** Disconfirming tests now cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; focused unit and benchmark suites |
+| Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
-- **Input:** two institution strings from different evidence sources (listed
-  institution, publication byline, enrichment result, prior record).
-- **Output:** a typed verdict with a machine-readable reason, so consumers can
-  auto-clear `same`/`related`, surface `distinct` as a real conflict, and
-  present `insufficient` honestly instead of calling it a mismatch.
-- **Not this contract:** COI adjacency (hard firewall, see invariants),
-  canonical-id resolution (C3), person identity (C2), address/person
-  attestation (its verification flow exists for contact safety and stays).
+The shipped boolean comparator remains the sole identity, selectability, and
+durable-write authority until every high-authority consumer in this plan is
+deliberately migrated. Stage 2 may change presentation only when its flag is on.
+The stop-rule remains in force: do not add another string-side guard or a third
+enrichment checker. New work proceeds through the typed contract below.
 
-### Where the manufactured conflicts come from
+## Problem statement
 
-`createInstitutionConsistencyChecker.areConsistent()` accepts direct identity
-and one-hop OpenAlex associated-institution links — Vanderbilt↔VUMC and
-Columbia↔Irving pass today [VERIFIED via
-`lib/services/institution-affiliation-consistency.js:13-51` and the S400 probe
-table]. Its consumers are the identity-evidence path, enrichment, and the
-affiliation-mismatch alert [VERIFIED via CodeGraph callers of
-`createInstitutionConsistencyChecker`: `reviewer-identity-evidence.js`,
-`workbench/enrich-recommended-service.js`,
-`alert-reviewer-affiliation-mismatch.js`]. [RECHECKED after
-lib/services/workbench/enrich-recommended-service.js change: the consumer set
-is unchanged on the Stage 1 branch and is now machine-enforced by
-`tests/unit/institution-checker-consumer-scope.test.js`.] It fails on the
-owner's two example classes for mechanical reasons proven live in
-`outputs/s400-institution-checker-probe-findings.md` (gitignored, machine-local
-evidence - not a tracked repo path):
+The product question is not:
 
-1. **Subset/decorated strings never resolve.** "Department of X,
-   <Institution>, City, ST, USA" returns zero OpenAlex search results; the
-   checker falls back to raw-string comparison → `false` → staff see
-   "institution mismatch." Four of the five real request-1002903 conflicts
-   were this class [VERIFIED via the S400 production capture section]. A core
-   extractor exists but is a crude first-match regex and is not applied in
-   the checker [VERIFIED via `lib/services/discovery/affiliation.js:117-136`
-   and the checker source, which calls only
-   `DeduplicationService.institutionDisplayName`].
-2. **Short forms tie ambiguously.** "Texas A&M," "NC State University" → tie
-   or zero results → null → `false` [VERIFIED via S400 probe 2].
+> Are these two organization strings exactly the same?
 
-So most human adjudication clicks resolve conflicts the system manufactured
-out of string decoration, not genuine disagreements.
+It is:
 
-### Why the dormant ROR stack fits this consumer
+> Given the source and time of each affiliation assertion, does the evidence
+> corroborate, remain compatible with, or genuinely contradict this reviewer's
+> independently established identity?
 
-- ROR's affiliation endpoint is built for messy decorated text — the input
-  class the incumbent resolver scores near zero on. Candidate benchmark:
-  ROR 128/141 vs incumbent 84/141 [VERIFIED via
-  `outputs/institution-resolution-handoff-to-codex-2026-08-07.md` evidence
-  trail].
-- ROR records carry typed relationships (parent/child/related/successor) —
-  the adjudication data for "Harvard Medical School relates to Harvard
-  University." The v2 benchmark already built relationship-aware pair
-  evaluation, and the frozen suite has hierarchy and byline-normalization
-  case families [VERIFIED via the handoff and
-  `benchmarks/fuzzy-matching-falsification/cases/` listing].
-- This consumer is lower risk than identity promotion: the checker's output
-  is a review flag, never an identity bind, contact promotion, invitation, or
-  COI decision [VERIFIED via the checker's header contract].
+The old boolean loses distinctions that change the correct action:
 
-## Design — three stages, smallest first
+- a department, school, or hospital can be a unit of the recorded university;
+- a publication can list multiple simultaneous affiliations;
+- a publication affiliation can be historical while the recorded institution
+  is current;
+- sibling campuses are different organizations without necessarily proving a
+  different person across time;
+- a provider failure or ambiguous resolution is not affirmative evidence of a
+  mismatch; and
+- the same unresolved relationship may be harmless in display copy but unsafe
+  when no independent identity authority exists.
 
-### Stage 1 — institution-core extraction before comparison (no ROR)
+The 2026-08-18 unresolved-case smoke exposed the framing failure:
 
-> [RECHECKED after lib/services/discovery/affiliation.js change:
-> `normalizeAffiliationForComparison` untouched at :117; additive
-> `institutionSegments` at :152.]
-> [RECHECKED after lib/services/institution-affiliation-consistency.js change:
-> opt-in `segmentComparison` default-off at :165; segment-wise comparison at
-> :187 with shared-fragment self-pair exclusion, parent-fragment pool
-> policy (`classifyFragment` with per-call-site `unprovenExtensionPolicy`
-> and extension-cap overflow handling), and Wave 4 direct-identity-only
-> crossings/fallback (associated-link evidence consulted nowhere on the
-> staged path; the Wave 3c/3d crossing tags and whole-parent restrictions
-> are removed as subsumed); default path in `areConsistent` (:335)
-> behavior-identical when the flag is off — verified via the live
-> default-path probe, the vector-4 pin, and the resolve call-count
-> assertions.]
-> [RECHECKED after lib/services/alert-reviewer-affiliation-mismatch.js change:
-> sole opt-in call site, `segmentComparison: true` at :66.]
-> [RECHECKED after scripts/evaluate-reviewer-works-first.js change:
-> `--institution-resolver` opt-in at :79; incumbent default construction at
-> :18,294; decision 4(a)'s earlier `:281-284` citation shifted to `:294`.]
-> [RECHECKED after lib/services/workbench/enrich-recommended-service.js Wave 2
-> change: copy-only edit to the `prior_flag` branch of `institutionVerdictReason`
-> (display text now says the institution "could not be compared this run"
-> instead of asserting a mismatch was flagged). `identityNeedsReview`, the
-> checker construction (bare `createInstitutionConsistencyChecker()`), and
-> every write-path condition described in owner decision 3 are byte-identical;
-> this file's verdict-bearing role in that decision is unchanged.]
->
-> Wave 1 built 2026-08-08 (fixtures + generator, segment-comparison opt-in,
-> arm-2 evaluator flag); 55 focused tests green including a falsification
-> test for the shared-parent-fragment sibling hazard flagged during build.
->
-> **Stage 1 live gate history.** Wave 2c PASS (145/145,
-> `results/stage1-wave2c-2026-08-08.json`) is HISTORICAL: it predates the
-> hardened runner, so it carries no provider-failure proof or provenance
-> (Codex finding 2). Wave 3 FAIL (141/145,
-> `results/stage1-wave3-2026-08-08.json`) is the falsification record for
-> the strict-everywhere pool rule. **Current gate: Wave 5 PASS, 2026-08-09
-> — 156/156 (named-relationship family added; required-families enforcement
-> active) with providerFailures 0 and clean-tree provenance (git sha
-> d9c8af0, dirty false)** (`results/stage1-wave5-2026-08-09.json`). All
-> three named-relationship rows surface on the staged arm as expected;
-> observationally, the incumbent (main-behavior) arm auto-clears
-> VUMC↔Vanderbilt AND Dana-Farber↔Harvard via associated links — live
-> confirmation that main's default path violates the policy table's
-> Dana-Farber surface expectation today, Stage 2 scope. Prior record:
-> Wave 4 PASS, 2026-08-08 — 153/153 (uc-system-* family added), git sha
-> df819f9 (`results/stage1-wave4-2026-08-08.json`). The seven new
-> campus-vs-system rows demonstrate the fix in-band: the incumbent
-> (main-behavior) arm auto-clears campus vs "University of California
-> System" (`same-or-related`, 7/7), the staged arm surfaces it
-> (`not-cleared`, 7/7); the eighth row (system self-pair) clears on both
-> arms, as expected for `same`.
-> Earlier PASS artifacts (wave3b/3c/3d/3e, 145-row set) record prior
-> checker revisions and are retained. The original wave2c narrative below
-> is retained for the family-level detail, which every subsequent passing
-> run reproduced:
->
-> **Wave 2c detail (historical)** — 145/145 pairs:
-> all five 1002903 pairs behave to spec (four clear, the genuine mismatch
-> stays flagged), zero sibling auto-clears across 126 cross-campus pairs,
-> and all seven campus-vs-parent pairs surface. Two prior failed runs are
-> retained as the falsification record (`stage1-wave2-…`: campus-vs-parent
-> auto-cleared via a fail-open fragment guard, since made fail-closed;
-> `stage1-wave2b-…`: keyless-pool rate-limit mass timeouts, since fixed by
-> loading `.env.local` in the CLI). A direct segment match now requires its
-> contiguous extensions to be PROVEN decoration; unproven extensions demote
-> to step 2's positive-evidence path, so total provider failure surfaces
-> instead of auto-clearing.
->
-> Wave 2 built 2026-08-08 (live replay CLI + offline tests, consumer-scope
-> assertion test, enrichment copy/provenance fix for the `prior_flag` verdict
-> reason).
->
-> **Wave 3 remediation (2026-08-08, after Codex adversarial re-review of the
-> branch: needs-attention, 2 high + 2 medium).** An earlier revision of this
-> paragraph claimed the residual exposure was campus-vs-parent only and
-> Stage-1-only; offline probes falsified both halves, and Wave 3 closed the
-> in-scope paths:
-> 1. *Step-2 parent-fragment fail-open (was documented too narrowly).* With a
->    resolver that resolves a bare parent string, step 2 auto-cleared BOTH
->    campus-vs-parent (via the shared-fragment whole-operand exception) AND
->    sibling campuses (parent fragment × associated-link) [VERIFIED via stub
->    probes, S409]. Wave 3 fix, two revisions: the first cut excluded any
->    fragment with an unresolvable extension from step-2 pools (strict fail
->    closed everywhere) — empirically REJECTED: the live gate failed 141/145
->    with all four 1002903 clears regressed, because real decoration
->    extensions ("…, La Jolla", "…, Nashville") definitively abstain
->    (`results/stage1-wave3-2026-08-08.json`, retained as the falsification
->    record; providerFailures 0, so the misses are definitive, not outage).
->    Final rule — a principled evidence split: step 1 (which clears on string
->    match alone) and the whole-operand parent check stay strict (unproven
->    extension demotes); step-2 pools, where clearing requires resolved
->    identity evidence on BOTH sides, admit a fragment whose own identity
->    resolved when its extensions merely abstain, and demote only on an
->    extension resolving to a DIFFERENT identity. A whole operand that is
->    itself a bare parent shape of the other operand earns direct-identity
->    credit only in step-2 pairings (associated-link evidence withheld).
->    The Codex re-review then falsified the first residual enumeration: an
->    admitted-unproven bare-parent fragment could ALSO cross to a SIBLING
->    campus whole via associated-link credit (bare parent resolves + one
->    campus definitively misses) [VERIFIED via reproduced probe, S409] —
->    an invariant-1 violation, not acceptable-residual class. Wave 3c fix
->    (HISTORICAL — the tagging mechanism described here was removed by
->    Wave 4, which drops associated-link evidence from the staged path
->    entirely): pool entries admitted despite an abstaining extension were
->    TAGGED, and any crossing involving a tagged entry cleared via direct
->    identity match only. Deliberate narrowing accepted with that fix: the
->    offline Broad-Institute-vs-MIT decorated-fragment case was re-pinned
->    false. (Its "whole-operand corroboration is unaffected" carve-out was
->    itself superseded by Wave 4, which flipped Harvard↔HMS to surface per
->    the relationship-policy table.)
->    ACCEPTED RESIDUAL, now precisely IDENTITY-EQUALITY ONLY (pinned in a
->    labeled offline test): if a bare parent ever RESOLVES (it abstains
->    today, S400) AND the campus extension string definitively misses, a
->    campus-vs-parent pair auto-clears via step-2 directMatch of the same
->    identity — unfixable without breaking the row-4 VUMC clear, which has
->    the identical structural shape. Two independently unlikely live
->    conditions. Tripwire: the deterministic offline pins — the live gate's
->    campus-vs-parent rows CANNOT exercise this class (they require a
->    one-sided definitive miss, and the real campuses resolve). Total
->    provider outage still surfaces (unresolved fragments never enter
->    pools — invariant 3 holds).
->
->    **Wave 4 (owner-directed, 2026-08-08): staged path drops
->    associated-link credit entirely.** A fourth review round found prefix-
->    ordered qualifiers bypass the suffix-only extension model; session
->    probes then established the deeper fact: **"University of California
->    System" resolves live** (OpenAlex I2803209242, 15 associated
->    institutions), so system↔campus pairs auto-cleared via associated-link
->    credit as plain whole operands — on the staged path AND on `main`'s
->    default path (the checker's original one-hop corroboration design)
->    [VERIFIED via live probes, S409: staged and default both returned true
->    for "University of California System" vs "University of California San
->    Diego"]. Owner decision 2 was therefore never enforced against the
->    resolvable system name anywhere; the prior gate never caught it because
->    its campus-vs-parent rows used the bare form, which abstains live. The
->    owner overrode the stop-rule for this one fix ("fix it and let's move
->    on"); the stop-rule is back in force after Wave 4.
->    **The Wave 4 invariant (replaces the suffix-contiguous closure claim):
->    with `segmentComparison: true`, associated-link evidence is consulted
->    nowhere — step 1 clears on string match with decoration proof; step 2
->    crossings and the fallback clear on resolved-identity direct match
->    only.** This removes the subsumed Wave 3c/3d crossing machinery
->    (`admittedUnproven` tags, whole-parent direct-only restriction,
->    fallback parent-shape guard) rather than adding a fifth guard; the
->    step-1 decoration proof, parent-fragment pool exclusion, and
->    shared-fragment self-pair exclusion remain (each still blocks a named
->    probe). Consequences, per the Stage 2 relationship-policy table
->    (verified from this doc): Harvard↔HMS and Dana-Farber↔Harvard now
->    SURFACE at the alert (the table's stated policy — note Harvard↔HMS was
->    the owner's motivating example, so related-institution pairs will
->    alert until Stage 2 typed relationships enable `related-autoclear`);
->    VUMC↔Vanderbilt-class auto-clears are explicitly Stage 2 scope. The
->    default path is behavior-identical (enrichment/identity-evidence
->    corroboration unchanged, decision 3 — verified via live probe and the
->    default-path pins) **as of Wave 4/5; superseded 2026-08-09 by Wave 6,
->    which moves enrichment off this default path onto the staged
->    (`segmentComparison: true`) path — see the Wave 6 entry above.
->    identity-evidence remains on the default path, unchanged.** The earlier "branch widens the
->    hazard" note inverts — post-Wave-4 the branch STRICTLY NARROWS alert
->    auto-clearing relative to `main`. Remaining accepted residual:
->    same-resolved-identity clears (the SYSTEM==SYSTEM class) are inherent
->    to identity-equality evidence. The gate gains a system-name family
->    ("University of California System" vs each campus → related-surface)
->    so the resolvable form is exercised live.
->
->    **Wave 3d (superseded by Wave 4 above) and the STOP-RULE.** A third re-review
->    round falsified the closure claim as then written: `fragmentExtensions`
->    capped classification at the 3 shortest extensions, so a crafted
->    byline whose contradictory extension is longest could be wrongly
->    certified proven-decoration and earn associated-link credit
->    [VERIFIED via reproduced probe, S409 — requires a bare parent that
->    resolves, so live exposure is nil today]. Wave 3d makes the claim
->    true: extension overflow forbids the 'decoration' classification
->    (demote under strict policy, `admittedUnproven` under admit policy);
->    the consumer-scope inventory widens to all runnable extensions and
->    static dynamic-import specifiers. **Stop-rule (owner-directed,
->    2026-08-08): this is the last Stage 1 checker iteration. If a
->    subsequent adversarial review finds any further step-2 path, Stage 1
->    freezes as-is — the finding is recorded, the closure claim is narrowed
->    to what is proven, and the remainder routes to Stage 2's typed
->    parent/child relationships. No fifth guard mechanism gets added to
->    the string-side checker.** Rationale: three rounds produced
->    progressively more contrived counterexamples, none live-reachable
->    today — the step-2 crossing paths (rounds 2–3) all require a bare
->    parent that resolves (live: abstains, S400), and round 1's fallback
->    path required an associated-institution NAME collision (live: OpenAlex
->    names the UC parent "University of California System", which does not
->    collide); the composition of four interacting guards is a hand-rolled
->    approximation of Stage 2's typed relationships, and further patching
->    adds complexity faster than safety.
-> 2. *Unguarded fallback under `segmentComparison: true`.* When the segment
->    path abstained, the pre-existing default path could still auto-clear
->    campus-vs-parent via an associated-institution NAME collision (resolver
->    abstains on the bare parent → raw-string substitution at the fallback →
->    name match against the campus's associated institution) [VERIFIED via
->    stub probe, S409]. Wave 3 fix: with `segmentComparison: true`, when one
->    whole operand equals a proper parent fragment of the other, the fallback
->    accepts only direct identity matches — associated-link evidence is
->    rejected for that pair shape.
-> 3. *Pre-existing main-branch hazard, DOCUMENTED NOT FIXED (owner risk
->    acceptance).* The same name-collision fallback path exists on `main`
->    with `segmentComparison: false` — **as of Wave 3, the mode enrichment
->    and identity-evidence both used; superseded 2026-08-09 by Wave 6, which
->    moves enrichment onto the `segmentComparison: true` path, where Wave 3
->    fix #2 (above) rejects associated-link evidence for this exact
->    parent-fragment pair shape — enrichment is no longer exposed to this
->    hazard. identity-evidence remains on the default path and remains
->    exposed, unchanged.** It does not fire live today only because OpenAlex
->    names the UC parent "University of California System" (string ≠
->    "University of California") [VERIFIED: live gate campus-vs-parent rows
->    surface; stub probe with colliding name auto-clears]. Per owner
->    decision 3 (enrichment copy-only in Stage 1 through Wave 5), Wave 3
->    leaves default-path behavior byte-identical and pins the current
->    behavior in a labeled test;
->    the structural fix (typed parent/child relationships) is Stage 2 scope.
-> 4. *Gate runner could PASS vacuously during provider failure* (default
->    error suppression turned provider exceptions into abstains, which
->    satisfy `distinct`/`related-surface` expectations). Wave 3 fix: the
->    runner propagates provider errors, records resolver metrics, and fails
->    on any recorded provider failure; artifacts now embed git HEAD, dirty
->    state, runner/fixture sha256, node version, and a key-present boolean.
->    `gate: PASS` now means "all expectations met AND zero provider
->    failures".
-> 5. *Falsification-record classification.* The two failed wave-2 artifacts
->    are historical, non-revision-reproducible observations (runner, failure,
->    and fix landed in one commit); the durable falsification record is the
->    offline jest regressions that pin those fail-open scenarios with stub
->    resolvers — stronger evidence than replaying an old commit, because the
->    scenarios are deterministic.
->
-> **Wave 6 — enrichment seam opt-in landed, 2026-08-09 (owner-approved).**
-> `createInstitutionConsistencyChecker()` at
-> `lib/services/workbench/enrich-recommended-service.js:608` [VERIFIED via
-> source read this session] now constructs with `{ segmentComparison: true }`
-> — the checker-verdict authority change decision 3 originally deferred
-> (see "Enrichment verdict injection is identity-authority work" below,
-> marked superseded). Only the checker construction changed: the
-> `identityNeedsReview = !identityConfirmed || institutionContradicted`
-> conjunction, the fail-closed `comparison_error` catch, and the
-> `institutionEvidenceConnectsIdentity` null contract (a missing operand
-> still returns null, filtered out of decided comparisons) are byte-identical
-> [VERIFIED via source read this session]. `reviewer-identity-evidence.js`'s
-> checker construction is untouched (still the legacy no-args default); the
-> consumer-scope boundary is now TWO consumers on the staged path (the
-> mismatch alert and enrichment) and ONE on the legacy default
-> (identity-evidence), machine-enforced by the updated
-> `tests/unit/institution-checker-consumer-scope.test.js`.
->
-> Motivating case: request 1002912, PubMed byline evidence
-> "Lunenfeld-Tanenbaum Research Institute" vs recorded/claimed affiliation
-> "Lunenfeld-Tanenbaum Research Institute, University of Toronto" — the
-> incumbent default cleared false (the production institution-mismatch
-> banner); the staged checker clears true in both argument orders
-> [VERIFIED via live OpenAlex probe, providerFailures 0, this session]. A
-> tracked fixture row (`request-1002903-pairs.jsonl`, caseId
-> `1002912-lunenfeld`) and unit pins
-> (`tests/unit/institution-pair-segment-comparison.test.js`) record this
-> case; the fixture row-count pin moved 5→6, the offline runner's total-row
-> pin moved 156→157.
->
-> **Wave 6 live gate: PASS, 157/157, 2026-08-09**
-> (`benchmarks/institution-pair-consistency/results/wave6-enrichment-flip-2026-08-09.json`),
-> providerFailures 0, clean-tree provenance (git sha 2ba7222, dirty false).
-> The new `1002912-lunenfeld` row: incumbent `not-cleared`, staged
-> `same-or-related`, matching the live probe.
->
-> **Wave 6 frozen-40 rerun: identical to the arm-1 baseline**
-> (`outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-enrichflip-2026-08-09.json`
-> vs
-> `...-baseline-2026-08-08.json`). All five `evaluatePromotion` gates pass
-> with the SAME numbers as the 2026-08-08 baseline: correctBindGain 8,
-> falseBinds 0, rightPersonPolicyBinds 1, misses 4, providerFailures 0.
-> Per-case decision fields (spine/works/combined status, reasonKey) are
-> byte-identical across all 40 cases [VERIFIED via per-case diff this
-> session]; the 13 rows with any byte difference differ only in live
-> OpenAlex works/candidate corpus churn between run dates (authorIds, DOIs,
-> worksCount), never in a decision outcome. Gate satisfied; the evaluator
-> does not exercise the flipped seam (import-trace verified: it imports
-> `reviewer-identity-evidence.js` but never calls
-> `institutionEvidenceConnectsIdentity`, which exists only in
-> `enrich-recommended-service.js`) — identical outcomes prove zero
-> regression on the frozen identity-evidence surface, not that the change
-> was untested.
->
-> Rollout status: this is a Tier 1+ runtime change on the identity-gating
-> path (`main` auto-deploys per
-> `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`) — landed on
-> branch `feature/enrichment-segment-comparison`, pending Codex review and
-> owner-decided promotion to `main`, not yet promoted as of this entry.
->
-> **Wave 6 round-6 — Codex adversarial finding + composite fix, 2026-08-09
-> (owner-approved: "Fix it, but I think you're starting to chase your
-> tail").** Codex review found that the staged-only checker landed above
-> deliberately drops the legacy checker's one-hop associated-link
-> corroboration (`institutionsConsistent`'s `associatedIdentityMatches`,
-> removed from the staged path by Wave 3e for a different, unrelated reason —
-> preventing system/campus and cross-institution auto-clears). At the
-> enrichment seam, dropping that corroboration is a regression, not a
-> tradeoff: `benchmarks/institution-pair-consistency/results/wave6-enrichment-flip-2026-08-09.json`
-> rows `named-rel-vumc-vanderbilt` and `named-rel-danafarber-harvard` show
-> incumbent (legacy) verdict `same-or-related` and staged verdict
-> `not-cleared` [VERIFIED via committed results artifact]. At this seam a
-> false verdict sets `institutionContradicted` → `identityNeedsReview` →
-> blocks email/ORCID/metrics/researcher writes, so the Wave 6 flip
-> regressed the VUMC-class byline shape (recorded affiliation names a
-> related-but-distinct entity of the byline institution — hospital vs
-> university, common in biomedical bylines).
->
-> **Fix (compose, don't choose): accept a clear from EITHER arm.**
-> `enrich-recommended-service.js` now constructs BOTH checkers at the seam
-> — a legacy/default one and a staged (segment-comparison) one — sharing
-> ONE `createInstitutionIdentityResolver()` instance so live OpenAlex calls
-> are not doubled per candidate (mirrors
-> `benchmarks/institution-pair-consistency/run-pair-gates.js`'s two-arm
-> pattern). `institutionEvidenceConnectsIdentity` evaluates the legacy arm
-> first and only calls the staged arm when legacy is false, so provider
-> traffic is bounded; a `throw` from EITHER arm propagates unchanged to the
-> existing fail-closed catch (never swallowed into a bare `false` — a
-> comparison outage must read as "could not complete," never as an
-> affirmative contradiction). The tri-state null contract (missing operand),
-> the `institutionDirectMatch` fast path, and the
-> `identityConfirmed = !!identity && mayPersistIdentity(identity.status)`
-> conjunction are byte-identical [VERIFIED via source read this session].
-> `lib/services/institution-affiliation-consistency.js` is untouched by this
-> fix — `git diff` against it is empty [VERIFIED this session].
->
-> The union is strictly additive versus pre-Wave-6 `main` production: every
-> pair the legacy arm alone cleared still clears (VUMC-class corroboration
-> restored); the only NEW clears are the staged arm's decoration clears
-> (request 1002912's Lunenfeld-Tanenbaum class), pinned false for every
-> sibling-institution shape by the 148-row uc-sibling live suite (unchanged
-> by this fix — the staged checker itself was not touched).
->
-> New pins: `tests/unit/enrich-recommended-institution-evidence.test.js`
-> gains a VUMC-class test (legacy arm clears via associated-link
-> corroboration; composite true) and a Sicheri-class test (legacy arm false,
-> staged arm clears via segment-whole match; composite true via the staged
-> arm), plus a fail-closed pin (legacy false + staged throws → composite
-> throws, not false).
-> `tests/unit/institution-checker-consumer-scope.test.js` is re-pinned to
-> the new truth: `enrich-recommended-service.js` now has TWO
-> `createInstitutionConsistencyChecker` call sites (legacy `{ resolver }`,
-> staged `{ resolver, segmentComparison: true }` — the same shared resolver
-> instance), `segmentComparison: true` still appears exactly once there, and
-> the behavioral (value-based) capture asserts both checkers share one
-> resolver object. The live pair gate was not rerun for this fix — the
-> checker itself is unchanged, so the frozen Wave 6 gate result stands as
-> evidence for both arms individually; the composite's seam-level behavior is
-> covered by the new offline unit pins above.
->
-> **SEAM STOP-RULE (owner-directed, 2026-08-09), mirroring the Stage 1
-> checker stop-rule above: this is the last enrichment-seam iteration. If a
-> subsequent review finds a further issue with how the enrichment seam
-> consumes the checker(s), the seam freezes as-is — the finding is recorded,
-> the closure claim is narrowed to what is proven, and the remainder routes
-> to Stage 2's typed parent/child relationships. No third checker or further
-> seam-level guard gets added here.** Rationale: two consecutive
-> owner-approved landings on this surface (the Wave 6 flip, then this
-> round-6 composite fix) is the tail-chasing pattern the Stage 1 stop-rule
-> was written to end; typed relationship classification is explicitly Stage
-> 2 scope, not a reason to keep iterating the seam's checker plumbing.
+- an exact UCSF affiliation plus HHMI was blocked because the string contained
+  multiple organizations;
+- University of Ottawa plus a street address was blocked by an overbroad
+  system-parent safeguard; and
+- Duke University School of Medicine versus Duke University was treated as a
+  substantive organizational conflict.
 
-Normalize both sides of `areConsistent` by comparing institution segments of
-decorated bylines before resolution and comparison. Implementation note
-(Stage 1 build, 2026-08-08): this ships as a new function in
-`lib/services/discovery/affiliation.js` rather than a change to
-`normalizeAffiliationForComparison` — that function keys
-`_affiliationWeightsMap` grouping, so "strengthening" it would silently
-change discovery affiliation-history behavior; the new function lives in the
-same module to keep one home for affiliation parsing. The comparison is
-segment-wise (split on comma/semicolon boundaries, test each segment and
-progressive joins against the other operand) so a verdict of `same` can only
-arise from matching the other operand, never from free extraction. The
-behavior is opt-in at the checker factory. As originally built (through
-Wave 5) it was enabled only at the mismatch-alert call site per decision 3;
-**superseded 2026-08-09 by Wave 6**, which also enables it at the enrichment
-call site (owner-approved) — `reviewer-identity-evidence.js` remains the
-sole consumer still on the legacy default. See the Wave 6 entry above and
-the updated decision 3 below.
+The first and third cases were also mislabeled in the benchmark itself. A gate
+that treats its own policy labels as unquestionable truth can reward the wrong
+behavior.
 
-- Expected effect: flips the four documented 1002903 byline-class false
-  mismatches; leaves the possibly-substantive fifth flagged — the correct
-  target behavior per S400.
-- Failure posture unchanged: extraction failure degrades to today's behavior,
-  never to a broader match.
+## Scope and non-goals
 
-### Stage 2 — ROR-backed pair adjudication
+### In scope
 
-Swap the checker's internal resolver from the incumbent
-`createInstitutionIdentityResolver` to the production
-`createRorInstitutionIdentityResolver` (dormant, veto-first, request-scoped),
-with a **provenance-preserving operand contract** (Codex finding 2): the
-pair-adjudication layer must receive, for each side, the source-matched ROR
-id, the canonical/hydrated ROR id, and any canonicalization relationship the
-decision layer applied — the current resolver returns only the hydrated
-canonical identity, and its decision layer can select an active successor for
-a predecessor input via `successor_from_predecessor` [VERIFIED via
-`lib/services/ror-institution-decision.js:181,200` and
-`ror-institution-identity-resolver.js:63-114`], which would otherwise make a
-forbidden successor pair look same-ID.
+- affiliation segmentation and provenance;
+- resolved organization relationships;
+- temporal/currentness context;
+- per-consumer policy and remedies;
+- benchmark adjudication and shadow rollout; and
+- migration of the alert, reviewer card/selectability, enrichment write gate,
+  and identity-anchor consumer.
 
-Pair adjudication order:
+### Out of scope
 
-1. predecessor/successor and any other canonicalization relationship is
-   adjudicated **before** same-ID equality; per decision 2, successor pairs
-   surface, never auto-clear;
-2. same source ROR id (no canonicalization) → `same`;
-3. relationship-policy table (below) maps typed links to
-   `related-autoclear` vs `related-surface`;
-4. both resolve, no link → `distinct`;
-5. either side unresolved/vetoed/provider-failed → `insufficient`.
+- proving person identity from affiliation alone;
+- changing COI relationship rules or weakening the COI firewall;
+- exact-address ownership or contact-address attestation;
+- contact/account legal-entity verification;
+- invitation sending or campaign state transitions; and
+- another heuristic patch to the Stage 1 string comparator.
 
-**Relationship-policy table (Codex finding 3):** ROR's `related` type does
-not distinguish a constituent hospital from a merely affiliated independent
-organization, so registry relation ≠ auto-clear eligibility. The table is a
-tracked artifact with a falsifiable classifier (e.g. parent/child → eligible;
-`related` eligible only with corroborating evidence such as shared domain or
-name-containment per the v3 name-compatibility policy; cross-system `related`
-without corroboration → surface). Required named regressions: Harvard↔HMS
-(successor/canonicalization: surface), VUMC↔Vanderbilt (`related` constituent:
-auto-clear), Dana-Farber↔Harvard (`related` cross-organization: surface).
+## Contract 1 — affiliation assertions
 
-**Gate-contract split (S409, closes the final Codex re-review finding):**
-the named regressions above carry TWO different expectations by stage. The
-**Stage 1 live gate** pins all three pairs as `related-surface` — the
-expected Wave 4 staged verdict given the live resolutions verified
-2026-08-09 (HMS definitively abstains; VUMC/Vanderbilt/Dana-Farber resolve
-to distinct identities) and the hostile-verified no-associated-link
-invariant; the expanded gate run recorded below is the end-to-end
-evidence — via the tracked `named-relationship-pairs.jsonl` family, and
-the runner fails fast if any required family (1002903, uc-sibling,
-named-relationship) is absent. The **Stage 2 contract** is where
-VUMC↔Vanderbilt's `related-autoclear` expectation lives (typed
-relationships); per the owner's 2026-08-09 cost calibration (institution
-errors at the alert tier are reviewer-self-corrected, so surfaced pairs —
-not false clears — are the expensive direction there), the Stage 2
-`related-autoclear` classification should lean broad. Byline-normalization
-coverage at the Stage 1 gate is the 1002903 family; the frozen
-fuzzy-matching hierarchy suites remain offline Stage 2 evidence, not Stage 1
-live-gate families.
+Every source affiliation becomes one or more assertions before organization
+comparison. The implementation shape may vary, but the semantic contract is:
 
-ROR rank/`chosen:true` remains retrieval evidence only; vetoes still run
-before any pair verdict. Callers of the incumbent resolver outside the
-checker (e.g. save-candidates, evaluation harness) are untouched.
+```text
+AffiliationAssertion
+  rawText
+  sourceType          publication | orcid_employment | official_profile |
+                      applicant_record | staff_record | reviewer_self_report
+  sourceReference     work/profile/record identifier when available
+  observedAt          publication/employment/observation date when available
+  currentness         current | historical | unknown
+  authorSpecific      true | false | unknown
+  resolvedSourceId    source-matched ROR id when available
+  resolvedCanonicalId canonical ROR id when canonicalization was applied
+  canonicalization    successor/predecessor metadata when present
+```
 
-### Stage 3 — consumer policy and copy
+Rules:
 
-- `same` and `related-autoclear` verdicts clear with a stated reason (e.g.
-  "constituent organization — registry relationship"), removing the manual
-  verify-and-cite step for those classes; `related-surface` verdicts stay in
-  the human queue with the relationship shown.
-- `distinct` surfaces as a genuine conflict and keeps the existing human
-  adjudication/attestation flow.
-- `insufficient` surfaces as "could not compare," never as "mismatch"
-  (S399/S400 lesson).
-- The banner names the institutions it compared (closes the withheld-fields
-  half of S399 finding 1).
+1. Semicolon- or provider-delimited multi-organization evidence is segmented
+   and each affiliation is resolved independently.
+2. An exact or compatible match on one segment is retained even when additional
+   affiliations exist. The extras remain visible metadata and continue through
+   the existing COI path; they are not contradictions merely because they are
+   additional.
+3. Publication bylines are historical observations at the publication date
+   unless a stronger source explicitly establishes currentness.
+4. Missing dates/currentness remain `unknown`; the system does not infer
+   current conflict from recency guesses.
+5. Provider failure is recorded as unresolved operational provenance, never
+   converted into `distinct`.
 
-## Safety invariants (all stages)
+## Contract 2 — organization relationship
 
-1. **Sibling campuses never auto-clear.** UCSD vs UCLA remains `distinct`
-   regardless of shared parents. The 120-case UC matrix is the regression
-   gate; zero auto-cleared sibling pairs is a hard gate.
-2. **COI firewall unchanged.** Relationship/associated links must not feed the
-   COI hard-drop matcher (existing invariant in the checker header).
-   `related` is appointment-compatibility evidence only.
-3. **Fail closed on ambiguity.** `insufficient` never auto-clears and never
-   blocks; it routes to the existing human flow with honest copy.
-4. **Address/person attestation is out of scope.** The exact-address
-   verification flow
-   (`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`) exists for
-   contact safety and is not weakened or bypassed by any pair verdict.
-5. **No schema, telemetry, or authority changes** beyond what a stage
-   explicitly lists; `REVIEWER_IDENTITY_RESOLVER_MODE` and production
-   resolver authority are untouched by this plan.
+The comparator returns relationship truth without embedding a consumer action:
 
-## Benchmark and gates — existing evidence only
+| Relationship | Meaning |
+|---|---|
+| `same` | Same resolved entity or an accepted alias/translation of it |
+| `parent_child` | One resolved organization is an ancestor/descendant or constituent unit of the other; direction is retained |
+| `sibling` | Distinct peer organizations sharing a parent; neither contains the other |
+| `related_other` | A typed relationship exists but is not parent/child, including successor/predecessor and weaker cross-organization relations |
+| `distinct` | Both resolve and no qualifying relationship connects them |
+| `unresolved` | One or both operands cannot be resolved confidently, the provider fails, or evidence is internally ambiguous |
 
-No new labeling effort and no Claude search. Score every stage on:
+The relationship result also carries:
 
-- `benchmarks/fuzzy-matching-falsification/cases/institution-byline-normalization.jsonl`
-  (14 cases) and `institution-hierarchy.jsonl` (7 cases) [case counts
-  VERIFIED via line counts this session] — the two families directly on
-  point;
-- a **tracked, sanitized fixture of the five request-1002903 pairs**
-  (institution strings only, no reviewer names), created in Stage 1 — the
-  source capture log is untracked local state under gitignored `outputs/`
-  and cannot gate a clean checkout (Codex finding 4). Expected: rows 1–4
-  become `same`, row 5 stays flagged;
-- sibling/parent adversarial **pairs produced by a frozen, tracked pair
-  generator with explicit expected verdicts** — the 120
-  `institution-uc-matrix.jsonl` rows are single-operand resolve cases, so
-  the pair set and its oracle must be derived deterministically and frozen
-  as their own case file, not implied. Expected: zero `same` or
-  `related-autoclear` verdicts across sibling campuses;
-- the **v3** relationship/product-policy comparator harness (not v2 — v3
-  carries the name-compatibility pair policy) under new result slugs;
-  frozen artifacts untouched;
-- the three named relationship regressions from Stage 2 (Harvard↔HMS
-  surface, VUMC↔Vanderbilt auto-clear, Dana-Farber↔Harvard surface).
+- the matched assertion/segment;
+- both source and canonical ROR ids;
+- relationship direction and provider provenance;
+- resolution confidence/reasons;
+- additional affiliations; and
+- an explicit unresolved reason when applicable.
 
-**Go gates per stage:** zero sibling auto-clears; zero new wrong `same`
-verdicts on the frozen families; 1002903 rows 1–4 flip and row 5 holds;
-no COI behavior change (existing COI tests stay green). **No-go:** any gate
-failure stops the stage; no threshold tuning against the gate set without a
-new owner decision (the S395 scope-accretion postmortem applies).
+### Hard relationship invariants
 
-## Agent-runnable evaluation harness (owner requirement, 2026-08-08)
+1. Sibling campuses never become `same` or `parent_child`. UCLA and UCSD remain
+   distinct sibling entities even when both share the University of California
+   parent.
+2. Parent/child compatibility does not imply sibling equivalence.
+3. Successor/predecessor canonicalization is adjudicated before same-id
+   equality; canonicalization must not erase the source relationship.
+4. A shared parent or generic name fragment is never sufficient to classify
+   siblings as the same organization.
+5. Additional affiliation is evidence shape, not an organization relationship.
+6. Two internal subunits without independent organization identifiers abstain
+   when all they establish is a shared parent.
+7. An assertion whose author specificity is false or unknown cannot add
+   affiliation identity weight or create an affiliation contradiction.
 
-Every stage gate must be executable from a local agent session (Claude/Codex
-CLI) with no production UI interaction and no paid Claude search. Precedents
-already in the repo: the S400 probes ran the real production modules against
-live keyless OpenAlex from a local Node process, and the falsification
-comparator harness (`benchmarks/fuzzy-matching-falsification/run-comparator.js`)
-replays frozen cases against adapters with new result slugs.
+## Contract 3 — evidence context
 
-Deliverables (Stage 1 builds the harness alongside the fix):
+Relationship truth is combined with temporal and source provenance before a
+consumer acts:
 
-1. **Offline jest suite** — deterministic fixture-based unit tests for the
-   normalizer and the pair-verdict logic (recorded provider responses for the
-   1002903-class strings, hierarchy pairs, and sibling pairs). Runs in the
-   ordinary test suite with no network; this is the red gate for regressions.
-2. **Live replay CLI** — a `benchmarks/`-style runner (jest-invisible, new
-   result slugs, refuses to overwrite existing results) that replays the gate
-   set — byline-normalization and hierarchy families, the frozen sibling
-   pair set, the tracked 1002903 pair fixture, and the named relationship
-   regressions — through the real checker in both incumbent and staged
-   configurations, and prints a per-family verdict table plus the go/no-go
-   gate results. Read-only provider calls (OpenAlex, and ROR from Stage 2);
-   no schema, no writes, no production deployment involved. **The CLI must
-   exit nonzero on any missing case, skipped case, provider failure, or
-   forbidden verdict** — a partially executed run is a failed run, never a
-   green one (Codex finding 4).
-3. **Consumer-scope assertion** — a focused test that the factory default is
-   unchanged and only the in-scope call sites receive the new behavior, so
-   decision 3's boundary is machine-enforced rather than convention. As
-   originally built (through Wave 5), "in-scope" meant the mismatch alert
-   only; **superseded 2026-08-09 by Wave 6**, which deliberately widened the
-   test's own assertions to cover enrichment as a second in-scope consumer
-   (`tests/unit/institution-checker-consumer-scope.test.js`) —
-   identity-evidence remains the sole consumer the test still pins to the
-   legacy default.
+| Evidence context | Compatibility interpretation |
+|---|---|
+| `same` or `parent_child` from an author-specific source | Corroborating/compatible affiliation evidence |
+| One compatible segment plus additional affiliations | Compatible; carry additional affiliations as informational and COI-relevant evidence |
+| Current, authoritative `sibling` or `distinct` versus another current assertion | Unreconciled current difference; a conflict only after segmentation/source evidence does not establish a joint appointment or other compatible explanation |
+| Historical `sibling` or `distinct` versus a current assertion | Possible career history; neutral unless another source proves concurrency or contradiction |
+| `related_other` | Not automatically compatible; evaluate source/time and surface when current significance is unclear |
+| `unresolved` | Neutral; neither corroboration nor contradiction |
 
-The live replay CLI replaces production-UI observation as the per-stage
-acceptance evidence; the post-promotion signed-in smoke remains a one-time
-deployment sanity check, not a measurement instrument.
+If source time/currentness is unavailable, a distinct relationship does not
+silently become a current contradiction. The assessment must say what is known
+and route according to independent identity authority.
 
-## Rollout
+## Contract 4 — conditional neutrality and independent identity
 
-- Tier classification per
-  `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`: Stages 1–2 change
-  runtime reviewer-facing behavior → **Tier 1–2, branch + deliberate
-  promotion**, not direct-to-main.
-- Sequence: Stage 1 alone first (smallest reversible increment, measurable on
-  the gates); Stage 2 only after Stage 1 ships and its effect is observed on
-  a real request batch; Stage 3 copy/policy rides with whichever stage its
-  pieces depend on.
-- Verification per stage: the offline jest suite, the live replay CLI gate
-  run (agent-runnable, see harness section), relevant red gates for touched
-  surfaces, and a one-time signed-in production smoke after promotion.
+Define `independentIdentitySufficient` at the execution point for every
+high-authority consumer. This must be calculated without using the affiliation
+assertion currently under adjudication. Reusing an identity status that was
+itself promoted solely by that affiliation would be circular and is forbidden.
 
-## Owner decisions — resolved 2026-08-08 (Session 409)
+The implementation must therefore expose either:
 
-1. **Contract approved.** Pair consistency is the product goal for this
-   workstream, superseding the resolver-promotion framing in the strategic
-   reset; the identity-arm promotion question remains separately parked.
-2. **Relationship auto-clear policy approved as recommended.** Parent/child
-   (med school, department, constituent college) and one-hop associated
-   institutions auto-clear as `related`; sibling campuses never;
-   `successor` and cross-system links are surfaced, not auto-cleared, until
-   observed.
-3. **Consumer scope — RESCOPED 2026-08-08 after Codex finding 1.** The
-   enrichment checker verdict is not display-only: `institutionContradicted`
-   feeds `identityNeedsReview`, whose false branch permits
-   `upsertByPotentialReviewer` (durable researcher write of email, ORCID,
-   metrics, affiliation), `writeIdentityDecision`, ORCID back-propagation to
-   the linked contact, and COI reason writes [VERIFIED via
-   `lib/services/workbench/enrich-recommended-service.js` identity-gate and
-   write branches, read S409]. [RECHECKED after
-   lib/services/workbench/enrich-recommended-service.js change: the Wave 2
-   branch diff is one display string in `institutionVerdictReason` (+1/−1);
-   the identity gate, checker construction, and every write branch cited
-   above are untouched, and
-   `tests/unit/institution-checker-consumer-scope.test.js` machine-enforces
-   the bare checker construction.] Therefore, **as originally scoped
-   (through Wave 5)**:
-   - **Full pair-verdict injection now: the affiliation-mismatch alert
-     only** (`alert-reviewer-affiliation-mismatch.js`).
-   - **Enrichment now: copy and provenance only** — the banner names the
-     compared institutions and `insufficient` reads "could not compare";
-     the verdict-bearing checker in the `identityNeedsReview` computation
-     stays legacy, bit-for-bit.
-   - **Enrichment verdict injection is identity-authority work**: it is
-     unlocked only by the frozen-40 person-identity benchmark run with the
-     new checker wired in, gated on zero false binds, plus an owner sign-off
-     on that result. Identity-evidence corroboration
-     (`reviewer-identity-evidence.js`) remains deferred behind the same gate
-     and a further owner decision.
-   - The checker factory default stays unchanged; scope boundaries are
-     machine-enforced by the harness's consumer-scope assertion.
+- an identity result calculated without affiliation anchors; or
+- a machine-verifiable breakdown showing that non-affiliation anchors alone
+  meet the consumer's existing persistence/selection threshold.
 
-   **SUPERSEDED 2026-08-09, Wave 6 (owner-approved).** The unlock condition
-   above is met: the frozen-40 rerun with the enrichment checker
-   reconfigured to `{ segmentComparison: true }` passes all five
-   `evaluatePromotion` gates identically to the 2026-08-08 arm-1 baseline
-   (correctBindGain 8, falseBinds 0, rightPersonPolicyBinds 1, misses 4,
-   providerFailures 0; per-case decision fields byte-identical across all 40
-   cases) — see the Wave 6 entry under Stage 1 for the full artifact
-   comparison — and the owner approved this landing directly (this task).
-   Enrichment verdict injection has therefore moved from "copy and
-   provenance only" to **live at the checker-construction level**:
-   `enrich-recommended-service.js`'s `institutionConsistencyChecker` now
-   constructs with `{ segmentComparison: true }`, so
-   `institutionContradicted` (and therefore `identityNeedsReview`) can be
-   decided by the staged segment-comparison verdict, not only the legacy
-   raw-string comparison. Identity-evidence corroboration
-   (`reviewer-identity-evidence.js`) remains explicitly OUT of this Wave 6
-   landing — deferred behind its own further owner decision, unchanged from
-   the original scoping above; its checker construction is still the legacy
-   no-args default. The checker factory default itself is still unchanged
-   (`segmentComparison = false`); scope boundaries (now: two consumers
-   staged, one on default) remain machine-enforced by the updated
-   consumer-scope assertion.
-   Note: the identity gate also requires the resolver to independently reach
-   ≥probable, so a pair verdict can only ever clear the second of two
-   vetoes; the rescope treats that as defense-in-depth to preserve, not as
-   license. This remains true after Wave 6 — the AND-gate at
-   `identityNeedsReview` is untouched.
-4. **Measurement runs — run (a) UNPARKED 2026-08-08; run (b) still
-   parked** (`outputs/ror-reviewer-finding-strategic-assessment-2026-08-08.md`).
-   - **(a) Frozen-40 W2 rerun: authorized, two arms.** Arm 1 (baseline,
-     runnable immediately): the existing evaluator as-is — it wires the
-     incumbent institution resolver [VERIFIED via
-     `scripts/evaluate-reviewer-works-first.js:18,281-284`], and the
-     benchmark had never had a clean run. Arm 2 (the actual
-     enrichment-injection gate): the evaluator extended to wire the
-     ROR-backed checker path — built with the Stage 1 harness. New output
-     slugs; the failed 2026-08-08 network-outage artifact is preserved,
-     not overwritten.
-     **Arm 1 COMPLETED 2026-08-08** (local artifact
-     `outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-baseline-2026-08-08.json`,
-     untracked per run-artifact precedent): 40/40 cases, zero provider
-     failures — the first clean run of this benchmark. All five
-     `evaluatePromotion` gates pass for the combined arm: correct-bind gain
-     +8 (spine 13 → combined 21, required ≥3), false binds 3 → 0 (all three
-     spine false binds were demoted to review by the combine policy — two
-     via `initial_only_not_works_corroborated`, one via
-     `resolver_anchor_disagreement`, the latter becoming a miss [VERIFIED
-     via the run artifact's rows]),
-     right-person-policy binds 1 (≤ spine's 1), misses 11 → 4 (≤8). Works
-     arm detail: 7 of 40 cases returned `claimed_institution_unresolved`
-     under the incumbent institution resolver — the headroom arm 2's
-     ROR-backed stage targets. This result is measurement evidence only; it
-     does not authorize combined-mode promotion or enrichment injection,
-     which still require arm 2 plus owner sign-off.
-     **Arm 2 COMPLETED 2026-08-09** (local artifact
-     `outputs/reviewer-holistic-m1/reviewer-identity-works-first-w2-v2-ror-arm2-2026-08-09.json`,
-     untracked per the same precedent): 40/40, zero provider failures on
-     both providers (ROR adapter: 31 requests, all 2xx, 0 timeouts/
-     transport failures/malformed responses). All five `evaluatePromotion`
-     gates pass with the SAME numbers as arm 1 — and that is the finding:
-     **every combined decision and outcome is identical to the baseline
-     across all 40 cases** [VERIFIED via per-case diff of both artifacts].
-     The headroom hypothesis is FALSIFIED on this benchmark: the ROR arm
-     resolved more claimed institutions (`claimed_institution_unresolved`
-     works-stage reasons dropped; resolver decisions: 21 resolved / 3
-     review / 0 unresolved), but in the only two cases whose works-stage
-     reason changed (hazard-10-a-patel, clean-01-ram-madabhushi) the newly
-     resolved institution then failed byline corroboration — `review
-     (claimed_institution_unresolved)` became `abstain
-     (no_institution_corroborated_byline)` with unchanged combined
-     outcomes. Institution resolution was not the binding constraint on
-     the frozen-40; byline corroboration is. Note the benchmark's claimed
-     affiliations are full institution names, so ROR's alias/short-form
-     advantage ("UCLA", "UC San Diego") is untested by this suite.
-     Consequence: the enrichment-injection gate's zero-false-binds
-     condition is met, but there is no measured benefit to justify the
-     authority change — recommendation recorded as do-not-inject on
-     current evidence; revisit only with a benchmark whose failure mode
-     is actually institution-resolution-bound (e.g. short-form
-     affiliations).
+Policy:
 
-     **This do-not-inject recommendation is about a different axis than
-     Wave 6 (2026-08-09) and remains in force, unaffected by it.** Arm 2
-     here swaps the institution RESOLVER inside the frozen-40 works-first
-     evaluation pipeline (incumbent → ROR-backed) — a `scripts/
-     evaluate-reviewer-works-first.js`-internal comparison that never
-     touches `enrich-recommended-service.js` or
-     `reviewer-identity-evidence.js`. Wave 6 instead flips the
-     `segmentComparison` OPTION on the existing incumbent-resolver checker
-     at the enrichment call site — a narrower, already-frozen (Stage 1
-     stop-rule) mechanism, not a resolver swap. Do-not-inject-ROR-resolver
-     and land-segment-comparison-at-enrichment are independent decisions;
-     nothing here reopens the ROR-resolver question.
-   - **(b) C3 replay: parked** — trigger unchanged (institution-resolver
-     promotion returning to the table).
+```text
+unreconciled current sibling/distinct conflict
+  -> veto, regardless of independent identity sufficiency, until corrected or
+     explicitly staff-confirmed under the existing identity-attestation flow
 
-## Relationship to the strategic reset
+unresolved affiliation + independentIdentitySufficient
+  -> neutral; do not create an institution veto
 
-The reset brief asked which capability should be the promotion target. This
-plan's answer: none of the three as originally framed. The ROR investment is
-retained and put to work where the demonstrated staff pain is — pair
-consistency — while production identity authority remains `legacy-default`
-and all identity-promotion work stays parked. The frozen benchmarks remain
-the falsification record; this plan adds only new result runs under new
-slugs.
+unresolved affiliation + !independentIdentitySufficient
+  -> hold; give an identity remedy, not an institution-mismatch accusation
+
+same/parent_child affiliation
+  -> remove the institution veto and optionally corroborate; never establish
+     the person identity by itself
+```
+
+Unknown enum values, missing provenance, or an unavailable independent-identity
+calculation fail closed at high-authority consumers. At display-only consumers
+they render as honest unavailable/unresolved information and never as a
+confirmed mismatch.
+
+## Consumer policy
+
+| Consumer | Compatible (`same`, `parent_child`, additional) | Unreconciled current sibling/distinct | Historical sibling/distinct | Unresolved |
+|---|---|---|---|---|
+| Post-acceptance staff notification | Suppress or show a non-actionable note | Alert with both resolved institutions and a correction path | Informational career-history note; no mismatch alert | “Could not compare”; nonblocking operational information |
+| Reviewer candidate card copy | Clear warning or show useful specificity/additional affiliation | “Current affiliations conflict” with exact choices | “Earlier work lists …”; no action required | Never say mismatch; explain whether identity is otherwise sufficient |
+| Candidate selectability | Selectable when other identity gates pass | Hold until correct record/right person/not-a-fit choice | Selectable when independent identity is sufficient | Selectable when independent identity is sufficient; otherwise hold with Confirm identity |
+| Automated researcher/contact/metrics writes | Removes affiliation veto; independent identity still required | Veto | Neutral when independent identity is sufficient | Neutral when independent identity is sufficient; otherwise hold |
+| Identity resolver anchor | `same` corroborates; `parent_child` corroborates at a lower or explicitly separate weight | Contradictory only when genuinely concurrent/current | Neutral/non-corroborating | Neutral/non-corroborating |
+
+No consumer may infer its action directly from the relationship enum. All
+actions flow through a total, versioned policy table whose unknown/default case
+is explicit.
+
+## User remedies
+
+Every held state names an action the user can actually take:
+
+| Reason | User-facing remedy |
+|---|---|
+| Unreconciled current sibling/distinct conflict | Confirm the right person and recorded current institution; record the additional joint appointment when applicable; correct the record; or choose Not a fit |
+| Independent identity insufficient | Confirm identity using the existing exact-person flow, add/correct authoritative evidence, or choose Not a fit |
+| Provider failure/timeout | Retry enrichment; do not ask the user to adjudicate organization identity because the system was unavailable |
+| Ambiguous organization resolution | Show the resolved candidates when useful and allow correction of the recorded institution; otherwise treat as neutral if independent identity is sufficient |
+| Historical difference | No remedy; show only when it helps explain the evidence |
+| Additional affiliation | No identity remedy; retain as information and COI input |
+
+The UI must not display “Suggested because” above negative identity evidence,
+must not call `unresolved` a mismatch, and must not recommend an action that is
+not available on that card.
+
+## Evaluation reset
+
+### Status of existing artifacts
+
+- The frozen Stage 1 pair fixtures and Wave 6 result remain valid evidence for
+  the shipped boolean comparator. Their `related-surface` vocabulary is a
+  Stage 1 gate convention, not the future Stage 2 relationship contract.
+- The 2026-08-18 25-case unresolved smoke is a **diagnostic falsification
+  artifact only**. It retained comparable pairs for only 15 cases, omitted
+  temporal/source context, and contained at least two conceptually wrong human
+  labels. It must not gate promotion.
+- The shadow `institution-structural-sameness` experiment on branch
+  `codex/institution-decision-harness` is not a production candidate. Its value
+  is proving that a narrower string classifier cannot satisfy this contract.
+- The replacement source-aware v1 fixture, normalized ROR snapshot, runner, and
+  passing artifact live under
+  `benchmarks/institution-affiliation-compatibility/`. Its go verdict permits
+  continued shadow evaluation only.
+
+Existing frozen files remain immutable. Revised cases and labels use a new
+versioned directory/result slug.
+
+### Re-adjudicated 25-case smoke
+
+Build a new read-only 25-case set from unresolved production-shaped cases that
+retain the full comparison context. Every case must include:
+
+- both raw institution operands and their segmented assertions;
+- source type and source reference;
+- publication/observation date and currentness when available;
+- resolved source/canonical ROR ids and typed relationships;
+- independent non-affiliation identity evidence available at the consumer;
+- an adjudicated relationship label;
+- a separately adjudicated consumer action; and
+- adjudicator rationale/confidence with evidence links or provider snapshots.
+
+Adjudication is blind to the proposed classifier result on the first pass.
+Disagreement between the old label, proposed relationship, and adjudicator is a
+review queue, not automatically a model error. Labels may be changed, and the
+label-revision rate is published.
+
+Minimum slice coverage across the 25 cases:
+
+- exact/alias/address/department decoration;
+- parent/child;
+- multiple or joint affiliations;
+- sibling and genuinely distinct current affiliations;
+- historical institution changes; and
+- unresolved/provider-failure/ambiguous cases.
+
+The three challenged smoke cases are mandatory regressions:
+
+- `83ce8914d857`: compatible UCSF segment plus additional HHMI affiliation;
+- `97d16b3bdc69`: University of Ottawa plus address decoration; and
+- `24810991224e`: Duke University School of Medicine parent/child compatibility.
+
+All three must avoid a blocking institution mismatch when independent identity
+requirements are otherwise satisfied.
+
+### Headline metrics
+
+Report counts and denominators per relationship and evidence-context slice. Do
+not publish aggregate accuracy without them.
+
+1. **Sibling entity collapses:** zero `same`/`parent_child` classifications.
+2. **Unsafe action clears:** zero adjudicated, unreconciled current
+   sibling/distinct conflicts mapped to a clear action; legitimate joint
+   appointments are labeled separately and must not count as conflicts.
+3. **Manufactured reviews:** count and rate of adjudicated compatible/historical
+   cases that still require staff action.
+4. **Conditional-neutrality accuracy:** unresolved cases mapped according to
+   independent identity sufficiency, with no circular affiliation authority.
+5. **Honest copy:** zero unresolved/provider-failure cases described as an
+   affirmative mismatch.
+6. **Remedy coverage:** 100% of held cases expose an available, relevant action.
+7. **Label quality:** old-label revision count/rate, published as a first-class
+   result.
+8. **Identity safety:** zero new false person binds on the frozen identity
+   benchmark and no new right-person-policy binds.
+9. **Operational completeness:** zero skipped cases or provider failures in a
+   passing live run; provider-failure fixtures remain covered offline.
+
+The existing 157-row Stage 1 corpus and UC sibling matrix remain adversarial
+safety evidence. They supplement rather than replace the source-complete 25.
+
+## Implementation stages
+
+### Stage 1 — typed shadow contract and adjudication
+
+**Authority:** none; shadow only.
+
+**Status: IMPLEMENTED AND PASSING, 2026-08-19.** The v1 artifact reports 25/25
+relationship matches, 25/25 action matches, zero sibling collapses, zero unsafe
+clears, zero manufactured reviews, all three challenged regressions
+nonblocking, five revised old labels out of sixteen old-labeled rows, and zero
+provider failures in the final live ROR capture. The production independent-
+identity execution-point contract remains insufficient for an authority flip.
+The result did not itself authorize Stage 2 or Stage 3; the owner separately
+authorized the bounded Stage 2 presentation implementation on 2026-08-19.
+
+Deliver:
+
+1. provenance-preserving ROR operand resolution;
+2. multi-affiliation segmentation;
+3. typed relationship and evidence-context results;
+4. a pure, total per-consumer policy evaluator;
+5. explicit independent-identity sufficiency without circular affiliation
+   credit;
+6. the re-adjudicated source-complete 25-case harness; and
+7. shadow comparison against current booleans, with no runtime behavior change.
+
+Go only when:
+
+- all 25 cases are complete and independently adjudicated;
+- the sibling and unsafe-action hard gates are zero;
+- the three challenged cases map to compatible/nonblocking outcomes;
+- unknown/default branches are pinned fail closed for high-authority consumers;
+- label revisions and per-slice denominators are published; and
+- the old boolean remains the only runtime authority.
+
+Stop if source/time provenance cannot be supplied at the execution point. Do
+not compensate with another string heuristic.
+
+### Stage 2 — low-authority consumer rollout
+
+**Authority:** notification and explanatory UI only; no automated identity or
+Dataverse-write authority.
+
+**Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAG; SYNTHETIC SIGNED-IN PREVIEW
+ACCEPTANCE COMPLETE, 2026-08-19.**
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on` enables source-aware
+candidate-card explanations/remedies and post-acceptance staff notifications.
+The exact default/off path restores the incumbent boolean presentation. The
+implementation passes the frozen 25-case presentation projection, remedy,
+selection-authority, write-authority, provider-fallback, rollback, focused unit,
+type, lint, and flag-on production-build gates.
+
+The signed-in Preview smoke used `pages/workbench/institution-stage2-smoke.js`,
+which is SSR-hidden outside Preview and guarded by reviewer access. Six static,
+non-sensitive cases are equality-pinned to the production projector and render
+the real `CandidateCard`; eight displayed notice actions write only to local
+component state. The owner confirmed all six cases, the exact flag-on state, and
+the local action check on deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`.
+Focused coverage independently clicked all eight actions and asserted zero
+network calls. Cleanup removed the branch flag and temporary Entra callback;
+default-off deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+
+This closes synthetic UI acceptance, not organic effectiveness sampling. A
+read-only Production audit found 952 roster rows and zero persisted Stage 2
+DTOs, so creating live examples would have mutated the shared roster. No claim
+of material manual-review reduction or bounded informational-alert volume has
+been made, and Production remains off pending an owner decision.
+
+A fresh Claude Fable adversarial review returned **REWORK** before enablement:
+it found a flag-on cache loop for deceased rows and a provenance fallback that
+could label applicant-entered text as historical publication evidence. Commit
+`0089822` fixes both, records an invisible versioned legacy-fallback DTO after
+unexpected Stage 2 failure, and makes the edit affordance use the same exact
+flag/version/visibility gate as the rendered notice. The remaining review risk
+is operational: unresolved ROR comparisons can increase informational alert
+volume, which must be measured during Preview acceptance. Fable's fresh
+post-fix review returned **APPROVE** with no P0/P1/P2 findings. Its residuals
+are copy-only: a deterministic-failure fallback remains on the incumbent copy
+until another enrichment or a presentation-version bump, and the edit-
+affordance rollback is pinned at the shared helper rather than by a separate
+component-level test.
+
+Deliver:
+
+- typed staff notification behavior;
+- reviewer card explanation and remedy selection;
+- historical/additional-affiliation notes; and
+- explicit provider-failure/retry copy.
+
+Go only when:
+
+- **PENDING ORGANIC EVIDENCE:** sampled false-clear review finds no hidden
+  current conflicts;
+- **VERIFIED SYNTHETIC PREVIEW:** 100% of held fixture cards expose an action
+  available on that card;
+- **VERIFIED SYNTHETIC PREVIEW:** unresolved never renders as mismatch;
+- **PENDING ORGANIC EVIDENCE:** compatible/historical cases show a material
+  reduction in manual-review prompts; and
+- **VERIFIED:** rollback to the boolean presentation remains independently
+  available.
+
+### Stage 3 — identity-authority rollout
+
+**Authority:** candidate selectability, enrichment write veto, and identity
+anchor semantics.
+
+Migrate one consumer at a time behind independently reversible configuration:
+
+1. candidate selectability;
+2. enrichment durable-write veto; and
+3. identity-anchor weighting.
+
+Go for each consumer only when:
+
+- the source-complete 25 and full adversarial corpora pass;
+- the frozen identity benchmark records zero new false binds and zero new
+  right-person-policy binds;
+- independent identity sufficiency is proven at that exact execution point;
+- unreconciled current sibling/distinct conflicts still veto;
+- unresolved with sufficient independent identity is demonstrably neutral;
+- unresolved without sufficient independent identity holds with a real remedy;
+- COI behavior and the exact-address attestation flow are unchanged; and
+- the owner explicitly approves the consumer flip.
+
+The boolean contract is removed only after all registered consumers have moved
+to the typed policy and a symbol-consumer sweep finds no remaining authority
+reads.
+
+## Safety invariants
+
+1. Affiliation evidence alone never confirms a person.
+2. Sibling organizations never become the same entity.
+3. Historical difference is not silently promoted to current contradiction.
+4. Unresolved is neutral, not positive and not negative.
+5. Conditional neutrality requires independently sufficient non-affiliation
+   identity evidence; otherwise the workflow holds.
+6. Provider failure never becomes a mismatch and never silently enables a
+   high-authority action.
+7. Unknown relationship/policy values fail closed at high-authority consumers.
+8. Additional affiliations remain available to COI evaluation but do not create
+   identity contradiction merely by being additional.
+9. Relationship policy never changes the COI hard-drop matcher.
+10. No new string-side checker or enrichment-seam guard is added.
+
+## Contract-reconcile requirements for implementation
+
+Before each stage is called complete, trace:
+
+1. source affiliation producer;
+2. assertion segmentation and provenance;
+3. ROR candidate/relationship resolution;
+4. typed relationship result;
+5. evidence-context assessment;
+6. independent identity calculation;
+7. per-consumer policy decision;
+8. persisted/logged/DTO representation;
+9. client state and rendering; and
+10. tests, benchmarks, operational gates, and rollback.
+
+The partial-success and async audits must prove that one failed affiliation
+segment or provider request cannot silently discard successful segments or
+write stale results into a later reviewer/request context. Any new durable DTO
+field must be swept through every select/projection, serializer, roster
+consumer, and UI bucket before authority changes.
+
+## Historical Stage 1 evidence
+
+Stage 1 remains the falsification record for the current boolean comparator:
+
+- segment-wise comparison shipped without changing the default checker;
+- the alert and enrichment seams adopted the staged behavior in bounded steps;
+- the enrichment seam now composes legacy and staged checkers, preserving
+  associated-link clears while adding decorated-byline clears;
+- the Wave 6 live gate passed 157/157 with zero provider failures;
+- the frozen-40 identity run remained identical to baseline with zero false
+  binds; and
+- repeated adversarial review produced explicit checker and seam stop-rules.
+
+Detailed frozen boolean artifacts and fixture semantics remain under
+`benchmarks/institution-pair-consistency/`. They prove the current Stage 1
+boolean behavior. The separate source-aware v1 artifact proves the new shadow
+relationship/policy contract only; neither artifact proves that production
+consumers have migrated.
+
+## Remaining implementation decisions
+
+These are required before Stage 3, not silently assumed:
+
+1. the exact non-affiliation anchor combination that constitutes
+   `independentIdentitySufficient` at each high-authority consumer;
+2. the versioned runtime/roster representation for the typed assessment;
+3. the policy for concurrent `related_other` evidence beyond the named
+   parent/child and sibling classes; and
+4. the owner-approved minimum manual-review reduction that justifies a
+   consumer flip.
+
+No threshold tuning against the 25-case set is permitted without preserving a
+held-out or newly collected adjudication slice. If the relationship substrate
+cannot explain a new case, record it as unresolved and improve coverage in a
+new evaluation version; do not patch the consumer with a case-specific rule.

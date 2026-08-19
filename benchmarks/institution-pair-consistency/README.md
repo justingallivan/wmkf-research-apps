@@ -1,10 +1,25 @@
 # institution-pair-consistency benchmark fixtures
 
-Gate fixtures for `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`
-(Wave 1A of Stage 1). These are pair-consistency evaluation cases — `left`
-vs `right` institution strings and the expected verdict — not the
+Gate fixtures for the shipped Stage 1 boolean comparator documented in
+`docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. These are legacy
+pair-consistency evaluation cases — `left` vs `right` institution strings and
+the expected Stage 1 verdict — not the
 `fuzzy-matching-falsification` single-operand resolve cases, and they are a
 separate, independently frozen directory from that suite.
+
+The 2026-08-19 plan rework preserves these fixtures as historical/current-
+implementation regression evidence but does not reuse their verdict vocabulary
+as the Stage 2 product contract. Stage 2 separately represents organization
+relationship, source/time context, and per-consumer action under conditional
+neutrality. New Stage 2 cases and results use a new versioned directory/slug;
+these frozen Stage 1 files are not relabeled.
+
+One frozen note requires an explicit historical boundary:
+`named-rel-vumc-vanderbilt` still says the future Stage 2
+`related-autoclear` classification should lean broad. That was the 2026-08-09
+outlook when the fixture was frozen and is **superseded** by the 2026-08-19
+plan. The relationship must now be classified independently of consumer action;
+the row remains byte-stable only so prior Stage 1 artifacts stay reproducible.
 
 ## Contents
 
@@ -52,13 +67,14 @@ separate, independently frozen directory from that suite.
     I136199984), so there's no shared identity to match on either side.
   - `named-rel-vumc-vanderbilt` — "Vanderbilt University Medical Center" vs
     "Vanderbilt University". Distinct OpenAlex identities (I901861585 vs
-    I200719446). The relationship-policy table's related-autoclear
-    expectation for this pair is **Stage 2 scope** (typed relationships) —
-    at Stage 1 it surfaces, and per the owner's 2026-08-09 cost calibration
-    the Stage 2 related-autoclear classification should lean broad.
+    I200719446). It surfaces under the frozen Stage 1 boolean contract. The
+    reworked Stage 2 contract will classify the typed relationship first and
+    apply consumer policy separately; this fixture does not prescribe that
+    future action.
   - `named-rel-danafarber-harvard` — "Dana-Farber Cancer Institute" vs
-    "Harvard University". Distinct identities; the policy table says
-    surface, with no Stage 2 auto-clear expectation noted for this pair.
+    "Harvard University". Distinct identities and expected to surface under
+    the frozen Stage 1 contract. Future consumer action depends on the typed
+    relationship plus source/time context.
 
 The runner's `REQUIRED_CASE_FILES` (`run-pair-gates.js`) now names all three
 tracked case files above by basename and fails fast — before any live
@@ -68,7 +84,7 @@ it's given" gap this family exists to fix.
 
 ## Row schema
 
-Each JSONL row is one pair-consistency case:
+Each JSONL row is one frozen Stage 1 pair-consistency case:
 
 ```json
 {

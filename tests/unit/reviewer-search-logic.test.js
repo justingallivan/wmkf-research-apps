@@ -1133,6 +1133,20 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
       seniorityEstimate: 'Senior',
       identityStatus: 'confirmed',
       needsIdentification: false,
+      institutionPresentation: {
+        version: 'institution-stage2-presentation/v1',
+        visible: true,
+        kind: 'historical',
+        tone: 'neutral',
+        heading: 'Earlier affiliation',
+        detail: 'Earlier work lists Old University.',
+        relationship: 'distinct',
+        evidenceContext: 'historical_difference',
+        evidenceInstitution: 'Old University',
+        recordedInstitution: 'New University',
+        remedies: ['not_a_fit', 'not_a_real_remedy'],
+        legacyHold: true,
+      },
     });
 
     expect(pruned.enrichedProposalKey).toBe('Library::Folder::Proposal.pdf');
@@ -1154,6 +1168,20 @@ describe('pruneCandidateForRoster — applicant enrichment cache fields survive 
     expect(pruned.seniorityEstimate).toBe('Senior');
     expect(pruned.identityStatus).toBe('confirmed');
     expect(pruned.needsIdentification).toBe(false);
+    expect(pruned.institutionPresentation).toEqual({
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'historical',
+      tone: 'neutral',
+      heading: 'Earlier affiliation',
+      detail: 'Earlier work lists Old University.',
+      relationship: 'distinct',
+      evidenceContext: 'historical_difference',
+      evidenceInstitution: 'Old University',
+      recordedInstitution: 'New University',
+      remedies: ['not_a_fit'],
+      legacyHold: true,
+    });
   });
 });
 
@@ -1175,6 +1203,28 @@ describe('hasValidApplicantEnrichmentCache', () => {
     },
     identityStatus: 'probable',
   };
+
+  afterEach(() => {
+    delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
+  });
+
+  test('Stage 2 requires the versioned presentation before reusing a cached row', () => {
+    process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+    expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(false);
+    expect(hasValidApplicantEnrichmentCache([{
+      ...canonical,
+      institutionPresentation: { version: 'institution-stage2-presentation/v1' },
+    }], proposalKey, expected)).toBe(true);
+  });
+
+  test('Stage 2 does not invalidate a terminal deceased enrichment row', () => {
+    process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+    expect(hasValidApplicantEnrichmentCache([{
+      ...canonical,
+      eligibilityStatus: 'deceased',
+      identityStatus: undefined,
+    }], proposalKey, expected)).toBe(true);
+  });
 
   test('requires a non-null proposal key and the exact expected canonical suggestion row', () => {
     expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(true);
@@ -1281,6 +1331,39 @@ describe('hasValidApplicantEnrichmentCache', () => {
     );
     expect(Array.from(terminal)).toEqual([]);
     expect(hasValidApplicantEnrichmentCache([], proposalKey, expected, terminal)).toBe(false);
+  });
+});
+
+describe('Stage 2 institution presentation has no selection authority', () => {
+  test('a current-conflict presentation cannot block an otherwise ready candidate', () => {
+    expect(isCandidateSelectable({
+      name: 'Ready Reviewer',
+      identityStatus: 'confirmed',
+      email: 'ready@example.edu',
+      emailSource: 'pubmed',
+      emailPersistAllowed: true,
+      addressTrustReceipt: {
+        receiptId: 'receipt-ready',
+        personConfirmed: true,
+        email: 'ready@example.edu',
+      },
+      institutionPresentation: {
+        version: 'institution-stage2-presentation/v1',
+        kind: 'current_conflict',
+      },
+    })).toBe(true);
+  });
+
+  test('a compatible presentation cannot make an unresolved candidate selectable', () => {
+    expect(isCandidateSelectable({
+      name: 'Held Reviewer',
+      identityStatus: 'unresolved',
+      needsIdentification: true,
+      institutionPresentation: {
+        version: 'institution-stage2-presentation/v1',
+        kind: 'compatible',
+      },
+    })).toBe(false);
   });
 });
 

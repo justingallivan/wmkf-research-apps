@@ -95,6 +95,14 @@ jest.mock('../../lib/services/institution-affiliation-consistency', () => ({
   })),
 }));
 
+const evaluateInstitutionStage2 = jest.fn();
+const createInstitutionStage2Evaluator = jest.fn(() => ({
+  evaluate: (...a) => evaluateInstitutionStage2(...a),
+}));
+jest.mock('../../lib/services/institution-affiliation-stage2', () => ({
+  createInstitutionStage2Evaluator: (...a) => createInstitutionStage2Evaluator(...a),
+}));
+
 jest.mock('../../lib/services/backprop-reviewer-orcid', () => ({
   backPropReviewerOrcidToContact: jest.fn(async () => {}),
 }));
@@ -156,6 +164,7 @@ const args = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
   ContactParser.isNameConsistentEmail.mockReturnValue(true);
   areInstitutionsConsistent.mockResolvedValue(false);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
@@ -181,6 +190,10 @@ beforeEach(() => {
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
   updatePerson.mockResolvedValue(undefined);
+});
+
+afterAll(() => {
+  delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
 });
 
 test('happy path: progress frames strictly precede one terminal complete; never touches res', async () => {
@@ -859,6 +872,7 @@ test('an institution contradiction overrides a probable identity verdict and lea
     verified: suggestions.map((s) => ({
       ...s,
       verified: true,
+      verificationSource: 'pubmed',
       institutionMismatch: true,
       suggestedInstitution: 'Expected University',
       affiliation: 'Different University',
@@ -900,6 +914,162 @@ test('an institution contradiction overrides a probable identity verdict and lea
   expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
   expect(writeIdentityDecision).not.toHaveBeenCalled();
   expect(setMatchReason).not.toHaveBeenCalled();
+});
+
+test('Stage 2 explanation never changes the incumbent institution hold or write gate', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  evaluateInstitutionStage2.mockResolvedValue({
+    assessment: { relationship: 'same', evidenceContext: 'compatible' },
+    presentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'compatible',
+      tone: 'neutral',
+      heading: 'Affiliations appear compatible',
+      detail: 'The affiliations resolve as compatible. Existing identity verification still requires confirmation before Invite.',
+      relationship: 'same',
+      evidenceContext: 'compatible',
+      remedies: ['confirm_identity', 'not_a_fit'],
+      legacyHold: true,
+    },
+  });
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      institutionMismatch: true,
+      suggestedInstitution: 'Expected University',
+      affiliation: 'Different University',
+      affiliationHistory: ['Expected University'],
+      publications: [{ title: 'Namesake paper', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => ({
+      ...c,
+      email: 'namesake@different.edu',
+      contactEnrichment: {
+        email: 'namesake@different.edu',
+        emailSource: 'claude_search',
+        identity: { status: 'probable' },
+      },
+    })),
+  }));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  const candidate = events.at(-1).data.recommended[0];
+  expect(candidate).toMatchObject({
+    needsIdentification: true,
+    institutionMismatch: true,
+    institutionPresentation: {
+      kind: 'compatible',
+      legacyHold: true,
+    },
+    email: null,
+  });
+  expect(candidate.reasoning).toMatch(/did not confirm a current mismatch/i);
+  expect(evaluateInstitutionStage2).toHaveBeenCalledWith(expect.objectContaining({
+    consumer: 'candidate_card',
+    independentIdentity: null,
+    legacyHold: true,
+    evidenceAssertion: expect.objectContaining({
+      sourceType: 'publication',
+      currentness: 'historical',
+      authorSpecific: true,
+    }),
+  }), expect.any(Object));
+  expect(upsertByPotentialReviewer).not.toHaveBeenCalled();
+  expect(writeIdentityDecision).not.toHaveBeenCalled();
+});
+
+test('Stage 2 does not present compact ORCID history as dated publication evidence', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  evaluateInstitutionStage2.mockResolvedValue({
+    assessment: { relationship: 'unresolved', evidenceContext: 'unresolved' },
+    presentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'unresolved',
+      tone: 'neutral',
+      heading: 'Institution comparison unresolved',
+      detail: 'The available evidence could not establish compatibility.',
+      relationship: 'unresolved',
+      evidenceContext: 'unresolved',
+      remedies: [],
+      legacyHold: false,
+    },
+  });
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'orcid',
+      institutionMismatch: false,
+      affiliation: 'Current University',
+      affiliationHistory: ['Earlier University'],
+      publications: [],
+    })),
+    unverified: [],
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(evaluateInstitutionStage2).toHaveBeenCalledWith(expect.objectContaining({
+    evidenceAssertion: expect.objectContaining({
+      sourceType: 'orcid_employment',
+      currentness: 'unknown',
+      authorSpecific: true,
+    }),
+  }), expect.any(Object));
+});
+
+test('Stage 2 labels a suggested-institution fallback as applicant evidence', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      suggestedInstitution: 'Applicant University',
+      affiliation: 'Recorded University',
+      affiliationHistory: [],
+      publications: [{ title: 'Paper without a parseable affiliation', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(evaluateInstitutionStage2).toHaveBeenCalledWith(expect.objectContaining({
+    evidenceAssertion: expect.objectContaining({
+      rawText: 'Applicant University',
+      sourceType: 'applicant_record',
+      currentness: 'unknown',
+      authorSpecific: 'unknown',
+    }),
+  }), expect.any(Object));
+});
+
+test('Stage 2 presentation failure is non-terminal and falls back to the legacy card payload', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  evaluateInstitutionStage2.mockRejectedValue(new Error('ROR presentation unavailable'));
+
+  const { events, onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(events.at(-1)).toMatchObject({ event: 'complete' });
+  expect(events.at(-1).data.recommended[0].institutionPresentation).toMatchObject({
+    version: 'institution-stage2-presentation/v1',
+    visible: false,
+    kind: 'unresolved',
+  });
+  expect(events.filter((event) => event.event === 'error')).toHaveLength(0);
 });
 
 test('a late namesake substitution is rejected even when PubMed matched the listed institution before enrichment', async () => {

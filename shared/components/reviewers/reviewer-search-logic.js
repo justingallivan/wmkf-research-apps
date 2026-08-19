@@ -24,6 +24,10 @@ import {
   projectCanonicalApplicantContact,
   pruneApplicantKnownReviewer,
 } from '../../../lib/utils/applicant-known-reviewer';
+import {
+  INSTITUTION_STAGE2_PRESENTATION_VERSION,
+  isInstitutionStage2PresentationEnabled,
+} from '../../utils/institution-stage2-presentation';
 
 // Increment when applicant-recommended enrichment semantics change in a way
 // that requires existing roster JSON to be recomputed. Unversioned legacy rows
@@ -185,6 +189,47 @@ export function getCandidatePromotionDecision(candidate) {
     decision: 'needs_identity_confirmation',
     reason: canonical.decision,
   };
+}
+
+export const CANDIDATE_REASON_PRESENTATION = Object.freeze({
+  suggestion: Object.freeze({
+    label: 'Suggested because:',
+    remedyId: null,
+  }),
+  identity_review: Object.freeze({
+    label: 'Why this needs review:',
+    remedyId: 'confirm_identity',
+  }),
+  record_repair: Object.freeze({
+    label: 'Why this needs repair:',
+    remedyId: 'create_repair_request',
+  }),
+});
+
+/**
+ * Closed presentation contract for candidate reasoning. `reasoning` is used
+ * both for positive recommendation rationale and for fail-closed identity
+ * explanations; this projection prevents negative copy from inheriting the
+ * positive "Suggested because" label and names the corresponding remedy.
+ */
+export function getCandidateReasonPresentation(candidate) {
+  const text = candidate?.reasoning || candidate?.generatedReasoning || null;
+  if (!text) return null;
+  const decision = getCandidatePromotionDecision(candidate)?.decision;
+  const explicitServerIdentityReview = decision === 'needs_identity_confirmation'
+    && Boolean(
+      candidate?.serverIdentityReviewReason
+        || candidate?.contactEnrichment?.dataverseContactEvidence?.reason,
+    );
+  const unresolvedIdentity = candidate?.identityStatus === 'unresolved'
+    || candidate?.verificationStatus === 'unresolved'
+    || candidate?.needsIdentification === true;
+  const kind = decision === 'needs_record_repair'
+    ? 'record_repair'
+    : (explicitServerIdentityReview || unresolvedIdentity
+        ? 'identity_review'
+        : 'suggestion');
+  return { kind, text, ...CANDIDATE_REASON_PRESENTATION[kind] };
 }
 
 /**
@@ -597,6 +642,7 @@ export function hasValidApplicantEnrichmentCache(
   if (expectedKeys.size === 0) return true;
 
   const canonicalRowsByKey = new Map();
+  const stage2PresentationRequired = isInstitutionStage2PresentationEnabled();
   for (const candidate of Array.isArray(rosterActive) ? rosterActive : []) {
     const canonicalKey = reviewerSuggestionCandidateKey(candidate?.suggestionId);
     if (
@@ -605,6 +651,9 @@ export function hasValidApplicantEnrichmentCache(
       && candidate?.candidateKey === canonicalKey
       && candidate?.enrichedProposalKey === proposalKey
       && candidate?.applicantEnrichmentCacheVersion === APPLICANT_ENRICHMENT_CACHE_VERSION
+      && (!stage2PresentationRequired
+        || candidate?.eligibilityStatus === 'deceased'
+        || candidate?.institutionPresentation?.version === INSTITUTION_STAGE2_PRESENTATION_VERSION)
       && candidate?.applicantKnownReviewer
       && candidate.applicantKnownReviewer.status !== 'unavailable'
       && (candidate.isApplicantRecommended || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED)
@@ -626,6 +675,46 @@ export function hasValidApplicantEnrichmentCache(
       || c?.identityStatus === 'probable'
       || c?.identityStatus === 'unresolved'
   ));
+}
+
+function pruneInstitutionPresentation(value) {
+  if (!value || value.version !== INSTITUTION_STAGE2_PRESENTATION_VERSION) return null;
+  const bounded = (text, max = 500) => (
+    typeof text === 'string' ? text.trim().slice(0, max) || null : null
+  );
+  const allowedKinds = new Set([
+    'compatible',
+    'additional',
+    'current_conflict',
+    'historical',
+    'provider_failure',
+    'unresolved',
+  ]);
+  const allowedTones = new Set(['neutral', 'warning']);
+  const allowedRemedies = new Set([
+    'confirm_identity',
+    'correct_current_institution',
+    'record_joint_appointment',
+    'not_a_fit',
+    'retry_enrichment',
+    'add_authoritative_evidence',
+    'operator_review',
+  ]);
+  return {
+    version: INSTITUTION_STAGE2_PRESENTATION_VERSION,
+    visible: value.visible === true,
+    kind: allowedKinds.has(value.kind) ? value.kind : 'unresolved',
+    tone: allowedTones.has(value.tone) ? value.tone : 'neutral',
+    heading: bounded(value.heading, 120),
+    detail: bounded(value.detail),
+    relationship: bounded(value.relationship, 40) || 'unresolved',
+    evidenceContext: bounded(value.evidenceContext, 80) || 'unresolved',
+    evidenceInstitution: bounded(value.evidenceInstitution, 180),
+    recordedInstitution: bounded(value.recordedInstitution, 180),
+    remedies: [...new Set((Array.isArray(value.remedies) ? value.remedies : [])
+      .filter((remedy) => allowedRemedies.has(remedy)))],
+    legacyHold: value.legacyHold === true,
+  };
 }
 
 /**
@@ -944,6 +1033,7 @@ export function pruneCandidateForRoster(c) {
     lowPublicationCount: !!c.lowPublicationCount,
     lowPublicationCountFound: Number.isFinite(c.lowPublicationCountFound) ? c.lowPublicationCountFound : null,
     institutionMismatch: !!c.institutionMismatch,
+    institutionPresentation: pruneInstitutionPresentation(c.institutionPresentation),
     suggestedInstitution: c.suggestedInstitution || null,
     expertiseMismatch: !!c.expertiseMismatch,
     // Verification-incoherence flag (Fix 11) drives the relevance-score −15
