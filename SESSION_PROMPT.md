@@ -2,11 +2,11 @@
 
 ## Session 445 Summary
 
-Session 445 shipped the Pre-Site generation and Reviewer Finder remediation
-work through `5fcd913c` on `origin/main`, then moved the institution-affiliation
-strategy onto `codex/institution-decision-harness`. That branch is four commits
-ahead of `origin/main` at `23a40e89`; its new relationship/policy implementation
-is shadow-only and has no production caller.
+Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
+then moved the institution-affiliation strategy onto
+`codex/institution-decision-harness`. The reviewed code tip is `947fb46`; its
+new relationship/policy implementation is shadow-only and has no production
+caller.
 
 ### What Was Completed
 
@@ -49,6 +49,16 @@ is shadow-only and has no production caller.
      benchmark's identity-sufficiency value is a counterfactual policy input,
      not production authority.
 
+4. **Promotion-review boundaries hardened**
+   - Prevented non-author-specific publication evidence from creating identity
+     weight or a current-conflict veto.
+   - Made same-parent internal subunits without independent identifiers abstain
+     instead of collapsing to parent/child compatibility.
+   - Prevented a named organization before an address from being ignored as
+     location decoration.
+   - Corrected explicit server identity-review reasoning so it cannot render
+     beneath the positive `Suggested because:` label.
+
 ### Commits
 
 - `45ea7456` — Add reviewer materials to Proposal tab
@@ -71,16 +81,19 @@ is shadow-only and has no production caller.
 - `8723aa9c` — Record unresolved institution smoke results
 - `dbafd2ec` — Rework institution compatibility plan
 - `23a40e89` — Implement source-aware institution shadow contract
+- `0d163998` — Document Session 445 and create Session 446 prompt
+- `c8c67aae` — Finalize Session 445 handoff cleanup
+- `947fb46` — Harden institution shadow decision boundaries
 
 ## Next Items
 
 ### Verified Open
 
-1. **Review the source-aware Stage 1 artifact and branch before promotion.**
-   Evidence: `23a40e89`, the frozen v1 report, and the caller search recorded in
-   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Confirm that the 25 adjudications and the shadow-only boundary are acceptable.
-   `origin/main` is currently `5fcd913c`; this branch is four commits ahead.
+1. **Complete owner review of the revised Stage 1 artifact before promotion.**
+   Evidence: `947fb46`, the unchanged frozen v1 report, and the caller search in
+   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Engineering promotion
+   review is complete and its four falsified boundaries are covered; owner
+   acceptance and the Stage 2 authority decision remain open.
 
 2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
    Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
@@ -122,9 +135,9 @@ is shadow-only and has no production caller.
    internal subunits that ROR does not model independently. Do not lower the
    production resolver threshold or overwrite the snapshot; use a new versioned
    capture and re-adjudication.
-2. Local `main` was stale at `f9d614ff` when this handoff was written, while
-   `origin/main` was `5fcd913c`. Fetch and verify branch state before switching,
-   merging, or making a production release.
+2. `origin/main` was `e82dfba4` when the review fixes were committed. The feature
+   branch was seven commits ahead and three commits behind; fetch and verify both
+   tips before merging or making a production release.
 3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
    handles, then moved them out of the worktree to
    `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
@@ -163,7 +176,7 @@ npm run check:secret-scan
 npm run check:types
 ```
 
-The institution-focused suites passed 24/24; targeted ESLint, TypeScript,
-documentation/fact/memory/secret gates, and their required self-tests passed.
+The expanded institution and reasoning suites passed 59/59; targeted ESLint,
+TypeScript, documentation/fact/memory/secret gates, and their required self-tests passed.
 The webpack production build passed. The default Turbopack build could not bind
 its local worker port on this host and failed before compiling application code.

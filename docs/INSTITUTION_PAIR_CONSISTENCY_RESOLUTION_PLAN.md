@@ -38,6 +38,13 @@ consumer actions in relationship labels such as `related-autoclear` and
 the frozen boolean-fixture vocabulary, current runtime behavior, candidate
 selectability, or durable-write authority.
 
+A 2026-08-19 promotion review then falsified four untested boundaries. Commit
+`947fb46` hardened them before promotion: non-author-specific evidence cannot
+corroborate or contradict identity, two unidentifiable internal subunits sharing
+a parent abstain instead of becoming parent/child, a named organization before
+an address suffix is not discarded as location decoration, and explicit server
+identity-review copy cannot inherit the positive candidate-suggestion label.
+
 The strategic correction is broader than a threshold adjustment:
 
 1. determine the relationship between resolved organizations;
@@ -59,6 +66,7 @@ two people are the same by itself.
 | Source/time-aware affiliation assessment | **VERIFIED, built in shadow only.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Current enrichment still reduces verifier history to strings and does not call the shadow service. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; caller search |
 | Typed consumer policy | **VERIFIED, built in shadow only.** A total versioned evaluator covers five consumers and fails closed for unknown/high-authority inputs. Existing cards and write gates still consume booleans and legacy flags. | `institution-affiliation-assessment.js`; focused tests; caller search |
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
+| Promotion-review falsification | **VERIFIED hardened on branch.** Disconfirming tests now cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; focused unit and benchmark suites |
 | Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
 The shipped boolean comparator remains the incumbent until every consumer in
@@ -192,6 +200,10 @@ The relationship result also carries:
 4. A shared parent or generic name fragment is never sufficient to classify
    siblings as the same organization.
 5. Additional affiliation is evidence shape, not an organization relationship.
+6. Two internal subunits without independent organization identifiers abstain
+   when all they establish is a shared parent.
+7. An assertion whose author specificity is false or unknown cannot add
+   affiliation identity weight or create an affiliation contradiction.
 
 ## Contract 3 — evidence context
 
