@@ -1,262 +1,163 @@
-# Session 446 Handoff: Stage 2 Institution Presentation Production-Live
+# Session 447 Prompt: Observe Stage II and Close Signed-In Smokes
 
-## Session 445 Summary
+## Session 446 Summary
 
-Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
-then moved the institution-affiliation strategy onto
-`codex/institution-decision-harness`. The Preview smoke harness commit is
-`80f2d739`.
-The owner authorized Stage 2 notification and explanatory-card presentation;
-it is Production-live behind an exact-`on` rollout flag with no identity,
-selectability, or Dataverse-write authority.
+Session 446 resolved the grantee upload failure reporting gap, put durable
+operational observability into Production, completed the source-aware
+institution decision harness, passed signed-in synthetic Preview acceptance,
+and promoted Stage II low-authority presentation to Production.
 
 ### What Was Completed
 
-1. **Proposal and Pre-Site production workflow refined**
-   - Added Reviewer Materials to the Proposal tab and changed the Pre-Site
-     institution value to the applicant organization's AKA.
-   - Published template v4 with the owner-directed line spacing, 1.5-inch
-     metadata label column, and zero value-column indent.
-   - Removed brittle narrative length gates, preserved raw/provider diagnostics,
-     improved generation failure messages, clarified regeneration as a new AI
-     call, and allowed audited prompt-schema/model publication through Admin.
+1. **Grantee upload failures became actionable**
+   - Submit failures now preserve their failure class and present clearer
+     feedback instead of collapsing image, SharePoint, virus-scan, and
+     Dataverse failures into one generic message.
+   - Error-severity notifications are mirrored into the durable operational
+     event store shipped later in the session.
 
-2. **Reviewer identity remediation made actionable**
-   - Added durable, request-scoped contact-draft editing with compare-and-swap,
-     strict HTTP(S) individual-profile URL validation, and explicit invalidation
-     of stale automated/staff identity authority after an ordinary contact edit.
-   - Repaired applicant-row error correlation and made malformed response
-     correlation fail closed.
-   - Reworked reviewer cards so evidence, warnings, status, and the next action
-     are not presented as contradictory independent boxes. Held cards now expose
-     a relevant confirmation, correction, retry, repair-request, or not-a-fit
-     remedy where available.
+2. **Operational observability shipped and activated**
+   - PRs #123 and #124 added the `operational_events` Postgres store, best-effort
+     redacted recording, recovery/supersede handling, Vercel Log Drain ingest,
+     admin visibility, and bounded retention.
+   - Migration 030 is applied to Production. The signed drain, environment
+     configuration, deduplication, storage, admin smoke, and recovery paths were
+     verified live. Do not rerun `scripts/setup-database.js` against Production.
 
-3. **Institution-affiliation strategy rebuilt around conditional neutrality**
-   - Re-adjudicated the 25 unresolved cases with source, currentness,
-     author-specificity, typed ROR relationships, and separate relationship and
-     consumer-action labels.
-   - Added a provenance-preserving ROR assertion resolver and a total five-
-     consumer policy evaluator. Unknown enum values fail closed for
-     high-authority consumers; sibling organizations never collapse to the same
-     entity; historical and additional affiliations remain distinct from current
-     conflicts.
-   - The frozen Stage 1 artifact passes 25/25 relationship and action decisions,
-     1/1 provider-failure copy checks, and 5/5 held-case remedy checks, with zero
-     sibling collapses, unsafe clears, or manufactured reviews. The three
-     challenged cases are compatible/nonblocking under explicit independent-
-     identity sufficiency.
-   - A read-only roster audit found 46 source-ready mismatch rows but only two
-     with the compact non-affiliation identity anchors inspected. Therefore the
-     benchmark's identity-sufficiency value is a counterfactual policy input,
-     not production authority.
+3. **The institution decision contract was rebuilt and adversarially reviewed**
+   - Added source/currentness-aware affiliation assertions, typed organization
+     relationships, a total five-consumer policy, and a frozen 25-case shadow
+     evaluation with zero sibling collapses or unsafe clears.
+   - Stage II remains low authority: it changes notification and explanatory
+     reviewer-card presentation only. Candidate selectability, person identity,
+     COI, and Dataverse-write authority still use incumbent contracts.
+   - Claude Fable's pre-enable findings were fixed and its post-fix review
+     approved the implementation with no P0/P1/P2 findings.
 
-4. **Promotion-review boundaries hardened**
-   - Prevented non-author-specific publication evidence from creating identity
-     weight or a current-conflict veto.
-   - Made same-parent internal subunits without independent identifiers abstain
-     instead of collapsing to parent/child compatibility.
-   - Prevented a named organization before an address from being ignored as
-     location decoration.
-   - Corrected explicit server identity-review reasoning so it cannot render
-     beneath the positive `Suggested because:` label.
+4. **Signed-in Stage II Preview acceptance passed**
+   - The Preview-only `/workbench/institution-stage2-smoke` page renders the real
+     `CandidateCard` with six projector-pinned synthetic cases and no
+     persistence path.
+   - The owner confirmed all six states and completed the local action check;
+     automated coverage exercised all eight notice actions with zero network
+     calls. The focused institution matrix passed 202/202 across 11 suites.
+   - The harness was synthetic because the pre-enable Production audit found
+     952 roster rows and zero persisted Stage II presentation DTOs.
 
-5. **Stage 2 institution presentation implemented with default-off rollback**
-   - Added source-aware typed projections for post-acceptance staff
-     notifications and reviewer candidate-card explanations/remedies.
-   - Preserved the incumbent boolean as the only selection, identity, and write
-     authority. Typed compatible results cannot clear an existing hold.
-   - Added a versioned, sanitized roster DTO, stale-cache refresh when enabled,
-     provider-failure retry copy, legacy fallback on unexpected failure, and an
-     exact flag-off rollback path.
-   - Corrected runtime provenance so PubMed history is historical publication
-     evidence, compact ORCID employment history remains time-unknown, and
-     untyped evidence remains unknown rather than gaining false specificity.
-   - Claude Fable's fresh adversarial review returned REWORK with two pre-enable
-     findings: deceased rows could invalidate the Stage 2 cache forever, and a
-     PubMed-without-affiliation fallback could mislabel applicant text as
-     publication evidence. Both are fixed; an additional stale DTO edit
-     affordance now obeys the same rollout gate as the notice. Informational
-     alert volume remains a named Preview observation. Fable's fresh post-fix
-     review returned APPROVE with no P0/P1/P2 findings; its only residuals are
-     sticky incumbent copy after a deterministic fallback until re-enrichment
-     or version bump, and helper-level rather than component-level coverage for
-     the edit-affordance rollback.
+5. **Stage II merged and became Production-live**
+   - PR #126 merged at `8c64ec76`; all GitHub, security, test, review, and
+     deployment checks passed.
+   - A repeated read-only Vercel probe verified
+     `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION="on"` in Production.
+   - Production deployment `dpl_HXZrU8Y4wyEW4BbQiJ974byqGryh` is Ready on all
+     application aliases. The exact unset/`off` path remains the rollback.
+   - Durable documentation was reconciled in `1173d086` after an earlier stale
+     claim incorrectly described the Production flag as off.
 
-6. **Signed-in synthetic Preview acceptance completed**
-   - Added `/workbench/institution-stage2-smoke`, a server-rendered Preview-only
-     page behind the existing signed-in `reviewers` access guard. Production,
-     local, and unknown deployment environments return `notFound` after auth.
-   - The page renders the production `CandidateCard` with six projector-pinned,
-     synthetic cases: compatible, additional, historical, current conflict,
-     unresolved, and provider failure. Its action handlers update component
-     state only; focused coverage clicks all eight notice actions and proves no
-     `fetch` call occurs.
-   - The owner confirmed all six cases and `Stage II flag: On` in signed-in
-     Preview deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`, then completed the
-     local action check. Unresolved/provider-failure copy did not claim a
-     mismatch, and every held synthetic case exposed a mapped card action.
-   - This was necessarily synthetic: a read-only Production roster audit found
-     952 rows and zero persisted Stage 2 presentation DTOs. The smoke therefore
-     proves rendering, access, rollback, and action wiring, but not organic
-     false-clear rates, alert volume, or material review reduction.
-   - Cleanup is complete. The temporary branch flag and immutable Entra callback
-     were removed, the four permanent callbacks were verified, and clean
-     default-off Preview deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+6. **Vercel update reminders were retired as routine chatter**
+   - PR #125 records the lasting owner preference: do not mention routine
+     Vercel CLI updates unless a concrete version incompatibility blocks work.
 
-7. **Stage 2 promoted and enabled in Production**
-   - PR #126 merged the institution decision harness to `main` at `8c64ec76`.
-     Jest, Playwright, Claude review, Vercel, Semgrep, Trivy, and Gitleaks all
-     passed.
-   - A read-only Vercel environment probe independently verified
-     `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION="on"` for Production. The
-     variable predates the merge deployment, so Ready Production deployment
-     `dpl_85jgQ2c4jR6V599KycEHcbww5Xag` contains the flag-on client bundle and
-     server behavior.
-   - This promotion changes only source-aware notification and explanatory-card
-     presentation. Candidate selectability, identity weighting, and Dataverse
-     write authority remain on the incumbent boolean contracts.
+### Key Commits
 
-### Commits
-
-- `45ea7456` — Add reviewer materials to Proposal tab
-- `33e8771f` — Use applicant AKA in Pre-Site writeups
-- `db9dfef1` — Format Pre-Site Visit template v4
-- `a1ea0d01` — Refine Pre-Site template line spacing
-- `36a33edb` — Record Pre-Site v4 production release
-- `19af2c3e` — Plan Pre-Site generation resilience
-- `24decb85` — Harden Pre-Site Visit generation resilience
-- `46903bc4` — Allow audited prompt schema publication
-- `73d8cb80` — Record Pre-Site resilience production release
-- `f9d614ff` — Fix Pre-Site metadata column geometry
-- `32b92d51` — Clarify Pre-Site draft regeneration
-- `bbde2536` — Remove Pre-Site value-column indent
-- `d9c29c7d` — Fix reviewer identity remediation flow
-- `c644808d` — Harden reviewer identity remediation
-- `f061e08c` — Clarify reviewer evidence and invite actions
-- `5fcd913c` — Clarify reviewer identity remediation cards
-- `55eafa13` — Add unresolved institution decision smoke harness
-- `8723aa9c` — Record unresolved institution smoke results
-- `dbafd2ec` — Rework institution compatibility plan
-- `23a40e89` — Implement source-aware institution shadow contract
-- `0d163998` — Document Session 445 and create Session 446 prompt
-- `c8c67aae` — Finalize Session 445 handoff cleanup
-- `947fb46` — Harden institution shadow decision boundaries
-- `82160a0f` — Document institution promotion review hardening
-- `6b2f259` — Add Stage 2 institution presentation
-- `e217f6ef` — Hand off Stage 2 institution validation
-- `0089822` — Address Stage 2 adversarial findings
-- `80f2d739` — Add signed-in Stage 2 Preview smoke page
-- `8c64ec76` — Merge PR #126 and promote Stage 2 presentation to Production
+- `3554b91f` / `c6c1f088` - clarify and persist grantee upload submit failures
+- `9de8b348` / `8e92c9e8` - merge operational observability PRs #123 and #124
+- `23a40e89` - implement the source-aware institution shadow contract
+- `6b2f2595` / `0089822f` - implement and harden Stage II presentation
+- `80f2d739` - add the signed-in Preview smoke page
+- `41f08d9f` - merge the lasting Vercel-reminder preference
+- `8c64ec76` - merge institution decision harness PR #126
+- `1173d086` - reconcile Stage II Production enablement documentation
 
 ## Next Items
 
 ### Verified Open
 
-1. **Observe Stage 2 Production outcomes during the two-week rollout window.**
-   Evidence: signed-in synthetic Preview acceptance proves all six card
-   presentations, all eight mapped notice actions, the no-write boundary, and
-   exact flag rollback. The pre-enable Production audit found zero persisted
-   Stage 2 DTOs, so organic false-clear, alert-volume, and manual-review-
-   reduction evidence must now come from normal Production use without
-   manufacturing roster rows.
+1. **Observe Stage II Production outcomes through 2026-09-02.**
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` and exact-on
+   Production probe. Sample naturally produced Stage II DTOs for false-clear
+   risk, informational-alert volume, and whether compatible/historical copy
+   reduces manual review. Do not manufacture shared-roster rows.
 
-2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
-   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
-   renewed confirmation contract; commits `d9c29c7d` through `5fcd913c` are on
-   `origin/main`. Use Peter Reiners or another reviewer who is genuinely intended
-   for an invite list; confirm that the card names the problem and exposes the
-   exact next action before performing a durable promotion.
+2. **Run a staff acceptance smoke of reviewer identity remediation.**
+   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; commits `d9c29c7d` through
+   `5fcd913c` are on `main`. Use a reviewer genuinely intended for an invite
+   list and confirm the card names the problem and exposes the exact next action
+   before any durable promotion.
 
-3. **Close the previously verified operational smokes.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` still marks the signed-in
-   Site Visit handoff and Phase II live-folder display smokes open;
-   `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still records the
-   passive Track A closeout separately from the already-passed Stage 2 baseline.
+3. **Finish the read-only Phase II document display smoke.**
+   Evidence: `83b9c68a` and the signed-in Workbench session demonstrated a real
+   Phase II PDF read, but did not formally record filenames plus both View and
+   Download end to end. This smoke must remain read-only.
+
+4. **Re-probe and close Track A passive safety.**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still
+   marks the 48-hour watch open. Its retained statement that no Log Drain exists
+   is now stale because operational observability is live; establish a current
+   collection method before treating the old export procedure as actionable.
 
 ### Owner Decision Needed
 
-1. **After the observation window, retain or remove the rollout flag.**
-   Evidence: Stage 2 is Production-live, but real-world effectiveness and alert-
-   volume evidence are still accumulating. The exact unset/`off` path restores
-   incumbent presentation. If Production behavior is stable and Stage 2 remains
-   the intended default, remove the temporary flag from code and configuration;
-   a reminder is scheduled for 2026-09-02.
+1. **Choose an approved request for the Site Visit handoff smoke.**
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` marks the signed-in
+   handoff smoke open. The action records a durable Draft-to-Review milestone
+   and locks Pre-Site regeneration, so do not click it without explicit request
+   approval.
+
+2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
+   Evidence: Stage II is Production-live behind an exact-on public build flag.
+   A reminder is scheduled. If behavior is stable and Stage II is the intended
+   default, remove the temporary flag from code and Vercel configuration and
+   rely on deployment rollback.
 
 ### Parked
 
-1. **Stage 3 institution identity authority.**
-   Evidence: the production roster audit found sparse machine-verifiable
-   non-affiliation identity inputs. Candidate selectability, write vetoes, and
-   identity-anchor weighting remain blocked until that execution-point contract
-   exists and the owner approves each consumer separately.
+1. **Stage III institution identity authority.**
+   Evidence: the Production roster audit found sparse machine-verifiable
+   non-affiliation identity inputs. Selectability, write vetoes, and identity
+   weighting remain blocked until the execution-point contract exists and each
+   consumer is separately approved.
 
 2. **Site Visit dossier/logistics and Final copy transaction.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. Inventory the existing
-   Dataverse fields and registered SharePoint categories before proposing more
-   schema or upload paths.
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. Inventory existing
+   Dataverse fields and registered SharePoint categories before proposing
+   schema or upload changes.
 
 ### Verify Before Acting
 
-1. The frozen ROR snapshot contains explicit manual adjudication overlays for
-   internal subunits that ROR does not model independently. Do not lower the
-   production resolver threshold or overwrite the snapshot; use a new versioned
-   capture and re-adjudication.
-2. Stage 2 is merged and Production-live at `8c64ec76` / deployment
-   `dpl_85jgQ2c4jR6V599KycEHcbww5Xag`. Before changing or removing its rollout
-   flag, re-probe the live environment and verify the replacement deployment.
-3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
-   handles, then moved them out of the worktree to
-   `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
-   changed, and the repository ended clean.
+1. Re-probe the live Stage II environment and replacement deployment before
+   changing or removing the rollout flag; `NEXT_PUBLIC_` changes require a new
+   build.
+2. Treat the Stage II 25-case gate as low-authority presentation evidence only;
+   it does not authorize identity, selectability, COI, or durable-write changes.
+3. Reconcile the Track A plan with the now-live Log Drain before collecting or
+   interpreting its closeout evidence.
 
 ### Do Not Reopen Without New Decision
 
-1. Another string-side institution checker or a rule that treats UCLA/UCSD-style
-   siblings as the same organization.
-2. Any production identity/selectability/write flip based only on the 25-case
-   shadow pass.
+1. Another string-side institution checker or a rule that collapses sibling
+   institutions such as UCLA and UCSD.
+2. Any Stage III authority flip based only on the 25-case Stage II benchmark.
 3. A separate Site Visit Writeup or Dataverse staff-observations memo.
+4. Routine Vercel CLI update reminders when no concrete incompatibility exists.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` | Readable Stage 1 before/after report |
-| `benchmarks/institution-affiliation-compatibility/v1/cases/source-aware-25.json` | Frozen relationship/action adjudications |
-| `lib/services/institution-affiliation-assessment.js` | Typed relationship and total consumer policy |
-| `lib/services/ror-affiliation-assertion-resolver.js` | Source/canonical ROR resolution with partial success |
-| `lib/services/institution-affiliation-stage2.js` | Bounded notification/card evaluation and presentation projection |
-| `shared/utils/institution-stage2-presentation.js` | Exact rollout flag and versioned presentation DTO identity |
-| `pages/workbench/institution-stage2-smoke.js` | Signed-in Preview-only synthetic presentation harness; no persistence |
-| `scripts/audit-institution-affiliation-shadow-cases.js` | Read-only, PII-bounded roster inventory |
-| `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Authority stages, gates, and current status |
-| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Durable contact edit and identity-remediation contract |
+| `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Stage II authority, evidence, rollout, and remaining gates |
+| `shared/utils/institution-stage2-presentation.js` | Exact rollout flag and versioned DTO activation |
+| `pages/workbench/institution-stage2-smoke.js` | Signed-in Preview-only synthetic presentation harness |
+| `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Durable event and Vercel Log Drain contract |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Site Visit handoff and Final lifecycle |
+| `shared/components/workbench/ProposalTab.js` | Phase II document display |
+| `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Reviewer identity-remediation acceptance contract |
 
 ## Testing
 
-```bash
-npm test -- --runInBand \
-  tests/unit/institution-affiliation-stage2.test.js \
-  tests/unit/institution-affiliation-assessment.test.js \
-  tests/unit/ror-affiliation-assertion-resolver.test.js \
-  tests/unit/alert-reviewer-affiliation-mismatch.test.js \
-  tests/unit/alert-reviewer-affiliation-mismatch-dal-context.test.js \
-  tests/unit/workbench-enrich-recommended-service.test.js \
-  tests/unit/reviewer-search-logic.test.js \
-  tests/unit/reviewer-search-mismatch-banner.test.js \
-  tests/unit/institution-stage2-smoke-page.test.js \
-  tests/unit/institution-checker-consumer-scope.test.js \
-  tests/unit/benchmarks/institution-affiliation-shadow-v1.test.js
-npm run check:doc-symbol-refs
-npm run check:fact-consistency
-npm run check:docs-catalog
-npm run check:secret-scan
-npm run check:types
-```
-
-The expanded Stage 1 plus Stage 2 matrix, including the Preview harness, passes
-202/202 across 11 suites. Targeted ESLint,
-TypeScript, documentation symbol/currency/fact/catalog gates, secret scan, and
-the required gate self-tests passed. The flag-on webpack production build
-passed with the repository's existing dynamic-dependency warnings.
+The institution matrix passed 202/202 across 11 suites. PR #126 also passed
+Jest, Playwright, Claude review, Semgrep, Trivy, Gitleaks, and Vercel checks.
+The Production flag/documentation correction passed document symbol, currency,
+fact-consistency, catalog, secret-scan, and agent-invariant gates plus required
+self-tests. Claim-evidence reporting was unavailable because local advisory
+state could not be read; no observation row was added.

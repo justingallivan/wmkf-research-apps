@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Stage II institution presentation is Production-live (Session 446)
+
+**Milestone:** Source-aware institution notifications and reviewer-card explanations moved from
+synthetic Preview acceptance into Production without expanding identity or write authority.
+**Sessions:** 445-446 (typed contract, adversarial review, Preview acceptance, merge, enablement).
+**Ship state:** PR #126 merged at `8c64ec76`; exact-on Production configuration was independently
+re-probed; deployment `dpl_HXZrU8Y4wyEW4BbQiJ974byqGryh` is Ready; all CI/review/security gates
+passed. Candidate selectability, person identity, COI, and Dataverse writes remain unchanged.
+**Why it matters:** Staff now receive honest current/historical/additional/unresolved institution
+context and executable remedies, while exact unset/`off` remains the rollback. Organic outcome and
+alert-volume observation runs through 2026-09-02 before deciding whether to remove the rollout flag.
+**Pointers:** `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`; PR #126; `1173d086`.
+
 ## August 2026 — Stage 2 institution presentation passed synthetic signed-in Preview acceptance
 
 **Milestone:** Source-aware institution explanations and remedies now have a safe, repeatable
