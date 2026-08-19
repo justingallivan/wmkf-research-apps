@@ -314,6 +314,13 @@ describe('setEventStatus', () => {
     await expect(OperationalEventService.setEventStatus('abc', 'resolve'))
       .rejects.toMatchObject({ code: 'invalid_id' });
   });
+
+  test('malformed expectedLastOccurredAt is a typed 400, not a 500 (Codex cycle-6 note)', async () => {
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', {
+      expectedLastOccurredAt: 'not-a-date',
+    })).rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('queryEvents', () => {

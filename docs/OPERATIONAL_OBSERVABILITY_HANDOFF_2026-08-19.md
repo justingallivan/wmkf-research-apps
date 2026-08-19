@@ -191,6 +191,20 @@ finding, applied:
 
 Post-cycle-5: full unit suite 8115 green, types green.
 
+A sixth adversarial cycle (same day) returned **READY TO MERGE — clean**: no
+finding survived verification, with the empty disconfirming checks listed
+(guards/HMAC/proxy/matrix registration, 503-vs-duplicate semantics, key
+canonicalization symmetry, recency-ranked retention, migration/manifest/
+fresh-install parity, docs registration, `git diff --check`). Its one
+non-material note — a superuser-only malformed `expectedLastOccurredAt`
+returning 500 — was fixed anyway (typed 400 before any query, with a guard
+test). Post-cycle-6: full unit suite 8116 green, types green.
+
+**Review series summary:** six adversarial cycles, nine findings fixed
+(3 high / 5 medium / 1 low, per the numbered list above) plus the cycle-6
+courtesy 400 fix, converging NEEDS REWORK ×4 → READY WITH NAMED CHANGES →
+READY TO MERGE.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from
