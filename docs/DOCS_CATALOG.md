@@ -222,6 +222,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [OPERATIONAL_EVENTS_AND_LOG_DRAIN.md](OPERATIONAL_EVENTS_AND_LOG_DRAIN.md) | runbook | active | yes | Durable operational_events layer (app-recorded failures + Vercel Log Drain ingestion), its privacy/dedup/retention contracts, and the activation runbook. | 2026-08-19 |
+| [OPERATIONAL_OBSERVABILITY_HANDOFF_2026-08-19.md](OPERATIONAL_OBSERVABILITY_HANDOFF_2026-08-19.md) | status | active |  | Session handoff for branch codex/operational-observability — commits, verification record, activation preconditions, and unresolved risks. | 2026-08-19 |
 
 ## process
 
