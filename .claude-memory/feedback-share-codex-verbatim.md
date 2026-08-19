@@ -57,6 +57,22 @@ the launching call.
   severity labels, footers, and usage details when present.
 - Any subsequent fix work happens after the verbatim delivery turn.
 
+## Mid-turn status text is not delivery either (2026-08-19)
+
+During a six-cycle adversarial review loop driven by background-task
+notifications, each cycle's verdict was written as status text BETWEEN tool
+calls (report → fix → commit → launch next cycle, all in one autonomous turn),
+and the turn's FINAL message only said the next cycle was running. The user had
+to ask "Why didn't you tell me what happened after the last run?" — the
+verdicts existed mid-turn but were never reliably shown.
+
+**How to apply:** in an autonomous continuation turn (task notification →
+report → fix → relaunch), the completed cycle's verdict and disposition must
+appear in that turn's FINAL message, not only between tool calls. If the
+workflow continues into another background launch, the final message carries
+BOTH the completed cycle's verbatim outcome AND the new launch note — never
+just the launch note.
+
 ## Related Rules
 
 - Hook: `.claude/hooks/codex-verbatim-reminder.js`.
