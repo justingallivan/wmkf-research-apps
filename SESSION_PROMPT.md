@@ -4,7 +4,7 @@
 
 Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
 then moved the institution-affiliation strategy onto
-`codex/institution-decision-harness`. The current local code tip is `6b2f259`.
+`codex/institution-decision-harness`. The current Stage 2 code tip is `0089822`.
 The owner authorized Stage 2 notification and explanatory-card presentation;
 it is implemented behind a default-off flag with no identity, selectability, or
 Dataverse-write authority.
@@ -71,6 +71,16 @@ Dataverse-write authority.
    - Corrected runtime provenance so PubMed history is historical publication
      evidence, compact ORCID employment history remains time-unknown, and
      untyped evidence remains unknown rather than gaining false specificity.
+   - Claude Fable's fresh adversarial review returned REWORK with two pre-enable
+     findings: deceased rows could invalidate the Stage 2 cache forever, and a
+     PubMed-without-affiliation fallback could mislabel applicant text as
+     publication evidence. Both are fixed; an additional stale DTO edit
+     affordance now obeys the same rollout gate as the notice. Informational
+     alert volume remains a named Preview observation. Fable's fresh post-fix
+     review returned APPROVE with no P0/P1/P2 findings; its only residuals are
+     sticky incumbent copy after a deterministic fallback until re-enrichment
+     or version bump, and helper-level rather than component-level coverage for
+     the edit-affordance rollback.
 
 ### Commits
 
@@ -99,14 +109,17 @@ Dataverse-write authority.
 - `947fb46` — Harden institution shadow decision boundaries
 - `82160a0f` — Document institution promotion review hardening
 - `6b2f259` — Add Stage 2 institution presentation
+- `e217f6ef` — Hand off Stage 2 institution validation
+- `0089822` — Address Stage 2 adversarial findings
 
 ## Next Items
 
 ### Verified Open
 
 1. **Run signed-in Preview acceptance for Stage 2 presentation.**
-   Evidence: `6b2f259` implements the bounded consumer projections behind
-   `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`; 194 focused tests and the
+   Evidence: `6b2f259` implements the bounded consumer projections and
+   `0089822` closes Fable's pre-enable findings behind
+   `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`; 198 focused tests and the
    flag-on webpack production build pass. Deploy a Preview with the flag on and
    sample compatible/additional, historical, current-conflict, unresolved, and
    retryable-failure copy. Confirm every held card exposes an action actually
@@ -153,7 +166,7 @@ Dataverse-write authority.
    production resolver threshold or overwrite the snapshot; use a new versioned
    capture and re-adjudication.
 2. Fetch and verify `origin/main` plus the feature-branch tip before merging or
-   making a production release. Local `6b2f259` has not yet been pushed.
+   making a production release. Local `0089822` has not yet been pushed.
 3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
    handles, then moved them out of the worktree to
    `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
@@ -202,7 +215,7 @@ npm run check:secret-scan
 npm run check:types
 ```
 
-The expanded Stage 1 plus Stage 2 matrix passed 194/194. Targeted ESLint,
+The expanded Stage 1 plus Stage 2 matrix passed 198/198. Targeted ESLint,
 TypeScript, documentation symbol/currency/fact/catalog gates, secret scan, and
 the required gate self-tests passed. The flag-on webpack production build
 passed with the repository's existing dynamic-dependency warnings.

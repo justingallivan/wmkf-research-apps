@@ -434,6 +434,20 @@ type, lint, and flag-on production-build gates. Preview sampling is still
 required before the flag is enabled in Production; no claim of material
 manual-review reduction has yet been made.
 
+A fresh Claude Fable adversarial review returned **REWORK** before enablement:
+it found a flag-on cache loop for deceased rows and a provenance fallback that
+could label applicant-entered text as historical publication evidence. Commit
+`0089822` fixes both, records an invisible versioned legacy-fallback DTO after
+unexpected Stage 2 failure, and makes the edit affordance use the same exact
+flag/version/visibility gate as the rendered notice. The remaining review risk
+is operational: unresolved ROR comparisons can increase informational alert
+volume, which must be measured during Preview acceptance. Fable's fresh
+post-fix review returned **APPROVE** with no P0/P1/P2 findings. Its residuals
+are copy-only: a deterministic-failure fallback remains on the incumbent copy
+until another enrichment or a presentation-version bump, and the edit-
+affordance rollback is pinned at the shared helper rather than by a separate
+component-level test.
+
 Deliver:
 
 - typed staff notification behavior;
