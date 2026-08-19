@@ -1,0 +1,59 @@
+/**
+ * API Route: /api/admin/operational-events
+ *
+ * GET — Recent durable operational events (app-recorded + Vercel drain)
+ *   Query: ?status=&severity=&source=&eventType=&search=&hours=168&limit=100
+ *   (hours max 2160 = 90 days; limit max 500 — bounds enforced in the service)
+ *
+ * PATCH — Staff resolution
+ *   Body: { id, action: 'resolve' | 'reopen', note? }
+ *
+ * Superuser only.
+ */
+
+import { requireSuperuser } from '../../../lib/utils/auth';
+import OperationalEventService from '../../../lib/services/operational-event-service';
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'PATCH') {
+    res.setHeader('Allow', 'GET, PATCH');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const gate = await requireSuperuser(req, res);
+  if (!gate) return;
+
+  if (req.method === 'GET') {
+    try {
+      const { status, severity, source, eventType, search, hours, limit } = req.query;
+      const [events, summary] = await Promise.all([
+        OperationalEventService.queryEvents({
+          status, severity, source, eventType, search, hours, limit,
+        }),
+        OperationalEventService.getEventSummary({ hours }),
+      ]);
+      return res.json({ events, summary });
+    } catch (error) {
+      console.error('Admin operational-events GET error:', error);
+      return res.status(500).json({ error: 'Failed to fetch operational events' });
+    }
+  }
+
+  try {
+    const { id, action, note } = req.body || {};
+    const updated = await OperationalEventService.setEventStatus(id, action, {
+      profileId: gate.profileId,
+      note: note || null,
+    });
+    if (!updated) {
+      return res.status(404).json({ error: 'Event not found or not resolvable' });
+    }
+    return res.json({ ok: true, id: updated.id, status: updated.status });
+  } catch (error) {
+    if (error?.code === 'invalid_id' || error?.code === 'invalid_action') {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Admin operational-events PATCH error:', error);
+    return res.status(500).json({ error: 'Failed to update operational event' });
+  }
+}
