@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-19 (typed conditional-neutrality contract passes the source-aware 25-case shadow gate; runtime authority unchanged)
+  last_verified: 2026-08-19 (Stage 2 presentation implemented behind a default-off flag; identity, selection, and write authority unchanged)
   originSessionId: 363a2e80-2dd8-483e-9088-3193c321799e
   modified: 2026-08-19T00:00:00.000Z
 ---
@@ -38,13 +38,16 @@ workflow holds with an identity remedy.
 lib/services/ror-affiliation-assertion-resolver.js, and
 benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md,
 2026-08-19]` The typed relationship, source/time context, explicit additional-
-affiliation handling, and total five-consumer policy now exist in shadow mode.
-The 25-case gate passes 25/25 with zero sibling collapses, unsafe clears,
-manufactured reviews, or live-capture provider failures. Production cards,
-selection, identity weighting, and writes still use the incumbent contracts.
-A production roster audit found source-ready affiliation evidence but sparse
-machine-verifiable non-affiliation identity breakdowns, so the benchmark's
-identity-sufficiency value remains an explicit policy input rather than runtime
+affiliation handling, and total five-consumer policy exist. The 25-case gate
+passes 25/25 with zero sibling collapses, unsafe clears, manufactured reviews,
+or live-capture provider failures. The owner authorized Stage 2 presentation,
+and candidate cards plus post-acceptance staff notifications now have bounded
+typed projections behind the default-off
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION` flag. Candidate selection,
+identity weighting, and writes still use the incumbent contracts. A production
+roster audit found source-ready affiliation evidence but sparse machine-
+verifiable non-affiliation identity breakdowns, so the benchmark's identity-
+sufficiency value remains an explicit policy input rather than runtime
 authority.
 
 **Why:** the original problem statement ([[institution-pair-consistency]]

@@ -3,7 +3,7 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "The source-aware conditional-neutrality contract passes its 25-case shadow gate; production still uses the incumbent boolean contract."
+summary: "Stage 2 source-aware notifications and reviewer-card explanations are implemented behind a default-off flag; boolean identity and write authority is unchanged."
 canonical: false
 cataloged: 2026-08-08
 last_verified: 2026-08-19
@@ -21,7 +21,8 @@ related:
 
 ## Current decision
 
-**STAGE 1 SHADOW CONTRACT IMPLEMENTED, 2026-08-19.** The owner accepted
+**STAGE 2 LOW-AUTHORITY PRESENTATION IMPLEMENTED BEHIND A DEFAULT-OFF FLAG,
+2026-08-19.** The owner accepted
 **conditional neutrality** as the governing policy for unresolved affiliation
 evidence:
 
@@ -34,9 +35,12 @@ evidence:
 This supersedes the prior future-stage framing in this document that embedded
 consumer actions in relationship labels such as `related-autoclear` and
 `related-surface`. The typed relationship/policy services and source-aware
-25-case evaluation are now implemented in shadow mode. They do **not** change
-the frozen boolean-fixture vocabulary, current runtime behavior, candidate
-selectability, or durable-write authority.
+25-case evaluation are implemented. The owner subsequently authorized a Stage
+2 implementation limited to notification and explanatory reviewer-card
+presentation. That implementation is gated by
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`, defaults off, and does **not**
+change the frozen boolean-fixture vocabulary, candidate selectability, identity
+authority, or durable-write authority.
 
 A 2026-08-19 promotion review then falsified four untested boundaries. Commit
 `947fb46` hardened them before promotion: non-author-specific evidence cannot
@@ -63,16 +67,18 @@ two people are the same by itself.
 | Pair result exposed to consumers | **VERIFIED boolean only.** `areConsistent()` returns `true` or `false`; it does not expose relationship, currentness, or remedy. | `institution-affiliation-consistency.js:335-369` |
 | Enrichment authority | **VERIFIED high authority.** A false/error comparison contributes to `institutionContradicted`, which combines with the independent identity status in `identityNeedsReview` and gates researcher, ORCID, metrics, and COI writes. | `enrich-recommended-service.js:684-767,933-1005` |
 | ROR relationship substrate | **VERIFIED present but not available to pair consumers.** The candidate/decision layer reads typed ROR relationships and detects sibling conflicts; the identity wrapper returns only a hydrated identity or `null`, discarding the decision provenance needed for pair policy. | `ror-institution-decision.js`; `ror-institution-identity-resolver.js:63-114` |
-| Source/time-aware affiliation assessment | **VERIFIED, built in shadow only.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Current enrichment still reduces verifier history to strings and does not call the shadow service. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; caller search |
-| Typed consumer policy | **VERIFIED, built in shadow only.** A total versioned evaluator covers five consumers and fails closed for unknown/high-authority inputs. Existing cards and write gates still consume booleans and legacy flags. | `institution-affiliation-assessment.js`; focused tests; caller search |
+| Source/time-aware affiliation assessment | **VERIFIED at Stage 2 low-authority consumers behind a default-off flag.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Enrichment supplies publication/applicant and recorded-institution provenance to card presentation; the post-acceptance alert supplies reviewer-self-report and staff-record provenance. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; `institution-affiliation-stage2.js`; Stage 2 focused tests |
+| Typed consumer policy | **VERIFIED at Stage 2 presentation authority only.** The total evaluator still covers all five consumers and fails closed for unknown/high-authority inputs. Only candidate-card and staff-notification projections consume it; selectability and write gates continue to consume booleans and legacy flags. | `institution-affiliation-assessment.js`; `institution-affiliation-stage2.js`; focused tests |
+| Stage 2 runtime presentation | **VERIFIED implemented, default off, not yet promoted.** The versioned DTO is sanitized before roster persistence, stale caches re-enrich when the flag is on, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; focused tests; flag-on webpack build |
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
 | Promotion-review falsification | **VERIFIED hardened on branch.** Disconfirming tests now cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; focused unit and benchmark suites |
 | Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
-The shipped boolean comparator remains the incumbent until every consumer in
-this plan is deliberately migrated. The stop-rule remains in force: do not add
-another string-side guard or a third enrichment checker. New work proceeds
-through the typed shadow contract below.
+The shipped boolean comparator remains the sole identity, selectability, and
+durable-write authority until every high-authority consumer in this plan is
+deliberately migrated. Stage 2 may change presentation only when its flag is on.
+The stop-rule remains in force: do not add another string-side guard or a third
+enrichment checker. New work proceeds through the typed contract below.
 
 ## Problem statement
 
@@ -386,8 +392,9 @@ relationship matches, 25/25 action matches, zero sibling collapses, zero unsafe
 clears, zero manufactured reviews, all three challenged regressions
 nonblocking, five revised old labels out of sixteen old-labeled rows, and zero
 provider failures in the final live ROR capture. The production independent-
-identity execution-point contract remains insufficient for an authority flip,
-so Stage 2/3 are not authorized by this result.
+identity execution-point contract remains insufficient for an authority flip.
+The result did not itself authorize Stage 2 or Stage 3; the owner separately
+authorized the bounded Stage 2 presentation implementation on 2026-08-19.
 
 Deliver:
 
@@ -416,6 +423,16 @@ not compensate with another string heuristic.
 
 **Authority:** notification and explanatory UI only; no automated identity or
 Dataverse-write authority.
+
+**Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAG, 2026-08-19; PREVIEW ACCEPTANCE
+PENDING.** `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on` enables source-aware
+candidate-card explanations/remedies and post-acceptance staff notifications.
+The exact default/off path restores the incumbent boolean presentation. The
+implementation passes the frozen 25-case presentation projection, remedy,
+selection-authority, write-authority, provider-fallback, rollback, focused unit,
+type, lint, and flag-on production-build gates. Preview sampling is still
+required before the flag is enabled in Production; no claim of material
+manual-review reduction has yet been made.
 
 Deliver:
 

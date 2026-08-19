@@ -4,6 +4,13 @@ const path = require('node:path');
 const {
   buildArtifact,
 } = require('../../../benchmarks/institution-affiliation-compatibility/v1/run-shadow-evaluation');
+const {
+  assessAffiliationRelationship,
+  evaluateAffiliationPolicy,
+} = require('../../../lib/services/institution-affiliation-assessment');
+const {
+  projectInstitutionStage2Presentation,
+} = require('../../../lib/services/institution-affiliation-stage2');
 
 const ROOT = path.join(
   process.cwd(),
@@ -75,4 +82,53 @@ test.each([
   expect(row.after.action).toBe('allow_if_other_identity_gates_pass');
   expect(row.after.effect).not.toBe('hold');
   expect(row.after.effect).not.toBe('veto');
+});
+
+test('Stage 2 card projection preserves every frozen source/time distinction', () => {
+  const fixture = JSON.parse(fs.readFileSync(CASES_PATH, 'utf8'));
+  const snapshot = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
+  const cases = new Map(fixture.cases.map((entry) => [entry.caseId, entry]));
+  const rows = snapshot.cases.map((provider) => {
+    const testCase = cases.get(provider.caseId);
+    const assessment = assessAffiliationRelationship({
+      evidenceAssertion: provider.evidenceAssertion,
+      recordedAssertion: provider.recordedAssertion,
+    });
+    const policy = evaluateAffiliationPolicy({
+      assessment,
+      consumer: 'candidate_card',
+      independentIdentity: testCase.independentIdentity,
+    });
+    return {
+      caseId: provider.caseId,
+      assessment,
+      policy,
+      presentation: projectInstitutionStage2Presentation({
+        assessment,
+        policy,
+        consumer: 'candidate_card',
+      }),
+    };
+  });
+
+  expect(rows).toHaveLength(25);
+  expect(rows.filter((row) => (
+    row.assessment.evidenceContext === 'current_conflict'
+      && row.presentation.kind !== 'current_conflict'
+  ))).toEqual([]);
+  expect(rows.filter((row) => (
+    row.assessment.evidenceContext.startsWith('historical_')
+      && row.presentation.kind !== 'historical'
+  ))).toEqual([]);
+  expect(rows.filter((row) => (
+    row.assessment.evidenceContext === 'compatible_with_additional'
+      && row.presentation.kind !== 'additional'
+  ))).toEqual([]);
+  expect(rows.filter((row) => (
+    row.presentation.kind !== 'current_conflict'
+      && /current affiliations conflict/i.test(row.presentation.heading || '')
+  ))).toEqual([]);
+  expect(rows.filter((row) => (
+    row.policy.effect === 'hold' && row.presentation.remedies.length === 0
+  ))).toEqual([]);
 });

@@ -41,6 +41,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react';
+import { Pencil, RefreshCw, UserCheck, UserX } from 'lucide-react';
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
 import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
@@ -81,6 +82,10 @@ import {
   withReviewerProvenance,
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
+import {
+  INSTITUTION_STAGE2_PRESENTATION_VERSION,
+  isInstitutionStage2PresentationEnabled,
+} from '../../utils/institution-stage2-presentation';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -331,6 +336,59 @@ function emailSourceDisplayLabel(source) {
   return labels[source] || leadSourceLabel(source);
 }
 
+function InstitutionPresentationNotice({
+  candidate,
+  presentation,
+  onConfirmIdentity,
+  onEdit,
+  onExclude,
+  onRetry,
+}) {
+  if (!presentation?.visible || !presentation.heading || !presentation.detail) return null;
+  const remedies = new Set(Array.isArray(presentation.remedies) ? presentation.remedies : []);
+  const canEdit = remedies.has('correct_current_institution')
+    || remedies.has('record_joint_appointment');
+  const actions = [
+    remedies.has('confirm_identity') && onConfirmIdentity
+      ? { key: 'confirm', label: 'Confirm identity', icon: UserCheck, run: onConfirmIdentity }
+      : null,
+    canEdit && onEdit
+      ? { key: 'edit', label: 'Edit affiliation', icon: Pencil, run: onEdit }
+      : null,
+    remedies.has('retry_enrichment') && onRetry
+      ? { key: 'retry', label: 'Retry enrichment', icon: RefreshCw, run: onRetry }
+      : null,
+    remedies.has('not_a_fit') && onExclude
+      ? { key: 'exclude', label: 'Not a fit', icon: UserX, run: onExclude }
+      : null,
+  ].filter(Boolean);
+  const tone = presentation.tone === 'warning'
+    ? 'border-amber-200 bg-amber-50 text-amber-900'
+    : 'border-gray-200 bg-gray-50 text-gray-700';
+
+  return (
+    <div className={`mt-2 rounded border p-2 text-xs ${tone}`} data-testid="institution-stage2-presentation">
+      <p><span className="font-medium">{presentation.heading}:</span>{' '}{presentation.detail}</p>
+      {actions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {actions.map(({ key, label, icon: Icon, run }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => run(candidate)}
+              className="inline-flex items-center gap-1 rounded border border-current/20 bg-white px-2 py-1 font-medium hover:bg-gray-50"
+              title={`${label} for ${candidate.name}`}
+            >
+              <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Ported from the standalone Reviewer Finder: build a Google Scholar author-search
 // URL as a fallback when we don't have the candidate's real profile URL. Strips
 // honorifics and extracts the institution from a messy affiliation string.
@@ -341,7 +399,7 @@ function emailSourceDisplayLabel(source) {
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
@@ -353,6 +411,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const isLowConfidence = confidence !== undefined && confidence < 0.35;
   const isWeakMatch = confidence !== undefined && confidence >= 0.35 && confidence < 0.65;
   const hasInstitutionMismatch = !!c.institutionMismatch;
+  const institutionPresentation = isInstitutionStage2PresentationEnabled()
+    && c.institutionPresentation?.version === INSTITUTION_STAGE2_PRESENTATION_VERSION
+    ? c.institutionPresentation
+    : null;
   const hasExpertiseMismatch = !!c.expertiseMismatch;
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
   const institutionCOIDecision = c.institutionCOIDetails?.dropDecision || null;
@@ -661,7 +723,17 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               </ul>
             </div>
           )}
-          {hasInstitutionMismatch && c.suggestedInstitution && (
+          {institutionPresentation && (
+            <InstitutionPresentationNotice
+              candidate={c}
+              presentation={institutionPresentation}
+              onConfirmIdentity={openIdentityRemedy}
+              onEdit={canEditAddress ? () => onEdit(c) : null}
+              onExclude={canManage && onExclude ? () => onExclude(c) : null}
+              onRetry={canManage && onRetryInstitution ? () => onRetryInstitution(c) : null}
+            />
+          )}
+          {!institutionPresentation && hasInstitutionMismatch && c.suggestedInstitution && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
               <span className="font-medium">Institution needs review:</span>{' '}
               {c.isApplicantRecommended ? 'The applicant listed' : 'The suggestion listed'} <strong>{c.suggestedInstitution}</strong>,{' '}
@@ -3199,6 +3271,7 @@ export default function ReviewerSearchSection({
                                     onExclude={excludeCandidate}
                                     onUseLead={useLead}
                                     onEdit={setEditingContact}
+                                    onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
                                     canManage={canManage}
                                   />;
                                 }
@@ -3212,10 +3285,12 @@ export default function ReviewerSearchSection({
                                     promotionDecision?.decision === 'ready'
                                     || promotionDecision?.reason === 'contact_claim_mismatch'
                                     || c.applicantContactMismatch === true
+                                    || c.institutionPresentation?.kind === 'current_conflict'
                                   ) ? setEditingContact : undefined}
                                   onRequestRepair={requestAddressRepair}
                                   onReviewAddressConflict={reviewAddressConflict}
                                   onRetryAddressCheck={retryAddressCheck}
+                                  onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
                                   onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
                                   canManage={canManage}
                                 />;

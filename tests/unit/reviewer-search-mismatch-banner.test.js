@@ -39,7 +39,11 @@ const SEARCH_MISMATCH = {
   affiliation: 'Northwestern University Feinberg School of Medicine, Chicago, IL',
 };
 
+let activeCandidates;
+
 beforeEach(() => {
+  delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
+  activeCandidates = [APPLICANT_MISMATCH, SEARCH_MISMATCH];
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
@@ -48,7 +52,7 @@ beforeEach(() => {
         status: 200,
         json: async () => ({
           success: true,
-          active: [APPLICANT_MISMATCH, SEARCH_MISMATCH],
+          active: activeCandidates,
           excluded: [],
           allNames: [APPLICANT_MISMATCH.name, SEARCH_MISMATCH.name],
         }),
@@ -60,6 +64,89 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.clearAllMocks();
+  delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION;
+});
+
+test('Stage 2 historical copy replaces the legacy mismatch accusation without changing the held card', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  activeCandidates = [{
+    ...APPLICANT_MISMATCH,
+    name: 'Dr Historical Move',
+    reasoning: null,
+    institutionPresentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'historical',
+      tone: 'neutral',
+      heading: 'Earlier affiliation',
+      detail: 'Earlier work lists Old University; the recorded affiliation is New University. No institution correction is required from this evidence alone.',
+      relationship: 'distinct',
+      evidenceContext: 'historical_difference',
+      remedies: [],
+      legacyHold: true,
+    },
+  }];
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText('Dr Historical Move');
+
+  expect(screen.getByText(/Earlier affiliation:/)).toBeInTheDocument();
+  expect(screen.getByText(/No institution correction is required/)).toBeInTheDocument();
+  expect(screen.queryByText(/Institution needs review:/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /not a fit: Dr Historical Move/i })).toBeInTheDocument();
+});
+
+test('Stage 2 provider failure exposes the existing retry-enrichment action', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  activeCandidates = [{
+    ...APPLICANT_MISMATCH,
+    name: 'Dr Retry Institution',
+    reasoning: null,
+    applicantKnownReviewer: { status: 'known' },
+    institutionPresentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'provider_failure',
+      tone: 'warning',
+      heading: 'Institution comparison unavailable',
+      detail: 'The institution service could not complete the comparison. Retry enrichment; this is not a confirmed mismatch.',
+      relationship: 'unresolved',
+      evidenceContext: 'unresolved',
+      remedies: ['retry_enrichment'],
+      legacyHold: true,
+    },
+  }];
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText('Dr Retry Institution');
+
+  expect(screen.getByText(/Institution comparison unavailable:/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /retry enrichment/i })).toBeInTheDocument();
+  expect(screen.queryByText(/Institution needs review:/)).not.toBeInTheDocument();
+});
+
+test('turning Stage 2 off restores the legacy banner even when cached presentation data exists', async () => {
+  activeCandidates = [{
+    ...APPLICANT_MISMATCH,
+    institutionPresentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'historical',
+      tone: 'neutral',
+      heading: 'Earlier affiliation',
+      detail: 'This stale typed presentation must not render while the flag is off.',
+      relationship: 'distinct',
+      evidenceContext: 'historical_difference',
+      remedies: [],
+      legacyHold: true,
+    },
+  }];
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText('Dr Applicant Referred');
+
+  expect(screen.getByText(/Institution needs review:/)).toBeInTheDocument();
+  expect(screen.queryByText(/Earlier affiliation:/)).not.toBeInTheDocument();
 });
 
 test('applicant-referred mismatch banner attributes the applicant and never fabricates a counter-institution', async () => {

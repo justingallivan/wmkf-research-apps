@@ -22,6 +22,8 @@ function makeDeps(overrides = {}) {
     institutionConsistency: overrides.institutionConsistency || {
       areConsistent: jest.fn().mockResolvedValue(false),
     },
+    stage2Enabled: overrides.stage2Enabled ?? false,
+    stage2Evaluator: overrides.stage2Evaluator || null,
     withDynamicsBypass: overrides.withDynamicsBypass || jest.fn((_label, fn) => fn()),
     warn: overrides.warn || jest.fn(),
   };
@@ -130,6 +132,85 @@ describe('alertReviewerAffiliationMismatch', () => {
       'CRM Account Org',
     );
     expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  test('Stage 2 suppresses a typed compatible pair without consulting the legacy checker', async () => {
+    const stage2Evaluator = {
+      evaluate: jest.fn().mockResolvedValue({
+        presentation: { notify: false, kind: 'compatible' },
+      }),
+    };
+    const deps = makeDeps({ stage2Enabled: true, stage2Evaluator });
+
+    const out = await alertReviewerAffiliationMismatch(baseArgs(), deps);
+
+    expect(out).toEqual({ skipped: 'match', comparison: 'stage2' });
+    expect(stage2Evaluator.evaluate).toHaveBeenCalledWith(expect.objectContaining({
+      consumer: 'staff_notification',
+      evidenceAssertion: expect.objectContaining({
+        rawText: 'Reviewer Reported Org',
+        sourceType: 'reviewer_self_report',
+        currentness: 'current',
+        authorSpecific: true,
+      }),
+      recordedAssertion: expect.objectContaining({
+        rawText: 'CRM Account Org',
+        sourceType: 'staff_record',
+        currentness: 'current',
+      }),
+    }));
+    expect(deps.institutionConsistency.areConsistent).not.toHaveBeenCalled();
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  test('Stage 2 sends source-aware current-conflict copy and metadata', async () => {
+    const stage2Evaluator = {
+      evaluate: jest.fn().mockResolvedValue({
+        presentation: {
+          notify: true,
+          kind: 'current_conflict',
+          severity: 'warning',
+          title: 'Reviewer reported a current affiliation conflict',
+          detail: 'Current evidence lists Reviewer Reported Org; the linked contact lists CRM Account Org.',
+          version: 'institution-stage2-presentation/v1',
+          relationship: 'distinct',
+          evidenceContext: 'current_conflict',
+        },
+      }),
+    };
+    const deps = makeDeps({ stage2Enabled: true, stage2Evaluator });
+
+    const out = await alertReviewerAffiliationMismatch(baseArgs(), deps);
+
+    expect(out).toEqual({ alerted: true, comparison: 'stage2', kind: 'current_conflict' });
+    expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'reviewer_contact_affiliation_mismatch',
+      severity: 'warning',
+      title: 'Reviewer reported a current affiliation conflict',
+      message: expect.stringContaining('The contact/account was not changed automatically.'),
+      metadata: expect.objectContaining({
+        presentationVersion: 'institution-stage2-presentation/v1',
+        relationship: 'distinct',
+        evidenceContext: 'current_conflict',
+        stage2Kind: 'current_conflict',
+      }),
+    }));
+  });
+
+  test('Stage 2 failure falls back to the independently available legacy presentation', async () => {
+    const stage2Evaluator = {
+      evaluate: jest.fn().mockRejectedValue(new Error('Stage 2 unavailable')),
+    };
+    const deps = makeDeps({ stage2Enabled: true, stage2Evaluator });
+
+    const out = await alertReviewerAffiliationMismatch(baseArgs(), deps);
+
+    expect(out).toEqual({ alerted: true });
+    expect(deps.institutionConsistency.areConsistent).toHaveBeenCalled();
+    expect(deps.warn).toHaveBeenCalledWith(
+      '[alert-reviewer-affiliation-mismatch] Stage 2 comparison failed; using legacy presentation:',
+      'Stage 2 unavailable',
+    );
   });
 
   test('no contact id skips without reading contact', async () => {
