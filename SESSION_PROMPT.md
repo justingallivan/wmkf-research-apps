@@ -125,9 +125,10 @@ is shadow-only and has no production caller.
 2. Local `main` was stale at `f9d614ff` when this handoff was written, while
    `origin/main` was `5fcd913c`. Fetch and verify branch state before switching,
    merging, or making a production release.
-3. Two unrelated Word temporary lock files remain untracked under
-   `shared/templates/pre-site-visit/`. Preserve them unless the user confirms
-   Word is closed and asks for cleanup.
+3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
+   handles, then moved them out of the worktree to
+   `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
+   changed, and the repository ended clean.
 
 ### Do Not Reopen Without New Decision
 
