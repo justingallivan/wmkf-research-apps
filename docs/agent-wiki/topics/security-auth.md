@@ -63,6 +63,15 @@ not a current authority.
 - Cron bearer-secret checks share `lib/utils/cron-auth.js` `constantTimeEqual`.
   The shared `verifyCronSecret` keeps its local-development bypass, while
   `drain-submissions` keeps its route-local strict verifier with no bypass.
+- Sessionless HMAC webhook routes (`/api/webhooks/bill`,
+  `/api/webhooks/vercel-log-drain`) verify an HMAC of the RAW body
+  (`bodyParser: false`) with a constant-time compare, fail closed on a missing
+  secret outside development, and must be (a) exact-match allowlisted in
+  `proxy.js` and (b) recognized via `HMAC_GUARDS` in
+  `scripts/check-api-route-security-matrix.js` plus a matrix row documenting
+  the shared-secret boundary. The Vercel drain route additionally never calls
+  NotificationService (recursive-alert-loop guard) and persists only
+  redacted/allowlisted fields — see `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`.
 - **Client auth-gate render contract (S398, `27aba5be`):** `RequireAuth` keeps
   children mounted through `useSession()` 'loading' — it must NOT swap to a
   spinner mid-resolution (that unmounted `ProfileProvider`+`AppAccessProvider`,

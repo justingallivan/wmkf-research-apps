@@ -217,6 +217,12 @@ related:
 |---|---|---|---|---|---|
 | [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain. |  |
 
+## observability
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [OPERATIONAL_EVENTS_AND_LOG_DRAIN.md](OPERATIONAL_EVENTS_AND_LOG_DRAIN.md) | runbook | active | yes | Durable operational_events layer (app-recorded failures + Vercel Log Drain ingestion), its privacy/dedup/retention contracts, and the activation runbook. | 2026-08-19 |
+
 ## process
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
