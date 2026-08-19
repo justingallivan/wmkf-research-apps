@@ -898,10 +898,12 @@ describe('saved candidate correlation', () => {
       { candidateKey: saveKey, index: 99 },
       { candidateKey: 'not-a-submitted-key', index: 0 },
       { candidateKey: 'not-a-submitted-key', rosterCandidateKey: 'orcid:forged' },
+      { candidateKey: saveKey },
     ], twins);
     expect(results[0].rosterCandidateKey).toBeUndefined();
     expect(results[1].rosterCandidateKey).toBeUndefined();
     expect(results[2].rosterCandidateKey).toBeUndefined();
+    expect(results[3].rosterCandidateKey).toBeUndefined();
 
     const distinct = [
       { name: 'First Person', email: 'first@example.edu', candidateKey: 'orcid:first' },

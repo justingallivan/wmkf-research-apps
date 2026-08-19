@@ -53,7 +53,6 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   getCandidatePromotionDecision,
-  candidateWasSaved,
   correlateSaveResultsToRosterCandidates,
   getCandidateEmailReadiness,
   normalizeReviewerName,
@@ -1939,6 +1938,9 @@ export default function ReviewerSearchSection({
     const durableUpdates = {};
     if (Object.prototype.hasOwnProperty.call(updates || {}, 'website')) durableUpdates.website = updates.website;
     if (Object.prototype.hasOwnProperty.call(updates || {}, 'affiliation')) durableUpdates.affiliation = updates.affiliation;
+    const localUpdates = { ...(updates || {}) };
+    delete localUpdates.website;
+    delete localUpdates.affiliation;
     if (Object.keys(durableUpdates).length === 0) {
       setManualContact(cand, updates);
       return;
@@ -1960,6 +1962,9 @@ export default function ReviewerSearchSection({
       throw new Error(data.error || 'Could not save these contact details to the request.');
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);
+    if (Object.keys(localUpdates).length > 0) {
+      setManualContact(data.candidate, localUpdates);
+    }
     setRosterNote(`${data.candidate.name || cand.name}: contact details saved to this request.`);
   }, [requestId, setManualContact, applyAuthoritativeRosterCandidate]);
 
@@ -2276,9 +2281,10 @@ export default function ReviewerSearchSection({
 
       let saved = 0;
       let savedKeys = [];
+      let savedResultRosterKeys = [];
       let savedRosterKeys = [];
-      let blockedKeys = [];
-      let expiredKeys = [];
+      let blockedRosterKeys = [];
+      let expiredRosterKeys = [];
       let addressVerificationKeys = [];
       let addressRepairKeys = [];
       let identityReviewResults = [];
@@ -2314,19 +2320,34 @@ export default function ReviewerSearchSection({
           ]);
           saved = sData.savedCount || 0;
           savedKeys = Array.isArray(sData.savedKeys) ? sData.savedKeys : [];
-          blockedKeys = saveResults
+          const correlatedSavedKeyResults = correlateSaveResultsToRosterCandidates(
+            savedKeys.map((candidateKey) => ({ candidateKey })),
+            toSave,
+          );
+          savedResultRosterKeys = Array.from(new Set([
+            ...correlatedSaveResults
+              .filter((result) => (
+                result?.outcome === 'saved'
+                && typeof result?.rosterCandidateKey === 'string'
+              ))
+              .map((result) => result.rosterCandidateKey),
+            ...correlatedSavedKeyResults
+              .filter((result) => typeof result?.rosterCandidateKey === 'string')
+              .map((result) => result.rosterCandidateKey),
+          ]));
+          blockedRosterKeys = correlatedSaveResults
             .filter((result) => (
               result?.outcome === 'failed'
               && result?.code === 'applicant_excluded'
-              && typeof result?.candidateKey === 'string'
+              && typeof result?.rosterCandidateKey === 'string'
             ))
-            .map((result) => result.candidateKey);
-          expiredKeys = saveResults
+            .map((result) => result.rosterCandidateKey);
+          expiredRosterKeys = correlatedSaveResults
             .filter((result) => (
               result?.code === 'identity_attestation_required'
-              && typeof result?.candidateKey === 'string'
+              && typeof result?.rosterCandidateKey === 'string'
             ))
-            .map((result) => result.candidateKey);
+            .map((result) => result.rosterCandidateKey);
           addressVerificationKeys = correlatedSaveResults
             .filter((result) => (
               result?.code === 'address_verification_required'
@@ -2378,18 +2399,17 @@ export default function ReviewerSearchSection({
               }
             } catch { /* retain unknown-outcome error below */ }
           }
+          const knownSavedRosterKeys = new Set([...savedResultRosterKeys, ...savedRosterKeys]);
           failures.push(...toSave
-            .filter((candidate) => (
-              !candidateWasSaved(candidate, savedKeys)
-              && !savedRosterKeys.includes(candKey(candidate))
-            ))
+            .filter((candidate) => !knownSavedRosterKeys.has(candKey(candidate)))
             .map((c) => ({
               name: c.name || 'Unknown candidate',
               error: receivedResponse ? e.message : 'Save outcome is unknown; roster state was refreshed before retry.',
             })));
         }
 
-        const expiredCandidates = toSave.filter((candidate) => candidateWasSaved(candidate, expiredKeys));
+        const expiredSet = new Set(expiredRosterKeys);
+        const expiredCandidates = toSave.filter((candidate) => expiredSet.has(candKey(candidate)));
         if (expiredCandidates.length > 0 && isCurrent()) {
           try {
             const refreshResult = await refreshExpiredVerification(expiredCandidates, myGen);
@@ -2467,7 +2487,9 @@ export default function ReviewerSearchSection({
             }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
-            if (result.code === 'conflict_record_unavailable') {
+            if (result.code === 'address_verification_required') {
+              addressVerificationKeys.push(candKey(result.candidate));
+            } else if (result.code === 'conflict_record_unavailable') {
               addressRepairKeys.push(candKey(result.candidate));
             } else if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner', 'contact_linked_elsewhere']).has(result.code)) {
               serverRepairResults.push({
@@ -2481,11 +2503,9 @@ export default function ReviewerSearchSection({
 
       // The server owns the durable `saved` transition. The browser only
       // reconciles exact successful keys into its current view.
-      if (savedKeys.length > 0 || savedRosterKeys.length > 0) {
-        const wasSaved = (candidate) => (
-          candidateWasSaved(candidate, savedKeys)
-          || savedRosterKeys.includes(candKey(candidate))
-        );
+      if (savedResultRosterKeys.length > 0 || savedRosterKeys.length > 0) {
+        const savedSet = new Set([...savedResultRosterKeys, ...savedRosterKeys]);
+        const wasSaved = (candidate) => savedSet.has(candKey(candidate));
         if (isCurrent()) {
           const matchedSavedCandidates = displayCandidates.filter(wasSaved);
           const matchedSavedRosterKeys = matchedSavedCandidates.map(candKey).filter(Boolean);
@@ -2499,8 +2519,9 @@ export default function ReviewerSearchSection({
           });
         }
       }
-      if (blockedKeys.length > 0 && isCurrent()) {
-        const wasBlocked = (candidate) => candidateWasSaved(candidate, blockedKeys);
+      if (blockedRosterKeys.length > 0 && isCurrent()) {
+        const blockedSet = new Set(blockedRosterKeys);
+        const wasBlocked = (candidate) => blockedSet.has(candKey(candidate));
         const blockedCandidates = displayCandidates
           .filter(wasBlocked)
           .map((candidate) => ({

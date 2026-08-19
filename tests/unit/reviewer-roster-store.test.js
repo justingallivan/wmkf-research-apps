@@ -552,6 +552,52 @@ describe('updateContactDraft', () => {
     expect(written).not.toHaveProperty('serverIdentityReviewReason');
   });
 
+  test('recognizes applicant-managed authority from trusted stored provenance even with a legacy source kind', async () => {
+    const applicant = {
+      name: 'Provenance Applicant Reviewer',
+      provenance: {
+        kind: 'applicant_suggested',
+        sources: ['applicant_form'],
+        seedRole: 'applicant_suggested',
+        groundingWorkIds: [],
+      },
+      automatedIdentityAttestation: 'applicant-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'applicant-confirmation',
+      staffIdentityConfirmation: { source: 'staff_confirmed' },
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'suggestion:provenance-applicant',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: '2026-08-18 17:29:00+00',
+        candidate: applicant,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'suggestion:provenance-applicant',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: '2026-08-18 17:30:00+00',
+        candidate: { ...applicant, affiliation: 'Applicant University' },
+      }] });
+
+    await store.updateContactDraft(
+      REQ,
+      'suggestion:provenance-applicant',
+      { affiliation: 'Applicant University' },
+    );
+    const written = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('Applicant University')
+    )));
+    expect(written).toMatchObject({
+      automatedIdentityAttestation: 'applicant-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'applicant-confirmation',
+    });
+    expect(written).not.toHaveProperty('serverIdentityReviewReason');
+  });
+
   test('fails closed instead of overwriting a concurrently changed row', async () => {
     sql
       .mockResolvedValueOnce({ rows: [{

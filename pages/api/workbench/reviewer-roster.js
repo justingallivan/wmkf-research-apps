@@ -46,6 +46,10 @@ import { DeduplicationService } from '../../../lib/services/deduplication-servic
 import { normalizeReviewerName } from '../../../lib/utils/reviewer-name-match';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import {
+  PROVENANCE_KINDS,
+  provenanceKindOf,
+} from '../../../lib/utils/reviewer-provenance';
+import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
@@ -88,9 +92,14 @@ function isServerManagedApplicantCandidate(candidate) {
     && (
       candidate.suggestionId
       || (typeof candidate.candidateKey === 'string' && candidate.candidateKey.startsWith('suggestion:'))
-      || candidate.isApplicantRecommended === true
       || candidate.enrichedProposalKey
-      || candidate.provenance?.kind === 'applicant_suggested'
+      // Raw legacy flags remain explicit because an untrusted provenance object
+      // can short-circuit inference. Use truthiness: pruning normalizes these to
+      // booleans before persistence, so string-valued legacy payloads must be
+      // rejected at the same boundary too.
+      || !!candidate.isApplicantRecommended
+      || !!candidate.applicantRecommended
+      || provenanceKindOf(candidate) === PROVENANCE_KINDS.APPLICANT_SUGGESTED
     )
   );
 }
@@ -117,6 +126,7 @@ function stripClientRosterAuthority(candidate) {
     pdIdentityConfirmed: _pdIdentityConfirmed,
     pdIdentityConfirmationId: _pdIdentityConfirmationId,
     serverIdentityDecisionReceipt: _serverIdentityDecisionReceipt,
+    serverIdentityReviewReason: _serverIdentityReviewReason,
     ...safe
   } = candidate;
   return safe;
@@ -224,15 +234,21 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
           },
         }
       : withIdentityReceipt;
-    if (!stored || !hasStoredStaffAuthority(stored)) return withAddressAuthority;
+    // This marker is server-owned and fail-closed. A roster refresh may carry a
+    // stale or missing browser copy, but only authenticated confirmation should
+    // clear the stored review requirement.
+    const withIdentityReviewReason = stored?.serverIdentityReviewReason
+      ? { ...withAddressAuthority, serverIdentityReviewReason: stored.serverIdentityReviewReason }
+      : withAddressAuthority;
+    if (!stored || !hasStoredStaffAuthority(stored)) return withIdentityReviewReason;
     const confirmation = stored.staffIdentityConfirmation;
     const email = confirmation.email || null;
     const website = confirmation.website || null;
     const affiliation = confirmation.affiliation || null;
     return {
       ...pruneCandidateForRoster({
-        ...withAddressAuthority,
-        name: stored.name || withAddressAuthority.name,
+        ...withIdentityReviewReason,
+        name: stored.name || withIdentityReviewReason.name,
         email,
         emailSource: email ? 'manual' : null,
         website,
@@ -241,7 +257,7 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
         affiliationSource: 'staff_manual',
         manualContactFields: stored.manualContactFields,
         contactEnrichment: {
-          ...(withAddressAuthority.contactEnrichment || {}),
+          ...(withIdentityReviewReason.contactEnrichment || {}),
           email,
           emailSource: email ? 'manual' : null,
           website,

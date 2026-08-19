@@ -143,6 +143,108 @@ test('partial non-2xx response still graduates only the exact server-confirmed s
   expect(screen.getByLabelText(`Select ${withheld.name}`)).toBeInTheDocument();
 });
 
+test('a saved result removes only the indexed roster card when an unsubmitted card shares its save key', async () => {
+  const primary = {
+    ...candidate('Dr Collision Reviewer', 'collision@example.edu'),
+    candidateKey: 'openalex:primary',
+    openAlexId: 'primary',
+  };
+  const sibling = {
+    ...candidate('Collision Reviewer', 'collision@example.edu'),
+    candidateKey: 'openalex:sibling',
+    openAlexId: 'sibling',
+  };
+  const sharedSaveKey = reviewerSaveKey(primary);
+  expect(reviewerSaveKey(sibling)).toBe(sharedSaveKey);
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [primary, sibling],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [primary.name, sibling.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({
+        success: true,
+        savedCount: 1,
+        savedKeys: [sharedSaveKey],
+        results: [{
+          name: primary.name,
+          candidateKey: sharedSaveKey,
+          index: 0,
+          outcome: 'saved',
+        }],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  await waitFor(() => expect(screen.queryByLabelText(`Select ${primary.name}`)).not.toBeInTheDocument());
+  expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeInTheDocument();
+});
+
+test('an applicant-excluded result blocks only the indexed roster card when another card shares its save key', async () => {
+  const primary = {
+    ...candidate('Dr Block Collision', 'block-collision@example.edu'),
+    candidateKey: 'openalex:block-primary',
+    openAlexId: 'block-primary',
+  };
+  const sibling = {
+    ...candidate('Block Collision', 'block-collision@example.edu'),
+    candidateKey: 'openalex:block-sibling',
+    openAlexId: 'block-sibling',
+  };
+  const sharedSaveKey = reviewerSaveKey(primary);
+  expect(reviewerSaveKey(sibling)).toBe(sharedSaveKey);
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [primary, sibling],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [primary.name, sibling.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({
+        success: false,
+        savedCount: 0,
+        savedKeys: [],
+        results: [{
+          name: primary.name,
+          candidateKey: sharedSaveKey,
+          index: 0,
+          outcome: 'failed',
+          code: 'applicant_excluded',
+        }],
+      }, false, 422));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  expect(await screen.findByText(/Promotion blocked \(1\)/i)).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${primary.name}`)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeInTheDocument();
+});
+
 test('same-person different-address conflict exposes identity confirmation on the exact ORCID card', async () => {
   const peter = {
     ...candidate('Peter Reiners', 'reiners@arizona.edu'),
@@ -305,6 +407,53 @@ test('applicant promotion repair failure attaches the repair remedy to the exact
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
 });
 
+test('applicant promotion address-verification failure exposes the address remedy and deselects the card', async () => {
+  const suggestionId = '55555555-5555-5555-5555-555555555555';
+  const reviewer = {
+    ...candidate('Applicant Address Reviewer', 'applicant-address@example.edu'),
+    candidateKey: `suggestion:${suggestionId}`,
+    suggestionId,
+    isApplicantRecommended: true,
+    enrichedProposalKey: 'proposal',
+    provenance: {
+      kind: 'applicant_suggested',
+      sources: ['applicant'],
+      seedRole: 'applicant_suggested',
+      groundingWorkIds: [],
+    },
+  };
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+      }));
+    }
+    if (target === '/api/workbench/promote-applicant-reviewer') {
+      return Promise.resolve(response({
+        success: false,
+        code: 'address_verification_required',
+        error: 'Select and verify the exact address before promotion.',
+      }, false, 422));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  expect(await screen.findByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
+  expect(screen.getByText(/Address verification is required/i)).toBeInTheDocument();
+});
+
 test('plain website edits are durably acknowledged by the request roster before the modal closes', async () => {
   const reviewer = {
     ...candidate('Peter Reiners', 'reiners@arizona.edu'),
@@ -355,6 +504,10 @@ test('plain website edits are durably acknowledged by the request roster before 
   fireEvent.change(screen.getByText('Website').parentElement.querySelector('input'), {
     target: { value: website },
   });
+  const localEmailEdit = 'REINERS@ARIZONA.EDU';
+  fireEvent.change(screen.getByText('Email').parentElement.querySelector('input'), {
+    target: { value: localEmailEdit },
+  });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
   expect(await screen.findByText(/contact details saved to this request/i)).toBeInTheDocument();
@@ -368,6 +521,7 @@ test('plain website edits are durably acknowledged by the request roster before 
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
   expect(screen.getByDisplayValue(website)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(localEmailEdit)).toBeInTheDocument();
 });
 
 test('verify contact sends every confirmation-bound field and promotes the server-authoritative candidate', async () => {
@@ -561,6 +715,87 @@ test('saved row with failed roster finalization stays successful and reloads the
   expect(screen.getByText(/Find roster could not be finalized/i)).toBeInTheDocument();
   expect(screen.getByLabelText(`Select ${saved.name}`)).toBeInTheDocument();
   expect(rosterLoads).toBe(2);
+});
+
+test('expired verification refresh targets only the indexed roster card when another submitted card shares its save key', async () => {
+  const primary = {
+    ...candidate('Dr Expired Collision', 'expired-collision@example.edu'),
+    candidateKey: 'openalex:expired-primary',
+    openAlexId: 'expired-primary',
+    automatedIdentityAttestation: 'expired-token',
+  };
+  const sibling = {
+    ...candidate('Expired Collision', 'expired-collision@example.edu'),
+    candidateKey: 'openalex:expired-sibling',
+    openAlexId: 'expired-sibling',
+  };
+  const sharedSaveKey = reviewerSaveKey(primary);
+  expect(reviewerSaveKey(sibling)).toBe(sharedSaveKey);
+  let enrichmentBody;
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [primary, sibling],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [primary.name, sibling.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({
+        success: false,
+        savedCount: 0,
+        savedKeys: [],
+        results: [{
+          name: primary.name,
+          candidateKey: sharedSaveKey,
+          index: 0,
+          outcome: 'failed',
+          code: 'identity_attestation_required',
+        }],
+      }, false, 422));
+    }
+    if (target === '/api/reviewer-finder/enrich-contacts') {
+      enrichmentBody = JSON.parse(options.body);
+      return Promise.resolve({ ok: true, status: 200, body: {} });
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return Promise.resolve(response({ success: true, recorded: 1 }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  readSseStream.mockImplementation(async (_response, onEvent) => {
+    onEvent({
+      event: 'complete',
+      data: {
+        type: 'complete',
+        results: [{
+          ...primary,
+          email: 'fresh-expired-collision@example.edu',
+          automatedIdentityAttestation: 'fresh-token',
+          contactEnrichment: {
+            email: 'fresh-expired-collision@example.edu',
+            emailSource: 'orcid',
+          },
+        }],
+      },
+    });
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
+  fireEvent.click(screen.getByLabelText(`Select ${sibling.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 2 selected to invite/i }));
+
+  expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
+  expect(enrichmentBody.candidates).toHaveLength(1);
+  expect(enrichmentBody.candidates[0].candidateKey).toBe(primary.candidateKey);
+  expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeInTheDocument();
+  expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeChecked();
 });
 
 test('expired verification is refreshed durably and deselected for review without automatic promotion', async () => {

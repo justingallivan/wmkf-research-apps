@@ -146,6 +146,24 @@ describe('POST recordSurfaced', () => {
     expect(store.recordSurfaced).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { isApplicantRecommended: true, provenance: {} },
+    { isApplicantRecommended: 'yes', provenance: { kind: 'literature_retrieved' } },
+    { applicantRecommended: true, provenance: {} },
+    { applicantRecommended: 'yes', provenance: { kind: 'literature_retrieved' } },
+  ])('rejects applicant flags even when untrusted provenance would short-circuit inference: %p', async (applicantFields) => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Legacy Applicant Reviewer',
+      email: 'legacy-applicant@example.edu',
+      ...applicantFields,
+    }] } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(r.body).toMatchObject({ code: 'server_managed_applicant_candidate' });
+    expect(store.recordSurfaced).not.toHaveBeenCalled();
+  });
+
   it('re-derives an untrusted browser candidate key before writing the roster', async () => {
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
@@ -226,6 +244,41 @@ describe('POST recordSurfaced', () => {
 
     const [, passed] = store.recordSurfaced.mock.calls[0];
     expect(passed[0].serverIdentityDecisionReceipt).toBeUndefined();
+  });
+
+  it('preserves a stored server identity-review marker when the browser re-post omits it', async () => {
+    const incoming = {
+      name: 'Review Required',
+      email: 'review@example.edu',
+      affiliation: 'Example University',
+    };
+    const candidateKey = reviewerCandidateKey(incoming);
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      ...incoming,
+      candidateKey,
+      serverIdentityReviewReason: 'manual_contact_changed',
+    }]);
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [incoming] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0]).toMatchObject({
+      candidateKey,
+      serverIdentityReviewReason: 'manual_contact_changed',
+    });
+  });
+
+  it('strips a browser-forged server identity-review marker when no stored marker backs it', async () => {
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Forged Review Marker',
+      serverIdentityReviewReason: 'manual_contact_changed',
+    }] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].serverIdentityReviewReason).toBeUndefined();
   });
 
   it('prunes server-side and records named candidates', async () => {
