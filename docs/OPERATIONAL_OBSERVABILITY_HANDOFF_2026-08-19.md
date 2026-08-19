@@ -176,6 +176,21 @@ break the cycle-3 fixes it targeted (poison-entry 503 loops, duplicate-marker
 contract, parallel-insert races, conditional-update race, 409 UI flow) and
 raised no other findings.
 
+A fifth adversarial cycle (same day) returned READY WITH NAMED CHANGES — the
+first pass with no production defect. Named disconfirming checks came back
+empty on the canonicalizeKey edge cases, fresh-install FK ordering
+(user_profiles v10 precedes operational_events v38), Vercel HMAC raw-body
+verification, the storage-failure 503 path, and the admin 409 path. The one
+finding, applied:
+
+9. **[low, FIXED]** The cycle-4 recovery-key symmetry test was decorative on
+   the record side (deleting recordEvent's canonicalization left it green).
+   The test now asserts the INSERTED recovery-key parameter equals
+   `canonicalizeKey(longKey)` and that the markRecovered lookup uses the
+   identical stored form.
+
+Post-cycle-5: full unit suite 8115 green, types green.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from

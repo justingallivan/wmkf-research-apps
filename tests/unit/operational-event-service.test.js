@@ -111,10 +111,29 @@ describe('recordEvent', () => {
   test('recovery lookups canonicalize identically to stored keys (symmetry)', async () => {
     const longKey = `honorarium_onboard_failed:${'x'.repeat(300)}`;
     expect(canonicalizeKey(longKey)).toBe(canonicalizeKey(longKey));
+
+    // Record side: the INSERTED recovery-key parameter must be the canonical
+    // form — without this half, deleting recordEvent's canonicalization would
+    // leave the lookup-side assertion green while production recovery missed
+    // overlong stored keys (Codex cycle-5 finding).
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    await OperationalEventService.recordEvent({
+      eventType: 'honorarium_onboard_failed',
+      severity: 'warning',
+      summary: 's',
+      recoveryKey: longKey,
+    });
+    const storedKey = sqlMock.mock.calls[0].slice(1)
+      .find(v => typeof v === 'string' && v.startsWith('honorarium_onboard_failed:'));
+    expect(storedKey).toBe(canonicalizeKey(longKey));
+    expect(storedKey).toContain('sha256:');
+
+    // Lookup side: markRecovered must query with the identical canonical form.
     sqlMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
     await OperationalEventService.markRecovered(longKey);
-    const lookupKey = sqlMock.mock.calls[0].slice(1).find(v => typeof v === 'string' && v.startsWith('honorarium'));
-    expect(lookupKey).toBe(canonicalizeKey(longKey));
+    const lookupKey = sqlMock.mock.calls[1].slice(1)
+      .find(v => typeof v === 'string' && v.startsWith('honorarium_onboard_failed:'));
+    expect(lookupKey).toBe(storedKey);
   });
 
   test('never throws: SQL failure returns null and leaves caller unaffected', async () => {
