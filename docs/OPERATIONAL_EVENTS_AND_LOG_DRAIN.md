@@ -21,10 +21,14 @@ related:
 
 # Operational Events and Vercel Log Drain
 
-**Status:** Implemented on branch `codex/operational-observability` (2026-08-19).
-**Not yet activated:** the production migration has NOT been applied and no
-Vercel Log Drain has been created. Activation is a deliberate, owner-approved
-step — see the runbook below.
+**Status:** Merged to `main` via PR #123 and production-deployed 2026-08-19
+(merge `9de8b348`). Migration 030 applied to production the same day
+[VERIFIED via `apply-migrations` output + live probe: 23 columns, 8 indexes,
+tracker 29/29]. The app-recorded event path is LIVE.
+**Drain activation remaining:** `VERCEL_LOG_DRAIN_SECRET` is not yet set and
+no Vercel Log Drain has been created — the drain endpoint is deployed and
+fail-closed (unsigned POST → 500) until the owner completes runbook steps
+3–5 below.
 
 ## Why
 
