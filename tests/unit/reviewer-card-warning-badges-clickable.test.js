@@ -2,13 +2,13 @@
  * @jest-environment jsdom
  *
  * Actionable evidence states on the candidate card. Address and identity
- * problems expose a clearly labelled primary remedy instead of requiring staff
- * to infer an action from a warning badge.
+ * problems expose one clearly labelled status plus a primary remedy instead of
+ * requiring staff to infer an action from duplicate warning badges.
  *
- * The load-bearing property is fail-closed parity: a badge is clickable only
- * when its remedy control would itself render (canManage, resolved identity,
- * conflict record available). No readiness or address-trust semantics are
- * decided by the badge — it is routing only
+ * The load-bearing property is fail-closed parity: the remedy renders only when
+ * its exact handler is available (canManage, resolved identity, conflict record
+ * available). No readiness or address-trust semantics are decided by the card
+ * presentation
  * (`project-reviewer-verify-fail-dangerous`).
  */
 
@@ -33,7 +33,7 @@ const QUICK_CHECK = {
 function renderCard(overrides = {}, props = {}) {
   const onEdit = jest.fn();
   const onConfirmIdentity = jest.fn();
-  render(
+  const result = render(
     <CandidateCard
       candidate={{ ...QUICK_CHECK, ...overrides }}
       checked={false}
@@ -43,19 +43,20 @@ function renderCard(overrides = {}, props = {}) {
       {...props}
     />,
   );
-  return { onEdit, onConfirmIdentity };
+  return { ...result, onEdit, onConfirmIdentity };
 }
 
 afterEach(() => {
   jest.clearAllMocks();
 });
 
-test('"Email needs confirmation" is a button that opens the verify/edit address remedy', async () => {
+test('address confirmation is shown once as status plus an executable remedy', async () => {
   const user = userEvent.setup();
   const { onEdit } = renderCard();
 
-  const badge = screen.getByRole('button', { name: /Email needs confirmation/ });
-  await user.click(badge);
+  expect(screen.getAllByText('Identity: address needs confirmation')).toHaveLength(1);
+  expect(screen.queryByRole('button', { name: /Email needs confirmation/ })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Verify address for Alexander Green' }));
 
   expect(onEdit).toHaveBeenCalledTimes(1);
   expect(onEdit.mock.calls[0][0].name).toBe('Alexander Green');
@@ -65,7 +66,7 @@ test('the primary "Verify address" action opens the same remedy', async () => {
   const user = userEvent.setup();
   const { onEdit } = renderCard();
 
-  await user.click(screen.getByRole('button', { name: 'Verify address' }));
+  await user.click(screen.getByRole('button', { name: 'Verify address for Alexander Green' }));
   expect(onEdit).toHaveBeenCalledTimes(1);
 });
 
@@ -83,7 +84,7 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
     />,
   );
 
-  await user.click(screen.getByRole('button', { name: 'Review address conflict' }));
+  await user.click(screen.getByRole('button', { name: 'Review address conflict for Alexander Green' }));
   expect(onReviewAddressConflict).toHaveBeenCalledTimes(1);
   expect(onEdit).not.toHaveBeenCalled();
 });
@@ -91,8 +92,22 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
 test('read-only (canManage=false) leaves the warning as inert text — no dead action offered', () => {
   renderCard({}, { canManage: false });
 
-  expect(screen.getByText(/Email needs confirmation/)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /Email needs confirmation/ })).toBeNull();
+  expect(screen.getByText(/Identity: address needs confirmation/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Verify address/ })).toBeNull();
+});
+
+test('does not render a dead address remedy when only the inactive conflict handler exists', () => {
+  const onReviewAddressConflict = jest.fn();
+  render(
+    <CandidateCard
+      candidate={QUICK_CHECK}
+      checked={false}
+      onToggle={() => {}}
+      onReviewAddressConflict={onReviewAddressConflict}
+    />,
+  );
+
+  expect(screen.getByText(/Identity: address needs confirmation/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Verify address/ })).toBeNull();
 });
 
@@ -135,6 +150,18 @@ test('ready identity evidence is summarized once and is not an action', () => {
   expect(screen.queryByRole('button', { name: /high-confidence email/ })).toBeNull();
 });
 
+test('a trusted address does not render green while the person still needs confirmation', () => {
+  const { container } = renderCard({
+    emailSource: 'staff_verified',
+    serverIdentityReviewReason: 'manual_contact_changed',
+    pdIdentityConfirmed: false,
+  });
+
+  expect(screen.getByText('Identity: confirmation required')).toBeInTheDocument();
+  expect(screen.queryByText('Identity: verified')).not.toBeInTheDocument();
+  expect(container.querySelectorAll('.bg-emerald-50')).toHaveLength(0);
+});
+
 test('a thin zero-match sample renders as one qualified expertise status with a direct Invite action', async () => {
   const user = userEvent.setup();
   const onAddToInvite = jest.fn();
@@ -169,6 +196,6 @@ test('a thin zero-match sample renders as one qualified expertise status with a 
   expect(screen.queryByText(/0%|Low match|Expertise mismatch|Claude claimed/)).not.toBeInTheDocument();
   expect(container.firstChild).toHaveClass('bg-white');
 
-  await user.click(screen.getByRole('button', { name: 'Add to Invite' }));
+  await user.click(screen.getByRole('button', { name: 'Add Peter Reiners to Invite' }));
   expect(onAddToInvite).toHaveBeenCalledTimes(1);
 });

@@ -166,9 +166,9 @@ test('groups candidates by readiness and the per-card Add action promotes only t
 
   expect(await screen.findByText('Ready to add to Invite (1)')).toBeInTheDocument();
   expect(screen.getByText('Needs review (1)')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Confirm identity' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Confirm identity for Needs Review Reviewer' })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Add to Invite' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add Ready Reviewer to Invite' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/reviewer-finder/save-candidates',

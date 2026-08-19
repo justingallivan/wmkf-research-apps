@@ -879,7 +879,8 @@ test('expired verification is refreshed durably and deselected for review withou
   fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /fresh@example.edu/i })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /fresh@example.edu/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/The available evidence for fresh@example.edu is limited/)).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(

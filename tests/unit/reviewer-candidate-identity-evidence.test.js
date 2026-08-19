@@ -189,7 +189,7 @@ describe('CandidateCard identity evidence disclosure', () => {
     expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
     // The gate itself is untouched.
     expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Confirm identity' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm identity for Benjamin Namesake' })).toBeInTheDocument();
   });
 
   test('points the staffer at the papers as the check the panel cannot make', async () => {

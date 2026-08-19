@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CandidateCard } from '../../shared/components/reviewers/ReviewerSearchSection';
 
 const baseCandidate = {
@@ -12,7 +13,7 @@ const baseCandidate = {
 function renderCandidate(candidate) {
   return render(
     <CandidateCard
-      candidate={{ ...baseCandidate, ...candidate }}
+      candidate={{ ...baseCandidate, pdIdentityConfirmed: true, ...candidate }}
       checked={false}
       onToggle={jest.fn()}
     />
@@ -43,8 +44,9 @@ describe('CandidateCard email readiness', () => {
       'title',
       'Email (from scholarly_multi, 2025)'
     );
+    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
     expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('Address source: scholarly_multi');
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('Address source: multiple recent papers');
     expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2 recent works');
     expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2025');
   });
@@ -80,10 +82,9 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'manual',
     });
 
-    expect(screen.getByText('Email needs confirmation')).toHaveAttribute(
-      'title',
-      'Manually entered — not verified against the reviewer’s identity. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
-    );
+    expect(screen.getByText('Identity: address needs confirmation')).toBeInTheDocument();
+    expect(screen.getByText(/The available evidence for manual@example.edu is limited/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'manual@example.edu' })).not.toBeInTheDocument();
   });
 
   test('lets a current address-trust receipt override stale enrichment readiness', () => {
@@ -102,20 +103,19 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
+    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
+    expect(screen.getByText(/verified@example.edu was verified by staff against recorded evidence/)).toBeInTheDocument();
     expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(
       'Staff verified this exact person and address for promotion'
     );
-    expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Identity: address needs confirmation')).not.toBeInTheDocument();
   });
 
   test('surfaces missing contact instead of implying enrichment succeeded', () => {
     renderCandidate({ email: null, contactEnrichment: {} });
 
-    expect(screen.getByText('Email not found')).toHaveAttribute(
-      'title',
-      'No email address found during contact enrichment'
-    );
+    expect(screen.getByText('Identity: verified email required')).toBeInTheDocument();
+    expect(screen.getByText(/No verified email address is available/)).toBeInTheDocument();
   });
 
   test('keeps search-derived addresses visibly quarantined as research-only', () => {
@@ -124,10 +124,9 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'serp_search',
     });
 
-    expect(screen.getByText('Research only')).toHaveAttribute(
-      'title',
-      'Search lead lacks address-specific first-party evidence. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
-    );
+    expect(screen.getByText('Identity: address not verified')).toBeInTheDocument();
+    expect(screen.getByText(/lead@example.edu was found through Google search/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'lead@example.edu' })).not.toBeInTheDocument();
   });
 
   test('does not surface contact readiness for an unresolved proposal-named identity', () => {
@@ -135,6 +134,7 @@ describe('CandidateCard email readiness', () => {
       email: 'namesake@example.edu',
       emailSource: 'pubmed',
       identityStatus: 'unresolved',
+      pdIdentityConfirmed: false,
       provenance: {
         kind: 'proposal_named',
         sources: ['proposal'],
@@ -144,8 +144,8 @@ describe('CandidateCard email readiness', () => {
     });
 
     expect(screen.queryByText(/Evidence includes high-confidence email/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
-    expect(screen.queryByText('Email not found')).not.toBeInTheDocument();
+    expect(screen.queryByText('Identity: address needs confirmation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Identity: verified email required')).not.toBeInTheDocument();
     expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
   });
 });
@@ -170,10 +170,81 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText('✓ Existing linked reviewer record')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'linked@example.edu' })).toBeInTheDocument();
-    expect(screen.getByText('Email needs confirmation')).toBeInTheDocument();
+    expect(screen.getByText('Existing reviewer record linked.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'linked@example.edu' })).not.toBeInTheDocument();
+    expect(screen.getByText('Identity: address needs confirmation')).toBeInTheDocument();
     expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
+  });
+
+  test('shows the Sarah Shackleton linked-record case as one actionable address issue', async () => {
+    const user = userEvent.setup();
+    const onEdit = jest.fn();
+    const { container } = render(
+      <CandidateCard
+        candidate={{
+          ...baseCandidate,
+          name: 'Sarah Shackleton',
+          affiliation: 'Woods Hole Oceanographic Institution',
+          isApplicantRecommended: true,
+          applicantKnownReviewer: {
+            status: 'known',
+            potentialReviewerId: 'e9bdceb0-test',
+            affiliation: 'Woods Hole Oceanographic Institution',
+            email: 'sarah.shackleton@whoi.edu',
+            emailSource: 'claude_search',
+            emailReadiness: {
+              level: 'low',
+              action: 'research_only',
+              reason: 'Search lead lacks address-specific first-party evidence',
+            },
+            addressTrustVerified: false,
+          },
+        }}
+        checked={false}
+        onToggle={jest.fn()}
+        onEdit={onEdit}
+      />,
+    );
+
+    expect(screen.getByText('Existing reviewer record linked.')).toBeInTheDocument();
+    expect(screen.getAllByText('Identity: address not verified')).toHaveLength(1);
+    expect(screen.getByText(/found through Claude web search/)).toBeInTheDocument();
+    expect(screen.queryByText(/research_only/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'sarah.shackleton@whoi.edu' })).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.bg-emerald-50')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Verify address for Sarah Shackleton' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByText('Details'));
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(
+      'Search lead lacks address-specific first-party evidence',
+    );
+    expect(screen.getByText('Dataverse record:').parentElement).toHaveTextContent(
+      'Existing reviewer record linked to this applicant recommendation',
+    );
+  });
+
+  test('turns a staff-verified linked record into a single verified identity state', () => {
+    renderCandidate({
+      isApplicantRecommended: true,
+      applicantKnownReviewer: {
+        status: 'known',
+        potentialReviewerId: 'person-verified',
+        email: 'verified-linked@example.edu',
+        emailSource: 'staff_verified',
+        emailReadiness: {
+          level: 'high',
+          action: 'ready',
+          reason: 'Staff verified this exact person and address for promotion',
+        },
+        addressTrustVerified: true,
+      },
+    });
+
+    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
+    expect(screen.getByText(/verified by staff against recorded evidence and is linked to an existing reviewer record/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'verified-linked@example.edu' })).toBeInTheDocument();
   });
 
   test('labels publication and OpenAlex evidence without claiming both are current', () => {

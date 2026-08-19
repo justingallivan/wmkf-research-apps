@@ -101,7 +101,7 @@ async function runSearchToUnverified() {
 // Fill and submit the confirm modal (email + both attestation checkboxes +
 // the evidence link the default evidence type requires).
 async function submitConfirmModal(email) {
-  fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /confirm identity for Yamuna Krishnan/i }));
   await screen.findByRole('button', { name: /add to candidates/i });
   fireEvent.change(screen.getByPlaceholderText('researcher@university.edu'), { target: { value: email } });
   for (const checkbox of screen.getAllByRole('checkbox')) fireEvent.click(checkbox);
@@ -128,8 +128,8 @@ test('an unverified suggestion card carries confirm-identity and exclude afforda
 
   await runSearchToUnverified();
 
-  expect(screen.getByRole('button', { name: /this is the right person/i })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /exclude/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /confirm identity for Yamuna Krishnan/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /not a fit: Yamuna Krishnan/i })).toBeInTheDocument();
   // Still not directly selectable — rescue goes through the confirm modal.
   expect(screen.queryByLabelText('Select Yamuna Krishnan')).not.toBeInTheDocument();
 });
@@ -427,7 +427,7 @@ test('excluding an unverified suggestion persists the durable exclusion and move
   mockSearchStreams();
 
   await runSearchToUnverified();
-  fireEvent.click(screen.getByRole('button', { name: /exclude/i }));
+  fireEvent.click(screen.getByRole('button', { name: /not a fit: Yamuna Krishnan/i }));
 
   await waitFor(() => expect(screen.getByText(/Excluded \(1\)/)).toBeInTheDocument());
   expect(screen.queryByText(/Unverified suggestions/)).not.toBeInTheDocument();
@@ -463,7 +463,7 @@ test('a failed exclusion restores the prior name membership before the next sear
 
   await runSearchToUnverified();
   const unverifiedCard = screen.getByText('Yamuna Krishnan').closest('.border');
-  fireEvent.click(within(unverifiedCard).getByRole('button', { name: /exclude/i }));
+  fireEvent.click(within(unverifiedCard).getByRole('button', { name: /not a fit: Yamuna Krishnan/i }));
 
   await waitFor(() => expect(screen.getByText(/Couldn't exclude that reviewer/)).toBeInTheDocument());
   // Back in Unverified; NOT promoted into an actionable/selectable card.

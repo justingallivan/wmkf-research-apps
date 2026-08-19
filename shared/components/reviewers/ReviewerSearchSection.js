@@ -44,7 +44,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useId } from 'react'
 import { Card } from '../Layout';
 import { readSseStream } from './sse';
 import ReviewerPromptOverridePanel from './ReviewerPromptOverridePanel';
-import ContactLeads from './ContactLeads';
+import ContactLeads, { leadSourceLabel } from './ContactLeads';
 import CandidateEditModal from './CandidateEditModal';
 import {
   mergeEnrichment,
@@ -315,6 +315,21 @@ function emailOwnershipLabel(evidence) {
   return labels[evidence?.matchClass] || null;
 }
 
+function emailSourceDisplayLabel(source) {
+  const labels = {
+    staff_verified: 'staff verification',
+    manual: 'staff entry',
+    institution_page: 'institutional page',
+    orcid: 'ORCID',
+    pubmed: 'PubMed',
+    scholarly_multi: 'multiple recent papers',
+    scholarly_single: 'one recent paper',
+    affiliation: 'publication affiliation',
+    search_contested: 'contested web-search results',
+  };
+  return labels[source] || leadSourceLabel(source);
+}
+
 // Ported from the standalone Reviewer Finder: build a Google Scholar author-search
 // URL as a fallback when we don't have the candidate's real profile URL. Strips
 // honorifics and extracts the institution from a messy affiliation string.
@@ -412,7 +427,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     : [];
   const promotionDecision = getCandidatePromotionDecision(c);
   const needsIdentityConfirmation = promotionDecision?.decision === 'needs_identity_confirmation';
-  const missingVerifiedEmail = promotionDecision?.decision === 'missing_email';
   const needsRecordRepair = promotionDecision?.decision === 'needs_record_repair';
   const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
 
@@ -450,7 +464,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               : 'No literature-based expertise assessment is available.',
           }
         : {
-          tone: 'green',
+          tone: 'neutral',
           label: 'Expertise supported',
           detail: expertiseSampleCount > 0
             ? `Supported by the ${expertiseSampleCount} retrieved paper${expertiseSampleCount === 1 ? '' : 's'} reviewed.`
@@ -460,17 +474,62 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     ? [
         'high-confidence email',
         orcidUrl ? 'ORCID' : null,
-        dataverseEvidence?.status === 'known' ? 'existing Dataverse record' : null,
+        (knownReviewer?.status === 'known' || dataverseEvidence?.status === 'known')
+          ? 'existing Dataverse record'
+          : null,
       ].filter(Boolean)
     : [];
+  const staffVerifiedAddress = emailSource === 'staff_verified'
+    || knownReviewer?.addressTrustVerified === true
+    || c.addressTrustReceipt?.personConfirmed === true;
+  const identityStatus = needsIdentityConfirmation
+    ? {
+        tone: 'amber',
+        label: 'Identity: confirmation required',
+        detail: 'Confirm the exact person and contact details before adding this reviewer to Invite.',
+      }
+    : emailAction === 'ready'
+      ? {
+        tone: 'green',
+        label: 'Identity: verified',
+        detail: staffVerifiedAddress
+          ? `${email} was verified by staff against recorded evidence${knownReviewer?.status === 'known' ? ' and is linked to an existing reviewer record' : ''}.`
+          : `Evidence includes ${identityEvidence.join(' + ')}.`,
+        }
+      : emailAction === 'blocked'
+        ? {
+            tone: 'red',
+            label: 'Identity: address conflict',
+            detail: 'The address conflicts with another reviewer record and must be resolved before this reviewer can be added to Invite.',
+          }
+        : emailAction === 'research_only'
+          ? {
+              tone: 'amber',
+              label: 'Identity: address not verified',
+              detail: `${email} was found through ${emailSourceDisplayLabel(emailSource)} but has not been confirmed by first-party evidence, so this reviewer cannot be added to Invite yet.`,
+            }
+          : emailAction === 'quick_check'
+            ? {
+                tone: 'amber',
+                label: 'Identity: address needs confirmation',
+                detail: `The available evidence for ${email} is limited. Verify the exact person and address before adding to Invite.`,
+              }
+            : {
+                tone: 'amber',
+                label: 'Identity: verified email required',
+                detail: 'No verified email address is available, so this reviewer cannot be added to Invite yet.',
+              };
 
-  // Warning-badge → remedy routing. These mirror the gating of the remedy
-  // controls rendered lower in the card EXACTLY; when a remedy is unavailable
-  // the handler is null and the badge stays a plain, non-clickable pill.
+  // Status → remedy routing. Require the exact handler for the candidate's
+  // current state so the card never presents a primary action that dead-ends.
   // Routing only — no readiness/trust semantics are decided here.
-  const openAddressRemedy = (canManage && (onEdit || onReviewAddressConflict) && !identityUnverified
-    && c.conflictRecordUnavailable !== true)
-    ? () => (c.addressConflictPending && onReviewAddressConflict ? onReviewAddressConflict(c) : onEdit?.(c))
+  const canReviewAddressConflict = c.addressConflictPending === true
+    && typeof onReviewAddressConflict === 'function';
+  const canEditAddress = c.addressConflictPending !== true && typeof onEdit === 'function';
+  const openAddressRemedy = (canManage && !identityUnverified
+    && c.conflictRecordUnavailable !== true
+    && (canReviewAddressConflict || canEditAddress))
+    ? () => (canReviewAddressConflict ? onReviewAddressConflict(c) : onEdit(c))
     : null;
   const openIdentityRemedy = (onConfirmIdentity && canManage) ? () => onConfirmIdentity(c) : null;
   const openRepairRemedy = (canManage && onRequestRepair
@@ -527,17 +586,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           )}
 
           {knownReviewer?.status === 'known' && (
-            <div className="mt-2 p-2 border rounded text-xs bg-emerald-50 border-emerald-200 text-emerald-800">
-              <div className="font-medium">✓ Existing linked reviewer record</div>
-              {knownReviewer.affiliation && <div>{knownReviewer.affiliation}</div>}
-              {knownReviewer.orcid && <div>ORCID {knownReviewer.orcid}</div>}
-              {knownReviewer.email && (
-                <div>
-                  {knownReviewer.email} · {knownReviewer.emailReadiness?.action || 'quick_check'}
-                  {knownReviewer.emailReadiness?.reason ? ` — ${knownReviewer.emailReadiness.reason}` : ''}
-                </div>
-              )}
-              {!knownReviewer.email && <div>No stored email address</div>}
+            <div className="mt-2 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <span className="font-medium">Existing reviewer record linked.</span>
+              {knownReviewer.affiliation ? ` ${knownReviewer.affiliation}.` : ''}
+              {' '}Contact readiness is shown under Identity below.
             </div>
           )}
           {knownReviewer && knownReviewer.status !== 'known' && (() => {
@@ -619,12 +671,17 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           )}
 
           {!identityUnverified && (
-            <div className="mt-2 grid gap-1.5 sm:grid-cols-2" aria-label="Reviewer evidence status">
-              <div className={`rounded border px-2 py-1.5 text-xs ${identityEvidence.length > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-                <span className="font-medium">Identity: </span>
-                {identityEvidence.length > 0
-                  ? <>Evidence includes {identityEvidence.join(' + ')}.</>
-                  : <>Contact evidence needs review before Invite.</>}
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2" role="group" aria-label={`Reviewer evidence status for ${c.name}`}>
+              <div className={`rounded border px-2 py-1.5 text-xs ${identityStatus.tone === 'green'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : identityStatus.tone === 'red'
+                  ? 'border-red-200 bg-red-50 text-red-900'
+                  : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                <span className="font-medium">
+                  <span aria-hidden="true">{identityStatus.tone === 'green' ? '✓ ' : '⚠ '}</span>
+                  {identityStatus.label}
+                </span>{' '}
+                {identityStatus.detail}
               </div>
               <div className={`rounded border px-2 py-1.5 text-xs ${expertiseStatus.tone === 'green'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -650,25 +707,18 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             </div>
           )}
 
-          {needsIdentityConfirmation && (
+          {identityUnverified && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
               <span className="font-medium">Identity confirmation required.</span>{' '}
               Confirm the exact person and email before adding this reviewer to Invite.
             </div>
           )}
-          {missingVerifiedEmail && (
-            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-              <span className="font-medium">Verified email required.</span>{' '}
-              Add or verify an email before adding this reviewer to Invite.
-            </div>
-          )}
-
           {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Suggested because: </span>{reason}</p>}
 
           {c.identityNote && <p className="text-[11px] text-gray-500 mt-2 italic border-t border-gray-100 pt-1.5">{c.identityNote}</p>}
 
           <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-gray-500">
-            {c.isApplicantRecommended && <Pill tone="green">Applicant recommended</Pill>}
+            {c.isApplicantRecommended && <Pill tone="gray">Applicant recommended</Pill>}
             {eligibilityStatus === 'emeritus' && <Pill tone="amber">Emeritus / retired</Pill>}
           </div>
           {eligibilityStatus === 'emeritus' && eligibilityEvidence?.url && (
@@ -688,7 +738,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
 
           {!identityUnverified && (
             <div className="mt-2 flex items-center flex-wrap gap-2 text-xs">
-              {email && (
+              {email && emailAction === 'ready' && (
                 <>
                   <a
                     href={`mailto:${email}`}
@@ -699,43 +749,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                   </a>
                 </>
               )}
-              {/* Not-ready readiness states are themselves the way into the
-                  remedy (Verify address). Ready evidence is already summarized
-                  once in the fixed Identity status above. */}
-              {(() => {
-                if (emailAction === 'ready') return null;
-                const chipClass = `inline-flex items-center gap-1 px-2 py-1 rounded border ${
-                  emailAction === 'blocked'
-                      ? 'bg-red-50 text-red-800 border-red-200'
-                    : emailAction === 'research_only'
-                      ? 'bg-red-50 text-red-800 border-red-200'
-                      : emailAction === 'quick_check'
-                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                        : 'bg-gray-50 text-gray-600 border-gray-200'
-                }`;
-                const chipTitle = emailAction === 'missing'
-                  ? emailActionReason
-                  : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`;
-                const label = emailAction === 'blocked'
-                    ? 'Address conflict must be resolved'
-                  : emailAction === 'research_only'
-                    ? 'Research only'
-                    : emailAction === 'quick_check'
-                      ? 'Email needs confirmation'
-                    : 'Email not found';
-                const clickable = openAddressRemedy;
-                if (!clickable) return <span className={chipClass} title={chipTitle}>{label}</span>;
-                return (
-                  <button
-                    type="button"
-                    onClick={openAddressRemedy}
-                    className={`${chipClass} underline underline-offset-2 hover:brightness-95 cursor-pointer`}
-                    title={`${chipTitle} — click to verify / edit the address.`}
-                  >
-                    {label}
-                  </button>
-                );
-              })()}
             </div>
           )}
 
@@ -933,6 +946,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                     Existing person record matched by exact {dataverseEvidence.matchKey || 'key'}.
                   </p>
                 )}
+                {knownReviewer?.status === 'known' && (
+                  <p>
+                    <span className="font-medium">Dataverse record: </span>
+                    Existing reviewer record linked to this applicant recommendation.
+                  </p>
+                )}
                 {dataverseInstitutions.length > 0 && (
                   <p>
                     <span className="font-medium">
@@ -949,7 +968,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 {email && (
                   <p>
                     <span className="font-medium">Email evidence: </span>
-                    {emailActionReason}
+                    Address source: {emailSourceDisplayLabel(emailSource)} · {emailAction === 'ready' ? 'verified for Invite' : 'verification required before Invite'}
+                    {emailActionReason ? ` · ${emailActionReason}` : ''}
                     {emailEvidence?.publicationCount > 0
                       ? ` · ${emailEvidence.publicationCount} recent ${emailEvidence.publicationCount === 1 ? 'work' : 'works'}`
                       : ''}
@@ -1013,15 +1033,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {!identityUnverified && pubs.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="text-xs font-medium text-blue-700 hover:text-blue-900" aria-expanded={expanded}>
-                {expanded ? 'Hide recent papers' : `View ${pubs.length} recent paper${pubs.length === 1 ? '' : 's'}`}
-              </button>
-            )}
             {openAddressRemedy && needsAddressVerification && (
               <button
                 type="button"
                 onClick={openAddressRemedy}
+                aria-label={`${c.addressConflictPending ? 'Review address conflict' : 'Verify address'} for ${c.name}`}
                 className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
                 title="Review the evidence, correct the address if needed, and verify the exact person and address"
               >
@@ -1032,6 +1048,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={() => onRetryAddressCheck(c)}
+                aria-label={`Retry conflict check for ${c.name}`}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
               >
                 Retry conflict check
@@ -1041,6 +1058,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={openRepairRemedy}
+                aria-label={`Create repair request for ${c.name}`}
                 className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
                 title="Create a durable repair request if neither address can be verified safely"
               >
@@ -1054,6 +1072,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={openIdentityRemedy}
+                aria-label={`Confirm identity for ${c.name}`}
                 className="rounded bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
                 title="Confirm the exact person and contact details before adding this reviewer to Invite"
               >
@@ -1064,16 +1083,23 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={() => onAddToInvite(c)}
+                aria-label={`Add ${c.name} to Invite`}
                 disabled={addingToInvite}
                 className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {addingToInvite ? 'Adding to Invite…' : 'Add to Invite'}
               </button>
             )}
+            {!identityUnverified && pubs.length > 0 && (
+              <button type="button" onClick={() => setExpanded((v) => !v)} className="text-xs font-medium text-blue-700 hover:text-blue-900" aria-expanded={expanded} aria-label={`${expanded ? 'Hide' : 'View'} recent papers for ${c.name}`}>
+                {expanded ? 'Hide recent papers' : `View ${pubs.length} recent paper${pubs.length === 1 ? '' : 's'}`}
+              </button>
+            )}
             {onExclude && (
               <button
                 type="button"
                 onClick={() => onExclude(c)}
+                aria-label={`Not a fit: ${c.name}`}
                 className="ml-auto text-xs text-gray-500 hover:text-red-700"
                 title="Set aside — moves to the Excluded list and won't be surfaced again by a search for this request (recoverable)"
               >
@@ -1084,6 +1110,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={() => onPromote(c)}
+                aria-label={`Reconsider ${c.name}`}
                 className="text-xs text-blue-600 hover:text-blue-800 ml-auto"
                 title="Return to the active candidate list"
               >
@@ -3135,7 +3162,7 @@ export default function ReviewerSearchSection({
                               {section.title} ({section.items.length})
                             </p>
                             {section.key === 'needs_review' && (
-                              <p className="text-xs text-gray-400 mb-1.5">
+                              <p className="text-xs text-gray-600 mb-1.5">
                                 These reviewers need an identity, address, eligibility, or record issue resolved before they can be added to Invite. Use the primary action shown on each card.
                               </p>
                             )}
