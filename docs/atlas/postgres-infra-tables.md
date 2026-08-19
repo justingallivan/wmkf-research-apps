@@ -144,6 +144,32 @@ returned zero eligible/enqueued/claimed/failed.
 **Source of truth:** Postgres-only.
 Cron-driven health checks (7 services), alert log, cron audit trail. `maintenance-service.js` writes; admin dashboard reads.
 
+### `operational_events` (0 rows at creation — migration 030 applied to production 2026-08-19)
+**Source of truth:** Postgres-only.
+**Schema:** durable structured operational events: `source` ('app' | 'vercel-drain'),
+`environment`, `event_type`, `subsystem`, `severity`, `status`
+('open'/'recovered'/'resolved'/'superseded'/'info'), redacted `summary`, `stage`,
+`transient`, `request_number`, `entity_refs JSONB`, `correlation_id`,
+`recovery_key`, unique-when-present `dedupe_key`, allowlisted `metadata JSONB`,
+`occurrence_count`, first/last occurrence timestamps, resolution fields.
+**Write paths:** `lib/services/operational-event-service.js` `recordEvent`
+(best-effort, never throws) — called by the `NotificationService.notify()`
+mirror (auto at error/critical, opt-in via `operationalEvent` at any severity)
+and drain ingestion `lib/services/vercel-log-drain-ingest.js` via
+`/api/webhooks/vercel-log-drain` (HMAC-verified, `vercel:<log id>` dedup).
+Recovery: `markRecovered`/`markSuperseded` (reviewer-acceptance drain
+completion/withdrawal edges; `AlertService.autoResolve` propagation).
+**Read paths:** `/api/admin/operational-events` → `OperationalEventsSection`
+in `pages/admin.js`.
+**Privacy boundary:** summaries pass `lib/utils/log-redactor.js`; metadata is
+depth/size/key-capped with a sensitive-key denylist; drain metadata is an
+explicit allowlist (never clientIp/userAgent/referer/JA3/JA4/headers/bodies).
+**Retention:** daily maintenance cron `cleanupOperationalEvents` — settled rows
+past `retention:operational_events_days` (default 90), open rows past 2x,
+hard 200k row cap.
+See `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` for the full design and
+activation runbook.
+
 ### `api_usage_log` (1,724 rows)
 **Source of truth:** Postgres-only.
 Per-Claude-call ledger (model, tokens, cost, latency). Written by `lib/services/llm-client.js` via `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`. Cost is computed locally from `lib/utils/model-pricing.js`; rows with an unknown model id land with `estimated_cost_cents = NULL` and are surfaced by the weekly `pricing-canary` cron. That same cron writes a `maintenance_runs` heartbeat and, when `CLAUDE_API_KEY` is available, compares Anthropic `/v1/models` against the reviewed capability/pricing registries to raise advisory `ops` alerts for newer Claude ids before runtime use.

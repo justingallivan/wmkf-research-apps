@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
@@ -533,6 +533,253 @@ function SystemAlertsSection() {
                   >
                     Resolve
                   </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+    </div>
+  );
+}
+
+// --- Section A3b: Operational Events (durable failures + Vercel drain) ---
+function OperationalEventsSection() {
+  const [events, setEvents] = useState([]);
+  const [summary, setSummary] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionInProgress, setActionInProgress] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('open');
+  const [severityFilter, setSeverityFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
+  // Generation guard: rapid filter changes issue overlapping fetches, and a
+  // slow older response must not overwrite a newer filter's results.
+  const fetchGenRef = useRef(0);
+
+  const fetchEvents = () => {
+    const gen = ++fetchGenRef.current;
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (statusFilter) params.set('status', statusFilter);
+    if (severityFilter) params.set('severity', severityFilter);
+    if (sourceFilter) params.set('source', sourceFilter);
+    if (search) params.set('search', search);
+    fetch(`/api/admin/operational-events?${params.toString()}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (gen !== fetchGenRef.current) return;
+        setEvents(data?.events || []);
+        setSummary(data?.summary || []);
+      })
+      .catch(() => {
+        if (gen !== fetchGenRef.current) return;
+        setEvents([]); setSummary([]);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setLoading(false);
+      });
+  };
+
+  useEffect(() => { fetchEvents(); }, [statusFilter, severityFilter, sourceFilter, search]);
+
+  const handleAction = async (event, action) => {
+    setActionInProgress(event.id);
+    try {
+      const res = await fetch('/api/admin/operational-events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: event.id,
+          action,
+          // Freshness precondition: the server refuses (409) if the row
+          // changed since this list rendered, so a stale view can't close a
+          // newly recurrent incident. A 409 just refetches the live state.
+          expectedStatus: event.status,
+          expectedLastOccurredAt: event.last_occurred_at,
+        }),
+      });
+      if (res.ok || res.status === 409) fetchEvents();
+    } catch {}
+    setActionInProgress(null);
+  };
+
+  const severityColors = {
+    critical: 'bg-red-100 text-red-800 border-red-200',
+    error: 'bg-red-50 text-red-700 border-red-200',
+    warning: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+    info: 'bg-blue-50 text-blue-700 border-blue-200',
+  };
+
+  const severityDots = {
+    critical: 'bg-red-500',
+    error: 'bg-red-400',
+    warning: 'bg-yellow-400',
+    info: 'bg-blue-400',
+  };
+
+  // Every status renders exactly one badge; unknown values fall through to a
+  // visible gray badge rather than disappearing.
+  const statusBadges = {
+    open: 'bg-red-100 text-red-700',
+    recovered: 'bg-green-100 text-green-700',
+    resolved: 'bg-gray-200 text-gray-600',
+    superseded: 'bg-gray-100 text-gray-500',
+    info: 'bg-blue-100 text-blue-600',
+  };
+
+  const openCount = summary
+    .filter(s => s.status === 'open')
+    .reduce((acc, s) => acc + (s.count || 0), 0);
+
+  const selectClass = 'text-xs border border-gray-300 rounded px-1.5 py-1 bg-white text-gray-700';
+
+  return (
+    <div id="operational-events" className="scroll-mt-6">
+    <Card>
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 className="text-lg font-semibold text-gray-900">Operational Events</h2>
+        <span className="text-sm text-gray-500">
+          {openCount > 0 ? `${openCount} open in the last 7 days` : 'no open events in the last 7 days'}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectClass} aria-label="Status filter">
+          <option value="open">Open</option>
+          <option value="recovered">Recovered</option>
+          <option value="resolved">Resolved</option>
+          <option value="superseded">Superseded</option>
+          <option value="info">Info</option>
+          <option value="">All statuses</option>
+        </select>
+        <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className={selectClass} aria-label="Severity filter">
+          <option value="">All severities</option>
+          <option value="critical">Critical</option>
+          <option value="error">Error</option>
+          <option value="warning">Warning</option>
+          <option value="info">Info</option>
+        </select>
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={selectClass} aria-label="Source filter">
+          <option value="">All sources</option>
+          <option value="app">Application</option>
+          <option value="vercel-drain">Vercel drain</option>
+        </select>
+        <form
+          onSubmit={e => { e.preventDefault(); setSearch(searchDraft.trim()); }}
+          className="flex items-center gap-1"
+        >
+          <input
+            type="text"
+            value={searchDraft}
+            onChange={e => setSearchDraft(e.target.value)}
+            placeholder="Request #, entity ID, text…"
+            className="text-xs border border-gray-300 rounded px-2 py-1 w-48"
+            aria-label="Search operational events"
+          />
+          <button type="submit" className="px-2 py-1 text-xs bg-white hover:bg-gray-50 rounded border border-gray-300 text-gray-700">
+            Search
+          </button>
+          {search && (
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setSearchDraft(''); }}
+              className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              Clear
+            </button>
+          )}
+        </form>
+      </div>
+
+      {loading ? (
+        <div className="text-gray-500 text-sm">Loading events...</div>
+      ) : events.length === 0 ? (
+        <p className="text-gray-500 text-sm">No matching operational events.</p>
+      ) : (
+        <div className="space-y-2">
+          {events.map(event => (
+            <div
+              key={event.id}
+              className={`p-3 rounded-lg border ${severityColors[event.severity] || severityColors.info}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${severityDots[event.severity] || 'bg-gray-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium break-all">{event.summary}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusBadges[event.status] || 'bg-gray-100 text-gray-500'}`}>
+                        {event.status}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/50 text-gray-600">
+                        {String(event.event_type || '').replace(/_/g, ' ')}
+                      </span>
+                      {event.occurrence_count > 1 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/50 text-gray-600">
+                          ×{event.occurrence_count}
+                        </span>
+                      )}
+                      {event.transient === true && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/50 text-gray-500">
+                          transient
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-600 mt-0.5">
+                      {new Date(event.last_occurred_at).toLocaleString()}
+                      {` · ${event.source}`}
+                      {event.subsystem && ` · ${event.subsystem}`}
+                      {event.stage && ` · ${event.stage}`}
+                      {event.request_number && ` · request ${event.request_number}`}
+                    </div>
+                    {expandedId === event.id && (
+                      <div className="mt-2 text-xs text-gray-700 space-y-1">
+                        {event.correlation_id && <p>Correlation: {event.correlation_id}</p>}
+                        {event.resolution_note && <p>Note: {event.resolution_note}</p>}
+                        {event.entity_refs && (
+                          <pre className="bg-white/50 p-2 rounded text-[11px] overflow-x-auto max-h-32">
+                            {JSON.stringify(event.entity_refs, null, 2)}
+                          </pre>
+                        )}
+                        {event.metadata && (
+                          <pre className="bg-white/50 p-2 rounded text-[11px] overflow-x-auto max-h-40">
+                            {JSON.stringify(event.metadata, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => setExpandedId(expandedId === event.id ? null : event.id)}
+                    className="p-1 text-xs text-gray-500 hover:text-gray-700 rounded"
+                    title={expandedId === event.id ? 'Collapse' : 'Expand'}
+                  >
+                    {expandedId === event.id ? '▲' : '▼'}
+                  </button>
+                  {event.status === 'open' && (
+                    <button
+                      onClick={() => handleAction(event, 'resolve')}
+                      disabled={actionInProgress === event.id}
+                      className="px-2 py-1 text-xs bg-white/70 hover:bg-white rounded border border-gray-300 text-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      Resolve
+                    </button>
+                  )}
+                  {(event.status === 'resolved' || event.status === 'recovered' || event.status === 'superseded') && (
+                    <button
+                      onClick={() => handleAction(event, 'reopen')}
+                      disabled={actionInProgress === event.id}
+                      className="px-2 py-1 text-xs bg-white/70 hover:bg-white rounded border border-gray-300 text-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      Reopen
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2945,6 +3192,7 @@ export default function AdminDashboard() {
         <HealthSection />
         <HealthHistorySection />
         <SystemAlertsSection />
+        <OperationalEventsSection />
         <MaintenanceSection />
         <SecretExpirationSection />
         <CollapsibleCard

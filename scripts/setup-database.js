@@ -590,6 +590,59 @@ const v37Statements = [
      ON review_synthesis_jobs (status)`,
 ];
 
+// V38: Durable operational events (app-recorded failures/recoveries +
+// selected Vercel Log Drain entries). Existing databases use migration
+// 030_operational_events.sql; this fresh-install block creates the same
+// table directly. Summaries are redacted and metadata is allowlisted before
+// insert — no secrets, tokens, bodies, raw emails, IPs, or user agents.
+const v38Statements = [
+  `CREATE TABLE IF NOT EXISTS operational_events (
+    id BIGSERIAL PRIMARY KEY,
+    source TEXT NOT NULL
+      CONSTRAINT operational_events_source_check
+      CHECK (source IN ('app', 'vercel-drain')),
+    environment TEXT,
+    event_type TEXT NOT NULL,
+    subsystem TEXT,
+    severity TEXT NOT NULL
+      CONSTRAINT operational_events_severity_check
+      CHECK (severity IN ('info', 'warning', 'error', 'critical')),
+    status TEXT NOT NULL DEFAULT 'open'
+      CONSTRAINT operational_events_status_check
+      CHECK (status IN ('open', 'recovered', 'resolved', 'superseded', 'info')),
+    summary TEXT NOT NULL,
+    stage TEXT,
+    transient BOOLEAN,
+    request_number TEXT,
+    entity_refs JSONB,
+    correlation_id TEXT,
+    recovery_key TEXT,
+    dedupe_key TEXT,
+    metadata JSONB,
+    occurrence_count INTEGER NOT NULL DEFAULT 1,
+    first_occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status_changed_at TIMESTAMPTZ,
+    resolved_by INTEGER REFERENCES user_profiles(id),
+    resolution_note TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_operational_events_dedupe
+     ON operational_events (dedupe_key) WHERE dedupe_key IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_last_occurred
+     ON operational_events (last_occurred_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_status_severity
+     ON operational_events (status, severity)`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_event_type
+     ON operational_events (event_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_request_number
+     ON operational_events (request_number) WHERE request_number IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_recovery_open
+     ON operational_events (recovery_key) WHERE recovery_key IS NOT NULL AND status = 'open'`,
+  `CREATE INDEX IF NOT EXISTS idx_operational_events_correlation
+     ON operational_events (correlation_id) WHERE correlation_id IS NOT NULL`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1273,6 +1326,24 @@ async function runMigration() {
           console.log(`[v37-${i + 1}/${v37Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v37-${i + 1}/${v37Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V38 table creation (durable operational events)
+    console.log(`\nApplying v38 schema updates - Operational events (${v38Statements.length} statements)...`);
+    for (let i = 0; i < v38Statements.length; i++) {
+      const statement = v38Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v38-${i + 1}/${v38Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v38-${i + 1}/${v38Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v38-${i + 1}/${v38Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

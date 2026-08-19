@@ -74,6 +74,10 @@ function pngFile() {
   return new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'fig.png', { type: 'image/png' });
 }
 
+function unsupportedImageFile() {
+  return new File([new Uint8Array([0x49, 0x49, 0x2a, 0x00])], 'figure.tif', { type: 'image/tiff' });
+}
+
 afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
 const submitBtn = () => screen.getByRole('button', { name: /^submit$/i });
@@ -162,6 +166,17 @@ test('checking the waiver alone does NOT enable submit without an image', () => 
   expect(submitBtn()).toBeDisabled();
 });
 
+test('unsupported image types are rejected before submit', () => {
+  renderForm();
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [unsupportedImageFile()] } });
+  acknowledgeWaiver();
+
+  expect(screen.getByRole('alert')).toHaveTextContent(/jpeg, png, or webp/i);
+  expect(screen.getByRole('alert')).toHaveTextContent(/tiff, heic, gif, word, and powerpoint/i);
+  expect(submitBtn()).toBeDisabled();
+});
+
 test('an already-on-file image satisfies the image requirement (no re-upload needed)', () => {
   renderForm({ deliverable: { ...deliverable, hasImage: true, caption: 'Existing caption.' } });
   acknowledgeWaiver();
@@ -201,5 +216,18 @@ test('a failed submit surfaces an error and re-enables the button', async () => 
   fireEvent.click(submitBtn());
 
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/scan failed/i));
+  expect(submitBtn()).toBeEnabled();
+});
+
+test('a server reason is translated into a useful submit error', async () => {
+  jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, json: async () => ({ ok: false, reason: 'image_invalid' }) });
+  renderForm();
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not be accepted/i));
+  expect(screen.getByRole('alert')).toHaveTextContent(/tiff, heic, gif, word, or powerpoint/i);
   expect(submitBtn()).toBeEnabled();
 });
