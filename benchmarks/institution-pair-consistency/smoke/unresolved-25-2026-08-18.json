@@ -1,0 +1,236 @@
+{
+  "selection": "All active unresolved institution-mismatch roster rows retaining both compared institutions (15), plus the 10 most recently updated rows lacking a reconstructable pair; no names, emails, request IDs, or candidate keys retained",
+  "capturedAt": "2026-08-19T04:41:53.150Z",
+  "population": {
+    "activeUnresolvedMismatch": 36,
+    "comparable": 15,
+    "insufficient": 21
+  },
+  "cases": [
+    {
+      "caseId": "unresolved-f9b213526332",
+      "capturedUpdatedAt": "2026-08-18T22:17:25.962Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_location_decoration",
+      "evidenceInstitution": "Lamont-Doherty Earth Observatory, Columbia University, Palisades, NY 10964.",
+      "recordedInstitution": "Lamont Doherty Earth Observatory, Columbia University"
+    },
+    {
+      "caseId": "unresolved-a84e6c6e46e5",
+      "capturedUpdatedAt": "2026-08-18T22:17:25.839Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Earth, Atmospheric, and Planetary Science, Purdue University, West Lafayette, IN 47907.",
+      "recordedInstitution": "Purdue University"
+    },
+    {
+      "caseId": "unresolved-d70586a585f6",
+      "capturedUpdatedAt": "2026-08-18T14:22:19.754Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Microbiology, Harvard Medical School, Boston, MA, USA.",
+      "recordedInstitution": "Harvard Medical School"
+    },
+    {
+      "caseId": "unresolved-24810991224e",
+      "capturedUpdatedAt": "2026-08-18T14:22:19.400Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "organization_granularity_requires_review",
+      "evidenceInstitution": "Department of Biochemistry, Duke University School of Medicine, Durham, NC, USA. [email removed].",
+      "recordedInstitution": "Duke University"
+    },
+    {
+      "caseId": "unresolved-83ce8914d857",
+      "capturedUpdatedAt": "2026-08-13T18:36:18.545Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "multiple_organizations_require_review",
+      "evidenceInstitution": "Department of Biochemistry and Biophysics, University of California, San Francisco, San Francisco, CA, USA; Howard Hughes Medical Institute…",
+      "recordedInstitution": "University of California, San Francisco"
+    },
+    {
+      "caseId": "unresolved-888808befc3f",
+      "capturedUpdatedAt": "2026-08-13T18:36:18.160Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "distinct_organizations",
+      "evidenceInstitution": "Department of Molecular Biology and Genetics, Cornell University, Ithaca, New York 14853, United States.",
+      "recordedInstitution": "Yale University"
+    },
+    {
+      "caseId": "unresolved-30ef5475b6e0",
+      "capturedUpdatedAt": "2026-08-11T18:21:23.210Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "organization_granularity_requires_review",
+      "evidenceInstitution": "University of Texas Institute for Geophysics, Jackson School of Geosciences, University of Texas at Austin, Austin, TX 78754, USA.",
+      "recordedInstitution": "The University of Texas at Austin"
+    },
+    {
+      "caseId": "unresolved-9eb2d6bb6876",
+      "capturedUpdatedAt": "2026-08-11T18:21:22.967Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "distinct_organizations",
+      "evidenceInstitution": "Department of Geology, University of Kansas, Lawrence, KS, USA.",
+      "recordedInstitution": "University of Pennsylvania"
+    },
+    {
+      "caseId": "unresolved-2569b1946dd0",
+      "capturedUpdatedAt": "2026-08-07T19:42:24.872Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "related_independent_organizations",
+      "evidenceInstitution": "Department of Cancer Biology, Dana-Farber Cancer Institute, Boston, MA, USA. [email removed].",
+      "recordedInstitution": "Harvard University"
+    },
+    {
+      "caseId": "unresolved-0e43e7bca20d",
+      "capturedUpdatedAt": "2026-08-07T00:11:57.509Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "multiple_organizations_require_review",
+      "evidenceInstitution": "Nash Family Department of Neuroscience, Friedman Brain Institute, Icahn School of Medicine at Mount Sinai, New York, New York 10029, USA.",
+      "recordedInstitution": "Howard Hughes Medical Institute"
+    },
+    {
+      "caseId": "unresolved-5c277235d507",
+      "capturedUpdatedAt": "2026-08-07T00:11:57.133Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Bioengineering, Stanford University, Stanford, CA 94305.",
+      "recordedInstitution": "Stanford University"
+    },
+    {
+      "caseId": "unresolved-69090881d690",
+      "capturedUpdatedAt": "2026-08-07T00:11:56.890Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Biomedical Engineering, Duke University, Durham, NC, USA.",
+      "recordedInstitution": "Duke University"
+    },
+    {
+      "caseId": "unresolved-365d3af38651",
+      "capturedUpdatedAt": "2026-08-06T00:26:59.504Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Chemistry and Biochemistry, University of California, Santa Barbara, Santa Barbara, United States.",
+      "recordedInstitution": "University of California Santa Barbara"
+    },
+    {
+      "caseId": "unresolved-97d16b3bdc69",
+      "capturedUpdatedAt": "2026-08-06T00:26:58.987Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Chemistry and Biomolecular Sciences, University of Ottawa, 10 Marie-Curie, Ottawa, ON K1N 6N5, Canada.",
+      "recordedInstitution": "University of Ottawa"
+    },
+    {
+      "caseId": "unresolved-a6e6bd5c0fab",
+      "capturedUpdatedAt": "2026-08-05T01:13:41.627Z",
+      "caseKind": "institution_pair",
+      "expectedDisposition": "auto_clear",
+      "expectedReasonClass": "same_organization_with_department_and_location_decoration",
+      "evidenceInstitution": "Department of Mechanical and Aerospace Engineering, University of California at Los Angeles, Los Angeles, CA, USA. [email removed].",
+      "recordedInstitution": "University of California, Los Angeles"
+    },
+    {
+      "caseId": "unresolved-07fb76d5ecff",
+      "capturedUpdatedAt": "2026-08-12T21:29:41.412Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Center for Translational Cancer Research, Institute of Biosciences and Technology, Texas A&M University, Houston, TX, USA. [email removed].",
+      "currentReasonClass": "identity_not_probable"
+    },
+    {
+      "caseId": "unresolved-5eb50b42a355",
+      "capturedUpdatedAt": "2026-08-06T16:13:23.092Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Division of Bacteriology & Mycology, ICAR-Indian Veterinary Research Institute, Bareilly, India.",
+      "currentReasonClass": "identity_not_probable"
+    },
+    {
+      "caseId": "unresolved-72c7eebfb78e",
+      "capturedUpdatedAt": "2026-08-06T00:26:59.241Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "UCLA",
+      "currentReasonClass": "identity_not_probable"
+    },
+    {
+      "caseId": "unresolved-aa1df2627290",
+      "capturedUpdatedAt": "2026-08-05T01:13:41.492Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "National Center for Chronic and Noncommunicable Disease Control and Prevention, Chinese Center for Disease Control and Prevention, Beijing, 100050, China. [email removed].",
+      "currentReasonClass": "identity_not_probable"
+    },
+    {
+      "caseId": "unresolved-a332f3cc7386",
+      "capturedUpdatedAt": "2026-08-02T05:56:01.013Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Stony Brook University",
+      "currentReasonClass": "other_unresolved"
+    },
+    {
+      "caseId": "unresolved-082466b29d1e",
+      "capturedUpdatedAt": "2026-08-02T05:56:00.775Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "University of Ottawa",
+      "currentReasonClass": "other_unresolved"
+    },
+    {
+      "caseId": "unresolved-b473c5a6674c",
+      "capturedUpdatedAt": "2026-08-01T03:15:46.957Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Tufts University School of Medicine",
+      "currentReasonClass": "other_unresolved"
+    },
+    {
+      "caseId": "unresolved-a445d6cbb334",
+      "capturedUpdatedAt": "2026-07-29T20:00:53.314Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Department of Chemistry, Chicago Center for Theoretical Chemistry, James Franck Institute, and Institute for Biophysical Dynamics, The University of Chicago, Chicago, IL 60637, USA. Electronic address: [email removed].",
+      "currentReasonClass": "other_unresolved"
+    },
+    {
+      "caseId": "unresolved-2df9e638deb8",
+      "capturedUpdatedAt": "2026-07-29T20:00:53.189Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Rice University",
+      "currentReasonClass": "identity_not_probable"
+    },
+    {
+      "caseId": "unresolved-9898c7eec1b4",
+      "capturedUpdatedAt": "2026-07-29T20:00:52.935Z",
+      "caseKind": "insufficient_pair_evidence",
+      "expectedDisposition": "surface",
+      "expectedReasonClass": "insufficient_identity_evidence",
+      "suggestedInstitution": "Department of Chemistry, Stanford University, Stanford, California 94305, United States.",
+      "currentReasonClass": "other_unresolved"
+    }
+  ]
+}

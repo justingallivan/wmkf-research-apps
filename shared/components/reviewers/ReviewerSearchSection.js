@@ -55,6 +55,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   getCandidatePromotionDecision,
+  getCandidateReasonPresentation,
   correlateSaveResultsToRosterCandidates,
   getCandidateEmailReadiness,
   normalizeReviewerName,
@@ -368,7 +369,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   // save-rejected, but shown amber because independent current evidence
   // contradicts the low-trust match that triggered it.
   const hasAnyCOI = (hasInstitutionCOI && !isFlaggedInstitutionCOI) || hasStrongCoauthorCOI;
-  const reason = c.reasoning || c.generatedReasoning || null;
+  const reasonPresentation = getCandidateReasonPresentation(c);
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];
   // Distinguish "0 publications" (a resolved profile with genuinely no recent
@@ -710,10 +711,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           {identityUnverified && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
               <span className="font-medium">Identity confirmation required.</span>{' '}
-              Confirm the exact person and email before adding this reviewer to Invite.
+              {openIdentityRemedy
+                ? 'Review the evidence below. If it belongs to this person, use Confirm identity and correct the contact details. Otherwise choose Not a fit.'
+                : 'Review the evidence below. If it does not belong to this person, choose Not a fit. If it does, retry enrichment after the linked reviewer record is repaired.'}
             </div>
           )}
-          {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Suggested because: </span>{reason}</p>}
+          {reasonPresentation && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">{reasonPresentation.label} </span>{reasonPresentation.text}</p>}
 
           {c.identityNote && <p className="text-[11px] text-gray-500 mt-2 italic border-t border-gray-100 pt-1.5">{c.identityNote}</p>}
 

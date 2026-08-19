@@ -187,6 +187,40 @@ export function getCandidatePromotionDecision(candidate) {
   };
 }
 
+export const CANDIDATE_REASON_PRESENTATION = Object.freeze({
+  suggestion: Object.freeze({
+    label: 'Suggested because:',
+    remedyId: null,
+  }),
+  identity_review: Object.freeze({
+    label: 'Why this needs review:',
+    remedyId: 'confirm_identity',
+  }),
+  record_repair: Object.freeze({
+    label: 'Why this needs repair:',
+    remedyId: 'create_repair_request',
+  }),
+});
+
+/**
+ * Closed presentation contract for candidate reasoning. `reasoning` is used
+ * both for positive recommendation rationale and for fail-closed identity
+ * explanations; this projection prevents negative copy from inheriting the
+ * positive "Suggested because" label and names the corresponding remedy.
+ */
+export function getCandidateReasonPresentation(candidate) {
+  const text = candidate?.reasoning || candidate?.generatedReasoning || null;
+  if (!text) return null;
+  const decision = getCandidatePromotionDecision(candidate)?.decision;
+  const unresolvedIdentity = candidate?.identityStatus === 'unresolved'
+    || candidate?.verificationStatus === 'unresolved'
+    || candidate?.needsIdentification === true;
+  const kind = decision === 'needs_record_repair'
+    ? 'record_repair'
+    : (unresolvedIdentity ? 'identity_review' : 'suggestion');
+  return { kind, text, ...CANDIDATE_REASON_PRESENTATION[kind] };
+}
+
 /**
  * Stable correlation key for one surfaced candidate row.
  *

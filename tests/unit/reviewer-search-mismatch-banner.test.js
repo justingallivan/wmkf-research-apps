@@ -70,7 +70,11 @@ test('applicant-referred mismatch banner attributes the applicant and never fabr
   expect(attribution).toBeInTheDocument();
   expect(screen.queryByText(/a different institution/)).not.toBeInTheDocument();
   expect(screen.getByText(/retrieved publications could not be reconciled with it/)).toBeInTheDocument();
-  expect(screen.getByText(/Suggested because:/).parentElement).toHaveTextContent('Could not confirm this is the right person');
+  expect(screen.getByText(/Why this needs review:/).parentElement).toHaveTextContent('Could not confirm this is the right person');
+  expect(screen.queryByText(/Suggested because:/)).not.toBeInTheDocument();
+  expect(screen.getByText(/retry enrichment after the linked reviewer record is repaired/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /confirm identity for Dr Applicant Referred/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /not a fit: Dr Applicant Referred/i })).toBeInTheDocument();
 });
 
 test('non-applicant mismatch uses source-neutral attribution and names the evidence institution neutrally', async () => {
