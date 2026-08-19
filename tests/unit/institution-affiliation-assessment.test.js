@@ -28,6 +28,7 @@ function assertion({
   text,
   sourceType = 'publication',
   currentness = 'current',
+  authorSpecific = true,
   resolution,
   segments,
 }) {
@@ -37,7 +38,7 @@ function assertion({
     sourceReference: 'fixture:source',
     observedAt: '2026-01-01',
     currentness,
-    authorSpecific: true,
+    authorSpecific,
     segments: segments || [{ rawText: text, resolution }],
   };
 }
@@ -85,6 +86,21 @@ describe('source-aware institution relationship truth', () => {
       },
       resolved(IDS.parent),
     )).toMatchObject({ relationship: 'parent_child', direction: 'left_child_of_right' });
+  });
+
+  test('abstains when two unidentifiable subunits share the same parent', () => {
+    const subunit = () => ({
+      status: 'resolved',
+      sourceRorId: null,
+      canonicalRorId: IDS.parent,
+      organizationScope: 'subunit',
+      parentRorId: IDS.parent,
+      relationships: [],
+    });
+    expect(relationshipBetween(subunit(), subunit())).toMatchObject({
+      relationship: 'unresolved',
+      reason: 'shared_parent_subunit_identity_unresolved',
+    });
   });
 
   test('never collapses siblings sharing a parent', () => {
@@ -141,6 +157,60 @@ describe('source-aware institution relationship truth', () => {
       }),
     });
     expect(assessment.relationship).toBe('unresolved');
+  });
+});
+
+describe('author-specific evidence authority', () => {
+  test.each([false, 'unknown'])('%p evidence cannot create a current-conflict veto', (authorSpecific) => {
+    const assessment = assessAffiliationRelationship({
+      evidenceAssertion: assertion({
+        text: 'Unattributed publication institution',
+        authorSpecific,
+        resolution: resolved(IDS.childA),
+      }),
+      recordedAssertion: assertion({
+        text: 'Recorded institution',
+        sourceType: 'staff_record',
+        resolution: resolved(IDS.other),
+      }),
+    });
+    expect(assessment).toMatchObject({
+      relationship: 'distinct',
+      evidenceContext: 'unresolved',
+    });
+    expect(evaluateAffiliationPolicy({
+      assessment,
+      consumer: 'candidate_selectability',
+      independentIdentity: identity(true),
+    })).toMatchObject({
+      effect: 'neutral',
+      action: 'allow_if_other_identity_gates_pass',
+      reason: 'unresolved',
+    });
+  });
+
+  test('non-author-specific compatibility cannot add identity weight', () => {
+    const assessment = assessAffiliationRelationship({
+      evidenceAssertion: assertion({
+        text: 'Unattributed publication institution',
+        authorSpecific: false,
+        resolution: resolved(IDS.childA),
+      }),
+      recordedAssertion: assertion({
+        text: 'Recorded institution',
+        sourceType: 'staff_record',
+        resolution: resolved(IDS.childA),
+      }),
+    });
+    expect(evaluateAffiliationPolicy({
+      assessment,
+      consumer: 'identity_anchor',
+      independentIdentity: identity(true),
+    })).toMatchObject({
+      effect: 'neutral',
+      action: 'no_affiliation_weight',
+      reason: 'unresolved',
+    });
   });
 });
 

@@ -102,6 +102,13 @@ describe('provider-independent Tier-0 institution sameness', () => {
     )).toMatchObject({ verdict: 'insufficient', disposition: 'surface' });
   });
 
+  test('does not ignore a named organization before an address suffix', () => {
+    expect(classify(
+      'Stanford University, Genentech, South San Francisco, CA 94080',
+      'Stanford University',
+    )).toMatchObject({ verdict: 'insufficient', disposition: 'surface' });
+  });
+
   test('missing operands fail closed with a real remedy id', () => {
     expect(classify(null, 'Stanford University')).toEqual({
       verdict: 'insufficient',

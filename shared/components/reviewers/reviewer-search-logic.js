@@ -212,12 +212,19 @@ export function getCandidateReasonPresentation(candidate) {
   const text = candidate?.reasoning || candidate?.generatedReasoning || null;
   if (!text) return null;
   const decision = getCandidatePromotionDecision(candidate)?.decision;
+  const explicitServerIdentityReview = decision === 'needs_identity_confirmation'
+    && Boolean(
+      candidate?.serverIdentityReviewReason
+        || candidate?.contactEnrichment?.dataverseContactEvidence?.reason,
+    );
   const unresolvedIdentity = candidate?.identityStatus === 'unresolved'
     || candidate?.verificationStatus === 'unresolved'
     || candidate?.needsIdentification === true;
   const kind = decision === 'needs_record_repair'
     ? 'record_repair'
-    : (unresolvedIdentity ? 'identity_review' : 'suggestion');
+    : (explicitServerIdentityReview || unresolvedIdentity
+        ? 'identity_review'
+        : 'suggestion');
   return { kind, text, ...CANDIDATE_REASON_PRESENTATION[kind] };
 }
 

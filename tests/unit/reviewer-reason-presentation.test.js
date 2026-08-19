@@ -31,6 +31,19 @@ describe('candidate reasoning presentation contract', () => {
     });
   });
 
+  test('server-required identity review cannot inherit positive suggestion framing', () => {
+    expect(getCandidateReasonPresentation({
+      reasoning: 'The ORCID and email resolve to different people.',
+      identityStatus: 'probable',
+      serverIdentityReviewReason: 'orcid_email_split',
+      pdIdentityConfirmed: false,
+    })).toMatchObject({
+      kind: 'identity_review',
+      label: 'Why this needs review:',
+      remedyId: 'confirm_identity',
+    });
+  });
+
   test('positive rationale keeps the suggestion label', () => {
     expect(getCandidateReasonPresentation({
       reasoning: 'Their work directly addresses the proposal.',
