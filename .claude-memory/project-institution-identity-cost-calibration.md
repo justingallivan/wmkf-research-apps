@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-19 (Stage 2 presentation implemented behind a default-off flag; identity, selection, and write authority unchanged)
+  last_verified: 2026-08-19 (Stage 2 low-authority presentation Production-live behind exact-on rollout flag; identity, selection, and write authority unchanged)
   originSessionId: 363a2e80-2dd8-483e-9088-3193c321799e
   modified: 2026-08-19T00:00:00.000Z
 ---
@@ -42,8 +42,10 @@ affiliation handling, and total five-consumer policy exist. The 25-case gate
 passes 25/25 with zero sibling collapses, unsafe clears, manufactured reviews,
 or live-capture provider failures. The owner authorized Stage 2 presentation,
 and candidate cards plus post-acceptance staff notifications now have bounded
-typed projections behind the default-off
-`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION` flag. Candidate selection,
+typed projections behind the exact-on
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION` rollout flag, enabled in
+Production on 2026-08-19 after signed-in synthetic Preview acceptance.
+Candidate selection,
 identity weighting, and writes still use the incumbent contracts. A production
 roster audit found source-ready affiliation evidence but sparse machine-
 verifiable non-affiliation identity breakdowns, so the benchmark's identity-

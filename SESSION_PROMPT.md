@@ -1,4 +1,4 @@
-# Session 446 Handoff: Stage 2 Synthetic Preview Acceptance Complete
+# Session 446 Handoff: Stage 2 Institution Presentation Production-Live
 
 ## Session 445 Summary
 
@@ -7,8 +7,8 @@ then moved the institution-affiliation strategy onto
 `codex/institution-decision-harness`. The Preview smoke harness commit is
 `80f2d739`.
 The owner authorized Stage 2 notification and explanatory-card presentation;
-it is implemented behind a default-off flag with no identity, selectability, or
-Dataverse-write authority.
+it is Production-live behind an exact-`on` rollout flag with no identity,
+selectability, or Dataverse-write authority.
 
 ### What Was Completed
 
@@ -61,7 +61,7 @@ Dataverse-write authority.
    - Corrected explicit server identity-review reasoning so it cannot render
      beneath the positive `Suggested because:` label.
 
-5. **Stage 2 institution presentation implemented, default off**
+5. **Stage 2 institution presentation implemented with default-off rollback**
    - Added source-aware typed projections for post-acceptance staff
      notifications and reviewer candidate-card explanations/remedies.
    - Preserved the incumbent boolean as the only selection, identity, and write
@@ -104,6 +104,19 @@ Dataverse-write authority.
      were removed, the four permanent callbacks were verified, and clean
      default-off Preview deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
 
+7. **Stage 2 promoted and enabled in Production**
+   - PR #126 merged the institution decision harness to `main` at `8c64ec76`.
+     Jest, Playwright, Claude review, Vercel, Semgrep, Trivy, and Gitleaks all
+     passed.
+   - A read-only Vercel environment probe independently verified
+     `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION="on"` for Production. The
+     variable predates the merge deployment, so Ready Production deployment
+     `dpl_85jgQ2c4jR6V599KycEHcbww5Xag` contains the flag-on client bundle and
+     server behavior.
+   - This promotion changes only source-aware notification and explanatory-card
+     presentation. Candidate selectability, identity weighting, and Dataverse
+     write authority remain on the incumbent boolean contracts.
+
 ### Commits
 
 - `45ea7456` — Add reviewer materials to Proposal tab
@@ -134,19 +147,19 @@ Dataverse-write authority.
 - `e217f6ef` — Hand off Stage 2 institution validation
 - `0089822` — Address Stage 2 adversarial findings
 - `80f2d739` — Add signed-in Stage 2 Preview smoke page
+- `8c64ec76` — Merge PR #126 and promote Stage 2 presentation to Production
 
 ## Next Items
 
 ### Verified Open
 
-1. **Choose an evidence threshold for Stage 2 Production enablement.**
-   Evidence: signed-in synthetic Preview acceptance now proves all six card
+1. **Observe Stage 2 Production outcomes during the two-week rollout window.**
+   Evidence: signed-in synthetic Preview acceptance proves all six card
    presentations, all eight mapped notice actions, the no-write boundary, and
-   exact flag rollback. Production currently has zero persisted Stage 2 DTOs,
-   so no organic false-clear, alert-volume, or manual-review-reduction sample
-   exists. Keep the Production flag off unless the owner explicitly accepts the
-   synthetic evidence or chooses a non-mutating observation period that can
-   produce real rows.
+   exact flag rollback. The pre-enable Production audit found zero persisted
+   Stage 2 DTOs, so organic false-clear, alert-volume, and manual-review-
+   reduction evidence must now come from normal Production use without
+   manufacturing roster rows.
 
 2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
    Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
@@ -163,12 +176,12 @@ Dataverse-write authority.
 
 ### Owner Decision Needed
 
-1. **Authorize, defer, or decline Production flag enablement.**
-   Evidence: Stage 2 is implemented and synthetic Preview acceptance passed,
-   but real-world effectiveness and alert-volume evidence remain unavailable.
-   Production enablement requires a new build because the flag is
-   `NEXT_PUBLIC`; the exact unset/`off` path independently restores incumbent
-   presentation.
+1. **After the observation window, retain or remove the rollout flag.**
+   Evidence: Stage 2 is Production-live, but real-world effectiveness and alert-
+   volume evidence are still accumulating. The exact unset/`off` path restores
+   incumbent presentation. If Production behavior is stable and Stage 2 remains
+   the intended default, remove the temporary flag from code and configuration;
+   a reminder is scheduled for 2026-09-02.
 
 ### Parked
 
@@ -189,10 +202,9 @@ Dataverse-write authority.
    internal subunits that ROR does not model independently. Do not lower the
    production resolver threshold or overwrite the snapshot; use a new versioned
    capture and re-adjudication.
-2. Fetch and verify `origin/main` plus the feature-branch tip before merging or
-   making a production release. `80f2d739` is pushed to
-   `origin/codex/institution-decision-harness`; no merge or Production flag
-   change has been made.
+2. Stage 2 is merged and Production-live at `8c64ec76` / deployment
+   `dpl_85jgQ2c4jR6V599KycEHcbww5Xag`. Before changing or removing its rollout
+   flag, re-probe the live environment and verify the replacement deployment.
 3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
    handles, then moved them out of the worktree to
    `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was

@@ -3,7 +3,7 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Stage 2 source-aware notifications and reviewer-card explanations are implemented behind a default-off flag; boolean identity and write authority is unchanged."
+summary: "Stage 2 institution notifications and reviewer-card explanations are Production-live; identity, selection, and write authority remain unchanged."
 canonical: false
 cataloged: 2026-08-08
 last_verified: 2026-08-19
@@ -21,8 +21,8 @@ related:
 
 ## Current decision
 
-**STAGE 2 LOW-AUTHORITY PRESENTATION IMPLEMENTED BEHIND A DEFAULT-OFF FLAG,
-2026-08-19.** The owner accepted
+**STAGE 2 LOW-AUTHORITY PRESENTATION IS PRODUCTION-LIVE BEHIND AN EXACT-ON
+ROLLOUT FLAG, 2026-08-19.** The owner accepted
 **conditional neutrality** as the governing policy for unresolved affiliation
 evidence:
 
@@ -38,8 +38,9 @@ consumer actions in relationship labels such as `related-autoclear` and
 25-case evaluation are implemented. The owner subsequently authorized a Stage
 2 implementation limited to notification and explanatory reviewer-card
 presentation. That implementation is gated by
-`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`, defaults off, and does **not**
-change the frozen boolean-fixture vocabulary, candidate selectability, identity
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`; code defaults off, while the
+live Preview and Production environments are exact `on`. It does **not** change
+the frozen boolean-fixture vocabulary, candidate selectability, identity
 authority, or durable-write authority.
 
 Signed-in synthetic Preview acceptance completed on 2026-08-19. The
@@ -48,8 +49,9 @@ candidate card and exercised all mapped notice actions without an API or
 persistence call. This proves the low-authority UI contract and exact rollback;
 it does not supply organic false-clear, alert-volume, or review-reduction
 evidence because all 952 audited Production roster rows carried zero persisted
-Stage 2 presentation DTOs. Production remains default off pending an explicit
-owner decision on that evidence boundary.
+Stage 2 presentation DTOs before enablement. The owner accepted that bounded
+synthetic evidence for the low-authority rollout; organic effectiveness and
+alert-volume evidence must now be observed from normal Production use.
 
 A 2026-08-19 promotion review then falsified four untested boundaries. Commit
 `947fb46` hardened them before promotion: non-author-specific evidence cannot
@@ -76,12 +78,12 @@ two people are the same by itself.
 | Pair result exposed to consumers | **VERIFIED boolean only.** `areConsistent()` returns `true` or `false`; it does not expose relationship, currentness, or remedy. | `institution-affiliation-consistency.js:335-369` |
 | Enrichment authority | **VERIFIED high authority.** A false/error comparison contributes to `institutionContradicted`, which combines with the independent identity status in `identityNeedsReview` and gates researcher, ORCID, metrics, and COI writes. | `enrich-recommended-service.js:684-767,933-1005` |
 | ROR relationship substrate | **VERIFIED present but not available to pair consumers.** The candidate/decision layer reads typed ROR relationships and detects sibling conflicts; the identity wrapper returns only a hydrated identity or `null`, discarding the decision provenance needed for pair policy. | `ror-institution-decision.js`; `ror-institution-identity-resolver.js:63-114` |
-| Source/time-aware affiliation assessment | **VERIFIED at Stage 2 low-authority consumers behind a default-off flag.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Enrichment supplies publication/applicant and recorded-institution provenance to card presentation; the post-acceptance alert supplies reviewer-self-report and staff-record provenance. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; `institution-affiliation-stage2.js`; Stage 2 focused tests |
+| Source/time-aware affiliation assessment | **VERIFIED Production-live at Stage 2 low-authority consumers behind an exact-on rollout flag.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Enrichment supplies publication/applicant and recorded-institution provenance to card presentation; the post-acceptance alert supplies reviewer-self-report and staff-record provenance. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; `institution-affiliation-stage2.js`; Stage 2 focused tests; live Vercel env/deployment probes |
 | Typed consumer policy | **VERIFIED at Stage 2 presentation authority only.** The total evaluator still covers all five consumers and fails closed for unknown/high-authority inputs. Only candidate-card and staff-notification projections consume it; selectability and write gates continue to consume booleans and legacy flags. | `institution-affiliation-assessment.js`; `institution-affiliation-stage2.js`; focused tests |
-| Stage 2 runtime presentation | **VERIFIED implemented and synthetically accepted in signed-in Preview; default off, not promoted.** The versioned DTO is sanitized before roster persistence, stale caches re-enrich when the flag is on, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. The Preview-only harness pins six DTOs to the production projector and routes card actions to local state only. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; `pages/workbench/institution-stage2-smoke.js`; focused tests; flag-on build and signed-in Preview smoke |
+| Stage 2 runtime presentation | **VERIFIED Production-live after signed-in synthetic Preview acceptance.** PR #126 merged at `8c64ec76`; exact `on` is set in Production and Ready deployment `dpl_85jgQ2c4jR6V599KycEHcbww5Xag` was built afterward. The versioned DTO is sanitized before roster persistence, stale caches re-enrich when enabled, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; `pages/workbench/institution-stage2-smoke.js`; focused tests; signed-in Preview smoke; live Vercel env/deployment probes |
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
-| Promotion-review falsification | **VERIFIED hardened on branch.** Disconfirming tests now cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; focused unit and benchmark suites |
-| Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
+| Promotion-review falsification | **VERIFIED hardened and merged.** Disconfirming tests cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; PR #126; focused unit and benchmark suites |
+| Runtime independent-identity input | **PARTIAL / Stage 3 promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
 The shipped boolean comparator remains the sole identity, selectability, and
 durable-write authority until every high-authority consumer in this plan is
@@ -433,8 +435,8 @@ not compensate with another string heuristic.
 **Authority:** notification and explanatory UI only; no automated identity or
 Dataverse-write authority.
 
-**Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAG; SYNTHETIC SIGNED-IN PREVIEW
-ACCEPTANCE COMPLETE, 2026-08-19.**
+**Status: PRODUCTION-LIVE BEHIND EXACT-ON ROLLOUT FLAG AFTER SYNTHETIC SIGNED-IN
+PREVIEW ACCEPTANCE, 2026-08-19.**
 `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on` enables source-aware
 candidate-card explanations/remedies and post-acceptance staff notifications.
 The exact default/off path restores the incumbent boolean presentation. The
@@ -449,14 +451,23 @@ the real `CandidateCard`; eight displayed notice actions write only to local
 component state. The owner confirmed all six cases, the exact flag-on state, and
 the local action check on deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`.
 Focused coverage independently clicked all eight actions and asserted zero
-network calls. Cleanup removed the branch flag and temporary Entra callback;
-default-off deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+network calls. Cleanup removed the branch-specific flag and temporary Entra
+callback; default-off deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` completed
+that Preview test cycle.
+
+PR #126 subsequently merged the implementation to `main` at `8c64ec76`. A
+read-only environment pull independently verified exact `on` in Production,
+and Ready Production deployment `dpl_85jgQ2c4jR6V599KycEHcbww5Xag` was built
+after that variable was created. Stage 2 low-authority presentation and
+notification behavior is therefore live; unset/`off` remains the immediate
+rollback.
 
 This closes synthetic UI acceptance, not organic effectiveness sampling. A
 read-only Production audit found 952 roster rows and zero persisted Stage 2
 DTOs, so creating live examples would have mutated the shared roster. No claim
 of material manual-review reduction or bounded informational-alert volume has
-been made, and Production remains off pending an owner decision.
+been made. Those are post-enable observation gates, not claims established by
+the deployment itself.
 
 A fresh Claude Fable adversarial review returned **REWORK** before enablement:
 it found a flag-on cache loop for deceased rows and a provenance fallback that
@@ -465,7 +476,8 @@ could label applicant-entered text as historical publication evidence. Commit
 unexpected Stage 2 failure, and makes the edit affordance use the same exact
 flag/version/visibility gate as the rendered notice. The remaining review risk
 is operational: unresolved ROR comparisons can increase informational alert
-volume, which must be measured during Preview acceptance. Fable's fresh
+volume. Synthetic Preview could not measure that residual, so it is now a
+Production observation item. Fable's fresh
 post-fix review returned **APPROVE** with no P0/P1/P2 findings. Its residuals
 are copy-only: a deterministic-failure fallback remains on the incumbent copy
 until another enrichment or a presentation-version bump, and the edit-
@@ -479,7 +491,7 @@ Deliver:
 - historical/additional-affiliation notes; and
 - explicit provider-failure/retry copy.
 
-Go only when:
+Post-enable observation and rollback criteria:
 
 - **PENDING ORGANIC EVIDENCE:** sampled false-clear review finds no hidden
   current conflicts;
