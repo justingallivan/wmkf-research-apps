@@ -10,6 +10,23 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Reviewer identity remediation shipped; affiliation policy proven in shadow (Session 445)
+
+**Milestone:** Reviewer Finder identity failures now present durable, actionable repair paths in
+Production, and institution comparison has moved from string heuristics to a source-aware typed
+relationship/policy contract in a non-authoritative branch.
+**Sessions:** 445 (production incident remediation and UI consolidation; 25-case re-adjudication,
+Fable strategy review, source-aware implementation, and frozen ROR evaluation).
+**Ship state:** `origin/main` reached `5fcd913c` with compare-and-swap contact drafts, safe profile-URL
+validation, stale-authority invalidation, and card-level remedies. Branch
+`codex/institution-decision-harness` reached `23a40e89`; its shadow gate passes 25/25 relationship and
+action decisions with zero sibling collapses or unsafe clears, but no runtime consumer calls it.
+**Why it matters:** Staff can resolve real reviewer blocks without deciphering contradictory badges,
+while future institution UI/authority changes now have explicit source, time, relationship, remedy,
+and independent-identity boundaries instead of another string-matching exception.
+**Pointers:** `docs/REVIEWER_CONTACT_LEADS_SPEC.md`;
+`docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`; commits `d9c29c7d`, `5fcd913c`, `23a40e89`.
+
 ## August 2026 — Pre-Site-to-Site-Visit handoff and Phase II proposal access are Production-live (Session 444)
 
 **Milestone:** The Workbench now carries one governed Pre-Site Word workspace into the Site Visit
