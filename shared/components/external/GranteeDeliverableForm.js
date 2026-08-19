@@ -33,12 +33,43 @@ const WAIVER_LABEL =
   "By submitting, I give the W. M. Keck Foundation permission to publish the abstract, project title, my name and institution, and the image and caption I provide here in materials announcing this award, in print and online. I further confirm that I have the right to share the image I've uploaded.";
 
 const ACCEPTED_IMAGE_TYPES = 'image/png,image/jpeg,image/webp';
+const ACCEPTED_IMAGE_EXTENSIONS = /\.(png|jpe?g|webp)$/i;
+const ACCEPTED_IMAGE_TYPE_SET = new Set(ACCEPTED_IMAGE_TYPES.split(','));
 
 // Client-side size cap for a friendly pre-upload error. MUST match the server cap
 // (MAX_IMAGE_BYTES in lib/services/grantee-upload.js) — the server is the
 // enforcement of record; this is UX only.
 const MAX_IMAGE_MB = 10;
 const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+
+function isAcceptedImageFile(file) {
+  if (!file) return true;
+  if (file.type && ACCEPTED_IMAGE_TYPE_SET.has(file.type)) return true;
+  return ACCEPTED_IMAGE_EXTENSIONS.test(file.name || '');
+}
+
+function submitErrorMessage(data) {
+  const reason = data?.reason;
+  if (data?.error) return data.error;
+  const imageTypes = 'JPEG, PNG, or WEBP';
+  const messages = {
+    image_invalid: `That image could not be accepted. Please upload a ${imageTypes} file, not a TIFF, HEIC, GIF, Word, or PowerPoint file.`,
+    image_too_large: `That image is too large. Please upload a ${imageTypes} file under ${MAX_IMAGE_MB} MB.`,
+    empty_image: `That image appears to be empty. Please upload a ${imageTypes} file under ${MAX_IMAGE_MB} MB.`,
+    image_required: `Please upload a ${imageTypes} image before submitting.`,
+    too_many_files: 'Please upload one image file only.',
+    caption_required: 'Please add an image caption before submitting.',
+    caption_too_long: 'The image caption is too long. Please shorten it and submit again.',
+    abstract_required: 'Please include the abstract text before submitting.',
+    abstract_too_long: 'The abstract is too long. Please shorten it and submit again.',
+    waiver_invalid: 'Your publication-consent session expired. Please refresh the page, acknowledge the waiver again, and submit.',
+    conflict: 'This page is out of date. Please refresh and try again.',
+    not_editable: 'This request is no longer open for editing. Please contact Foundation staff for help.',
+    sharepoint_failed: 'The image upload service was unavailable. Please try again in a few minutes.',
+    scan_unavailable: 'The image safety scan was unavailable. Please try again in a few minutes.',
+  };
+  return messages[reason] || 'Submission failed. Please try again.';
+}
 
 export default function GranteeDeliverableForm({ token, deliverable, waiverPolicy, waiverToken, onSubmitted }) {
   const init = deliverable || {};
@@ -78,6 +109,12 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
 
   function handleImageChange(e) {
     const file = e.target.files?.[0] || null;
+    if (file && !isAcceptedImageFile(file)) {
+      setError('Please upload a JPEG, PNG, or WEBP image file. TIFF, HEIC, GIF, Word, and PowerPoint files cannot be submitted here.');
+      setImageFile(null);
+      e.target.value = ''; // let the grantee re-select the same file after converting it
+      return;
+    }
     if (file && file.size > MAX_IMAGE_BYTES) {
       setError(`That image is ${(file.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_IMAGE_MB} MB. Please upload a smaller file.`);
       setImageFile(null);
@@ -104,7 +141,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
       const res = await fetch(`/api/external/grantee/${token}/submit`, { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        setError(data.error || 'Submission failed. Please try again.');
+        setError(submitErrorMessage(data));
         setSubmitting(false);
         return;
       }
