@@ -10,6 +10,25 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Stage 2 institution presentation passed synthetic signed-in Preview acceptance
+
+**Milestone:** Source-aware institution explanations and remedies now have a safe, repeatable
+signed-in Preview acceptance surface that renders the production reviewer card without touching
+the shared roster.
+**Sessions:** 445–446 (typed policy/projection build, Fable adversarial review, Preview harness,
+signed-in owner acceptance, and cleanup).
+**Ship state:** Branch `codex/institution-decision-harness` reached `80f2d739`; the owner confirmed
+six projector-pinned cases and completed the local action check in flag-on Preview, while automated
+coverage exercised all eight local-only notice actions with no network call. Production remains
+default off. The temporary flag/callback were removed and clean Preview
+`dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+**Why it matters:** UI correctness, remedy availability, unresolved/provider-failure honesty, and
+rollback are now verified without inventing Production data. Organic false-clear, alert-volume,
+and review-reduction evidence remains open because 952 audited roster rows contained zero Stage 2
+DTOs.
+**Pointers:** `pages/workbench/institution-stage2-smoke.js`;
+`docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`; commit `80f2d739`.
+
 ## August 2026 — Durable operational observability is Production-live (operational_events + Log Drain endpoint)
 
 **Milestone:** Application failures now persist as structured, sanitized `operational_events` rows

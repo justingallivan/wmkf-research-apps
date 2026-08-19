@@ -42,6 +42,15 @@ presentation. That implementation is gated by
 change the frozen boolean-fixture vocabulary, candidate selectability, identity
 authority, or durable-write authority.
 
+Signed-in synthetic Preview acceptance completed on 2026-08-19. The
+Preview-only harness rendered six projector-pinned cases through the production
+candidate card and exercised all mapped notice actions without an API or
+persistence call. This proves the low-authority UI contract and exact rollback;
+it does not supply organic false-clear, alert-volume, or review-reduction
+evidence because all 952 audited Production roster rows carried zero persisted
+Stage 2 presentation DTOs. Production remains default off pending an explicit
+owner decision on that evidence boundary.
+
 A 2026-08-19 promotion review then falsified four untested boundaries. Commit
 `947fb46` hardened them before promotion: non-author-specific evidence cannot
 corroborate or contradict identity, two unidentifiable internal subunits sharing
@@ -69,7 +78,7 @@ two people are the same by itself.
 | ROR relationship substrate | **VERIFIED present but not available to pair consumers.** The candidate/decision layer reads typed ROR relationships and detects sibling conflicts; the identity wrapper returns only a hydrated identity or `null`, discarding the decision provenance needed for pair policy. | `ror-institution-decision.js`; `ror-institution-identity-resolver.js:63-114` |
 | Source/time-aware affiliation assessment | **VERIFIED at Stage 2 low-authority consumers behind a default-off flag.** Assertions retain source/currentness/author specificity, explicit multi-organization segments, source/canonical ROR ids, adjudicated internal-subunit scope, and typed relationships. Enrichment supplies publication/applicant and recorded-institution provenance to card presentation; the post-acceptance alert supplies reviewer-self-report and staff-record provenance. | `institution-affiliation-assessment.js`; `ror-affiliation-assertion-resolver.js`; `institution-affiliation-stage2.js`; Stage 2 focused tests |
 | Typed consumer policy | **VERIFIED at Stage 2 presentation authority only.** The total evaluator still covers all five consumers and fails closed for unknown/high-authority inputs. Only candidate-card and staff-notification projections consume it; selectability and write gates continue to consume booleans and legacy flags. | `institution-affiliation-assessment.js`; `institution-affiliation-stage2.js`; focused tests |
-| Stage 2 runtime presentation | **VERIFIED implemented, default off, not yet promoted.** The versioned DTO is sanitized before roster persistence, stale caches re-enrich when the flag is on, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; focused tests; flag-on webpack build |
+| Stage 2 runtime presentation | **VERIFIED implemented and synthetically accepted in signed-in Preview; default off, not promoted.** The versioned DTO is sanitized before roster persistence, stale caches re-enrich when the flag is on, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. The Preview-only harness pins six DTOs to the production projector and routes card actions to local state only. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; `pages/workbench/institution-stage2-smoke.js`; focused tests; flag-on build and signed-in Preview smoke |
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
 | Promotion-review falsification | **VERIFIED hardened on branch.** Disconfirming tests now cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; focused unit and benchmark suites |
 | Runtime independent-identity input | **PARTIAL / promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
@@ -424,15 +433,30 @@ not compensate with another string heuristic.
 **Authority:** notification and explanatory UI only; no automated identity or
 Dataverse-write authority.
 
-**Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAG, 2026-08-19; PREVIEW ACCEPTANCE
-PENDING.** `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on` enables source-aware
+**Status: IMPLEMENTED BEHIND DEFAULT-OFF FLAG; SYNTHETIC SIGNED-IN PREVIEW
+ACCEPTANCE COMPLETE, 2026-08-19.**
+`NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on` enables source-aware
 candidate-card explanations/remedies and post-acceptance staff notifications.
 The exact default/off path restores the incumbent boolean presentation. The
 implementation passes the frozen 25-case presentation projection, remedy,
 selection-authority, write-authority, provider-fallback, rollback, focused unit,
-type, lint, and flag-on production-build gates. Preview sampling is still
-required before the flag is enabled in Production; no claim of material
-manual-review reduction has yet been made.
+type, lint, and flag-on production-build gates.
+
+The signed-in Preview smoke used `pages/workbench/institution-stage2-smoke.js`,
+which is SSR-hidden outside Preview and guarded by reviewer access. Six static,
+non-sensitive cases are equality-pinned to the production projector and render
+the real `CandidateCard`; eight displayed notice actions write only to local
+component state. The owner confirmed all six cases, the exact flag-on state, and
+the local action check on deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`.
+Focused coverage independently clicked all eight actions and asserted zero
+network calls. Cleanup removed the branch flag and temporary Entra callback;
+default-off deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+
+This closes synthetic UI acceptance, not organic effectiveness sampling. A
+read-only Production audit found 952 roster rows and zero persisted Stage 2
+DTOs, so creating live examples would have mutated the shared roster. No claim
+of material manual-review reduction or bounded informational-alert volume has
+been made, and Production remains off pending an owner decision.
 
 A fresh Claude Fable adversarial review returned **REWORK** before enablement:
 it found a flag-on cache loop for deceased rows and a provenance fallback that
@@ -457,12 +481,15 @@ Deliver:
 
 Go only when:
 
-- sampled false-clear review finds no hidden current conflicts;
-- 100% of held cards expose an action available on that card;
-- unresolved never renders as mismatch;
-- compatible/historical cases show a material reduction in manual-review
-  prompts; and
-- rollback to the boolean presentation remains independently available.
+- **PENDING ORGANIC EVIDENCE:** sampled false-clear review finds no hidden
+  current conflicts;
+- **VERIFIED SYNTHETIC PREVIEW:** 100% of held fixture cards expose an action
+  available on that card;
+- **VERIFIED SYNTHETIC PREVIEW:** unresolved never renders as mismatch;
+- **PENDING ORGANIC EVIDENCE:** compatible/historical cases show a material
+  reduction in manual-review prompts; and
+- **VERIFIED:** rollback to the boolean presentation remains independently
+  available.
 
 ### Stage 3 — identity-authority rollout
 

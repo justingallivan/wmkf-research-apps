@@ -1,10 +1,11 @@
-# Session 446 Handoff: Validate Stage 2 Institution Presentation in Preview
+# Session 446 Handoff: Stage 2 Synthetic Preview Acceptance Complete
 
 ## Session 445 Summary
 
 Session 445 shipped the Pre-Site generation and Reviewer Finder remediation,
 then moved the institution-affiliation strategy onto
-`codex/institution-decision-harness`. The current Stage 2 code tip is `0089822`.
+`codex/institution-decision-harness`. The Preview smoke harness commit is
+`80f2d739`.
 The owner authorized Stage 2 notification and explanatory-card presentation;
 it is implemented behind a default-off flag with no identity, selectability, or
 Dataverse-write authority.
@@ -82,6 +83,27 @@ Dataverse-write authority.
      or version bump, and helper-level rather than component-level coverage for
      the edit-affordance rollback.
 
+6. **Signed-in synthetic Preview acceptance completed**
+   - Added `/workbench/institution-stage2-smoke`, a server-rendered Preview-only
+     page behind the existing signed-in `reviewers` access guard. Production,
+     local, and unknown deployment environments return `notFound` after auth.
+   - The page renders the production `CandidateCard` with six projector-pinned,
+     synthetic cases: compatible, additional, historical, current conflict,
+     unresolved, and provider failure. Its action handlers update component
+     state only; focused coverage clicks all eight notice actions and proves no
+     `fetch` call occurs.
+   - The owner confirmed all six cases and `Stage II flag: On` in signed-in
+     Preview deployment `dpl_kZqGC1j1yuF73RYCbWum3HgQaS9T`, then completed the
+     local action check. Unresolved/provider-failure copy did not claim a
+     mismatch, and every held synthetic case exposed a mapped card action.
+   - This was necessarily synthetic: a read-only Production roster audit found
+     952 rows and zero persisted Stage 2 presentation DTOs. The smoke therefore
+     proves rendering, access, rollback, and action wiring, but not organic
+     false-clear rates, alert volume, or material review reduction.
+   - Cleanup is complete. The temporary branch flag and immutable Entra callback
+     were removed, the four permanent callbacks were verified, and clean
+     default-off Preview deployment `dpl_5c2Cj98zUGybjjT5TdcvPuRFUL88` is Ready.
+
 ### Commits
 
 - `45ea7456` — Add reviewer materials to Proposal tab
@@ -111,19 +133,20 @@ Dataverse-write authority.
 - `6b2f259` — Add Stage 2 institution presentation
 - `e217f6ef` — Hand off Stage 2 institution validation
 - `0089822` — Address Stage 2 adversarial findings
+- `80f2d739` — Add signed-in Stage 2 Preview smoke page
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run signed-in Preview acceptance for Stage 2 presentation.**
-   Evidence: `6b2f259` implements the bounded consumer projections and
-   `0089822` closes Fable's pre-enable findings behind
-   `NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION=on`; 198 focused tests and the
-   flag-on webpack production build pass. Deploy a Preview with the flag on and
-   sample compatible/additional, historical, current-conflict, unresolved, and
-   retryable-failure copy. Confirm every held card exposes an action actually
-   available on that card and unresolved never reads as a mismatch.
+1. **Choose an evidence threshold for Stage 2 Production enablement.**
+   Evidence: signed-in synthetic Preview acceptance now proves all six card
+   presentations, all eight mapped notice actions, the no-write boundary, and
+   exact flag rollback. Production currently has zero persisted Stage 2 DTOs,
+   so no organic false-clear, alert-volume, or manual-review-reduction sample
+   exists. Keep the Production flag off unless the owner explicitly accepts the
+   synthetic evidence or chooses a non-mutating observation period that can
+   produce real rows.
 
 2. **Run a staff acceptance smoke of the reviewer identity-remediation flow.**
    Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` records the durable edit and
@@ -140,8 +163,9 @@ Dataverse-write authority.
 
 ### Owner Decision Needed
 
-1. **After Preview evidence, authorize or decline Production flag enablement.**
-   Evidence: Stage 2 is implemented but not promoted or enabled in Production.
+1. **Authorize, defer, or decline Production flag enablement.**
+   Evidence: Stage 2 is implemented and synthetic Preview acceptance passed,
+   but real-world effectiveness and alert-volume evidence remain unavailable.
    Production enablement requires a new build because the flag is
    `NEXT_PUBLIC`; the exact unset/`off` path independently restores incumbent
    presentation.
@@ -166,7 +190,9 @@ Dataverse-write authority.
    production resolver threshold or overwrite the snapshot; use a new versioned
    capture and re-adjudication.
 2. Fetch and verify `origin/main` plus the feature-branch tip before merging or
-   making a production release. Local `0089822` has not yet been pushed.
+   making a production release. `80f2d739` is pushed to
+   `origin/codex/institution-decision-harness`; no merge or Production flag
+   change has been made.
 3. Stop cleanup verified that the two 162-byte Word lock artifacts had no open
    handles, then moved them out of the worktree to
    `/private/tmp/wmkf-word-locks-session-445-20260819/`. No template content was
@@ -190,6 +216,7 @@ Dataverse-write authority.
 | `lib/services/ror-affiliation-assertion-resolver.js` | Source/canonical ROR resolution with partial success |
 | `lib/services/institution-affiliation-stage2.js` | Bounded notification/card evaluation and presentation projection |
 | `shared/utils/institution-stage2-presentation.js` | Exact rollout flag and versioned presentation DTO identity |
+| `pages/workbench/institution-stage2-smoke.js` | Signed-in Preview-only synthetic presentation harness; no persistence |
 | `scripts/audit-institution-affiliation-shadow-cases.js` | Read-only, PII-bounded roster inventory |
 | `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Authority stages, gates, and current status |
 | `docs/REVIEWER_CONTACT_LEADS_SPEC.md` | Durable contact edit and identity-remediation contract |
@@ -206,6 +233,7 @@ npm test -- --runInBand \
   tests/unit/workbench-enrich-recommended-service.test.js \
   tests/unit/reviewer-search-logic.test.js \
   tests/unit/reviewer-search-mismatch-banner.test.js \
+  tests/unit/institution-stage2-smoke-page.test.js \
   tests/unit/institution-checker-consumer-scope.test.js \
   tests/unit/benchmarks/institution-affiliation-shadow-v1.test.js
 npm run check:doc-symbol-refs
@@ -215,7 +243,8 @@ npm run check:secret-scan
 npm run check:types
 ```
 
-The expanded Stage 1 plus Stage 2 matrix passed 198/198. Targeted ESLint,
+The expanded Stage 1 plus Stage 2 matrix, including the Preview harness, passes
+202/202 across 11 suites. Targeted ESLint,
 TypeScript, documentation symbol/currency/fact/catalog gates, secret scan, and
 the required gate self-tests passed. The flag-on webpack production build
 passed with the repository's existing dynamic-dependency warnings.
