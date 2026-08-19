@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
@@ -556,8 +556,12 @@ function OperationalEventsSection() {
   const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
+  // Generation guard: rapid filter changes issue overlapping fetches, and a
+  // slow older response must not overwrite a newer filter's results.
+  const fetchGenRef = useRef(0);
 
   const fetchEvents = () => {
+    const gen = ++fetchGenRef.current;
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set('status', statusFilter);
@@ -567,24 +571,38 @@ function OperationalEventsSection() {
     fetch(`/api/admin/operational-events?${params.toString()}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
+        if (gen !== fetchGenRef.current) return;
         setEvents(data?.events || []);
         setSummary(data?.summary || []);
       })
-      .catch(() => { setEvents([]); setSummary([]); })
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (gen !== fetchGenRef.current) return;
+        setEvents([]); setSummary([]);
+      })
+      .finally(() => {
+        if (gen === fetchGenRef.current) setLoading(false);
+      });
   };
 
   useEffect(() => { fetchEvents(); }, [statusFilter, severityFilter, sourceFilter, search]);
 
-  const handleAction = async (id, action) => {
-    setActionInProgress(id);
+  const handleAction = async (event, action) => {
+    setActionInProgress(event.id);
     try {
       const res = await fetch('/api/admin/operational-events', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({
+          id: event.id,
+          action,
+          // Freshness precondition: the server refuses (409) if the row
+          // changed since this list rendered, so a stale view can't close a
+          // newly recurrent incident. A 409 just refetches the live state.
+          expectedStatus: event.status,
+          expectedLastOccurredAt: event.last_occurred_at,
+        }),
       });
-      if (res.ok) fetchEvents();
+      if (res.ok || res.status === 409) fetchEvents();
     } catch {}
     setActionInProgress(null);
   };
@@ -746,7 +764,7 @@ function OperationalEventsSection() {
                   </button>
                   {event.status === 'open' && (
                     <button
-                      onClick={() => handleAction(event.id, 'resolve')}
+                      onClick={() => handleAction(event, 'resolve')}
                       disabled={actionInProgress === event.id}
                       className="px-2 py-1 text-xs bg-white/70 hover:bg-white rounded border border-gray-300 text-gray-700 transition-colors disabled:opacity-50"
                     >
@@ -755,7 +773,7 @@ function OperationalEventsSection() {
                   )}
                   {(event.status === 'resolved' || event.status === 'recovered' || event.status === 'superseded') && (
                     <button
-                      onClick={() => handleAction(event.id, 'reopen')}
+                      onClick={() => handleAction(event, 'reopen')}
                       disabled={actionInProgress === event.id}
                       className="px-2 py-1 text-xs bg-white/70 hover:bg-white rounded border border-gray-300 text-gray-700 transition-colors disabled:opacity-50"
                     >

@@ -187,13 +187,13 @@ describe('ingestDrainEntries', () => {
   test('stores kept entries with vercel:<id> dedupe key and counts duplicates', async () => {
     OperationalEventService.recordEvent
       .mockResolvedValueOnce({ id: 1, folded: false })
-      .mockResolvedValueOnce(null); // duplicate delivery
+      .mockResolvedValueOnce({ duplicate: true }); // duplicate delivery
     const counts = await ingestDrainEntries([
       { ...baseEntry, id: 'a' },
       { ...baseEntry, id: 'b' },
       { ...baseEntry, id: 'c', level: 'info', statusCode: 200, proxy: undefined },
     ]);
-    expect(counts).toMatchObject({ considered: 3, stored: 1, duplicates: 1, skipped: 1 });
+    expect(counts).toMatchObject({ considered: 3, stored: 1, duplicates: 1, skipped: 1, storageFailures: 0 });
     const call = OperationalEventService.recordEvent.mock.calls[0][0];
     expect(call.dedupeKey).toBe('vercel:a');
     expect(call.source).toBe('vercel-drain');
@@ -217,6 +217,19 @@ describe('ingestDrainEntries', () => {
     expect(call.eventType).toBe('runtime_dependency_failure');
     expect(call.severity).toBe('warning');
     expect(call.status).toBe('open');
+  });
+
+  test('failed inserts are counted as storageFailures, never as duplicates (Codex cycle-3 finding)', async () => {
+    // recordEvent returns null on a storage failure; the delivery must not be
+    // acknowledged as success or Vercel stops redelivering.
+    OperationalEventService.recordEvent
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 2, folded: false });
+    const counts = await ingestDrainEntries([
+      { ...baseEntry, id: 'a' },
+      { ...baseEntry, id: 'b' },
+    ]);
+    expect(counts).toMatchObject({ stored: 1, duplicates: 0, storageFailures: 1 });
   });
 
   test('entries without a stable id are counted invalid, not stored', async () => {

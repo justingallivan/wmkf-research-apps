@@ -78,7 +78,13 @@ One Postgres table, `operational_events` (migration
    - **Idempotent under at-least-once delivery:** each stored row uses
      `dedupe_key = vercel:<log id>` with `ON CONFLICT DO NOTHING`.
    - **Caps, loud:** 4 MB body (413), ≤1000 entries considered and ≤200 stored
-     per delivery; dropped counts are returned in the response and logged.
+     per delivery (chunked parallel inserts, 25 wide); dropped counts are
+     returned in the response and logged.
+   - **Storage failures are not acknowledged:** a failed Postgres insert
+     returns 503 so Vercel redelivers (dedup makes the retry safe); true
+     duplicates and malformed/skipped entries still return 200. A sustained
+     Postgres outage therefore surfaces as an errored drain on the Vercel
+     Drains page instead of silently dropping the outage's own evidence.
    - **Selection:** keep `level` error/fatal, `statusCode >= 500` or `-1`
      (crash), `proxy.statusCode >= 500`, and structured JSON log lines (the
      `workbench.dependency` convention) whose outcome is

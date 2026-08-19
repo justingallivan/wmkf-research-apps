@@ -44,7 +44,7 @@ describe('recordEvent', () => {
     expect(lastQueryText()).not.toContain('ON CONFLICT');
   });
 
-  test('drain event uses ON CONFLICT DO NOTHING and reports duplicate as null', async () => {
+  test('drain event uses ON CONFLICT DO NOTHING and marks duplicates distinctly from failures', async () => {
     sqlMock.mockResolvedValueOnce({ rows: [] });
     const result = await OperationalEventService.recordEvent({
       source: 'vercel-drain',
@@ -53,7 +53,9 @@ describe('recordEvent', () => {
       summary: 'lambda /api/x status 500',
       dedupeKey: 'vercel:abc123',
     });
-    expect(result).toBeNull();
+    // Duplicate is a marker object; null is reserved for storage FAILURE so
+    // the drain route can refuse acknowledgement (Codex cycle-3 finding).
+    expect(result).toEqual({ duplicate: true });
     expect(lastQueryText()).toContain('DO NOTHING');
   });
 
@@ -217,6 +219,30 @@ describe('setEventStatus', () => {
     const row = await OperationalEventService.setEventStatus(5, 'resolve', { profileId: 9 });
     expect(row).toEqual({ id: 5, status: 'resolved' });
     expect(lastQueryText()).toContain("status <> 'info'");
+  });
+
+  test('stale expected state throws stale_state with the current row (Codex cycle-3 finding)', async () => {
+    // Conditional UPDATE misses (row folded a new occurrence and reopened),
+    // then the existence probe finds the live row → 409 material.
+    sqlMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'open', last_occurred_at: 'now', occurrence_count: 3 }] });
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', {
+      profileId: 9,
+      expectedStatus: 'open',
+      expectedLastOccurredAt: '2026-08-19T00:00:00.000Z',
+    })).rejects.toMatchObject({
+      code: 'stale_state',
+      current: expect.objectContaining({ occurrence_count: 3 }),
+    });
+  });
+
+  test('missing row returns null (404), not stale_state', async () => {
+    sqlMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    await expect(OperationalEventService.setEventStatus(999, 'resolve', {}))
+      .resolves.toBeNull();
   });
 
   test('invalid action throws typed error', async () => {

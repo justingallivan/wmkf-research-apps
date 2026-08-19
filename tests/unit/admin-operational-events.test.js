@@ -66,14 +66,37 @@ test('GET passes filters through and returns events + summary', async () => {
   expect(res.body.summary).toHaveLength(1);
 });
 
-test('PATCH resolve attributes the acting profile', async () => {
+test('PATCH resolve attributes the acting profile and forwards freshness expectations', async () => {
   OperationalEventService.setEventStatus.mockResolvedValue({ id: 5, status: 'resolved' });
   const res = mkRes();
-  await handler({ method: 'PATCH', body: { id: 5, action: 'resolve', note: 'checked' } }, res);
+  await handler({
+    method: 'PATCH',
+    body: {
+      id: 5, action: 'resolve', note: 'checked',
+      expectedStatus: 'open', expectedLastOccurredAt: '2026-08-19T00:00:00.000Z',
+    },
+  }, res);
   expect(OperationalEventService.setEventStatus).toHaveBeenCalledWith(5, 'resolve', {
-    profileId: 9, note: 'checked',
+    profileId: 9,
+    note: 'checked',
+    expectedStatus: 'open',
+    expectedLastOccurredAt: '2026-08-19T00:00:00.000Z',
   });
   expect(res.body).toEqual({ ok: true, id: 5, status: 'resolved' });
+});
+
+test('PATCH against a row that changed since render → 409 with current state', async () => {
+  const err = new Error('event changed since it was rendered');
+  err.code = 'stale_state';
+  err.current = { id: 5, status: 'open', occurrence_count: 3 };
+  OperationalEventService.setEventStatus.mockRejectedValue(err);
+  const res = mkRes();
+  await handler({
+    method: 'PATCH',
+    body: { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x' },
+  }, res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body.current).toMatchObject({ occurrence_count: 3 });
 });
 
 test('PATCH invalid action → 400', async () => {

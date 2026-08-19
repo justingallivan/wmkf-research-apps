@@ -40,10 +40,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, action, note } = req.body || {};
+    const { id, action, note, expectedStatus, expectedLastOccurredAt } = req.body || {};
     const updated = await OperationalEventService.setEventStatus(id, action, {
       profileId: gate.profileId,
       note: note || null,
+      expectedStatus: expectedStatus || null,
+      expectedLastOccurredAt: expectedLastOccurredAt || null,
     });
     if (!updated) {
       return res.status(404).json({ error: 'Event not found or not resolvable' });
@@ -52,6 +54,12 @@ export default async function handler(req, res) {
   } catch (error) {
     if (error?.code === 'invalid_id' || error?.code === 'invalid_action') {
       return res.status(400).json({ error: error.message });
+    }
+    if (error?.code === 'stale_state') {
+      // The row folded a new occurrence or changed status since it was
+      // rendered — refuse the blind write so a stale list can't close a
+      // newly recurrent incident (Codex adversarial finding, cycle 3).
+      return res.status(409).json({ error: 'Event changed since it was loaded', current: error.current });
     }
     console.error('Admin operational-events PATCH error:', error);
     return res.status(500).json({ error: 'Failed to update operational event' });

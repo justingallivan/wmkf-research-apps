@@ -54,7 +54,8 @@ beforeEach(() => {
   delete process.env.VERCEL_LOG_DRAIN_VERIFY;
   ingestDrainEntries.mockReset();
   ingestDrainEntries.mockResolvedValue({
-    considered: 1, stored: 1, duplicates: 0, skipped: 0, invalid: 0, droppedByCap: 0,
+    considered: 1, stored: 1, duplicates: 0, skipped: 0, invalid: 0,
+    droppedByCap: 0, storageFailures: 0,
   });
 });
 
@@ -115,6 +116,18 @@ test('valid NDJSON delivery → 200 with counters', async () => {
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({ ok: true, received: 1, stored: 1 });
   expect(ingestDrainEntries).toHaveBeenCalledWith([entry]);
+});
+
+test('storage failures refuse acknowledgement with 503 so Vercel redelivers (Codex cycle-3 finding)', async () => {
+  ingestDrainEntries.mockResolvedValue({
+    considered: 2, stored: 1, duplicates: 0, skipped: 0, invalid: 0,
+    droppedByCap: 0, storageFailures: 1,
+  });
+  const entry = { id: 'log-1', source: 'lambda', level: 'error', timestamp: 1, message: 'boom' };
+  const res = mkRes();
+  await handler(mkReq({ body: JSON.stringify([entry]) }), res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toMatchObject({ ok: false, storageFailures: 1 });
 });
 
 test('VERCEL_LOG_DRAIN_VERIFY echoes x-vercel-verify header', async () => {

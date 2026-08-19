@@ -136,6 +136,27 @@ Post-cycle-2: full unit suite 8108 green, types green. Cycle 2 raised no
 findings against the cycle-1 fixes' edge cases (drain-open noise, IP
 over/under-redaction) or the other attacked surfaces.
 
+A third adversarial cycle (same day) returned NEEDS REWORK with three
+findings; all confirmed and fixed:
+
+5. **[high, FIXED]** A failed Postgres insert during a drain delivery was
+   counted as a duplicate and acknowledged with 200 — Vercel would never
+   redeliver, permanently dropping the very evidence an outage produces.
+   Fix: `recordEvent` now returns a distinct `{duplicate:true}` marker (null
+   = storage failure); the route returns 503 when any entry failed to store
+   so Vercel redelivers (dedup makes retry safe), 200 otherwise.
+6. **[medium, FIXED]** Up to 200 serial awaited inserts risked the route's
+   60s budget on a cold pool. Fix: two-phase ingest — classify, then chunked
+   parallel inserts (25 wide).
+7. **[medium, FIXED]** Admin resolve/reopen were blind writes: a stale list
+   could close a row that had folded a new occurrence and reopened. Fix:
+   the UI sends `expectedStatus`/`expectedLastOccurredAt` from the rendered
+   row, `setEventStatus` applies conditionally and throws `stale_state`
+   (route → 409 with current state, UI refetches); the events fetch also
+   gained a generation guard against out-of-order filter responses.
+
+Post-cycle-3: full unit suite green, types green, production build green.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from

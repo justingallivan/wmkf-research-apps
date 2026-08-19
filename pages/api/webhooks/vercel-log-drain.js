@@ -19,9 +19,11 @@
  *   * Body capped at 4 MB (413 above), batch selection/storage caps live in
  *     lib/services/vercel-log-drain-ingest.js; dropped counts are returned
  *     and logged, never silent.
- *   * Parse/ingest problems return 200 with counters — a 5xx would only
- *     trigger redelivery of the same payload and eventually mark the drain
- *     errored.
+ *   * Parse problems (malformed/skipped/invalid entries) return 200 with
+ *     counters — redelivering unparseable data cannot help. Storage FAILURES
+ *     return 503 so Vercel redelivers: per-entry dedup makes the retry safe,
+ *     and a sustained Postgres outage correctly surfaces as an errored drain
+ *     instead of silently dropping the outage's own evidence.
  *   * `content-encoding` other than identity → 415 (configure the drain with
  *     compression "none"); the drain-creation test delivery gets a 200.
  *
@@ -115,8 +117,15 @@ export default async function handler(req, res) {
   const { entries, malformed } = parseDrainBody(rawBody.toString('utf8'));
   const counts = await ingestDrainEntries(entries);
 
-  return res.status(200).json({
-    ok: true,
+  // Storage failures must NOT be acknowledged: a 200 here would stop Vercel's
+  // at-least-once redelivery and permanently drop the very failure evidence a
+  // Postgres outage produces (Codex adversarial finding, cycle 3). The
+  // per-entry dedup makes redelivery of the already-stored remainder safe;
+  // sustained 503s surface on Vercel's Drains page as an errored drain, which
+  // is the correct loud signal for a storage outage.
+  const status = counts.storageFailures > 0 ? 503 : 200;
+  return res.status(status).json({
+    ok: counts.storageFailures === 0,
     received: entries.length,
     malformed,
     stored: counts.stored,
@@ -124,6 +133,7 @@ export default async function handler(req, res) {
     skipped: counts.skipped,
     invalid: counts.invalid,
     droppedByCap: counts.droppedByCap,
+    storageFailures: counts.storageFailures,
   });
 }
 
