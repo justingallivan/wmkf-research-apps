@@ -75,6 +75,7 @@ const mockReviewerSuggestionAdapter = {
   setHonorariumRequest: jest.fn(),
   isExcluded: jest.fn((row) => row?.wmkf_applicantdisposition === 100000001),
   notExcludedFilter: jest.fn(() => 'wmkf_applicantdisposition ne 100000001'),
+  selectedAndNotRevokedFilter: jest.fn(() => 'wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)'),
   ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
 };
 const mockPotentialReviewerAdapter = {
@@ -772,6 +773,9 @@ describe('notification trust-model Stage 1 pushed-up wrappers', () => {
     process.env.NEXT_RUNTIME = 'nodejs';
     process.env.NODE_ENV = 'production';
     process.env.EMERGENCY_AUTH_BYPASS = 'true';
+    // The site-15 critical alert mirrors into operational_events first (one
+    // INSERT), then migration-drift's tracker probe gets the 42P01 rejection.
+    mockSql.mockResolvedValueOnce({ rows: [{ id: 1 }] });
     mockSql.mockRejectedValueOnce(Object.assign(new Error('missing tracker'), { code: '42P01' }));
 
     await register();

@@ -174,6 +174,8 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | `BILL_ORG_ID` | BILL organization id used during login. | Required when `BILL_ENABLED=true` |
 | `BILL_WEBHOOK_SECRET` | HMAC secret for `/api/webhooks/bill` (`x-bill-sha-signature`). | Required outside development for BILL webhook verification; tracked as `bill_webhook_secret` |
 | `BILL_WEBHOOK_DEBUG` | Logs a redacted raw payload sample for sandbox payload-shape discovery. | unset/`false`; use only in sandbox because BILL payloads contain vendor PII |
+| `VERCEL_LOG_DRAIN_SECRET` | HMAC-SHA1 signature secret for `/api/webhooks/vercel-log-drain` (`x-vercel-signature`). Must equal the drain's Signature Verification Secret in Vercel Team Settings → Drains. | Required outside development for drain ingestion (endpoint fails closed 500 when unset); tracked as `vercel_log_drain_secret`. See `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` |
+| `VERCEL_LOG_DRAIN_VERIFY` | Optional legacy endpoint-verification token echoed as `x-vercel-verify` on drain responses. | unset unless Vercel's drain creation demands endpoint verification |
 | `BILL_INTEGRATION_SECRET` | Internal HMAC secret for same-deployment calls to `/api/bill/onboard-reviewer`. | Required for the HTTP endpoint; tracked as `bill_integration_secret`; generate with `openssl rand -base64 48` |
 | `BILLCOM_ACCOUNT_YES_VALUE` / `BILLCOM_ACCOUNT_NO_VALUE` | Dataverse option-set integer values for `wmkf_exisitngbillcomaccount`. | Probe per environment with `node scripts/probe-bill-option-set-values.js`; required when `BILL_ENABLED=true` |
 
@@ -427,6 +429,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `external_link_secret` | External-Reviewer Link Secret (HMAC for JWT) | hmac | No expiry. Rotate on compromise / offboarding / ~12 months via the dual-secret window — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). |
 | `irs_verify_secret` | IRS Verify Secret (PowerAutomate shared) | hmac | No expiry. Rotate on PA-flow rebuild or compromise |
 | `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
+| `vercel_log_drain_secret` | Vercel Log Drain Secret (HMAC for /api/webhooks/vercel-log-drain) | hmac | No expiry. Rotate by editing the drain's Signature Verification Secret in Vercel Team Settings → Drains and updating the env var in the same window |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
 | `openalex_api_key` | OpenAlex API Key | vendor | Authenticated request credential; rotate on compromise and update every runtime environment |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |

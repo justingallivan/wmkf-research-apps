@@ -169,7 +169,10 @@ export const config = {
      *   server-side, which has no staff NextAuth session). Same anchored-
      *   match safety as the webhook; auth is HMAC-of-body via
      *   BILL_INTEGRATION_SECRET. See lib/bill/internal-call-auth.js.
+     * - /api/webhooks/vercel-log-drain (Vercel Log Drain x-vercel-signature
+     *   HMAC-SHA1 of raw body via VERCEL_LOG_DRAIN_SECRET). Exact anchored
+     *   match, same safety rationale as the BILL webhook.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/bill/onboard-reviewer$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/bill/onboard-reviewer$).*)',
   ],
 };

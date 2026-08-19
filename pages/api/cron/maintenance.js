@@ -63,6 +63,16 @@ export default async function handler(req, res) {
       results.reviewerIdentityShadowLog = { error: error.message };
     }
 
+    // 2c. Operational events cleanup (settled-row retention window, 2x window
+    //     for open rows, plus a hard row cap). Migration 030.
+    try {
+      results.operationalEvents =
+        await MaintenanceService.cleanupOperationalEvents(config.operational_events_days);
+      totalDeleted += results.operationalEvents;
+    } catch (error) {
+      results.operationalEvents = { error: error.message };
+    }
+
     // 3. Expired cache cleanup
     try {
       results.cache = await MaintenanceService.cleanupExpiredCache();
