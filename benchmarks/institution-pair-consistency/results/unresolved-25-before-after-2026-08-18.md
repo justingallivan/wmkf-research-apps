@@ -60,4 +60,3 @@ The sample contains 15 cards with both compared institutions and 10 cards where 
 ## Stop boundary
 
 This artifact evaluates the approved narrow slice. Registry-backed sameness and organizational relationships remain outside production authority and require a later shadow/adjudication promotion decision.
-
