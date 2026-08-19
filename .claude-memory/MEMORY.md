@@ -21,7 +21,7 @@
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-green-requires-full-test-suite.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-cite-ground-truth.md; feedback-no-fabricated-placeholder-values.md
 - Delegated work: feedback-share-codex-verbatim.md; feedback-surface-full-review-findings.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md; ../docs/AGENT_COLLABORATION_PLAN.md
-- Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; reference-vercel-sensitive-env-unreadable.md
+- Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; feedback-no-vercel-cli-update-reminders.md; reference-vercel-sensitive-env-unreadable.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md (never set DATAVERSE_ALLOW_PROD_READS yourself — hand over the command or ask and wait; applies to read-only probes and scratch diagnostics too)
 
 ## Working Norms
