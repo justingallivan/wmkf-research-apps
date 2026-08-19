@@ -198,6 +198,25 @@ describe('ingestDrainEntries', () => {
     expect(call.dedupeKey).toBe('vercel:a');
     expect(call.source).toBe('vercel-drain');
     expect(call.occurredAt).toBe(baseEntry.timestamp);
+    expect(call.status).toBe('open');
+  });
+
+  test('warning-graded dependency timeout is stored open, never info (Codex finding 2026-08-19)', async () => {
+    // The discriminating fixture: info level + HTTP 200, kept ONLY because the
+    // structured dependency event reports a timeout. The old severity-derived
+    // status buried exactly this row as 'info'.
+    const structuredMessage = JSON.stringify({
+      event: 'workbench.dependency', v: 1, dependency: 'dataverse',
+      operation: 'GET', outcome: 'timeout', ms: 30000,
+    });
+    await ingestDrainEntries([{
+      ...baseEntry, id: 'timeout-1', level: 'info', statusCode: 200,
+      message: structuredMessage, proxy: undefined,
+    }]);
+    const call = OperationalEventService.recordEvent.mock.calls[0][0];
+    expect(call.eventType).toBe('runtime_dependency_failure');
+    expect(call.severity).toBe('warning');
+    expect(call.status).toBe('open');
   });
 
   test('entries without a stable id are counted invalid, not stored', async () => {

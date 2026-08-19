@@ -97,6 +97,25 @@ Full architecture, contracts, and the verified activation runbook:
   `https://applications.wmkeck.org/api/webhooks/vercel-log-drain` → Test →
   confirm rows in /admin). Secret values stay in Vercel.
 
+## Codex adversarial review (2026-08-19, post-push)
+
+A Codex adversarial review of the branch diff returned NEEDS REWORK with two
+findings; both were confirmed against source and fixed on this branch:
+
+1. **[high, FIXED]** Warning-graded structured dependency failures (e.g. an
+   info-level `workbench.dependency` timeout with HTTP 200) were persisted as
+   `status 'info'` and hidden from the admin default open filter. Fix: the
+   drain ingester now stores every kept row as `open` — the selection policy
+   only keeps failures — with a discriminating guard test
+   (`vercel-log-drain-ingest.test.js`, info-level timeout ⇒ `status 'open'`).
+2. **[medium, FIXED]** The metadata sanitizer's denylist missed common IP keys
+   (`ip`, `ipAddress`, `remoteAddress`, `x-forwarded-for`) and had no IP value
+   rule. Fix: key fragments added plus value-level IPv4/IPv6 redaction in
+   `sanitizeString` (applies to summaries and metadata), with counter-fixtures.
+
+Post-fix: full unit suite 8107 green, types green. Review verdict otherwise
+raised no auth, dedup, schema-parity, retention, or compatibility findings.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from

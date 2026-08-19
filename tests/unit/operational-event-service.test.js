@@ -146,6 +146,29 @@ describe('sanitizeMetadata', () => {
     expect(clean.ok).toBe(true);
   });
 
+  test('redacts IP addresses by key vocabulary AND value pattern (Codex finding 2026-08-19)', () => {
+    const clean = sanitizeMetadata({
+      ip: '203.0.113.9',
+      ipAddress: '198.51.100.2',
+      remoteAddress: '192.0.2.1',
+      'x-forwarded-for': '203.0.113.7, 198.51.100.9',
+      note: 'request came from 203.0.113.9 and fe80::1ff:fe23:4567:890a today',
+    });
+    const json = JSON.stringify(clean);
+    expect(json).not.toContain('203.0.113.9');
+    expect(json).not.toContain('198.51.100.2');
+    expect(json).not.toContain('192.0.2.1');
+    expect(json).not.toContain('198.51.100.9');
+    expect(json).not.toContain('fe80::1ff:fe23:4567:890a');
+    // Denylisted keys are fully redacted; the bare `ip` key survives via the
+    // value-level pattern backstop.
+    expect(clean.ipAddress).toBe('[REDACTED]');
+    expect(clean.remoteAddress).toBe('[REDACTED]');
+    expect(clean['x-forwarded-for']).toBe('[REDACTED]');
+    expect(clean.ip).toBe('[REDACTED:ip]');
+    expect(clean.note).toContain('[REDACTED:ip]');
+  });
+
   test('projects Error objects to message/code only (no stack, no cause)', () => {
     const err = new Error('boom at person@example.org');
     err.code = 'dataverse_timeout';
