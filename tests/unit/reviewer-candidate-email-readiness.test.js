@@ -39,15 +39,14 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText('📧 ready@example.edu')).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'ready@example.edu' })).toHaveAttribute(
       'title',
       'Email (from scholarly_multi, 2025)'
     );
-    expect(screen.getByText('✓ High-confidence email')).toHaveAttribute(
-      'title',
-      'Address source: scholarly_multi. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
-    );
-    expect(screen.getByText(/Evidence: 2 recent works/)).toHaveTextContent('2025');
+    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('Address source: scholarly_multi');
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2 recent works');
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2025');
   });
 
   test('explains an institution-page ownership decision after roster reload', () => {
@@ -65,7 +64,7 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText('✓ High-confidence email')).toBeInTheDocument();
+    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'official profile' })).toHaveAttribute(
       'href',
       'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
@@ -81,7 +80,7 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'manual',
     });
 
-    expect(screen.getByText('⚠ Email needs confirmation')).toHaveAttribute(
+    expect(screen.getByText('Email needs confirmation')).toHaveAttribute(
       'title',
       'Manually entered — not verified against the reviewer’s identity. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
     );
@@ -103,11 +102,11 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText('✓ High-confidence email')).toHaveAttribute(
-      'title',
-      'Staff verified this exact person and address for promotion. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
+    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(
+      'Staff verified this exact person and address for promotion'
     );
-    expect(screen.queryByText('⚠ Email needs confirmation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
   });
 
   test('surfaces missing contact instead of implying enrichment succeeded', () => {
@@ -125,7 +124,7 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'serp_search',
     });
 
-    expect(screen.getByText('⚠ Research only')).toHaveAttribute(
+    expect(screen.getByText('Research only')).toHaveAttribute(
       'title',
       'Search lead lacks address-specific first-party evidence. Confidence reflects address provenance and identity-grounded evidence, not deliverability.'
     );
@@ -144,10 +143,10 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.queryByText('✓ High-confidence email')).not.toBeInTheDocument();
-    expect(screen.queryByText('⚠ Email needs confirmation')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Evidence includes high-confidence email/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
     expect(screen.queryByText('Email not found')).not.toBeInTheDocument();
-    expect(screen.getByText(/Keep in Find — identity\/contact confirmation required/)).toBeInTheDocument();
+    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
   });
 });
 
@@ -172,9 +171,9 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
     });
 
     expect(screen.getByText('✓ Existing linked reviewer record')).toBeInTheDocument();
-    expect(screen.getByText('📧 linked@example.edu')).toBeInTheDocument();
-    expect(screen.getByText('⚠ Email needs confirmation')).toBeInTheDocument();
-    expect(screen.queryByText(/Known in Dataverse by exact/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'linked@example.edu' })).toBeInTheDocument();
+    expect(screen.getByText('Email needs confirmation')).toBeInTheDocument();
+    expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
   });
 
   test('labels publication and OpenAlex evidence without claiming both are current', () => {
@@ -209,12 +208,12 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText(/Known in Dataverse by exact email/)).toBeInTheDocument();
-    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent(
+    expect(screen.getByText(/Existing person record matched by exact email/)).toBeInTheDocument();
+    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent(
       'may include co-affiliations or history',
     );
-    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent('Stanford University');
-    expect(screen.getByText(/Multiple affiliation records/)).toHaveTextContent('Northwestern University');
+    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent('Stanford University');
+    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent('Northwestern University');
   });
 
   test('surfaces review-required exact-key reconciliation without making a known claim', () => {
@@ -229,7 +228,7 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText('⚠ Dataverse identity needs review')).toBeInTheDocument();
-    expect(screen.queryByText(/Known in Dataverse/)).not.toBeInTheDocument();
+    expect(screen.getByText('Dataverse identity needs review')).toBeInTheDocument();
+    expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
   });
 });

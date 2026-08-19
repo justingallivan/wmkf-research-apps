@@ -1,12 +1,9 @@
 /**
  * @jest-environment jsdom
  *
- * Clickable warning badges on the candidate card (S403, owner report
- * 2026-08-06): "⚠ Email needs confirmation" and the sibling warning pills were
- * inert text, while the remedy ("Verify / edit address", "This is the right
- * person") sat low in the card and read as decoration — the owner reported the
- * link as hard to see. Each warning now routes to the SAME remedy the card
- * already offers.
+ * Actionable evidence states on the candidate card. Address and identity
+ * problems expose a clearly labelled primary remedy instead of requiring staff
+ * to infer an action from a warning badge.
  *
  * The load-bearing property is fail-closed parity: a badge is clickable only
  * when its remedy control would itself render (canManage, resolved identity,
@@ -21,8 +18,8 @@ import { CandidateCard } from '../../shared/components/reviewers/ReviewerSearchS
 
 // Reproduces the reported card: identity resolved (so the row is past identity
 // review) but a legacy single-publication PubMed address ⇒
-// emailReadiness.action === 'quick_check' ⇒ both "⚠ Email needs confirmation"
-// and "⚠ Address verification required" render.
+// emailReadiness.action === 'quick_check' ⇒ "Email needs confirmation" and the
+// primary "Verify address" remedy render.
 const QUICK_CHECK = {
   name: 'Alexander Green',
   affiliation: 'Boston University',
@@ -64,11 +61,11 @@ test('"Email needs confirmation" is a button that opens the verify/edit address 
   expect(onEdit.mock.calls[0][0].name).toBe('Alexander Green');
 });
 
-test('"Address verification required" pill opens the same remedy', async () => {
+test('the primary "Verify address" action opens the same remedy', async () => {
   const user = userEvent.setup();
   const { onEdit } = renderCard();
 
-  await user.click(screen.getByRole('button', { name: /Address verification required/ }));
+  await user.click(screen.getByRole('button', { name: 'Verify address' }));
   expect(onEdit).toHaveBeenCalledTimes(1);
 });
 
@@ -86,7 +83,7 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
     />,
   );
 
-  await user.click(screen.getByRole('button', { name: '⛔ Address conflict' }));
+  await user.click(screen.getByRole('button', { name: 'Review address conflict' }));
   expect(onReviewAddressConflict).toHaveBeenCalledTimes(1);
   expect(onEdit).not.toHaveBeenCalled();
 });
@@ -96,7 +93,7 @@ test('read-only (canManage=false) leaves the warning as inert text — no dead a
 
   expect(screen.getByText(/Email needs confirmation/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Email needs confirmation/ })).toBeNull();
-  expect(screen.queryByRole('button', { name: /Address verification required/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Verify address/ })).toBeNull();
 });
 
 test('an unrecorded address conflict leaves the badge inert (repair path owns it)', () => {
@@ -131,9 +128,47 @@ test('"Existing linked reviewer record needs repair" banner opens the repair rem
   expect(onRequestRepair).toHaveBeenCalledTimes(1);
 });
 
-test('a ready email chip stays a plain, non-clickable chip', () => {
+test('ready identity evidence is summarized once and is not an action', () => {
   renderCard({ emailSource: 'orcid' });
 
-  expect(screen.getByText(/High-confidence email/)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /High-confidence email/ })).toBeNull();
+  expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /high-confidence email/ })).toBeNull();
+});
+
+test('a thin zero-match sample renders as one qualified expertise status with a direct Invite action', async () => {
+  const user = userEvent.setup();
+  const onAddToInvite = jest.fn();
+  const { container } = render(
+    <CandidateCard
+      candidate={{
+        ...QUICK_CHECK,
+        name: 'Peter Reiners',
+        email: 'reiners@arizona.edu',
+        emailSource: 'institution_page',
+        orcidUrl: 'https://orcid.org/0000-0002-0000-0000',
+        verificationConfidence: 0,
+        expertiseMismatch: true,
+        expertiseAreas: ['(U-Th)/He geochronology', 'helium diffusion and retention'],
+        publications: [
+          { title: 'Paper one', year: 2025 },
+          { title: 'Paper two', year: 2024 },
+          { title: 'Paper three', year: 2023 },
+        ],
+        reasoning: 'His work addresses the proposal risk.',
+      }}
+      checked={false}
+      onToggle={() => {}}
+      onAddToInvite={onAddToInvite}
+    />,
+  );
+
+  expect(screen.getByText(/0 of 3 retrieved papers matched the stated expertise/)).toBeInTheDocument();
+  expect(screen.getByText(/not this person's full publication record/)).toBeInTheDocument();
+  expect(screen.getByText(/Suggested because:/).parentElement).toHaveTextContent('His work addresses the proposal risk.');
+  expect(screen.getByText(/Evidence includes high-confidence email \+ ORCID/)).toBeInTheDocument();
+  expect(screen.queryByText(/0%|Low match|Expertise mismatch|Claude claimed/)).not.toBeInTheDocument();
+  expect(container.firstChild).toHaveClass('bg-white');
+
+  await user.click(screen.getByRole('button', { name: 'Add to Invite' }));
+  expect(onAddToInvite).toHaveBeenCalledTimes(1);
 });

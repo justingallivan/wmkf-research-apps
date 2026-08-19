@@ -68,7 +68,7 @@ async function runStaleSave(saveResponse) {
   />);
   await screen.findByLabelText('Select Dr Candidate A');
   fireEvent.click(screen.getByLabelText('Select Dr Candidate A'));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   await act(async () => {
     rerender(<ReviewerSearchSection
@@ -146,11 +146,11 @@ test('promotion progress and completion stay in a live status beside the action'
 
   render(<ReviewerSearchSection requestId={REQ_A} blobUrl="blob-a" proposalKey="proposal-a" />);
   fireEvent.click(await screen.findByLabelText('Select Dr Candidate A'));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   const status = await screen.findByRole('status');
-  expect(status).toHaveTextContent('Promoting 1 selected reviewer…');
-  expect(screen.getByRole('button', { name: /promoting 1 selected reviewer/i })).toBeDisabled();
+  expect(status).toHaveTextContent('Adding 1 reviewer to Invite…');
+  expect(screen.getByRole('button', { name: /adding 1 reviewer to invite/i })).toBeDisabled();
 
   await act(async () => {
     save.resolve(response({

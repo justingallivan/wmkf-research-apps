@@ -4,14 +4,12 @@
  * Institution-mismatch banner copy (S400 increment E).
  *
  * Pins the two honesty fixes on the card banner:
- *  1. Attribution: applicant-referred rows say "The applicant listed" —
- *     the suggestion came from the applicant's form, not Claude (Codex S400
- *     verification finding).
+ *  1. Attribution: applicant-referred rows say "The applicant listed" while
+ *     generated rows use source-neutral staff language.
  *  2. No fabricated counter-evidence: when the needs-review DTO withholds
  *     the matched affiliation (it is null), the banner must not claim
- *     "PubMed shows a different institution"; it defers to the identity note.
- *     When an affiliation IS present, the "PubMed shows <first segment>"
- *     form is preserved.
+ *     "PubMed shows a different institution." When an affiliation is present,
+ *     the evidence institution is still named without leaking pipeline terms.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -71,16 +69,15 @@ test('applicant-referred mismatch banner attributes the applicant and never fabr
   const attribution = await screen.findByText(/The applicant listed/);
   expect(attribution).toBeInTheDocument();
   expect(screen.queryByText(/a different institution/)).not.toBeInTheDocument();
-  // Points at the "Why" note the card actually renders (from `reasoning`),
-  // not the separate optional identityNote field (Codex S400 review, LOW).
-  expect(screen.getByText(/could not be reconciled with it — see the “Why” note/)).toBeInTheDocument();
+  expect(screen.getByText(/retrieved publications could not be reconciled with it/)).toBeInTheDocument();
+  expect(screen.getByText(/Suggested because:/).parentElement).toHaveTextContent('Could not confirm this is the right person');
 });
 
-test('non-applicant mismatch with a present affiliation keeps Claude attribution and names the evidence institution neutrally', async () => {
+test('non-applicant mismatch uses source-neutral attribution and names the evidence institution neutrally', async () => {
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
   await screen.findByText('Dr Search Result');
 
-  expect(await screen.findByText(/Claude suggested/)).toBeInTheDocument();
+  expect(await screen.findByText(/The suggestion listed/)).toBeInTheDocument();
   // Source-neutral phrasing: the displayed affiliation may be ORCID/OpenAlex-
   // sourced, so the banner must not attribute it to PubMed (Codex S400
   // review, MEDIUM).

@@ -115,6 +115,71 @@ test('restored incomplete PubMed COI checks remain selectable but show one compa
   expect(screen.getByLabelText(`Select ${incompleteCandidate.name}`)).toBeInTheDocument();
 });
 
+test('groups candidates by readiness and the per-card Add action promotes only that reviewer', async () => {
+  const ready = {
+    ...generatedCandidate,
+    candidateKey: 'candidate:ready-now',
+    name: 'Ready Reviewer',
+    rosterUpdatedAt: null,
+  };
+  const needsReview = {
+    candidateKey: 'candidate:needs-review',
+    name: 'Needs Review Reviewer',
+    identityStatus: 'unresolved',
+    email: 'unconfirmed@example.edu',
+    emailSource: 'pubmed',
+    publications: [{ title: 'Retrieved paper', year: 2025 }],
+    provenance: {
+      kind: 'proposal_named',
+      sources: ['proposal'],
+      seedRole: 'query_seed',
+      groundingWorkIds: [],
+    },
+  };
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [ready, needsReview],
+        excluded: [],
+        ineligible: [],
+        allNames: [ready.name, needsReview.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates' && options.method === 'POST') {
+      return Promise.resolve(response({
+        success: true,
+        savedCount: 1,
+        savedKeys: [ready.candidateKey],
+        results: [{
+          candidateKey: ready.candidateKey,
+          outcome: 'saved',
+          rosterFinalized: true,
+        }],
+      }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+
+  expect(await screen.findByText('Ready to add to Invite (1)')).toBeInTheDocument();
+  expect(screen.getByText('Needs review (1)')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Confirm identity' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add to Invite' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/reviewer-finder/save-candidates',
+    expect.objectContaining({ method: 'POST' }),
+  ));
+  const saveCall = global.fetch.mock.calls.find(([url]) => url === '/api/reviewer-finder/save-candidates');
+  const savedBody = JSON.parse(saveCall[1].body);
+  expect(savedBody.candidates).toHaveLength(1);
+  expect(savedBody.candidates[0].name).toBe(ready.name);
+});
+
 test('a handled suggestion-anchored roster row renders only in the Already handled summary with navigation', async () => {
   const onNavigate = jest.fn();
   global.fetch = jest.fn((url) => {
@@ -399,7 +464,7 @@ test('labels restored generated rows and removes only the scoped previous result
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
 
-  expect(await screen.findByText('Previously found')).toBeInTheDocument();
+  expect(await screen.findByText(/Found in an earlier search/)).toBeInTheDocument();
   expect(screen.getByText(/1 candidate below was restored from an earlier search/i)).toBeInTheDocument();
   expect(screen.getByText('Applicant recommended')).toBeInTheDocument();
 

@@ -15,9 +15,11 @@
  * candidate-count + additional-context inputs;
  * enrichment runs ON RESULTS (not at save) so cards show email + ORCID/Scholar +
  * REAL h-index/citations (fetched via the google_scholar_author engine) BEFORE the
- * user selects; rich candidate cards with COI / mismatch / confidence warnings;
- * results split by provenance group plus Unverified (the last is read-only).
- * The displayed "expertise match %" is verificationConfidence;
+ * user selects; rich candidate cards with COI / evidence-quality warnings;
+ * results split by decision readiness plus Unverified (the last is read-only).
+ * verificationConfidence informs the evidence-quality wording but is not shown
+ * as a percentage: the underlying literature sample is often too small for a
+ * percentage to communicate uncertainty honestly.
  * the composite relevanceScore drives ordering only — and because /discover ranks
  * BEFORE enrichment, the enriched list is RE-RANKED here (shared scorer in
  * lib/utils/relevance-score.js) so the fetched h-index/citations affect order.
@@ -317,25 +319,25 @@ function emailOwnershipLabel(evidence) {
 // URL as a fallback when we don't have the candidate's real profile URL. Strips
 // honorifics and extracts the institution from a messy affiliation string.
 // Rich candidate card — ports the standalone Reviewer Finder's CandidateCard into
-// the in-panel Workbench: seniority, COI + mismatch + confidence warnings, the
-// metrics line (expertise match % + real h-index/citations), enriched contact
+// the in-panel Workbench: seniority, COI + evidence-quality warnings, the
+// metrics line (publication sample + real h-index/citations), enriched contact
 // links, a Scholar link, and a publications expander. `readOnly` renders the card
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, canManage = true }) {
   const [expanded, setExpanded] = useState(false);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const evidencePanelId = `${useId()}-identity-evidence`;
+  const selectId = `${useId()}-select`;
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
   const isLowConfidence = confidence !== undefined && confidence < 0.35;
   const isWeakMatch = confidence !== undefined && confidence >= 0.35 && confidence < 0.65;
   const hasInstitutionMismatch = !!c.institutionMismatch;
   const hasExpertiseMismatch = !!c.expertiseMismatch;
-  const hasAnyMismatch = hasInstitutionMismatch || hasExpertiseMismatch;
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
   const institutionCOIDecision = c.institutionCOIDetails?.dropDecision || null;
   const isFlaggedInstitutionCOI = hasInstitutionCOI && institutionCOIDecision === 'flagged';
@@ -419,6 +421,49 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const identityUnverified = needsIdentityConfirmation
     && promotionDecision?.reason === 'identity_not_resolved';
 
+  const expertiseTerms = Array.isArray(c.expertiseAreas)
+    ? c.expertiseAreas.filter(Boolean).slice(0, 2)
+    : [];
+  const expertiseSampleCount = pubs.length;
+  const expertiseStatus = hasExpertiseMismatch || isLowConfidence
+    ? {
+        tone: 'amber',
+        label: 'Expertise not confirmed',
+        detail: expertiseSampleCount > 0
+          ? `0 of ${expertiseSampleCount} retrieved paper${expertiseSampleCount === 1 ? '' : 's'} matched the stated expertise.`
+          : 'No retrieved papers confirmed the stated expertise.',
+      }
+    : isWeakMatch || aiFlaggedNotRelevant
+      ? {
+          tone: 'amber',
+          label: 'Expertise needs review',
+          detail: expertiseSampleCount > 0
+            ? `The ${expertiseSampleCount} retrieved paper${expertiseSampleCount === 1 ? '' : 's'} provided limited support for the stated expertise.`
+            : 'The retrieved evidence did not provide enough support for the stated expertise.',
+        }
+      : confidence === undefined
+        ? {
+            tone: 'neutral',
+            label: 'Expertise evidence',
+            detail: expertiseSampleCount > 0
+              ? `${expertiseSampleCount} retrieved paper${expertiseSampleCount === 1 ? ' was' : 's were'} available for review.`
+              : 'No literature-based expertise assessment is available.',
+          }
+        : {
+          tone: 'green',
+          label: 'Expertise supported',
+          detail: expertiseSampleCount > 0
+            ? `Supported by the ${expertiseSampleCount} retrieved paper${expertiseSampleCount === 1 ? '' : 's'} reviewed.`
+            : 'No expertise warning was raised by the literature check.',
+        };
+  const identityEvidence = emailAction === 'ready'
+    ? [
+        'high-confidence email',
+        orcidUrl ? 'ORCID' : null,
+        dataverseEvidence?.status === 'known' ? 'existing Dataverse record' : null,
+      ].filter(Boolean)
+    : [];
+
   // Warning-badge → remedy routing. These mirror the gating of the remedy
   // controls rendered lower in the card EXACTLY; when a remedy is unavailable
   // the handler is null and the badge stays a plain, non-clickable pill.
@@ -435,49 +480,52 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
 
   const border = checked ? 'border-blue-500 bg-blue-50'
     : hasAnyCOI ? 'border-red-300 bg-red-50'
-    : hasAnyMismatch ? 'border-orange-300 bg-orange-50'
-    : isLowConfidence ? 'border-amber-300 bg-amber-50'
-    : isWeakMatch ? 'border-yellow-200 bg-yellow-50'
-    : 'border-gray-200';
+    : 'border-gray-200 bg-white';
 
   return (
     <div className={`border rounded-lg p-3 transition-colors ${border}`}>
       <div className="flex items-start gap-3">
         {!readOnly && (
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={onToggle}
-            aria-label={`Select ${c.name}`}
-            className="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300"
-          />
+          <label htmlFor={selectId} className="mt-0.5 inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600">
+            <input
+              id={selectId}
+              type="checkbox"
+              checked={checked}
+              onChange={onToggle}
+              aria-label={`Select ${c.name}`}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            />
+            <span>Select</span>
+          </label>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-gray-900 truncate">{c.name}</span>
             {c.seniorityEstimate && (
-              <Pill tone={c.seniorityEstimate === 'Senior' ? 'purple' : c.seniorityEstimate === 'Mid-career' ? 'blue' : 'green'}>
-                {c.seniorityEstimate}
+              <Pill
+                tone={c.seniorityEstimate === 'Senior' ? 'purple' : c.seniorityEstimate === 'Mid-career' ? 'blue' : 'green'}
+                title="Estimated career stage"
+              >
+                Career stage: {c.seniorityEstimate}
               </Pill>
             )}
           </div>
           {!identityUnverified && c.affiliation && (
             <p className="text-xs text-gray-500 mt-0.5 truncate" title={`Affiliation evidence: ${affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}${enr.priorAffiliation ? `; previous search value: ${enr.priorAffiliation}` : ''}`}>
               {c.affiliation}
-              {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource) && (
-                <span className="ml-1 text-gray-400">· {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource)}</span>
-              )}
             </p>
           )}
 
-          {!identityUnverified && dataverseEvidence?.status === 'known' && (
-            <div
-              className="mt-2 text-xs text-emerald-700"
-              title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}
-            >
-              ✓ Known in Dataverse by exact {dataverseEvidence.matchKey || 'key'} (checked during this search)
+          {!identityUnverified && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+              {hasPubCount && <span>{pubCount} publication{pubCount === 1 ? '' : 's'}</span>}
+              {!hasPubCount && <span>Publication count unavailable</span>}
+              {hIndex != null && <span>· h-index {hIndex}</span>}
+              {citations != null && <span>· {citations.toLocaleString()} citations</span>}
+              {previousResult && <span className="text-blue-700">· Found in an earlier search</span>}
             </div>
           )}
+
           {knownReviewer?.status === 'known' && (
             <div className="mt-2 p-2 border rounded text-xs bg-emerald-50 border-emerald-200 text-emerald-800">
               <div className="font-medium">✓ Existing linked reviewer record</div>
@@ -499,7 +547,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               : knownReviewer.status === 'email_conflict'
                 ? 'the stored email is owned by another or ambiguous reviewer record'
                 : 'the person record could not be loaded';
-            const text = `⚠ Existing linked reviewer record needs repair: ${detail}.`;
+            const text = `Existing linked reviewer record needs repair: ${detail}.`;
             if (!openRepairRemedy) return <div className={banner}>{text}</div>;
             return (
               <button
@@ -516,7 +564,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             const banner = 'mt-2 p-2 border rounded text-xs bg-amber-50 border-amber-300 text-amber-800';
             const checkedTitle = dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined;
             if (!openIdentityRemedy) {
-              return <div className={banner} title={checkedTitle}>⚠ Dataverse identity needs review</div>;
+              return <div className={banner} title={checkedTitle}>Dataverse identity needs review</div>;
             }
             return (
               <button
@@ -525,26 +573,14 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 className={`${banner} block w-full text-left underline underline-offset-2 hover:brightness-95 cursor-pointer`}
                 title={`${checkedTitle ? `${checkedTitle}. ` : ''}Confirm this is the right person and correct the contact.`}
               >
-                ⚠ Dataverse identity needs review
+                Dataverse identity needs review
               </button>
             );
           })()}
-          {!identityUnverified && dataverseInstitutions.length > 0 && (
-            <div className={`mt-1 text-xs ${dataverseInstitutions.length > 1 ? 'text-amber-700' : 'text-gray-500'}`}>
-              {dataverseInstitutions.length > 1
-                ? 'Multiple affiliation records (may include co-affiliations or history): '
-                : 'Dataverse institution: '}
-              {dataverseInstitutions.map((entry, index) => (
-                <span key={`${entry.source}:${entry.value}`}>
-                  {index > 0 ? '; ' : ''}{entry.value} ({dataverseInstitutionSourceLabel(entry.source)})
-                </span>
-              ))}
-            </div>
-          )}
 
           {hasInstitutionCOI && (
             <div className={`mt-2 p-2 border rounded text-xs ${isFlaggedInstitutionCOI ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-red-50 border-red-300 text-red-800'}`}>
-              <span className="font-medium">🏛️ Institution COI:</span>{' '}
+              <span className="font-medium">Institution conflict:</span>{' '}
               {isFlaggedInstitutionCOI
                 ? 'Read-only: low-trust institution match contradicted by current-affiliation evidence'
                 : 'Same institution as proposal PI'}
@@ -555,8 +591,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             <div className={`mt-2 p-2 rounded text-xs border ${hasStrongCoauthorCOI ? 'bg-red-50 border-red-300 text-red-800' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>
               <span className="font-medium">
                 {hasStrongCoauthorCOI
-                  ? `🚨 Coauthor COI:`
-                  : `⚠️ Possible coauthor overlap:`}
+                  ? 'Coauthor conflict:'
+                  : 'Possible coauthor overlap:'}
               </span>{' '}
               Co-authored {coauthorships.reduce((s, co) => s + (co.paperCount || 0), 0)} paper(s) with proposal author(s)
               {hasPossibleCoauthorCOI && <span> — may be incidental (e.g. a shared large-collaboration paper); verify</span>}:
@@ -572,101 +608,68 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               </ul>
             </div>
           )}
-          {isLowConfidence && (
-            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">⚠️ Low match ({Math.round(confidence * 100)}%):</span> Publications don't match Claude's description — could be a different person with the same name.
-            </div>
-          )}
-          {isWeakMatch && !hasAnyMismatch && (
-            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-800">
-              <span className="font-medium">⚡ Weak match ({Math.round(confidence * 100)}%):</span> Some publications match, but relevance is uncertain — verify expertise manually.
-            </div>
-          )}
           {hasInstitutionMismatch && c.suggestedInstitution && (
-            <div className="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs text-orange-800">
-              <span className="font-medium">⚠️ Institution mismatch:</span>{' '}
-              {c.isApplicantRecommended ? 'The applicant listed' : 'Claude suggested'} <strong>{c.suggestedInstitution}</strong>,{' '}
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <span className="font-medium">Institution needs review:</span>{' '}
+              {c.isApplicantRecommended ? 'The applicant listed' : 'The suggestion listed'} <strong>{c.suggestedInstitution}</strong>,{' '}
               {c.affiliation
                 ? <>but linked evidence shows <strong>{c.affiliation.split(',')[0]}</strong>.</>
-                : <>but the matched publications could not be reconciled with it — see the “Why” note on this card.</>}
-            </div>
-          )}
-          {hasExpertiseMismatch && Array.isArray(c.expertiseAreas) && c.expertiseAreas.length > 0 && (
-            <div className="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-xs text-orange-800">
-              <span className="font-medium">⚠️ Expertise mismatch:</span> Claude claimed “{c.expertiseAreas.slice(0, 2).join(', ')}” but no publications matched these terms.
+                : <>but the retrieved publications could not be reconciled with it.</>}
             </div>
           )}
 
-          {lowPublicationCount && (
-            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">⚠️ Few publications found ({lowPublicationFound}):</span> below the usual minimum — surfaced rather than dropped, since the count can be undercounted (e.g. a preprint and its published version collapsing to one). Verify activity manually.
+          {!identityUnverified && (
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2" aria-label="Reviewer evidence status">
+              <div className={`rounded border px-2 py-1.5 text-xs ${identityEvidence.length > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                <span className="font-medium">Identity: </span>
+                {identityEvidence.length > 0
+                  ? <>Evidence includes {identityEvidence.join(' + ')}.</>
+                  : <>Contact evidence needs review before Invite.</>}
+              </div>
+              <div className={`rounded border px-2 py-1.5 text-xs ${expertiseStatus.tone === 'green'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : expertiseStatus.tone === 'amber'
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                  : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                <span className="font-medium">{expertiseStatus.label}: </span>
+                {expertiseStatus.detail}
+              </div>
             </div>
           )}
-          {aiFlaggedNotRelevant && (
-            <div className="mt-2 p-2 bg-amber-100 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">⚠️ AI flagged as possibly off-topic:</span> the reasoning pass judged this literature-retrieved author a weak topical match — surfaced (ranked last) rather than dropped. Verify relevance manually.
+
+          {!identityUnverified && expertiseStatus.tone === 'amber' && expertiseTerms.length > 0 && (
+            <p className="mt-1 text-[11px] text-gray-500">
+              Suggested for: {expertiseTerms.join(', ')}. Based on retrieved papers, not this person&apos;s full publication record.
+            </p>
+          )}
+
+          {lowPublicationCount && (
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <span className="font-medium">Publication activity needs review:</span>{' '}
+              only {lowPublicationFound} publication{lowPublicationFound === 1 ? '' : 's'} was retrieved, and the count may be incomplete.
             </div>
           )}
 
           {needsIdentityConfirmation && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">Keep in Find — identity/contact confirmation required.</span>{' '}
-              Confirm the exact person and email before promoting this reviewer to Invite.
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <span className="font-medium">Identity confirmation required.</span>{' '}
+              Confirm the exact person and email before adding this reviewer to Invite.
             </div>
           )}
           {missingVerifiedEmail && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">Keep in Find — verified email missing.</span>{' '}
-              Add or verify an email before promoting this reviewer to Invite.
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+              <span className="font-medium">Verified email required.</span>{' '}
+              Add or verify an email before adding this reviewer to Invite.
             </div>
           )}
 
-          {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Why: </span>{reason}</p>}
+          {reason && <p className="text-xs text-gray-700 mt-2"><span className="font-medium">Suggested because: </span>{reason}</p>}
 
           {c.identityNote && <p className="text-[11px] text-gray-500 mt-2 italic border-t border-gray-100 pt-1.5">{c.identityNote}</p>}
 
           <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-gray-500">
-            <span className="flex items-center gap-1">
-              <span className={hasAnyMismatch ? 'text-orange-500' : isLowConfidence ? 'text-amber-500' : isWeakMatch ? 'text-yellow-600' : 'text-green-500'}>
-                {hasAnyMismatch || isLowConfidence ? '⚠' : isWeakMatch ? '⚡' : '✓'}
-              </span>
-              {hasPubCount ? `${pubCount} publications` : 'publication count unavailable'}
-              {confidence !== undefined && <span className="text-gray-400">({Math.round(confidence * 100)}% expertise match)</span>}
-            </span>
-            {!identityUnverified && hIndex != null && <span>· h-index {hIndex}</span>}
-            {!identityUnverified && citations != null && <span>· {citations.toLocaleString()} citations</span>}
-            {c.isApplicantRecommended
-              ? <Pill tone="green">Applicant recommended</Pill>
-              : <Pill tone={provenanceGroupOf(c) === 'needs_identity_review' ? 'amber' : 'gray'}>{provenanceLabel}</Pill>}
+            {c.isApplicantRecommended && <Pill tone="green">Applicant recommended</Pill>}
             {eligibilityStatus === 'emeritus' && <Pill tone="amber">Emeritus / retired</Pill>}
-            {previousResult && <Pill tone="blue">Previously found</Pill>}
-            {identityUnverified && (
-              <Pill
-                tone="amber"
-                onClick={openIdentityRemedy}
-                title={openIdentityRemedy ? 'Confirm this is the right person and correct the contact' : undefined}
-              >
-                ⚠ Identity review required
-              </Pill>
-            )}
-            {missingVerifiedEmail && (
-              <Pill
-                tone="amber"
-                onClick={openAddressRemedy}
-                title={openAddressRemedy ? 'Add a verified email for this reviewer' : undefined}
-              >
-                ⚠ Verified email required
-              </Pill>
-            )}
-            {needsAddressVerification && (
-              <Pill
-                tone={emailReadiness.action === 'blocked' ? 'red' : 'amber'}
-                onClick={openAddressRemedy}
-                title={openAddressRemedy ? 'Review the evidence, correct the address if needed, and verify the exact person and address' : undefined}
-              >
-                {emailReadiness.action === 'blocked' ? '⛔ Address conflict' : '⚠ Address verification required'}
-              </Pill>
-            )}
           </div>
           {eligibilityStatus === 'emeritus' && eligibilityEvidence?.url && (
             <p className="mt-1 text-[11px] text-amber-700">
@@ -692,60 +695,17 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                     className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
                     title={`Email (from ${emailSource || 'unknown source'}${enr.emailYear ? `, ${enr.emailYear}` : ''})`}
                   >
-                    📧 {email}
+                    {email}
                   </a>
-                  {emailEvidence?.publicationCount > 0 && (
-                    <span className="text-gray-600">
-                      Evidence: {emailEvidence.publicationCount} recent {emailEvidence.publicationCount === 1 ? 'work' : 'works'}
-                      {evidencePublications.length > 0 && (
-                        <>
-                          {' ('}
-                          {evidencePublications.map((publication, index) => (
-                            <span key={publication.url}>
-                              {index > 0 ? ', ' : ''}
-                              <a
-                                href={publication.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-700 hover:underline"
-                                title={publication.title || 'Publication evidence'}
-                              >
-                                {publication.year || index + 1}
-                              </a>
-                            </span>
-                          ))}
-                          {')'}
-                        </>
-                      )}
-                    </span>
-                  )}
-                  {emailEvidence?.sourceKind === 'institution_page' && emailEvidence?.sourceUrl && (
-                    <span className="text-gray-600">
-                      Verified on{' '}
-                      <a
-                        href={emailEvidence.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-700 hover:underline"
-                        title="Open the institutional page used to verify this address"
-                      >
-                        official profile
-                      </a>
-                      {ownershipLabel ? ` · ${ownershipLabel}` : ''}
-                      {alternativeAddressCount > 0
-                        ? ` · ${alternativeAddressCount} other page ${alternativeAddressCount === 1 ? 'address' : 'addresses'} not selected`
-                        : ''}
-                    </span>
-                  )}
                 </>
               )}
               {/* Not-ready readiness states are themselves the way into the
-                  remedy (Verify / edit address); 'ready' stays a plain chip. */}
+                  remedy (Verify address). Ready evidence is already summarized
+                  once in the fixed Identity status above. */}
               {(() => {
+                if (emailAction === 'ready') return null;
                 const chipClass = `inline-flex items-center gap-1 px-2 py-1 rounded border ${
-                  emailAction === 'ready'
-                    ? 'bg-green-50 text-green-800 border-green-200'
-                    : emailAction === 'blocked'
+                  emailAction === 'blocked'
                       ? 'bg-red-50 text-red-800 border-red-200'
                     : emailAction === 'research_only'
                       ? 'bg-red-50 text-red-800 border-red-200'
@@ -756,16 +716,14 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 const chipTitle = emailAction === 'missing'
                   ? emailActionReason
                   : `${emailActionReason}. Confidence reflects address provenance and identity-grounded evidence, not deliverability.`;
-                const label = emailAction === 'ready'
-                  ? '✓ High-confidence email'
-                  : emailAction === 'blocked'
-                    ? '⛔ Address conflict must be resolved'
+                const label = emailAction === 'blocked'
+                    ? 'Address conflict must be resolved'
                   : emailAction === 'research_only'
-                    ? '⚠ Research only'
+                    ? 'Research only'
                     : emailAction === 'quick_check'
-                      ? '⚠ Email needs confirmation'
+                      ? 'Email needs confirmation'
                     : 'Email not found';
-                const clickable = emailAction !== 'ready' && openAddressRemedy;
+                const clickable = openAddressRemedy;
                 if (!clickable) return <span className={chipClass} title={chipTitle}>{label}</span>;
                 return (
                   <button
@@ -778,16 +736,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                   </button>
                 );
               })()}
-              {website && (
-                <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100" title="Faculty / personal website">
-                  🔗 Website
-                </a>
-              )}
-              {orcidUrl && (
-                <a href={orcidUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100" title="ORCID profile">
-                  ORCID
-                </a>
-              )}
             </div>
           )}
 
@@ -962,7 +910,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                       className="text-purple-600 hover:text-purple-800"
                       title="Search Google Scholar by name — results may include other researchers with this name"
                     >
-                      🎓 Search Google Scholar for this name
+                      Search Google Scholar for this name
                     </a>
                     <span className="text-gray-500"> — results may include other people with this name</span>
                   </div>
@@ -971,65 +919,132 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             </div>
           )}
 
-          <div className="mt-2 flex items-center gap-3">
+          {!identityUnverified && (
+            <details className="mt-2 rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-700">
+              <summary className="cursor-pointer font-medium text-blue-700">Details</summary>
+              <div className="mt-2 space-y-1.5">
+                <p><span className="font-medium">Source: </span>{provenanceLabel}{previousResult ? ' · found in an earlier search' : ''}</p>
+                {c.affiliation && (
+                  <p><span className="font-medium">Affiliation evidence: </span>{affiliationSourceLabel(c.affiliationSource || enr.affiliationSource)}</p>
+                )}
+                {dataverseEvidence?.status === 'known' && (
+                  <p title={dataverseEvidence.checkedAt ? `Dataverse checked ${dataverseEvidence.checkedAt}` : undefined}>
+                    <span className="font-medium">Dataverse evidence: </span>
+                    Existing person record matched by exact {dataverseEvidence.matchKey || 'key'}.
+                  </p>
+                )}
+                {dataverseInstitutions.length > 0 && (
+                  <p>
+                    <span className="font-medium">
+                      {dataverseInstitutions.length > 1 ? 'Dataverse institutions: ' : 'Dataverse institution: '}
+                    </span>
+                    {dataverseInstitutions.map((entry, index) => (
+                      <span key={`${entry.source}:${entry.value}`}>
+                        {index > 0 ? '; ' : ''}{entry.value} ({dataverseInstitutionSourceLabel(entry.source)})
+                      </span>
+                    ))}
+                    {dataverseInstitutions.length > 1 ? ' · may include co-affiliations or history' : ''}
+                  </p>
+                )}
+                {email && (
+                  <p>
+                    <span className="font-medium">Email evidence: </span>
+                    {emailActionReason}
+                    {emailEvidence?.publicationCount > 0
+                      ? ` · ${emailEvidence.publicationCount} recent ${emailEvidence.publicationCount === 1 ? 'work' : 'works'}`
+                      : ''}
+                    {evidencePublications.length > 0 && (
+                      <>
+                        {' ('}
+                        {evidencePublications.map((publication, index) => (
+                          <span key={publication.url}>
+                            {index > 0 ? ', ' : ''}
+                            <a
+                              href={publication.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-700 hover:underline"
+                              title={publication.title || 'Publication evidence'}
+                            >
+                              {publication.year || index + 1}
+                            </a>
+                          </span>
+                        ))}
+                        {')'}
+                      </>
+                    )}
+                  </p>
+                )}
+                {emailEvidence?.sourceKind === 'institution_page' && emailEvidence?.sourceUrl && (
+                  <p>
+                    Verified on{' '}
+                    <a
+                      href={emailEvidence.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-700 hover:underline"
+                      title="Open the institutional page used to verify this address"
+                    >
+                      official profile
+                    </a>
+                    {ownershipLabel ? ` · ${ownershipLabel}` : ''}
+                    {alternativeAddressCount > 0
+                      ? ` · ${alternativeAddressCount} other page ${alternativeAddressCount === 1 ? 'address' : 'addresses'} not selected`
+                      : ''}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {website && <a href={website} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline">Website</a>}
+                  {orcidUrl && <a href={orcidUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline">ORCID</a>}
+                  <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline" title={hasRealScholar ? "Open this researcher's Google Scholar profile" : 'Search Google Scholar for this researcher'}>
+                    {hasRealScholar ? 'Scholar profile' : 'Scholar search'}
+                  </a>
+                  {buildGoogleSearchUrl(c.name, c.affiliation) && (
+                    <a href={buildGoogleSearchUrl(c.name, c.affiliation)} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline">
+                      Google search
+                    </a>
+                  )}
+                  {openAddressRemedy && !needsAddressVerification && (
+                    <button type="button" onClick={openAddressRemedy} className="text-blue-700 hover:underline">Edit contact</button>
+                  )}
+                </div>
+              </div>
+            </details>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {!identityUnverified && pubs.length > 0 && (
-              <button type="button" onClick={() => setExpanded((v) => !v)} className="text-xs text-blue-600 hover:text-blue-800" aria-expanded={expanded}>
-                {expanded ? 'Show less' : `View ${pubs.length} recent paper${pubs.length === 1 ? '' : 's'}`}
+              <button type="button" onClick={() => setExpanded((v) => !v)} className="text-xs font-medium text-blue-700 hover:text-blue-900" aria-expanded={expanded}>
+                {expanded ? 'Hide recent papers' : `View ${pubs.length} recent paper${pubs.length === 1 ? '' : 's'}`}
               </button>
             )}
-            {/* Scholar profile/search link suppressed for selectable-but-unverified rows — it
-                would nudge staff toward a possibly-wrong namesake profile (Codex re-review LOW). */}
-            {!identityUnverified && (
-              <a href={scholarUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1" title={hasRealScholar ? "Open this researcher's Google Scholar profile" : 'Search Google Scholar for this researcher'}>
-                🎓 {hasRealScholar ? 'Scholar Profile' : 'Scholar Search'}
-              </a>
-            )}
-            {/* One-click Google search for the person + notional institution, so staff
-                don't have to hand-compose the search they already run to verify a
-                suggestion (owner request, fuzzy-matching-owner-answers Q2). */}
-            {buildGoogleSearchUrl(c.name, c.affiliation) && (
-              <a
-                href={buildGoogleSearchUrl(c.name, c.affiliation)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                title="Search Google for this name and institution"
-              >
-                Search Google ↗
-              </a>
-            )}
-            {/* Manual contact edit (manage-only): correct a wrong email/website
-                (or affiliation/h-index) by hand. A typed email is stamped manual
-                → quick check at invite (per-recipient acknowledgement). */}
-            {openAddressRemedy && (
+            {openAddressRemedy && needsAddressVerification && (
               <button
                 type="button"
                 onClick={openAddressRemedy}
-                className="text-xs text-gray-500 hover:text-blue-700 flex items-center gap-1"
-                title={needsAddressVerification
-                  ? 'Review the evidence, correct the address if needed, and verify the exact person and address'
-                  : 'Edit contact details (email/website/affiliation) for this candidate'}
+                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                title="Review the evidence, correct the address if needed, and verify the exact person and address"
               >
-                {c.addressConflictPending ? 'Review address conflict' : (needsAddressVerification ? '✓ Verify / edit address' : '✏️ Edit contact')}
+                {c.addressConflictPending ? 'Review address conflict' : 'Verify address'}
               </button>
             )}
             {canManage && onRetryAddressCheck && c.conflictRecordUnavailable === true && (
               <button
                 type="button"
                 onClick={() => onRetryAddressCheck(c)}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
               >
-                ↻ Retry conflict check
+                Retry conflict check
               </button>
             )}
             {openRepairRemedy && (
               <button
                 type="button"
                 onClick={openRepairRemedy}
-                className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1"
+                className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
                 title="Create a durable repair request if neither address can be verified safely"
               >
-                ⚑ Create repair request
+                Create repair request
               </button>
             )}
             {/* Needs-identity-review escape hatch: a PD who recognizes the person can
@@ -1039,20 +1054,30 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={openIdentityRemedy}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                title="If you recognize this person, confirm their identity and correct the email/website, then add them to the candidate list"
+                className="rounded bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800"
+                title="Confirm the exact person and contact details before adding this reviewer to Invite"
               >
-                ✓ This is the right person → edit &amp; add
+                Confirm identity
+              </button>
+            )}
+            {onAddToInvite && (
+              <button
+                type="button"
+                onClick={() => onAddToInvite(c)}
+                disabled={addingToInvite}
+                className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {addingToInvite ? 'Adding to Invite…' : 'Add to Invite'}
               </button>
             )}
             {onExclude && (
               <button
                 type="button"
                 onClick={() => onExclude(c)}
-                className="text-xs text-gray-400 hover:text-red-600 ml-auto"
+                className="ml-auto text-xs text-gray-500 hover:text-red-700"
                 title="Set aside — moves to the Excluded list and won't be surfaced again by a search for this request (recoverable)"
               >
-                ✕ Exclude
+                Not a fit
               </button>
             )}
             {onPromote && (
@@ -1060,9 +1085,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 type="button"
                 onClick={() => onPromote(c)}
                 className="text-xs text-blue-600 hover:text-blue-800 ml-auto"
-                title="Promote back to the active candidate list"
+                title="Return to the active candidate list"
               >
-                ↩ Promote back
+                Reconsider
               </button>
             )}
           </div>
@@ -1108,6 +1133,7 @@ export default function ReviewerSearchSection({
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
+  const [savingCount, setSavingCount] = useState(0);
   // Saved-pool projections: names feed the cross-run search exclusion union
   // (S224); the engaged-row identity index collapses re-discovered
   // already-engaged people at the display merge (S401 Kwong confusion —
@@ -1207,7 +1233,7 @@ export default function ReviewerSearchSection({
   useEffect(() => {
     genRef.current += 1; // invalidate any in-flight run
     const myGen = genRef.current;
-    setPhase('idle'); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
+    setPhase('idle'); setSavingCount(0); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
     setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
@@ -1818,7 +1844,7 @@ export default function ReviewerSearchSection({
       if (genRef.current === myGen) {
         setRosterActive((prev) => prev.filter((c) => candKey(c) !== key));
         setRosterExcluded((prev) => dedupeByName([cand, ...prev]));
-        setRosterNote("Couldn't promote that reviewer — please try again.");
+        setRosterNote("Couldn't return that reviewer to the active list — please try again.");
       }
     }
   }, [requestId, reloadRoster]);
@@ -2167,7 +2193,7 @@ export default function ReviewerSearchSection({
       .filter((candidate) => Array.isArray(candidate?.manualContactFields) && candidate.manualContactFields.length > 0)
       .map((candidate) => ({
         name: candidate.name || 'Unknown candidate',
-        error: 'Manual contact details were not overwritten by automated refresh; confirm the contact again before promoting.',
+        error: 'Manual contact details were not overwritten by automated refresh; confirm the contact again before adding to Invite.',
       }));
     const refreshableCandidates = staleCandidates.filter((candidate) => (
       !Array.isArray(candidate?.manualContactFields) || candidate.manualContactFields.length === 0
@@ -2251,17 +2277,19 @@ export default function ReviewerSearchSection({
     };
   }, [requestId, analysis, pushProgress]);
 
-  const saveSelected = useCallback(async () => {
+  const saveSelected = useCallback(async (candidateKeys = selected) => {
     const myGen = genRef.current;
     if (savingRef.current === myGen) return;
     // Filter by isSelectable too (not just `selected`): a needs-identity-review row
     // can't be checked, but this guarantees one never reaches save-candidates even if
     // a stale `selected` entry survives a reclassification (defense-in-depth; the
     // server 422s these anyway).
-    const chosen = displayCandidates.filter((c) => selected.has(candKey(c)) && isCandidateSelectable(c));
+    const keysToSave = candidateKeys instanceof Set ? candidateKeys : selected;
+    const chosen = displayCandidates.filter((c) => keysToSave.has(candKey(c)) && isCandidateSelectable(c));
     if (chosen.length === 0) return;
     savingRef.current = myGen;
     const isCurrent = () => genRef.current === myGen;
+    setSavingCount(chosen.length);
     setPhase('saving');
     setError(null); setErrorMeta(null); setProgress([]); setPromotionNotice(null);
     try {
@@ -2379,7 +2407,7 @@ export default function ReviewerSearchSection({
           if ((!sRes.ok || !sData.success) && saved === 0) {
             const detail = formatSaveFailureDetails(sData.errors);
             failures.push({
-              name: 'Reviewer promotion',
+              name: 'Add to Invite',
               error: detail
                 ? `${sData.error || `Save failed (${sRes.status})`} ${detail}`
                 : (sData.error || `Save failed (${sRes.status})`),
@@ -2419,7 +2447,7 @@ export default function ReviewerSearchSection({
             if (refreshedVerificationCandidates.length > 0) {
               rosterWarnings.push(
                 `Contact verification was refreshed for ${refreshedVerificationCandidates.length} reviewer`
-                + `${refreshedVerificationCandidates.length === 1 ? '' : 's'}. Review the updated contact details, then select and promote again.`,
+                + `${refreshedVerificationCandidates.length === 1 ? '' : 's'}. Review the updated contact details, then add to Invite again.`,
               );
             }
             if (refreshResult.failures.length > 0) {
@@ -2441,7 +2469,7 @@ export default function ReviewerSearchSection({
       let promoted = 0;
       const promotedCandidates = [];
       if (applicantChosen.length > 0) {
-        if (isCurrent()) pushProgress(`Promoting ${applicantChosen.length} applicant-referred reviewer(s)…`);
+        if (isCurrent()) pushProgress(`Adding ${applicantChosen.length} applicant-referred reviewer(s) to Invite…`);
         const results = await Promise.all(applicantChosen.map(async (c) => {
           try {
             // Carry the PD's hand-corrections (ONLY the fields marked manual) so the
@@ -2464,7 +2492,7 @@ export default function ReviewerSearchSection({
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) {
-              const error = new Error(data.message || data.error || `Promotion failed (${res.status})`);
+              const error = new Error(data.message || data.error || `Adding to Invite failed (${res.status})`);
               error.code = data.code || null;
               throw error;
             }
@@ -2483,7 +2511,7 @@ export default function ReviewerSearchSection({
             promotedCandidates.push(result.candidate);
             if (!result.rosterFinalized) {
               needsRosterReload = true;
-              rosterWarnings.push('A promoted reviewer was saved, but the Find roster could not be finalized.');
+              rosterWarnings.push('An applicant-referred reviewer was added, but the Find roster could not be finalized.');
             }
           } else {
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
@@ -2528,7 +2556,7 @@ export default function ReviewerSearchSection({
             ...candidate,
             promotionDecision: 'blocked_applicant_excluded',
             promotionBlockCode: 'applicant_excluded',
-            promotionBlockReason: 'This reviewer is applicant-excluded for the request and cannot be promoted.',
+            promotionBlockReason: 'This reviewer is applicant-excluded for the request and cannot be added to Invite.',
           }));
         setCandidates((prev) => prev.filter((candidate) => !wasBlocked(candidate)));
         setRecCandidates((prev) => prev.filter((candidate) => !wasBlocked(candidate)));
@@ -2577,7 +2605,7 @@ export default function ReviewerSearchSection({
           return next;
         });
         if (addressVerificationKeys.length > 0) {
-          rosterWarnings.push('Address verification is required. Use “Verify / edit address” on each affected reviewer, then select and promote again.');
+          rosterWarnings.push('Address verification is required. Use “Verify address” on each affected reviewer, then add to Invite again.');
         }
         if (addressRepairKeys.length > 0) {
           rosterWarnings.push('A conflict safety record could not be written. Retry from the reviewer card or create a durable repair request.');
@@ -2601,7 +2629,7 @@ export default function ReviewerSearchSection({
           identityReviewResults.forEach((result) => next.delete(result.rosterCandidateKey));
           return next;
         });
-        rosterWarnings.push('Dataverse identity evidence needs review. Use “This is the right person” to verify the person and exact address, or set the reviewer aside.');
+        rosterWarnings.push('Dataverse identity evidence needs review. Use “Confirm identity” to verify the person and exact address, or set the reviewer aside.');
       }
 
       if (serverRepairResults.length > 0 && isCurrent()) {
@@ -2621,7 +2649,7 @@ export default function ReviewerSearchSection({
           serverRepairResults.forEach((result) => next.delete(result.rosterCandidateKey));
           return next;
         });
-        rosterWarnings.push('A reviewer record must be repaired before promotion. Use “Create repair request” on the affected card.');
+        rosterWarnings.push('A reviewer record must be repaired before it can be added to Invite. Use “Create repair request” on the affected card.');
       }
 
       const totalSucceeded = saved + promoted;
@@ -2660,7 +2688,7 @@ export default function ReviewerSearchSection({
 
       const messageParts = [];
       if (saved > 0) messageParts.push(`Saved ${saved} of ${toSave.length} to this request's candidate pool.`);
-      if (promoted > 0) messageParts.push(`Promoted ${promoted} of ${applicantChosen.length} applicant-referred reviewer${applicantChosen.length === 1 ? '' : 's'}.`);
+      if (promoted > 0) messageParts.push(`Added ${promoted} of ${applicantChosen.length} applicant-referred reviewer${applicantChosen.length === 1 ? '' : 's'} to Invite.`);
       if (failures.length > 0) {
         const detail = failures.map((f) => `${f.name || 'Unknown candidate'}: ${f.error || 'failed'}`).join('; ');
         messageParts.push(`${failures.length} could not be saved (${detail}).`);
@@ -2702,6 +2730,7 @@ export default function ReviewerSearchSection({
       }
     } finally {
       if (savingRef.current === myGen) savingRef.current = null;
+      if (isCurrent()) setSavingCount(0);
     }
   }, [
     displayCandidates,
@@ -2784,37 +2813,27 @@ export default function ReviewerSearchSection({
 
   const onExcludeChange = (ev) => { excludeEditedRef.current = true; setExcludeText(ev.target.value); };
 
-  // The two selectable sections are VIEWS over displayCandidates; selection is
+  // Decision-readiness sections are VIEWS over displayCandidates; selection is
   // keyed by candKey(c) (stable normalized name), so a roster splice can't
   // corrupt it (S224 — replaces the former flat-index invariant).
   // Default order is confidence/relevance rank (server-ranked, preserved). The
-  // alpha toggle re-sorts WITHIN each provenance group by display name so the
-  // grouping (cited vs literature vs applicant) — which carries meaning — stays
-  // intact while a specific name is easy to find. Non-mutating (copy before sort).
+  // alpha toggle re-sorts within each readiness group by display name. Provenance
+  // remains available in each card's Details disclosure without driving the
+  // staffer's attention order.
   const sortForDisplay = (items) =>
     sortMode === 'alpha'
       ? [...items].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }))
       : items;
-  const provenanceSections = [
+  const readinessSections = [
     {
-      key: 'cited_or_proposal_named',
-      title: 'Cited / proposal-named / externally-referred',
-      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'cited_or_proposal_named')),
+      key: 'ready_to_invite',
+      title: 'Ready to add to Invite',
+      items: sortForDisplay(displayCandidates.filter((c) => isCandidateSelectable(c))),
     },
     {
-      key: 'literature_retrieved',
-      title: 'Literature-retrieved',
-      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'literature_retrieved')),
-    },
-    {
-      key: 'applicant_suggested',
-      title: 'Applicant-referred',
-      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'applicant_suggested')),
-    },
-    {
-      key: 'needs_identity_review',
-      title: 'Needs identity review',
-      items: sortForDisplay(displayCandidates.filter((c) => provenanceGroupOf(c) === 'needs_identity_review')),
+      key: 'needs_review',
+      title: 'Needs review',
+      items: sortForDisplay(displayCandidates.filter((c) => !isCandidateSelectable(c))),
     },
   ].filter((section) => section.items.length > 0);
 
@@ -3109,23 +3128,15 @@ export default function ReviewerSearchSection({
                         </div>
                       </div>
                       <div data-testid="reviewer-candidate-list" className="space-y-4">
-                        {provenanceSections.map((section) => {
-                          // Slice E: the needs-identity-review section is read-only.
-                          const readOnlySection = section.key === 'needs_identity_review';
+                        {readinessSections.map((section) => {
                           return (
                           <div key={section.key}>
                             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
                               {section.title} ({section.items.length})
                             </p>
-                            {section.key === 'needs_identity_review' && (
+                            {section.key === 'needs_review' && (
                               <p className="text-xs text-gray-400 mb-1.5">
-                                Identity couldn't be confirmed for these. If you recognize one, use
-                                “This is the right person” to correct the contact and add them.
-                              </p>
-                            )}
-                            {section.key === 'applicant_suggested' && (
-                              <p className="text-xs text-gray-400 mb-1.5">
-                                Named by the applicant — promote only after the identity and exact email are verified.
+                                These reviewers need an identity, address, eligibility, or record issue resolved before they can be added to Invite. Use the primary action shown on each card.
                               </p>
                             )}
                             <div className="space-y-2">
@@ -3146,12 +3157,20 @@ export default function ReviewerSearchSection({
                                     promotionDecision?.decision === 'needs_identity_confirmation'
                                     || promotionDecision?.decision === 'missing_email'
                                   );
-                                if (selectableNow && !readOnlySection) {
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
-                                }
-                                if (selectableNow && readOnlySection) {
-                                  // needs-review row the PD just confirmed → selectable + editable.
-                                  return <CandidateCard key={candKey(c)} candidate={c} previousResult={previousSearchKeys.has(candKey(c))} checked={selected.has(candKey(c))} onToggle={() => toggle(candKey(c))} onExclude={excludeCandidate} onUseLead={useLead} onEdit={setEditingContact} canManage={canManage} />;
+                                if (selectableNow) {
+                                  return <CandidateCard
+                                    key={candKey(c)}
+                                    candidate={c}
+                                    previousResult={previousSearchKeys.has(candKey(c))}
+                                    checked={selected.has(candKey(c))}
+                                    onToggle={() => toggle(candKey(c))}
+                                    onAddToInvite={canManage ? () => saveSelected(new Set([candKey(c)])) : undefined}
+                                    addingToInvite={phase === 'saving'}
+                                    onExclude={excludeCandidate}
+                                    onUseLead={useLead}
+                                    onEdit={setEditingContact}
+                                    canManage={canManage}
+                                  />;
                                 }
                                 return <CandidateCard
                                   key={candKey(c)}
@@ -3179,7 +3198,7 @@ export default function ReviewerSearchSection({
                       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur">
                         <button
                           type="button"
-                          onClick={saveSelected}
+                          onClick={() => saveSelected()}
                           disabled={selected.size === 0 || phase === 'saving'}
                           aria-busy={phase === 'saving'}
                           className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -3187,10 +3206,10 @@ export default function ReviewerSearchSection({
                           {phase === 'saving' ? (
                             <>
                               <span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                              Promoting {selected.size} selected reviewer{selected.size === 1 ? '' : 's'}…
+                              Adding {savingCount} reviewer{savingCount === 1 ? '' : 's'} to Invite…
                             </>
                           ) : (
-                            <>Promote {selected.size > 0 ? selected.size : ''} selected to Invite</>
+                            <>Add {selected.size > 0 ? selected.size : ''} selected to Invite</>
                           )}
                         </button>
                         <button
@@ -3217,7 +3236,7 @@ export default function ReviewerSearchSection({
                   {rosterExcluded.length > 0 && (
                     <details open={excludedOpen} onToggle={(e) => setExcludedOpen(e.currentTarget.open)} className="border border-gray-200 rounded-lg p-2">
                       <summary className="text-xs font-medium text-gray-500 cursor-pointer">
-                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Promote one back to reconsider it.
+                        Excluded ({rosterExcluded.length}) — set aside for this request; not re-surfaced by a search. Use Reconsider to return one to the active list.
                       </summary>
                       <div className="space-y-2 mt-2">
                         {rosterExcluded.map((c) => (
@@ -3262,7 +3281,7 @@ export default function ReviewerSearchSection({
                   {rosterBlocked.length > 0 && (
                     <details className="border border-amber-200 bg-amber-50 rounded-lg p-2">
                       <summary className="text-xs font-medium text-amber-900 cursor-pointer">
-                        Promotion blocked ({rosterBlocked.length}) — applicant-excluded for this request
+                        Cannot add to Invite ({rosterBlocked.length}) — applicant-excluded for this request
                       </summary>
                       <div className="space-y-2 mt-2">
                         {rosterBlocked.map((candidate) => (
@@ -3282,7 +3301,7 @@ export default function ReviewerSearchSection({
                         Unverified suggestions ({unverifiedToShow.length}) — couldn't confirm these in the literature; not selectable until you confirm one
                       </summary>
                       <p className="text-xs text-gray-400 mt-1.5">
-                        If you recognize one, use “This is the right person” to confirm their
+                        If you recognize one, use “Confirm identity” to confirm their
                         identity and correct the contact — that adds them to the candidate
                         list. Exclude sets one aside so searches stop suggesting the name.
                       </p>
@@ -3328,7 +3347,7 @@ export default function ReviewerSearchSection({
                   <div>
                     <p>
                       {phase === 'saving'
-                        ? `Promoting ${selected.size} selected reviewer${selected.size === 1 ? '' : 's'}…`
+                        ? `Adding ${savingCount} reviewer${savingCount === 1 ? '' : 's'} to Invite…`
                         : promotionNotice?.message}
                     </p>
                     {phase === 'saving' && progress.length > 0 && (

@@ -8,8 +8,8 @@ import {
 /**
  * A needs-identity-review card suppresses the normal contact/bibliometric chips,
  * because those read as verified facts about a resolved person. Staff still have
- * to answer "is this the right person?" before clicking
- * "This is the right person → edit & add", which commits a durable attestation.
+ * to answer "is this the right person?" before clicking "Confirm identity",
+ * which commits a durable attestation.
  * These tests pin that the same retrieved evidence is available BEFORE that click,
  * and that it is not dressed up as the verified treatment.
  */
@@ -86,7 +86,7 @@ test('a failed conflict write suppresses verification and exposes all executable
   expect(screen.queryByRole('button', { name: /Verify \/ edit address/i })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /Retry conflict check/i }));
   await user.click(screen.getByRole('button', { name: /Create repair request/i }));
-  await user.click(screen.getByRole('button', { name: /Exclude/i }));
+  await user.click(screen.getByRole('button', { name: /Not a fit/i }));
   expect(retry).toHaveBeenCalledTimes(1);
   expect(repair).toHaveBeenCalledTimes(1);
   expect(exclude).toHaveBeenCalledTimes(1);
@@ -183,13 +183,13 @@ describe('CandidateCard identity evidence disclosure', () => {
     await user.click(screen.getByRole('button', { name: TOGGLE }));
 
     // No mailto chip, no readiness verdict, no "known in Dataverse" ✓ claim.
-    expect(screen.queryByText('📧 namesake@example.edu')).not.toBeInTheDocument();
-    expect(screen.queryByText('✓ High-confidence email')).not.toBeInTheDocument();
-    expect(screen.queryByText('⚠ Email needs confirmation')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Known in Dataverse by exact/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'namesake@example.edu' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Identity:.*high-confidence email/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
     // The gate itself is untouched.
-    expect(screen.getByText(/Keep in Find — identity\/contact confirmation required/)).toBeInTheDocument();
-    expect(screen.getByText(/⚠ Identity review required/)).toBeInTheDocument();
+    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm identity' })).toBeInTheDocument();
   });
 
   test('points the staffer at the papers as the check the panel cannot make', async () => {

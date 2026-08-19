@@ -87,9 +87,9 @@ test('applicant-excluded collision moves the exact candidate into terminal read-
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${blocked.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByText(/Promotion blocked \(1\) — applicant-excluded for this request/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Cannot add to Invite \(1\) — applicant-excluded for this request/i)).toBeInTheDocument();
   expect(screen.getByText(blocked.name)).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${blocked.name}`)).not.toBeInTheDocument();
 });
@@ -136,7 +136,7 @@ test('partial non-2xx response still graduates only the exact server-confirmed s
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${saved.name}`));
   fireEvent.click(screen.getByLabelText(`Select ${withheld.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 2 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 2 selected to invite/i }));
 
   await waitFor(() => expect(screen.queryByText(saved.name)).not.toBeInTheDocument());
   expect(screen.getByText(withheld.name)).toBeInTheDocument();
@@ -187,7 +187,7 @@ test('a saved result removes only the indexed roster card when an unsubmitted ca
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   await waitFor(() => expect(screen.queryByLabelText(`Select ${primary.name}`)).not.toBeInTheDocument());
   expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeInTheDocument();
@@ -238,9 +238,9 @@ test('an applicant-excluded result blocks only the indexed roster card when anot
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByText(/Promotion blocked \(1\)/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Cannot add to Invite \(1\)/i)).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${primary.name}`)).not.toBeInTheDocument();
   expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeInTheDocument();
 });
@@ -296,11 +296,11 @@ test('same-person different-address conflict exposes identity confirmation on th
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${peter.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByRole('button', { name: /this is the right person/i })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /confirm identity/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${peter.name}`)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /confirm identity/i }));
   expect(screen.getByDisplayValue(peter.email)).toBeInTheDocument();
   expect(screen.getByDisplayValue(peter.website)).toBeInTheDocument();
 });
@@ -354,10 +354,10 @@ test('record-repair conflicts stay on the repair remedy even when the server als
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /this is the right person/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /confirm identity/i })).not.toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
 });
 
@@ -401,7 +401,7 @@ test('applicant promotion repair failure attaches the repair remedy to the exact
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
@@ -447,9 +447,9 @@ test('applicant promotion address-verification failure exposes the address remed
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /verify address/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
   expect(screen.getByText(/Address verification is required/i)).toBeInTheDocument();
 });
@@ -517,9 +517,9 @@ test('plain website edits are durably acknowledged by the request roster before 
     candidateKey: reviewer.candidateKey,
     updates: { website },
   });
-  expect(screen.getByRole('button', { name: /this is the right person/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /confirm identity/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /confirm identity/i }));
   expect(screen.getByDisplayValue(website)).toBeInTheDocument();
   expect(screen.getByDisplayValue(localEmailEdit)).toBeInTheDocument();
 });
@@ -594,15 +594,16 @@ test('verify contact sends every confirmation-bound field and promotes the serve
   });
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
-  fireEvent.click(await screen.findByRole('button', { name: /verify \/ edit address/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /verify address/i }));
   fireEvent.change(screen.getByText('Affiliation').parentElement.querySelector('input'), { target: { value: 'Current Department' } });
-  fireEvent.change(screen.getByText('Website').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
+  const websiteLabel = screen.getAllByText('Website').find((element) => element.tagName === 'LABEL');
+  fireEvent.change(websiteLabel.parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
   fireEvent.click(screen.getByLabelText(/belongs to this person — I checked the evidence below/i));
   fireEvent.change(screen.getByText('Evidence link').parentElement.querySelector('input'), { target: { value: 'https://example.edu/current-profile' } });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
   expect(await screen.findByText(/exact person and address verified/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
   await waitFor(() => expect(saveBody).toBeDefined());
 
   expect(addressBody).toMatchObject({
@@ -663,7 +664,7 @@ test('stale promote conflict reloads server truth instead of restoring the revie
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByText(/Excluded \(1\)/i));
-  fireEvent.click(screen.getByRole('button', { name: /Promote back/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Reconsider/i }));
 
   expect(await screen.findByText(/no longer actionable, so the reviewer roster was reloaded/i)).toBeInTheDocument();
   expect(screen.queryByText(/Excluded \(1\)/i)).not.toBeInTheDocument();
@@ -709,7 +710,7 @@ test('saved row with failed roster finalization stays successful and reloads the
 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${saved.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   expect(await screen.findByText(/Saved 1 of 1/i)).toBeInTheDocument();
   expect(screen.getByText(/Find roster could not be finalized/i)).toBeInTheDocument();
@@ -789,7 +790,7 @@ test('expired verification refresh targets only the indexed roster card when ano
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${primary.name}`));
   fireEvent.click(screen.getByLabelText(`Select ${sibling.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 2 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 2 selected to invite/i }));
 
   expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
   expect(enrichmentBody.candidates).toHaveLength(1);
@@ -875,12 +876,12 @@ test('expired verification is refreshed durably and deselected for review withou
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   const checkbox = await screen.findByLabelText(`Select ${expired.name}`);
   fireEvent.click(checkbox);
-  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
   expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /fresh@example.edu/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/reviewer-finder/save-candidates',
     expect.any(Object),
@@ -976,12 +977,12 @@ test('mixed saved and expired rows reconcile independently before the refreshed 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByLabelText(`Select ${saved.name}`));
   fireEvent.click(screen.getByLabelText(`Select ${expired.name}`));
-  fireEvent.click(screen.getByRole('button', { name: /promote 2 selected to invite/i }));
+  fireEvent.click(screen.getByRole('button', { name: /add 2 selected to invite/i }));
 
   expect(await screen.findByText(/Saved 1 of 2/i)).toBeInTheDocument();
   expect(screen.queryByText(saved.name)).not.toBeInTheDocument();
   expect(screen.getByText(expired.name)).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /verify \/ edit address/i })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
   expect(screen.getByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
 });
