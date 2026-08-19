@@ -45,7 +45,14 @@ describe('cleanupOperationalEvents', () => {
     expect(sqlMock.mock.calls[1].slice(1)).toContain(180); // 2x window
 
     const capText = sqlMock.mock.calls[2][0].join(' ');
-    expect(capText).toContain('ORDER BY id DESC');
+    // The cap must rank by OPERATIONAL recency: folded/reopened events keep
+    // their original low id while recurrence refreshes last_occurred_at, so
+    // an id-ordered cap would delete a still-current open incident (Codex
+    // adversarial finding, cycle 2). An old-id row with a fresh
+    // last_occurred_at must survive the cap window.
+    expect(capText).toContain('ORDER BY last_occurred_at DESC, id DESC');
+    expect(capText).toContain('OFFSET');
+    expect(capText).not.toMatch(/ORDER BY id DESC(?!.*last_occurred_at)/);
   });
 
   test('missing table (42P01) is silent — cron may run before migration 030', async () => {

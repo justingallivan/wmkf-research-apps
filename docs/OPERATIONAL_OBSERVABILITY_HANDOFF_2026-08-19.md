@@ -116,6 +116,26 @@ findings; both were confirmed against source and fixed on this branch:
 Post-fix: full unit suite 8107 green, types green. Review verdict otherwise
 raised no auth, dedup, schema-parity, retention, or compatibility findings.
 
+A second adversarial cycle (same day, against the fixed diff) returned NEEDS
+REWORK with two new findings; both confirmed and fixed:
+
+3. **[high, FIXED]** The retention hard-cap ranked "newest" by id, but
+   folded/reopened app events keep their original low id while recurrence
+   refreshes `last_occurred_at` — an actively recurring open incident could be
+   deleted by the cap. Fix: the cap phase now ranks by
+   `last_occurred_at DESC, id DESC` (OFFSET window); the append-only
+   shadow-log sibling deliberately keeps its id-based cap (rows there are
+   never updated in place).
+4. **[medium, FIXED]** `notifyAcceptedContactFailure` (warning severity)
+   recorded no durable event even though completion/withdrawal settle its
+   `accepted-reviewer-contact-failed:<id>` recovery key. Fix: it now passes
+   the `operationalEvent` enrichment (stage `accepted_contact_promotion`,
+   structured-error projection, job id/attempts), so the settled row exists.
+
+Post-cycle-2: full unit suite 8108 green, types green. Cycle 2 raised no
+findings against the cycle-1 fixes' edge cases (drain-open noise, IP
+over/under-redaction) or the other attacked surfaces.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from

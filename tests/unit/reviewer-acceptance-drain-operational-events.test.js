@@ -128,6 +128,38 @@ test('honorarium failure sends operationalEvent enrichment through notify()', as
   expect(OperationalEventService.markRecovered).not.toHaveBeenCalled();
 });
 
+test('accepted-contact failure sends operationalEvent enrichment through notify()', async () => {
+  // Cycle-2 Codex finding: this warning-severity path recorded no durable
+  // event, yet completion/withdrawal settle its recovery key. The enrichment
+  // makes the settled row actually exist.
+  const d = deps();
+  const contactErr = new Error('contact promotion blocked');
+  contactErr.code = 'accepted_reviewer_contact_conflict';
+  contactErr.isTransient = false;
+  d.ensureHonorarium.mockRejectedValue(contactErr);
+
+  await expect(processReviewerAcceptanceJob(job(), d)).rejects.toThrow();
+
+  const notifyArgs = d.notify.mock.calls.find(
+    ([args]) => args.type === 'accepted_reviewer_contact_promotion_failed',
+  )[0];
+  expect(notifyArgs.autoResolveKey).toBe(`accepted-reviewer-contact-failed:${REVIEWER_ID}`);
+  expect(notifyArgs.operationalEvent).toMatchObject({
+    stage: 'accepted_contact_promotion',
+    transient: false,
+    requestNumber: 'REQ-001',
+    entityRefs: {
+      suggestionId: SUGGESTION_ID,
+      potentialReviewerId: REVIEWER_ID,
+      jobId: 77,
+    },
+    metadata: expect.objectContaining({
+      code: 'accepted_reviewer_contact_conflict',
+      attempts: 3,
+    }),
+  });
+});
+
 test('job completion marks the follow-up recovery keys recovered', async () => {
   const d = deps();
   const result = await processReviewerAcceptanceJob(job(), d);
