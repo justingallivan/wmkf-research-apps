@@ -189,7 +189,9 @@ describe('reconciliation report semantics', () => {
 
     expect(claim).toMatchObject({
       entity: 'wmkf_appreviewersuggestion',
-      atlas_claim: 724,
+      // Tracks the dated "Live row count" snapshot on the canonical Atlas
+      // page; update together with that page (was 724 pre-2026-08-15).
+      atlas_claim: 793,
       source_file: 'docs/atlas/dataverse-wmkf-appreviewersuggestion.md',
     });
   });
