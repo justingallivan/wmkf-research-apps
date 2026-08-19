@@ -39,6 +39,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     cleanupUsageLog: jest.fn(async () => 0),
     cleanupQueryLog: jest.fn(async () => 0),
     cleanupReviewerIdentityShadowLog: jest.fn(async () => 0),
+    cleanupOperationalEvents: jest.fn(async () => 0),
     cleanupExpiredCache: jest.fn(async () => 0),
     cleanupHealthHistory: jest.fn(async () => 0),
     cleanupIntakeAudit: jest.fn(async () => 0),
