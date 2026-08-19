@@ -157,6 +157,25 @@ findings; all confirmed and fixed:
 
 Post-cycle-3: full unit suite green, types green, production build green.
 
+A fourth adversarial cycle (same day) returned NEEDS REWORK with one finding;
+confirmed and fixed:
+
+8. **[medium, FIXED]** `dedupeKey`/`recoveryKey` passed through the DISPLAY
+   sanitizer, whose long-token redaction collapses distinct ≥40-char opaque
+   ids into the same `[REDACTED:long-token]` key — two distinct long drain
+   ids would collide and the second be acknowledged as a false duplicate.
+   Fix: identity fields now use `canonicalizeKey` (never redacted; keys ≤200
+   chars pass through exactly, overlong keys become
+   `<80-char prefix>…sha256:<digest>`), applied symmetrically in `recordEvent`
+   and the recovery/supersede lookups; regression tests cover two distinct
+   long ids, the documented-shape Vercel id passing through exactly, and
+   store/lookup key symmetry.
+
+Post-cycle-4: full unit suite 8115 green, types green. Cycle 4 could not
+break the cycle-3 fixes it targeted (poison-entry 503 loops, duplicate-marker
+contract, parallel-insert races, conditional-update race, 409 UI flow) and
+raised no other findings.
+
 ## Unresolved risk / notes for the next session
 
 1. Migration 030 SQL has not run against a live Postgres (no DB access from

@@ -17,7 +17,8 @@ jest.mock('@vercel/postgres', () => ({
 }));
 
 const OperationalEventService = require('../../lib/services/operational-event-service');
-const { sanitizeMetadata } = require('../../lib/services/operational-event-service');
+const { sanitizeMetadata, _internal } = require('../../lib/services/operational-event-service');
+const { canonicalizeKey } = _internal;
 
 beforeEach(() => {
   sqlMock.mockReset();
@@ -74,6 +75,46 @@ describe('recordEvent', () => {
     expect(text).toContain("occurrence_count = operational_events.occurrence_count + 1");
     // Settled rows reopen on recurrence.
     expect(text).toContain("IN ('recovered', 'resolved', 'superseded')");
+  });
+
+  test('identity keys are canonicalized, never redacted: distinct long ids stay distinct (Codex cycle-4 finding)', async () => {
+    // Display redaction's long-token rule collapsed distinct ≥40-char opaque
+    // ids into the same '[REDACTED:long-token]' dedupe key → false duplicate
+    // → acknowledged data loss. Identity must be stable and collision-free.
+    const idA = `vercel:${'a'.repeat(250)}`;
+    const idB = `vercel:${'b'.repeat(250)}`;
+    sqlMock.mockResolvedValue({ rows: [{ id: 1 }] });
+    await OperationalEventService.recordEvent({
+      source: 'vercel-drain', eventType: 'runtime_5xx', severity: 'error',
+      summary: 's', dedupeKey: idA,
+    });
+    await OperationalEventService.recordEvent({
+      source: 'vercel-drain', eventType: 'runtime_5xx', severity: 'error',
+      summary: 's', dedupeKey: idB,
+    });
+    const keyA = sqlMock.mock.calls[0].slice(1).find(v => typeof v === 'string' && v.startsWith('vercel:'));
+    const keyB = sqlMock.mock.calls[1].slice(1).find(v => typeof v === 'string' && v.startsWith('vercel:'));
+    expect(keyA).not.toBe(keyB);
+    expect(keyA).not.toContain('[REDACTED');
+    expect(keyA).toContain('sha256:');
+    expect(keyA.length).toBeLessThanOrEqual(200);
+
+    // A normal documented-shape Vercel id passes through EXACTLY.
+    await OperationalEventService.recordEvent({
+      source: 'vercel-drain', eventType: 'runtime_5xx', severity: 'error',
+      summary: 's', dedupeKey: 'vercel:1573817187330377061717300000',
+    });
+    const keyC = sqlMock.mock.calls[2].slice(1).find(v => typeof v === 'string' && v.startsWith('vercel:'));
+    expect(keyC).toBe('vercel:1573817187330377061717300000');
+  });
+
+  test('recovery lookups canonicalize identically to stored keys (symmetry)', async () => {
+    const longKey = `honorarium_onboard_failed:${'x'.repeat(300)}`;
+    expect(canonicalizeKey(longKey)).toBe(canonicalizeKey(longKey));
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    await OperationalEventService.markRecovered(longKey);
+    const lookupKey = sqlMock.mock.calls[0].slice(1).find(v => typeof v === 'string' && v.startsWith('honorarium'));
+    expect(lookupKey).toBe(canonicalizeKey(longKey));
   });
 
   test('never throws: SQL failure returns null and leaves caller unaffected', async () => {
