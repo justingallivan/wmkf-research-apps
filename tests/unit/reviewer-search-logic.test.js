@@ -13,6 +13,7 @@ import {
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
   candidateWasSaved,
+  correlateSaveResultsToRosterCandidates,
   getCandidatePromotionDecision,
   getCandidateEmailReadiness,
   pruneCandidateForRoster,
@@ -867,6 +868,63 @@ describe('saved candidate correlation', () => {
 
   test('legacy savedNames cannot graduate a candidate without an exact stable key', () => {
     expect(candidateWasSaved({ name: 'Dr Legacy' }, [], ['Legacy'])).toBe(false);
+  });
+
+  test('binds a save-key result to the exact submitted roster key', () => {
+    const submitted = [{
+      name: 'Peter Reiners',
+      email: 'reiners@arizona.edu',
+      affiliation: 'University of Arizona',
+      orcid: '0000-0002-4517-2318',
+      candidateKey: 'orcid:0000-0002-4517-2318',
+    }];
+    const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+    const [result] = correlateSaveResultsToRosterCandidates([{
+      candidateKey: reviewerSaveKey(submitted[0]),
+      index: 0,
+      code: 'ambiguous_or_name_mismatch',
+    }], submitted);
+    expect(result.rosterCandidateKey).toBe(submitted[0].candidateKey);
+  });
+
+  test('leaves malformed and ambiguous save results unbound', () => {
+    const twins = [
+      { name: 'Same Person', email: 'same@example.edu', candidateKey: 'orcid:first' },
+      { name: 'Same Person', email: 'same@example.edu', candidateKey: 'orcid:second' },
+    ];
+    const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+    const saveKey = reviewerSaveKey(twins[0]);
+    const results = correlateSaveResultsToRosterCandidates([
+      { candidateKey: saveKey, index: 99 },
+      { candidateKey: 'not-a-submitted-key', index: 0 },
+      { candidateKey: 'not-a-submitted-key', rosterCandidateKey: 'orcid:forged' },
+    ], twins);
+    expect(results[0].rosterCandidateKey).toBeUndefined();
+    expect(results[1].rosterCandidateKey).toBeUndefined();
+    expect(results[2].rosterCandidateKey).toBeUndefined();
+
+    const distinct = [
+      { name: 'First Person', email: 'first@example.edu', candidateKey: 'orcid:first' },
+      { name: 'Second Person', email: 'second@example.edu', candidateKey: 'orcid:second' },
+    ];
+    const [contradictory] = correlateSaveResultsToRosterCandidates([{
+      candidateKey: reviewerSaveKey(distinct[1]),
+      index: 0,
+    }], distinct);
+    expect(contradictory.rosterCandidateKey).toBeUndefined();
+  });
+
+  test('uses unique save-key fallback only for legacy results with no index', () => {
+    const submitted = [{
+      name: 'Legacy Result',
+      email: 'legacy@example.edu',
+      candidateKey: 'orcid:legacy',
+    }];
+    const { reviewerSaveKey } = require('../../lib/utils/reviewer-save-key');
+    const [result] = correlateSaveResultsToRosterCandidates([{
+      candidateKey: reviewerSaveKey(submitted[0]),
+    }], submitted);
+    expect(result.rosterCandidateKey).toBe('orcid:legacy');
   });
 });
 

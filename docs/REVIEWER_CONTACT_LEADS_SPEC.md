@@ -6,7 +6,7 @@ status: active
 summary: "Shipped contact-leads contract: quarantined leads, staff promotion, bounded roster persistence; broad paid scouting is parked as unjustified."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-27
+last_verified: 2026-08-18
 owner: product-engineering
 related:
   - lib/services/discovery-service.js
@@ -18,7 +18,7 @@ related:
 # Reviewer Contact Leads / Scout Layer Spec
 
 Status: **PARTIALLY SHIPPED; current contract**
-Drafted: 2026-06-18; reconciled: 2026-07-27
+Drafted: 2026-06-18; reconciled: 2026-08-18
 Scope: Reviewer Finder contact recall and staff workflow.
 
 ## Current implementation boundary
@@ -401,15 +401,24 @@ the live invite gate `emailConfidence` (`lib/utils/reviewer-invite.js`) classifi
 low address without `confirmedLowConfidenceIds`). No auto-send. Only offered for identity-OK
 rows (leads are gated on `!identityUnverified`). Locked by tests.
 
-**On-card manual edit (S267 follow-up).** Beyond promoting a surfaced lead, a manage-only
-"✏️ Edit contact" on the Find/Workbench card opens `CandidateEditModal` in a new local mode
-(`onApply` prop — applies to client state instead of PATCHing the saved-row `my-candidates`).
-Staff can correct email/website (and affiliation/h-index) by hand — e.g. an address found on
-the reviewer's own page that differs from the Google-suggested one — overriding a wrong
-existing value. Email/website go through the SAME `setManualContact` mutation as promotion
-(`emailSource:'manual'` → low-confidence invite). The Name field is locked in this mode (the
-Find card is keyed by normalized name; renaming there would desync selection/dedup). The
-saved-candidates editor (ReviewerInvitePanel) keeps full PATCH-mode editing including name.
+**On-card manual edit (S267 follow-up; durable draft correction 2026-08-18).** Beyond
+promoting a surfaced lead, a manage-only "✏️ Edit contact" on the Find/Workbench card opens
+`CandidateEditModal` in Find mode (`onApply` prop; it never PATCHes the saved-row
+`my-candidates`). A website or affiliation edit now awaits the authenticated roster
+`update_contact_draft` action and replaces the card only with the server-returned candidate,
+so the edit survives a reload and a later promotion failure. This is a request-scoped
+Postgres draft only; a server-side `updated_at` compare-and-swap refuses a concurrent
+roster change rather than overwriting it. Non-empty websites must be safe HTTP(S) individual
+pages; document, directory, unsafe-scheme, and candidate-inconsistent profile URLs fail closed.
+Because website/affiliation are part of the exact contact authority bundle, an ordinary
+non-applicant edit clears the stale automated/staff grant and immediately exposes the
+"This is the right person" confirmation remedy instead of failing opaquely during promotion.
+Applicant-recommended rows retain their separate exact server promotion contract. This action
+does not write the Dataverse person. Email changes remain on the separate exact-person/address
+verification path and cannot use this action. The Name field
+is locked in Find mode because renaming a candidate would desynchronize its stable roster
+key. The saved-candidates editor (`ReviewerInvitePanel`) keeps full PATCH-mode editing,
+including name and confirmed person fields.
 
 Add a manual promotion path:
 

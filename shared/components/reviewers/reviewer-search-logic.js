@@ -67,6 +67,51 @@ export function candidateWasSaved(candidate, savedKeys = []) {
   return stableKeys.has(reviewerSaveKey(candidate));
 }
 
+/**
+ * Bind per-row save results back to the immutable roster key rendered by Find.
+ *
+ * The save API deliberately returns `reviewerSaveKey(candidate)` as its batch
+ * correlation key, while the roster/UI uses `reviewerCandidateKey(candidate)`.
+ * Those keys often differ (for example, an ORCID-anchored card). Prefer the
+ * server-returned batch index, but require its save key to match before using
+ * it. A unique save-key match is the compatibility fallback for older result
+ * rows without an index. Ambiguous or malformed results remain unbound so the
+ * client cannot mutate the wrong card.
+ */
+export function correlateSaveResultsToRosterCandidates(results, candidates) {
+  const rows = Array.isArray(results) ? results : [];
+  const submitted = Array.isArray(candidates) ? candidates : [];
+  const bySaveKey = new Map();
+  for (const candidate of submitted) {
+    const saveKey = reviewerSaveKey(candidate);
+    if (!saveKey) continue;
+    const matches = bySaveKey.get(saveKey) || [];
+    matches.push(candidate);
+    bySaveKey.set(saveKey, matches);
+  }
+  return rows.map((result) => {
+    if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
+    // `rosterCandidateKey` is derived locally from the submitted batch. Never
+    // accept a server/client-carried value for this UI mutation target.
+    const { rosterCandidateKey: _discardedRosterCandidateKey, ...cleanResult } = result;
+    const saveKey = typeof result?.candidateKey === 'string' ? result.candidateKey : null;
+    let matched = null;
+    const hasIndex = Object.prototype.hasOwnProperty.call(result, 'index');
+    if (saveKey && hasIndex && Number.isInteger(result.index) && result.index >= 0 && result.index < submitted.length) {
+      const indexed = submitted[result.index];
+      if (reviewerSaveKey(indexed) === saveKey) matched = indexed;
+    }
+    // A contradictory/malformed explicit index is untrusted. Unique-key lookup
+    // exists only for legacy result rows that omitted index entirely.
+    if (!matched && saveKey && !hasIndex) {
+      const matches = bySaveKey.get(saveKey) || [];
+      if (matches.length === 1) [matched] = matches;
+    }
+    const rosterCandidateKey = reviewerCandidateKey(matched);
+    return rosterCandidateKey ? { ...cleanResult, rosterCandidateKey } : cleanResult;
+  });
+}
+
 export function getCandidatePromotionDecision(candidate) {
   const knownRepairReason = candidate?.applicantKnownReviewer?.status === 'inactive'
     ? 'person_inactive'
@@ -88,6 +133,7 @@ export function getCandidatePromotionDecision(candidate) {
     'orcid_email_split',
     'contact_linked_elsewhere',
     'identity_conflict',
+    'manual_contact_changed',
   ]).has(dataverseReason);
   if (candidate?.pdIdentityConfirmed !== true && dataverseNeedsIdentityChoice) {
     return {

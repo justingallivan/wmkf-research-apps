@@ -54,6 +54,7 @@ import {
   isCandidateSelectable,
   getCandidatePromotionDecision,
   candidateWasSaved,
+  correlateSaveResultsToRosterCandidates,
   getCandidateEmailReadiness,
   normalizeReviewerName,
   pruneCandidateForRoster,
@@ -1865,14 +1866,14 @@ export default function ReviewerSearchSection({
     }
   }, [requestId, busy, removingPrevious, previousSearchKeys, previousSearchRefs]);
 
-  // Apply a staff-entered MANUAL contact to a candidate's client state (the row
-  // isn't a saved Dataverse record yet). Used by the lead "Use this email"
-  // promotion (Slice 4) AND the on-card Edit-contact modal. For email/website it
+  // Apply a staff-entered MANUAL contact to transient candidate state. Used by
+  // the lead "Use this email" promotion (Slice 4); the on-card Edit-contact
+  // modal now persists website/affiliation through persistManualContact first.
+  // For email/website it
   // stamps `manual` provenance (so emailConfidence → low → the invite flow requires
   // explicit quick-check acknowledgement) and clears the contact-layer abstain that
   // withheld a value (e.g. verified_domain_contradiction) so save can persist it.
-  // NEVER touches name (the find-card key) or any identity field. Auto-selects so
-  // the edit is included on save.
+  // NEVER touches name (the find-card key) or any identity field.
   const setManualContact = useCallback((cand, updates) => {
     if (!cand || !updates) return;
     const key = candKey(cand);
@@ -1930,6 +1931,37 @@ export default function ReviewerSearchSection({
     setRecCandidates((prev) => prev.map(replace));
     setRosterActive((prev) => prev.map(replace));
   }, []);
+
+  const persistManualContact = useCallback(async (cand, updates) => {
+    if (!cand || !requestId) throw new Error('Reload this request before editing contact details.');
+    const key = candKey(cand);
+    if (!key) throw new Error('This reviewer has no stable roster key. Reload and try again.');
+    const durableUpdates = {};
+    if (Object.prototype.hasOwnProperty.call(updates || {}, 'website')) durableUpdates.website = updates.website;
+    if (Object.prototype.hasOwnProperty.call(updates || {}, 'affiliation')) durableUpdates.affiliation = updates.affiliation;
+    if (Object.keys(durableUpdates).length === 0) {
+      setManualContact(cand, updates);
+      return;
+    }
+    const myGen = genRef.current;
+    const response = await fetch('/api/workbench/reviewer-roster', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        action: 'update_contact_draft',
+        candidateKey: key,
+        updates: durableUpdates,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
+    if (!response.ok || !data.success || !data.candidate) {
+      throw new Error(data.error || 'Could not save these contact details to the request.');
+    }
+    applyAuthoritativeRosterCandidate(key, data.candidate);
+    setRosterNote(`${data.candidate.name || cand.name}: contact details saved to this request.`);
+  }, [requestId, setManualContact, applyAuthoritativeRosterCandidate]);
 
   const verifyAddressContact = useCallback(async (cand, updates, evidence) => {
     if (!cand || !requestId) throw new Error('Reload this request before verifying an address.');
@@ -2272,6 +2304,14 @@ export default function ReviewerSearchSection({
           receivedResponse = true;
           const sData = await sRes.json().catch(() => ({}));
           const saveResults = Array.isArray(sData.results) ? sData.results : [];
+          const correlatedSaveResults = correlateSaveResultsToRosterCandidates(saveResults, toSave);
+          const recordRepairCodes = new Set([
+            'person_inactive',
+            'email_conflict',
+            'ambiguous_email_owner',
+            'inactive_email_owner',
+            'contact_linked_elsewhere',
+          ]);
           saved = sData.savedCount || 0;
           savedKeys = Array.isArray(sData.savedKeys) ? sData.savedKeys : [];
           blockedKeys = saveResults
@@ -2287,32 +2327,26 @@ export default function ReviewerSearchSection({
               && typeof result?.candidateKey === 'string'
             ))
             .map((result) => result.candidateKey);
-          addressVerificationKeys = saveResults
+          addressVerificationKeys = correlatedSaveResults
             .filter((result) => (
               result?.code === 'address_verification_required'
-              && typeof result?.candidateKey === 'string'
+              && typeof result?.rosterCandidateKey === 'string'
             ))
-            .map((result) => result.candidateKey);
-          addressRepairKeys = saveResults
+            .map((result) => result.rosterCandidateKey);
+          addressRepairKeys = correlatedSaveResults
             .filter((result) => (
               result?.code === 'conflict_record_unavailable'
-              && typeof result?.candidateKey === 'string'
+              && typeof result?.rosterCandidateKey === 'string'
             ))
-            .map((result) => result.candidateKey);
-          identityReviewResults = saveResults.filter((result) => (
+            .map((result) => result.rosterCandidateKey);
+          identityReviewResults = correlatedSaveResults.filter((result) => (
             result?.decision === 'identity_choice_required'
-            && result?.code !== 'person_inactive'
-            && typeof result?.candidateKey === 'string'
+            && !recordRepairCodes.has(result?.code)
+            && typeof result?.rosterCandidateKey === 'string'
           ));
-          serverRepairResults = saveResults.filter((result) => (
-            new Set([
-              'person_inactive',
-              'email_conflict',
-              'ambiguous_email_owner',
-              'inactive_email_owner',
-              'contact_linked_elsewhere',
-            ]).has(result?.code)
-            && typeof result?.candidateKey === 'string'
+          serverRepairResults = correlatedSaveResults.filter((result) => (
+            recordRepairCodes.has(result?.code)
+            && typeof result?.rosterCandidateKey === 'string'
           ));
           needsRosterReload = saveResults.some((result) => (
             result?.outcome === 'saved' && result?.rosterFinalized === false
@@ -2435,9 +2469,9 @@ export default function ReviewerSearchSection({
             failures.push({ name: result.candidate.name || 'Applicant-referred reviewer', error: result.error });
             if (result.code === 'conflict_record_unavailable') {
               addressRepairKeys.push(candKey(result.candidate));
-            } else if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner']).has(result.code)) {
+            } else if (new Set(['person_inactive', 'email_conflict', 'ambiguous_email_owner', 'inactive_email_owner', 'contact_linked_elsewhere']).has(result.code)) {
               serverRepairResults.push({
-                candidateKey: candKey(result.candidate),
+                rosterCandidateKey: candKey(result.candidate),
                 code: result.code,
               });
             }
@@ -2531,7 +2565,7 @@ export default function ReviewerSearchSection({
 
       if (identityReviewResults.length > 0 && isCurrent()) {
         const reasonByKey = new Map(identityReviewResults.map((result) => [
-          result.candidateKey,
+          result.rosterCandidateKey,
           result.code || 'ambiguous_or_name_mismatch',
         ]));
         const exposeIdentityRemedy = (candidate) => {
@@ -2543,7 +2577,7 @@ export default function ReviewerSearchSection({
         setRosterActive((prev) => prev.map(exposeIdentityRemedy));
         setSelected((prev) => {
           const next = new Set(prev);
-          identityReviewResults.forEach((result) => next.delete(result.candidateKey));
+          identityReviewResults.forEach((result) => next.delete(result.rosterCandidateKey));
           return next;
         });
         rosterWarnings.push('Dataverse identity evidence needs review. Use “This is the right person” to verify the person and exact address, or set the reviewer aside.');
@@ -2551,7 +2585,7 @@ export default function ReviewerSearchSection({
 
       if (serverRepairResults.length > 0 && isCurrent()) {
         const reasonByKey = new Map(serverRepairResults.map((result) => [
-          result.candidateKey,
+          result.rosterCandidateKey,
           result.code || 'record_repair_required',
         ]));
         const exposeRepair = (candidate) => {
@@ -2563,7 +2597,7 @@ export default function ReviewerSearchSection({
         setRosterActive((prev) => prev.map(exposeRepair));
         setSelected((prev) => {
           const next = new Set(prev);
-          serverRepairResults.forEach((result) => next.delete(result.candidateKey));
+          serverRepairResults.forEach((result) => next.delete(result.rosterCandidateKey));
           return next;
         });
         rosterWarnings.push('A reviewer record must be repaired before promotion. Use “Create repair request” on the affected card.');
@@ -3292,7 +3326,7 @@ export default function ReviewerSearchSection({
         <CandidateEditModal
           candidate={editingContact}
           nameEditable={false}
-          onApply={(updates) => setManualContact(editingContact, updates)}
+          onApply={(updates) => persistManualContact(editingContact, updates)}
           onVerifyAddress={(updates, evidence) => verifyAddressContact(editingContact, updates, evidence)}
           requireAddressVerification={getCandidateEmailReadiness(editingContact).action !== 'ready'}
           onClose={() => setEditingContact(null)}

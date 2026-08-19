@@ -11,6 +11,7 @@
  *   PATCH { requestId, action:'promote', candidateKey } → excluded → active (returns blob; stale/no-op is 409)
  *   PATCH { requestId, action:'saved', candidates }  → rejected; promotion services own graduation
  *   PATCH { requestId, action:'confirm_identity', candidate } → staff attestation
+ *   PATCH { requestId, action:'update_contact_draft', candidateKey, updates } → roster-only website/affiliation edit
  *   PATCH { requestId, action:'remove_previous_results' } → delete active search history
  *
  * App-key tuple matches my-candidates.js so the Find tab's `reviewers`/
@@ -23,6 +24,7 @@ import {
   setExcluded,
   promote,
   confirmIdentity,
+  updateContactDraft,
   listForRequest,
   findCandidateBySuggestionAnchor,
   findCandidatesByKeys,
@@ -42,6 +44,7 @@ import { resolveProposalPI } from '../../../lib/services/proposal-pi-identity';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { DeduplicationService } from '../../../lib/services/deduplication-service';
 import { normalizeReviewerName } from '../../../lib/utils/reviewer-name-match';
+import { ContactParser } from '../../../lib/utils/contact-parser';
 import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
@@ -449,6 +452,69 @@ async function handlePatch(req, res, access) {
     return res.status(200).json({ success: true, ...confirmed });
   }
 
+  if (action === 'update_contact_draft') {
+    const { candidateKey, updates } = req.body;
+    const allowedFields = new Set(['website', 'affiliation']);
+    const updateKeys = updates && typeof updates === 'object' && !Array.isArray(updates)
+      ? Object.keys(updates)
+      : [];
+    if (typeof candidateKey !== 'string' || !candidateKey.trim() || candidateKey.trim().length > 1024) {
+      return res.status(400).json({ error: 'candidateKey is required and must not exceed 1024 characters' });
+    }
+    if (updateKeys.length === 0 || updateKeys.some((field) => !allowedFields.has(field))) {
+      return res.status(400).json({
+        error: 'updates must contain only website and/or affiliation',
+        code: 'invalid_contact_draft',
+      });
+    }
+    if (updateKeys.some((field) => updates[field] !== null && typeof updates[field] !== 'string')) {
+      return res.status(400).json({ error: 'website and affiliation must be strings or null' });
+    }
+    const website = typeof updates.website === 'string' ? updates.website.trim() : updates.website;
+    const affiliation = typeof updates.affiliation === 'string' ? updates.affiliation.trim() : updates.affiliation;
+    if (website && website.length > 500) {
+      return res.status(400).json({ error: 'website exceeds 500 characters' });
+    }
+    if (website) {
+      let parsedWebsite = null;
+      try {
+        parsedWebsite = new URL(website);
+      } catch { /* handled below */ }
+      if (
+        !parsedWebsite
+        || !['http:', 'https:'].includes(parsedWebsite.protocol)
+        || ContactParser.isDocumentUrl(website)
+      ) {
+        return res.status(400).json({
+          error: 'website must be an http(s) profile page, not a document link',
+          code: 'invalid_contact_draft',
+        });
+      }
+    }
+    if (affiliation && affiliation.length > 500) {
+      return res.status(400).json({ error: 'affiliation exceeds 500 characters' });
+    }
+    let candidate = null;
+    try {
+      candidate = await updateContactDraft(requestId, candidateKey, {
+        ...(Object.prototype.hasOwnProperty.call(updates, 'website') ? { website } : {}),
+        ...(Object.prototype.hasOwnProperty.call(updates, 'affiliation') ? { affiliation } : {}),
+      });
+    } catch (error) {
+      if (error?.code === 'invalid_contact_draft') {
+        return res.status(400).json({ error: error.message, code: error.code });
+      }
+      throw error;
+    }
+    if (!candidate) {
+      return res.status(409).json({
+        error: 'Candidate changed or is no longer active; reload before editing contact details.',
+        code: 'candidate_stale',
+      });
+    }
+    return res.status(200).json({ success: true, candidate });
+  }
+
   if (action === 'remove_previous_results') {
     const { candidateRefs } = req.body;
     // Do not impose a per-key character cap: server-generated fallback keys
@@ -473,5 +539,5 @@ async function handlePatch(req, res, access) {
     return res.status(200).json({ success: true, ...result });
   }
 
-  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity | remove_previous_results)' });
+  return res.status(400).json({ error: 'Unknown action (expected exclude | promote | saved | confirm_identity | update_contact_draft | remove_previous_results)' });
 }

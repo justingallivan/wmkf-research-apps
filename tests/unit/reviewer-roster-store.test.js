@@ -407,6 +407,188 @@ describe('staff identity confirmation', () => {
   });
 });
 
+describe('updateContactDraft', () => {
+  test('merges website and affiliation into the active request row without touching Dataverse', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'orcid:0000-0002-4517-2318',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: '2026-08-18 17:29:00+00',
+        candidate: {
+          name: 'Peter Reiners',
+          email: 'reiners@arizona.edu',
+          automatedIdentityAttestation: 'old-automated-token',
+          pdIdentityConfirmed: true,
+          pdIdentityConfirmationId: 'old-confirmation',
+          staffIdentityConfirmation: { source: 'staff_confirmed' },
+          contactEnrichment: { email: 'reiners@arizona.edu' },
+        },
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'orcid:0000-0002-4517-2318',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: '2026-08-18 17:30:00+00',
+        candidate: {
+          name: 'Peter Reiners',
+          email: 'reiners@arizona.edu',
+          website: 'https://profiles.arizona.edu/person/reiners',
+          websiteSource: 'manual',
+          websitePersistAllowed: true,
+          affiliation: 'University of Arizona',
+          affiliationSource: 'staff_manual',
+          affiliationPersistAllowed: true,
+          manualContactFields: ['website', 'affiliation'],
+          serverIdentityReviewReason: 'manual_contact_changed',
+          contactEnrichment: {
+            email: 'reiners@arizona.edu',
+            website: 'https://profiles.arizona.edu/person/reiners',
+            websiteSource: 'manual',
+            websitePersistAllowed: true,
+            affiliation: 'University of Arizona',
+            affiliationSource: 'staff_manual',
+            affiliationPersistAllowed: true,
+          },
+        },
+      }] });
+
+    const out = await store.updateContactDraft(
+      REQ,
+      'orcid:0000-0002-4517-2318',
+      {
+        website: 'https://profiles.arizona.edu/person/reiners',
+        affiliation: 'University of Arizona',
+      },
+    );
+
+    expect(out).toMatchObject({
+      candidateKey: 'orcid:0000-0002-4517-2318',
+      rosterStatus: 'active',
+      rosterUpdatedAt: '2026-08-18 17:30:00+00',
+      website: 'https://profiles.arizona.edu/person/reiners',
+      websitePersistAllowed: true,
+      affiliation: 'University of Arizona',
+      affiliationPersistAllowed: true,
+      manualContactFields: ['website', 'affiliation'],
+      serverIdentityReviewReason: 'manual_contact_changed',
+    });
+    expect(sql).toHaveBeenCalledTimes(2);
+    expect(queryTextOf(0)).toMatch(/status = 'active'/);
+    expect(queryTextOf(1)).toMatch(/UPDATE reviewer_find_roster/);
+    expect(queryTextOf(1)).toMatch(/updated_at = .*::timestamptz/);
+    expect(allInterpolations()).toContain('2026-08-18 17:29:00+00');
+    const written = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('profiles.arizona.edu')
+    )));
+    expect(written).toMatchObject({
+      name: 'Peter Reiners',
+      email: 'reiners@arizona.edu',
+      website: 'https://profiles.arizona.edu/person/reiners',
+      affiliation: 'University of Arizona',
+      manualContactFields: ['website', 'affiliation'],
+      serverIdentityReviewReason: 'manual_contact_changed',
+    });
+    expect(written).not.toHaveProperty('automatedIdentityAttestation');
+    expect(written).not.toHaveProperty('pdIdentityConfirmed');
+    expect(written).not.toHaveProperty('pdIdentityConfirmationId');
+    expect(written).not.toHaveProperty('staffIdentityConfirmation');
+  });
+
+  test('returns null without writing when the row is no longer active', async () => {
+    sql.mockResolvedValueOnce({ rows: [] });
+    await expect(store.updateContactDraft(
+      REQ,
+      'candidate:gone',
+      { website: 'https://example.edu/profile' },
+    )).resolves.toBeNull();
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(queryTextOf(0)).toMatch(/status = 'active'/);
+  });
+
+  test('keeps applicant-managed authority on its separate promotion contract', async () => {
+    const applicant = {
+      name: 'Applicant Reviewer',
+      isApplicantRecommended: true,
+      automatedIdentityAttestation: 'applicant-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'applicant-confirmation',
+      staffIdentityConfirmation: { source: 'staff_confirmed' },
+    };
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'suggestion:applicant',
+        status: 'active',
+        source_kind: 'applicant_suggested',
+        updated_at_token: '2026-08-18 17:29:00+00',
+        candidate: applicant,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'suggestion:applicant',
+        status: 'active',
+        source_kind: 'applicant_suggested',
+        updated_at_token: '2026-08-18 17:30:00+00',
+        candidate: { ...applicant, affiliation: 'Applicant University' },
+      }] });
+
+    const out = await store.updateContactDraft(
+      REQ,
+      'suggestion:applicant',
+      { affiliation: 'Applicant University' },
+    );
+    expect(out).toMatchObject({
+      automatedIdentityAttestation: 'applicant-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'applicant-confirmation',
+    });
+    const written = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('Applicant University')
+    )));
+    expect(written).toMatchObject({
+      automatedIdentityAttestation: 'applicant-token',
+      pdIdentityConfirmed: true,
+      pdIdentityConfirmationId: 'applicant-confirmation',
+    });
+    expect(written).not.toHaveProperty('serverIdentityReviewReason');
+  });
+
+  test('fails closed instead of overwriting a concurrently changed row', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'candidate:changed',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: '2026-08-18 17:29:00+00',
+        candidate: { name: 'Changed Reviewer' },
+      }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(store.updateContactDraft(
+      REQ,
+      'candidate:changed',
+      { affiliation: 'New Institution' },
+    )).resolves.toBeNull();
+    expect(queryTextOf(1)).toMatch(/updated_at = .*::timestamptz/);
+  });
+
+  test('rejects a non-profile website instead of reporting success with a cleared value', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:unsafe-site',
+      status: 'active',
+      source_kind: 'literature_retrieved',
+      updated_at_token: '2026-08-18 17:29:00+00',
+      candidate: { name: 'Safe Reviewer' },
+    }] });
+
+    await expect(store.updateContactDraft(
+      REQ,
+      'candidate:unsafe-site',
+      { website: 'https://example.edu/cv.pdf' },
+    )).rejects.toMatchObject({ code: 'invalid_contact_draft' });
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('address attestation', () => {
   test('persists a receipt for the real literature-row shape with matching top-level and enrichment emails', async () => {
     sql

@@ -143,6 +143,233 @@ test('partial non-2xx response still graduates only the exact server-confirmed s
   expect(screen.getByLabelText(`Select ${withheld.name}`)).toBeInTheDocument();
 });
 
+test('same-person different-address conflict exposes identity confirmation on the exact ORCID card', async () => {
+  const peter = {
+    ...candidate('Peter Reiners', 'reiners@arizona.edu'),
+    candidateKey: 'orcid:0000-0002-4517-2318',
+    orcid: '0000-0002-4517-2318',
+    website: 'https://profiles.arizona.edu/person/reiners',
+    affiliation: 'University of Arizona',
+  };
+  const saveKey = reviewerSaveKey(peter);
+  expect(saveKey).not.toBe(peter.candidateKey);
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [peter],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [peter.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({
+        success: false,
+        savedCount: 0,
+        savedKeys: [],
+        errors: [{
+          name: peter.name,
+          candidateKey: saveKey,
+          index: 0,
+          code: 'ambiguous_or_name_mismatch',
+          decision: 'identity_choice_required',
+          error: 'Dataverse identity evidence conflicts or is ambiguous.',
+        }],
+        results: [{
+          name: peter.name,
+          candidateKey: saveKey,
+          index: 0,
+          outcome: 'withheld',
+          code: 'ambiguous_or_name_mismatch',
+          decision: 'identity_choice_required',
+        }],
+      }, false, 422));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${peter.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  expect(await screen.findByRole('button', { name: /this is the right person/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${peter.name}`)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
+  expect(screen.getByDisplayValue(peter.email)).toBeInTheDocument();
+  expect(screen.getByDisplayValue(peter.website)).toBeInTheDocument();
+});
+
+test('record-repair conflicts stay on the repair remedy even when the server also labels them identity-choice-required', async () => {
+  const reviewer = {
+    ...candidate('Repair Reviewer', 'repair@example.edu'),
+    candidateKey: 'orcid:0000-0002-1825-0097',
+    orcid: '0000-0002-1825-0097',
+  };
+  const saveKey = reviewerSaveKey(reviewer);
+  expect(saveKey).not.toBe(reviewer.candidateKey);
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+      }));
+    }
+    if (target === '/api/reviewer-finder/save-candidates') {
+      return Promise.resolve(response({
+        success: false,
+        savedCount: 0,
+        savedKeys: [],
+        errors: [{
+          name: reviewer.name,
+          candidateKey: saveKey,
+          index: 0,
+          code: 'contact_linked_elsewhere',
+          decision: 'identity_choice_required',
+          error: 'The contact is linked to another reviewer record.',
+        }],
+        results: [{
+          name: reviewer.name,
+          candidateKey: saveKey,
+          index: 0,
+          outcome: 'withheld',
+          code: 'contact_linked_elsewhere',
+          decision: 'identity_choice_required',
+        }],
+      }, false, 422));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /this is the right person/i })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
+});
+
+test('applicant promotion repair failure attaches the repair remedy to the exact applicant card', async () => {
+  const suggestionId = '44444444-4444-4444-4444-444444444444';
+  const reviewer = {
+    ...candidate('Applicant Repair Reviewer', 'applicant-repair@example.edu'),
+    candidateKey: `suggestion:${suggestionId}`,
+    suggestionId,
+    isApplicantRecommended: true,
+    enrichedProposalKey: 'proposal',
+    provenance: {
+      kind: 'applicant_suggested',
+      sources: ['applicant'],
+      seedRole: 'query_seed',
+      groundingWorkIds: [],
+    },
+  };
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+      }));
+    }
+    if (target === '/api/workbench/promote-applicant-reviewer') {
+      return Promise.resolve(response({
+        success: false,
+        code: 'person_inactive',
+        error: 'The applicant-linked reviewer record is inactive.',
+      }, false, 422));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
+  fireEvent.click(screen.getByRole('button', { name: /promote 1 selected to invite/i }));
+
+  expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
+});
+
+test('plain website edits are durably acknowledged by the request roster before the modal closes', async () => {
+  const reviewer = {
+    ...candidate('Peter Reiners', 'reiners@arizona.edu'),
+    candidateKey: 'orcid:0000-0002-4517-2318',
+    orcid: '0000-0002-4517-2318',
+    website: null,
+    affiliation: 'University of Arizona',
+  };
+  const website = 'https://profiles.arizona.edu/person/reiners';
+  let patchBody;
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      patchBody = JSON.parse(options.body);
+      return Promise.resolve(response({
+        success: true,
+        candidate: {
+          ...reviewer,
+          website,
+          websiteSource: 'manual',
+          websitePersistAllowed: true,
+          manualContactFields: ['website'],
+          serverIdentityReviewReason: 'manual_contact_changed',
+          contactEnrichment: {
+            website,
+            websiteSource: 'manual',
+            websitePersistAllowed: true,
+          },
+        },
+      }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: /edit contact/i }));
+  fireEvent.change(screen.getByText('Website').parentElement.querySelector('input'), {
+    target: { value: website },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+  expect(await screen.findByText(/contact details saved to this request/i)).toBeInTheDocument();
+  expect(patchBody).toEqual({
+    requestId: REQ,
+    action: 'update_contact_draft',
+    candidateKey: reviewer.candidateKey,
+    updates: { website },
+  });
+  expect(screen.getByRole('button', { name: /this is the right person/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /this is the right person/i }));
+  expect(screen.getByDisplayValue(website)).toBeInTheDocument();
+});
+
 test('verify contact sends every confirmation-bound field and promotes the server-authoritative candidate', async () => {
   const staleConfirmation = {
     confirmationId: 'confirmation-old',

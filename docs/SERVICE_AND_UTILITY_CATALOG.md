@@ -123,7 +123,9 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
 - **`reviewer-roster-store.js`** — Postgres operational roster for
   request-scoped Find state and server-owned promotion finalization. Stores
-  actor-bound staff identity confirmation; only the successful Dataverse
+  actor-bound staff identity confirmation and roster-only manual
+  website/affiliation drafts (never an unverified email). Ordinary edits invalidate the
+  prior exact contact authority and expose explicit re-confirmation; only the successful Dataverse
   promotion service can finalize exact keys as `saved`, while authoritative
   applicant-excluded collisions become `blocked`.
 - **`workbench/reviewer-roster-projection-service.js`** — Read-only Find-roster

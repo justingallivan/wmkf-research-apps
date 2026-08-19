@@ -234,9 +234,10 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
         return;
       }
 
-      // LOCAL mode: plain edits apply to client state. Address verification goes
-      // through the parent's authenticated roster endpoint so the verified
-      // contact and its confirmation are durable before the modal closes.
+      // FIND mode: the parent owns persistence to the request roster. Address
+      // verification uses the stronger authenticated evidence endpoint; ordinary
+      // website/affiliation edits still await a durable roster acknowledgement
+      // before the modal closes.
       if (onApply) {
         if (needsAddressVerification) {
           await onVerifyAddress({ ...updates, email: normalizedEmail }, {
@@ -245,7 +246,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             note: evidenceNote.trim() || null,
           });
         } else {
-          onApply(updates);
+          await onApply(updates);
         }
         onClose();
         return;

@@ -31,6 +31,11 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   setExcluded: jest.fn(async () => {}),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
+  updateContactDraft: jest.fn(async (_requestId, candidateKey, updates) => ({
+    name: 'Ann Lee',
+    candidateKey,
+    ...updates,
+  })),
   markSaved: jest.fn(async () => 1),
   findCandidateBySuggestion: jest.fn(async () => null),
   // S387: the roster route resolves an applicant row by its Dataverse ANCHOR, so an
@@ -857,6 +862,108 @@ describe('PATCH', () => {
       candidate: { name: 'Ann Lee', email: 'ann@example.edu' },
     } }, r);
     expect(r.statusCode).toBe(409);
+  });
+
+  it('update_contact_draft persists only roster-safe website and affiliation fields', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: 'orcid:0000-0002-4517-2318',
+      updates: {
+        website: ' https://profiles.arizona.edu/person/reiners ',
+        affiliation: ' University of Arizona ',
+      },
+    } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(store.updateContactDraft).toHaveBeenCalledWith(
+      REQ,
+      'orcid:0000-0002-4517-2318',
+      {
+        website: 'https://profiles.arizona.edu/person/reiners',
+        affiliation: 'University of Arizona',
+      },
+    );
+    expect(r.body.candidate).toMatchObject({
+      website: 'https://profiles.arizona.edu/person/reiners',
+      affiliation: 'University of Arizona',
+    });
+  });
+
+  it('update_contact_draft rejects address and unknown-field edits', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: 'candidate:ann',
+      updates: { email: 'ann@example.edu' },
+    } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(r.body).toMatchObject({ code: 'invalid_contact_draft' });
+    expect(store.updateContactDraft).not.toHaveBeenCalled();
+  });
+
+  it('update_contact_draft rejects an oversized candidate key before the store', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: `candidate:${'x'.repeat(1024)}`,
+      updates: { affiliation: 'Example University' },
+    } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(store.updateContactDraft).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,unsafe',
+    'https://example.edu/reviewer-cv.pdf',
+  ])('update_contact_draft rejects unsafe or document website %s', async (website) => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: 'candidate:ann',
+      updates: { website },
+    } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(r.body).toMatchObject({ code: 'invalid_contact_draft' });
+    expect(store.updateContactDraft).not.toHaveBeenCalled();
+  });
+
+  it('update_contact_draft translates store profile-page rejection without a 500', async () => {
+    const error = new Error('Website must be an individual profile page.');
+    error.code = 'invalid_contact_draft';
+    store.updateContactDraft.mockRejectedValueOnce(error);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: 'candidate:ann',
+      updates: { website: 'https://example.edu/directory/' },
+    } }, r);
+
+    expect(r.statusCode).toBe(400);
+    expect(r.body).toMatchObject({ code: 'invalid_contact_draft' });
+  });
+
+  it('update_contact_draft returns a reload conflict when the row changed or is gone', async () => {
+    store.updateContactDraft.mockResolvedValueOnce(null);
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'update_contact_draft',
+      candidateKey: 'candidate:gone',
+      updates: { website: 'https://example.edu/profile' },
+    } }, r);
+
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toMatchObject({ code: 'candidate_stale' });
   });
 
   it('remove_previous_results deletes only through the scoped store helper and returns the refreshed roster', async () => {
