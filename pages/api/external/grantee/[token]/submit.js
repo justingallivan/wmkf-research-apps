@@ -58,6 +58,68 @@ async function alertWaiverBlock({ requestId, detail }) {
   }
 }
 
+const ALERTED_SUBMIT_FAILURE_REASONS = new Set([
+  'sharepoint_failed',
+  'scan_unavailable',
+  'scan_misconfigured',
+  'infected',
+  'dataverse_failed',
+]);
+
+function imageMeta(imageFile) {
+  if (!imageFile) return { present: false };
+  const name = typeof imageFile.filename === 'string' ? imageFile.filename : '';
+  const match = name.match(/\.([A-Za-z0-9]+)$/);
+  return {
+    present: true,
+    extension: match ? match[1].toLowerCase() : null,
+    declaredMime: imageFile.mimeType || null,
+    sizeBytes: Buffer.isBuffer(imageFile.buffer) ? imageFile.buffer.length : null,
+  };
+}
+
+/**
+ * Best-effort operator alert for failures that are not simple grantee form
+ * validation. Metadata is intentionally sanitized: no token, no file contents,
+ * and no original filename (external-user controlled, often identifying).
+ */
+async function alertSubmitFailure({ request, deliverable, imageFile, result }) {
+  if (!ALERTED_SUBMIT_FAILURE_REASONS.has(result?.reason)) return;
+
+  const requestId = request?.akoya_requestid || null;
+  const requestNumber = request?.akoya_requestnum || null;
+  const metadata = {
+    reason: result.reason,
+    status: result.status || null,
+    requestId,
+    requestNumber,
+    deliverableId: deliverable?.wmkf_granteedeliverableid || null,
+    deliverableStatus: deliverable?.wmkf_deliverablestatus ?? null,
+    image: imageMeta(imageFile),
+    diagnostics: result.diagnostics || null,
+  };
+
+  console.error('[grantee/submit] failure incident:', JSON.stringify(metadata));
+
+  try {
+    await withDalContext('grantee-submit-alert', () => NotificationService.notify({
+      type: 'grantee_submit_failed',
+      severity: result.reason === 'infected' ? 'warning' : 'error',
+      emailAdmins: true,
+      autoResolveKey: `grantee_submit_failed:${result.reason}:${requestId || 'unknown'}`,
+      title: `Grantee submit failed (${result.reason})`,
+      message:
+        `A grantee deliverables submission failed for request ${requestNumber || requestId || 'unknown'} `
+        + `with reason ${result.reason}. Check the sanitized metadata for the upload/write stage and cleanup outcome.`,
+      metadata,
+      source: 'grantee-submit',
+      category: 'grantee-deliverables',
+    }));
+  } catch (err) {
+    console.error('[grantee/submit] failure alert failed (non-fatal):', err?.message || err);
+  }
+}
+
 export const config = {
   api: { bodyParser: false }, // busboy needs the raw stream
 };
@@ -132,6 +194,7 @@ export default async function handler(req, res) {
 
     if (!result.ok) {
       // Generic, non-leaky reasons (service already logged specifics server-side).
+      await alertSubmitFailure({ request, deliverable, imageFile, result });
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
 

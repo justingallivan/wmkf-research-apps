@@ -164,9 +164,41 @@ test('rejects an oversized image', async () => {
 
 test('infected scan → 422, no upload', async () => {
   isVirusScanEnabled.mockReturnValue(true);
-  scanBytes.mockResolvedValue({ scan_result: 'infected' });
+  scanBytes.mockResolvedValue({ scan_result: 'infected', scanner: 'cloudmersive', detectedThreats: ['embedded macro'] });
   const r = await call();
-  expect(r).toEqual({ ok: false, reason: 'infected', status: 422 });
+  expect(r).toMatchObject({
+    ok: false,
+    reason: 'infected',
+    status: 422,
+    diagnostics: {
+      stage: 'virus_scan',
+      service: 'cloudmersive',
+      scanResult: 'infected',
+      detectedThreats: ['embedded macro'],
+    },
+  });
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+});
+
+test('transient scan failure carries sanitized diagnostics', async () => {
+  isVirusScanEnabled.mockReturnValue(true);
+  scanBytes.mockRejectedValue(Object.assign(new Error('timeout'), {
+    serviceName: 'cloudmersive',
+    isTransient: true,
+    status: 503,
+  }));
+  const r = await call();
+  expect(r).toMatchObject({
+    ok: false,
+    reason: 'scan_unavailable',
+    status: 503,
+    diagnostics: {
+      stage: 'virus_scan',
+      service: 'cloudmersive',
+      transient: true,
+      status: 503,
+    },
+  });
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
 });
 
@@ -177,9 +209,25 @@ test('no _etag on either row → 503 fail-closed (no changeset, no upload)', asy
 });
 
 test('SharePoint upload failure → sharepoint_failed, no changeset', async () => {
-  GraphService.uploadFile.mockRejectedValue(new Error('graph 500'));
+  GraphService.uploadFile.mockRejectedValue(Object.assign(new Error('graph 500'), {
+    serviceName: 'graph',
+    isTransient: true,
+    status: 503,
+  }));
   const r = await call();
-  expect(r).toMatchObject({ ok: false, reason: 'sharepoint_failed', status: 502 });
+  expect(r).toMatchObject({
+    ok: false,
+    reason: 'sharepoint_failed',
+    status: 502,
+    diagnostics: {
+      stage: 'sharepoint_upload',
+      service: 'graph',
+      transient: true,
+      status: 503,
+      uploadedItemCreated: false,
+      cleanupAttempted: false,
+    },
+  });
   expect(runChangeset).not.toHaveBeenCalled();
 });
 
@@ -195,7 +243,17 @@ test('non-412 error with nothing committed → cleans up upload → dataverse_fa
   runChangeset.mockRejectedValue(new Error('batch 500'));
   getDeliverableForRequest.mockResolvedValue({ wmkf_imagefileref: null, wmkf_deliverablestatus: null });
   const r = await call();
-  expect(r).toMatchObject({ ok: false, reason: 'dataverse_failed', status: 502 });
+  expect(r).toMatchObject({
+    ok: false,
+    reason: 'dataverse_failed',
+    status: 502,
+    diagnostics: {
+      stage: 'dataverse_changeset',
+      uploadedItemCreated: true,
+      postErrorCommitState: 'not_committed',
+      cleanupOutcome: 'deleted',
+    },
+  });
   expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
 });
 
@@ -214,7 +272,17 @@ test('non-412 error and re-read FAILS → leave upload in place (never delete a 
   runChangeset.mockRejectedValue(new Error('socket hang up'));
   getDeliverableForRequest.mockRejectedValue(new Error('re-read failed'));
   const r = await call();
-  expect(r).toMatchObject({ ok: false, reason: 'dataverse_failed', status: 502 });
+  expect(r).toMatchObject({
+    ok: false,
+    reason: 'dataverse_failed',
+    status: 502,
+    diagnostics: {
+      stage: 'dataverse_changeset',
+      uploadedItemCreated: true,
+      postErrorCommitState: 'unknown',
+      cleanupOutcome: 'not_attempted',
+    },
+  });
   expect(GraphService.deleteFile).not.toHaveBeenCalledWith('drive-1', 'item-new');
 });
 

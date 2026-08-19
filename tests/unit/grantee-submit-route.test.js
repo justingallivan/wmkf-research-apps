@@ -498,3 +498,99 @@ test('maps a service failure status/reason through (e.g. image_invalid 400)', as
   expect(res.statusCode).toBe(400);
   expect(res.body.reason).toBe('image_invalid');
 });
+
+test('backend submit failure logs sanitized metadata and alerts operators', async () => {
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  writeGranteeDeliverables.mockResolvedValue({
+    ok: false,
+    reason: 'sharepoint_failed',
+    status: 502,
+    diagnostics: {
+      stage: 'sharepoint_upload',
+      service: 'graph',
+      transient: true,
+      status: 503,
+      uploadedItemCreated: false,
+      cleanupAttempted: false,
+    },
+  });
+
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'signed.tok' },
+    file: {
+      filename: '<img src=x onerror=alert(1)>.png',
+      buffer: Buffer.from([0x89, 0x50]),
+    },
+  }), res);
+
+  expect(res.statusCode).toBe(502);
+  expect(res.body).toEqual({ ok: false, reason: 'sharepoint_failed' });
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+  const alert = NotificationService.notify.mock.calls[0][0];
+  expect(alert).toMatchObject({
+    type: 'grantee_submit_failed',
+    severity: 'error',
+    emailAdmins: true,
+    category: 'grantee-deliverables',
+    source: 'grantee-submit',
+    autoResolveKey: 'grantee_submit_failed:sharepoint_failed:r1',
+    metadata: {
+      reason: 'sharepoint_failed',
+      status: 502,
+      requestId: 'r1',
+      requestNumber: '1002794',
+      deliverableId: 'd1',
+      image: {
+        present: true,
+        extension: 'png',
+        declaredMime: 'image/png',
+        sizeBytes: 2,
+      },
+      diagnostics: {
+        stage: 'sharepoint_upload',
+        service: 'graph',
+        transient: true,
+      },
+    },
+  });
+  expect(JSON.stringify(alert)).not.toContain('onerror');
+  expect(JSON.stringify(alert)).not.toContain('signed.tok');
+  expect(errorSpy).toHaveBeenCalledWith(
+    '[grantee/submit] failure incident:',
+    expect.stringContaining('"reason":"sharepoint_failed"'),
+  );
+  errorSpy.mockRestore();
+});
+
+test('operator alert failure is swallowed and does not change the grantee response', async () => {
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  writeGranteeDeliverables.mockResolvedValue({
+    ok: false,
+    reason: 'dataverse_failed',
+    status: 502,
+    diagnostics: {
+      stage: 'dataverse_changeset',
+      cleanupOutcome: 'deleted',
+    },
+  });
+  NotificationService.notify.mockRejectedValue(new Error('email down'));
+
+  const res = mockRes();
+  await handler(multipartReq({
+    fields: { editedAbstract: 'x', caption: 'c', waiverToken: 'signed.tok' },
+    file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
+  }), res);
+
+  expect(res.statusCode).toBe(502);
+  expect(res.body).toEqual({ ok: false, reason: 'dataverse_failed' });
+  expect(res.sends).toBe(1);
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+  expect(errorSpy).toHaveBeenCalledWith(
+    '[grantee/submit] failure alert failed (non-fatal):',
+    'email down',
+  );
+  errorSpy.mockRestore();
+});
