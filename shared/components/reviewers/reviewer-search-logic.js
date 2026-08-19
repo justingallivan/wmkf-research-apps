@@ -652,6 +652,7 @@ export function hasValidApplicantEnrichmentCache(
       && candidate?.enrichedProposalKey === proposalKey
       && candidate?.applicantEnrichmentCacheVersion === APPLICANT_ENRICHMENT_CACHE_VERSION
       && (!stage2PresentationRequired
+        || candidate?.eligibilityStatus === 'deceased'
         || candidate?.institutionPresentation?.version === INSTITUTION_STAGE2_PRESENTATION_VERSION)
       && candidate?.applicantKnownReviewer
       && candidate.applicantKnownReviewer.status !== 'unavailable'

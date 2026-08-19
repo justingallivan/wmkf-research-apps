@@ -83,8 +83,7 @@ import {
 } from '../../../lib/utils/reviewer-provenance';
 import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
 import {
-  INSTITUTION_STAGE2_PRESENTATION_VERSION,
-  isInstitutionStage2PresentationEnabled,
+  activeInstitutionStage2Presentation,
 } from '../../utils/institution-stage2-presentation';
 
 // The four literature sources the discover endpoint understands. The user picks
@@ -411,10 +410,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const isLowConfidence = confidence !== undefined && confidence < 0.35;
   const isWeakMatch = confidence !== undefined && confidence >= 0.35 && confidence < 0.65;
   const hasInstitutionMismatch = !!c.institutionMismatch;
-  const institutionPresentation = isInstitutionStage2PresentationEnabled()
-    && c.institutionPresentation?.version === INSTITUTION_STAGE2_PRESENTATION_VERSION
-    ? c.institutionPresentation
-    : null;
+  const institutionPresentation = activeInstitutionStage2Presentation(c);
   const hasExpertiseMismatch = !!c.expertiseMismatch;
   const hasInstitutionCOI = !!c.hasInstitutionCOI;
   const institutionCOIDecision = c.institutionCOIDetails?.dropDecision || null;
@@ -3285,7 +3281,7 @@ export default function ReviewerSearchSection({
                                     promotionDecision?.decision === 'ready'
                                     || promotionDecision?.reason === 'contact_claim_mismatch'
                                     || c.applicantContactMismatch === true
-                                    || c.institutionPresentation?.kind === 'current_conflict'
+                                    || activeInstitutionStage2Presentation(c)?.kind === 'current_conflict'
                                   ) ? setEditingContact : undefined}
                                   onRequestRepair={requestAddressRepair}
                                   onReviewAddressConflict={reviewAddressConflict}

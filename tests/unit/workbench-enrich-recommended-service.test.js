@@ -1028,6 +1028,34 @@ test('Stage 2 does not present compact ORCID history as dated publication eviden
   }), expect.any(Object));
 });
 
+test('Stage 2 labels a suggested-institution fallback as applicant evidence', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
+    verified: suggestions.map((s) => ({
+      ...s,
+      verified: true,
+      verificationSource: 'pubmed',
+      suggestedInstitution: 'Applicant University',
+      affiliation: 'Recorded University',
+      affiliationHistory: [],
+      publications: [{ title: 'Paper without a parseable affiliation', year: 2025 }],
+    })),
+    unverified: [],
+  }));
+
+  const { onEvent } = recorder();
+  await enrichRecommended(args(), onEvent);
+
+  expect(evaluateInstitutionStage2).toHaveBeenCalledWith(expect.objectContaining({
+    evidenceAssertion: expect.objectContaining({
+      rawText: 'Applicant University',
+      sourceType: 'applicant_record',
+      currentness: 'unknown',
+      authorSpecific: 'unknown',
+    }),
+  }), expect.any(Object));
+});
+
 test('Stage 2 presentation failure is non-terminal and falls back to the legacy card payload', async () => {
   process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
   evaluateInstitutionStage2.mockRejectedValue(new Error('ROR presentation unavailable'));
@@ -1036,7 +1064,11 @@ test('Stage 2 presentation failure is non-terminal and falls back to the legacy 
   await enrichRecommended(args(), onEvent);
 
   expect(events.at(-1)).toMatchObject({ event: 'complete' });
-  expect(events.at(-1).data.recommended[0].institutionPresentation).toBeUndefined();
+  expect(events.at(-1).data.recommended[0].institutionPresentation).toMatchObject({
+    version: 'institution-stage2-presentation/v1',
+    visible: false,
+    kind: 'unresolved',
+  });
   expect(events.filter((event) => event.event === 'error')).toHaveLength(0);
 });
 

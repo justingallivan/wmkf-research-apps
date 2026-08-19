@@ -1217,6 +1217,15 @@ describe('hasValidApplicantEnrichmentCache', () => {
     }], proposalKey, expected)).toBe(true);
   });
 
+  test('Stage 2 does not invalidate a terminal deceased enrichment row', () => {
+    process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+    expect(hasValidApplicantEnrichmentCache([{
+      ...canonical,
+      eligibilityStatus: 'deceased',
+      identityStatus: undefined,
+    }], proposalKey, expected)).toBe(true);
+  });
+
   test('requires a non-null proposal key and the exact expected canonical suggestion row', () => {
     expect(hasValidApplicantEnrichmentCache([canonical], proposalKey, expected)).toBe(true);
 

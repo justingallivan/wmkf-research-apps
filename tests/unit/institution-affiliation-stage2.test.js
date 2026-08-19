@@ -5,6 +5,9 @@
 const {
   createInstitutionStage2Evaluator,
 } = require('../../lib/services/institution-affiliation-stage2');
+const {
+  activeInstitutionStage2Presentation,
+} = require('../../shared/utils/institution-stage2-presentation');
 
 const IDS = {
   left: 'https://ror.org/000000001',
@@ -34,6 +37,25 @@ function resolverFor(resolutions) {
     })),
   };
 }
+
+test('active presentation requires the exact flag, version, and visible contract', () => {
+  const candidate = {
+    institutionPresentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: true,
+      kind: 'current_conflict',
+    },
+  };
+
+  expect(activeInstitutionStage2Presentation(candidate, 'off')).toBeNull();
+  expect(activeInstitutionStage2Presentation(candidate, 'on')).toBe(candidate.institutionPresentation);
+  expect(activeInstitutionStage2Presentation({
+    institutionPresentation: { ...candidate.institutionPresentation, visible: false },
+  }, 'on')).toBeNull();
+  expect(activeInstitutionStage2Presentation({
+    institutionPresentation: { ...candidate.institutionPresentation, version: 'older' },
+  }, 'on')).toBeNull();
+});
 
 function assertion(rawText, overrides = {}) {
   return {

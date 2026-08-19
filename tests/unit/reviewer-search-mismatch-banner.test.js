@@ -149,6 +149,31 @@ test('turning Stage 2 off restores the legacy banner even when cached presentati
   expect(screen.queryByText(/Earlier affiliation:/)).not.toBeInTheDocument();
 });
 
+test('an invisible Stage 2 fallback preserves the legacy banner when the flag is on', async () => {
+  process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+  activeCandidates = [{
+    ...APPLICANT_MISMATCH,
+    institutionPresentation: {
+      version: 'institution-stage2-presentation/v1',
+      visible: false,
+      kind: 'unresolved',
+      tone: 'neutral',
+      heading: null,
+      detail: null,
+      relationship: 'unresolved',
+      evidenceContext: 'unresolved',
+      remedies: [],
+      legacyHold: true,
+    },
+  }];
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
+  await screen.findByText('Dr Applicant Referred');
+
+  expect(screen.getByText(/Institution needs review:/)).toBeInTheDocument();
+  expect(screen.queryByTestId('institution-stage2-presentation')).not.toBeInTheDocument();
+});
+
 test('applicant-referred mismatch banner attributes the applicant and never fabricates a counter-institution', async () => {
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
   await screen.findByText('Dr Applicant Referred');
