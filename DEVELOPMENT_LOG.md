@@ -10,6 +10,21 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Large grantee images now use durable direct Blob staging (Session 447)
+
+**Milestone:** The grantee submission and staff replacement flows no longer send large image
+bytes through the Function request-body seam that rejected the reporter's valid 9.12 MiB PNG.
+**Sessions:** 447 (incident reconstruction, cross-layer design/build, Opus adversarial iterations,
+exact-payload proof, Preview evidence, and deliberate Production promotion).
+**Ship state:** `main` reached `1f31afdf`; migration 031 and `portal_upload_staging` are live;
+deployment `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` is Ready on all aliases. Actor-bound private Blob
+tokens, JSON finalizers, crash reconciliation, exact-path cleanup, and sanitized client-failure
+events cover external grantee and staff replacement images. A named owner-approved Production
+business smoke remains; the affected grantee must not be asked to retry.
+**Why it matters:** Valid near-limit scientific figures can now cross the transport boundary
+without weakening authorization, private storage, scanning, or cross-system commit semantics.
+**Pointers:** `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md`; commits `b73dddb8`, `0dd3d808`, `1f31afdf`.
+
 ## August 2026 — Stage II institution presentation is Production-live (Session 446)
 
 **Milestone:** Source-aware institution notifications and reviewer-card explanations moved from

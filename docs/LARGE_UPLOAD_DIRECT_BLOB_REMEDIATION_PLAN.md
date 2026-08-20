@@ -3,7 +3,7 @@ title: Large Upload Direct-Blob Remediation Plan
 domain: security
 kind: plan
 status: active
-summary: Plan to route portal file bytes around Vercel body limits while preserving authorization, validation, scanning, persistence, cleanup, and diagnostics.
+summary: Production-live direct private-Blob staging for large grantee images, with one owner-approved business smoke still open.
 canonical: false
 cataloged: 2026-08-19
 owner: product-engineering
@@ -17,26 +17,25 @@ related:
 
 # Large Upload Direct-Blob Remediation Plan
 
-**Status: SHIP READY on `codex/large-upload-direct-staging`; not yet merged or
-application-deployed to Production.** The private-store adversarial preflight, migration,
-external and staff direct-upload flows, durable retry/reconciliation ledger,
-exact-path maintenance cleanup, and authenticated sanitized client-failure
-events are present and covered by focused tests. Migration 031 is applied to the
-Postgres integration shared by Preview and Production. Preview deployment
-`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` is Ready behind the stable authenticated
-Preview alias, and the exact supplied PNG passed the runtime-identical private
-Blob transport/privacy gate. The remaining verification is a controlled
-Production smoke on a named owner-approved test record immediately after
-promotion. Claude Opus's final adversarial pass returned **SHIP READY** with no
-remaining blockers.
+**Status: PRODUCTION-LIVE at commit `1f31afdf`, deployment
+`dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d`.** The private-store adversarial preflight,
+migration, external and staff direct-upload flows, durable retry/reconciliation
+ledger, exact-path maintenance cleanup, and authenticated sanitized
+client-failure events are live. Migration 031 is applied to the Postgres
+integration shared by Preview and Production. The exact supplied PNG passed the
+runtime-identical private Blob transport/privacy gate, the Production token
+route failed closed in a post-deploy probe, and the canonical application domain
+served the release. The remaining verification is a controlled full business
+smoke on a named owner-approved Production test record. Claude Opus's final
+adversarial pass returned **SHIP READY** with no remaining blockers.
 
 State labels are deliberate:
 
 - **[VERIFIED via …]** means current source, a focused test, or a live no-write
   probe established the claim on 2026-08-19.
 - **[PLANNED]** is proposed work, not shipped behavior.
-- **[IMPLEMENTED ON BRANCH]** exists in the named feature branch but is not a
-  statement about Production.
+- **[PRODUCTION-LIVE]** exists on `main` and the Ready Production deployment;
+  any narrower verification limit is stated beside the claim.
 - **[ASSUMED]** identifies a proposition that still needs the named probe.
 
 ## 1. Decision and outcome
@@ -69,12 +68,11 @@ change or remove their request contract; complete the consumer-discovery gate in
 
 ### Acceptance outcome
 
-Pre-ship evidence must prove that the exact supplied 9,564,384-byte PNG crosses
-the direct private-Blob transport and passes the runtime's no-redirect privacy
-predicate. The full business acceptance smoke must run immediately after
-Production promotion on a named owner-approved test record because Preview's
-Dataverse target interlock intentionally denies the required Production write.
-That controlled smoke must:
+Pre-ship evidence proved that the exact supplied 9,564,384-byte PNG crosses the
+direct private-Blob transport and passes the runtime's no-redirect privacy
+predicate. Preview's Dataverse target interlock intentionally denied the
+required Production write, so the remaining full business acceptance smoke must
+use a named owner-approved Production test record. That controlled smoke must:
 
 1. obtain an authorized staging token through a small JSON request;
 2. upload bytes directly to private Blob without the file crossing Routing
@@ -222,7 +220,7 @@ defenses:
 - the adversarial public-mode PUT is a required Preview release probe so an
   SDK/store-policy change fails loud.
 
-**[IMPLEMENTED ON BRANCH]** Finalization performs an anonymous HEAD against the
+**[PRODUCTION-LIVE]** Finalization performs an anonymous HEAD against the
 exact server-returned Blob URL and accepts only 401/403 before reading bytes;
 anonymous success is a terminal rejection and any indeterminate response is a
 retryable fail-closed error. **Explicit release-process deviation:** the live
@@ -474,25 +472,27 @@ inventory.
 
 Use generated fixtures for automated tests. Do not commit the supplied image.
 
-### 9.2 Preview evidence
+### 9.2 Release evidence and remaining Production smoke
 
-1. Deploy a runtime-change branch under the campaign release strategy.
-2. Browser-smoke the exact supplied 9.12 MiB PNG through the full grantee flow
-   against a test-owned Preview record.
-3. Confirm the large PUT is visible at Blob, while application function logs
-   contain only small token/finalize requests.
-4. Confirm staged and downloaded SHA-256 match the supplied file.
-5. Confirm private URL returns 403 without authorization.
-6. Confirm SharePoint/Dataverse results, status/waiver fields, and notification.
-7. Confirm temporary Blob cleanup and staging-row terminal state.
-8. Exercise invalid magic, oversize, infected/scanner-unavailable, stale ETag,
-   response-drop, abandoned upload, expired lease, and delete-failure paths.
-9. Verify the client failure report creates a sanitized, clearly client-reported
-   Operational Event.
+The branch build, private-store adversarial probe, exact-payload transport,
+migration, focused failure paths, full regression suite, Preview deployment, and
+Production promotion are complete; §§14–15 record the evidence.
 
-Do not ask the affected grantee to retry. Production promotion requires the
-owner-approved test record; a no-write transport smoke alone cannot prove the
-new cross-system commit/cleanup contract.
+One controlled business smoke remains. After the owner names and approves a
+Production test record:
+
+1. upload the exact supplied 9.12 MiB PNG through the appropriate external or
+   staff browser flow;
+2. confirm the application receives only the small token/finalize JSON requests;
+3. confirm staged and downloaded SHA-256 match the supplied file;
+4. confirm image validation and scanning complete;
+5. confirm the expected SharePoint/Dataverse result and notification behavior;
+6. confirm the staging row reaches `consumed` and the temporary Blob is gone;
+7. confirm no duplicate business write or notification occurs; and
+8. inspect Operational Events and runtime logs for sanitized, actionable truth.
+
+Do not ask the affected grantee to retry. A no-write transport smoke proves the
+transport/privacy boundary, not the cross-system business commit.
 
 ### 9.3 Repository gates
 
@@ -551,11 +551,11 @@ the implementation diff.
 
 | Recommendation | Evidence | Confidence | Residual risk / gate |
 |---|---|---|---|
-| Use direct private Blob staging | Exact 9.12 MiB body returned 413 even on real proxy-excluded Function; server legs and a separate browser direct-upload path exist | High | Full combined browser/Preview flow still required |
+| Use direct private Blob staging | Exact 9.12 MiB body returned 413 even on real proxy-excluded Function; exact-payload direct transport and private-store behavior passed; implementation is Production-live | High | Controlled Production business smoke on an owner-approved record remains |
 | Keep `proxy.js` unchanged | Matcher bypass failed the decisive Function probe and would drop staff idle-session defense-in-depth | High | None for urgent architecture; JSON remains well below limits |
-| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Live disposable preflight proved the provisioned store rejects public-mode PUT, accepts private PUT, denies anonymous HEAD, and allowed exact cleanup | High | Full combined browser/Preview flow still required |
-| Add durable staging state | Cross-request ownership, retry, idempotency, and orphan cleanup cannot rely on client descriptors | High | New migration/table broadens implementation and gate surface |
-| Reauthorize at mint and finalize | Long-running upload creates a state-change window | High | Finalize tests must prove fresh status/ETag/waiver checks |
+| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Live disposable preflight proved the provisioned store rejects public-mode PUT, accepts private PUT, denies anonymous HEAD, and allowed exact cleanup | High | Controlled Production business smoke remains |
+| Add durable staging state | Cross-request ownership, retry, idempotency, and orphan cleanup cannot rely on client descriptors | High | Migration 031 is live; controlled terminal-state/cleanup observation remains |
+| Reauthorize at mint and finalize | Long-running upload creates a state-change window | High | Focused tests passed; controlled smoke must confirm current status/ETag/waiver behavior |
 | Add sanitized client failure reporting | Direct Blob PUT otherwise bypasses application observability | High | Client evidence is forgeable; label and rate-limit it |
 | Stage reviewer work after consumer discovery | No source caller found; route/tests still exist | Medium | External/manual caller may exist |
 | Audit non-multipart oversized contracts separately | Configuration census found additional >4 MB declarations | High | Declared cap alone does not prove real payload failure |
@@ -651,3 +651,26 @@ direct 403; the disposable object was deleted.
 target before the Preview deployment is
 `wmkfresearchapps-erymyonv3-justin-gallivans-projects.vercel.app` at commit
 `7d20afddf7d2d6d73722829066e26a72990a4b27`.
+
+## 15. Production release evidence
+
+**[VERIFIED 2026-08-20 via Git and Vercel CLI]** `main` advanced from
+`7d20afdd` to `1f31afdf`; Production deployment
+`dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` reached Ready and acquired all application
+aliases. `applications.wmkeck.org/auth/signin` returned 200 from the canonical
+domain.
+
+**[VERIFIED 2026-08-20 via Vercel environment metadata]** Production contains
+the required sensitive `UPLOADS_BLOB_RW_TOKEN` and `CLOUDMERSIVE_API_KEY`
+variables plus the explicit virus-scan configuration. No values were printed or
+persisted in release evidence.
+
+**[VERIFIED 2026-08-20 via fail-closed route probe]** A deliberately malformed
+external token matched `/api/external/grantee/[token]/upload-token` on the new
+Production deployment and returned `401 {"ok":false,"reason":"malformed"}`.
+
+**[VERIFIED 2026-08-20 via Postgres audit and Vercel error-log query]**
+`portal_upload_staging` remained present with zero rows immediately after
+promotion, and no Production error logs were present in the release window. The
+zero-row state is expected because no unapproved business record was used for a
+write smoke.
