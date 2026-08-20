@@ -47,8 +47,9 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
      returned 403, and the disposable Blob was deleted.
 
 5. **Production promotion and safe checks passed**
-   - `main` advanced to `1f31afdf`; Vercel deployment
-     `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` is Ready on all application aliases.
+   - `main` advanced to `1f31afdf`; initial runtime deployment
+     `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` reached Ready and acquired all
+     application aliases.
    - Production has the required upload and virus-scan configuration. The new
      token route matched and failed closed with 401 for an invalid token.
    - `portal_upload_staging` existed with zero rows after promotion, the

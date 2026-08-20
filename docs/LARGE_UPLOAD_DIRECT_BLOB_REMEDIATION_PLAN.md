@@ -17,7 +17,7 @@ related:
 
 # Large Upload Direct-Blob Remediation Plan
 
-**Status: PRODUCTION-LIVE at commit `1f31afdf`, deployment
+**Status: PRODUCTION-LIVE since commit `1f31afdf` and initial runtime deployment
 `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d`.** The private-store adversarial preflight,
 migration, external and staff direct-upload flows, durable retry/reconciliation
 ledger, exact-path maintenance cleanup, and authenticated sanitized

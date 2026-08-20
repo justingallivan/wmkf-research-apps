@@ -17,9 +17,10 @@ bytes through the Function request-body seam that rejected the reporter's valid 
 **Sessions:** 447 (incident reconstruction, cross-layer design/build, Opus adversarial iterations,
 exact-payload proof, Preview evidence, and deliberate Production promotion).
 **Ship state:** `main` reached `1f31afdf`; migration 031 and `portal_upload_staging` are live;
-deployment `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` is Ready on all aliases. Actor-bound private Blob
-tokens, JSON finalizers, crash reconciliation, exact-path cleanup, and sanitized client-failure
-events cover external grantee and staff replacement images. A named owner-approved Production
+initial runtime deployment `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` reached Ready and acquired all
+aliases. Actor-bound private Blob tokens, JSON finalizers, crash reconciliation, exact-path
+cleanup, and sanitized client-failure events cover external grantee and staff replacement images.
+A named owner-approved Production
 business smoke remains; the affected grantee must not be asked to retry.
 **Why it matters:** Valid near-limit scientific figures can now cross the transport boundary
 without weakening authorization, private storage, scanning, or cross-system commit semantics.
