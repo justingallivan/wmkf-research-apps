@@ -9,6 +9,8 @@ const findCandidatesByKeys = jest.fn();
 const recordSurfaced = jest.fn();
 const resolveTrustedReviewerPerson = jest.fn();
 const getRequestById = jest.fn();
+const notify = jest.fn(async () => ({ id: 'alert-1' }));
+const getOpenAlertsByTypeAndRequestId = jest.fn(async () => []);
 
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...args) => getRequestById(...args),
@@ -32,12 +34,18 @@ jest.mock('../../lib/services/reviewer-contact-reconciliation', () => ({
 }));
 jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
-  default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
+  default: { notify: (...args) => notify(...args) },
+}));
+jest.mock('../../lib/services/alert-service', () => ({
+  __esModule: true,
+  default: { getOpenAlertsByTypeAndRequestId: (...args) => getOpenAlertsByTypeAndRequestId(...args) },
 }));
 
 const {
   getAddressConflict,
   getAddressRepairRequestContext,
+  createAddressRepairRequest,
+  listOpenAddressRepairRequests,
   retryAddressCheck,
   verifyPersonAndAddress,
 } = require('../../lib/services/reviewer-address-trust-service');
@@ -102,6 +110,106 @@ beforeEach(() => {
     akoya_requestnum: '1000001',
     akoya_title: 'Test request',
   });
+  notify.mockResolvedValue({ id: 'alert-1' });
+  getOpenAlertsByTypeAndRequestId.mockResolvedValue([]);
+});
+
+test('open repair projection keeps only server-owned candidate keys and one newest alert per candidate', async () => {
+  getOpenAlertsByTypeAndRequestId.mockResolvedValueOnce([
+    { id: 491, status: 'acknowledged', metadata: { candidateKey: 'candidate:reviewer' } },
+    { id: 490, status: 'active', metadata: { candidateKey: 'candidate:reviewer' } },
+    { id: 489, status: 'active', metadata: { candidateKey: 'candidate:other-request' } },
+  ]);
+
+  await expect(listOpenAddressRepairRequests({
+    requestId: REQUEST_ID,
+    candidateKeys: ['candidate:reviewer'],
+  })).resolves.toEqual([{
+    alertId: 491,
+    candidateKey: 'candidate:reviewer',
+    status: 'acknowledged',
+    adminUrl: '/admin#system-alerts',
+  }]);
+});
+
+test('create repair request returns an acknowledged request instead of notifying again', async () => {
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'candidate:reviewer',
+    name: 'Reviewer Name',
+    rosterStatus: 'active',
+    conflictRecordUnavailable: true,
+  }]);
+  getOpenAlertsByTypeAndRequestId.mockResolvedValueOnce([{
+    id: 491,
+    status: 'acknowledged',
+    metadata: { candidateKey: 'candidate:reviewer' },
+  }]);
+
+  await expect(createAddressRepairRequest({
+    requestId: REQUEST_ID,
+    candidateKey: 'candidate:reviewer',
+    code: 'different_client_code',
+  })).resolves.toMatchObject({
+    success: true,
+    decision: 'repair_requested',
+    repairReference: 491,
+    repairRequest: {
+      alertId: 491,
+      candidateKey: 'candidate:reviewer',
+      status: 'acknowledged',
+    },
+    message: expect.stringContaining('already pending'),
+  });
+  expect(notify).not.toHaveBeenCalled();
+});
+
+test('create repair request returns the newly-created durable pending state', async () => {
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey: 'candidate:reviewer',
+    name: 'Reviewer Name',
+    rosterStatus: 'active',
+    conflictRecordUnavailable: true,
+  }]);
+
+  await expect(createAddressRepairRequest({
+    requestId: REQUEST_ID,
+    candidateKey: 'candidate:reviewer',
+    code: 'conflict_record_unavailable',
+  })).resolves.toMatchObject({
+    success: true,
+    repairReference: 'alert-1',
+    repairRequest: {
+      alertId: 'alert-1',
+      candidateKey: 'candidate:reviewer',
+      status: 'active',
+      adminUrl: '/admin#system-alerts',
+    },
+  });
+  expect(notify).toHaveBeenCalledTimes(1);
+});
+
+test('repair alert lock identity is candidate-scoped rather than reason-code-scoped', async () => {
+  const candidate = {
+    candidateKey: 'candidate:reviewer',
+    name: 'Reviewer Name',
+    rosterStatus: 'active',
+    conflictRecordUnavailable: true,
+  };
+  findCandidatesByKeys.mockResolvedValue([candidate]);
+
+  await createAddressRepairRequest({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    code: 'address_conflict_pending',
+  });
+  await createAddressRepairRequest({
+    requestId: REQUEST_ID,
+    candidateKey: candidate.candidateKey,
+    code: 'person_inactive',
+  });
+
+  expect(notify).toHaveBeenCalledTimes(2);
+  expect(notify.mock.calls[0][0].autoResolveKey).toBe(notify.mock.calls[1][0].autoResolveKey);
 });
 
 test('already-promoted verification binds evidence to the exact current person address atomically', async () => {

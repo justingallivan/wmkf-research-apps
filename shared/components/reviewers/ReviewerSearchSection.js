@@ -399,7 +399,7 @@ function InstitutionPresentationNotice({
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef(null);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
@@ -598,8 +598,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     ? () => (canReviewAddressConflict ? onReviewAddressConflict(c) : onEdit(c))
     : null;
   const openIdentityRemedy = (onConfirmIdentity && canManage) ? () => onConfirmIdentity(c) : null;
-  const openRepairRemedy = (canManage && onRequestRepair
-    && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair))
+  const repairEligible = canManage && onRequestRepair
+    && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair);
+  const openRepairRemedy = (!repairRequest && !repairRequestsUnavailable && repairEligible)
     ? () => onRequestRepair(c)
     : null;
 
@@ -1147,6 +1148,28 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 Create repair request
               </button>
             )}
+            {repairRequest && (
+              <a
+                href={repairRequest.adminUrl || '/admin#system-alerts'}
+                aria-label={`Open pending repair request for ${c.name} in Admin`}
+                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                title="This repair request is still open in the Admin alert queue"
+              >
+                Repair request pending · View in Admin
+              </a>
+            )}
+            {!repairRequest && repairRequestsUnavailable && repairEligible && (
+              <button
+                type="button"
+                onClick={onRetryRepairStatus}
+                disabled={!onRetryRepairStatus}
+                aria-label={`Retry repair request status for ${c.name}`}
+                className="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                title="The Admin repair queue could not be checked, so creating another request is temporarily disabled"
+              >
+                Repair status unavailable · Retry
+              </button>
+            )}
             {/* Needs-identity-review escape hatch: a PD who recognizes the person can
                 confirm identity + correct the contact, which makes the row selectable
                 and lets it pass the save gate (bibliometrics still dropped server-side). */}
@@ -1272,6 +1295,8 @@ export default function ReviewerSearchSection({
   const [rosterHandled, setRosterHandled] = useState([]);
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState([]);
+  const [repairRequestsByCandidateKey, setRepairRequestsByCandidateKey] = useState({});
+  const [repairRequestsUnavailable, setRepairRequestsUnavailable] = useState(false);
   // Gates the search button until the roster GET resolves, so a run can't skip
   // the cross-run dedup by firing before rosterNames is loaded (Codex post-impl).
   const [rosterLoaded, setRosterLoaded] = useState(false);
@@ -1324,6 +1349,12 @@ export default function ReviewerSearchSection({
     setRosterHandled(Array.isArray(data?.handled) ? data.handled : []);
     setRosterSavedKeys(Array.isArray(data?.savedKeys) ? data.savedKeys : []);
     setRosterNames(Array.isArray(data?.allNames) ? data.allNames : []);
+    setRepairRequestsByCandidateKey(Object.fromEntries(
+      (Array.isArray(data?.repairRequests) ? data.repairRequests : [])
+        .filter((request) => request?.candidateKey)
+        .map((request) => [request.candidateKey, request]),
+    ));
+    setRepairRequestsUnavailable(data?.repairRequestsUnavailable === true);
   }, []);
 
   const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
@@ -1346,7 +1377,7 @@ export default function ReviewerSearchSection({
     setPhase('idle'); setSavingCount(0); setProgress([]); setCandidates([]); setUnverified([]); setAnalysis(null); setIdentityComparison(null);
     setSelected(new Set()); setError(null); setErrorMeta(null); setPromotionNotice(null); setEnrichNote(null); setExportError(null);
     setExcludedRemoved(0); setRosterNote(null); setRemovingPrevious(false);
-    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
+    setRosterActive([]); setRosterExcluded([]); setRosterIneligible([]); setRosterBlocked([]); setRosterHandled([]); setRosterSavedKeys([]); setRosterNames([]); setRepairRequestsByCandidateKey({}); setRepairRequestsUnavailable(false); setExcludedOpen(false); setRosterLoaded(false); setRosterLoadFailed(false);
     setSearchSources({ pubmed: true, arxiv: true, biorxiv: true, chemrxiv: true });
     setReviewerCount(DEFAULT_REVIEWER_COUNT);
     setAdditionalNotes('');
@@ -2211,6 +2242,12 @@ export default function ReviewerSearchSection({
     });
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
+    if (response.ok && data.success && data.repairRequest) {
+      setRepairRequestsByCandidateKey((previous) => ({
+        ...previous,
+        [key]: data.repairRequest,
+      }));
+    }
     setRosterNote(response.ok && data.success
       ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
@@ -3272,6 +3309,9 @@ export default function ReviewerSearchSection({
                                     onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
                                     canManage={canManage}
                                     repairAttention={repairCandidateKey === candKey(c)}
+                                    repairRequest={repairRequestsByCandidateKey[candKey(c)] || null}
+                                    repairRequestsUnavailable={repairRequestsUnavailable}
+                                    onRetryRepairStatus={retryRosterLoad}
                                   />;
                                 }
                                 return <CandidateCard
@@ -3293,6 +3333,9 @@ export default function ReviewerSearchSection({
                                   onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
                                   canManage={canManage}
                                   repairAttention={repairCandidateKey === candKey(c)}
+                                  repairRequest={repairRequestsByCandidateKey[candKey(c)] || null}
+                                  repairRequestsUnavailable={repairRequestsUnavailable}
+                                  onRetryRepairStatus={retryRosterLoad}
                                 />;
                               })}
                             </div>
