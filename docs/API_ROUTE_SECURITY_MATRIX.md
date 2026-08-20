@@ -81,7 +81,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 | Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
 |---|---:|---|---|---|---|---|---|
-| `/api/admin/alerts` | GET, PATCH | Superuser | `requireSuperuser` | Global admin | Reads/updates `system_alerts` (PG) | Low | Shared helper. |
+| `/api/admin/alerts` | GET, PATCH | Superuser | `requireSuperuser` | Global admin | Reads/updates `system_alerts` (PG); repair-context GET re-reads one alert-correlated request, reviewer roster row, and potential reviewer from Dataverse | Low | Shared helper. `repairContext=<alert id>` accepts only an active/acknowledged reviewer-repair alert and derives all downstream identifiers from its server-owned metadata. |
 | `/api/admin/health-history` | GET | Superuser | `requireSuperuser` | Global admin | Reads `health_check_history` (PG) | Low | Shared helper. |
 | `/api/admin/alert-recipients` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes `alertRecipientsByCategory` setting in `wmkf_appsystemsettings` (DV); reads superuser roster from `dynamics_user_roles` (PG) for fallback display | Low | Per-category routing config for system-alert emails. |
 | `/api/admin/email-defaults` | GET, PUT | Superuser | `requireSuperuser` | Global admin | Reads/writes cataloged email text defaults, including `email.grantee_invite.*` and the body-only `email.reviewer_extension.body`, in `wmkf_appsystemsettings` (DV) via dispatcher | Low | Admin-editable email/text defaults catalog. GET uses strict reads and marks per-entry `unavailable` on settings fetch failure; PUT validates the catalog key and required placeholders. Reviewer-extension subject is fixed in source, not editable. |

@@ -64,6 +64,7 @@ export default function ReviewerFindPanel({
   proposalFileKey = null,
   proposalBindingReady = true,
   onProposalFileKeyChange,
+  repairCandidateKey = null,
 }) {
   const requestIdRef = useRef(requestId);
   requestIdRef.current = requestId;
@@ -806,6 +807,7 @@ export default function ReviewerFindPanel({
         onSaved={onSaved}
         onNavigate={onNavigate}
         manualAddSlot={manualAddCard}
+        repairCandidateKey={repairCandidateKey}
       />
     </div>
   );

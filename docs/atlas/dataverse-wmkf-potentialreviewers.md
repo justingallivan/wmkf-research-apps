@@ -133,7 +133,9 @@ Methods:
 - `lib/services/reviewer-address-trust-service.js` — reads the current exact
   address trust/conflict bundle, requires fresh server-derived person identity
   and ETag for mutation, and projects only bounded decision/remedy state to the
-  browser
+  browser. The superuser-only Admin repair-alert detail path also re-reads this
+  current bundle from server-owned alert correlation keys; that detail read is
+  fail-soft and performs no mutation.
 
 ## Write paths
 

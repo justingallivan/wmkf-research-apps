@@ -398,13 +398,19 @@ function InstitutionPresentationNotice({
 // without a checkbox for the non-selectable Unverified section. `onExclude` adds
 // a set-aside action (active cards); `onPromote` adds a restore action (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true }) {
+export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false }) {
   const [expanded, setExpanded] = useState(false);
+  const cardRef = useRef(null);
   // Identity-unverified rows only: the retrieved-but-unconfirmed evidence panel.
   // Collapsed by default so a list of these stays scannable.
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const evidencePanelId = `${useId()}-identity-evidence`;
   const selectId = `${useId()}-select`;
+  useEffect(() => {
+    if (repairAttention && typeof cardRef.current?.scrollIntoView === 'function') {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [repairAttention]);
   const c = candidate;
   const confidence = typeof c.verificationConfidence === 'number' ? c.verificationConfidence : undefined;
   const isLowConfidence = confidence !== undefined && confidence < 0.35;
@@ -601,7 +607,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     : 'border-gray-200 bg-white';
 
   return (
-    <div className={`border rounded-lg p-3 transition-colors ${border}`}>
+    <div
+      ref={cardRef}
+      data-repair-target={repairAttention ? 'true' : undefined}
+      className={`border rounded-lg p-3 transition-colors ${border} ${repairAttention ? 'ring-2 ring-amber-400 ring-offset-2' : ''}`}
+    >
       <div className="flex items-start gap-3">
         {!readOnly && (
           <label htmlFor={selectId} className="mt-0.5 inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600">
@@ -1228,6 +1238,7 @@ export default function ReviewerSearchSection({
   onNavigate,
   manualAddSlot = null,
   canManage = true,
+  repairCandidateKey = null,
 }) {
   const [phase, setPhase] = useState('idle'); // idle | running | results | saving | done | error
   const busy = phase === 'running' || phase === 'saving';
@@ -3269,6 +3280,7 @@ export default function ReviewerSearchSection({
                                     onEdit={setEditingContact}
                                     onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
                                     canManage={canManage}
+                                    repairAttention={repairCandidateKey === candKey(c)}
                                   />;
                                 }
                                 return <CandidateCard
@@ -3289,6 +3301,7 @@ export default function ReviewerSearchSection({
                                   onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
                                   onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
                                   canManage={canManage}
+                                  repairAttention={repairCandidateKey === candKey(c)}
                                 />;
                               })}
                             </div>
