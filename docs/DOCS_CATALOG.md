@@ -395,6 +395,12 @@ related:
 | [REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md](REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md) | plan | historical |  | Shipped permanent reviewer-removal behavior; retained as historical implementation record. |  |
 | [REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md](REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md) | plan | canonical | yes | Reviewer stabilization contract; the independent challenge pass is complete and owner-accepted, and implementation is authorized via SESSION_PROMPT.md. | 2026-07-31 |
 
+## security
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md](LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md) | plan | active |  | Plan to route portal file bytes around Vercel body limits while preserving authorization, validation, scanning, persistence, cleanup, and diagnostics. | 2026-08-19 |
+
 ## security-auth
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
