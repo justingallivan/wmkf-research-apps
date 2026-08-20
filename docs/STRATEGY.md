@@ -156,10 +156,10 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    deployed and live-verified in both consumers on Request `1003109` via
    production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. A disposable
    production-library audit also proved previous-version inspection/restore
-   and signed-in first-stage recycle recovery. Next obtain administrator
-   evidence for version limits, second-stage recovery, retention, and editor
-   least privilege, and build Workbench history/admin restore plus milestone
-   snapshots;
+   and signed-in first-stage recycle recovery. Administrator evidence closed
+   version limits and second-stage recovery (2026-08-10 / 2026-08-20);
+   retention and editor Delete flags stay owner-accepted-open. Next build
+   Workbench history/admin restore plus milestone snapshots;
 2. complete the signed-in smoke of the deployed Pre-Site client recovery path. Request
    `1002379` created one Ready/Draft row, completed governed v3 AI run, current
    request pointer, and stable Word item from the exact narrative-only source;

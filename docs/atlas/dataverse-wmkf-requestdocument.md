@@ -108,9 +108,12 @@ proved prior-version inspection/download and restore to a new current version
 with exact expected bytes. Justin then restored the deleted probe from the
 first-stage recycle bin, and Graph confirmed the same item and exact contents
 live. Both probes were removed from the first-stage bin after testing. Justin
-was denied the second-stage administrator view. Connor's 2026-08-10 replies left
-configured version limits, site/library Purview retention, and ordinary-editor
-least privilege still open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
+was denied the second-stage administrator view at the time; 2026-08-20 IT
+screenshots later showed both probes in the second-stage bin (bin confirmed
+present) and closed the Members level as built-in Edit on a Public M365 group
+site. Version limits were read 2026-08-10 (major-only, keep 500, no age
+limit); Purview retention and the Edit level's Delete flags remain
+owner-accepted-open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
 from the Ready registry row and never from the caller. **Administrator restore and

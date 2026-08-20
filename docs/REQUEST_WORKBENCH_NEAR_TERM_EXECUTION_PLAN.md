@@ -97,10 +97,13 @@ live-verified on Request `1003109` via production deployment
 `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Target-library protection checks remain
 required before the pilot is complete. A controlled disposable-file audit
 subsequently proved previous-version inspection/restore and signed-in
-first-stage recycle recovery in the production Request library. It did not
-prove the configured version limit, second-stage administrator recovery,
-site/library Purview retention, or ordinary-editor least privilege; Workbench
-history/admin restore and milestone snapshots also remain unbuilt.
+first-stage recycle recovery in the production Request library. Administrator
+evidence later closed the configured version limit (2026-08-10: major-only,
+keep 500, no age limit) and second-stage recycle presence (2026-08-20: bin
+exists and held both audit probes); Purview retention and the Members Edit
+level's exact Delete flags remain owner-accepted-open, and Workbench
+history/admin restore and milestone snapshots remain unbuilt. See
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 Passing this draft-functional gate is not a broad production-readiness claim
 and never required the later Pre-Site, Site Visit, or Final slices to be built
 alongside it.
@@ -177,9 +180,12 @@ denied the second-stage administrator recycle-bin view. The app's
 `Sites.Selected` token could read the drive/list but received `403` when
 enumerating site permissions. An item-level retention-label read returned no
 label fields, which does not establish whether a site/library Purview policy
-applies. Library version limits, second-stage recovery, retention, and
-ordinary-editor permission design therefore still require administrator
-evidence. The Workbench current-metadata portion is live; its version-history
+applies. Administrator evidence has since closed version limits (2026-08-10)
+and second-stage recovery (2026-08-20: bin present, both probes visible);
+Members hold the built-in Edit level on a Public M365 group site, so ordinary
+editors presumptively can delete. Retention and the Edit level's Delete flags
+remain owner-accepted-open (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`). The
+Workbench current-metadata portion is live; its version-history
 link/admin restore and the Board milestone freeze remain planned.
 
 ### Cycle-wide editing
@@ -889,10 +895,11 @@ Explicit non-goals during design freeze:
 > version/last-modified refresh is deployed and live-verified in both consumers
 > on Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`.
 > A controlled production-library probe also passed native previous-version
-> inspection/restore and signed-in first-stage recycle recovery. The remaining
-> pilot acceptance work is the administrator audit of version limits,
-> second-stage recovery, Purview retention, and ordinary-editor permissions,
-> plus Workbench history/admin restore and milestone snapshots.
+> inspection/restore and signed-in first-stage recycle recovery. Administrator
+> evidence has closed version limits and second-stage recovery
+> (2026-08-10 / 2026-08-20); Purview retention and the Edit level's Delete
+> flags stay owner-accepted-open. The remaining pilot acceptance work is
+> Workbench history/admin restore and milestone snapshots.
 
 The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
 former default. Exercise the now-live
@@ -1130,9 +1137,9 @@ Still required:
    the locally implemented durable writer; the controlled Request `1002379`
    document passed historical render QA, while the deterministic reviewer
    roster and anonymous review-narrative merge remain unbuilt;
-3. administrator verification of the target library's configured version
-   limit, second-stage recycle recovery, applicable site/library Purview
-   retention, and ordinary-editor least-privilege policy; stable-identity
+3. administrator verification: version limit and second-stage recycle
+   recovery are closed (2026-08-10 / 2026-08-20); Purview retention and the
+   Edit level's Delete flags are owner-accepted-open; stable-identity
    metadata read-through, consumer display, native version restore,
    first-stage recycle recovery, and production registry/pointer readback are
    complete;

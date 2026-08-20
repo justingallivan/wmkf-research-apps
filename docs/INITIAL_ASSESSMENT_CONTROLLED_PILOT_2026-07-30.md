@@ -126,10 +126,12 @@ deletion, Justin's signed-in SharePoint session found the probe in the
 first-stage recycle bin, restored it, and Graph confirmed the same item and
 exact contents were live. The probe was deleted again; both controlled probe
 artifacts were removed from the first-stage bin. Justin was denied access to
-the second-stage administrator recycle-bin view. Library version limits,
-site/library Purview retention, ordinary-editor permissions, Workbench
-history/restore controls, and immutable Board milestone snapshots therefore
-remain open.
+the second-stage administrator recycle-bin view at the time; on 2026-08-20 an
+IT administrator screenshot showed both probes sitting in the **second-stage
+recycle bin**, proving the bin exists and the full deletion cascade works.
+Purview retention and the Edit level's exact Delete flags remain open
+(owner-accepted-open 2026-08-20), and Workbench history/restore controls and
+immutable Board milestone snapshots remain unbuilt.
 
 ## Evidence matrix
 
@@ -144,7 +146,7 @@ remain open.
 | Current-version readback | Native Word editing advanced the canonical item from version `1.0` to `2.0` | Dataverse remains the upload/finalization snapshot; the deployed read model overlays current Graph values in the response only | Both live consumers display the same current/missing/unavailable/unchecked semantics | PASS — Request `1003109` displayed current SharePoint version `2.0` in both consumers on deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2` |
 | Native version inspection/restore | Disposable file in the production Request library was uploaded twice, then prior version `1.0` was downloaded and restored | SharePoint retained `2.0` and `1.0`; restore created `3.0` and exact current bytes matched version one | Graph version list/content/restore operations | PASS — controlled probe only; no Request `1003109` mutation |
 | First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
-| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. Second-stage bin still reported absent (unusual, confirm); Purview unanswered and rerouted to a compliance admin; "limited control" is not a built-in permission level, so **editor delete rights remain the one unresolved durability question**. New 2026-08-10 evidence, unresolved: the same user could **edit** a Phase I file but **not delete** it (both attempts returned `0x80060728`, a lock catch-all rather than the permissions message). That asymmetry is impossible under a standard editing level, so it is either a transient self-lock (attempt was 109s after their own edit) or a custom "Contribute minus Delete" level — see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` for the two hypotheses and the non-destructive discriminating check |
+| Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. **2026-08-20 (S448) IT screenshots closed most of the rest**: the second-stage recycle bin exists and holds both 2026-07-30 probe files (refuting the 2026-08-10 "no second-stage bin" report as an access artifact); Members' assigned level is **Edit** ("limited control" was the pane caption), so ordinary editors presumptively CAN delete files and versions — and the connected M365 group is **Public**, making the effective editor population the whole tenant. Purview retention and the Edit level's exact Delete flags remain open and owner-accepted-open absent a pressing need — see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` for the full evidence and classifications |
 | Workbench version-history display | `View version history` disclosure on the Initial Assessment tab, lazy-fetched per staff click | Read-only. Lists native SharePoint versions for the exact displayed artifact via Graph; a replacement race returns 409 rather than another artifact's editors; no Dataverse write and no snapshot row | Workbench shows editor attribution per version, current-first, with honest truncation reporting | PASS — shipped S413 (2026-08-10) at merge `147d3e49` and **live-verified by signed-in smoke** on Request `1003109`. The tab rendered `Version 2.0 · current · Justin Gallivan · Jul 30, 2026 6:33 PM` over `Version 1.0 · SharePoint App · Jul 30, 2026 5:28 PM`, with no truncation note. Two independent cross-checks passed: those timestamps equal the direct-Graph probe's `2.0@2026-07-31T01:33:55Z` / `1.0@2026-07-31T00:28:08Z` converted to Pacific, so the route→service→Graph chain returns the same versions as a direct Graph call; and the `current` badge agrees with the tab header's `2.0`, which is a genuinely separate read — the header resolves `publication.versionId` through `currentMetadata` at page load [VERIFIED via `lib/services/graph-service.js:410`, `lib/services/initial-assessment/artifact-service.js:286`], while the history path issues its own item read on the disclosure click [VERIFIED via `lib/services/graph-service.js:491`], so this is two requests agreeing rather than one value rendered twice. This retires the mock-coverage gap — until this smoke, all three test files stubbed their outbound boundary [VERIFIED via `tests/unit/graph-service-versions.test.js:45`, `tests/unit/workbench-initial-assessment-versions-route.test.js:11`, `tests/unit/initial-assessment-artifact-versions.test.js:5`] and the chain had never executed end to end |
 | Workbench administrator restore and milestone freeze | No current producer/action | No milestone snapshot row/artifact is created; no restore path exists in the app | Workbench has no administrator restore control | PLANNED — restore stays blocked on the outstanding SharePoint permission evidence in the row above; the milestone snapshot producer is blocked on the owner's pointer-vs-copy decision |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
@@ -204,23 +206,24 @@ not an intervening staff edit. Version `2.0` later hashed to
    recovery are production-proved. Connor's replies to the four administrator
    checks, verbatim: **"Major versioning is on" / "No second-stage recycle
    bin" / "Not familiar with purview" / "Site members have 'limited
-   control'".** Only the second is a clean answer, and it is a negative one.
-   Standing state after those replies:
-   - **Version limits — still open.** Versioning being *on* was already proved
-     empirically (`1.0 → 2.0 → 3.0`); the configured *limit* is the unanswered
-     part and is what governs whether an old version survives.
-   - **Second-stage recovery — reported absent; confirm before relying on it.**
-     A tenant with no site-collection recycle bin is unusual, and the reply may
-     instead reflect the same access denial Justin hit. Needs someone with
-     site-collection administrator rights.
-   - **Purview retention — unanswered, and needs a different owner.** "Not
-     familiar with purview" routes this to an M365 compliance administrator.
-   - **Editor least privilege — ambiguous.** "Limited control" is not a
-     built-in SharePoint permission level. The operative question — whether an
-     ordinary editor can delete the file or its versions — is unresolved.
+   control'".** Standing state after those replies and the **2026-08-20 (S448)
+   IT administrator screenshots**:
+   - **Version limits — closed.** The signed-in Versioning Settings capture
+     (2026-08-10) read the full policy: major versions only, **keep 500**, no
+     age limit. (Residual: a limit is a setting an administrator can lower.)
+   - **Second-stage recovery — closed positive (2026-08-20).** The
+     site-collection bin exists and held both 2026-07-30 probe files; the
+     2026-08-10 "reported absent" was an access-visibility artifact.
+   - **Purview retention — open, rerouted, owner-accepted-open (2026-08-20).**
+     Needs an M365 compliance administrator; not to be chased absent a
+     pressing need.
+   - **Editor least privilege — largely resolved (2026-08-20).** Members hold
+     the built-in **Edit** level ("limited control" was a pane caption), and
+     the connected M365 group is **Public** — so any internal user
+     presumptively can edit and delete. The Edit level's exact Delete
+     checkbox read-out remains owner-accepted-open.
 
-   Two of four therefore remain genuinely open, one is ambiguous, and one is a
-   negative finding pending confirmation. Add Workbench version-history/admin
+   Add Workbench version-history/admin
    restore and milestone snapshots before calling the artifact system
    production-ready, and settle the milestone pointer-vs-copy question
    (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Board milestone freeze) — these

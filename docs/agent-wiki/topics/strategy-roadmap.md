@@ -269,9 +269,10 @@ document inventory, and individual implementation plans do not establish priorit
   Request `1003109` via deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`;
   native previous-version inspection/restore and signed-in first-stage
   recycle recovery also passed in the production Request library.
-  Administrator checks for version limits, second-stage recovery, retention,
-  and editor permissions plus Workbench history/admin restore and milestone
-  snapshots remain open. See
+  Administrator evidence closed version limits and second-stage recovery
+  (2026-08-10 / 2026-08-20; Members hold Edit on a Public M365 group site);
+  retention and the Edit level's Delete flags stay owner-accepted-open, and
+  Workbench history/admin restore and milestone snapshots remain open. See
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
 - Pre-Site persistence schema (owner-approved and Production-live 2026-08-17):
   Wave 19 adds 12 `wmkf_requestdocument` fields and the optional

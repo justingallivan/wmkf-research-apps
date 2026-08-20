@@ -69,8 +69,9 @@ and remained reachable through both consumers. Production deployment
 Graph-current metadata, and both signed-in consumers displayed current
 SharePoint version `2.0`. A disposable production-library audit then proved
 native previous-version inspection/restore and signed-in first-stage recycle
-recovery. Administrator checks for version limits, second-stage recovery,
-retention, and editor permissions plus Workbench history/admin restore and
+recovery. Administrator evidence closed version limits and second-stage
+recovery (2026-08-10 / 2026-08-20); retention and editor Delete flags stay
+owner-accepted-open, while Workbench history/admin restore and
 milestone snapshots remain open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
