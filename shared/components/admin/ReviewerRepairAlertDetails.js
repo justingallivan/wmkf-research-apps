@@ -25,6 +25,7 @@ function fallbackContext(alert) {
       foundEmail: null,
       source: null,
       detectedAt: null,
+      recommendedAction: 'use_primary_action',
     },
     evidenceLinks: [],
     warnings: ['current_context_unavailable'],
@@ -84,6 +85,7 @@ export default function ReviewerRepairAlertDetails({ alert }) {
   const isAddressConflict = context.issue.status === 'conflict_pending';
   const isReadyToClose = context.issue.status === 'ready_to_close';
   const isInviteSurface = context.workbenchSurface === 'invite';
+  const recommendedAction = context.issue.recommendedAction;
 
   return (
     <div className="mt-2 space-y-3 text-xs text-gray-700">
@@ -154,13 +156,20 @@ export default function ReviewerRepairAlertDetails({ alert }) {
                 <li>Optionally open the reviewer in Workbench to confirm the conflict or repair block is gone.</li>
                 <li>Return here and Resolve this alert. No additional reviewer change is required by this alert.</li>
               </>
-            ) : isAddressConflict && isInviteSurface ? (
+            ) : isAddressConflict && recommendedAction === 'confirm_identity' ? (
+              <>
+                <li>Open the highlighted reviewer in Workbench and choose Confirm identity.</li>
+                <li>Compare the stored and newly found addresses against the evidence, correct the contact details, and submit the identity/address attestation.</li>
+                <li>If the evidence does not establish the exact person, choose Not a fit instead. Do not create another repair request for this alert.</li>
+                <li>Return here and Resolve this alert only after the reviewer card no longer shows the identity or address block.</li>
+              </>
+            ) : isAddressConflict && recommendedAction === 'review_repair' && isInviteSurface ? (
               <>
                 <li>Open the highlighted reviewer in Invite Reviewers and choose Review repair.</li>
                 <li>Compare the two addresses against the evidence, choose the correct address, and submit the attestation.</li>
                 <li>Return here and Resolve this alert only after the reviewer no longer shows the conflict.</li>
               </>
-            ) : isAddressConflict ? (
+            ) : isAddressConflict && recommendedAction === 'review_address_conflict' ? (
               <>
                 <li>Open the reviewer in Workbench and choose Review address conflict on the highlighted card.</li>
                 <li>Compare the two addresses against the evidence, choose the correct address, and submit the attestation.</li>

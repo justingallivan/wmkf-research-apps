@@ -35,6 +35,7 @@ beforeEach(() => {
           foundEmail: 'found@lab.example.edu',
           source: 'scholarly_multi',
           detectedAt: '2026-08-20T20:00:00.000Z',
+          recommendedAction: 'review_address_conflict',
         },
         evidenceLinks: [{ label: 'Institution profile', url: 'https://example.edu/reviewer' }],
         workbenchUrl: '/workbench/request-guid?tab=reviewers&sub=find&repairCandidate=candidate%3Areviewer',
@@ -58,6 +59,7 @@ test('renders the repair decision context and explicit closeout sequence', async
     'https://example.edu/reviewer',
   );
   expect(screen.getByText(/Resolve this alert only after/)).toBeInTheDocument();
+  expect(screen.getByText(/choose Review address conflict/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Open reviewer in Workbench/ })).toHaveAttribute(
     'href',
     expect.stringContaining('repairCandidate='),
@@ -66,6 +68,68 @@ test('renders the repair decision context and explicit closeout sequence', async
     '/api/admin/alerts?repairContext=491',
     expect.objectContaining({ signal: expect.any(AbortSignal) }),
   );
+});
+
+test('an unresolved-identity conflict directs staff to Confirm identity without creating another repair request', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      context: {
+        request: { id: 'request-guid', number: '1000001', title: 'Repair test request' },
+        reviewer: {
+          candidateKey: 'candidate:reviewer',
+          name: 'Reviewer Name',
+          affiliation: 'Example University',
+        },
+        issue: {
+          code: 'address_conflict_pending',
+          status: 'conflict_pending',
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@lab.example.edu',
+          recommendedAction: 'confirm_identity',
+        },
+        evidenceLinks: [],
+        warnings: [],
+        workbenchSurface: 'find',
+        workbenchUrl: '/workbench/request-guid?tab=reviewers&sub=find&repairCandidate=candidate%3Areviewer',
+      },
+    }),
+  });
+
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+
+  expect(await screen.findByText(/choose Confirm identity/)).toBeInTheDocument();
+  expect(screen.getByText(/Do not create another repair request/)).toBeInTheDocument();
+  expect(screen.queryByText(/choose Review address conflict/)).not.toBeInTheDocument();
+});
+
+test('an unknown conflict action falls back without naming an unavailable control', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      context: {
+        request: { id: 'request-guid', number: '1000001', title: 'Repair test request' },
+        reviewer: { candidateKey: 'candidate:reviewer', name: 'Reviewer Name' },
+        issue: {
+          code: 'address_conflict_pending',
+          status: 'conflict_pending',
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@lab.example.edu',
+          recommendedAction: 'future_action',
+        },
+        evidenceLinks: [],
+        warnings: [],
+        workbenchSurface: 'find',
+        workbenchUrl: '/workbench/request-guid?tab=reviewers&sub=find&repairCandidate=candidate%3Areviewer',
+      },
+    }),
+  });
+
+  render(<ReviewerRepairAlertDetails alert={alert} />);
+
+  expect(await screen.findByText(/use the primary repair or retry action shown on the card/)).toBeInTheDocument();
+  expect(screen.queryByText(/choose Confirm identity/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/choose Review address conflict/)).not.toBeInTheDocument();
 });
 
 test('a sparse historical alert keeps a safe identifier-based fallback when refresh fails', async () => {
@@ -162,6 +226,29 @@ test('repair attention scrolls to and highlights the matching reviewer card', as
     behavior: 'smooth',
     block: 'center',
   }));
+});
+
+test('the unresolved conflict card exposes Confirm identity and suppresses direct address review', () => {
+  render(
+    <CandidateCard
+      candidate={{
+        name: 'Reviewer Name',
+        affiliation: 'Example University',
+        email: 'found@lab.example.edu',
+        emailSource: 'scholarly_multi',
+        identityStatus: 'unresolved',
+        addressConflictPending: true,
+        publications: [],
+      }}
+      readOnly
+      onRequestRepair={jest.fn()}
+      onReviewAddressConflict={jest.fn()}
+      onConfirmIdentity={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Review address conflict for Reviewer Name' })).not.toBeInTheDocument();
 });
 
 test('Invite-origin repair attention highlights the saved reviewer and exposes the repair action', async () => {

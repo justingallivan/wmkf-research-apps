@@ -66,6 +66,37 @@ export function isCandidateSelectable(c) {
     && !c?.hasInstitutionCOI;
 }
 
+export function canConfirmCandidateForPromotion(candidate) {
+  const promotionDecision = getCandidatePromotionDecision(candidate);
+  const eligibilityStatus = candidate?.eligibilityStatus
+    || candidate?.contactEnrichment?.eligibilityStatus;
+  return !isCandidateSelectable(candidate)
+    && !candidate?.hasInstitutionCOI
+    && (!candidate?.isApplicantRecommended || candidate?.applicantKnownReviewer?.status === 'known')
+    && eligibilityStatus !== 'deceased'
+    && (
+      promotionDecision?.decision === 'needs_identity_confirmation'
+      || promotionDecision?.decision === 'missing_email'
+    );
+}
+
+/**
+ * Name an exact Find-card action only when the card caller will expose it.
+ * Unknown, unavailable, and record-repair cases deliberately remain generic:
+ * a repair alert must never instruct staff to create the same alert again.
+ */
+export function getFindCandidateRepairGuidanceAction(candidate) {
+  const promotionDecision = getCandidatePromotionDecision(candidate);
+  const identityUnverified = promotionDecision?.decision === 'needs_identity_confirmation'
+    && promotionDecision?.reason === 'identity_not_resolved';
+  if (candidate?.conflictRecordUnavailable === true) return 'use_primary_action';
+  if (identityUnverified) {
+    return canConfirmCandidateForPromotion(candidate) ? 'confirm_identity' : 'use_primary_action';
+  }
+  if (candidate?.addressConflictPending === true) return 'review_address_conflict';
+  return 'use_primary_action';
+}
+
 export function candidateWasSaved(candidate, savedKeys = []) {
   const stableKeys = new Set(Array.isArray(savedKeys) ? savedKeys : []);
   return stableKeys.has(reviewerSaveKey(candidate));
