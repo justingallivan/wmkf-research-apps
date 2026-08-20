@@ -1,171 +1,164 @@
-# Session 449 Prompt: Observe Stage II and Close Passive Safety
+# Session 450 Prompt: Explorer Campaign Awaits SoCal Questions; Stage II Window Continues
 
-## Session 448 Summary
+## Session 449 Summary
 
-Session 448 closed the owner-approved large-image business smoke, corrected the
-route-local response warning exposed by that smoke, cleaned up the merged image
-fix branch, and completed the signed-in Phase II document display smoke.
+Session 449 was a no-code exploratory session preparing the Dynamics Explorer
+behavior campaign. It reconstructed the Explorer retooling history, measured
+production behavior from Postgres logs, diagnosed the Sonnet 5 posture risk,
+settled the SoCal twin-field questions by owner-run Dataverse probes, and
+delivered the campaign plan (merged to main as PR #130, `7805b27f`).
 
 ### What Was Completed
 
-1. **The controlled staff replacement smoke passed end to end**
-   - Production Request `1002788` accepted the exact 9,564,384-byte PNG with
-     SHA-256
-     `1b8663c98764d70af416bfa6a0bf3a0b1b5befc1cfa8ad6cae6f785dea4e8f14`.
-   - The staging row reached `consumed`/`ok`, the exact temporary Blob was gone,
-     the scanner allowed the clean file, SharePoint and Dataverse committed,
-     and the Awardee image rendered at 4755×4615.
-   - The impersonated Dataverse PATCH returned 403 because ordinary staff lack
-     Global Write on the organization-owned table; the designed service-
-     principal retry returned 2xx. The owner accepted that fallback without a
-     staff-role expansion. Staff replacement correctly sent no notification.
+1. **Retooling history + production behavior measured**
+   - Three waves reconstructed: Feb round-limit bumps, May Path A, and the
+     Aug 8 cluster (PR #117 thinking-delta fix + `79a27d13` validator lookup
+     aliases). Query-log analysis: pre-Aug-8 ~19% of request-bursts hit ≥15
+     tool calls; post-fix 0 of 15 (small sample). `dynamics_feedback` is
+     empty — no user-reported failure signal exists.
+   - Model flip Haiku→`claude-sonnet-5` occurred by first August use and is
+     what triggered the Aug 7 "Query failed" incident. Sonnet posture risk
+     measured: 3 of 102 calls hit the 2048 `maxTokens` cap (silent
+     truncation); latency ~3.5×. Total Explorer spend ever: $4.09.
 
-2. **The valid large image no longer creates the default response warning**
-   - PR #127 / commit `68979db3` raised only the grantee-image route's Next.js
-     response warning threshold above the existing 10 MiB product contract.
-   - Ready deployment `dpl_GxXEy525EkJNJPir1DNFqcaDHoLi` served the image with
-     HTTP 200, and the old 4 MiB warning did not recur.
-   - Merged branch `codex/grantee-image-response-limit` was deleted locally and
-     from `origin` after verification.
+2. **SoCal vernacular gap diagnosed; twin fields settled by probe**
+   - LEXICON/vocabulary is Research-dialect; SoCal concept-call pipeline,
+     codes (owner's 7.15.22 spreadsheet, read this session), and field-usage
+     differences are unrepresented. Owner decided a program-NEUTRAL rubric.
+   - Owner-run probes: underscore `wmkf_programareaserved_socal`/`_research`
+     carry all data (2,342/4,597); no-underscore twins are dead (0 rows);
+     `wmkf_supporttype2` is real (14,409, active) vs the 53-row lookup;
+     population-served twins ~abandoned since 2024. `akoya_dc_app` holds the
+     Blackbaud application-id crosswalk on 22,879 rows (22,573 = exactly the
+     migrated cohort); other `akoya_dc_*` fields empty on akoya_request.
+     Lineage: Keck migrated from Blackbaud ("Sky"); Pearl was Bromelkamp's
+     prior product — dc fields are stock conversion scaffolding.
 
-3. **The Phase II Proposal-tab display smoke passed**
-   - Request `1002788` correctly showed an empty Phase II section, so populated
-     production Request `1002379` was used for the read-only smoke.
-   - The tab displayed ten exact filenames: `Bibliography.pdf`,
-     `Biographical Sketches.pdf`, `Collaborative Arrangements.pdf`,
-     `Financial Narrative.pdf`, `Graphical Abstract.pdf`, `Project Budget.pdf`,
-     `Project Narrative.pdf`, `Proposal Abstract.docx`,
-     `Proposal Cover Page.docx`, and `Recognition Statement.docx`.
-   - `Bibliography.pdf` opened through View in Chrome's inline PDF viewer and
-     downloaded as a valid 756,947-byte PDF. The production proxy returned 200
-     and its terminal Graph drive-item read returned 2xx. PDFs expose View and
-     Download; the three DOCX files correctly expose Download only.
+3. **Campaign plan drafted and merged (PR #130, merge `7805b27f`)**
+   - `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`: Phase A model
+     posture (Sonnet 5 + `effort: low` + 16K ceiling — owner-approved),
+     B request-level telemetry, C eval harness, D program-neutral vernacular
+     rubric, E probe backlog. Durable memory:
+     `.claude-memory/project-dynamics-explorer-socal-campaign.md`.
+   - Drafted the owner's outreach message asking SoCal staff for 10–20 real
+     questions plus two field-usage questions (population-served, `_socal`
+     program-area fill stop).
 
 ### Commits
 
-- `68979db3` - raise the grantee-image route response warning threshold
+- `1876b2fc` - Draft Dynamics Explorer behavior campaign plan (S449 exploration)
+- `7805b27f` - Merge pull request #130 (landed the above on main)
 
 ## Next Items
 
 ### Verified Open
 
-1. **Observe Stage II Production outcomes through 2026-09-02.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` records the
-   exact-on Production state and organic-observation window.
-   Sample naturally produced Stage II DTOs for false-clear risk,
-   informational-alert volume, and whether compatible/historical copy reduces
-   manual review. Do not manufacture shared-roster rows.
+1. **Explorer campaign Phase A: Sonnet 5 posture fix.**
+   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` §Phase A;
+   api_usage_log truncation measurements (S449).
+   `maxTokens` 2048→16,000 + `output_config: {effort: 'low'}` in
+   `pages/api/dynamics-explorer/chat.js` `callClaude`; verify LLMClient
+   passes `output_config` through ([ASSUMED] unchecked); log `stop_reason`.
+   Does NOT depend on the SoCal questions — buildable now.
 
-2. **Run a staff acceptance smoke of reviewer identity remediation.**
-   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` and shipped commits
-   `d9c29c7d` through `5fcd913c`.
-   Use a reviewer genuinely intended for an invite list and confirm the card
-   names the problem and exposes the exact next action before any durable
-   promotion.
+2. **Observe Stage II Production outcomes through 2026-09-02.**
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` (exact-on
+   Production state, organic-observation window). Untouched in S449.
+   Do not manufacture shared-roster rows.
 
-3. **Re-probe and close Track A passive safety.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still
-   carries the completed 48-hour window as open guidance.
-   Reconcile collection against the now-live Log Drain before interpreting or
-   closing the old export procedure.
+3. **Run a staff acceptance smoke of reviewer identity remediation.**
+   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; commits `d9c29c7d`
+   through `5fcd913c`. Untouched in S449.
+
+4. **Re-probe and close Track A passive safety.**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`
+   still carries the completed 48-hour window as open guidance. Untouched in
+   S449. Reconcile against the live Log Drain first.
+
+### Blocked on External Input
+
+1. **Explorer campaign Phases C–D (eval harness seeds + vernacular rubric).**
+   Evidence: plan §4 Open items; owner sent/is sending the SoCal outreach
+   message drafted in S449.
+   Blocked on: 10–20 real SoCal questions; answers on population-served and
+   `_socal` program-area fill. Phase B (telemetry) is not blocked but is most
+   valuable landed before behavior changes.
 
 ### Owner Decision Needed
 
 1. **Choose an approved request for the Site Visit handoff smoke.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` marks the signed-in
-   Draft→Review handoff smoke open.
-   The action records a durable milestone and locks Pre-Site regeneration, so
-   do not click it without explicit request approval.
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` (signed-in
+   Draft→Review smoke open). Untouched in S449. The action records a durable
+   milestone — do not click without explicit approval.
 
 2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` records Stage
-   II as Production-live behind an exact-on public build flag.
-   Re-probe the live environment and replacement deployment before changing it.
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
+   Re-probe the live environment and replacement deployment before changing
+   it; `NEXT_PUBLIC_` changes require a new build.
 
 ### Parked
 
 1. **`NEXTAUTH_SECRET` rotation and Vercel Sensitive conversion.**
-   Evidence: owner decision in Session 447; Vercel metadata still classifies it
-   as non-sensitive.
-   Reopen only when the owner chooses a coordinated session invalidation window.
+   Evidence: owner decision Session 447. Reopen only with a coordinated
+   session-invalidation window.
 
 2. **Reviewer multipart direct-upload conversion.**
    Evidence: `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` §8.
-   The two reviewer routes have tests and security-matrix entries but no source
-   caller was found. Complete consumer discovery and obtain an owner decision
-   before changing their request contract.
+   Complete consumer discovery + owner decision first.
 
 3. **Stage III institution identity authority.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Selectability, write vetoes, and identity weighting remain blocked until the
-   execution-point contract exists and each consumer is separately approved.
+   Blocked until the execution-point contract exists.
 
 4. **Site Visit dossier/logistics and Final copy transaction.**
    Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
-   Inventory existing Dataverse fields and registered SharePoint categories
-   before proposing schema or upload changes.
 
 ### Verify Before Acting
 
-1. A rollback may leave additive migration 031 in place; never drop
-   `portal_upload_staging` during incident rollback or delete SharePoint content
-   referenced by committed Dataverse state.
-2. Re-probe the live Stage II environment before changing/removing its flag;
-   `NEXT_PUBLIC_` changes require a new build.
-3. Reconcile the Track A plan with the live Log Drain before collecting or
-   interpreting closeout evidence.
+1. Production Dataverse reads (including the campaign's Phase E probes and
+   any eval-harness run) are owner-run — never set
+   `DATAVERSE_ALLOW_PROD_READS` yourself
+   (`feedback-never-self-authorize-prod-dataverse-reads`).
+2. `dynamics_query_log.record_count` rows before 2026-08-08 carry broken
+   semantics (PR #117); never trend across that boundary.
+3. `compactMessages` clearing prior-turn `tool_use.input` while thinking
+   blocks remain is [ASSUMED] safe — untested with a thinking model; pin it
+   in the Phase C harness before relying on it.
+4. Stage II flag / Track A items: re-probe live state first (carried from
+   S449 prompt, unchanged).
 
 ### Do Not Reopen Without New Decision
 
-1. A multipart fallback or proxy-matcher exclusion for large grantee images;
-   both were falsified by the measured Function transport boundary.
-2. Another string-side institution checker or Stage III authority flip based
-   only on the 25-case Stage II benchmark.
-3. A separate Site Visit Writeup or Dataverse staff-observations memo.
-4. Routine Vercel CLI update reminders without a concrete incompatibility.
-5. The direct-upload business smoke: Request `1002788` closed it on 2026-08-20.
-   Reopen only for a new regression signal or a changed storage/scanner contract.
-6. The Phase II Proposal-tab display smoke: populated Request `1002379` closed
-   filename, View, and Download verification on 2026-08-20. Reopen only for a
-   regression signal or a changed SharePoint listing/proxy contract.
+1. Asker-profile-based program biasing in the Explorer — owner chose
+   program-NEUTRAL (2026-08-20); revisit only by new owner decision.
+2. Round-exhaustion re-fixes (e.g. raising MAX_TOOL_ROUNDS) without new
+   post-telemetry evidence — the Aug 8 cluster closed the measured era.
+3. Items 1–6 from the Session 449 prompt's list (multipart fallback,
+   Stage III flip on the 25-case benchmark, separate Site Visit memo, Vercel
+   CLI reminders, direct-upload smoke, Phase II display smoke) — unchanged.
 
 ## Key Files Reference
 
 | File | Purpose |
-|---|---|
-| `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` | Incident evidence, direct-upload contract, release proof, and completed staff smoke |
-| `lib/services/portal-upload-staging.js` | Actor-bound staging, lease/idempotency, reconciliation, and exact-path cleanup |
-| `lib/db/migrations/031_portal_upload_staging.sql` | Existing-database staging ledger migration |
-| `pages/api/external/grantee/[token]/upload-token.js` | External token mint route |
-| `pages/api/external/grantee/[token]/submit.js` | External JSON finalizer |
-| `pages/api/workbench/grantee-deliverables/replacement-upload-token.js` | Staff replacement token mint route |
-| `pages/api/workbench/grantee-deliverables/replace-submission.js` | Staff JSON finalizer |
-| `scripts/probe-private-blob-client-access.mjs` | Disposable private-store and exact-payload gate |
-| `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Stage II rollout and observation gate |
-| `docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md` | Phase II display contract and completed production smoke |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Site Visit handoff contract and open signed-in smoke |
+|------|---------|
+| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | The campaign plan; §Phase A is the next buildable step |
+| `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions + probe-verified twin/dc-field facts |
+| `scripts/probe-dynexp-query-log-analysis.mjs` | Re-runnable query-log aggregate analysis (Postgres, read-only) |
+| `scripts/probe-programareaserved-twins.mjs` | Owner-run Dataverse twin/dc-family population probe |
+| `pages/api/dynamics-explorer/chat.js` | Phase A target (`callClaude` maxTokens/effort) + Phase B logQuery |
+| `shared/config/prompts/dynamics-explorer.js` | LEXICON / TABLE_ANNOTATIONS — Phase D target |
+| `lib/services/llm-client.js` | Verify `output_config` passthrough before Phase A |
 
 ## Testing
 
-The upload release passed 669 Jest suites / 8,636 tests, the canonical Production
-build, migration-manifest, Atlas, API-route, documentation, fact-consistency,
-secret-scan, and agent-invariant gates. The exact supplied PNG passed the live
-private Blob transport/privacy probe. Post-deploy checks confirmed a Ready
-deployment, fail-closed route matching, required Production configuration,
-zero staging rows before approved use, a healthy canonical sign-in route, and
-no release-window errors. Claim-evidence reporting was unavailable because local
-advisory state could not be read; no observation row was added.
+```bash
+# Query-log behavior analysis (Postgres, read-only, aggregate-only)
+node scripts/probe-dynexp-query-log-analysis.mjs
 
-The later owner-approved Request `1002788` staff smoke passed the exact-payload
-token → private Blob → JSON finalize → scanner → SharePoint → Dataverse path.
-The staging row consumed with matching bytes/hash and its temporary Blob was
-gone; the Awardee image rendered in Production after PR #127, with no recurrence
-of the default 4 MiB response warning.
+# Twin/dc-field population probe (production Dataverse — OWNER-RUN ONLY)
+node scripts/probe-programareaserved-twins.mjs
+```
 
-The signed-in Proposal tab on populated Request `1002379` displayed all ten
-Phase II files. Representative View and Download actions for
-`Bibliography.pdf` reached the production proxy with 200 responses and terminal
-Graph 2xx reads; the downloaded 756,947-byte artifact was a valid PDF.
-
-The Session 448 claim-evidence pilot report returned zero advisory events and
-zero claims, so no observation row was eligible.
+S449 shipped no runtime changes; no test-suite deltas. The S449 claim-evidence
+pilot report returned zero advisory events and zero claims; no observation row
+was eligible.
