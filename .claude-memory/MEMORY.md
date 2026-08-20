@@ -49,6 +49,7 @@
 - Review-form multiselect: ../docs/agent-wiki/topics/external-reviewer-portal.md; ../docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md — implementation and production smoke are complete; broader exposure and rollback rehearsals remain held
 - Reviewer closeout / reliability: project-reviewer-closeout-payability.md; project-reviewer-reliability-data.md
 - Dataverse / Dynamics / Explorer / CRM facts: ../docs/agent-wiki/topics/dataverse-dynamics.md
+- Dynamics Explorer behavior campaign / SoCal vernacular / Explorer telemetry+eval: ../docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md; project-dynamics-explorer-socal-campaign.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md; project-cache-hit-rate-review.md
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; project-app-access-control.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-reviewer-org-open-access-by-design.md; project-merge-candidates-authorization-gap.md (org-open reviewer/document access accepted by-design 2026-08-15; no Dataverse request/data ownership to scope against)
