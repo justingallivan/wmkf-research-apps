@@ -4,7 +4,7 @@
  * (`reviewer_find_roster` via `reviewer-roster-store`) reconciled on GET with
  * authoritative Dataverse engagement for every suggestion-anchored active row.
  *
- *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames }
+ *   GET   ?requestId            → { active, excluded, ineligible, blocked, savedKeys, allNames, repairRequests }
  *   POST  { requestId, candidates }                  → record surfaced
  *     (active, or ineligible only with a bound server eligibility receipt)
  *   PATCH { requestId, action:'exclude', candidate } → set aside
@@ -53,6 +53,7 @@ import {
   pruneCandidateForRoster,
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
+import { listOpenAddressRepairRequests } from '../../../lib/services/reviewer-address-trust-service';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -285,7 +286,24 @@ async function handleGet(req, res) {
   const reconciled = await withDalContext('workbench-reviewer-roster-get', () => (
     reconcileRosterEngagement({ requestId, roster })
   ));
-  return res.status(200).json({ success: true, ...reconciled });
+  const candidateKeys = ['active', 'excluded', 'ineligible', 'blocked']
+    .flatMap((bucket) => (Array.isArray(reconciled?.[bucket]) ? reconciled[bucket] : []))
+    .map((candidate) => candidate?.candidateKey)
+    .filter(Boolean);
+  let repairRequests = [];
+  let repairRequestsUnavailable = false;
+  try {
+    repairRequests = await listOpenAddressRepairRequests({ requestId, candidateKeys });
+  } catch (error) {
+    repairRequestsUnavailable = true;
+    console.error('reviewer-roster repair request lookup failed:', error.message);
+  }
+  return res.status(200).json({
+    success: true,
+    ...reconciled,
+    repairRequests,
+    repairRequestsUnavailable,
+  });
 }
 
 async function handlePost(req, res) {

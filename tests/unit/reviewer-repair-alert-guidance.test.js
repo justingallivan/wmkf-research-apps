@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerRepairAlertDetails from '../../shared/components/admin/ReviewerRepairAlertDetails';
 import { CandidateCard } from '../../shared/components/reviewers/ReviewerSearchSection';
 import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvitePanel';
@@ -226,6 +226,60 @@ test('repair attention scrolls to and highlights the matching reviewer card', as
     behavior: 'smooth',
     block: 'center',
   }));
+});
+
+test('an open repair request replaces the duplicate action and keeps identity confirmation available', () => {
+  render(
+    <CandidateCard
+      candidate={{
+        name: 'Reviewer Name',
+        email: 'found@lab.example.edu',
+        identityStatus: 'unresolved',
+        addressConflictPending: true,
+        publications: [],
+      }}
+      readOnly
+      onRequestRepair={jest.fn()}
+      onConfirmIdentity={jest.fn()}
+      repairRequest={{
+        alertId: 491,
+        status: 'active',
+        adminUrl: '/admin#system-alerts',
+      }}
+    />,
+  );
+
+  expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Open pending repair request/i })).toHaveAttribute(
+    'href',
+    '/admin#system-alerts',
+  );
+  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
+});
+
+test('an unavailable repair lookup fails closed only for duplicate creation', () => {
+  const retry = jest.fn();
+  render(
+    <CandidateCard
+      candidate={{
+        name: 'Reviewer Name',
+        email: 'found@lab.example.edu',
+        identityStatus: 'unresolved',
+        addressConflictPending: true,
+        publications: [],
+      }}
+      readOnly
+      onRequestRepair={jest.fn()}
+      onConfirmIdentity={jest.fn()}
+      repairRequestsUnavailable
+      onRetryRepairStatus={retry}
+    />,
+  );
+
+  expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Retry repair request status/i }));
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
 });
 
 test('the unresolved conflict card exposes Confirm identity and suppresses direct address review', () => {

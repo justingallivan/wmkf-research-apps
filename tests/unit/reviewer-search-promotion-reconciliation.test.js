@@ -361,6 +361,49 @@ test('record-repair conflicts stay on the repair remedy even when the server als
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
 });
 
+test('a repair request created from the card immediately becomes pending', async () => {
+  const reviewer = {
+    ...candidate('Pending Repair Reviewer', 'pending-repair@example.edu'),
+    candidateKey: 'candidate:pending-repair',
+    conflictRecordUnavailable: true,
+  };
+  global.fetch = jest.fn((url) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(response({
+        success: true,
+        active: [reviewer],
+        excluded: [],
+        ineligible: [],
+        blocked: [],
+        savedKeys: [],
+        allNames: [reviewer.name],
+        repairRequests: [],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-address-trust') {
+      return Promise.resolve(response({
+        success: true,
+        message: 'Repair request created.',
+        adminUrl: '/admin#system-alerts',
+        repairRequest: {
+          alertId: 491,
+          candidateKey: reviewer.candidateKey,
+          status: 'active',
+          adminUrl: '/admin#system-alerts',
+        },
+      }));
+    }
+    throw new Error(`unexpected fetch ${target}`);
+  });
+
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: /create repair request/i }));
+
+  expect(await screen.findByRole('link', { name: /open pending repair request/i })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /create repair request/i })).not.toBeInTheDocument();
+});
+
 test('applicant promotion repair failure attaches the repair remedy to the exact applicant card', async () => {
   const suggestionId = '44444444-4444-4444-4444-444444444444';
   const reviewer = {

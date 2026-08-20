@@ -57,6 +57,10 @@ jest.mock('../../lib/services/workbench/reviewer-roster-projection-service', () 
   reconcileRosterEngagement: (...args) => mockReconcileRosterEngagement(...args),
   validateRosterPromotionEngagement: (...args) => mockValidateRosterPromotionEngagement(...args),
 }));
+const mockListOpenAddressRepairRequests = jest.fn(async () => []);
+jest.mock('../../lib/services/reviewer-address-trust-service', () => ({
+  listOpenAddressRepairRequests: (...args) => mockListOpenAddressRepairRequests(...args),
+}));
 
 import handler from '../../pages/api/workbench/reviewer-roster';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -81,6 +85,7 @@ beforeEach(() => {
   store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
   mockValidateRosterPromotionEngagement.mockResolvedValue({ allowed: true });
+  mockListOpenAddressRepairRequests.mockResolvedValue([]);
 });
 
 describe('auth', () => {
@@ -101,16 +106,52 @@ describe('GET', () => {
   });
 
   it('lists the roster for a valid requestId', async () => {
-    store.listForRequest.mockResolvedValueOnce({ active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] });
+    const candidate = { name: 'Ann', candidateKey: 'candidate:ann' };
+    store.listForRequest.mockResolvedValueOnce({ active: [candidate], excluded: [], allNames: ['Ann'] });
+    mockListOpenAddressRepairRequests.mockResolvedValueOnce([{
+      alertId: 491,
+      candidateKey: candidate.candidateKey,
+      status: 'acknowledged',
+      adminUrl: '/admin#system-alerts',
+    }]);
     const r = res();
     await handler({ method: 'GET', query: { requestId: REQ } }, r);
     expect(r.statusCode).toBe(200);
     expect(store.listForRequest).toHaveBeenCalledWith(REQ);
     expect(mockReconcileRosterEngagement).toHaveBeenCalledWith({
       requestId: REQ,
-      roster: { active: [{ name: 'Ann' }], excluded: [], allNames: ['Ann'] },
+      roster: { active: [candidate], excluded: [], allNames: ['Ann'] },
     });
-    expect(r.body.active).toEqual([{ name: 'Ann' }]);
+    expect(mockListOpenAddressRepairRequests).toHaveBeenCalledWith({
+      requestId: REQ,
+      candidateKeys: [candidate.candidateKey],
+    });
+    expect(r.body.active).toEqual([candidate]);
+    expect(r.body.repairRequests).toEqual([expect.objectContaining({
+      alertId: 491,
+      candidateKey: candidate.candidateKey,
+      status: 'acknowledged',
+    })]);
+  });
+
+  it('preserves the roster but marks repair creation unavailable when the alert lookup fails', async () => {
+    const candidate = { name: 'Ann', candidateKey: 'candidate:ann' };
+    store.listForRequest.mockResolvedValueOnce({ active: [candidate], excluded: [], allNames: ['Ann'] });
+    mockListOpenAddressRepairRequests.mockRejectedValueOnce(new Error('alert store unavailable'));
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const r = res();
+    await handler({ method: 'GET', query: { requestId: REQ } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body.active).toEqual([candidate]);
+    expect(r.body.repairRequests).toEqual([]);
+    expect(r.body.repairRequestsUnavailable).toBe(true);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'reviewer-roster repair request lookup failed:',
+      'alert store unavailable',
+    );
+    consoleSpy.mockRestore();
   });
 });
 
