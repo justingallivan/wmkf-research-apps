@@ -266,6 +266,9 @@ test('repair alert context re-reads request, conflict, and bounded evidence from
     affiliation: 'Example University',
     email: 'found@lab.example.edu',
     rosterStatus: 'active',
+    identityStatus: 'confirmed',
+    emailPersistAllowed: true,
+    addressConflictPending: true,
     website: 'https://example.edu/reviewer',
     orcid: '0000-0002-1825-0097',
     contactEnrichment: {
@@ -297,6 +300,7 @@ test('repair alert context re-reads request, conflict, and bounded evidence from
       storedEmail: 'stored@example.edu',
       foundEmail: 'found@lab.example.edu',
       source: 'scholarly_multi',
+      recommendedAction: 'review_address_conflict',
     },
     evidenceLinks: [
       { label: 'Institution or lab profile', url: 'https://example.edu/reviewer' },
@@ -310,6 +314,80 @@ test('repair alert context re-reads request, conflict, and bounded evidence from
   });
   expect(update).not.toHaveBeenCalled();
   expect(recordSurfaced).not.toHaveBeenCalled();
+});
+
+test('repair alert context recommends identity confirmation when the highlighted card gates address review', async () => {
+  const candidateKey = 'candidate:unresolved-reviewer';
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@lab.example.edu',
+    reason: 'email_mismatch',
+    requestId: REQUEST_ID,
+    candidateKey,
+    detectedAt: '2026-08-20T20:00:00.000Z',
+  });
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey,
+    name: 'Unresolved Reviewer',
+    email: 'found@lab.example.edu',
+    rosterStatus: 'active',
+    identityStatus: 'unresolved',
+    addressConflictPending: true,
+  }]);
+  resolveTrustedReviewerPerson.mockResolvedValueOnce({
+    personId: PERSON_ID,
+    person: {
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(conflict),
+    },
+  });
+
+  await expect(getAddressRepairRequestContext({
+    requestId: REQUEST_ID,
+    candidateKey,
+    code: 'address_conflict_pending',
+  })).resolves.toMatchObject({
+    issue: {
+      status: 'conflict_pending',
+      recommendedAction: 'confirm_identity',
+    },
+  });
+});
+
+test('repair alert context stays generic when Confirm identity is suppressed by a card blocker', async () => {
+  const candidateKey = 'candidate:blocked-unresolved-reviewer';
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@lab.example.edu',
+    reason: 'email_mismatch',
+    requestId: REQUEST_ID,
+    candidateKey,
+    detectedAt: '2026-08-20T20:00:00.000Z',
+  });
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey,
+    name: 'Blocked Reviewer',
+    email: 'found@lab.example.edu',
+    rosterStatus: 'active',
+    identityStatus: 'unresolved',
+    addressConflictPending: true,
+    hasInstitutionCOI: true,
+  }]);
+  resolveTrustedReviewerPerson.mockResolvedValueOnce({
+    personId: PERSON_ID,
+    person: {
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(conflict),
+    },
+  });
+
+  await expect(getAddressRepairRequestContext({
+    requestId: REQUEST_ID,
+    candidateKey,
+    code: 'address_conflict_pending',
+  })).resolves.toMatchObject({
+    issue: { recommendedAction: 'use_primary_action' },
+  });
 });
 
 test('suggestion repair context falls back to Dataverse and deep-links to Invite when its roster row is gone', async () => {
@@ -338,6 +416,7 @@ test('suggestion repair context falls back to Dataverse and deep-links to Invite
 
   expect(context).toMatchObject({
     workbenchSurface: 'invite',
+    issue: { recommendedAction: 'review_repair' },
     workbenchUrl: expect.stringContaining(`sub=candidates&repairSuggestion=${SUGGESTION_ID}`),
   });
 });
@@ -386,7 +465,7 @@ test('a staff-verified conflict with a cleared roster block is ready to close, n
     candidateKey,
     code: 'address_conflict_pending',
   })).resolves.toMatchObject({
-    issue: { status: 'ready_to_close' },
+    issue: { status: 'ready_to_close', recommendedAction: 'resolve_alert' },
   });
 });
 

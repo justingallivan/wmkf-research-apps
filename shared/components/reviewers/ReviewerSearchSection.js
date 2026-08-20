@@ -55,6 +55,7 @@ import {
   applicantTerminalSuggestionKeys,
   hasValidApplicantEnrichmentCache,
   isCandidateSelectable,
+  canConfirmCandidateForPromotion,
   getCandidatePromotionDecision,
   getCandidateReasonPresentation,
   correlateSaveResultsToRosterCandidates,
@@ -3255,17 +3256,7 @@ export default function ReviewerSearchSection({
                                 // identity" affordance so a PD can rescue a real reviewer.
                                 const selectableNow = isCandidateSelectable(c);
                                 const promotionDecision = getCandidatePromotionDecision(c);
-                                const canConfirmForPromotion = !selectableNow
-                                  && !c.hasInstitutionCOI
-                                  && (
-                                    !c.isApplicantRecommended
-                                    || c.applicantKnownReviewer?.status === 'known'
-                                  )
-                                  && (c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) !== 'deceased'
-                                  && (
-                                    promotionDecision?.decision === 'needs_identity_confirmation'
-                                    || promotionDecision?.decision === 'missing_email'
-                                  );
+                                const canConfirmForPromotion = canConfirmCandidateForPromotion(c);
                                 if (selectableNow) {
                                   return <CandidateCard
                                     key={candKey(c)}
