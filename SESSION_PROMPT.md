@@ -1,69 +1,49 @@
-# Session 448 Prompt: Complete Controlled Upload Smoke and Observe Production
+# Session 449 Prompt: Observe Stage II and Close Passive Safety
 
-## Session 447 Summary
+## Session 448 Summary
 
-Session 447 completed credential housekeeping, diagnosed the repeat 9.12 MiB
-grantee-image failure as a pre-handler transport rejection, built durable direct
-private-Blob staging for the two live grantee-image consumers, iterated with
-Claude Opus to ship-ready consensus, and promoted the release to Production.
+Session 448 closed the owner-approved large-image business smoke, corrected the
+route-local response warning exposed by that smoke, cleaned up the merged image
+fix branch, and completed the signed-in Phase II document display smoke.
 
 ### What Was Completed
 
-1. **Credential housekeeping was completed without exposing values**
-   - The Azure AD client secret was rotated and the application configuration
-     continued to complete Azure SSO under `AZURE_AD_CLIENT_SECRET`.
-   - `CRON_SECRET` was rotated in Production and local configuration.
-   - `NEXTAUTH_SECRET` was identified as the NextAuth session-signing/encryption
-     secret, distinct from the local-environment file. Its Vercel sensitivity
-     warning/rotation was explicitly set aside by the owner.
-
-2. **The repeat upload incident was reconstructed**
-   - The reporter's 1:53 PM email aligned with a successful portal/context load
-     around 1:49 PM but no submit POST or application upload marker.
-   - The supplied PNG is valid: 9,564,384 bytes, 4755×4615, accepted by the
-     application validator, SHA-256
+1. **The controlled staff replacement smoke passed end to end**
+   - Production Request `1002788` accepted the exact 9,564,384-byte PNG with
+     SHA-256
      `1b8663c98764d70af416bfa6a0bf3a0b1b5befc1cfa8ad6cae6f785dea4e8f14`.
-   - Live no-write probes established that the 9.12 MiB request was rejected
-     before handler code, including on a proxy-excluded real Function. The
-     affected grantee must not be asked to retry.
+   - The staging row reached `consumed`/`ok`, the exact temporary Blob was gone,
+     the scanner allowed the clean file, SharePoint and Dataverse committed,
+     and the Awardee image rendered at 4755×4615.
+   - The impersonated Dataverse PATCH returned 403 because ordinary staff lack
+     Global Write on the organization-owned table; the designed service-
+     principal retry returned 2xx. The owner accepted that fallback without a
+     staff-role expansion. Staff replacement correctly sent no notification.
 
-3. **Durable direct private-Blob staging shipped**
-   - External grantee submission and staff replacement now mint actor/resource-
-     bound private Blob tokens, upload image bytes directly, and finalize with
-     small JSON requests.
-   - Migration 031 adds `portal_upload_staging` for ownership, lease/retry,
-     idempotency, candidate reconciliation, and exact-path cleanup.
-   - Reauthorization, magic-byte validation, virus scanning, SharePoint and
-     Dataverse behavior, notification semantics, and sanitized client-failure
-     Operational Events remain enforced.
+2. **The valid large image no longer creates the default response warning**
+   - PR #127 / commit `68979db3` raised only the grantee-image route's Next.js
+     response warning threshold above the existing 10 MiB product contract.
+   - Ready deployment `dpl_GxXEy525EkJNJPir1DNFqcaDHoLi` served the image with
+     HTTP 200, and the old 4 MiB warning did not recur.
+   - Merged branch `codex/grantee-image-response-limit` was deleted locally and
+     from `origin` after verification.
 
-4. **Adversarial review and exact-payload verification passed**
-   - Claude Opus found and drove fixes for crash reconciliation, terminal retry,
-     notification-skipped recovery, private response-shape handling, and the
-     probe's redirect mismatch.
-   - Its final verdict was **SHIP READY** with no remaining blockers.
-   - The exact supplied PNG passed the runtime-identical private-store gate:
-     public PUT rejected, private PUT accepted, anonymous manual-redirect HEAD
-     returned 403, and the disposable Blob was deleted.
-
-5. **Production promotion and safe checks passed**
-   - `main` advanced to `1f31afdf`; initial runtime deployment
-     `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` reached Ready and acquired all
-     application aliases.
-   - Production has the required upload and virus-scan configuration. The new
-     token route matched and failed closed with 401 for an invalid token.
-   - `portal_upload_staging` existed with zero rows after promotion, the
-     canonical sign-in route returned 200, and the release-window error query
-     returned no logs.
+3. **The Phase II Proposal-tab display smoke passed**
+   - Request `1002788` correctly showed an empty Phase II section, so populated
+     production Request `1002379` was used for the read-only smoke.
+   - The tab displayed ten exact filenames: `Bibliography.pdf`,
+     `Biographical Sketches.pdf`, `Collaborative Arrangements.pdf`,
+     `Financial Narrative.pdf`, `Graphical Abstract.pdf`, `Project Budget.pdf`,
+     `Project Narrative.pdf`, `Proposal Abstract.docx`,
+     `Proposal Cover Page.docx`, and `Recognition Statement.docx`.
+   - `Bibliography.pdf` opened through View in Chrome's inline PDF viewer and
+     downloaded as a valid 756,947-byte PDF. The production proxy returned 200
+     and its terminal Graph drive-item read returned 2xx. PDFs expose View and
+     Download; the three DOCX files correctly expose Download only.
 
 ### Commits
 
-- `8d1f2a43` - plan direct staging for large portal uploads
-- `b73dddb8` - route grantee images through durable direct Blob staging
-- `0dd3d808` - harden upload crash reconciliation and terminal retries
-- `6b3a905e` - record Opus ship-ready review consensus
-- `20631c7c` - record Preview release evidence
-- `1f31afdf` - close exact-payload release verification
+- `68979db3` - raise the grantee-image route response warning threshold
 
 ## Next Items
 
@@ -83,12 +63,7 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
    names the problem and exposes the exact next action before any durable
    promotion.
 
-3. **Finish the read-only Phase II document display smoke.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` and commit `83b9c68a`.
-   Formally record filenames plus both View and Download end to end; keep the
-   smoke read-only.
-
-4. **Re-probe and close Track A passive safety.**
+3. **Re-probe and close Track A passive safety.**
    Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still
    carries the completed 48-hour window as open guidance.
    Reconcile collection against the now-live Log Drain before interpreting or
@@ -96,20 +71,13 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
 
 ### Owner Decision Needed
 
-1. **Choose and approve a Production record for the direct-upload business smoke.**
-   Evidence: `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` §§9.2 and 15.
-   Use the exact supplied PNG through the approved external-grantee or staff
-   replacement flow, then verify the SharePoint/Dataverse result, one
-   notification, consumed staging state, byte cleanup, and clean operational
-   evidence. Do not use the affected grantee as the tester.
-
-2. **Choose an approved request for the Site Visit handoff smoke.**
+1. **Choose an approved request for the Site Visit handoff smoke.**
    Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` marks the signed-in
    Draft→Review handoff smoke open.
    The action records a durable milestone and locks Pre-Site regeneration, so
    do not click it without explicit request approval.
 
-3. **After 2026-09-02, retain or remove the Stage II rollout flag.**
+2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` records Stage
    II as Production-live behind an exact-on public build flag.
    Re-probe the live environment and replacement deployment before changing it.
@@ -142,12 +110,9 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
 1. A rollback may leave additive migration 031 in place; never drop
    `portal_upload_staging` during incident rollback or delete SharePoint content
    referenced by committed Dataverse state.
-2. Re-probe live upload configuration and use a named approved record before the
-   remaining business smoke; transport evidence alone does not prove the
-   SharePoint/Dataverse commit.
-3. Re-probe the live Stage II environment before changing/removing its flag;
+2. Re-probe the live Stage II environment before changing/removing its flag;
    `NEXT_PUBLIC_` changes require a new build.
-4. Reconcile the Track A plan with the live Log Drain before collecting or
+3. Reconcile the Track A plan with the live Log Drain before collecting or
    interpreting closeout evidence.
 
 ### Do Not Reopen Without New Decision
@@ -158,12 +123,17 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
    only on the 25-case Stage II benchmark.
 3. A separate Site Visit Writeup or Dataverse staff-observations memo.
 4. Routine Vercel CLI update reminders without a concrete incompatibility.
+5. The direct-upload business smoke: Request `1002788` closed it on 2026-08-20.
+   Reopen only for a new regression signal or a changed storage/scanner contract.
+6. The Phase II Proposal-tab display smoke: populated Request `1002379` closed
+   filename, View, and Download verification on 2026-08-20. Reopen only for a
+   regression signal or a changed SharePoint listing/proxy contract.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` | Incident evidence, direct-upload contract, release proof, and remaining smoke |
+| `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` | Incident evidence, direct-upload contract, release proof, and completed staff smoke |
 | `lib/services/portal-upload-staging.js` | Actor-bound staging, lease/idempotency, reconciliation, and exact-path cleanup |
 | `lib/db/migrations/031_portal_upload_staging.sql` | Existing-database staging ledger migration |
 | `pages/api/external/grantee/[token]/upload-token.js` | External token mint route |
@@ -172,7 +142,8 @@ Claude Opus to ship-ready consensus, and promoted the release to Production.
 | `pages/api/workbench/grantee-deliverables/replace-submission.js` | Staff JSON finalizer |
 | `scripts/probe-private-blob-client-access.mjs` | Disposable private-store and exact-payload gate |
 | `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` | Stage II rollout and observation gate |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Phase II display and Site Visit handoff smokes |
+| `docs/WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md` | Phase II display contract and completed production smoke |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Site Visit handoff contract and open signed-in smoke |
 
 ## Testing
 
@@ -184,3 +155,17 @@ deployment, fail-closed route matching, required Production configuration,
 zero staging rows before approved use, a healthy canonical sign-in route, and
 no release-window errors. Claim-evidence reporting was unavailable because local
 advisory state could not be read; no observation row was added.
+
+The later owner-approved Request `1002788` staff smoke passed the exact-payload
+token → private Blob → JSON finalize → scanner → SharePoint → Dataverse path.
+The staging row consumed with matching bytes/hash and its temporary Blob was
+gone; the Awardee image rendered in Production after PR #127, with no recurrence
+of the default 4 MiB response warning.
+
+The signed-in Proposal tab on populated Request `1002379` displayed all ten
+Phase II files. Representative View and Download actions for
+`Bibliography.pdf` reached the production proxy with 200 responses and terminal
+Graph 2xx reads; the downloaded 756,947-byte artifact was a valid PDF.
+
+The Session 448 claim-evidence pilot report returned zero advisory events and
+zero claims, so no observation row was eligible.

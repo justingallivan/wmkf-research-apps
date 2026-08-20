@@ -20,11 +20,12 @@ exact-payload proof, Preview evidence, and deliberate Production promotion).
 initial runtime deployment `dpl_AKWrYmBjCaPy8LCuiwKRzdKoFz9d` reached Ready and acquired all
 aliases. Actor-bound private Blob tokens, JSON finalizers, crash reconciliation, exact-path
 cleanup, and sanitized client-failure events cover external grantee and staff replacement images.
-A named owner-approved Production
-business smoke remains; the affected grantee must not be asked to retry.
+The owner-approved Request `1002788` staff smoke passed on 2026-08-20, including
+clean scan, SharePoint/Dataverse commit, exact temporary-Blob cleanup, and
+production image display; the affected grantee must not be asked to retry.
 **Why it matters:** Valid near-limit scientific figures can now cross the transport boundary
 without weakening authorization, private storage, scanning, or cross-system commit semantics.
-**Pointers:** `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md`; commits `b73dddb8`, `0dd3d808`, `1f31afdf`.
+**Pointers:** `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md`; commits `b73dddb8`, `0dd3d808`, `1f31afdf`, `68979db3`.
 
 ## August 2026 — Stage II institution presentation is Production-live (Session 446)
 
@@ -100,7 +101,8 @@ document-listing expansion, owner-directed promotion).
 **Ship state:** `main` reached `83b9c68a`; the handoff records an exact SharePoint version/hash/time,
 changes Draft→Review under ETag, locks regeneration, and keeps the same Word item. The Proposal tab
 lists exact `Phase II` folder files with scoped View/Download; deployment
-`dpl_BiottKiZuBra2xpfv8quSaZ8jjVM` is READY. Signed-in handoff and live-folder display smokes remain.
+`dpl_BiottKiZuBra2xpfv8quSaZ8jjVM` is READY. The signed-in Request `1002379`
+live-folder View/Download smoke passed on 2026-08-20; the mutating handoff smoke remains.
 **Why it matters:** PDs can continue editing one Word workspace through the visit without a parallel
 Site Visit memo, while staff can finally read both Phase I and Phase II submissions in one request.
 **Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`;

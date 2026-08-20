@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-18 via Ready resilience deployment, sole-current prompt-v4 exact readback, prior signed-in Request 1002379 generation/retry, and Dataverse/SharePoint lineage readback
+  last_verified: 2026-08-20 via signed-in Request 1002379 Phase II filename/View/Download smoke, Ready resilience deployment, sole-current prompt-v4 exact readback, and Dataverse/SharePoint lineage readback
 ---
 
 ## Recall Rule
@@ -134,8 +134,13 @@ logistics/supporting files and Final remain later slices.
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`):** the Proposal tab now displays every
 file beneath the request's SharePoint `Phase II` folder in a separate section.
 The scoped download proxy admits only the Phase I, Phase II, and canonical AI
-Materials entries re-derived by the listing service. A signed-in live-folder
-display smoke remains open.
+Materials entries re-derived by the listing service. **[VERIFIED IN PRODUCTION
+2026-08-20]** signed-in Request `1002379` displayed ten exact Phase II
+filenames. `Bibliography.pdf` opened through View in the inline PDF viewer and
+downloaded as a valid 756,947-byte PDF; the production proxy returned 200 and
+its terminal Graph drive-item read returned 2xx. PDFs expose View and Download,
+while the three DOCX files correctly expose Download only. Request `1002788`
+had no Phase II files and was not the populated display fixture.
 
 **2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
 notes-area detail):** Initial Assessment,

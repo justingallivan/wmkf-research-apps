@@ -32,6 +32,19 @@ related:
 **Cycle:** D26. Several pieces are deliberately interim (see "J27 / out of scope").
 **Owner surfaces:** `pages/workbench/[requestId].js`, `lib/services/field-primer-service.js`, `docs/atlas/dataverse-akoya-request.md`.
 
+**[VERIFIED IN PRODUCTION 2026-08-20]** Signed-in, read-only Request
+`1002379` displayed all ten files beneath its SharePoint `Phase II` folder:
+`Bibliography.pdf`, `Biographical Sketches.pdf`,
+`Collaborative Arrangements.pdf`, `Financial Narrative.pdf`,
+`Graphical Abstract.pdf`, `Project Budget.pdf`, `Project Narrative.pdf`,
+`Proposal Abstract.docx`, `Proposal Cover Page.docx`, and
+`Recognition Statement.docx`. The `Bibliography.pdf` View action opened the
+inline Chrome PDF viewer with the correct filename. Its Download action
+produced a valid 756,947-byte PDF, while the production proxy returned 200 and
+the terminal Graph drive-item read returned 2xx. PDF rows expose View and
+Download; Word rows correctly expose Download only. Request `1002788` had no
+Phase II files and therefore was not a valid populated display fixture.
+
 ## 1. Goal
 
 Light up the **Proposal** tab in the per-request Workbench (today a `This panel is

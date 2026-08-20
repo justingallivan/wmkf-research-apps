@@ -3,7 +3,7 @@ title: Large Upload Direct-Blob Remediation Plan
 domain: security
 kind: plan
 status: active
-summary: Production-live direct private-Blob staging for large grantee images, with one owner-approved business smoke still open.
+summary: Production-live direct private-Blob staging for grantee images; the staff business smoke passed, while reviewer conversion remains parked.
 canonical: false
 cataloged: 2026-08-19
 owner: product-engineering
@@ -25,9 +25,12 @@ client-failure events are live. Migration 031 is applied to the Postgres
 integration shared by Preview and Production. The exact supplied PNG passed the
 runtime-identical private Blob transport/privacy gate, the Production token
 route failed closed in a post-deploy probe, and the canonical application domain
-served the release. The remaining verification is a controlled full business
-smoke on a named owner-approved Production test record. Claude Opus's final
-adversarial pass returned **SHIP READY** with no remaining blockers.
+served the release. The owner-approved staff business smoke then completed on
+Request `1002788` with the exact supplied PNG: the staging ledger consumed the
+byte-identical object, SharePoint and Dataverse committed, temporary Blob cleanup
+completed, and the production image consumer rendered the result. §15 records
+the evidence and the accepted Dataverse attribution limitation. Claude Opus's
+final adversarial pass returned **SHIP READY** with no remaining blockers.
 
 State labels are deliberate:
 
@@ -71,19 +74,20 @@ change or remove their request contract; complete the consumer-discovery gate in
 Pre-ship evidence proved that the exact supplied 9,564,384-byte PNG crosses the
 direct private-Blob transport and passes the runtime's no-redirect privacy
 predicate. Preview's Dataverse target interlock intentionally denied the
-required Production write, so the remaining full business acceptance smoke must
-use a named owner-approved Production test record. That controlled smoke must:
+required Production write, so the full business acceptance smoke used the
+owner-approved Production test Request `1002788`. The completed smoke proved:
 
-1. obtain an authorized staging token through a small JSON request;
-2. upload bytes directly to private Blob without the file crossing Routing
+1. obtained an authorized staging token through a small JSON request;
+2. uploaded bytes directly to private Blob without the file crossing Routing
    Middleware or a Vercel Function request body;
-3. finalize through a small JSON request;
-4. re-download byte-identical content server-side;
-5. pass the current grantee image validator and scanner;
-6. execute the current SharePoint and conditional/atomic Dataverse workflow;
-7. delete or durably schedule deletion of the temporary Blob; and
-8. surface a specific, actionable client message and sanitized Operational Event
-   for a failure at any of the three stages.
+3. finalized through a small JSON request;
+4. re-downloaded byte-identical content server-side;
+5. passed the current grantee image validator and scanner;
+6. executed the current SharePoint and conditional/atomic Dataverse workflow;
+7. deleted the temporary Blob after consumption; and
+8. established that the staff replacement contract's expected behavior is no
+   notification; the one-notification invariant belongs to external-grantee
+   submission, not staff correction.
 
 ## 2. Root cause and corrected evidence
 
@@ -472,24 +476,38 @@ inventory.
 
 Use generated fixtures for automated tests. Do not commit the supplied image.
 
-### 9.2 Release evidence and remaining Production smoke
+### 9.2 Release evidence and completed Production smoke
 
 The branch build, private-store adversarial probe, exact-payload transport,
 migration, focused failure paths, full regression suite, Preview deployment, and
 Production promotion are complete; §§14–15 record the evidence.
 
-One controlled business smoke remains. After the owner names and approves a
-Production test record:
+**[VERIFIED 2026-08-20 via the owner-approved staff browser flow, Production
+logs, Postgres, and private-Blob readback]** Request `1002788` completed the
+controlled business smoke with the exact supplied 9.12 MiB PNG:
 
-1. upload the exact supplied 9.12 MiB PNG through the appropriate external or
-   staff browser flow;
-2. confirm the application receives only the small token/finalize JSON requests;
-3. confirm staged and downloaded SHA-256 match the supplied file;
-4. confirm image validation and scanning complete;
-5. confirm the expected SharePoint/Dataverse result and notification behavior;
-6. confirm the staging row reaches `consumed` and the temporary Blob is gone;
-7. confirm no duplicate business write or notification occurs; and
-8. inspect Operational Events and runtime logs for sanitized, actionable truth.
+1. the staff token and finalize routes both returned 200 through small JSON
+   requests;
+2. the one `staff_grantee_image` staging row recorded 9,564,384 actual bytes and
+   SHA-256 `1b8663c98764d70af416bfa6a0bf3a0b1b5befc1cfa8ad6cae6f785dea4e8f14`,
+   exactly matching the supplied file;
+3. Production had `VIRUS_SCAN_ENABLED=true` and Cloudmersive configured; source
+   permits the later SharePoint PUT only after `scan_result === 'clean'`, so the
+   successful PUT and 200 finalizer establish a clean scan (there is no separate
+   success log marker);
+4. SharePoint stored `1002788_grantee_image_65bab6b9.png`, the Dataverse patch
+   committed, and the finalizer returned the submitted status plus caption
+   `Homer in a blimp`;
+5. the staging row reached `consumed`/`ok`, and a credentialed read of its exact
+   temporary pathname returned `The requested blob does not exist`;
+6. exactly one staging row exists for this staff smoke. Staff replacement has no
+   notification call by contract, so zero notifications is the expected outcome;
+7. no Request `1002788` Operational Event was recorded in the smoke window, and
+   the route log contained no terminal application failure; and
+8. the initial impersonated Dataverse PATCH was rejected with 403, then the
+   designed service-principal fallback succeeded with 2xx. The owner elected to
+   retain that availability-first fallback rather than grant ordinary staff the
+   organization-wide Write privilege required for direct attribution.
 
 Do not ask the affected grantee to retry. A no-write transport smoke proves the
 transport/privacy boundary, not the cross-system business commit.
@@ -551,11 +569,11 @@ the implementation diff.
 
 | Recommendation | Evidence | Confidence | Residual risk / gate |
 |---|---|---|---|
-| Use direct private Blob staging | Exact 9.12 MiB body returned 413 even on real proxy-excluded Function; exact-payload direct transport and private-store behavior passed; implementation is Production-live | High | Controlled Production business smoke on an owner-approved record remains |
+| Use direct private Blob staging | Exact 9.12 MiB body returned 413 even on real proxy-excluded Function; exact-payload direct transport, private-store behavior, and the Request `1002788` staff business smoke passed; implementation is Production-live | High | External-grantee business behavior was not re-exercised by the staff smoke; its notification contract remains covered by source/tests |
 | Keep `proxy.js` unchanged | Matcher bypass failed the decisive Function probe and would drop staff idle-session defense-in-depth | High | None for urgent architecture; JSON remains well below limits |
-| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Live disposable preflight proved the provisioned store rejects public-mode PUT, accepts private PUT, denies anonymous HEAD, and allowed exact cleanup | High | Controlled Production business smoke remains |
-| Add durable staging state | Cross-request ownership, retry, idempotency, and orphan cleanup cannot rely on client descriptors | High | Migration 031 is live; controlled terminal-state/cleanup observation remains |
-| Reauthorize at mint and finalize | Long-running upload creates a state-change window | High | Focused tests passed; controlled smoke must confirm current status/ETag/waiver behavior |
+| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Live disposable preflight proved the provisioned store rejects public-mode PUT, accepts private PUT, denies anonymous HEAD, and allowed exact cleanup; the staff smoke's exact temporary object was absent after consumption | High | Re-run the adversarial store probe before a future storage-policy or SDK change |
+| Add durable staging state | Cross-request ownership, retry, idempotency, and orphan cleanup cannot rely on client descriptors | High | Migration 031 is live; the controlled row reached `consumed` and its exact temporary Blob was absent |
+| Reauthorize at mint and finalize | Long-running upload creates a state-change window | High | Focused tests and the controlled staff smoke passed; external waiver behavior remains covered by its separate source/tests |
 | Add sanitized client failure reporting | Direct Blob PUT otherwise bypasses application observability | High | Client evidence is forgeable; label and rate-limit it |
 | Stage reviewer work after consumer discovery | No source caller found; route/tests still exist | Medium | External/manual caller may exist |
 | Audit non-multipart oversized contracts separately | Configuration census found additional >4 MB declarations | High | Declared cap alone does not prove real payload failure |
@@ -672,5 +690,20 @@ Production deployment and returned `401 {"ok":false,"reason":"malformed"}`.
 **[VERIFIED 2026-08-20 via Postgres audit and Vercel error-log query]**
 `portal_upload_staging` remained present with zero rows immediately after
 promotion, and no Production error logs were present in the release window. The
-zero-row state is expected because no unapproved business record was used for a
-write smoke.
+zero-row state was expected before the later owner-approved write smoke.
+
+**[VERIFIED 2026-08-20 via owner-approved staff replacement, Production logs,
+Postgres, and private-Blob readback]** Request `1002788` then exercised the full
+business path with the exact supplied PNG. The staff staging row reached
+`consumed` with the expected byte count/hash and result payload; its exact
+temporary Blob was gone; SharePoint PUT and service-principal Dataverse retry
+both returned 2xx; and the finalizer returned 200. The impersonated Dataverse
+PATCH first returned 403 because ordinary staff lack Global Write on the
+organization-owned grantee-deliverable table. The owner accepted the existing
+fallback and no role expansion was made.
+
+**[VERIFIED 2026-08-20 via PR #127, Ready Production deployment
+`dpl_GxXEy525EkJNJPir1DNFqcaDHoLi`, signed-in browser, and Production logs]**
+The private image consumer subsequently rendered the 4755×4615 replacement and
+returned 200. Its route-local Next.js response warning threshold now sits above
+the valid 10 MiB image contract; the prior default 4 MiB warning did not recur.
