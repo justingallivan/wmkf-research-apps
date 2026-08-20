@@ -22,8 +22,9 @@ production-deployed.** The private-store adversarial preflight, migration,
 external and staff direct-upload flows, durable retry/reconciliation ledger,
 exact-path maintenance cleanup, and authenticated sanitized client-failure
 events are present and covered by focused tests. Remaining release gates are
-the final adversarial Claude Opus implementation review, Preview migration and
-deployment, and an owner-controlled browser smoke with the exact supplied PNG.
+Preview migration and deployment, and an owner-controlled browser smoke with
+the exact supplied PNG. Claude Opus's second adversarial implementation pass
+returned **SHIP READY** after the first pass's material findings were fixed.
 
 State labels are deliberate:
 
@@ -542,7 +543,7 @@ the implementation diff.
 |---|---|---|---|
 | Use direct private Blob staging | Exact 9.12 MiB body returned 413 even on real proxy-excluded Function; server legs and a separate browser direct-upload path exist | High | Full combined browser/Preview flow still required |
 | Keep `proxy.js` unchanged | Matcher bypass failed the decisive Function probe and would drop staff idle-session defense-in-depth | High | None for urgent architecture; JSON remains well below limits |
-| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Provisioned private store exists, but client-token constraints do not bind access | Medium pending §5.1 | A successful adversarial public PUT blocks this mechanism |
+| Reuse `UPLOADS_BLOB_RW_TOKEN` only if public mode is impossible | Live disposable preflight proved the provisioned store rejects public-mode PUT, accepts private PUT, denies anonymous HEAD, and allowed exact cleanup | High | Full combined browser/Preview flow still required |
 | Add durable staging state | Cross-request ownership, retry, idempotency, and orphan cleanup cannot rely on client descriptors | High | New migration/table broadens implementation and gate surface |
 | Reauthorize at mint and finalize | Long-running upload creates a state-change window | High | Finalize tests must prove fresh status/ETag/waiver checks |
 | Add sanitized client failure reporting | Direct Blob PUT otherwise bypasses application observability | High | Client evidence is forgeable; label and rate-limit it |
@@ -581,3 +582,18 @@ new staging table/retention contract, reviewer routes must remain unchanged
 until their consumers are classified, the private-by-construction gate in §5.1
 must pass, and the implementation diff must pass the cross-layer and Preview
 gates above.
+
+### Implementation review rounds
+
+Claude Opus then reviewed the implementation diff adversarially on the feature
+branch. Its first implementation pass required three material reconciliation
+fixes and three bounded hardening changes: status-aware candidate
+reconciliation, notification-skipped reconciliation, explicit crash-window
+tests, terminal-failure client recovery, private-Blob response-shape probing,
+and staging-failure alert coverage. Commit `0dd3d80` implements those changes.
+
+The second pass re-read the fixes, re-ran the focused test surface, and returned
+**SHIP READY**. Its only residual notes were non-blocking: one staff validation
+error may require an explicit reselect, and the private-Blob HEAD check is
+deliberately fail-closed if the provider response shape changes. Preview and the
+exact-file browser smoke remain release gates rather than review findings.
