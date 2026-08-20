@@ -36,8 +36,10 @@ import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { loadGranteeImage } from '../../../../lib/services/workbench/grantee-deliverables/image-service';
 
 export const config = {
-  // Binary response; no request body is read on this route.
-  api: { bodyParser: false },
+  // Binary response; no request body is read on this route. Valid uploads may
+  // be exactly 10 MiB, and Next warns at (not above) responseLimit, so leave a
+  // small margin while retaining a warning for responses outside the contract.
+  api: { bodyParser: false, responseLimit: '11mb' },
 };
 
 export default async function handler(req, res) {

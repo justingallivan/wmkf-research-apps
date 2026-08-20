@@ -18,7 +18,7 @@ jest.mock('../../lib/services/workbench/grantee-deliverables/image-service', () 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { loadGranteeImage } from '../../lib/services/workbench/grantee-deliverables/image-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import handler from '../../pages/api/workbench/grantee-deliverables/image';
+import handler, { config } from '../../pages/api/workbench/grantee-deliverables/image';
 
 const GUID = '22222222-2222-2222-2222-222222222222';
 const BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -38,6 +38,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ session: { user: {} } });
   loadGranteeImage.mockResolvedValue({ buffer: BYTES, contentType: 'image/png', filename: NAME });
+});
+
+test('sets the binary response warning threshold above the 10 MiB image contract', () => {
+  expect(config.api).toEqual({ bodyParser: false, responseLimit: '11mb' });
 });
 
 test('rejects non-GET with an Allow header', async () => {
