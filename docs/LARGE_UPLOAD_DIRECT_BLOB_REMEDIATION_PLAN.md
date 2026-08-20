@@ -17,17 +17,18 @@ related:
 
 # Large Upload Direct-Blob Remediation Plan
 
-**Status: IMPLEMENTED ON `codex/large-upload-direct-staging`; not yet merged or
-production-deployed.** The private-store adversarial preflight, migration,
+**Status: SHIP READY on `codex/large-upload-direct-staging`; not yet merged or
+application-deployed to Production.** The private-store adversarial preflight, migration,
 external and staff direct-upload flows, durable retry/reconciliation ledger,
 exact-path maintenance cleanup, and authenticated sanitized client-failure
-events are present and covered by focused tests. Remaining release gates are
-the owner-approved additive migration 031 against the Postgres integration
-shared by Preview and Production, followed by an owner-controlled browser smoke
-with the exact supplied PNG. Preview deployment
-`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` is Ready. Claude Opus's second adversarial
-implementation pass returned **SHIP READY** after the first pass's material
-findings were fixed.
+events are present and covered by focused tests. Migration 031 is applied to the
+Postgres integration shared by Preview and Production. Preview deployment
+`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` is Ready behind the stable authenticated
+Preview alias, and the exact supplied PNG passed the runtime-identical private
+Blob transport/privacy gate. The remaining verification is a controlled
+Production smoke on a named owner-approved test record immediately after
+promotion. Claude Opus's final adversarial pass returned **SHIP READY** with no
+remaining blockers.
 
 State labels are deliberate:
 
@@ -68,7 +69,12 @@ change or remove their request contract; complete the consumer-discovery gate in
 
 ### Acceptance outcome
 
-Using the exact supplied 9,564,384-byte PNG, a Preview browser smoke must:
+Pre-ship evidence must prove that the exact supplied 9,564,384-byte PNG crosses
+the direct private-Blob transport and passes the runtime's no-redirect privacy
+predicate. The full business acceptance smoke must run immediately after
+Production promotion on a named owner-approved test record because Preview's
+Dataverse target interlock intentionally denies the required Production write.
+That controlled smoke must:
 
 1. obtain an authorized staging token through a small JSON request;
 2. upload bytes directly to private Blob without the file crossing Routing
@@ -228,7 +234,8 @@ the live probe holds the external store-policy boundary.
 
 ### 5.2 New Postgres table
 
-**[IMPLEMENTED ON BRANCH — migration 031 not yet applied]** `portal_upload_staging` is added through
+**[IMPLEMENTED ON BRANCH; MIGRATION 031 APPLIED TO SHARED POSTGRES 2026-08-20]**
+`portal_upload_staging` is added through
 `lib/db/migrations/` and the migrations manifest; do not edit the fresh-install
 shape alone. Minimum contract:
 
@@ -598,23 +605,46 @@ and staging-failure alert coverage. Commit `0dd3d80` implements those changes.
 The second pass re-read the fixes, re-ran the focused test surface, and returned
 **SHIP READY**. Its only residual notes were non-blocking: one staff validation
 error may require an explicit reselect, and the private-Blob HEAD check is
-deliberately fail-closed if the provider response shape changes. Preview and the
-exact-file browser smoke remain release gates rather than review findings.
+deliberately fail-closed if the provider response shape changes.
+
+After the shared migration, Preview deployment, and exact-payload probe, Opus
+performed a final release-disposition review. It found one material mismatch:
+the probe followed redirects while runtime rejects them. The probe was changed
+to use `redirect: 'manual'` and the runtime-identical 401/403-only predicate,
+then rerun successfully against the exact PNG with a direct anonymous 403.
+Opus re-read the fix, reported no remaining blockers, and returned **SHIP
+READY**. The controlled full business commit is post-deploy verification, not a
+waiver of the Preview write interlock.
 
 ## 14. Preview release evidence
 
-**[VERIFIED 2026-08-19 via Vercel CLI]** Preview deployment
+**[VERIFIED 2026-08-20 via Vercel CLI and signed-in Chrome]** Preview deployment
 `dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` completed the canonical Next.js 16.3
-Turbopack build and reached Ready. Its route inventory includes the external
-and staff token/failure endpoints plus both JSON finalizers. A protected CLI
-request to the external token endpoint matched the dynamic route and failed
-closed with `401 malformed` for an intentionally invalid token.
+Turbopack build and reached Ready. The Azure-registered stable alias
+`wmkfresearchapps-preview.vercel.app` points to it and completed SSO. Its route
+inventory includes the external and staff token/failure endpoints plus both
+JSON finalizers. A protected CLI request to the external token endpoint matched
+the dynamic route and failed closed with `401 malformed` for an intentionally
+invalid token.
 
-**[VERIFIED 2026-08-19 via Vercel environment scope listing, one-way connection
-fingerprints, and `scripts/audit-postgres-state.js`]** Preview and Production
-use the same Postgres integration, and `portal_upload_staging` is not present
-yet. Migration 031 is therefore a production database change even when it is
-needed by a Preview smoke; it requires the owner's explicit release decision.
+**[VERIFIED 2026-08-20 via the canonical migration runner and
+`scripts/audit-postgres-state.js`]** Owner-approved migration 031 applied
+transactionally to the Postgres integration shared by Preview and Production;
+`portal_upload_staging` exists and started with zero rows.
+
+**[VERIFIED 2026-08-20 via signed-in Preview and Vercel runtime logs]** The
+Dataverse target interlock denies Preview reads of Production without
+`DATAVERSE_ALLOW_PROD_READS=yes` and denies Preview writes regardless. The
+release did not weaken or bypass that boundary. A successful
+SharePoint-plus-Dataverse business commit therefore remains a controlled
+post-promotion Production smoke.
+
+**[VERIFIED 2026-08-20 via
+`scripts/probe-private-blob-client-access.mjs --file`]** The exact 9,564,384-byte
+PNG (`SHA-256 1b8663c98764d70af416bfa6a0bf3a0b1b5befc1cfa8ad6cae6f785dea4e8f14`)
+passed the direct client-token transport. Public-mode PUT was rejected; private
+PUT succeeded; the runtime-identical manual-redirect anonymous HEAD returned a
+direct 403; the disposable object was deleted.
 
 **[VERIFIED 2026-08-19 via Jest]** The post-review full regression run passed
 669 suites and 8,636 tests. The recorded last-known-good Production rollback
