@@ -281,7 +281,7 @@ Likely files:
 - Every editor transaction, including an unsupported/degraded paste, updates parent state to the serialization of the visible document and never retains an older value.
 - Empty-document behavior cannot bypass either server's existing non-empty validation.
 - Serialized length is accepted at 20000 characters and rejected at 20001 in both routes; markup expansion and multi-byte input are covered.
-- External multipart submission contains canonical Markdown in `editedAbstract` and preserves the rest of the package.
+- External JSON finalization contains canonical Markdown in `editedAbstract`; any image bytes travel browser→private Blob under a separate actor-bound staging contract, and the rest of the package is preserved.
 - Staff PUT contains canonical Markdown in `text` and preserves ETag/base-field behavior.
 - Staff stale ETag and field-flip cases preserve the unsaved editor value while separately displaying current server text; non-editable status still fails without a write.
 - The editable region has an accessible name plus required/invalid state; all toolbar actions are keyboard-operable; disabled/read-only mode exposes read-only semantics and accepts no input.

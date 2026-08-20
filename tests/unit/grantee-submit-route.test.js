@@ -1,12 +1,10 @@
 /**
  * POST /api/external/grantee/[token]/submit — chunk 5 route.
- * Guard order (method/rate-limit/token/status), multipart parse → service call,
- * result mapping. The service (writeGranteeDeliverables) is unit-tested separately.
+ * Guard order, actor-bound staged-image claim/load, JSON finalization, and
+ * result mapping. The writer is unit-tested separately.
  *
  * @jest-environment node
  */
-import { Readable } from 'stream';
-
 jest.mock('../../lib/external/rate-limit', () => ({
   checkRateLimit: jest.fn(async () => ({ ok: true })),
   recordTokenOutcome: jest.fn(async () => {}),
@@ -17,9 +15,28 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 }));
 jest.mock('../../lib/services/grantee-upload', () => ({
   writeGranteeDeliverables: jest.fn(),
-  // Small cap so a tiny over-cap file exercises the busboy fileSize limit branch.
   MAX_IMAGE_BYTES: 16,
 }));
+jest.mock('../../lib/services/portal-upload-staging', () => {
+  class PortalUploadStagingError extends Error {
+    constructor(code, { httpStatus = 400 } = {}) {
+      super(code); this.code = code; this.httpStatus = httpStatus;
+    }
+  }
+  return {
+    PORTAL_UPLOAD_SCOPES: { GRANTEE_IMAGE: 'grantee_image' },
+    PortalUploadStagingError,
+    claimPortalUpload: jest.fn(),
+    clearPortalUploadCandidate: jest.fn(),
+    completePortalUpload: jest.fn(),
+    discardPortalUploadCandidate: jest.fn(),
+    externalGranteeActorBinding: jest.fn(() => 'grantee:hash'),
+    loadClaimedPortalImage: jest.fn(),
+    recordPortalUploadCandidate: jest.fn(),
+    rejectPortalUpload: jest.fn(),
+    releasePortalUpload: jest.fn(),
+  };
+});
 jest.mock('../../lib/services/external-token', () => ({ verifyWaiverRenderToken: jest.fn() }));
 jest.mock('../../lib/services/notification-service', () => ({ __esModule: true, default: { notify: jest.fn() } }));
 // lib/services/grantee-submit-notification (called by the route) re-reads the request
@@ -40,6 +57,14 @@ import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request
 import { resolveProgramDirectorEmailForRequest } from '../../lib/services/program-director-resolver';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import { notifyGranteeSubmission } from '../../lib/services/grantee-submit-notification';
+import {
+  PortalUploadStagingError,
+  claimPortalUpload,
+  completePortalUpload,
+  loadClaimedPortalImage,
+  rejectPortalUpload,
+  releasePortalUpload,
+} from '../../lib/services/portal-upload-staging';
 import handler from '../../pages/api/external/grantee/[token]/submit';
 
 const VER = '33333333-3333-3333-3333-333333333333';
@@ -59,28 +84,16 @@ function mockRes() {
   return res;
 }
 
-function plainReq(method = 'POST') {
-  return { method, query: { token: 't' }, headers: {} };
+function plainReq(method = 'POST', body = {}) {
+  return { method, query: { token: 't' }, headers: {}, body };
 }
 
 function multipartReq({ fields = {}, file, files } = {}) {
-  const boundary = '----tb';
-  const parts = [];
-  for (const [k, v] of Object.entries(fields)) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
-  }
   const fileList = files || (file ? [file] : []);
-  for (const f of fileList) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${f.filename}"\r\nContent-Type: image/png\r\n\r\n`));
-    parts.push(f.buffer);
-    parts.push(Buffer.from('\r\n'));
-  }
-  parts.push(Buffer.from(`--${boundary}--\r\n`));
-  const req = Readable.from(Buffer.concat(parts));
-  req.method = 'POST';
-  req.query = { token: 't' };
-  req.headers = { 'content-type': `multipart/form-data; boundary=${boundary}` };
-  return req;
+  return plainReq('POST', {
+    ...fields,
+    stagingId: fileList.length ? 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' : null,
+  });
 }
 
 const okVerify = (status = GRANTEE_DELIVERABLE_STATUS.INVITED) => ({
@@ -107,9 +120,22 @@ beforeEach(() => {
     _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
   });
   resolveProgramDirectorEmailForRequest.mockReset().mockResolvedValue('pd@wmkf.example');
+  claimPortalUpload.mockReset().mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', original_etag: 'W/"2"', candidate_result: null },
+  });
+  loadClaimedPortalImage.mockReset().mockResolvedValue({
+    filename: 'fig.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+  });
+  completePortalUpload.mockReset().mockResolvedValue({ ok: true });
+  rejectPortalUpload.mockReset().mockResolvedValue(undefined);
+  releasePortalUpload.mockReset().mockResolvedValue(undefined);
 });
 
-/** The multipart body every success-path test uses. */
+/** The staged-upload JSON body every success-path test uses. */
 const successReq = () => multipartReq({
   fields: { editedAbstract: 'x', caption: 'A figure.', waiverToken: 'signed.tok' },
   file: { filename: 'fig.png', buffer: Buffer.from([0x89, 0x50]) },
@@ -166,7 +192,7 @@ test('FAIL-CLOSED: missing deliverable row → 409', async () => {
   expect(writeGranteeDeliverables).not.toHaveBeenCalled();
 });
 
-test('happy path: parses multipart, calls service, returns 200', async () => {
+test('happy path: claims staged image, calls service, returns 200', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
   const res = mockRes();
   await handler(multipartReq({
@@ -461,30 +487,29 @@ test('render token version is not a GUID → 409 + alert (defensive; would be a 
   expect(NotificationService.notify).toHaveBeenCalledTimes(1);
 });
 
-test('busboy FILE_TOO_LARGE → 400 image_too_large, service not called', async () => {
+test('staged image over verified size → 400 image_too_large, service not called', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  loadClaimedPortalImage.mockRejectedValue(
+    new PortalUploadStagingError('image_too_large', { httpStatus: 400 }),
+  );
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { editedAbstract: 'x', caption: 'c' },
-    file: { filename: 'fig.png', buffer: Buffer.alloc(64, 1) }, // > 16-byte mock cap
-  }), res);
+  await handler(successReq(), res);
   expect(res.statusCode).toBe(400);
   expect(res.body.reason).toBe('image_too_large');
   expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(rejectPortalUpload).toHaveBeenCalled();
 });
 
-test('busboy TOO_MANY_FILES → 400 too_many_files', async () => {
+test('foreign or missing staging id → 404 without loading bytes', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  claimPortalUpload.mockRejectedValue(
+    new PortalUploadStagingError('staging_not_found', { httpStatus: 404 }),
+  );
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { editedAbstract: 'x', caption: 'c' },
-    files: [
-      { filename: 'a.png', buffer: Buffer.from([1, 2]) },
-      { filename: 'b.png', buffer: Buffer.from([3, 4]) },
-    ],
-  }), res);
-  expect(res.statusCode).toBe(400);
-  expect(res.body.reason).toBe('too_many_files');
+  await handler(successReq(), res);
+  expect(res.statusCode).toBe(404);
+  expect(res.body.reason).toBe('staging_not_found');
+  expect(loadClaimedPortalImage).not.toHaveBeenCalled();
 });
 
 test('maps a service failure status/reason through (e.g. image_invalid 400)', async () => {
@@ -497,6 +522,21 @@ test('maps a service failure status/reason through (e.g. image_invalid 400)', as
   }), res);
   expect(res.statusCode).toBe(400);
   expect(res.body.reason).toBe('image_invalid');
+});
+
+test('correctable text validation releases the staged image for retry', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  writeGranteeDeliverables.mockResolvedValue({ ok: false, reason: 'caption_required', status: 400 });
+
+  const res = mockRes();
+  await handler(successReq(), res);
+
+  expect(res.statusCode).toBe(400);
+  expect(res.body.reason).toBe('caption_required');
+  expect(releasePortalUpload).toHaveBeenCalledWith(expect.objectContaining({
+    stagingId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  }));
+  expect(rejectPortalUpload).not.toHaveBeenCalled();
 });
 
 test('backend submit failure logs sanitized metadata and alerts operators', async () => {
@@ -546,7 +586,7 @@ test('backend submit failure logs sanitized metadata and alerts operators', asyn
         present: true,
         extension: 'png',
         declaredMime: 'image/png',
-        sizeBytes: 2,
+        sizeBytes: 4,
       },
       diagnostics: {
         stage: 'sharepoint_upload',

@@ -1,42 +1,40 @@
 /**
  * POST /api/external/grantee/[token]/submit
  *
- * Chunk 5 of the Grantee Deliverables Portal — the grantee returns the edited
- * abstract + a graphical image + caption. Public, token-authed (NOT app-authed);
- * parallel grantee variant of the reviewer upload route.
- *
- * Order (fail-fast): method → rate-limit → verify token (aud:'grantee') → record
- * outcome → editable-status guard → parse multipart → verify waiver render token →
- * writeGranteeDeliverables (validate image magic → scan → upload → atomic changeset)
- * → notifyGranteeSubmission (post-commit, best-effort, never throws).
- *
- * Publication waiver (as of 2026-07-09): the checkbox is still a client-side submit
- * gate, but the ACKNOWLEDGED VERSION is now recorded. The client echoes the signed
- * render token minted by /context; this route verifies it, confirms it was minted
- * for THIS request, and passes the bound version id to the service, which pins it
- * on the deliverable row (wmkf_WaiverPolicyVersion + wmkf_waiverackedat).
+ * Small-JSON finalizer for the grantee deliverables portal. New image bytes are
+ * uploaded browser → private Blob using /upload-token; this route re-verifies
+ * token ownership, claims the staging row, downloads the exact private object,
+ * and then runs the existing SharePoint + atomic Dataverse writer.
  */
 
-import Busboy from 'busboy';
 import { verifyGranteeToken } from '../../../../../lib/external/verify-grantee-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
-import { writeGranteeDeliverables, MAX_IMAGE_BYTES } from '../../../../../lib/services/grantee-upload';
+import { writeGranteeDeliverables } from '../../../../../lib/services/grantee-upload';
 import { verifyWaiverRenderToken } from '../../../../../lib/services/external-token';
 import { WAIVER_SLOT_CODE } from '../../../../../lib/external/grantee-waiver-policy';
 import { isGuid } from '../../../../../lib/utils/guid';
 import NotificationService from '../../../../../lib/services/notification-service';
-import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
+import {
+  GRANTEE_DELIVERABLE_STATUS,
+  isGranteeEditableStatus,
+} from '../../../../../shared/config/granteeDeliverableStatus';
 import { notifyGranteeSubmission } from '../../../../../lib/services/grantee-submit-notification';
 import { keepAlive } from '../../../../../lib/utils/keep-alive';
+import {
+  PORTAL_UPLOAD_SCOPES,
+  PortalUploadStagingError,
+  claimPortalUpload,
+  clearPortalUploadCandidate,
+  completePortalUpload,
+  discardPortalUploadCandidate,
+  externalGranteeActorBinding,
+  loadClaimedPortalImage,
+  recordPortalUploadCandidate,
+  rejectPortalUpload,
+  releasePortalUpload,
+} from '../../../../../lib/services/portal-upload-staging';
 
-/**
- * Best-effort operator alert when a grantee submit is blocked by a waiver-token
- * failure that looks suspicious (bad signature/claim, request mismatch, or a
- * malformed version) rather than plain client staleness. Carries the slot code so
- * a mis-seed / wrong-env / post-deploy breakage is visible, not silently blocking
- * grantees. Wrapped in a trusted DAL context so the admin-email path can send.
- */
 async function alertWaiverBlock({ requestId, detail }) {
   try {
     await withDalContext('grantee-waiver-alert', () => NotificationService.notify({
@@ -48,7 +46,7 @@ async function alertWaiverBlock({ requestId, detail }) {
       message:
         `A grantee submission was blocked because the ${WAIVER_SLOT_CODE} waiver render token `
         + `failed verification (${detail}). Confirm the slot is seeded + active and the portal `
-        + `deploy matches the seeded environment.`,
+        + 'deploy matches the seeded environment.',
       metadata: { requestId, slotCode: WAIVER_SLOT_CODE, detail },
       source: 'grantee-waiver',
       category: 'ops',
@@ -64,6 +62,7 @@ const ALERTED_SUBMIT_FAILURE_REASONS = new Set([
   'scan_misconfigured',
   'infected',
   'dataverse_failed',
+  'reconciliation_unavailable',
 ]);
 
 function imageMeta(imageFile) {
@@ -78,14 +77,8 @@ function imageMeta(imageFile) {
   };
 }
 
-/**
- * Best-effort operator alert for failures that are not simple grantee form
- * validation. Metadata is intentionally sanitized: no token, no file contents,
- * and no original filename (external-user controlled, often identifying).
- */
 async function alertSubmitFailure({ request, deliverable, imageFile, result }) {
   if (!ALERTED_SUBMIT_FAILURE_REASONS.has(result?.reason)) return;
-
   const requestId = request?.akoya_requestid || null;
   const requestNumber = request?.akoya_requestnum || null;
   const metadata = {
@@ -98,9 +91,7 @@ async function alertSubmitFailure({ request, deliverable, imageFile, result }) {
     image: imageMeta(imageFile),
     diagnostics: result.diagnostics || null,
   };
-
   console.error('[grantee/submit] failure incident:', JSON.stringify(metadata));
-
   try {
     await withDalContext('grantee-submit-alert', () => NotificationService.notify({
       type: 'grantee_submit_failed',
@@ -120,9 +111,12 @@ async function alertSubmitFailure({ request, deliverable, imageFile, result }) {
   }
 }
 
-export const config = {
-  api: { bodyParser: false }, // busboy needs the raw stream
-};
+function stagingErrorResponse(res, error) {
+  if (error instanceof PortalUploadStagingError) {
+    return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+  }
+  throw error;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -138,41 +132,77 @@ export default async function handler(req, res) {
       return res.status(429).json({ ok: false, reason: 'rate_limited' });
     }
 
-    // S333 Stage 4b: trust-model tightening — this route now establishes
-    // the trusted context itself (label byte-preserved from the wrap that
-    // used to live inside verifyGranteeToken() itself).
     const verified = await withDalContext('grantee-token-verify', () => verifyGranteeToken(token));
     await recordTokenOutcome(req, token, verified.ok);
     if (!verified.ok) {
-      return res.status(verified.reason === 'not_found' ? 404 : 401).json({ ok: false, reason: verified.reason });
+      return res.status(verified.reason === 'not_found' ? 404 : 401)
+        .json({ ok: false, reason: verified.reason });
     }
 
     const { request, deliverable } = verified;
-    // Fail-closed editable-status guard. The ETag-conditional PATCH in the service
-    // closes the TOCTOU window (a staff status change after this read → 412 → 409).
-    if (!isGranteeEditableStatus(deliverable?.wmkf_deliverablestatus)) {
-      return res.status(409).json({ ok: false, reason: 'not_editable' });
-    }
-
-    let parsed;
-    try {
-      parsed = await parseMultipart(req);
-    } catch (e) {
-      if (e.code === 'FILE_TOO_LARGE') return res.status(400).json({ ok: false, reason: 'image_too_large' });
-      if (e.code === 'TOO_MANY_FILES') return res.status(400).json({ ok: false, reason: 'too_many_files' });
+    const editedAbstract = typeof req.body?.editedAbstract === 'string' ? req.body.editedAbstract : '';
+    const caption = typeof req.body?.caption === 'string' ? req.body.caption : '';
+    const waiverToken = typeof req.body?.waiverToken === 'string' ? req.body.waiverToken : '';
+    const stagingId = typeof req.body?.stagingId === 'string' ? req.body.stagingId.trim() : '';
+    if (stagingId && !isGuid(stagingId)) {
       return res.status(400).json({ ok: false, reason: 'bad_request' });
     }
 
-    const editedAbstract = parsed.fields.editedAbstract || '';
-    const caption = parsed.fields.caption || '';
-    const imageFile = parsed.files[0] || null;
+    let claim = null;
+    let imageFile = null;
+    if (stagingId) {
+      try {
+        claim = await claimPortalUpload({
+          stagingId,
+          scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE,
+          resourceId: verified.requestId,
+          actorBinding: externalGranteeActorBinding(token),
+        });
+      } catch (error) {
+        return stagingErrorResponse(res, error);
+      }
+      if (claim.state === 'consumed') {
+        return res.status(200).json(claim.result || { ok: true });
+      }
 
-    // Verify the signed waiver render token → the exact version the grantee saw.
-    // Fail closed: the version id comes from the VERIFIED payload (not raw input),
-    // must be bound to THIS request, and must be a GUID before it reaches the
-    // @odata.bind selector (check:trust-boundary-guid). A plain stale/expired token
-    // just asks the grantee to reload; a suspicious failure also alerts operators.
-    const waiver = await verifyWaiverRenderToken(parsed.fields.waiverToken || '');
+      const candidate = claim.row.candidate_result;
+      if (candidate?.imageRef) {
+        const committed = deliverable?.wmkf_imagefileref === candidate.imageRef
+          && Number(deliverable?.wmkf_deliverablestatus) === GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+        if (committed) {
+          const body = { ok: true };
+          await completePortalUpload({
+            stagingId,
+            leaseToken: claim.leaseToken,
+            resultCode: 'reconciled',
+            resultPayload: body,
+          });
+          return res.status(200).json(body);
+        }
+        const discarded = await discardPortalUploadCandidate(candidate);
+        if (!discarded) {
+          await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+          const result = { ok: false, reason: 'reconciliation_unavailable', status: 503 };
+          await alertSubmitFailure({ request, deliverable, imageFile: null, result });
+          return res.status(503).json({ ok: false, reason: result.reason });
+        }
+        await clearPortalUploadCandidate({ stagingId, leaseToken: claim.leaseToken });
+      }
+
+      if (claim.row.original_etag && claim.row.original_etag !== deliverable?._etag) {
+        await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'conflict' });
+        return res.status(409).json({ ok: false, reason: 'conflict' });
+      }
+    }
+
+    if (!isGranteeEditableStatus(deliverable?.wmkf_deliverablestatus)) {
+      if (claim) {
+        await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'not_editable' });
+      }
+      return res.status(409).json({ ok: false, reason: 'not_editable' });
+    }
+
+    const waiver = await verifyWaiverRenderToken(waiverToken);
     const waiverOk = waiver.valid
       && waiver.requestId === verified.requestId
       && isGuid(waiver.versionId);
@@ -182,35 +212,77 @@ export default async function handler(req, res) {
         const detail = waiver.valid ? 'request_mismatch_or_bad_version' : waiver.reason;
         await alertWaiverBlock({ requestId: verified.requestId, detail });
       }
+      if (claim) await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
       return res.status(409).json({ ok: false, reason: 'waiver_invalid' });
+    }
+
+    if (claim) {
+      try {
+        imageFile = await loadClaimedPortalImage({ row: claim.row, leaseToken: claim.leaseToken });
+      } catch (error) {
+        if (!(error instanceof PortalUploadStagingError)) throw error;
+        const permanent = ['empty_image', 'image_too_large', 'staged_upload_mismatch'].includes(error.code);
+        if (permanent) {
+          await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: error.code });
+        } else {
+          await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+        }
+        return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+      }
     }
 
     const result = await withDalContext('grantee-submit', () =>
       writeGranteeDeliverables({
-        request, deliverable, editedAbstract, caption, imageFile,
+        request,
+        deliverable,
+        editedAbstract,
+        caption,
+        imageFile,
         waiverVersionId: waiver.versionId,
         waiverBodyHash: waiver.bodyHash,
+        onCandidateUploaded: claim
+          ? (candidate) => recordPortalUploadCandidate({
+            stagingId,
+            leaseToken: claim.leaseToken,
+            candidate,
+          })
+          : null,
       }));
 
     if (!result.ok) {
-      // Generic, non-leaky reasons (service already logged specifics server-side).
+      if (claim) {
+        const candidateAlreadyCleaned = result.reason === 'conflict'
+          || result.reason === 'staging_failed'
+          || result.diagnostics?.postErrorCommitState === 'not_committed';
+        if (candidateAlreadyCleaned) {
+          await clearPortalUploadCandidate({ stagingId, leaseToken: claim.leaseToken });
+        }
+        // Text validation can be corrected without uploading the same image again.
+        // Reject only failures that make the staged bytes unusable or unsafe.
+        const permanent = [
+          'image_required', 'empty_image', 'image_too_large', 'image_invalid', 'infected',
+          'conflict',
+        ].includes(result.reason);
+        if (permanent) {
+          await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: result.reason });
+        } else {
+          await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+        }
+      }
       await alertSubmitFailure({ request, deliverable, imageFile, result });
       return res.status(result.status || 500).json({ ok: false, reason: result.reason });
     }
 
-    // RESPOND FIRST, then hand the notification to the runtime. The package is
-    // committed, so the grantee's 200 must not depend on anything that follows:
-    // notifying before responding risks the platform ending the invocation before
-    // the 200 is written, and the grantee would see a timeout on a submission that
-    // DID commit (their retry then 409s not_editable). But bare post-response work
-    // has no lifecycle guarantee on Vercel — the invocation may be frozen once the
-    // response ends — so `waitUntil` registers the promise and keeps the invocation
-    // alive until it settles. Both guarantees hold: immediate 200, delivered
-    // notification.
-    //
-    // hasImage describes the package AFTER this submit: a resubmit with no new file
-    // (REVISION_REQUESTED is editable) retains the existing ref, because the writer
-    // only patches wmkf_imagefileref when it uploaded something.
+    const responseBody = { ok: true };
+    if (claim) {
+      await completePortalUpload({
+        stagingId,
+        leaseToken: claim.leaseToken,
+        resultCode: 'ok',
+        resultPayload: responseBody,
+      });
+    }
+
     const notifying = notifyGranteeSubmission({
       requestId: verified.requestId,
       requestNum: request?.akoya_requestnum || null,
@@ -218,65 +290,16 @@ export default async function handler(req, res) {
       hasImage: Boolean(imageFile || deliverable?.wmkf_imagefileref),
       captionPresent: Boolean(caption && caption.trim()),
     });
-    res.status(200).json({ ok: true });
+    res.status(200).json(responseBody);
     await keepAlive(notifying);
     return undefined;
   } catch (e) {
     console.error('[grantee/submit] unexpected error:', e?.message || e);
-    // The success path responds before notifying, so never try to re-send after it.
-    // (notifyGranteeSubmission does not throw; this is defence in depth.)
     if (res.headersSent) return undefined;
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }
 }
 
-/**
- * Parse one image file + the text fields. Busboy caps: one file, image size cap,
- * bounded field size (the abstract is a few KB; 4KB would truncate it).
- */
-function parseMultipart(req) {
-  return new Promise((resolve, reject) => {
-    let busboy;
-    try {
-      busboy = Busboy({
-        headers: req.headers,
-        limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fieldSize: 64 * 1024, fields: 5 },
-      });
-    } catch (e) {
-      return reject(e);
-    }
-
-    const files = [];
-    const fields = {};
-    let aborted = false;
-
-    busboy.on('file', (_fieldname, fileStream, info) => {
-      if (aborted) { fileStream.resume(); return; }
-      const chunks = [];
-      fileStream.on('data', (chunk) => chunks.push(chunk));
-      fileStream.on('limit', () => {
-        aborted = true;
-        const err = new Error('FILE_TOO_LARGE');
-        err.code = 'FILE_TOO_LARGE';
-        reject(err);
-      });
-      fileStream.on('end', () => {
-        if (aborted) return;
-        files.push({ filename: info.filename, buffer: Buffer.concat(chunks), mimeType: info.mimeType });
-      });
-    });
-
-    busboy.on('filesLimit', () => {
-      aborted = true;
-      const err = new Error('TOO_MANY_FILES');
-      err.code = 'TOO_MANY_FILES';
-      reject(err);
-    });
-
-    busboy.on('field', (name, value) => { fields[name] = value; });
-    busboy.on('error', reject);
-    busboy.on('finish', () => { if (!aborted) resolve({ files, fields }); });
-
-    req.pipe(busboy);
-  });
-}
+export const config = {
+  api: { bodyParser: { sizeLimit: '128kb' } },
+};

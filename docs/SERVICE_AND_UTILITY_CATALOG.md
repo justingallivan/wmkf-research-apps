@@ -197,6 +197,15 @@ If you're touching a service or utility, read its header before this catalog. If
   trusted ambient Dataverse context; the service no longer creates a hidden
   bypass around its Dynamics email transport.
 - **`maintenance-service.js`** — Cleanup operations; audit trail; Dataverse-configured retention.
+- **`portal-upload-staging.js`** — Actor/scope/resource-bound private Vercel Blob
+  staging for external-grantee and staff replacement images. Owns short-lived
+  client-token minting, atomic finalize leases, exact-path server reads, byte
+  hash/size recording, durable SharePoint candidate identity, terminal result
+  replay, and exact-path expiry cleanup. It never accepts a client pathname.
+- **`portal-upload-client-failure.js`** — Closed-vocabulary parser and
+  best-effort Operational Event writer for authenticated browser-direct upload
+  failures. Stores only stage/category/status/declared size/type plus the
+  server-resolved request identity and labels every row `clientReported:true`.
 
 ### Other
 

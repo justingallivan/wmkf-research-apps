@@ -1,34 +1,55 @@
 /**
- * POST /api/workbench/grantee-deliverables/replace-submission — S412.
- *
- * Direct thin-shell coverage with real multipart request streams. The service is
- * mocked; these tests pin auth, parsed-input guards, DAL context, propagation,
- * and busboy's file-count/size limits at the route trust boundary.
- *
+ * JSON finalizer coverage for staff grantee image/caption replacement.
  * @jest-environment node
  */
-import { Readable } from 'stream';
 
-jest.mock('../../lib/utils/auth', () => ({
-  requireAppAccess: jest.fn(),
-}));
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => Promise.resolve().then(fn)),
 }));
-jest.mock('../../lib/services/grantee-upload', () => ({
-  MAX_IMAGE_BYTES: 16,
+jest.mock('../../lib/services/grantee-deliverable-record', () => ({
+  getDeliverableForRequest: jest.fn(),
 }));
 jest.mock('../../lib/services/workbench/grantee-deliverables/replace-submission-service', () => ({
   replaceGranteeSubmission: jest.fn(),
 }));
+jest.mock('../../lib/services/portal-upload-staging', () => {
+  class PortalUploadStagingError extends Error {
+    constructor(code, { httpStatus = 400 } = {}) {
+      super(code); this.code = code; this.httpStatus = httpStatus;
+    }
+  }
+  return {
+    PORTAL_UPLOAD_SCOPES: { STAFF_GRANTEE_IMAGE: 'staff_grantee_image' },
+    PortalUploadStagingError,
+    claimPortalUpload: jest.fn(),
+    clearPortalUploadCandidate: jest.fn(),
+    completePortalUpload: jest.fn(),
+    discardPortalUploadCandidate: jest.fn(),
+    loadClaimedPortalImage: jest.fn(),
+    recordPortalUploadCandidate: jest.fn(),
+    rejectPortalUpload: jest.fn(),
+    releasePortalUpload: jest.fn(),
+    staffActorBinding: jest.fn(() => 'profile:profile-1'),
+  };
+});
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
+import { getDeliverableForRequest } from '../../lib/services/grantee-deliverable-record';
 import { replaceGranteeSubmission } from '../../lib/services/workbench/grantee-deliverables/replace-submission-service';
+import {
+  PortalUploadStagingError,
+  claimPortalUpload,
+  completePortalUpload,
+  loadClaimedPortalImage,
+} from '../../lib/services/portal-upload-staging';
 import handler from '../../pages/api/workbench/grantee-deliverables/replace-submission';
 
-const GUID = '22222222-2222-2222-2222-222222222222';
+const GUID = '22222222-2222-4222-8222-222222222222';
+const STAGING_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ETAG = 'W/"d1"';
+const BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null, sends: 0 };
@@ -38,40 +59,8 @@ function mockRes() {
   return res;
 }
 
-function multipartReq({ fields = {}, files = [] } = {}) {
-  const boundary = '----wmkf-replace-route-test';
-  const parts = [];
-  for (const [name, value] of Object.entries(fields)) {
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
-    ));
-  }
-  for (const file of files) {
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${file.filename}"\r\n` +
-      `Content-Type: ${file.mimeType || 'image/png'}\r\n\r\n`,
-    ));
-    parts.push(file.buffer);
-    parts.push(Buffer.from('\r\n'));
-  }
-  parts.push(Buffer.from(`--${boundary}--\r\n`));
-  const body = Buffer.concat(parts);
-  const req = Readable.from([body]);
-  req.method = 'POST';
-  req.query = {};
-  req.headers = {
-    'content-type': `multipart/form-data; boundary=${boundary}`,
-    'content-length': String(body.length),
-  };
-  return req;
-}
-
-function malformedMultipartReq() {
-  const req = Readable.from([Buffer.from('not a multipart body')]);
-  req.method = 'POST';
-  req.query = {};
-  req.headers = { 'content-type': 'multipart/form-data' };
-  return req;
+function req(body = {}, method = 'POST') {
+  return { method, body, headers: {}, query: {} };
 }
 
 beforeEach(() => {
@@ -80,102 +69,87 @@ beforeEach(() => {
     profileId: 'profile-1',
     session: { user: { dynamicsSystemuserId: 'system-user-1' } },
   });
+  getDeliverableForRequest.mockResolvedValue({
+    wmkf_granteedeliverableid: 'd1',
+    wmkf_deliverablestatus: 100000001,
+    wmkf_imagefileref: 'https://sp/old.png',
+    _etag: ETAG,
+  });
+  claimPortalUpload.mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: { original_etag: ETAG, candidate_result: null },
+  });
+  loadClaimedPortalImage.mockResolvedValue({ filename: 'replacement.png', mimeType: 'image/png', buffer: BYTES });
   replaceGranteeSubmission.mockResolvedValue({ ok: true, etag: 'W/"d2"' });
+  completePortalUpload.mockResolvedValue({ ok: true });
 });
 
-test('auth gate short-circuits before multipart parsing or service work', async () => {
+test('auth gate short-circuits before DAL or service work', async () => {
   requireAppAccess.mockResolvedValue(null);
   const res = mockRes();
-  await handler(multipartReq({ fields: { requestId: GUID, caption: 'Revised.', etag: ETAG } }), res);
+  await handler(req({ requestId: GUID, caption: 'Revised.', etag: ETAG }), res);
   expect(res.sends).toBe(0);
   expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });
 
-test('valid multipart fields and file reach the service inside a trusted DAL context', async () => {
-  const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+test('caption-only JSON reaches service with no staged image', async () => {
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { requestId: ` ${GUID} `, caption: 'Revised caption.', etag: ` ${ETAG} ` },
-    files: [{ filename: 'replacement.png', mimeType: 'image/png', buffer: bytes }],
-  }), res);
-
+  await handler(req({ requestId: ` ${GUID} `, caption: 'Revised caption.', etag: ` ${ETAG} ` }), res);
   expect(withDalContext).toHaveBeenCalledWith('grantee-submission-replace', expect.any(Function));
-  expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
-  expect(replaceGranteeSubmission).toHaveBeenCalledWith({
+  expect(replaceGranteeSubmission).toHaveBeenCalledWith(expect.objectContaining({
     requestId: GUID,
     caption: 'Revised caption.',
-    imageFile: { filename: 'replacement.png', mimeType: 'image/png', buffer: bytes },
+    imageFile: null,
     clientEtag: ETAG,
     actingUserSystemId: 'system-user-1',
-  });
+  }));
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({ ok: true, etag: 'W/"d2"' });
 });
 
-test.each([
-  ['missing', undefined],
-  ['invalid', 'not-a-guid'],
-])('%s requestId returns 400 before DAL context or service work', async (_label, requestId) => {
-  const fields = { caption: 'Revised.', etag: ETAG };
-  if (requestId !== undefined) fields.requestId = requestId;
+test('actor-bound staged image is loaded and completed around service write', async () => {
   const res = mockRes();
-  await handler(multipartReq({ fields }), res);
-  expect(res.statusCode).toBe(400);
-  expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
+  await handler(req({ requestId: GUID, etag: ETAG, stagingId: STAGING_ID }), res);
+  expect(claimPortalUpload).toHaveBeenCalledWith(expect.objectContaining({
+    stagingId: STAGING_ID,
+    resourceId: GUID,
+    actorBinding: 'profile:profile-1',
+  }));
+  expect(replaceGranteeSubmission).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: GUID,
+    caption: null,
+    imageFile: { filename: 'replacement.png', mimeType: 'image/png', buffer: BYTES },
+    onCandidateUploaded: expect.any(Function),
+  }));
+  expect(completePortalUpload).toHaveBeenCalledWith(expect.objectContaining({ stagingId: STAGING_ID }));
+  expect(res.statusCode).toBe(200);
 });
 
-test('an overlong caption returns 400 before DAL context or service work', async () => {
+test.each([undefined, 'not-a-guid'])('invalid requestId %p returns 400', async (requestId) => {
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { requestId: GUID, caption: 'x'.repeat(2001), etag: ETAG },
-  }), res);
+  await handler(req({ requestId, caption: 'Revised.', etag: ETAG }), res);
   expect(res.statusCode).toBe(400);
   expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });
 
-test('an oversized file returns 400 before DAL context or service work', async () => {
+test('overlong caption returns 400 before DAL work', async () => {
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { requestId: GUID, etag: ETAG },
-    files: [{ filename: 'too-large.png', buffer: Buffer.alloc(17, 1) }],
-  }), res);
+  await handler(req({ requestId: GUID, caption: 'x'.repeat(2001), etag: ETAG }), res);
   expect(res.statusCode).toBe(400);
-  expect(res.body).toEqual({ error: 'The image is too large.' });
   expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });
 
-test('more than one file returns 400 before DAL context or service work', async () => {
+test('neither caption nor staging id returns 400', async () => {
   const res = mockRes();
-  await handler(multipartReq({
-    fields: { requestId: GUID, etag: ETAG },
-    files: [
-      { filename: 'one.png', buffer: Buffer.from([1]) },
-      { filename: 'two.png', buffer: Buffer.from([2]) },
-    ],
-  }), res);
+  await handler(req({ requestId: GUID, etag: ETAG }), res);
   expect(res.statusCode).toBe(400);
-  expect(res.body).toEqual({ error: 'Only one image can be uploaded.' });
   expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });
 
-test('neither caption nor file returns 400 before DAL context or service work', async () => {
+test('foreign staging id maps to 404 without invoking writer', async () => {
+  claimPortalUpload.mockRejectedValue(new PortalUploadStagingError('staging_not_found', { httpStatus: 404 }));
   const res = mockRes();
-  await handler(multipartReq({ fields: { requestId: GUID, etag: ETAG } }), res);
-  expect(res.statusCode).toBe(400);
-  expect(withDalContext).not.toHaveBeenCalled();
-  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
-});
-
-test('malformed multipart returns 400 before DAL context or service work', async () => {
-  const res = mockRes();
-  await handler(malformedMultipartReq(), res);
-  expect(res.statusCode).toBe(400);
-  expect(res.body).toEqual({ error: 'Could not read the upload.' });
-  expect(withDalContext).not.toHaveBeenCalled();
+  await handler(req({ requestId: GUID, etag: ETAG, stagingId: STAGING_ID }), res);
+  expect(res.statusCode).toBe(404);
   expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });

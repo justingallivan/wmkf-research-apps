@@ -50,6 +50,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     sweepIntakePending: jest.fn(async () => ({ deleted: 0 })),
     cleanupBlobs: jest.fn(async () => ({ deleted: 0, skipped: 0, errors: 0, details: [] })),
     cleanupIntakePrivateBlobs: jest.fn(async () => ({ deleted: 0 })),
+    cleanupPortalUploadStaging: jest.fn(async () => ({ deleted: 0, errors: 0, pruned: 0 })),
   },
 }));
 
@@ -144,6 +145,17 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     // All other steps return 0 here, so the GC count is folded into totalDeleted.
     expect(res.body.totalDeleted).toBe(4);
     expect(res.body.failedSubtasks).not.toContain('reviewDrafts');
+  });
+
+  it('wires exact-path portal staging cleanup and folds deleted blobs into totalDeleted', async () => {
+    MaintenanceService.cleanupPortalUploadStaging.mockResolvedValueOnce({ deleted: 3, errors: 0, pruned: 2 });
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(MaintenanceService.cleanupPortalUploadStaging).toHaveBeenCalledWith({});
+    expect(res.body.ok).toBe(true);
+    expect(res.body.results.portalUploadStaging).toEqual({ deleted: 3, errors: 0, pruned: 2 });
+    expect(res.body.totalDeleted).toBe(3);
   });
 
   it('a thrown review-draft GC is caught, surfaced in failedSubtasks, and marks the run failed', async () => {

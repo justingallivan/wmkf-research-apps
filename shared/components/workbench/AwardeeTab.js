@@ -40,6 +40,15 @@ import GranteeAbstractEditor from '../external/GranteeAbstractEditor';
 
 const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());
 
+function replacementContentType(file) {
+  if (['image/png', 'image/jpeg', 'image/webp'].includes(file?.type)) return file.type;
+  const name = file?.name || '';
+  if (/\.png$/i.test(name)) return 'image/png';
+  if (/\.webp$/i.test(name)) return 'image/webp';
+  if (/\.jpe?g$/i.test(name)) return 'image/jpeg';
+  return '';
+}
+
 /**
  * Whole days past the derived response-date estimate, or 0 when not applicable.
  *
@@ -124,7 +133,9 @@ export default function AwardeeTab({ requestId, context }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceCaption, setReplaceCaption] = useState('');
   const [replaceFile, setReplaceFile] = useState(null);
+  const [replaceStagedUpload, setReplaceStagedUpload] = useState(null);
   const [replacing, setReplacing] = useState(false);
+  const [replaceUploadProgress, setReplaceUploadProgress] = useState(null);
   const [replaceMsg, setReplaceMsg] = useState(null);
   const [replaceError, setReplaceError] = useState(null);
   const replaceFileInputRef = useRef(null);
@@ -360,6 +371,9 @@ export default function AwardeeTab({ requestId, context }) {
     setAbstractConflict(null);
     setAbstractMsg(null);
     setAbstractError(null);
+    setReplaceStagedUpload(null);
+    setReplaceFile(null);
+    setReplacing(false);
   }, [requestId]);
 
   useEffect(() => {
@@ -566,9 +580,11 @@ export default function AwardeeTab({ requestId, context }) {
   function closeReplace() {
     setReplaceOpen(false);
     setReplaceFile(null);
+    setReplaceStagedUpload(null);
     setReplaceCaption('');
     setReplaceError(null);
     setReplaceMsg(null);
+    setReplaceUploadProgress(null);
     // The file input keeps its selection across an unmount/remount of the panel,
     // so clear the DOM value too — otherwise reopening shows a filename that is
     // no longer in state and the Save button reads as wrongly disabled.
@@ -584,24 +600,85 @@ export default function AwardeeTab({ requestId, context }) {
    */
   async function replaceSubmission() {
     if (!requestId || replacing) return;
-    setReplacing(true); setReplaceError(null); setReplaceMsg(null);
+    const saveRequestId = requestId;
+    setReplacing(true); setReplaceError(null); setReplaceMsg(null); setReplaceUploadProgress(null);
+    let activeStage = 'token_request';
+    const reportUploadFailure = (category, httpStatus = null) => {
+      const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
+        ? httpStatus
+        : null;
+      void fetch('/api/workbench/grantee-deliverables/replacement-upload-failure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: saveRequestId,
+          stage: activeStage,
+          category,
+          httpStatus: status,
+          declaredBytes: replaceFile?.size ?? null,
+          contentType: replaceFile ? replacementContentType(replaceFile) : null,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    };
     try {
-      const form = new FormData();
-      form.append('requestId', requestId);
-      form.append('etag', submission.deliverableEtag || '');
-      if (replaceCaptionChanged) form.append('caption', replaceCaption);
-      if (replaceFile) form.append('image', replaceFile);
+      let staged = replaceStagedUpload;
+      if (replaceFile && !staged) {
+        const tokenRes = await fetch('/api/workbench/grantee-deliverables/replacement-upload-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: saveRequestId,
+            etag: submission.deliverableEtag || '',
+            filename: replaceFile.name,
+            contentType: replacementContentType(replaceFile),
+            size: replaceFile.size,
+          }),
+        });
+        const tokenData = await tokenRes.json().catch(() => ({}));
+        if (currentRequestIdRef.current !== saveRequestId) return;
+        if (!tokenRes.ok || !tokenData.ok) {
+          if (tokenRes.status === 413) reportUploadFailure('http_rejected', tokenRes.status);
+          setReplaceError(tokenData.error || 'Could not prepare the image upload.');
+          setReplacing(false);
+          return;
+        }
+        activeStage = 'blob_put';
+        const { put } = await import('@vercel/blob/client');
+        await put(tokenData.pathname, replaceFile, {
+          access: 'private',
+          token: tokenData.clientToken,
+          contentType: tokenData.contentType,
+          onUploadProgress: ({ percentage }) => setReplaceUploadProgress(Math.round(percentage)),
+        });
+        if (currentRequestIdRef.current !== saveRequestId) return;
+        staged = { stagingId: tokenData.stagingId };
+        setReplaceStagedUpload(staged);
+      }
 
+      const payload = {
+        requestId: saveRequestId,
+        etag: submission.deliverableEtag || '',
+        stagingId: staged?.stagingId || null,
+      };
+      if (replaceCaptionChanged) payload.caption = replaceCaption;
+
+      activeStage = 'finalize';
       const res = await fetch('/api/workbench/grantee-deliverables/replace-submission', {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
+      if (currentRequestIdRef.current !== saveRequestId) return;
       if (!res.ok) {
+        if (res.status === 413) reportUploadFailure('http_rejected', res.status);
         setReplaceError(data.error || 'Could not save the replacement.');
       } else {
         setReplaceMsg('Replacement saved.');
         setReplaceFile(null);
+        setReplaceStagedUpload(null);
+        setReplaceUploadProgress(null);
         if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
         // Re-read so the pane shows the committed values and a fresh etag — the
         // same best-effort reload the send path uses. loadAbstract swallows its
@@ -609,10 +686,20 @@ export default function AwardeeTab({ requestId, context }) {
         // reported one.
         await loadAbstract();
       }
-    } catch {
-      setReplaceError('Could not save the replacement.');
+    } catch (caught) {
+      const status = Number(caught?.status || caught?.statusCode);
+      reportUploadFailure(
+        Number.isInteger(status) ? 'http_rejected' : (activeStage === 'blob_put' ? 'sdk_failure' : 'network'),
+        status,
+      );
+      setReplaceError(activeStage === 'blob_put'
+        ? 'The image could not be uploaded. Nothing was replaced; try again.'
+        : activeStage === 'finalize'
+          ? 'The save confirmation was interrupted. Try Save replacement again; the staged image will be reused.'
+          : 'Could not prepare the image upload. Try again.');
+      setReplaceUploadProgress(null);
     }
-    setReplacing(false);
+    if (currentRequestIdRef.current === saveRequestId) setReplacing(false);
   }
 
   const statusLabel = status != null ? (GRANTEE_DELIVERABLE_LABEL[status] || String(status)) : 'Not started';
@@ -991,7 +1078,11 @@ export default function AwardeeTab({ requestId, context }) {
                       aria-label="Replacement image"
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
-                      onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
+                      disabled={replacing}
+                      onChange={(e) => {
+                        setReplaceFile(e.target.files?.[0] || null);
+                        setReplaceStagedUpload(null);
+                      }}
                       className="block w-full text-sm"
                     />
                   </label>
@@ -999,6 +1090,11 @@ export default function AwardeeTab({ requestId, context }) {
                     Replacing the image removes the grantee’s previous file from the
                     SharePoint folder.
                   </p>
+                  {replaceUploadProgress !== null && replacing && (
+                    <p role="status" className="text-sm text-gray-600">
+                      Uploading image: {replaceUploadProgress}%
+                    </p>
+                  )}
                   {replaceError && <p role="alert" className="text-sm text-red-700">{replaceError}</p>}
                   {replaceMsg && <p className="text-sm text-green-700">{replaceMsg}</p>}
                   <div className="flex flex-wrap items-center gap-2">

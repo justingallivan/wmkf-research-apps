@@ -9,10 +9,9 @@
  * version/body hash to the request. The server verifies that token and persists
  * the version lookup, acknowledgment time, and body hash with the package.
  *
- * Submit contract (implemented):
- *   POST /api/external/grantee/{token}/submit  (multipart/form-data)
- *     editedAbstract: string   caption: string   image: File (optional if one is
- *     already on file) plus waiverToken. Returns { ok: true } on success.
+ * Submit contract: mint an actor-bound private Blob token, upload browser →
+ * Blob, then POST a small JSON finalization payload. The image bytes never
+ * traverse a Vercel Function request body.
  */
 
 import { useState } from 'react';
@@ -48,6 +47,15 @@ function isAcceptedImageFile(file) {
   return ACCEPTED_IMAGE_EXTENSIONS.test(file.name || '');
 }
 
+function declaredImageContentType(file) {
+  if (file?.type && ACCEPTED_IMAGE_TYPE_SET.has(file.type)) return file.type;
+  const name = file?.name || '';
+  if (/\.png$/i.test(name)) return 'image/png';
+  if (/\.webp$/i.test(name)) return 'image/webp';
+  if (/\.jpe?g$/i.test(name)) return 'image/jpeg';
+  return '';
+}
+
 function submitErrorMessage(data) {
   const reason = data?.reason;
   if (data?.error) return data.error;
@@ -76,9 +84,11 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
   const [abstract, setAbstract] = useState(init.abstractApproved || init.abstractFormatted || '');
   const [caption, setCaption] = useState(init.caption || '');
   const [imageFile, setImageFile] = useState(null);
+  const [stagedUpload, setStagedUpload] = useState(null);
   const [waiverAcknowledged, setWaiverAcknowledged] = useState(false);
   const [waiverModalOpen, setWaiverModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
 
@@ -123,6 +133,26 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     }
     setError(null);
     setImageFile(file);
+    setStagedUpload(null);
+    setUploadProgress(null);
+  }
+
+  function reportUploadFailure(stage, category, httpStatus = null) {
+    const status = Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599
+      ? httpStatus
+      : null;
+    void fetch(`/api/external/grantee/${token}/upload-failure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stage,
+        category,
+        httpStatus: status,
+        declaredBytes: imageFile?.size ?? null,
+        contentType: imageFile ? declaredImageContentType(imageFile) : null,
+      }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
   async function handleSubmit(e) {
@@ -130,25 +160,73 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
+    setUploadProgress(null);
+    let activeStage = 'token_request';
     try {
-      const fd = new FormData();
-      fd.append('editedAbstract', abstract);
-      fd.append('caption', caption);
-      // Echo the signed render token so the server records the exact waiver
-      // version the grantee saw (server verifies + extracts the version id).
-      if (waiverToken) fd.append('waiverToken', waiverToken);
-      if (imageFile) fd.append('image', imageFile);
-      const res = await fetch(`/api/external/grantee/${token}/submit`, { method: 'POST', body: fd });
+      let staged = stagedUpload;
+      if (imageFile && !staged) {
+        const tokenRes = await fetch(`/api/external/grantee/${token}/upload-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: imageFile.name,
+            contentType: declaredImageContentType(imageFile),
+            size: imageFile.size,
+          }),
+        });
+        const tokenData = await tokenRes.json().catch(() => ({}));
+        if (!tokenRes.ok || !tokenData.ok) {
+          if (tokenRes.status === 413) reportUploadFailure(activeStage, 'http_rejected', tokenRes.status);
+          setError(submitErrorMessage(tokenData));
+          setSubmitting(false);
+          return;
+        }
+        activeStage = 'blob_put';
+        const { put } = await import('@vercel/blob/client');
+        await put(tokenData.pathname, imageFile, {
+          access: 'private',
+          token: tokenData.clientToken,
+          contentType: tokenData.contentType,
+          onUploadProgress: ({ percentage }) => setUploadProgress(Math.round(percentage)),
+        });
+        staged = { stagingId: tokenData.stagingId };
+        setStagedUpload(staged);
+      }
+
+      activeStage = 'finalize';
+      const res = await fetch(`/api/external/grantee/${token}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          editedAbstract: abstract,
+          caption,
+          waiverToken,
+          stagingId: staged?.stagingId || null,
+        }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
+        if (res.status === 413) reportUploadFailure(activeStage, 'http_rejected', res.status);
         setError(submitErrorMessage(data));
         setSubmitting(false);
         return;
       }
       setDone(true);
+      setUploadProgress(null);
       if (onSubmitted) onSubmitted();
-    } catch {
-      setError('Submission failed. Please try again.');
+    } catch (caught) {
+      const status = Number(caught?.status || caught?.statusCode);
+      reportUploadFailure(
+        activeStage,
+        Number.isInteger(status) ? 'http_rejected' : (activeStage === 'blob_put' ? 'sdk_failure' : 'network'),
+        status,
+      );
+      setError(activeStage === 'blob_put'
+        ? 'The image could not be uploaded, so nothing was submitted. Please try again; if this repeats, contact Foundation staff.'
+        : activeStage === 'finalize'
+          ? 'The final confirmation could not be received. Please select Submit again; the uploaded image will be reused.'
+          : 'The upload could not be prepared. Please try again; if this repeats, contact Foundation staff.');
+      setUploadProgress(null);
       setSubmitting(false);
     }
   }
@@ -179,7 +257,13 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
 
       <label style={{ display: 'block', marginTop: '1rem' }}>
         <strong>Graphical image</strong>
-        <input aria-label="Graphical image" type="file" accept={ACCEPTED_IMAGE_TYPES} onChange={handleImageChange} />
+        <input
+          aria-label="Graphical image"
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES}
+          onChange={handleImageChange}
+          disabled={submitting}
+        />
       </label>
       <p style={{ margin: '.25rem 0 0', fontSize: '.85rem', color: '#555' }}>
         JPEG, PNG, or WEBP (max {MAX_IMAGE_MB} MB) — not embedded in a Word or PowerPoint file. Use 16:9 for landscape photos.
@@ -238,6 +322,9 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
         </div>
       </div>
 
+      {uploadProgress !== null && submitting && (
+        <p role="status">Uploading image: {uploadProgress}%</p>
+      )}
       {error && <p role="alert" style={{ color: '#b00' }}>{error}</p>}
 
       {/* Prominent primary submit, matching the suite's primary buttons (e.g. the

@@ -292,6 +292,7 @@ View sign-in logs in Azure Portal:
 | Infrastructure API routes (auth/admin/health) | `requireAuth()` / `requireAuthWithProfile()` / `requireSuperuser()` — all perform a live `is_active` read per request; disabled or missing (zero-row) profiles fail closed (403; DB error → 503) |
 | Cron routes (`/api/cron/*`) | `CRON_SECRET` (not session JWT) — excluded from proxy; both cron verifier variants use the shared constant-time comparison primitive while preserving their distinct development-bypass policies |
 | External-reviewer routes (`/api/external/*`) | HMAC JWT (`EXTERNAL_LINK_SECRET`) — public, allowlisted in proxy |
+| External grantee direct uploads | The HMAC grantee token is verified independently at upload-token mint, sanitized client-failure reporting, and finalization. A path-scoped Blob client token authorizes only the temporary byte transfer; possession of it never authorizes finalization. |
 | Auth routes (`/api/auth/*`) | Public (required for OAuth flow) — excluded from proxy |
 | Client UI | `RequireAuth` / `RequireAppAccess` (defense-in-depth, not the security boundary) |
 

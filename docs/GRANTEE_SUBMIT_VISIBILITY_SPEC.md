@@ -867,7 +867,7 @@ Tier 2. Built on branch `staff-submission-replace` (S412); merged to `main` as
 | Piece | Path |
 |---|---|
 | Service (all logic) | `lib/services/workbench/grantee-deliverables/replace-submission-service.js` |
-| Route (thin shell, multipart) | `pages/api/workbench/grantee-deliverables/replace-submission.js` |
+| Routes (direct-upload token, sanitized client-failure report, JSON finalizer) | `pages/api/workbench/grantee-deliverables/replacement-upload-token.js`, `replacement-upload-failure.js`, `replace-submission.js` |
 | Status rule (one definition) | `shared/config/granteeDeliverableStatus.js` — `STAFF_REPLACEABLE_STATUSES` / `isStaffReplaceableStatus` |
 | Capability flag + package etag | `abstract-service.js` GET adds `canReplace`, `deliverableEtag` |
 | UI | `AwardeeTab.js` Submission pane, collapsed by default |

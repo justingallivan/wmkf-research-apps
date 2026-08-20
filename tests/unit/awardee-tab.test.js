@@ -6,6 +6,7 @@
  */
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
+import { put } from '@vercel/blob/client';
 import {
   GRANTEE_INVITE_SEED_BODY,
   GRANTEE_INVITE_SEED_SUBJECT,
@@ -20,6 +21,7 @@ let mockProfileId = 'p1';
 jest.mock('../../shared/context/ProfileContext', () => ({
   useProfile: () => ({ preferences: mockPreferences, currentProfile: { id: mockProfileId } }),
 }));
+jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
 jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
   __esModule: true,
   default: ({ value, htmlValue, onChange, disabled, invalid, ariaLabel, toolbarLabel = 'Abstract formatting' }) => (
@@ -36,7 +38,11 @@ jest.mock('../../shared/components/external/GranteeAbstractEditor', () => ({
     </div>
   ),
 }));
-beforeEach(() => { mockPreferences = {}; mockProfileId = 'p1'; });
+beforeEach(() => {
+  mockPreferences = {};
+  mockProfileId = 'p1';
+  put.mockReset().mockResolvedValue({ pathname: 'portal-staging/staff/x' });
+});
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 
@@ -148,18 +154,27 @@ function wireFetch({
         bylineNames: state.bylineNames, bylineUnavailable: state.bylineUnavailable,
       }) };
     }
+    if (u.includes('/grantee-deliverables/replacement-upload-token')) {
+      return { ok: true, json: async () => ({
+        ok: true,
+        stagingId: 'stage-1',
+        pathname: 'portal-staging/staff/x',
+        clientToken: 'client-token',
+        contentType: 'image/png',
+      }) };
+    }
     if (u.includes('/grantee-deliverables/replace-submission')) {
       if (!replaceOk) {
         return { ok: false, json: async () => ({ error: 'This package changed since you loaded it.', code: 'stale' }) };
       }
       // Mirror the service: an absent caption field leaves it alone, and a new
       // image lands as a fresh nonce ref (which is what re-keys the inline img).
-      const form = opts.body;
-      if (form.has('caption')) {
-        state.caption = form.get('caption');
+      const payload = JSON.parse(opts.body);
+      if (Object.prototype.hasOwnProperty.call(payload, 'caption')) {
+        state.caption = payload.caption;
         state.captionHtml = String(state.caption).replace(/^\*([^*]+)\*$/, '<em>$1</em>');
       }
-      if (form.has('image')) {
+      if (payload.stagingId) {
         state.imageRef = `1002365_grantee_image_${replaceNonce}.png`;
         state.hasImage = true;
       }
@@ -1231,7 +1246,7 @@ test('an overlong formatted caption cannot be submitted', async () => {
   expect(screen.getByRole('button', { name: /save replacement/i })).toBeDisabled();
 });
 
-test('a caption replacement posts multipart with the package etag and reloads', async () => {
+test('a caption replacement posts JSON with the package etag and reloads', async () => {
   wireFetch({ abstract: submitted(REPLACEABLE) });
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await openReplace();
@@ -1241,10 +1256,10 @@ test('a caption replacement posts multipart with the package etag and reloads', 
   await waitFor(() => expect(screen.getByText(/replacement saved/i)).toBeInTheDocument());
   const call = global.fetch.mock.calls.find(([u]) => String(u).includes('/replace-submission'));
   expect(call[1].method).toBe('POST');
-  const form = call[1].body;
-  expect(form.get('requestId')).toBe(REQ);
-  expect(form.get('etag')).toBe('W/"d1"');
-  expect(form.get('caption')).toBe('Revised caption.');
+  const payload = JSON.parse(call[1].body);
+  expect(payload.requestId).toBe(REQ);
+  expect(payload.etag).toBe('W/"d1"');
+  expect(payload.caption).toBe('Revised caption.');
   // The reload re-read the committed value into the read-only display (scoped to
   // the <p>, since the edit textarea holds the same text).
   await waitFor(() => expect(screen.getByText('Revised caption.', { selector: 'p' })).toBeInTheDocument());
@@ -1264,6 +1279,11 @@ test('an image replacement re-keys the inline image so the browser refetches', a
   fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
 
   await waitFor(() => expect(screen.getByText(/replacement saved/i)).toBeInTheDocument());
+  expect(put).toHaveBeenCalledWith(
+    'portal-staging/staff/x',
+    expect.any(File),
+    expect.objectContaining({ access: 'private', token: 'client-token' }),
+  );
   await waitFor(() => expect(screen.getByRole('img').getAttribute('src')).not.toBe(srcBefore));
   expect(screen.getByRole('img').getAttribute('src')).toContain('cccccccc');
 });

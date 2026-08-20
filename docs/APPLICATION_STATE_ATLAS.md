@@ -101,6 +101,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Integrity Screener | `integrity_screenings`, `screening_dismissals`, `retractions` | same |
 | Virtual Review Panel | `panel_reviews`, `panel_review_items` | same |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |
+| Portal upload staging | `portal_upload_staging` (private Blob ownership, finalize lease/idempotency, candidate reconciliation; no published content authority) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer acceptance follow-up | `reviewer_acceptance_jobs` (post-accept side-effect queue; Dataverse suggestion row remains accepted-state source) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Review synthesis lifecycle | `review_synthesis_jobs` (generation queue/currentness ledger; no review text; Dataverse request memo remains content source) — **[VERIFIED 2026-07-28 via controlled automatic smoke and post-deploy probes] migration 028 applied; Production automation enabled; job `2` completed in one claim with AI run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6`; exact cleanup returned zero eligible requests; final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` Ready** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer authoring | `review_drafts` (autosave scratchpad; Dataverse `wmkf_appreviewanswer` is the submitted system of record) | [postgres-review-drafts.md](atlas/postgres-review-drafts.md) |

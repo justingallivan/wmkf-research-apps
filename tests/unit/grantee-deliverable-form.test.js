@@ -4,8 +4,8 @@
  * GranteeDeliverableForm — the external grantee edit form. Covers the publish
  * waiver SUBMIT GATE (button disabled until the waiver is acknowledged AND the
  * required fields are present AND the signed render token is present), the
- * versioned waiver text, the multipart submit contract (now echoing the render
- * token), and the thank-you state.
+ * versioned waiver text, the direct private-Blob + JSON finalize contract, and
+ * the thank-you state.
  *
  * As of S351 the inline checkbox was replaced by the scroll-gated PolicyAckModal
  * (see grantee-deliverable-form-waiver.test.js for the modal-wiring test).
@@ -17,6 +17,9 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GranteeDeliverableForm from '../../shared/components/external/GranteeDeliverableForm';
+import { put } from '@vercel/blob/client';
+
+jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
 
 // Minimal stand-in exposing the two callbacks the form depends on (mirrors
 // grantee-deliverable-form-waiver.test.js's mocking pattern).
@@ -78,6 +81,7 @@ function unsupportedImageFile() {
   return new File([new Uint8Array([0x49, 0x49, 0x2a, 0x00])], 'figure.tif', { type: 'image/tiff' });
 }
 
+beforeEach(() => { put.mockReset().mockResolvedValue({ pathname: 'portal-staging/x' }); });
 afterEach(() => { if (global.fetch && global.fetch.mockRestore) global.fetch.mockRestore(); });
 
 const submitBtn = () => screen.getByRole('button', { name: /^submit$/i });
@@ -183,8 +187,19 @@ test('an already-on-file image satisfies the image requirement (no re-upload nee
   expect(submitBtn()).toBeEnabled();
 });
 
-test('submit POSTs multipart (echoing the render token) and shows the thank-you state', async () => {
-  const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+test('uploads directly to private Blob, finalizes with JSON, and shows the thank-you state', async () => {
+  const fetchSpy = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        stagingId: 'stage-1',
+        pathname: 'portal-staging/grantee/x',
+        clientToken: 'client-token',
+        contentType: 'image/png',
+      }),
+    })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
   renderForm({ token: 'tok-123' });
 
   fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
@@ -194,17 +209,24 @@ test('submit POSTs multipart (echoing the render token) and shows the thank-you 
 
   await waitFor(() => expect(screen.getByText(/your materials have been submitted/i)).toBeInTheDocument());
 
-  expect(fetchSpy).toHaveBeenCalledTimes(1);
-  const [url, opts] = fetchSpy.mock.calls[0];
+  expect(fetchSpy).toHaveBeenCalledTimes(2);
+  expect(fetchSpy.mock.calls[0][0]).toBe('/api/external/grantee/tok-123/upload-token');
+  expect(put).toHaveBeenCalledWith(
+    'portal-staging/grantee/x',
+    expect.any(File),
+    expect.objectContaining({ access: 'private', token: 'client-token', contentType: 'image/png' }),
+  );
+  expect(put.mock.calls[0][2].onUploadProgress).toEqual(expect.any(Function));
+  const [url, opts] = fetchSpy.mock.calls[1];
   expect(url).toBe('/api/external/grantee/tok-123/submit');
   expect(opts.method).toBe('POST');
-  expect(opts.body).toBeInstanceOf(FormData);
-  expect(opts.body.has('image')).toBe(true);
-  expect(opts.body.get('editedAbstract')).toBe(deliverable.abstractFormatted);
-  expect(opts.body.get('caption')).toBe('A figure.');
-  // The signed render token IS echoed; the raw acknowledgment is NOT.
-  expect(opts.body.get('waiverToken')).toBe(WAIVER_TOKEN);
-  expect(opts.body.has('waiver')).toBe(false);
+  expect(opts.headers).toEqual({ 'Content-Type': 'application/json' });
+  expect(JSON.parse(opts.body)).toEqual({
+    editedAbstract: deliverable.abstractFormatted,
+    caption: 'A figure.',
+    waiverToken: WAIVER_TOKEN,
+    stagingId: 'stage-1',
+  });
 });
 
 test('a failed submit surfaces an error and re-enables the button', async () => {
@@ -217,6 +239,34 @@ test('a failed submit surfaces an error and re-enables the button', async () => 
 
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/scan failed/i));
   expect(submitBtn()).toBeEnabled();
+});
+
+test('a direct Blob SDK failure sends only closed, authenticated client telemetry', async () => {
+  const fetchSpy = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true, stagingId: 'stage-1', pathname: 'portal-staging/grantee/x',
+        clientToken: 'client-token', contentType: 'image/png',
+      }),
+    })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+  put.mockRejectedValueOnce(new Error('SDK detail and signed URL must not be sent'));
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'A figure.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+  fireEvent.click(submitBtn());
+
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/image could not be uploaded/i));
+  const [url, opts] = fetchSpy.mock.calls[1];
+  expect(url).toBe('/api/external/grantee/tok-123/upload-failure');
+  const body = JSON.parse(opts.body);
+  expect(body).toEqual({
+    stage: 'blob_put', category: 'sdk_failure', httpStatus: null,
+    declaredBytes: 4, contentType: 'image/png',
+  });
+  expect(opts.body).not.toMatch(/SDK detail|signed URL|fig\.png/i);
 });
 
 test('a server reason is translated into a useful submit error', async () => {

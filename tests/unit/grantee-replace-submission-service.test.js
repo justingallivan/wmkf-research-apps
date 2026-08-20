@@ -84,6 +84,27 @@ beforeEach(() => {
   GraphService.listFiles.mockResolvedValue([]);
 });
 
+test('durability hook records exact candidate before conditional package PATCH', async () => {
+  const order = [];
+  const onCandidateUploaded = jest.fn(async (candidate) => {
+    order.push('candidate');
+    expect(candidate).toMatchObject({ driveId: 'drive-1', itemId: 'new-item', imageRef: 'https://sp/new.png' });
+  });
+  patchDeliverable.mockImplementation(async () => { order.push('patch'); return {}; });
+  await call({ imageFile: imageFile(), onCandidateUploaded });
+  expect(order).toEqual(['candidate', 'patch']);
+});
+
+test('durability hook failure removes candidate and prevents package PATCH', async () => {
+  cleanupSharePointItems.mockResolvedValue(true);
+  await expect(call({
+    imageFile: imageFile(),
+    onCandidateUploaded: jest.fn(async () => { throw new Error('ledger unavailable'); }),
+  })).rejects.toMatchObject({ httpStatus: 503, code: 'staging_failed' });
+  expect(cleanupSharePointItems).toHaveBeenCalledWith('drive-1', [expect.objectContaining({ id: 'new-item' })], 'grantee-replace-candidate');
+  expect(patchDeliverable).not.toHaveBeenCalled();
+});
+
 // ── Status gate ──
 
 test('Revision Requested is NOT staff-replaceable — the grantee has the ball', async () => {

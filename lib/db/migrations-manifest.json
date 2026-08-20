@@ -28,6 +28,7 @@
     "027_reviewer_find_roster_ineligible.sql",
     "028_review_synthesis_jobs.sql",
     "029_reviewer_find_roster_blocked.sql",
-    "030_operational_events.sql"
+    "030_operational_events.sql",
+    "031_portal_upload_staging.sql"
   ]
 }

@@ -66,11 +66,14 @@ One Postgres table, `operational_events` (migration
      `lib/services/reviewer-acceptance-drain.js`).
    - `AlertService.autoResolve(key)` also marks matching open events recovered,
      so every existing auto-resolve signal doubles as event recovery.
-   - The unmerged grantee-diagnostics branch (`c6c1f088`, `3554b91f`) composes
-     without changes: its `notify(... severity 'error'/'warning' ...)` call
-     auto-mirrors at error severity on merge, and its closed-vocabulary
-     `diagnostics` object rides in `metadata`; adding an `operationalEvent`
-     block later upgrades the warning-severity `infected` case.
+   - Grantee finalization failures use the same notification/event path with a
+     closed-vocabulary diagnostics projection. Browser→private-Blob failures
+     occur outside application code, so the authenticated `/upload-failure`
+     routes accept only closed stage/category, bounded HTTP status, declared
+     byte count, and image type. They write `portal_upload_client_failure`
+     events labeled `clientReported:true`; no raw exception, pathname, URL,
+     filename, token, text field, or bytes are accepted. These rows are useful
+     diagnostics but are not authoritative proof of a server failure.
 
 2. **Vercel Log Drain ingestion** — `POST /api/webhooks/vercel-log-drain`
    (`pages/api/webhooks/vercel-log-drain.js` + selection/mapping in
@@ -140,19 +143,17 @@ admin-tunable via Dataverse settings like every other retention key), open
 rows after twice that window, hard 200k row cap. No cron polls Vercel for
 logs; the drain pushes.
 
-## Activation runbook (owner-approved steps — do NOT run from a feature branch)
+## Drain activation runbook (owner-approved external steps)
 
-1. **Merge** `codex/operational-observability` to `main` via the normal
-   promotion path.
-2. **Apply the migration** to the production database:
-   `node scripts/apply-migrations.js` (applies `030_operational_events.sql`;
-   existing-database path — never `setup-database.js`).
-3. **Set the secret** (Vercel → Project → Settings → Environment Variables):
+The application code and migration 030 are already deployed. Only the external
+Vercel drain configuration remains:
+
+1. **Set the secret** (Vercel → Project → Settings → Environment Variables):
    `VERCEL_LOG_DRAIN_SECRET` in Production (and Preview if previews should
    ingest). Generate with `openssl rand -hex 32`, or create the drain first
-   (step 4) and copy the auto-generated Signature Verification Secret. Values
+   (step 2) and copy the auto-generated Signature Verification Secret. Values
    stay in Vercel — never committed. Redeploy so the function picks it up.
-4. **Create the drain** (Vercel dashboard → **Team Settings → Drains → Add
+2. **Create the drain** (Vercel dashboard → **Team Settings → Drains → Add
    Drain**; Pro plan supports this):
    - Data type: **Logs**.
    - Projects: this project only.
@@ -164,13 +165,13 @@ logs; the drain pushes.
      `https://applications.wmkeck.org/api/webhooks/vercel-log-drain`.
    - Format: **NDJSON**. Compression: **none**.
    - Signature Verification Secret: must equal `VERCEL_LOG_DRAIN_SECRET`
-     (step 3).
+     (step 1).
    - Create — Vercel tests the endpoint automatically; a signed test delivery
      returns 200.
-5. **Smoke:** use the drain's **Test** button, then confirm rows appear in
+3. **Smoke:** use the drain's **Test** button, then confirm rows appear in
    `/admin` → Operational Events (source `vercel-drain`) and that a repeated
    Test does not duplicate rows.
-6. **Optional tuning:** set `retention:operational_events_days` in `/admin` →
+4. **Optional tuning:** set `retention:operational_events_days` in `/admin` →
    settings if 90 days is wrong; pause/delete the drain any time from the
    Drains page (ingestion simply stops; the endpoint stays fail-closed).
 

@@ -138,6 +138,31 @@ mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
 
+## Portal upload staging
+
+### `portal_upload_staging` (migration 031)
+**Source of truth:** Postgres coordination ledger; published abstract/caption/image
+authority remains Dataverse + SharePoint.
+
+One row authorizes one private Blob pathname for one server-derived actor,
+scope, and request. Statuses are `pending`, `finalizing`, `consumed`, `rejected`,
+and `expired`; a five-minute lease serializes finalization. Verified Blob ETag,
+SHA-256, and actual bytes are recorded before domain processing. If SharePoint
+upload succeeds, `candidate_result` records the exact drive/item/image reference
+before the Dataverse write, allowing an expired-lease retry to recognize a
+committed response drop or delete only the exact unreferenced candidate.
+`result_payload` makes consumed retries idempotent.
+
+Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
+and submit routes; staff replacement mint and finalize routes. Raw external
+tokens are never stored (SHA-256 binding only), and clients never choose or echo
+an authoritative pathname. Daily maintenance deletes exact table-selected Blob
+pathnames after expiry and prunes terminal ledger rows after seven days.
+
+Private-store prerequisite is covered by
+`scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
+PUT must succeed, and anonymous HEAD must return 403.
+
 ## Monitoring / observability
 
 ### `health_check_history` (2,964 rows), `system_alerts` (150 rows), `maintenance_runs` (1,498 rows)

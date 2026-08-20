@@ -88,6 +88,30 @@ test('happy path: uploads image + one atomic changeset of both PATCHes, per-op I
   expect(typeof ops[1].body.wmkf_waiverackedat).toBe('string');
 });
 
+test('durability hook records exact SharePoint candidate before Dataverse commit', async () => {
+  const order = [];
+  const onCandidateUploaded = jest.fn(async (candidate) => {
+    order.push('candidate');
+    expect(candidate).toMatchObject({
+      driveId: 'drive-1',
+      itemId: 'item-new',
+      imageRef: 'https://sp/new.png',
+    });
+  });
+  runChangeset.mockImplementation(async () => { order.push('changeset'); return { ok: true }; });
+  await call({ onCandidateUploaded });
+  expect(order).toEqual(['candidate', 'changeset']);
+});
+
+test('durability hook failure removes candidate and prevents Dataverse commit', async () => {
+  const result = await call({
+    onCandidateUploaded: jest.fn(async () => { throw new Error('ledger unavailable'); }),
+  });
+  expect(result).toMatchObject({ ok: false, reason: 'staging_failed', status: 503 });
+  expect(GraphService.deleteFile).toHaveBeenCalledWith('drive-1', 'item-new');
+  expect(runChangeset).not.toHaveBeenCalled();
+});
+
 test('omits the body hash column when none is supplied (still writes the version lookup)', async () => {
   await call({ waiverBodyHash: undefined });
   const [ops] = runChangeset.mock.calls[0];

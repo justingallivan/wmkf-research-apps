@@ -196,6 +196,17 @@ export default async function handler(req, res) {
       results.intakePrivateBlobs = { error: error.message };
     }
 
+    // 7.6. Private portal-upload staging cleanup. The service selects exact
+    // pathnames from portal_upload_staging; it never scans/deletes by prefix.
+    try {
+      results.portalUploadStaging = await MaintenanceService.cleanupPortalUploadStaging({});
+      if (typeof results.portalUploadStaging?.deleted === 'number') {
+        totalDeleted += results.portalUploadStaging.deleted;
+      }
+    } catch (error) {
+      results.portalUploadStaging = { error: error.message };
+    }
+
     // 8. Dynamics feedback cleanup (20 days after first admin ACK).
     // Owner decision 2026-08-08: reviewed_at is the retention clock; rows
     // without an ACK remain ineligible regardless of status or creation age.

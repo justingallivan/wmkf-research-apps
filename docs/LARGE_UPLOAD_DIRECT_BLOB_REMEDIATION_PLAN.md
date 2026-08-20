@@ -17,14 +17,21 @@ related:
 
 # Large Upload Direct-Blob Remediation Plan
 
-**Status: READY WITH NAMED CHANGES after Claude Opus review. No runtime,
-schema, environment, or deployment change has been made by this plan.**
+**Status: IMPLEMENTED ON `codex/large-upload-direct-staging`; not yet merged or
+production-deployed.** The private-store adversarial preflight, migration,
+external and staff direct-upload flows, durable retry/reconciliation ledger,
+exact-path maintenance cleanup, and authenticated sanitized client-failure
+events are present and covered by focused tests. Remaining release gates are
+the final adversarial Claude Opus implementation review, Preview migration and
+deployment, and an owner-controlled browser smoke with the exact supplied PNG.
 
 State labels are deliberate:
 
 - **[VERIFIED via …]** means current source, a focused test, or a live no-write
   probe established the claim on 2026-08-19.
 - **[PLANNED]** is proposed work, not shipped behavior.
+- **[IMPLEMENTED ON BRANCH]** exists in the named feature branch but is not a
+  statement about Production.
 - **[ASSUMED]** identifies a proposition that still needs the named probe.
 
 ## 1. Decision and outcome
@@ -145,8 +152,11 @@ That different token-issuance variant does not prove a hostile client cannot
 request public access with a pre-minted token. The shared uploader uses the
 existing `wmkf-uploads-private` store through `UPLOADS_BLOB_RW_TOKEN`; the
 credentials runbook records that token in local, Preview, and Production.
-**[PLANNED, gated by §5.1]** Portal staging will use that private store under
-new server-controlled path namespaces. It must never use the intake-only
+**[IMPLEMENTED ON BRANCH; VERIFIED via adversarial store probe]** Portal
+staging uses that private store under new server-controlled path namespaces.
+A client token minted from the private store rejected a public-mode PUT; an
+honest private PUT succeeded and anonymous HEAD returned 403. The probe deleted
+both test objects. Portal staging never uses the intake-only
 `INTAKE_BLOB_RW_TOKEN`.
 
 Do not directly reuse the generic `/api/upload-handler` authorization contract:
@@ -178,8 +188,8 @@ overwrite, and cache behavior, but it does not bind the client-supplied
 `access: 'public' | 'private'` choice. The installed presigned PUT signature
 also omits access. Client cooperation is therefore not a security boundary.
 
-Before creating the migration or endpoints, run an isolated, immediately
-cleaned Preview-store adversarial probe:
+The pre-implementation gate was an isolated, immediately cleaned private-store
+adversarial probe:
 
 1. mint a token for one random, server-owned pathname with the private-store
    `UPLOADS_BLOB_RW_TOKEN`;
@@ -204,7 +214,7 @@ defenses:
 
 ### 5.2 New Postgres table
 
-**[PLANNED — migration required]** Add `portal_upload_staging` through
+**[IMPLEMENTED ON BRANCH — migration 031 not yet applied]** `portal_upload_staging` is added through
 `lib/db/migrations/` and the migrations manifest; do not edit the fresh-install
 shape alone. Minimum contract:
 

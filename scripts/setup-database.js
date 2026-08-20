@@ -643,6 +643,54 @@ const v38Statements = [
      ON operational_events (correlation_id) WHERE correlation_id IS NOT NULL`,
 ];
 
+// V39: Private Blob staging ledger for browser-direct portal image uploads.
+// Existing databases use migration 031_portal_upload_staging.sql; this fresh-
+// install block creates the same ownership, lease, and idempotency contract.
+const v39Statements = [
+  `CREATE TABLE IF NOT EXISTS portal_upload_staging (
+    id UUID PRIMARY KEY,
+    scope TEXT NOT NULL CHECK (scope IN ('grantee_image', 'staff_grantee_image')),
+    resource_id UUID NOT NULL,
+    actor_binding TEXT NOT NULL,
+    pathname TEXT NOT NULL UNIQUE,
+    filename TEXT NOT NULL,
+    declared_content_type TEXT NOT NULL,
+    max_bytes BIGINT NOT NULL CHECK (max_bytes > 0),
+    original_etag TEXT,
+    status TEXT NOT NULL DEFAULT 'pending'
+      CHECK (status IN ('pending', 'finalizing', 'consumed', 'rejected', 'expired')),
+    lease_token UUID,
+    lease_expires_at TIMESTAMPTZ,
+    candidate_result JSONB,
+    result_code TEXT,
+    result_payload JSONB,
+    blob_etag TEXT,
+    sha256 CHAR(64),
+    actual_bytes BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    CONSTRAINT portal_upload_staging_lease_shape CHECK (
+      (status = 'finalizing' AND lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+      OR (status <> 'finalizing' AND lease_token IS NULL AND lease_expires_at IS NULL)
+    ),
+    CONSTRAINT portal_upload_staging_terminal_shape CHECK (
+      (status = 'consumed' AND consumed_at IS NOT NULL AND result_code IS NOT NULL)
+      OR (status <> 'consumed' AND consumed_at IS NULL)
+    ),
+    CONSTRAINT portal_upload_staging_sha256_shape CHECK (
+      sha256 IS NULL OR sha256 ~ '^[0-9a-f]{64}$'
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_portal_upload_staging_actor_resource
+     ON portal_upload_staging (actor_binding, scope, resource_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_portal_upload_staging_claim
+     ON portal_upload_staging (status, lease_expires_at, expires_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_portal_upload_staging_cleanup
+     ON portal_upload_staging (expires_at, status)`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1349,6 +1397,24 @@ async function runMigration() {
       }
     }
 
+    // Run V39 table creation (private portal upload staging ledger)
+    console.log(`\nApplying v39 schema updates - Portal upload staging (${v39Statements.length} statements)...`);
+    for (let i = 0; i < v39Statements.length; i++) {
+      const statement = v39Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v39-${i + 1}/${v39Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v39-${i + 1}/${v39Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v39-${i + 1}/${v39Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1405,7 +1471,9 @@ async function runMigration() {
     console.log('  • reviewer_acceptance_jobs (post-accept side-effect queue — drained by cron)');
     console.log('\nV37 new tables (Review synthesis generation jobs):');
     console.log('  • review_synthesis_jobs (automatic/manual generation ledger — drained by cron)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37)');
+    console.log('\nV39 new table (Private portal upload staging):');
+    console.log('  • portal_upload_staging (actor-bound private Blob staging + finalize idempotency)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);
