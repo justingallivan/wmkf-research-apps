@@ -399,7 +399,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md](LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md) | plan | active |  | Production-live direct private-Blob staging for large grantee images, with one owner-approved business smoke still open. | 2026-08-19 |
+| [LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md](LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md) | plan | active |  | Production-live direct private-Blob staging for large grantee images, with controlled staff acceptance complete. | 2026-08-19 |
 
 ## security-auth
 

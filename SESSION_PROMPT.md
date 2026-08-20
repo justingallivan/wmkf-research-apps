@@ -1,12 +1,14 @@
-# Session 449 Prompt: Act on Open Smokes and Watch for the IT Access Answer
+# Session 449 Prompt: Diagnose Upload Residue and Watch for the IT Access Answer
 
 ## Session 448 Summary
 
-Session 448 was a docs-only housekeeping session on branch `codex/housekeeping`
-(kept byte-identical to `main`; both fast-forwarded together). All 57 /start
-gate and self-test runs passed. The session recorded IT-provided SharePoint
-administrator evidence, reconciled every repo restatement, corrected a
-fabricated organization name, and published an access-question memo.
+Session 448 began as docs housekeeping on branch `codex/housekeeping` (the two
+docs commits were fast-forwarded to `main`) and closed with a controlled,
+read-only-verification Production acceptance run for the staff direct-upload
+path. All 57 /start gate and self-test runs passed. The session recorded
+IT-provided SharePoint administrator evidence, reconciled every repo
+restatement, corrected a fabricated organization name, published an
+access-question memo, and closed the remaining large-upload business smoke.
 
 ### What Was Completed
 
@@ -53,6 +55,26 @@ fabricated organization name, and published an access-question memo.
    branch/worktree; `codex/housekeeping` carried no unique commits at session
    start.
 
+5. **Staff direct-upload Production acceptance closed (read-only verification;
+   no commit)**
+   - Owner uploaded the exact 9,564,384-byte PNG through the staff replacement
+     UI on test request `1002788`.
+   - The token and finalizer routes returned 200. The staging row reached
+     `consumed` with SHA-256
+     `1b8663c98764d70af416bfa6a0bf3a0b1b5befc1cfa8ad6cae6f785dea4e8f14`,
+     the committed Dataverse/SharePoint result was present, exactly one
+     matching SharePoint image remained, and the exact temporary private Blob
+     was absent.
+   - The successful fail-closed finalize path proves validation and the enabled
+     Cloudmersive scan gate did not report a failure. The staff flow correctly
+     sent no notification by design. No duplicate business result,
+     upload-related Operational Event, or error/fatal runtime log appeared in
+     the acceptance window.
+   - Two nonblocking follow-ups were observed: the impersonated Dataverse PATCH
+     returned 403 and succeeded through the intentional service-principal
+     fallback, degrading actor attribution; the authenticated image route
+     returned 200 but Next logged its response-over-4-MB warning.
+
 ### Commits
 
 - `0c99fd9c` - Record 2026-08-20 IT SharePoint audit evidence
@@ -65,45 +87,54 @@ Tier 0.
 
 ### Verified Open
 
-1. **Watch for IT's answer to the Public-group memo.**
+1. **Diagnose the staff-replacement Dataverse attribution fallback, read-only
+   first.** The request `1002788` acceptance logs showed the impersonated PATCH
+   return 403 before the intentional service-principal retry succeeded. Identify
+   the exact missing/intersected Dataverse privilege and affected role; do not
+   alter the global fallback or a Production role without an explicit owner
+   decision.
+
+2. **Bound the legitimate large-image response warning.** The authenticated
+   `/api/workbench/grantee-deliverables/image` request returned the expected
+   9,564,384 bytes with 200, but Next logged its response-over-4-MB warning.
+   Confirm the route-local response-limit contract and focused tests before a
+   code change; this is not an upload failure.
+
+3. **Watch for IT's answer to the Public-group memo.**
    Evidence: `docs/SHAREPOINT_SITE_PUBLIC_ACCESS_MEMO_2026-08-20.md` (status
    section). When the answer arrives, record intentional / operational
    requirement / changed in the memo and reconcile the file-model audit
    section. If Public→Private is ever executed, verify the app's
    `Sites.Selected` access afterward.
 
-2. **Observe Stage II Production outcomes through 2026-09-02.**
+4. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` records the
    exact-on Production state and organic-observation window. Sample naturally
    produced Stage II DTOs; do not manufacture shared-roster rows. (Unchanged
    from Session 447 — no work this session.)
 
-3. **Run a staff acceptance smoke of reviewer identity remediation.**
+5. **Run a staff acceptance smoke of reviewer identity remediation.**
    Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md` and commits `d9c29c7d`
    through `5fcd913c`. Use a reviewer genuinely intended for an invite list.
    (Unchanged from Session 447.)
 
-4. **Finish the read-only Phase II document display smoke.**
+6. **Finish the read-only Phase II document display smoke.**
    Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` and commit `83b9c68a`.
    Record filenames plus View and Download end to end; keep it read-only.
    (Unchanged from Session 447.)
 
-5. **Re-probe and close Track A passive safety.**
+7. **Re-probe and close Track A passive safety.**
    Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` still
    carries the completed 48-hour window as open guidance. Reconcile against
    the live Log Drain first. (Unchanged from Session 447.)
 
 ### Owner Decision Needed
 
-1. **Choose and approve a Production record for the direct-upload business
-   smoke.** Evidence: `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md`
-   §§9.2 and 15. Do not use the affected grantee as the tester.
-
-2. **Choose an approved request for the Site Visit handoff smoke.**
+1. **Choose an approved request for the Site Visit handoff smoke.**
    Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The action locks
    Pre-Site regeneration; do not click without explicit request approval.
 
-3. **After 2026-09-02, retain or remove the Stage II rollout flag.**
+2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
    the live environment before changing it.
 
@@ -138,11 +169,15 @@ Tier 0.
 2. A rollback may leave additive migration 031 in place; never drop
    `portal_upload_staging` during incident rollback or delete SharePoint
    content referenced by committed Dataverse state.
-3. Re-probe live upload configuration and use a named approved record before
-   the remaining business smoke.
-4. Re-probe the live Stage II environment before changing/removing its flag;
+3. Treat the direct-upload business acceptance as complete. Repeat it only for
+   a specific regression or incident, never with the originally affected
+   grantee.
+4. Before changing Dataverse privileges, identify the exact staff role and
+   entity operation behind the observed impersonated 403; preserve the
+   intentional fail-safe fallback until a separately approved change is proven.
+5. Re-probe the live Stage II environment before changing/removing its flag;
    `NEXT_PUBLIC_` changes require a new build.
-5. Reconcile the Track A plan with the live Log Drain before collecting or
+6. Reconcile the Track A plan with the live Log Drain before collecting or
    interpreting closeout evidence.
 
 ### Do Not Reopen Without New Decision
@@ -151,10 +186,12 @@ Tier 0.
    administrator screenshot evidence 2026-08-20.
 2. A multipart fallback or proxy-matcher exclusion for large grantee images;
    falsified by the measured Function transport boundary.
-3. Another string-side institution checker or Stage III authority flip based
+3. Another direct-upload Production business smoke without a specific new
+   regression or incident; request `1002788` closed acceptance on 2026-08-20.
+4. Another string-side institution checker or Stage III authority flip based
    only on the 25-case Stage II benchmark.
-4. A separate Site Visit Writeup or Dataverse staff-observations memo.
-5. Routine Vercel CLI update reminders without a concrete incompatibility.
+5. A separate Site Visit Writeup or Dataverse staff-observations memo.
+6. Routine Vercel CLI update reminders without a concrete incompatibility.
 
 ## Key Files Reference
 
@@ -164,13 +201,17 @@ Tier 0.
 | `docs/SHAREPOINT_SITE_PUBLIC_ACCESS_MEMO_2026-08-20.md` | Public-group question memo for IT; record the answer here |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence matrix and item 5 standing state |
 | `docs/CURRENT_WORK_QUEUE.md` | Priority queue; item 1 boundary updated 2026-08-20 |
-| `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` | Direct-upload contract and remaining business smoke |
+| `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` | Direct-upload contract, completed Production acceptance, and named residue |
 | `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Phase II display and Site Visit handoff smokes |
 
 ## Testing
 
-Session 448 was docs-only. All 57 /start gate + self-test runs passed at
-session start; the docs drift gates (docs-catalog, doc-currency,
+The two Session 448 commits were docs-only. All 57 /start gate + self-test runs
+passed at session start; the docs drift gates (docs-catalog, doc-currency,
 fact-consistency, canonical-pointers, doc-symbol-refs, build-claim-freshness,
 agent-wiki, memory-router, drain-table-mentions, prompt-storage-mentions)
-passed after each reconciliation commit. No runtime code changed.
+passed after each reconciliation commit. The later Production acceptance used
+the existing staff UI plus read-only Dataverse, Postgres, Blob, SharePoint, and
+Vercel verification; no runtime code or Production configuration changed.
+The final handoff reconciliation reran the same documentation gate family and
+all checks/self-tests passed.
