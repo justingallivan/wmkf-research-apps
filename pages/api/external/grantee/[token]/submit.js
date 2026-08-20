@@ -15,10 +15,7 @@ import { verifyWaiverRenderToken } from '../../../../../lib/services/external-to
 import { WAIVER_SLOT_CODE } from '../../../../../lib/external/grantee-waiver-policy';
 import { isGuid } from '../../../../../lib/utils/guid';
 import NotificationService from '../../../../../lib/services/notification-service';
-import {
-  GRANTEE_DELIVERABLE_STATUS,
-  isGranteeEditableStatus,
-} from '../../../../../shared/config/granteeDeliverableStatus';
+import { isGranteeEditableStatus } from '../../../../../shared/config/granteeDeliverableStatus';
 import { notifyGranteeSubmission } from '../../../../../lib/services/grantee-submit-notification';
 import { keepAlive } from '../../../../../lib/utils/keep-alive';
 import {
@@ -62,6 +59,7 @@ const ALERTED_SUBMIT_FAILURE_REASONS = new Set([
   'scan_misconfigured',
   'infected',
   'dataverse_failed',
+  'staging_failed',
   'reconciliation_unavailable',
 ]);
 
@@ -118,6 +116,19 @@ function stagingErrorResponse(res, error) {
   throw error;
 }
 
+async function respondSubmitted(res, { body, verified, request, deliverable, imageFile, caption }) {
+  const notifying = notifyGranteeSubmission({
+    requestId: verified.requestId,
+    requestNum: request?.akoya_requestnum || null,
+    title: request?.akoya_title || null,
+    hasImage: Boolean(imageFile || deliverable?.wmkf_imagefileref),
+    captionPresent: Boolean(caption && caption.trim()),
+  });
+  res.status(200).json(body);
+  await keepAlive(notifying);
+  return undefined;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -167,8 +178,11 @@ export default async function handler(req, res) {
 
       const candidate = claim.row.candidate_result;
       if (candidate?.imageRef) {
-        const committed = deliverable?.wmkf_imagefileref === candidate.imageRef
-          && Number(deliverable?.wmkf_deliverablestatus) === GRANTEE_DELIVERABLE_STATUS.SUBMITTED;
+        // A ref match is sufficient proof that this unique candidate committed.
+        // Status may legitimately advance after commit; coupling it here could
+        // misclassify a referenced image as orphaned and delete it.
+        const committed = Boolean(candidate.imageRef)
+          && deliverable?.wmkf_imagefileref === candidate.imageRef;
         if (committed) {
           const body = { ok: true };
           await completePortalUpload({
@@ -177,7 +191,9 @@ export default async function handler(req, res) {
             resultCode: 'reconciled',
             resultPayload: body,
           });
-          return res.status(200).json(body);
+          return respondSubmitted(res, {
+            body, verified, request, deliverable, imageFile: null, caption,
+          });
         }
         const discarded = await discardPortalUploadCandidate(candidate);
         if (!discarded) {
@@ -221,7 +237,9 @@ export default async function handler(req, res) {
         imageFile = await loadClaimedPortalImage({ row: claim.row, leaseToken: claim.leaseToken });
       } catch (error) {
         if (!(error instanceof PortalUploadStagingError)) throw error;
-        const permanent = ['empty_image', 'image_too_large', 'staged_upload_mismatch'].includes(error.code);
+        const permanent = [
+          'empty_image', 'image_too_large', 'staged_upload_mismatch', 'staging_publicly_readable',
+        ].includes(error.code);
         if (permanent) {
           await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: error.code });
         } else {
@@ -283,16 +301,9 @@ export default async function handler(req, res) {
       });
     }
 
-    const notifying = notifyGranteeSubmission({
-      requestId: verified.requestId,
-      requestNum: request?.akoya_requestnum || null,
-      title: request?.akoya_title || null,
-      hasImage: Boolean(imageFile || deliverable?.wmkf_imagefileref),
-      captionPresent: Boolean(caption && caption.trim()),
+    return respondSubmitted(res, {
+      body: responseBody, verified, request, deliverable, imageFile, caption,
     });
-    res.status(200).json(responseBody);
-    await keepAlive(notifying);
-    return undefined;
   } catch (e) {
     console.error('[grantee/submit] unexpected error:', e?.message || e);
     if (res.headersSent) return undefined;

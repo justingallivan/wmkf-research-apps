@@ -293,7 +293,10 @@ to that one pathname/type/size. Finalizers never accept a client pathname. Befor
 shipping changes to this mechanism, run
 `node scripts/probe-private-blob-client-access.mjs`; the release gate is: public
 mode PUT rejected, private PUT accepted, anonymous HEAD = 403, and probe objects
-deleted in cleanup.
+deleted in cleanup. This is deliberately a credentialed Preview release probe,
+not a normal CI/Jest test, because it mutates the live Blob store. Independently,
+every finalizer performs an anonymous HEAD of its exact staged Blob and fails
+closed unless the response is 401/403 before consuming the bytes.
 
 > **Note (2026-06-11): the modern dashboard/CLI auto-connect uses the OIDC model.** When `wmkf-uploads-private` was connected it auto-created `BLOB_STORE_ID` (pointing at the private store) + `BLOB_WEBHOOK_PUBLIC_KEY` and **no** static RW token. That conflicts with this repo's explicit-per-store-token model (it would make the private store the default for token-less `@vercel/blob` calls). Fix applied: the RW token was copied from the store dashboard into `UPLOADS_BLOB_RW_TOKEN`, and `BLOB_STORE_ID` + `BLOB_WEBHOOK_PUBLIC_KEY` were **removed** (`vercel env rm`). For future private stores, either decline the auto-connect or remove those two vars afterward and wire only the explicit token.
 

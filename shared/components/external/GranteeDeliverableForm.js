@@ -14,7 +14,7 @@
  * traverse a Vercel Function request body.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import PolicyAckModal from './PolicyAckModal';
 import GranteeAbstractEditor from './GranteeAbstractEditor';
 import {
@@ -75,6 +75,13 @@ function submitErrorMessage(data) {
     not_editable: 'This request is no longer open for editing. Please contact Foundation staff for help.',
     sharepoint_failed: 'The image upload service was unavailable. Please try again in a few minutes.',
     scan_unavailable: 'The image safety scan was unavailable. Please try again in a few minutes.',
+    staging_expired: 'The temporary image upload expired. Select Submit again to re-upload the selected image.',
+    staging_not_found: 'The temporary image upload is no longer available. Select Submit again to re-upload the selected image.',
+    staged_upload_missing: 'The temporary image could not be found. Select Submit again to re-upload the selected image.',
+    staging_publicly_readable: 'The temporary image did not meet the private-storage requirement. Please select the image again and retry.',
+    staging_privacy_unverified: 'The image privacy check is temporarily unavailable. Please try again in a few minutes.',
+    finalize_in_progress: 'This submission is still being finalized. Please wait a moment and select Submit again.',
+    reconciliation_unavailable: 'The prior save could not yet be confirmed safely. Please wait a moment and select Submit again.',
   };
   return messages[reason] || 'Submission failed. Please try again.';
 }
@@ -91,6 +98,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
   const [uploadProgress, setUploadProgress] = useState(null);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
+  const imageInputRef = useRef(null);
 
   // An image is satisfied by a new upload OR one already on file (replacing is optional).
   const hasImage = imageFile != null || Boolean(init.hasImage);
@@ -207,6 +215,16 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
         if (res.status === 413) reportUploadFailure(activeStage, 'http_rejected', res.status);
+        const terminalStaging = new Set([
+          'staging_expired', 'staging_not_found', 'staged_upload_missing',
+          'staging_publicly_readable', 'image_invalid', 'image_too_large',
+          'empty_image', 'conflict', 'not_editable',
+        ]);
+        if (terminalStaging.has(data.reason)) setStagedUpload(null);
+        if (['staging_publicly_readable', 'image_invalid', 'image_too_large', 'empty_image'].includes(data.reason)) {
+          setImageFile(null);
+          if (imageInputRef.current) imageInputRef.current.value = '';
+        }
         setError(submitErrorMessage(data));
         setSubmitting(false);
         return;
@@ -258,6 +276,7 @@ export default function GranteeDeliverableForm({ token, deliverable, waiverPolic
       <label style={{ display: 'block', marginTop: '1rem' }}>
         <strong>Graphical image</strong>
         <input
+          ref={imageInputRef}
           aria-label="Graphical image"
           type="file"
           accept={ACCEPTED_IMAGE_TYPES}

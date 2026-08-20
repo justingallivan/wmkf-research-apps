@@ -61,6 +61,7 @@ import {
   PortalUploadStagingError,
   claimPortalUpload,
   completePortalUpload,
+  discardPortalUploadCandidate,
   loadClaimedPortalImage,
   rejectPortalUpload,
   releasePortalUpload,
@@ -512,6 +513,67 @@ test('foreign or missing staging id → 404 without loading bytes', async () => 
   expect(loadClaimedPortalImage).not.toHaveBeenCalled();
 });
 
+test('expired-lease reconciliation treats a matching unique ref as committed after status advances', async () => {
+  const verified = okVerify(GRANTEE_DELIVERABLE_STATUS.STAFF_REVIEW);
+  verified.deliverable.wmkf_imagefileref = 'unique-candidate-ref';
+  verifyGranteeToken.mockResolvedValue(verified);
+  claimPortalUpload.mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      original_etag: 'W/"old"',
+      candidate_result: { driveId: 'drive', itemId: 'item', imageRef: 'unique-candidate-ref' },
+    },
+  });
+
+  const res = mockRes();
+  await handler(successReq(), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(discardPortalUploadCandidate).not.toHaveBeenCalled();
+  expect(loadClaimedPortalImage).not.toHaveBeenCalled();
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(completePortalUpload).toHaveBeenCalledWith(expect.objectContaining({
+    resultCode: 'reconciled', resultPayload: { ok: true },
+  }));
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+});
+
+test('a consumed replay returns its durable result without duplicating the PD notification', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.SUBMITTED));
+  claimPortalUpload.mockResolvedValue({ state: 'consumed', result: { ok: true } });
+
+  const res = mockRes();
+  await handler(successReq(), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({ ok: true });
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(NotificationService.notify).not.toHaveBeenCalled();
+});
+
+test('unreferenced candidate is not retried unless its exact cleanup succeeds', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  claimPortalUpload.mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: {
+      original_etag: 'W/"2"',
+      candidate_result: { driveId: 'drive', itemId: 'item', imageRef: 'other-ref' },
+    },
+  });
+  discardPortalUploadCandidate.mockResolvedValue(false);
+
+  const res = mockRes();
+  await handler(successReq(), res);
+
+  expect(res.statusCode).toBe(503);
+  expect(res.body.reason).toBe('reconciliation_unavailable');
+  expect(writeGranteeDeliverables).not.toHaveBeenCalled();
+  expect(releasePortalUpload).toHaveBeenCalled();
+});
+
 test('maps a service failure status/reason through (e.g. image_invalid 400)', async () => {
   verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
   writeGranteeDeliverables.mockResolvedValue({ ok: false, reason: 'image_invalid', status: 400 });
@@ -537,6 +599,24 @@ test('correctable text validation releases the staged image for retry', async ()
     stagingId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   }));
   expect(rejectPortalUpload).not.toHaveBeenCalled();
+});
+
+test('candidate-ledger persistence failure alerts operators after exact SharePoint cleanup', async () => {
+  verifyGranteeToken.mockResolvedValue(okVerify(GRANTEE_DELIVERABLE_STATUS.INVITED));
+  writeGranteeDeliverables.mockResolvedValue({
+    ok: false,
+    reason: 'staging_failed',
+    status: 503,
+    diagnostics: { stage: 'staging_candidate_record', cleanupOutcome: 'deleted' },
+  });
+
+  const res = mockRes();
+  await handler(successReq(), res);
+
+  expect(res.statusCode).toBe(503);
+  expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+  expect(notifyArg()).toMatchObject({ type: 'grantee_submit_failed', severity: 'error' });
+  expect(notifyArg().metadata).toMatchObject({ reason: 'staging_failed' });
 });
 
 test('backend submit failure logs sanitized metadata and alerts operators', async () => {

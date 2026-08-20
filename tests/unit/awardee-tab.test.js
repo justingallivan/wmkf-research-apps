@@ -72,6 +72,8 @@ function wireFetch({
   sentInvitedAt = '2026-08-09T16:00:00Z',
   failAbstractReloadAfterSend = false,
   replaceOk = true,
+  replaceFailures = 0,
+  replaceFailureCode = 'stale',
   replaceNonce = 'bbbbbbbb',
 } = {}) {
   // Stateful effective-abstract mock (S278): GET returns the current state, the
@@ -105,6 +107,7 @@ function wireFetch({
     bylineUnavailable: abstract?.bylineUnavailable ?? false,
   };
   let staleSavePending = staleSave;
+  let replaceFailuresRemaining = replaceFailures;
   global.fetch = jest.fn(async (url, opts = {}) => {
     const u = String(url);
     if (u.includes('/api/email-defaults/grantee-invite')) {
@@ -164,8 +167,18 @@ function wireFetch({
       }) };
     }
     if (u.includes('/grantee-deliverables/replace-submission')) {
-      if (!replaceOk) {
-        return { ok: false, json: async () => ({ error: 'This package changed since you loaded it.', code: 'stale' }) };
+      if (!replaceOk || replaceFailuresRemaining > 0) {
+        if (replaceFailuresRemaining > 0) replaceFailuresRemaining -= 1;
+        return {
+          ok: false,
+          status: replaceFailureCode === 'staging_expired' ? 410 : 409,
+          json: async () => ({
+            error: replaceFailureCode === 'staging_expired'
+              ? 'The temporary image upload expired.'
+              : 'This package changed since you loaded it.',
+            code: replaceFailureCode,
+          }),
+        };
       }
       // Mirror the service: an absent caption field leaves it alone, and a new
       // image lands as a fresh nonce ref (which is what re-keys the inline img).
@@ -1297,6 +1310,27 @@ test('a rejected replacement surfaces the server message and does not claim succ
 
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/changed since you loaded it/i));
   expect(screen.queryByText(/replacement saved/i)).not.toBeInTheDocument();
+});
+
+test('an expired staff staging row is cleared so Save re-mints without reselecting the file', async () => {
+  wireFetch({
+    abstract: submitted(REPLACEABLE),
+    replaceFailures: 1,
+    replaceFailureCode: 'staging_expired',
+  });
+  render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
+  await openReplace();
+  fireEvent.change(screen.getByLabelText('Replacement image'), {
+    target: { files: [new File(['x'], 'new.png', { type: 'image/png' })] },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/temporary image upload expired/i));
+  fireEvent.click(screen.getByRole('button', { name: /save replacement/i }));
+
+  await waitFor(() => expect(screen.getByText(/replacement saved/i)).toBeInTheDocument());
+  expect(put).toHaveBeenCalledTimes(2);
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).includes('replacement-upload-token'))).toHaveLength(2);
 });
 
 test('the panel warns that replacing removes the grantee original', async () => {

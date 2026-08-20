@@ -144,7 +144,9 @@ export default async function handler(req, res) {
     } catch (error) {
       if (error instanceof PortalUploadStagingError) {
         if (claim?.state === 'claimed') {
-          const permanent = ['empty_image', 'image_too_large', 'staged_upload_mismatch'].includes(error.code);
+          const permanent = [
+            'empty_image', 'image_too_large', 'staged_upload_mismatch', 'staging_publicly_readable',
+          ].includes(error.code);
           if (permanent) {
             await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: error.code });
           } else {

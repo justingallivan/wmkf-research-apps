@@ -269,6 +269,35 @@ test('a direct Blob SDK failure sends only closed, authenticated client telemetr
   expect(opts.body).not.toMatch(/SDK detail|signed URL|fig\.png/i);
 });
 
+test('an expired staging row is cleared so the next submit re-uploads without losing edits', async () => {
+  const tokenResponse = (id) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      ok: true, stagingId: id, pathname: `portal-staging/grantee/${id}`,
+      clientToken: `client-${id}`, contentType: 'image/png',
+    }),
+  });
+  const fetchSpy = jest.spyOn(global, 'fetch')
+    .mockResolvedValueOnce(tokenResponse('stage-1'))
+    .mockResolvedValueOnce({ ok: false, status: 410, json: async () => ({ ok: false, reason: 'staging_expired' }) })
+    .mockResolvedValueOnce(tokenResponse('stage-2'))
+    .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true }) });
+  renderForm({ token: 'tok-123' });
+  fireEvent.change(screen.getByLabelText('Image caption'), { target: { value: 'Edited caption survives.' } });
+  fireEvent.change(screen.getByLabelText('Graphical image'), { target: { files: [pngFile()] } });
+  acknowledgeWaiver();
+
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/temporary image upload expired/i));
+  expect(screen.getByLabelText('Image caption')).toHaveValue('Edited caption survives.');
+
+  fireEvent.click(submitBtn());
+  await waitFor(() => expect(screen.getByText(/your materials have been submitted/i)).toBeInTheDocument());
+  expect(put).toHaveBeenCalledTimes(2);
+  expect(fetchSpy.mock.calls.filter(([url]) => String(url).endsWith('/upload-token'))).toHaveLength(2);
+});
+
 test('a server reason is translated into a useful submit error', async () => {
   jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, json: async () => ({ ok: false, reason: 'image_invalid' }) });
   renderForm();

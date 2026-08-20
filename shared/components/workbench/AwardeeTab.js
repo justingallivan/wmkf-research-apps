@@ -673,6 +673,16 @@ export default function AwardeeTab({ requestId, context }) {
       if (currentRequestIdRef.current !== saveRequestId) return;
       if (!res.ok) {
         if (res.status === 413) reportUploadFailure('http_rejected', res.status);
+        const terminalStaging = new Set([
+          'staging_expired', 'staging_not_found', 'staged_upload_missing',
+          'staging_publicly_readable', 'image_invalid', 'image_too_large',
+          'empty_image', 'stale', 'not_replaceable',
+        ]);
+        if (terminalStaging.has(data.code)) setReplaceStagedUpload(null);
+        if (['staging_publicly_readable', 'image_invalid', 'image_too_large', 'empty_image'].includes(data.code)) {
+          setReplaceFile(null);
+          if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
+        }
         setReplaceError(data.error || 'Could not save the replacement.');
       } else {
         setReplaceMsg('Replacement saved.');

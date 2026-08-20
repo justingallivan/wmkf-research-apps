@@ -42,6 +42,7 @@ import {
   PortalUploadStagingError,
   claimPortalUpload,
   completePortalUpload,
+  discardPortalUploadCandidate,
   loadClaimedPortalImage,
 } from '../../lib/services/portal-upload-staging';
 import handler from '../../pages/api/workbench/grantee-deliverables/replace-submission';
@@ -123,6 +124,61 @@ test('actor-bound staged image is loaded and completed around service write', as
   }));
   expect(completePortalUpload).toHaveBeenCalledWith(expect.objectContaining({ stagingId: STAGING_ID }));
   expect(res.statusCode).toBe(200);
+});
+
+test('expired-lease reconciliation returns committed staff candidate without a second write', async () => {
+  claimPortalUpload.mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: {
+      original_etag: 'W/"old"',
+      candidate_result: { driveId: 'drive', itemId: 'item', imageRef: 'candidate-ref' },
+    },
+  });
+  getDeliverableForRequest.mockResolvedValue({
+    wmkf_granteedeliverableid: 'd1', wmkf_deliverablestatus: 100000002,
+    wmkf_imagefileref: 'candidate-ref', wmkf_imagecaption: 'kept', _etag: 'W/"new"',
+  });
+
+  const res = mockRes();
+  await handler(req({ requestId: GUID, etag: ETAG, stagingId: STAGING_ID }), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(discardPortalUploadCandidate).not.toHaveBeenCalled();
+  expect(loadClaimedPortalImage).not.toHaveBeenCalled();
+  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
+  expect(completePortalUpload).toHaveBeenCalledWith(expect.objectContaining({ resultCode: 'reconciled' }));
+});
+
+test('a consumed staff replay returns its durable body without a second domain write', async () => {
+  claimPortalUpload.mockResolvedValue({ state: 'consumed', result: { ok: true, etag: 'W/"d2"' } });
+  const res = mockRes();
+
+  await handler(req({ requestId: GUID, etag: ETAG, stagingId: STAGING_ID }), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({ ok: true, etag: 'W/"d2"' });
+  expect(getDeliverableForRequest).not.toHaveBeenCalled();
+  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
+});
+
+test('staff candidate cleanup failure returns retryable 503 without another write', async () => {
+  claimPortalUpload.mockResolvedValue({
+    state: 'claimed',
+    leaseToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    row: {
+      original_etag: ETAG,
+      candidate_result: { driveId: 'drive', itemId: 'item', imageRef: 'candidate-ref' },
+    },
+  });
+  discardPortalUploadCandidate.mockResolvedValue(false);
+
+  const res = mockRes();
+  await handler(req({ requestId: GUID, etag: ETAG, stagingId: STAGING_ID }), res);
+
+  expect(res.statusCode).toBe(503);
+  expect(res.body.code).toBe('reconciliation_unavailable');
+  expect(replaceGranteeSubmission).not.toHaveBeenCalled();
 });
 
 test.each([undefined, 'not-a-guid'])('invalid requestId %p returns 400', async (requestId) => {

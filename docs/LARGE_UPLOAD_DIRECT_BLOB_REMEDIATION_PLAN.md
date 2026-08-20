@@ -209,8 +209,18 @@ defenses:
   expiry, no overwrite, and the minimum supported cache lifetime;
 - finalization verifies the object is not anonymously readable before use and
   rejects/deletes it otherwise; and
-- an automated adversarial public-mode PUT remains in the Preview security
-  suite so an SDK/store-policy change fails loud.
+- the adversarial public-mode PUT is a required Preview release probe so an
+  SDK/store-policy change fails loud.
+
+**[IMPLEMENTED ON BRANCH]** Finalization performs an anonymous HEAD against the
+exact server-returned Blob URL and accepts only 401/403 before reading bytes;
+anonymous success is a terminal rejection and any indeterminate response is a
+retryable fail-closed error. **Explicit release-process deviation:** the live
+public-mode PUT probe is `scripts/probe-private-blob-client-access.mjs`, not a
+normal Jest/CI test, because it intentionally creates and deletes objects in a
+credentialed Vercel store. It is mandatory for Preview promotion and performs
+its own exact-object cleanup. Unit tests hold the runtime anonymous-read check;
+the live probe holds the external store-policy boundary.
 
 ### 5.2 New Postgres table
 
