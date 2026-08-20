@@ -1,164 +1,172 @@
-# Session 450 Prompt: Explorer Campaign Awaits SoCal Questions; Stage II Window Continues
+# Session 451 Prompt: Verify Reviewer Repair Pending State; Explorer Phase A Remains Open
 
-## Session 449 Summary
+## Session 450 Summary
 
-Session 449 was a no-code exploratory session preparing the Dynamics Explorer
-behavior campaign. It reconstructed the Explorer retooling history, measured
-production behavior from Postgres logs, diagnosed the Sonnet 5 posture risk,
-settled the SoCal twin-field questions by owner-run Dataverse probes, and
-delivered the campaign plan (merged to main as PR #130, `7805b27f`).
+Session 450 shipped the missing operational loop for reviewer repair alerts,
+then corrected the Find card so an already-open repair request cannot be filed
+again. It also incorporated Claude's Dynamics Explorer campaign documents and
+reconciled the production Log Drain's activation state.
 
 ### What Was Completed
 
-1. **Retooling history + production behavior measured**
-   - Three waves reconstructed: Feb round-limit bumps, May Path A, and the
-     Aug 8 cluster (PR #117 thinking-delta fix + `79a27d13` validator lookup
-     aliases). Query-log analysis: pre-Aug-8 ~19% of request-bursts hit ≥15
-     tool calls; post-fix 0 of 15 (small sample). `dynamics_feedback` is
-     empty — no user-reported failure signal exists.
-   - Model flip Haiku→`claude-sonnet-5` occurred by first August use and is
-     what triggered the Aug 7 "Query failed" incident. Sonnet posture risk
-     measured: 3 of 102 calls hit the 2048 `maxTokens` cap (silent
-     truncation); latency ~3.5×. Total Explorer spend ever: $4.09.
+1. **Reviewer repair alerts became actionable from Admin.**
+   - PR #128 (`e74d1124`) added a bounded, server-re-read repair context,
+     current address/conflict evidence, an explicit closeout sequence, and
+     deep links back to the exact Find or Invite surface.
+   - PR #129 (`8b61be8d`) aligned that Admin guidance with the actions the
+     destination card actually exposes.
 
-2. **SoCal vernacular gap diagnosed; twin fields settled by probe**
-   - LEXICON/vocabulary is Research-dialect; SoCal concept-call pipeline,
-     codes (owner's 7.15.22 spreadsheet, read this session), and field-usage
-     differences are unrepresented. Owner decided a program-NEUTRAL rubric.
-   - Owner-run probes: underscore `wmkf_programareaserved_socal`/`_research`
-     carry all data (2,342/4,597); no-underscore twins are dead (0 rows);
-     `wmkf_supporttype2` is real (14,409, active) vs the 53-row lookup;
-     population-served twins ~abandoned since 2024. `akoya_dc_app` holds the
-     Blackbaud application-id crosswalk on 22,879 rows (22,573 = exactly the
-     migrated cohort); other `akoya_dc_*` fields empty on akoya_request.
-     Lineage: Keck migrated from Blackbaud ("Sky"); Pearl was Bromelkamp's
-     prior product — dc fields are stock conversion scaffolding.
+2. **Open repair requests now project back onto the Find card.**
+   - PR #132 (`be21c450`) makes active/acknowledged
+     `reviewer_address_repair_requested` alerts render as **Repair request
+     pending · View in Admin** instead of another **Create repair request**.
+   - **Confirm identity** remains available. A resolved alert no longer
+     suppresses a later request if the underlying block persists.
+   - Alert-status lookup is fail-soft for roster availability but fail-closed
+     for duplicate creation. Creation is transactionally deduplicated under a
+     request/candidate-scoped advisory lock, including concurrent calls with
+     different reason codes.
+   - PR #132 passed all eight required CI/review/security/deployment checks and
+     was production-deployed. The public Production auth boundary returned the
+     expected sign-in redirect and successful sign-in page response.
 
-3. **Campaign plan drafted and merged (PR #130, merge `7805b27f`)**
-   - `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`: Phase A model
-     posture (Sonnet 5 + `effort: low` + 16K ceiling — owner-approved),
-     B request-level telemetry, C eval harness, D program-neutral vernacular
-     rubric, E probe backlog. Durable memory:
-     `.claude-memory/project-dynamics-explorer-socal-campaign.md`.
-   - Drafted the owner's outreach message asking SoCal staff for 10–20 real
-     questions plus two field-usage questions (population-served, `_socal`
-     program-area fill stop).
+3. **Dynamics Explorer behavior campaign docs landed from Claude's isolated worktree.**
+   - PR #130 (`7805b27f`) added the campaign plan, read-only analysis/probe
+     tooling, and durable SoCal field findings.
+   - PR #131 (`8d29e8b1`) recorded Session 449 and created the prior Session
+     450 prompt. The Claude worktree was stopped and removed before the
+     reviewer branch was promoted.
+
+4. **Production Log Drain activation was reconciled.**
+   - [VERIFIED via read-only `operational_events` aggregate, 2026-08-20]
+     Production contains 45 `vercel-drain` rows, first seen
+     `2026-08-19T21:21:58.177Z` and last seen
+     `2026-08-20T20:33:58.144Z`; all rows in the 72-hour aggregate were
+     resolved. The canonical runbook was corrected from “not activated” to
+     LIVE.
+   - This proves signed drain ingestion, not the original Track A
+     whole-stream volume/malformed/truncation criteria. Track A therefore
+     remains a bounded verification item rather than being declared closed.
 
 ### Commits
 
-- `1876b2fc` - Draft Dynamics Explorer behavior campaign plan (S449 exploration)
-- `7805b27f` - Merge pull request #130 (landed the above on main)
+- `997de04d` - feat(admin): guide reviewer repair alert resolution
+- `e74d1124` - Merge PR #128
+- `707a719b` - fix(admin): align reviewer repair guidance with card actions
+- `8b61be8d` - Merge PR #129
+- `1876b2fc` - Draft Dynamics Explorer behavior campaign plan
+- `7805b27f` - Merge PR #130
+- `558740d4` - Document Session 449 and create Session 450 prompt
+- `8d29e8b1` - Merge PR #131
+- `9fbc4e1e` - fix(reviewers): show pending repair requests
+- `be21c450` - Merge PR #132
 
 ## Next Items
 
 ### Verified Open
 
-1. **Explorer campaign Phase A: Sonnet 5 posture fix.**
-   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` §Phase A;
-   api_usage_log truncation measurements (S449).
-   `maxTokens` 2048→16,000 + `output_config: {effort: 'low'}` in
-   `pages/api/dynamics-explorer/chat.js` `callClaude`; verify LLMClient
-   passes `output_config` through ([ASSUMED] unchecked); log `stop_reason`.
-   Does NOT depend on the SoCal questions — buildable now.
+1. **Run the post-deploy signed-in visual check for Neville Sanjana.**
+   Evidence: PR #132 source/tests and the active repair alert for request
+   `e2639251-9644-f111-88b4-000d3a306d0c`.
+   Reload the Find card and verify that **Create repair request** is gone,
+   **Repair request pending · View in Admin** is present, and **Confirm
+   identity** remains available. Do not resolve the Admin alert merely to test
+   the button; resolve it only after the underlying reviewer record is repaired.
 
-2. **Observe Stage II Production outcomes through 2026-09-02.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` (exact-on
-   Production state, organic-observation window). Untouched in S449.
-   Do not manufacture shared-roster rows.
+2. **Explorer campaign Phase A: Sonnet 5 posture fix.**
+   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A and
+   Session 449 query-log measurements.
+   Change `maxTokens` from 2,048 to 16,000, add
+   `output_config: { effort: 'low' }` in
+   `pages/api/dynamics-explorer/chat.js`, verify the shared LLM client passes
+   `output_config`, and log `stop_reason`. This does not depend on the SoCal
+   question set.
 
-3. **Run a staff acceptance smoke of reviewer identity remediation.**
-   Evidence: `docs/REVIEWER_CONTACT_LEADS_SPEC.md`; commits `d9c29c7d`
-   through `5fcd913c`. Untouched in S449.
+3. **Observe Stage II Production outcomes through 2026-09-02.**
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
+   Production state and organic-observation window. Do not manufacture shared
+   roster rows.
 
-4. **Re-probe and close Track A passive safety.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md`
-   still carries the completed 48-hour window as open guidance. Untouched in
-   S449. Reconcile against the live Log Drain first.
+4. **Finish Track A passive-safety closeout against the active drain.**
+   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
+   `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`.
+   The durable sink intentionally retains selected failures, so its 45 rows do
+   not establish total event volume, malformed-event count, throttling, or
+   truncation. Use complete platform/drain-health evidence for those original
+   criteria, then reconcile the two observability docs and close or explicitly
+   narrow Track A.
 
 ### Blocked on External Input
 
-1. **Explorer campaign Phases C–D (eval harness seeds + vernacular rubric).**
-   Evidence: plan §4 Open items; owner sent/is sending the SoCal outreach
-   message drafted in S449.
-   Blocked on: 10–20 real SoCal questions; answers on population-served and
-   `_socal` program-area fill. Phase B (telemetry) is not blocked but is most
-   valuable landed before behavior changes.
+1. **Explorer campaign Phases C-D (eval seeds and vernacular rubric).**
+   Evidence: campaign plan Section 4. Blocked on 10-20 real SoCal questions
+   and answers about population-served and `_socal` program-area usage. Phase B
+   telemetry is not blocked and is most valuable before behavior changes.
 
 ### Owner Decision Needed
 
 1. **Choose an approved request for the Site Visit handoff smoke.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` (signed-in
-   Draft→Review smoke open). Untouched in S449. The action records a durable
-   milestone — do not click without explicit approval.
+   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The action records a
+   durable Draft-to-Review milestone; do not click without explicit approval.
 
 2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Re-probe the live environment and replacement deployment before changing
-   it; `NEXT_PUBLIC_` changes require a new build.
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
+   live environment and replacement deployment state before changing it.
 
 ### Parked
 
-1. **`NEXTAUTH_SECRET` rotation and Vercel Sensitive conversion.**
-   Evidence: owner decision Session 447. Reopen only with a coordinated
-   session-invalidation window.
-
-2. **Reviewer multipart direct-upload conversion.**
-   Evidence: `docs/LARGE_UPLOAD_DIRECT_BLOB_REMEDIATION_PLAN.md` §8.
-   Complete consumer discovery + owner decision first.
-
-3. **Stage III institution identity authority.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Blocked until the execution-point contract exists.
-
-4. **Site Visit dossier/logistics and Final copy transaction.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+1. `NEXTAUTH_SECRET` rotation and Vercel Sensitive conversion — reopen only
+   with a coordinated session-invalidation window.
+2. Reviewer multipart direct-upload conversion — complete consumer discovery
+   and obtain an owner decision first.
+3. Stage III institution identity authority — blocked until the
+   execution-point contract exists.
+4. Site Visit dossier/logistics and Final copy transaction.
 
 ### Verify Before Acting
 
-1. Production Dataverse reads (including the campaign's Phase E probes and
-   any eval-harness run) are owner-run — never set
-   `DATAVERSE_ALLOW_PROD_READS` yourself
-   (`feedback-never-self-authorize-prod-dataverse-reads`).
-2. `dynamics_query_log.record_count` rows before 2026-08-08 carry broken
-   semantics (PR #117); never trend across that boundary.
-3. `compactMessages` clearing prior-turn `tool_use.input` while thinking
-   blocks remain is [ASSUMED] safe — untested with a thinking model; pin it
-   in the Phase C harness before relying on it.
-4. Stage II flag / Track A items: re-probe live state first (carried from
-   S449 prompt, unchanged).
+1. Production Dataverse reads are owner-run. Never set
+   `DATAVERSE_ALLOW_PROD_READS` yourself.
+2. `dynamics_query_log.record_count` rows before 2026-08-08 have broken
+   semantics; never trend across that boundary.
+3. `compactMessages` clearing earlier `tool_use.input` while thinking blocks
+   remain is [ASSUMED] safe and untested with a thinking model; pin it in the
+   Phase C harness before relying on it.
+4. Active/acknowledged repair alerts suppress duplicate creation; resolved
+   alerts do not. Re-read live state before changing an alert status.
+5. Track A's durable `vercel-drain` rows are a selected failure subset, not a
+   complete dependency-event export.
 
 ### Do Not Reopen Without New Decision
 
-1. Asker-profile-based program biasing in the Explorer — owner chose
-   program-NEUTRAL (2026-08-20); revisit only by new owner decision.
-2. Round-exhaustion re-fixes (e.g. raising MAX_TOOL_ROUNDS) without new
-   post-telemetry evidence — the Aug 8 cluster closed the measured era.
-3. Items 1–6 from the Session 449 prompt's list (multipart fallback,
-   Stage III flip on the 25-case benchmark, separate Site Visit memo, Vercel
-   CLI reminders, direct-upload smoke, Phase II display smoke) — unchanged.
+1. Asker-profile-based program biasing in the Explorer — the owner chose a
+   program-neutral rubric on 2026-08-20.
+2. Round-exhaustion changes such as raising `MAX_TOOL_ROUNDS` without new
+   post-telemetry evidence.
+3. Multipart fallback, Stage III activation on the 25-case benchmark, a
+   separate Site Visit memo, Vercel CLI reminders, direct-upload smoke, and
+   Phase II display smoke.
 
 ## Key Files Reference
 
 | File | Purpose |
-|------|---------|
-| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | The campaign plan; §Phase A is the next buildable step |
-| `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions + probe-verified twin/dc-field facts |
-| `scripts/probe-dynexp-query-log-analysis.mjs` | Re-runnable query-log aggregate analysis (Postgres, read-only) |
-| `scripts/probe-programareaserved-twins.mjs` | Owner-run Dataverse twin/dc-family population probe |
-| `pages/api/dynamics-explorer/chat.js` | Phase A target (`callClaude` maxTokens/effort) + Phase B logQuery |
-| `shared/config/prompts/dynamics-explorer.js` | LEXICON / TABLE_ANNOTATIONS — Phase D target |
-| `lib/services/llm-client.js` | Verify `output_config` passthrough before Phase A |
+|---|---|
+| `shared/components/reviewers/ReviewerSearchSection.js` | Find-card pending repair state and remedies |
+| `pages/api/workbench/reviewer-roster.js` | Roster projection of open repair alerts |
+| `lib/services/reviewer-address-trust-service.js` | Repair-request lookup, creation, and server-owned correlation |
+| `lib/services/alert-service.js` | Transactional open-alert deduplication |
+| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Reviewer repair contract and Admin closeout flow |
+| `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Live drain/runbook and durable-event selection contract |
+| `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A criteria |
+| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A is buildable now |
+| `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions and field-probe findings |
 
 ## Testing
 
-```bash
-# Query-log behavior analysis (Postgres, read-only, aggregate-only)
-node scripts/probe-dynexp-query-log-analysis.mjs
+PR #132's focused reviewer/alert suites and all eight required GitHub checks
+passed, including full Jest/gates/build, Playwright, Semgrep, Gitleaks, Trivy,
+and Vercel Preview. Production deployment succeeded; the public auth boundary
+returned its expected redirect and sign-in response.
 
-# Twin/dc-field population probe (production Dataverse — OWNER-RUN ONLY)
-node scripts/probe-programareaserved-twins.mjs
-```
-
-S449 shipped no runtime changes; no test-suite deltas. The S449 claim-evidence
-pilot report returned zero advisory events and zero claims; no observation row
-was eligible.
+The Session 450 claim-evidence pilot report was unavailable because its local
+observation state could not be read. No observation row was added.

@@ -25,10 +25,13 @@ related:
 (merge `9de8b348`). Migration 030 applied to production the same day
 [VERIFIED via `apply-migrations` output + live probe: 23 columns, 8 indexes,
 tracker 29/29]. The app-recorded event path is LIVE.
-**Drain activation remaining:** `VERCEL_LOG_DRAIN_SECRET` is not yet set and
-no Vercel Log Drain has been created — the drain endpoint is deployed and
-fail-closed (unsigned POST → 500) until the owner completes runbook steps
-3–5 below.
+**Drain activation:** Production Log Drain ingestion is LIVE. A read-only
+Postgres aggregate probe on 2026-08-20 found 45 `source='vercel-drain'` rows,
+first observed at `2026-08-19T21:21:58.177Z` and most recently observed at
+`2026-08-20T20:33:58.144Z` [VERIFIED via `operational_events`]. Successful
+signed ingestion proves the drain and matching secret are active; it does not
+by itself prove whole-stream volume, malformed-event, throttling, or
+truncation acceptance for the separate Track A measurement program.
 
 ## Why
 
@@ -143,10 +146,10 @@ admin-tunable via Dataverse settings like every other retention key), open
 rows after twice that window, hard 200k row cap. No cron polls Vercel for
 logs; the drain pushes.
 
-## Drain activation runbook (owner-approved external steps)
+## Drain configuration / recovery runbook (owner-approved external steps)
 
-The application code and migration 030 are already deployed. Only the external
-Vercel drain configuration remains:
+Production is configured and ingesting. Use these steps to recreate the drain,
+rotate its secret, or reverify it after an external configuration change:
 
 1. **Set the secret** (Vercel → Project → Settings → Environment Variables):
    `VERCEL_LOG_DRAIN_SECRET` in Production (and Preview if previews should

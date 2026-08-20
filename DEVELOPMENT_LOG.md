@@ -64,11 +64,14 @@ DTOs.
 **Milestone:** Application failures now persist as structured, sanitized `operational_events` rows
 that outlive Vercel's log-retention window, with recovery tracking that distinguishes
 transient/recovered failures from unresolved ones.
-**Sessions:** one worktree session on `codex/operational-observability` (2026-08-19), merged via PR #123.
+**Sessions:** one worktree session on `codex/operational-observability` (2026-08-19), merged via
+PR #123; Production drain activation and durable-state reconciliation in Session 450 (2026-08-20).
 **Ship state:** `main` at `9de8b348`, deployment READY, migration 030 applied and probe-verified
 (23 cols / 8 idx / tracker 29). LIVE: notify() error/critical mirror, reviewer-acceptance
 honorarium failure enrichment + recovered/superseded settling, superuser admin surface, daily
-retention. DORMANT: the HMAC drain endpoint awaits `VERCEL_LOG_DRAIN_SECRET` + drain creation.
+retention, and HMAC-authenticated Vercel Log Drain ingestion. A read-only 2026-08-20 aggregate
+found 45 `vercel-drain` rows spanning `2026-08-19T21:21:58.177Z` through
+`2026-08-20T20:33:58.144Z`; this proves signed ingestion, not Track A whole-stream acceptance.
 **Why it matters:** operators can open `/admin` after an alert, find the durable event by request
 number or entity id, and see whether it recovered — the honorarium-alert incident class is closed.
 Hardened by six Codex adversarial cycles (nine findings fixed) ending READY TO MERGE.

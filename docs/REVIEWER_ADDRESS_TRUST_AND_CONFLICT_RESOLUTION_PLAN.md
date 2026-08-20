@@ -430,6 +430,19 @@ alerts fail soft to their stored identifiers, and raw metadata is retained under
 This read-only presentation does not repair, unblock, acknowledge, or resolve
 anything by itself.
 
+**Shipped pending-state follow-up (2026-08-20, PR #132 / merge
+`be21c450`):** roster GET now supplements each visible server-owned candidate
+with its matching active or acknowledged repair alert. The Find card replaces
+**Create repair request** with **Repair request pending · View in Admin** while
+that alert is open, but preserves **Confirm identity** as a separate safe
+remedy. Resolving the alert removes the pending projection, so a still-blocked
+candidate can create a later request. The supplemental alert read is fail-soft:
+if it fails, the roster still renders and Confirm identity remains available,
+but duplicate repair creation is suppressed until staff retry the status read.
+Creation itself uses a request/candidate-scoped transactional advisory lock and
+rechecks active/acknowledged state, so concurrent calls and different reason
+codes cannot create two open requests for the same candidate.
+
 ### Total reason-to-remedy matrix
 
 | Code/state | Class / blocks? | What staff see | Primary remedy | Safe completion |
