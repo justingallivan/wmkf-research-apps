@@ -415,6 +415,21 @@ section. Other staff still see the reference and can
 continue with any safe unlinked-reviewer remedy the server offered. Creating an
 alert alone never changes a blocked decision to ready.
 
+**Shipped follow-up (2026-08-20):** expanding a reviewer repair alert now asks
+`GET /api/admin/alerts?repairContext=<alert id>` to re-read the current request,
+roster candidate, person conflict bundle, and bounded evidence links from the
+alert's server-owned correlation keys. The Admin card presents the address pair
+and an explicit review/closeout sequence, then deep-links to the current
+actionable surface: a Find candidate uses
+`?tab=reviewers&sub=find&repairCandidate=...`, while a saved suggestion uses
+`?tab=reviewers&sub=candidates&repairSuggestion=...` and exposes Review repair
+on the highlighted Invite row. The target scrolls into view. A conflict whose
+current person bundle is staff-verified and whose roster block cleared is
+presented as ready to close, not as requiring another repair. Sparse historical
+alerts fail soft to their stored identifiers, and raw metadata is retained under Technical details.
+This read-only presentation does not repair, unblock, acknowledge, or resolve
+anything by itself.
+
 ### Total reason-to-remedy matrix
 
 | Code/state | Class / blocks? | What staff see | Primary remedy | Safe completion |

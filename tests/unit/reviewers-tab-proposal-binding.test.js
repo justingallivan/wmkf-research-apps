@@ -5,6 +5,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 
 let findPanelProps = null;
+let invitePanelProps = null;
 const existingKey = 'akoya_request::REQ/Phase I::ProjectDescription.pdf';
 const mockReplacementKey = 'akoya_request::REQ/Reviewer Materials::Proposal_1003010.pdf';
 jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub(props) {
@@ -20,7 +21,8 @@ jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub() {
   return null;
 });
-jest.mock('../../shared/components/reviewers/ReviewerInvitePanel', () => function InvitePanelStub() {
+jest.mock('../../shared/components/reviewers/ReviewerInvitePanel', () => function InvitePanelStub(props) {
+  invitePanelProps = props;
   return null;
 });
 jest.mock('../../shared/components/reviewers/EmailTemplatesModal', () => function EmailTemplatesModalStub() {
@@ -51,6 +53,7 @@ const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
 
 beforeEach(() => {
   findPanelProps = null;
+  invitePanelProps = null;
   mockReplace.mockClear();
   router.query = {
     requestId: REQ,
@@ -113,4 +116,32 @@ test('ignores a repeated/malformed proposalFile query instead of granting it fil
 
   expect(await screen.findByTestId('persist-proposal')).toHaveAttribute('data-file-key', '');
   expect(findPanelProps.proposalFileKey).toBeNull();
+});
+
+test('passes a repair deep-link candidate key into the Find panel', async () => {
+  router.query = {
+    requestId: REQ,
+    tab: 'reviewers',
+    sub: 'find',
+    repairCandidate: 'candidate:reviewer-name|email:-',
+  };
+
+  render(<ReviewersTab requestId={REQ} />);
+
+  await screen.findByTestId('persist-proposal');
+  expect(findPanelProps.repairCandidateKey).toBe('candidate:reviewer-name|email:-');
+});
+
+test('passes an Invite-origin repair suggestion into the Invite panel', async () => {
+  router.query = {
+    requestId: REQ,
+    tab: 'reviewers',
+    sub: 'candidates',
+    repairSuggestion: 'suggestion-guid',
+  };
+
+  render(<ReviewersTab requestId={REQ} />);
+
+  await waitFor(() => expect(invitePanelProps).not.toBeNull());
+  expect(invitePanelProps.repairSuggestionId).toBe('suggestion-guid');
 });

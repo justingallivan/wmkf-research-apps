@@ -205,7 +205,7 @@ function RowRemoveMenu({ candidate, disabled = false, onRemoveFromProposal, onDe
   );
 }
 
-function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true }) {
+function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCandidates = [], loading = false, onRefresh, settings = {}, canManage = true, repairSuggestionId = null }) {
   const [selected, setSelected] = useState(() => new Set());
   const [modal, setModal] = useState(null); // { candidates, allowResend } | null
   const [editing, setEditing] = useState(null); // candidate row being edited | null
@@ -218,6 +218,17 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   const [exportError, setExportError] = useState(null);
   const [nudgeTarget, setNudgeTarget] = useState(null); // active invited candidate | null
   const exportingRef = useRef(false);
+  const repairTargetRef = useRef(null);
+
+  useEffect(() => {
+    if (
+      repairSuggestionId
+      && candidates.some((candidate) => String(candidate.suggestionId) === String(repairSuggestionId))
+      && typeof repairTargetRef.current?.scrollIntoView === 'function'
+    ) {
+      repairTargetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [candidates, repairSuggestionId]);
 
   // Export the saved candidate list to Excel (same Request Info + Candidates
   // workbook the Find tab builds, server-side). The persisted rows carry only
@@ -407,8 +418,15 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           </p>
 
           <ul className="divide-y divide-gray-100">
-            {candidates.map((c) => (
-              <li key={c.suggestionId} className="py-3 flex items-start gap-3">
+            {candidates.map((c) => {
+              const isRepairTarget = String(c.suggestionId) === String(repairSuggestionId || '');
+              return (
+              <li
+                key={c.suggestionId}
+                ref={isRepairTarget ? repairTargetRef : undefined}
+                data-repair-target={isRepairTarget ? 'true' : undefined}
+                className={`py-3 flex items-start gap-3 ${isRepairTarget ? 'rounded ring-2 ring-amber-400 ring-offset-2' : ''}`}
+              >
                 {/* No email ⇒ can't be invited (send-emails skips no_email). Block
                     selection so a doomed invite can't be queued — but let an
                     already-invited row through (email may have been cleared after
@@ -527,6 +545,19 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                       This legacy selected row has no canonical email. Verify the person and add the exact address before inviting.
                     </div>
                   )}
+                  {isRepairTarget && canManage && (
+                    <div className="mt-1.5 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                      <span className="font-medium">Admin repair alert:</span>{' '}
+                      open the current invitation preview to review the exact address or repair requirement.
+                      <button
+                        type="button"
+                        onClick={() => openInvite([c], Boolean(c.invited))}
+                        className="ml-2 font-medium underline hover:text-amber-950"
+                      >
+                        Review repair
+                      </button>
+                    </div>
+                  )}
 
                   <CandidateRationale reasoning={c.reasoning} />
                   {c.keywords && (
@@ -573,7 +604,8 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           <div className="flex items-center gap-3 mt-3">

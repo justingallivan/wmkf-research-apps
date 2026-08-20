@@ -8,6 +8,11 @@ const clearAddressTrustBlocks = jest.fn();
 const findCandidatesByKeys = jest.fn();
 const recordSurfaced = jest.fn();
 const resolveTrustedReviewerPerson = jest.fn();
+const getRequestById = jest.fn();
+
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  getById: (...args) => getRequestById(...args),
+}));
 
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...args) => findById(...args),
@@ -32,6 +37,7 @@ jest.mock('../../lib/services/notification-service', () => ({
 
 const {
   getAddressConflict,
+  getAddressRepairRequestContext,
   retryAddressCheck,
   verifyPersonAndAddress,
 } = require('../../lib/services/reviewer-address-trust-service');
@@ -92,6 +98,10 @@ beforeEach(() => {
   clearAddressTrustBlocks.mockResolvedValue(null);
   recordSurfaced.mockResolvedValue(1);
   resolveTrustedReviewerPerson.mockResolvedValue(null);
+  getRequestById.mockResolvedValue({
+    akoya_requestnum: '1000001',
+    akoya_title: 'Test request',
+  });
 });
 
 test('already-promoted verification binds evidence to the exact current person address atomically', async () => {
@@ -236,6 +246,147 @@ test('ordinary roster conflict discloses only the current address pair', async (
       foundEmail: 'found@example.edu',
       reason: 'email_mismatch',
     },
+  });
+});
+
+test('repair alert context re-reads request, conflict, and bounded evidence from server-owned keys', async () => {
+  const candidateKey = 'candidate:reviewer';
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@lab.example.edu',
+    reason: 'email_mismatch',
+    source: 'scholarly_multi',
+    requestId: REQUEST_ID,
+    candidateKey,
+    detectedAt: '2026-08-20T20:00:00.000Z',
+  });
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey,
+    name: 'Reviewer Name',
+    affiliation: 'Example University',
+    email: 'found@lab.example.edu',
+    rosterStatus: 'active',
+    website: 'https://example.edu/reviewer',
+    orcid: '0000-0002-1825-0097',
+    contactEnrichment: {
+      emailSource: 'scholarly_multi',
+      emailEvidence: {
+        sourceUrl: 'javascript:alert(1)',
+        publications: [{ title: 'Evidence paper', url: 'https://pubmed.ncbi.nlm.nih.gov/1/' }],
+      },
+    },
+  }]);
+  resolveTrustedReviewerPerson.mockResolvedValueOnce({
+    personId: PERSON_ID,
+    person: {
+      wmkf_name: 'Reviewer Name',
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(conflict),
+    },
+  });
+
+  await expect(getAddressRepairRequestContext({
+    requestId: REQUEST_ID,
+    candidateKey,
+    code: 'address_conflict_pending',
+  })).resolves.toMatchObject({
+    request: { id: REQUEST_ID, number: '1000001', title: 'Test request' },
+    reviewer: { candidateKey, name: 'Reviewer Name', affiliation: 'Example University' },
+    issue: {
+      status: 'conflict_pending',
+      storedEmail: 'stored@example.edu',
+      foundEmail: 'found@lab.example.edu',
+      source: 'scholarly_multi',
+    },
+    evidenceLinks: [
+      { label: 'Institution or lab profile', url: 'https://example.edu/reviewer' },
+      { label: 'ORCID profile', url: 'https://orcid.org/0000-0002-1825-0097' },
+      { label: 'Evidence paper', url: 'https://pubmed.ncbi.nlm.nih.gov/1/' },
+    ],
+    workbenchUrl: expect.stringContaining(`repairCandidate=${encodeURIComponent(candidateKey)}`),
+  });
+  expect(getRequestById).toHaveBeenCalledWith(REQUEST_ID, {
+    select: 'akoya_requestnum,akoya_title',
+  });
+  expect(update).not.toHaveBeenCalled();
+  expect(recordSurfaced).not.toHaveBeenCalled();
+});
+
+test('suggestion repair context falls back to Dataverse and deep-links to Invite when its roster row is gone', async () => {
+  const candidateKey = `suggestion:${SUGGESTION_ID}`;
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@example.edu',
+    reason: 'email_mismatch',
+    requestId: REQUEST_ID,
+    candidateKey,
+    detectedAt: '2026-08-20T20:00:00.000Z',
+  });
+  findCandidatesByKeys.mockResolvedValueOnce([]);
+  getById.mockResolvedValue({
+    wmkf_name: 'Saved Reviewer',
+    wmkf_emailaddress: 'stored@example.edu',
+    wmkf_addresstruststatejson: JSON.stringify(conflict),
+  });
+
+  const context = await getAddressRepairRequestContext({
+    requestId: REQUEST_ID,
+    candidateKey,
+    suggestionId: SUGGESTION_ID,
+    code: 'address_conflict_pending',
+  });
+
+  expect(context).toMatchObject({
+    workbenchSurface: 'invite',
+    workbenchUrl: expect.stringContaining(`sub=candidates&repairSuggestion=${SUGGESTION_ID}`),
+  });
+});
+
+test('a staff-verified conflict with a cleared roster block is ready to close, not repair again', async () => {
+  const candidateKey = 'candidate:resolved-reviewer';
+  const prior = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'found@example.edu',
+    reason: 'email_mismatch',
+    requestId: REQUEST_ID,
+    candidateKey,
+    detectedAt: '2026-08-20T20:00:00.000Z',
+  });
+  const resolved = createStaffVerifiedState({
+    email: 'stored@example.edu',
+    requestId: REQUEST_ID,
+    candidateKey,
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/profile',
+    attestedAt: '2026-08-20T21:00:00.000Z',
+    resolution: {
+      conflict: prior.conflict,
+      decision: 'keep_stored',
+      resolvedAt: '2026-08-20T21:00:00.000Z',
+    },
+  });
+  findCandidatesByKeys.mockResolvedValueOnce([{
+    candidateKey,
+    name: 'Resolved Reviewer',
+    email: 'stored@example.edu',
+    rosterStatus: 'active',
+    addressConflictPending: false,
+    conflictRecordUnavailable: false,
+  }]);
+  resolveTrustedReviewerPerson.mockResolvedValueOnce({
+    personId: PERSON_ID,
+    person: {
+      wmkf_emailaddress: 'stored@example.edu',
+      wmkf_addresstruststatejson: JSON.stringify(resolved),
+    },
+  });
+
+  await expect(getAddressRepairRequestContext({
+    requestId: REQUEST_ID,
+    candidateKey,
+    code: 'address_conflict_pending',
+  })).resolves.toMatchObject({
+    issue: { status: 'ready_to_close' },
   });
 });
 

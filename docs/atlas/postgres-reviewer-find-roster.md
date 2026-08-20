@@ -153,8 +153,11 @@ cold search emitted the new authority envelope.
   callers retain their internal roster read. On that embedded warm path, panel
   mount performs neither proposal preparation nor applicant-input
   materialization; staff explicitly prepare the canonical/manual proposal and
-  explicitly load applicant suggestions. The embedded cold-search control fails
-  closed until that materialization succeeds and its exclusion parse is
+  explicitly load applicant suggestions. The superuser-only Admin repair-alert
+  detail path may separately re-read one exact candidate from server-owned
+  alert correlation keys to present current repair context and a Workbench deep
+  link; that read performs no roster mutation. The embedded cold-search control
+  fails closed until that materialization succeeds and its exclusion parse is
   available, so a search cannot silently omit applicant exclusions. A missing
   applicant-enrichment cache remains visible and idle until staff choose its verification action. The
   request/generation and AbortController guards prevent an explicit operation

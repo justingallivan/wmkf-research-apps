@@ -108,6 +108,12 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   const proposalFileKey = typeof router.query.proposalFile === 'string'
     ? router.query.proposalFile
     : null;
+  const repairCandidateKey = typeof router.query.repairCandidate === 'string'
+    ? router.query.repairCandidate
+    : null;
+  const repairSuggestionId = typeof router.query.repairSuggestion === 'string'
+    ? router.query.repairSuggestion
+    : null;
 
   // A deliberate proposal override is navigation state, not component memory.
   // The Find loader still revalidates this opaque key against the request's
@@ -491,6 +497,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           savedPool={findSavedPool}
           onSaved={refreshAll}
           onNavigate={selectSub}
+          repairCandidateKey={repairCandidateKey}
         />
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
@@ -501,6 +508,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           onRefresh={refreshAll}
           settings={settings}
           canManage={canManage}
+          repairSuggestionId={repairSuggestionId}
         />
       ) : (
         <ReviewerManagePanel

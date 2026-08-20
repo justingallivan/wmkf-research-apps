@@ -4,6 +4,7 @@ import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
+import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DataverseFieldInfoButton, {
   appSystemSettingField,
   appSystemSettingPattern,
@@ -498,14 +499,18 @@ function SystemAlertsSection() {
                       {alert.source && ` \u00b7 ${alert.source}`}
                     </div>
                     {expandedId === alert.id && (
-                      <div className="mt-2 text-xs text-gray-700 space-y-1">
-                        {alert.message && <p>{alert.message}</p>}
-                        {alert.metadata && (
-                          <pre className="bg-white/50 p-2 rounded text-[11px] overflow-x-auto max-h-40">
-                            {JSON.stringify(alert.metadata, null, 2)}
-                          </pre>
-                        )}
-                      </div>
+                      alert.alert_type === 'reviewer_address_repair_requested' ? (
+                        <ReviewerRepairAlertDetails alert={alert} />
+                      ) : (
+                        <div className="mt-2 text-xs text-gray-700 space-y-1">
+                          {alert.message && <p>{alert.message}</p>}
+                          {alert.metadata && (
+                            <pre className="bg-white/50 p-2 rounded text-[11px] overflow-x-auto max-h-40">
+                              {JSON.stringify(alert.metadata, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
