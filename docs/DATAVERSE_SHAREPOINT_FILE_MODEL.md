@@ -960,7 +960,8 @@ The remaining controls are deliberately not collapsed into that pass:
   decision, not an app change ([ASSUMED] the app's own `Sites.Selected` grant
   is per-site and independent of group privacy — verify app access after any
   flip, and add ambient-access staff as real members first). No change was
-  requested on 2026-08-20.
+  requested on 2026-08-20; the intentional-vs-default question is posed to IT
+  in `docs/SHAREPOINT_SITE_PUBLIC_ACCESS_MEMO_2026-08-20.md`.
 - **[PARTIAL] Workbench recovery UI.** Current version and last-modified
   metadata are live. Version-history navigation and an administrator-only
   restore action are not implemented.

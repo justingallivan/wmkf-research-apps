@@ -1,8 +1,13 @@
 # SharePoint permission audit — primer for Connor's Claude Code
 
+> **Correction (2026-08-20):** the drafting session fabricated the organization
+> name "Wilburforce Foundation" in this file; the organization is the **W.M.
+> Keck Foundation** (WMKF). Corrected below. The copy actually sent to Connor
+> may have carried the wrong name; the owner reviewed and is not concerned.
+
 **Purpose:** paste everything below the line into a fresh Claude Code session on
 Connor's machine. It is written to be self-contained — it assumes no access to
-the Wilburforce/WMKF repository and no prior conversation.
+the WMKF repository and no prior conversation.
 
 **Scope:** a strictly read-only diagnosis of permissions, recycle-bin
 configuration, and version policy on one SharePoint site and one document
@@ -13,7 +18,7 @@ library. No setting is changed, nothing is deleted, and nothing is restored.
 # Read-only SharePoint permission and recoverability audit
 
 You are helping me (Connor) run a **read-only diagnostic** against one SharePoint
-Online site. Someone else (Justin, at the Wilburforce Foundation) needs specific
+Online site. Someone else (Justin, at the W.M. Keck Foundation) needs specific
 facts about how this site and library are configured. Your job is to help me get
 the prerequisites working, run the read-only checks I'm authorized to run, and
 produce a clean report I can send back.
