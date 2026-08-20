@@ -22,9 +22,12 @@ production-deployed.** The private-store adversarial preflight, migration,
 external and staff direct-upload flows, durable retry/reconciliation ledger,
 exact-path maintenance cleanup, and authenticated sanitized client-failure
 events are present and covered by focused tests. Remaining release gates are
-Preview migration and deployment, and an owner-controlled browser smoke with
-the exact supplied PNG. Claude Opus's second adversarial implementation pass
-returned **SHIP READY** after the first pass's material findings were fixed.
+the owner-approved additive migration 031 against the Postgres integration
+shared by Preview and Production, followed by an owner-controlled browser smoke
+with the exact supplied PNG. Preview deployment
+`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` is Ready. Claude Opus's second adversarial
+implementation pass returned **SHIP READY** after the first pass's material
+findings were fixed.
 
 State labels are deliberate:
 
@@ -597,3 +600,24 @@ The second pass re-read the fixes, re-ran the focused test surface, and returned
 error may require an explicit reselect, and the private-Blob HEAD check is
 deliberately fail-closed if the provider response shape changes. Preview and the
 exact-file browser smoke remain release gates rather than review findings.
+
+## 14. Preview release evidence
+
+**[VERIFIED 2026-08-19 via Vercel CLI]** Preview deployment
+`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9` completed the canonical Next.js 16.3
+Turbopack build and reached Ready. Its route inventory includes the external
+and staff token/failure endpoints plus both JSON finalizers. A protected CLI
+request to the external token endpoint matched the dynamic route and failed
+closed with `401 malformed` for an intentionally invalid token.
+
+**[VERIFIED 2026-08-19 via Vercel environment scope listing, one-way connection
+fingerprints, and `scripts/audit-postgres-state.js`]** Preview and Production
+use the same Postgres integration, and `portal_upload_staging` is not present
+yet. Migration 031 is therefore a production database change even when it is
+needed by a Preview smoke; it requires the owner's explicit release decision.
+
+**[VERIFIED 2026-08-19 via Jest]** The post-review full regression run passed
+669 suites and 8,636 tests. The recorded last-known-good Production rollback
+target before the Preview deployment is
+`wmkfresearchapps-erymyonv3-justin-gallivans-projects.vercel.app` at commit
+`7d20afddf7d2d6d73722829066e26a72990a4b27`.
