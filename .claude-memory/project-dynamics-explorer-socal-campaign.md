@@ -7,7 +7,7 @@ metadata:
   status: active
   scope: dynamics
   originSessionId: abb437dd-056c-45cf-9188-a6ea7a903c05
-  modified: 2026-08-21T16:53:00.000Z
+  modified: 2026-08-21T20:45:00.000Z
 ---
 
 ## Recall Rule
@@ -42,9 +42,9 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
    and 5355 recorded successful `tool_use` and `end_turn` stop reasons (27/545
    output tokens; 1.851s/4.970s). The longer latency/cap observation window
    remains open.
-2. Phase B request telemetry is implemented and tested in source on
-   `codex/reviewer-email-conflict-self-service`; migration 033 is generated but
-   not yet applied and the branch is not deployed. One
+2. Phase B request telemetry is Production-live at commit `ea125997` /
+   deployment `dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; migration 033 applied at
+   `2026-08-21T20:40:02.139Z`, and exact schema/tracker readback passed. One
    `dynamics_explorer_requests` row owns each accepted request lifecycle;
    nullable request/round fields correlate existing per-tool query and
    per-model usage rows, and authenticated-profile + exact-session verification
@@ -52,8 +52,10 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
    abort so its rejection cannot win as `error`; stale `running` is derived as
    `abandoned`. Do not put a synthetic terminal row into
    `dynamics_query_log`. `record_count` rows before 2026-08-08 still carry
-   broken semantics. Next proof: deploy, apply migration 033, and read back one
-   harmless joined request. One OAuth-authenticated, read-only Claude Fable
+   broken semantics. Signed-in request
+   `84aee86d-9c89-4434-9642-47ee6ccb4141` completed in two rounds and joined to
+   one tool row plus two usage rows; no feedback row or Dataverse write was
+   created. One OAuth-authenticated, read-only Claude Fable
    implementation review returned READY with no P0/P1 finding; minor review
    loops were explicitly excluded.
 3. Eval harness (golden questions, both Research and SoCal dialects) — organic

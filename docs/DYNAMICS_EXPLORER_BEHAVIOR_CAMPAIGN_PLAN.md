@@ -22,9 +22,10 @@ related:
 **Status:** Active. Phase A is Production-live as of 2026-08-21 at commit
 `9a54620d`; migration `032_api_usage_stop_reason.sql` is applied and deployment
 `dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` is Ready on the Production aliases. Phase B
-is implemented and verified in source on a feature branch; migration 033,
-deployment, and Production joined-row proof remain open. Phases C-E remain
-planned from the S449 probe evidence.
+is Production-live at commit `ea125997` / deployment
+`dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; migration 033 and one exact joined
+signed-in request were read back on 2026-08-21. Phases C-E remain planned from
+the S449 probe evidence.
 
 **Objective:** make the Explorer trustworthy for staff outside the Research
 team — starting with SoCal — while making its behavior *measurable*, so the
@@ -122,7 +123,7 @@ Ordered so measurement lands before behavior changes.
 
 ### Phase B — Request-level telemetry
 
-- **IMPLEMENTED IN SOURCE; NOT YET DEPLOYED/MIGRATED:**
+- **PRODUCTION-LIVE AND JOIN-SMOKE-VERIFIED 2026-08-21:**
   `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Preserve the unit of
   meaning of each log: a new `dynamics_explorer_requests` lifecycle table owns
   one row per request; nullable request/round columns correlate tool rows in
@@ -134,8 +135,9 @@ Ordered so measurement lands before behavior changes.
   `abandoned`. Telemetry remains fail-soft toward the user.
 - Keep the 2026-08-08 era boundary documented wherever record_count trends
   are read (earlier rows are not comparable).
-- Acceptance: one SQL query answers "distribution of rounds and outcomes per
-  request this month".
+- **Acceptance passed 2026-08-21:** the committed aggregate probe answered the
+  monthly outcome/round distribution directly from request rows and reported
+  correlation completeness without session/tool-count heuristics.
 
 ### Phase C — Eval harness (replay, not soak)
 
@@ -226,7 +228,7 @@ claim gets a dated probe first:
 | Unsupported/fallback models do not receive effort | `LLMClient._buildBody` and fallback rebuild | N/A | Anthropic request body | Capability registry + existing body-shaping tests + model gate | VERIFIED |
 | Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Deployed source + logger/client tests + migration 032 + fresh-install parity + Production schema/tracker readback + usage rows 5354/5355 | VERIFIED in Production (`tool_use`, then `end_turn`) |
 | Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Deployed source + route-config test | VERIFIED in Production at 4,096 |
-| Request-level rounds/outcomes are queryable | Chat handler + request telemetry service | Source-defined `dynamics_explorer_requests`; nullable request/round correlations on query/usage logs; verified optional feedback FK | Aggregate analysis probe and feedback review | Migration 033 + fresh-install parity + focused route/service/client/cleanup tests; Production migration/deployment not yet performed | VERIFIED IN SOURCE; PRODUCTION OPEN |
+| Request-level rounds/outcomes are queryable | Chat handler + request telemetry service | `dynamics_explorer_requests`; nullable request/round correlations on query/usage logs; verified optional feedback FK | Aggregate analysis probe and feedback review | Deployed `ea125997`; migration 033 schema/tracker readback; request `84aee86d-9c89-4434-9642-47ee6ccb4141` joined to one tool row and two usage rows | VERIFIED IN PRODUCTION |
 
 **Sweep mode:** Mode A — changed fact. Source → persistence → consumer was
 traced before documentation edits. Searches covered source/tests, active docs,
@@ -263,8 +265,8 @@ explicitly pending.
 
 | Claim | Producer / entry | Persistence | Consumer | Evidence | Status |
 |---|---|---|---|---|---|
-| One accepted request has one lifecycle | Chat route + request telemetry service | `dynamics_explorer_requests` via migration 033 | Monthly outcome/round analysis | Focused service/route tests + Fable P0/P1 review | VERIFIED IN SOURCE |
-| Tool/model rows retain their own units | `logQuery` + `LLMClient`/usage logger | Nullable request/round fields on query/usage logs | Joined request diagnosis | Route/client/logger tests + pre-migration fallback tests | VERIFIED IN SOURCE |
+| One accepted request has one lifecycle | Chat route + request telemetry service | `dynamics_explorer_requests` via migration 033 | Monthly outcome/round analysis | Focused service/route tests + Fable P0/P1 review + Production joined smoke | VERIFIED IN PRODUCTION |
+| Tool/model rows retain their own units | `logQuery` + `LLMClient`/usage logger | Nullable request/round fields on query/usage logs | Joined request diagnosis | Route/client/logger tests + pre-migration fallback tests + Production joined smoke | VERIFIED IN PRODUCTION |
 | Feedback correlation is non-authoritative | Browser request ID → feedback route/service | Nullable feedback FK after owner + exact-session verification | Admin feedback review | Client/service tests, mismatch/outage cases | VERIFIED IN SOURCE |
 | Retention preserves feedback | Maintenance cron/service | Request rows 365d; FK `ON DELETE SET NULL` | Aggregate analysis and retained feedback | Cleanup service/cron tests + migration | VERIFIED IN SOURCE |
 
@@ -289,7 +291,14 @@ detailed Phase B plan, campaign memory, and session handoff. Historical Phase A
 Production evidence and the pre-2026-08-08 `record_count` warning remain
 unchanged.
 
-**Remaining unverified external state:** migration 033 application/tracker
-readback, deployment, and one signed-in harmless request with joined
-lifecycle/query/usage evidence. **Verdict:** RECONCILED for source completion;
-not Production-live.
+**Production release evidence:** commit `ea125997` deployed Ready as
+`dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; migration 033 applied transactionally at
+`2026-08-21T20:40:02.139Z`, followed by exact tracker, column, index, and
+constraint readback. Signed-in request
+`84aee86d-9c89-4434-9642-47ee6ccb4141` completed in two rounds with one
+correlated tool row, two correlated usage rows, and zero feedback rows. The
+browser returned 16,305 proposals; no Dataverse write or synthetic feedback was
+performed. The committed aggregate probe reported one August `completed`
+request, average/p90 rounds of 2, no abandonment, and complete observed
+query/usage correlation. **Verdict:** RECONCILED and VERIFIED IN PRODUCTION; organic
+distribution/latency observation remains open.

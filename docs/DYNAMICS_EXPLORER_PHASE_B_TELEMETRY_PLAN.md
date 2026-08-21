@@ -17,9 +17,9 @@ related:
 
 # Dynamics Explorer Phase B — Request Telemetry Plan
 
-**Status:** IMPLEMENTED AND FABLE-REVIEWED IN SOURCE — migration 033 is
-generated but not applied; the branch is not deployed and Production
-schema/runtime evidence remains open
+**Status:** PRODUCTION-LIVE AND SMOKE-VERIFIED — commit `ea125997`, deployment
+`dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`, migration 033, exact schema readback, and
+one joined signed-in request were verified on 2026-08-21
 
 **Owner decision:** proceed with request-level measurement before changing Explorer behavior
 
@@ -28,7 +28,7 @@ schema/runtime evidence remains open
 ## 1. Outcome
 
 Phase B makes one Explorer chat request—not a browser session and not an
-individual tool call—the unit of analysis. Once migration 033 is applied, one query can
+individual tool call—the unit of analysis. One query can
 answer how many accepted requests completed, were truncated, exhausted the
 round limit, failed, or lost their client; how many model rounds they used; and
 which tool and model-usage rows belong to each request.
@@ -47,7 +47,7 @@ tool behavior, model choice, or the answer shown to the user.
 | Tool executions are logged | Each executed or denied tool calls `logQuery` | `dynamics_query_log` | Analysis scripts and 365-day cleanup | Chat route, setup schema, maintenance service | VERIFIED |
 | Model completion reasons are normalized | `LLMClient.complete/stream` | Nullable `api_usage_log.stop_reason` on completed calls | Usage analysis | `lib/services/llm-client.js`, migration 032 | VERIFIED |
 | Feedback is session-correlated | Explorer page posts `sessionId` | `dynamics_feedback` | Admin feedback surface | Explorer page, feedback route/service | VERIFIED |
-| Request outcomes are durable | Chat route + `dynamics-explorer-request-telemetry.js` | `dynamics_explorer_requests` | Aggregate analysis probe | Source, migration 033, focused tests | VERIFIED IN SOURCE; NOT DEPLOYED/MIGRATED |
+| Request outcomes are durable | `/api/dynamics-explorer/chat` + `dynamics-explorer-request-telemetry.js` | `dynamics_explorer_requests` | Aggregate analysis probe | Deployed source, migration 033 readback, focused tests, joined Production smoke | VERIFIED IN PRODUCTION |
 
 The current `dynamics_query_log` aggregates remain a tool-call proxy, not a
 request measure. A browser `session_id` can contain several requests, and one
@@ -89,10 +89,9 @@ semantics.
 
 ### 3.2 Schema
 
-At implementation time, allocate the next migration number (currently expected
-to be 033; re-check the manifest first), add it to
-`lib/db/migrations-manifest.json`, and make `scripts/setup-database.js`
-byte-for-contract equivalent for a fresh install.
+Implementation allocated migration 033 after re-checking the manifest, added it
+to `lib/db/migrations-manifest.json`, and made `scripts/setup-database.js`
+contract-equivalent for a fresh install.
 
 New table:
 
@@ -369,6 +368,16 @@ Additional joined checks must be possible without heuristics:
    then run one harmless signed-in request and verify the request, usage, and
    tool rows join by the same ID. Do not manufacture feedback in Production.
 
+Step 8 completed on 2026-08-21: `ea125997` deployed Ready as
+`dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; migration 033 applied transactionally at
+`2026-08-21T20:40:02.139Z`; schema, indexes, constraints, and tracker state
+matched the source contract; and signed-in request
+`84aee86d-9c89-4434-9642-47ee6ccb4141` completed in two rounds with one
+round-1 tool row, two usage rows across rounds 1–2, and no feedback row.
+The committed aggregate probe then reported one August `completed` request,
+average/p90 rounds of 2, no derived abandonment, and complete query/usage
+correlation for the observed request.
+
 ## 9. Verification gates
 
 ### Focused tests
@@ -427,24 +436,32 @@ process death can always be distinguished from a lost client.
 
 ## 11. Sweep report for this plan
 
-- **Mode:** B — domain truth audit, limited to the Phase B telemetry contract.
-- **Authoritative evidence:** chat/page/feedback/LLM/usage/maintenance source,
-  Postgres setup and migrations, Atlas, committed aggregate probe, and current
-  tests.
-- **Claims:** request UUID, round counting, terminal classification, lifecycle
-  persistence, nullable cross-table correlation, verified feedback linkage,
-  and retention are VERIFIED IN SOURCE; Production migration/deployment and
-  joined-row evidence remain open.
-- **Durable restatements in scope:** this plan, the parent campaign plan,
-  Explorer campaign memory, and session handoff.
-- **Historical surfaces left unchanged:** dated pre/post Aug 8 aggregate
-  evidence and the March 2026 security review snapshot.
-- **Durable reconciliation:** both Atlas surfaces, the API matrix, service
-  catalog, parent campaign plan, campaign memory, and session handoff are
-  updated in this implementation commit with the source-versus-Production
-  boundary explicit.
-- **Remaining unknown:** exact disconnect coverage under platform process loss;
-  it is deliberately represented as stale `running` → derived `abandoned`.
+- **Mode:** A — changed fact: source-complete Phase B became Production-live.
+- **Authoritative evidence:** commit `ea125997`; Ready deployment
+  `dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; transactional migration output; exact
+  tracker/column/index/constraint readback; signed-in browser response; joined
+  lifecycle/query/usage SQL; and the committed aggregate probe.
+- **Claims:** deployment, schema application, terminal lifecycle persistence,
+  exact query/usage correlation, and aggregate analysis are 5 VERIFIED / 0
+  PARTIAL / 0 PLANNED / 0 ASSUMED / 0 STALE-CONFLICT / 0 UNKNOWN for this
+  release proof.
+- **Restatement files:** 7 active durable files contained source-only or
+  pending-Production language; all 7 were classified STALE and structurally
+  corrected. Dated planning/review transcripts remain HISTORICAL.
+- **Durable reconciliation:** this plan, the parent campaign plan, both Atlas
+  surfaces, the API matrix, campaign memory, and session handoff record the
+  2026-08-21 Production deployment, migration, readback, and smoke.
+- **Disconfirming checks:** the pre-apply probe found migration 033 absent; the
+  post-apply probe found its tracker row and exact schema; the joined smoke
+  found one completed request with one query row and two usage rows; the
+  aggregate probe independently found one terminal request with complete
+  observed query/usage correlation; and the stale-language re-search returned
+  no current hit.
+- **Semantic omissions:** none found in the bounded Phase B release surfaces.
+- **Remaining live STALE:** 0. **Verdict:** RECONCILED.
+- **Remaining runtime unknown:** exact disconnect coverage under platform
+  process loss; it is deliberately represented as stale `running` → derived
+  `abandoned`, not asserted as a detectable terminal event.
 
 ## 12. Adversarial review record
 

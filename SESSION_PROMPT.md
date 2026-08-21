@@ -1,4 +1,4 @@
-# Session 451 Prompt: Explorer Phase B Built in Source; Production Proof Pending
+# Session 451 Prompt: Explorer Phase B Production-Live and Join-Verified
 
 ## Session 450 Summary
 
@@ -101,7 +101,7 @@ documents and reconciled the production Log Drain's activation state.
    found successful usage rows 5354/5355 with non-null `tool_use` and
    `end_turn` stop reasons, 27/545 output tokens, and 1.851s/4.970s latency.
 
-7. **Dynamics Explorer Phase B request telemetry is built in source.**
+7. **Dynamics Explorer Phase B request telemetry is Production-live.**
    - Migration 033 plus fresh-install parity define one
      `dynamics_explorer_requests` lifecycle row per authenticated, body-valid
      request and nullable request/round correlation on query and usage logs;
@@ -119,8 +119,17 @@ documents and reconciled the production Log Drain's activation state.
    - One OAuth-authenticated read-only Claude Fable implementation review traced
      caller→persistence→consumer and returned READY with no P0/P1 finding. Per
      owner direction, no minor-point review loop was opened.
-   - This is source evidence only. Migration 033 is not applied, the branch is
-     not deployed, and Production joined-row proof remains open.
+   - Commit `ea125997` deployed Ready as
+     `dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`. Migration 033 applied transactionally
+     at `2026-08-21T20:40:02.139Z`; tracker, lifecycle/correlation columns,
+     indexes, and constraints matched the source contract on readback.
+   - The signed-in read-only question “How many proposals are there?” returned
+     16,305 after two rounds. Request
+     `84aee86d-9c89-4434-9642-47ee6ccb4141` persisted `completed` / `end_turn`,
+     one round-1 query row, two usage rows across rounds 1–2, and no feedback
+     row. No Dataverse write was performed. The aggregate probe independently
+     reported one completed August request, p90 rounds of 2, and complete
+     observed query/usage correlation.
 
 ### Commits
 
@@ -140,17 +149,19 @@ documents and reconciled the production Log Drain's activation state.
 - `0e9b25f` - chore(vercel): exclude local codegraph state
 - `ba5a22f` - fix(reviewers): expose combined email choice
 - `9a54620d` - feat(dynamics-explorer): tune interactive model posture
+- `1b552cae` - docs(dynamics-explorer): plan request telemetry
+- `ea125997` - feat(dynamics-explorer): add request telemetry
 
 ## Next Items
 
 ### Verified Open
 
-1. **Promote and Production-prove Explorer campaign Phase B request telemetry.**
-   Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Source and
-   tests are complete. Next: merge/deploy deliberately, apply migration 033,
-   verify exact schema/tracker state, run one harmless signed-in Explorer
-   request, and read back the lifecycle/query/usage join. Do not claim Phase B
-   Production-live before those steps.
+1. **Observe Explorer campaign Phase B over normal use.**
+   Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Deployment,
+   migration, exact schema/tracker readback, and one joined signed-in smoke are
+   complete. Next: let organic staff requests accumulate, then run the
+   aggregate probe to inspect outcome/round distribution and correlation
+   completeness. Do not manufacture feedback or request traffic.
 
 2. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
@@ -268,3 +279,12 @@ commit `9a54620d` is Ready on the Production aliases, and the public auth
 boundary passed. A signed-in two-round Explorer smoke succeeded and exact
 Production usage rows proved `tool_use`/`end_turn` persistence. Only the longer
 production observation window remains unverified.
+
+Explorer Phase B passed 121 focused cross-layer tests, typecheck, the relevant
+migration/data/model/route/docs gates and self-tests, a Next.js webpack build,
+and one P0/P1-only Claude Fable implementation review with verdict READY.
+Commit `ea125997` is Ready in Production as
+`dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3`; migration 033 and its exact schema contract
+were read back, and the signed-in two-round request
+`84aee86d-9c89-4434-9642-47ee6ccb4141` proved lifecycle/query/usage
+correlation. Organic observation is the remaining Phase B evidence item.

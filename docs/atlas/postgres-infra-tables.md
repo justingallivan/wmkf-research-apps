@@ -46,13 +46,14 @@ loud at module load.
 
 ### `dynamics_query_log` (1,417 rows)
 **Source of truth:** Postgres-only.
-Per-tool-execution/denial log (NL → tool plan → result). Migration 033 adds
+Per-tool-execution/denial log (NL → tool plan → result). Migration 033 added
 nullable `request_id` and one-based `request_round` without changing that unit
 of meaning or historical rows. The Explorer chat writer falls back to the
 legacy insert if code arrives before the additive migration. **[VERIFIED
-2026-08-21 via source/tests; migration 033 not yet applied or Production-probed.]**
+2026-08-21 via source/tests, Production migration/schema readback, and one
+correlated smoke tool row.]**
 
-### `dynamics_explorer_requests` (source-defined; Production row count unavailable)
+### `dynamics_explorer_requests` (Production-live; one release-smoke row observed 2026-08-21)
 **Source of truth:** Postgres-only.
 One mutable lifecycle row per authenticated, body-valid Explorer chat request.
 Outcomes are `running`, `completed`, `truncated`, `max_rounds`, `refused`,
@@ -62,7 +63,8 @@ operational metadata only—no prompt, answer, tool output, query text, or raw
 error. Start and terminal compare-and-set writes are awaited but fail-soft
 toward the answer. Daily maintenance retains rows for the query-log window
 (default 365 days). **[VERIFIED 2026-08-21 via migration 033, fresh-install
-schema, service/route tests; migration 033 not yet applied or Production-probed.]**
+schema, service/route tests, Production tracker/schema readback, and completed
+request `84aee86d-9c89-4434-9642-47ee6ccb4141`.]**
 
 ### `dynamics_feedback` (5 rows; targeted re-probe 2026-08-08)
 **Source of truth:** Postgres-only.
@@ -77,8 +79,9 @@ Migration 033 adds nullable `request_id` with `ON DELETE SET NULL`. The POST
 path accepts a client request ID only as correlation evidence: it persists the
 link only when the row belongs to the authenticated profile and both request
 and feedback carry the same non-null session ID; lookup failure or mismatch
-still saves uncorrelated feedback. **[VERIFIED 2026-08-21 via source/tests;
-migration 033 not yet applied or Production-probed.]**
+still saves uncorrelated feedback. **[VERIFIED 2026-08-21 via source/tests and
+Production migration/schema readback; release smoke intentionally created no
+feedback.]**
 
 ### `dynamics_user_roles` (6 rows), `dynamics_restrictions` (0 rows)
 **Source of truth:** Postgres-only.
@@ -220,7 +223,7 @@ activation runbook.
 ### `api_usage_log` (1,724 rows)
 **Source of truth:** Postgres-only.
 Per-Claude-call ledger (model, tokens, cost, latency, status, and nullable
-provider stop reason). Migration 033 adds nullable `request_id` and one-based
+provider stop reason). Migration 033 added nullable `request_id` and one-based
 `request_round` for Explorer calls while all other callers and historical rows
 remain null. Written by `lib/services/llm-client.js` via
 `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`.
@@ -237,8 +240,9 @@ surfaced by the weekly `pricing-canary` cron. That same cron writes a
 Anthropic `/v1/models` against the reviewed capability/pricing registries to
 raise advisory `ops` alerts for newer Claude ids before runtime use.
 The correlated writer has a legacy-column fallback for deployment-before-
-migration ordering. **[VERIFIED 2026-08-21 via source/tests; migration 033 not
-yet applied or Production-probed.]**
+migration ordering. **[VERIFIED 2026-08-21 via source/tests, Production
+migration/schema readback, and two correlated smoke usage rows across rounds
+1–2.]**
 
 ### `model_pricing_audit` (S181, V032)
 **Source of truth:** Postgres-only.
