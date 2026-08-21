@@ -40,6 +40,14 @@ const pending = {
   accepted: false,
   declined: false,
 };
+const fresh = {
+  suggestionId: 'S-new',
+  name: 'Fresh Candidate',
+  email: 'fresh@example.edu',
+  invited: false,
+  accepted: false,
+  declined: false,
+};
 
 function renderPanel(candidates) {
   return render(
@@ -50,7 +58,7 @@ function renderPanel(candidates) {
 describe('ReviewerInvitePanel — release-pending affordance', () => {
   test('release button is visible and disabled with nothing selected', () => {
     renderPanel([accepted, pending]);
-    const btn = screen.getByRole('button', { name: /release pending invites as no longer needed/i });
+    const btn = screen.getByRole('button', { name: /^release invitee$/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute('title', expect.stringMatching(/has not yet responded/i));
   });
@@ -58,17 +66,30 @@ describe('ReviewerInvitePanel — release-pending affordance', () => {
   test('selecting a still-pending invitee enables it and shows the count', () => {
     renderPanel([accepted, pending]);
     fireEvent.click(screen.getByRole('checkbox', { name: /select pending reviewer/i }));
-    const btn = screen.getByRole('button', { name: /review & release 1 as no longer needed/i });
+    const btn = screen.getByRole('button', { name: /release invitee \(1\)/i });
     expect(btn).toBeEnabled();
     fireEvent.click(btn);
     expect(screen.getByTestId('release-modal')).toBeInTheDocument();
+  });
+
+  test('mixed selection disables both actions and shows the warning', () => {
+    renderPanel([fresh, pending]);
+    fireEvent.click(screen.getByRole('checkbox', { name: /select fresh candidate/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /select pending reviewer/i }));
+    expect(screen.getByRole('button', { name: /send invitation \(1\)/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /release invitee \(1\)/i })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/mixed selection: 1 to invite and 1 to release/i);
+    // Unchecking one kind re-enables the other.
+    fireEvent.click(screen.getByRole('checkbox', { name: /select fresh candidate/i }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /release invitee \(1\)/i })).toBeEnabled();
   });
 
   test('accepted rows cannot feed the release flow (checkbox disabled)', () => {
     renderPanel([accepted, pending]);
     expect(screen.getByRole('checkbox', { name: /select accepted reviewer/i })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: /release pending invites as no longer needed/i }),
+      screen.getByRole('button', { name: /^release invitee$/i }),
     ).toBeDisabled();
   });
 

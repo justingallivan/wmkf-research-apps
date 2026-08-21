@@ -360,6 +360,10 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
   const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+  // A selection mixing not-yet-invited and still-pending rows disables BOTH
+  // actions (owner decision 2026-08-20): each button silently acting on only
+  // its own subset read as ambiguous. Staff pick one kind at a time.
+  const mixedSelection = selectedNotInvited.length > 0 && selectedPending.length > 0;
 
   // Staff review the rendered emails and can tune each one before anything is
   // sent (staff request, 2026-07-27). The release itself still happens
@@ -608,11 +612,17 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
             })}
           </ul>
 
+          {mixedSelection && (
+            <p className="text-xs text-amber-700 mt-3" role="alert">
+              Mixed selection: {selectedNotInvited.length} to invite and {selectedPending.length} to
+              release. Uncheck one kind to continue — invitations and releases are sent separately.
+            </p>
+          )}
           <div className="flex items-center gap-3 mt-3">
             <button
               type="button"
               onClick={() => openInvite(selectedNotInvited, false)}
-              disabled={selectedNotInvited.length === 0}
+              disabled={selectedNotInvited.length === 0 || mixedSelection}
               className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Send invitation{selectedNotInvited.length > 0 ? ` (${selectedNotInvited.length})` : ''}
@@ -620,21 +630,25 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
             {/* Always visible (disabled until a still-pending invitee is checked) —
                 owner discoverability report 2026-08-07: the appear-on-selection
                 version was unfindable when the quota email said to release
-                pending invitees. */}
+                pending invitees. Promoted from an underlined text link to a
+                peer button of Send invitation (owner report 2026-08-20: the
+                link form was still too easy to miss). */}
             <button
               type="button"
               onClick={handleWithdraw}
-              disabled={selectedPending.length === 0}
-              className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+              disabled={selectedPending.length === 0 || mixedSelection}
+              className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               title={
-                selectedPending.length === 0
-                  ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
-                  : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
+                mixedSelection
+                  ? 'Selection mixes reviewers to invite and to release — uncheck one kind to continue'
+                  : selectedPending.length === 0
+                    ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
+                    : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
               }
             >
               {selectedPending.length > 0
-                ? `Review & release ${selectedPending.length} as no longer needed`
-                : 'Release pending invites as no longer needed'}
+                ? `Release invitee${selectedPending.length > 1 ? 's' : ''} (${selectedPending.length})`
+                : 'Release invitee'}
             </button>
             <span className="text-xs text-gray-400">{invitable.length} invitable · {acceptedCount} accepted</span>
           </div>
