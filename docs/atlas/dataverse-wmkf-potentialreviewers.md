@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; promotion trigger re-verified from source/tests 2026-07-30; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC
+**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice semantics re-verified in source/tests 2026-08-20 on `codex/reviewer-email-conflict-self-service` (not deployed)
 **Live row count:** 4,474
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
@@ -35,7 +35,9 @@ Contact:
   versioned server-owned current state binding the exact normalized email to a
   staff attestation or pending contradiction. Null, malformed, unknown-version,
   or wrong-email bundles grant no authority. This is current state, not an event
-  log; native Dataverse audit supplies field history.
+  log; native Dataverse audit supplies field history. A `staff_address_choice`
+  attestation grants readiness only when its resolution is non-null, bound to
+  the current pending stored/found tuple, and selects the exact current email.
 
 Provenance / linking:
 - `wmkf_source` (Picklist — where the lead came from)
@@ -133,9 +135,11 @@ Methods:
 - `lib/services/reviewer-address-trust-service.js` — reads the current exact
   address trust/conflict bundle, requires fresh server-derived person identity
   and ETag for mutation, and projects only bounded decision/remedy state to the
-  browser. The superuser-only Admin repair-alert detail path also re-reads this
-  current bundle from server-owned alert correlation keys; that detail read is
-  fail-soft and performs no mutation.
+  browser. Routine stored/found conflicts are adjudicated by staff in Workbench;
+  structural repairs are freshly rechecked after an AkoyaGO correction. The
+  superuser-only Admin repair-alert detail path remains a transitional
+  compatibility reader for existing alerts; it is fail-soft and performs no
+  mutation.
 
 ## Write paths
 
@@ -153,8 +157,10 @@ Methods:
 - `lib/services/reviewer-identity-binding-writer.js` — one complete ETag-guarded person PATCH after transition validation; first production caller is live in acceptance-drain self-report
 - `lib/services/capture-self-reported-orcid.js` — stable acceptance events use the binding writer with the event identity (`boundAt`/`resolvedAt`) truncated to Dataverse second precision (DateTime columns drop fractional seconds on round-trip, so a job retry must replay as an exact no-op); only typed `legacy_classification_required` falls back to the transitional person writes, and contact fill follows person persistence
 - `lib/services/reviewer-address-trust-service.js` — ETag-guards exact-address
-  attestation and contradiction bundles; receipt-first partial success remains
-  explicit, and address adjudication never creates or links a CRM Contact
+  attestation and contradiction bundles, including exact `keep_stored` /
+  `use_found` resolution for `staff_address_choice`; receipt-first partial
+  success remains explicit, and address adjudication never creates or links a
+  CRM Contact
 
 ### Shared-person identity/contact monotonicity
 

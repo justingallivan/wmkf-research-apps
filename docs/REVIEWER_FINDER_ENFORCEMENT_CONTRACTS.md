@@ -19,8 +19,10 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-08-02 on branch
-`codex/reviewer-find-performance-build` (not deployed) — Contracts 1–3 were
+**Last verified:** 2026-08-20 on branch
+`codex/reviewer-email-conflict-self-service` (not deployed) — Contract 3 was
+re-traced through the fresh stored/found choice, exact resolved-bundle replay,
+structural retry, and legacy-alert closeout. Contracts 1–3 were previously
 re-traced through the canonical contact projection, v3/v4 attestation,
 server-owned roster finalization, explicit contact-clear command, and focused
 tests. Contract 5 was last re-verified 2026-07-06 against the server-side save
@@ -122,7 +124,7 @@ creating that ambiguous durable state.
 
 ---
 
-## 3. Reviewer address-action gate `[IMPLEMENTED IN SOURCE 2026-07-31; NOT DEPLOYED]`
+## 3. Reviewer address-action gate `[VERIFIED IN SOURCE 2026-08-20; NOT DEPLOYED]`
 
 **Contract.** On a first-contact **invitation**, the server independently computes
 `emailConfidence(person)` and applies one of five actions. A client-provided confidence label
@@ -143,8 +145,14 @@ never authorizes a send.
   `address_verification_moved` and cannot relabel provenance without evidence.
 - **Blocked** = a valid exact-email bundle has `conflict_pending`. Promotion, invitation,
   materials, follow-up, and thank-you all refuse the address with
-  `address_conflict_pending`; no low-confidence acknowledgement bypasses it. Staff choose and
-  verify the stored or found address in Find, or create a durable repair request.
+  `address_conflict_pending`; no low-confidence acknowledgement bypasses it. In Find, staff
+  see both fresh current values and explicitly choose **Keep stored** or **Replace with found**.
+  The bounded `staff_address_choice` evidence type requires the exact pending pair and records
+  `keep_stored` or `use_found` in a non-null resolution under the person ETag. That exact
+  resolved choice is `ready` without a second send-time acknowledgement; a missing/mismatched
+  resolution remains blocked. Structural duplicate-owner, inactive-person, and Contact-linkage
+  states instead direct staff to fix the identified AkoyaGO record and use **Retry record
+  check**, which freshly revalidates the condition before clearing the roster block.
 - **Missing** = no address. There is nothing to send.
 - **Scope.** Ready/quick/research-only remain first-contact invitation policy. A pending
   contradiction is a wrong-recipient risk and therefore blocks every outbound reviewer template.
@@ -227,6 +235,13 @@ caps the population, aborts on the first error, verifies the address still holds
 write, and refuses to execute unless the plan matches the manifest from a reviewed dry run.
 
 **Why.** The API is the enforced boundary — the modal acknowledgement alone is not trusted.
+
+Matching legacy `reviewer_address_repair_requested` alerts are best-effort
+auto-resolved only after canonical address success, using each server-read
+row's persisted key. Alert cleanup failure is observable but cannot roll back
+the person/roster decision. The Find card exposes neither an Admin link nor an
+alert key; retained Admin detail/readers are transitional compatibility for
+existing rows.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-11
+last_verified: 2026-08-20
 stale_after_days: 45
 owner: reviewer-finder
 source_files:
@@ -24,6 +24,7 @@ source_files:
   - lib/services/ror-institution-decision.js
   - lib/services/ror-institution-identity-resolver.js
   - lib/services/reviewer-roster-store.js
+  - lib/services/reviewer-address-trust-service.js
   - lib/services/reviewer-email-reconciler.js
   - lib/services/alert-service.js
   - lib/services/proposal-pi-identity.js
@@ -90,11 +91,11 @@ Use this page before work on reviewer identity, enrichment, ORCID propagation, c
 The fail-closed gates that protect against wrong-person invite risk are owned by the
 **maintained** reference `docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md` (each traced to live
 source file:line). Read it before changing any of these; do not restate its detail here (one home,
-no drift). The 8 contracts:
+no drift). The 9 contracts:
 
 1. **Slice-E identity-unresolved gate** — client FIND select list (`provenanceGroupOf`) is *stricter* than the server save gate (`isUnresolvedIdentity`, 422 on full-batch reject); the asymmetry is intentional.
 2. **PI-named / cited / referred exemption + contact force-null** — `cited_reference`/`proposal_named`/`referred` rows (the exempt kinds in `isIdentityReviewExemptProvenance`, S249) are selectable when unresolved but ALL contact + identity-derived fields are force-nulled (`contactBlockedForUnresolvedExempt`) until confirmed/probable.
-3. **Address-action gate** — `send-emails-service` recomputes `emailConfidence` per recipient: valid exact-bundle `staff_verified` is `ready`; legacy source-only `staff_verified` remains `quick_check`; `research_only` is refused for invitations; `missing` has no address; and `conflict_pending` blocks every outbound reviewer template. Evidence-backed verification uses `/api/workbench/reviewer-address-trust`; the former provenance-only `my-candidates verifyEmailAddress` action is retired. No client label authorizes a send.
+3. **Address-action gate** — `send-emails-service` recomputes `emailConfidence` per recipient: valid exact-bundle `staff_verified` is `ready`; legacy source-only `staff_verified` remains `quick_check`; `research_only` is refused for invitations; `missing` has no address; and `conflict_pending` blocks every outbound reviewer template. Evidence-backed verification uses `/api/workbench/reviewer-address-trust`; the former provenance-only `my-candidates verifyEmailAddress` action is retired. For a fresh stored/found conflict, staff explicitly choose **Keep stored** or **Replace with found** in Workbench. `staff_address_choice` is valid only with the exact non-null resolved tuple and then becomes ready without a second send acknowledgement. Duplicate-owner, inactive-person, and Contact-linkage states remain fail-closed until staff fix the identified AkoyaGO record and **Retry record check** succeeds. No client label authorizes a send. [VERIFIED in source/tests 2026-08-20 on `codex/reviewer-email-conflict-self-service`; not deployed.]
 4. **Structured-PI identity** — `resolveProposalPI` is server-resolved from the request GUID, FAIL-OPEN + AUGMENT-ONLY, gated on confirmed/probable, name-guarded by `forenamesContradict`.
 5. **S240 institution COI** — current same-institution is a default HARD DROP on both discovery tracks AND re-rejected at the durable save boundary (`rejectedInstitutionCOI`). Approved Phase C allows a visible read-only flag only for a single low-trust affiliation match contradicted by current-affiliation evidence; save still rejects it. Historical/former-shared COI is retired. The `POTENTIAL_CONCERNS` amber advisory was retired (Chunk 2b, S254) — the model no longer emits it and COI is screened deterministically server-side (`docs/REVIEWER_FINDER_COI_CHUNK2_DESIGN.md`, now historical).
 6. **OpenAlex bibliometrics + verified-domain** — `_attachOpenAlexMetrics` sources metrics/affiliation/verified-domain from OpenAlex (ORCID or carried author id; never a bare name search). Scholar deep-links dropped; field renames in `docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`.

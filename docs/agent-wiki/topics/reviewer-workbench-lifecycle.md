@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-14
+last_verified: 2026-08-20
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -851,9 +851,18 @@ address + `staff_verified` + the versioned exact-address bundle on the stable
 person. Bundle-backed `staff_verified` is ready; legacy source-only values remain
 quick-check. High-confidence stored-versus-found contradictions on exact
 applicant-linked people persist `conflict_pending`, which blocks promotion and all
-outbound reviewer templates until staff verifies the stored or found address.
-Every blocked card offers verification/editing, set-aside, or a durable repair
-request. Ordinary conflict retries require a still-matching server-bound identity
+outbound reviewer templates until staff chooses the stored or found address.
+On `codex/reviewer-email-conflict-self-service` (implemented in source
+2026-08-20; not deployed), Find shows **Review email choice** even when a legacy
+repair alert is open, presents both fresh exact values, and records
+`staff_address_choice` with a non-null `keep_stored`/`use_found` resolution.
+That resolved exact choice is invite-ready without a second send acknowledgement;
+the card has no Admin link. Known duplicate-owner, inactive-person, and
+Contact-linkage blocks instead identify the AkoyaGO record and expose **Retry
+record check**, which freshly proves the structural repair before clearing the
+card. Matching legacy repair alerts auto-resolve best-effort after canonical
+success; their compatibility readers remain because a 2026-08-20 read-only
+probe found one active row. Ordinary conflict retries require a still-matching server-bound identity
 receipt plus anchor-grounded ORCID identity; an existing address receipt is
 replayed as the prior adjudication, while a failed pre-bundle conflict write can
 clear without inventing person state. Receipt-first partial success and stale
@@ -867,7 +876,8 @@ fail-closed state machine: a failed conflict write blocks direct verification
 plus both promotion paths; retry persists only a real `conflict_pending`
 contradiction, and may clear the roster flag without a person write only after a
 fresh read shows the contradiction disappeared. Receipts resolve only existing
-exact pending tuples. Every block exposes Retry, repair, or set-aside. The final
+exact pending tuples. Unknown/transient failures retain the durable repair
+fallback; routine and known structural states use the direct controls above. The final
 bounded review found and closed a stale-roster overwrite: resurfacing now
 preserves the three stored address blocks but does not carry permissive
 `emailPersistAllowed` authority to a resurfaced address (`86bf5d1`, corrected by

@@ -1,25 +1,44 @@
-# Session 451 Prompt: Verify Reviewer Repair Pending State; Explorer Phase A Remains Open
+# Session 451 Prompt: Preview Reviewer Email Self-Service; Explorer Phase A Remains Open
 
 ## Session 450 Summary
 
-Session 450 shipped the missing operational loop for reviewer repair alerts,
-then corrected the Find card so an already-open repair request cannot be filed
-again. It also incorporated Claude's Dynamics Explorer campaign documents and
-reconciled the production Log Drain's activation state.
+Session 450 shipped the missing operational loop for reviewer repair alerts.
+The current feature branch then replaced that routine Admin round trip with a
+direct staff-owned stored/found email choice while retaining legacy alert
+compatibility. It also incorporated Claude's Dynamics Explorer campaign
+documents and reconciled the production Log Drain's activation state.
 
 ### What Was Completed
 
-1. **Reviewer repair alerts became actionable from Admin.**
+1. **Routine reviewer email conflicts became staff self-service in source.**
+   - Reader compatibility landed in `f59dcff`; runtime/UI/tests landed in
+     `e8c90f5` on `codex/reviewer-email-conflict-self-service`.
+   - Find shows **Review email choice**, requires an explicit **Keep stored** or
+     **Replace with found** selection against a fresh server-read tuple, records
+     `staff_address_choice` with a non-null ETag-guarded resolution, and makes
+     that exact choice invite-ready without a second acknowledgement.
+   - Duplicate-owner, inactive-person, and Contact-linkage states identify the
+     AkoyaGO record and expose a working **Retry record check** action. Find no
+     longer links staff to Admin.
+   - Canonical success best-effort auto-resolves server-correlated legacy alerts
+     using their persisted keys. A read-only Postgres probe found one active and
+     three resolved rows, all with request/candidate correlation and stored
+     keys, so compatibility readers were retained and no rows were mutated.
+   - [VERIFIED via source, 390 focused tests, typecheck, CodeGraph, and read-only
+     Postgres probe; NOT DEPLOYED.]
+
+2. **Reviewer repair alerts had previously become actionable from Admin.**
    - PR #128 (`e74d1124`) added a bounded, server-re-read repair context,
      current address/conflict evidence, an explicit closeout sequence, and
      deep links back to the exact Find or Invite surface.
    - PR #129 (`8b61be8d`) aligned that Admin guidance with the actions the
      destination card actually exposes.
 
-2. **Open repair requests now project back onto the Find card.**
-   - PR #132 (`be21c450`) makes active/acknowledged
-     `reviewer_address_repair_requested` alerts render as **Repair request
-     pending · View in Admin** instead of another **Create repair request**.
+3. **Open repair requests still project onto the Find card for compatibility.**
+   - PR #132 (`be21c450`) established the Production baseline
+     **Repair request pending · View in Admin**. The current feature branch
+     retains **Repair request pending** but removes its Admin link and keeps the
+     direct **Review email choice** action visible.
    - **Confirm identity** remains available. A resolved alert no longer
      suppresses a later request if the underlying block persists.
    - Alert-status lookup is fail-soft for roster availability but fail-closed
@@ -30,14 +49,14 @@ reconciled the production Log Drain's activation state.
      was production-deployed. The public Production auth boundary returned the
      expected sign-in redirect and successful sign-in page response.
 
-3. **Dynamics Explorer behavior campaign docs landed from Claude's isolated worktree.**
+4. **Dynamics Explorer behavior campaign docs landed from Claude's isolated worktree.**
    - PR #130 (`7805b27f`) added the campaign plan, read-only analysis/probe
      tooling, and durable SoCal field findings.
    - PR #131 (`8d29e8b1`) recorded Session 449 and created the prior Session
      450 prompt. The Claude worktree was stopped and removed before the
      reviewer branch was promoted.
 
-4. **Production Log Drain activation was reconciled.**
+5. **Production Log Drain activation was reconciled.**
    - [VERIFIED via read-only `operational_events` aggregate, 2026-08-20]
      Production contains 45 `vercel-drain` rows, first seen
      `2026-08-19T21:21:58.177Z` and last seen
@@ -60,18 +79,21 @@ reconciled the production Log Drain's activation state.
 - `8d29e8b1` - Merge PR #131
 - `9fbc4e1e` - fix(reviewers): show pending repair requests
 - `be21c450` - Merge PR #132
+- `f59dcff` - feat(reviewers): read staff email choices safely
+- `e8c90f5` - feat(reviewers): resolve email conflicts in workbench
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run the post-deploy signed-in visual check for Neville Sanjana.**
-   Evidence: PR #132 source/tests and the active repair alert for request
-   `e2639251-9644-f111-88b4-000d3a306d0c`.
-   Reload the Find card and verify that **Create repair request** is gone,
-   **Repair request pending · View in Admin** is present, and **Confirm
-   identity** remains available. Do not resolve the Admin alert merely to test
-   the button; resolve it only after the underlying reviewer record is repaired.
+1. **Run a signed-in Preview smoke for the reviewer email-choice branch.**
+   Evidence: `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md`, commits
+   `f59dcff` and `e8c90f5`, and the retained active legacy alert. Use a safe
+   natural conflict. Verify **Review email choice** remains visible alongside
+   non-linked **Repair request pending**, both exact addresses render, cancel
+   changes nothing, and one deliberate choice produces truthful ready state on
+   reload. For a structural case, verify AkoyaGO guidance plus **Retry record
+   check**. Do not mutate Production merely to manufacture a case.
 
 2. **Explorer campaign Phase A: Sonnet 5 posture fix.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A and
@@ -151,11 +173,13 @@ reconciled the production Log Drain's activation state.
 
 | File | Purpose |
 |---|---|
-| `shared/components/reviewers/ReviewerSearchSection.js` | Find-card pending repair state and remedies |
+| `shared/components/reviewers/ReviewerSearchSection.js` | Direct email choice, structural retry, and pending-alert compatibility |
+| `shared/components/reviewers/CandidateEditModal.js` | Explicit Keep stored / Replace with found dialog |
 | `pages/api/workbench/reviewer-roster.js` | Roster projection of open repair alerts |
-| `lib/services/reviewer-address-trust-service.js` | Repair-request lookup, creation, and server-owned correlation |
+| `lib/services/reviewer-address-trust-service.js` | Fresh pair validation, ETag resolution, structural retry, and alert closeout |
 | `lib/services/alert-service.js` | Transactional open-alert deduplication |
-| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Reviewer repair contract and Admin closeout flow |
+| `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md` | Implemented source contract and sweep evidence |
+| `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Reviewer address trust and retained alert compatibility |
 | `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Live drain/runbook and durable-event selection contract |
 | `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A criteria |
 | `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A is buildable now |
@@ -163,10 +187,11 @@ reconciled the production Log Drain's activation state.
 
 ## Testing
 
-PR #132's focused reviewer/alert suites and all eight required GitHub checks
-passed, including full Jest/gates/build, Playwright, Semgrep, Gitleaks, Trivy,
-and Vercel Preview. Production deployment succeeded; the public auth boundary
-returned its expected redirect and sign-in response.
+The self-service branch passes 390 focused reviewer tests and typecheck; the
+remaining required gates/build are the current task's final verification step.
+It has not been deployed or signed-in smoke-tested. PR #132's earlier focused
+reviewer/alert suites and all eight GitHub checks passed before its production
+deployment; those results do not verify the new self-service branch.
 
 The Session 450 claim-evidence pilot report was unavailable because its local
 observation state could not be read. No observation row was added.

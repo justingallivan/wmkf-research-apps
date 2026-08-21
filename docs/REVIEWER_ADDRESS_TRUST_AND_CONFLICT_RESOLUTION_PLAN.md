@@ -3,10 +3,10 @@ title: Reviewer Address Trust and Actionable Conflict Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Address trust/conflict remedies are production-live; the no-send pilot passed, while conflict and promotion-parity cases remain unexercised."
+summary: "Address trust is production-live; direct Workbench stored/found self-service is implemented in source and awaits Preview/deployment verification."
 canonical: false
 cataloged: 2026-07-31
-last_verified: 2026-07-31
+last_verified: 2026-08-20
 owner: product-engineering
 related:
   - docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
@@ -158,7 +158,7 @@ paths, the send boundary, and a total reason-to-remedy contract.
 | D5 | A linked paper is valid independent evidence when staff open it and find the corresponding author's address. | Owner-decided |
 | D6 | **No dead ends:** every warning/block names the problem and provides a primary remedy; a state that staff cannot safely repair themselves provides retry plus a one-click durable repair request. | Owner-decided |
 | D7 | Invitation sending never creates or links a CRM Contact; identity-bearing acceptance remains the Contact-promotion event. | Implemented current contract |
-| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Owner-decided target on 2026-08-20; planned in `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md` |
+| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Implemented in source on `codex/reviewer-email-conflict-self-service`; not deployed (2026-08-20) |
 
 ## Approved implementation decisions
 
@@ -380,7 +380,7 @@ stable code plus server-approved remediation descriptors:
   "code": "email_mismatch",
   "message": "The stored and newly found addresses differ.",
   "remediation": [
-    { "action": "resolve_address_conflict", "label": "Review both addresses" },
+    { "action": "resolve_address_conflict", "label": "Review email choice" },
     { "action": "set_aside", "label": "Set reviewer aside" }
   ]
 }
@@ -409,13 +409,12 @@ granting this route authority to create or merge people.
 the exact candidate key and resulting decision after every action; it never
 accepts a client-authored remediation array.
 
-`create_repair_request` uses `NotificationService.notify` to create a durable
-`system_alerts` row with a tuple-derived `autoResolveKey`, and returns the alert
-ID as the visible repair reference. Add a `system-alerts` anchor to the existing
-System Alerts section of `/admin`; a superuser receives a direct link to that
-section. Other staff still see the reference and can
-continue with any safe unlinked-reviewer remedy the server offered. Creating an
-alert alone never changes a blocked decision to ready.
+`create_repair_request` remains the durable terminal fallback for unknown or
+repeated system/write failures. It uses `NotificationService.notify` to create
+a `system_alerts` row with a tuple-derived `autoResolveKey` and returns the alert
+ID as a visible reference. The superuser Admin detail remains a compatibility
+surface for existing rows, but ordinary Find staff receive no Admin link.
+Creating an alert alone never changes a blocked decision to ready.
 
 **Shipped follow-up (2026-08-20):** expanding a reviewer repair alert now asks
 `GET /api/admin/alerts?repairContext=<alert id>` to re-read the current request,
@@ -432,7 +431,7 @@ alerts fail soft to their stored identifiers, and raw metadata is retained under
 This read-only presentation does not repair, unblock, acknowledge, or resolve
 anything by itself.
 
-**Shipped pending-state follow-up (2026-08-20, PR #132 / merge
+**Historical pending-state follow-up (deployed 2026-08-20, PR #132 / merge
 `be21c450`):** roster GET now supplements each visible server-owned candidate
 with its matching active or acknowledged repair alert. The Find card replaces
 **Create repair request** with **Repair request pending · View in Admin** while
@@ -445,6 +444,18 @@ Creation itself uses a request/candidate-scoped transactional advisory lock and
 rechecks active/acknowledged state, so concurrent calls and different reason
 codes cannot create two open requests for the same candidate.
 
+**Implemented-in-source self-service follow-up (2026-08-20; not deployed):**
+the open-alert projection remains for compatibility but renders only **Repair
+request pending**; it no longer links Find users to Admin or hides **Review
+email choice**. The modal shows the fresh exact pair and records an explicit
+`keep_stored` or `use_found` `staff_address_choice` resolution under the person
+ETag. Matching legacy alerts are auto-resolved best-effort after canonical
+success. Duplicate-owner, inactive-person, and Contact-linkage states tell staff
+to fix the identified AkoyaGO record and use **Retry record check**, whose
+server branch freshly proves the structural condition cleared. One active and
+three resolved legacy rows remained at the 2026-08-20 read-only Postgres probe,
+so Admin detail/projection code is retained as bounded compatibility.
+
 ### Total reason-to-remedy matrix
 
 | Code/state | Class / blocks? | What staff see | Primary remedy | Safe completion |
@@ -455,11 +466,11 @@ codes cannot create two open requests for the same candidate.
 | `identity_confirmation_required` | Blocking | System cannot establish that the evidence belongs to the intended person. | **Review papers and confirm person + address**, **Choose a different person**, or **Set aside**. | Server-bound identity/address receipt. |
 | `provisional_orcid_match` | Blocking until person/address judgment | ORCID match is not a trusted anchor. | **Confirm from papers**, **Reject this match**, or **Choose another record**. | Stable person resolution plus exact-address attestation. |
 | `ambiguous_or_name_mismatch` | Blocking | Multiple records or a name disagreement exist. | **Choose the correct person**, **Create as a different person**, or **Set aside**. | Server re-runs identity resolution and records the chosen branch. |
-| `email_mismatch` | Blocking | Stored and newly found addresses differ. | **Use found address**, **Keep stored address**, or **These are different people**. | One ETag-guarded exact-tuple resolution; address/source/trust update is atomic when changed. |
+| `email_mismatch` / `address_conflict_pending` | Blocking | Stored and newly found addresses differ. | **Review email choice**, then **Keep stored** or **Replace with found**. | One ETag-guarded exact-tuple resolution; address/source/trust update is atomic even when keeping the stored value. |
 | `orcid_email_split` | Blocking until exact person/address attestation; CRM repair itself need not block afterward | ORCID and email resolve to different records. | **Review records and choose**, or **Verify this person/address and continue unlinked**; automatically **Create repair request**. | Candidate may proceed only with explicit attestation; Contact stays unlinked pending repair. |
-| `contact_linked_elsewhere` | Same policy as split | The matching Contact is already linked to another reviewer. | **Open merge/repair**, or **Verify and continue unlinked**; automatically **Create repair request**. | No Contact relink by this workflow. |
-| `email_conflict` / duplicate owner | Blocking | Another active reviewer owns the exact address. | **Create repair request** from the card; saved-candidate surfaces that already have a safe merge plan may still use that existing flow. | An administrator repairs/merges the records; promotion retries afterward. The Find card never presents a fake merge action. |
-| `person_inactive` | Blocking | The resolved reviewer record is inactive. | **Create repair request** from the card. | An administrator reactivates or repairs the stable person; the user reloads and retries. Identity confirmation cannot bypass inactivity. |
+| `contact_linked_elsewhere` | Blocking | The matching Contact is already linked to another reviewer. | Correct the linkage in AkoyaGO, then **Retry record check**. | The retry re-resolves the trusted person/contact linkage; no Contact relink occurs in this workflow. |
+| `email_conflict` / duplicate or ambiguous owner | Blocking | Another or inactive reviewer owns the exact address. | Correct the duplicate owner in AkoyaGO, then **Retry record check**. | The retry freshly proves one active exact owner matching the resolved person before clearing the block. |
+| `person_inactive` | Blocking | The resolved reviewer record is inactive. | Reactivate/correct the identified AkoyaGO record, then **Retry record check**. | The server freshly proves the exact person is active; identity confirmation cannot bypass inactivity. |
 | `conflict_record_unavailable` | Blocking for this request | Contradiction was detected but could not be recorded durably. | **Retry recording/check**; if repeated, **Create repair request**. | Durable person state must succeed before promotion. |
 | `identity_unavailable` / service timeout | Blocking, retryable | Authoritative identity check is temporarily unavailable. | **Retry check**; repeated failures expose **Create repair request**. | Fresh successful server check; no cached fail-open. |
 | unknown/unrecognized code | Blocking by default | A safe generic explanation plus reference. | **Retry check** and **Create repair request**. | Only a subsequently recognized server decision can proceed. |
@@ -513,13 +524,14 @@ The roster candidate is rebound to the new server-issued identity context. This
 action cannot use a client-supplied replacement person ID without server
 validation.
 
-### Continue unlinked and create repair request
+### Exceptional repair request compatibility
 
-For Contact-link conflicts, staff may finish the reviewer workflow only after
-explicitly verifying the person and address. The system records a durable repair
-request containing bounded person/contact identifiers and the conflict reason.
-The reviewer person remains unlinked; acceptance promotion later retains its
-independent fail-closed Contact identity checks.
+Durable repair requests remain a terminal fallback for unknown or repeated
+system/write failures and a compatibility surface for existing alerts. Routine
+stored/found conflicts and the known duplicate/inactive/linkage structural
+states no longer route Find staff through Admin. Address adjudication still
+never changes Contact linkage; acceptance promotion retains its independent
+fail-closed Contact identity checks.
 
 ## Whole-flow contract
 

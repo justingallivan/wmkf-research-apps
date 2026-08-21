@@ -3,7 +3,7 @@ title: Reviewer Email Conflict Self-Service Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Plan to replace the reviewer Admin-alert loop with a Workbench stored-versus-found email choice guarded by fresh reads and an audited staff decision."
+summary: "Direct Workbench reviewer email choice is implemented in source; legacy alert compatibility remains during rollout."
 canonical: false
 cataloged: 2026-08-20
 last_verified: 2026-08-20
@@ -25,16 +25,19 @@ related:
 
 ## Decision and status
 
-**OWNER-DECIDED; PLANNED, NOT YET IMPLEMENTED.** On 2026-08-20, the owner
+**IMPLEMENTED IN SOURCE 2026-08-20; NOT DEPLOYED.** On 2026-08-20, the owner
 rejected the reviewer-address Admin round trip for ordinary staff work. Staff
 already have broad authority over the underlying AkoyaGO data, and choosing
 between the address already stored for a person and a different address found
 during reviewer search is within their role. The safety gate is a deliberate,
 audited choice after seeing both values—not escalation to a superuser.
 
-This plan supersedes the Admin-routing recommendation for routine
-stored-versus-found reviewer email conflicts. It does not claim that the current
-runtime already behaves this way.
+Reader support landed first in `f59dcff`; the bounded writer/UI/retry/alert
+implementation landed in `e8c90f5` on branch
+`codex/reviewer-email-conflict-self-service`. [VERIFIED via source and 390
+focused tests.] This plan supersedes the Admin-routing recommendation for
+routine stored-versus-found reviewer email conflicts. Production retains its
+prior behavior until this branch is deliberately promoted and smoke-tested.
 
 ## Contract-reconcile surface
 
@@ -55,7 +58,7 @@ runtime already behaves this way.
   Workbench. The existing Workbench modal and service already implement most of
   the desired two-address decision.
 
-## Authoritative current-state evidence
+## Pre-implementation baseline (historical)
 
 | Claim | Producer / entry | Persistence | Consumer | Evidence | Status |
 |---|---|---|---|---|---|
@@ -63,12 +66,12 @@ runtime already behaves this way.
 | The modal offers stored and found choices | `CandidateEditModal` | client draft until submit | staff dialog | `CandidateEditModal.js` “Use stored” / “Use found” controls | VERIFIED |
 | The server accepts only one member of the current pair | `verify_person_and_address` | roster receipt + Dataverse trust bundle/email | promotion/render/send | exact-pair membership check in `reviewer-address-trust-service.js` | VERIFIED |
 | Person update is stale-write protected | address verification service | Dataverse reviewer person | all later person reads | person `_etag` required and passed as `ifMatch` | VERIFIED |
-| Current open-repair projection points to Admin | roster GET → CandidateCard | `system_alerts` | Find card | `repairRequests` projection and `Repair request pending · View in Admin` | VERIFIED |
+| Current open-repair projection points to Admin | roster GET → CandidateCard | `system_alerts` | Find card | pre-implementation `repairRequests` projection and `Repair request pending · View in Admin` | HISTORICAL |
 | Admin is required to complete a routine email choice | none | none | none | Admin detail only links back to Workbench; it performs no reviewer repair | STALE/CONFLICT |
-| Successful address choice currently auto-resolves its repair alert | none | `system_alerts` | Find/Admin status | no `AlertService.autoResolve(repairKey(...))` call in the success path | PLANNED |
+| Successful address choice currently auto-resolves its repair alert | none | `system_alerts` | Find/Admin status | no pre-implementation `AlertService.autoResolve(repairKey(...))` call in the success path | HISTORICAL |
 | `staff_verified` currently becomes invite-ready without a send-time low-confidence acknowledgment | address-trust write | person email source + valid trust bundle | `emailConfidence`, render/send | `reviewer-invite.js` ready branch and `send-emails-service.js` ready path | VERIFIED |
 | A literal `set_aside` remediation currently renders a working control | remediation map | none | Find card | no `set_aside` handler; the real card affordance is `onExclude` / Not a fit | STALE/CONFLICT |
-| Structural duplicate/inactive/linkage states can currently invoke `retry_check` | remediation/card | none | address-trust service | retry is gated to pending/unavailable conflict flags | STALE/CONFLICT |
+| Structural duplicate/inactive/linkage states can currently invoke `retry_check` | remediation/card | none | address-trust service | pre-implementation retry was gated to pending/unavailable conflict flags | HISTORICAL |
 | `get_address_conflict` currently supports saved/Invite rows | route/service | current person bundle | Invite dialog | service requires an active Find roster row and route takes no suggestion target | STALE/CONFLICT |
 
 ## Product invariants
@@ -212,23 +215,24 @@ existing route and actions; do not add a new API route or persistence surface.
    `personUpdated`, `rosterCleared`, and the closeout object so the client changes
    only the exact card and reports partial cleanup accurately.
 
-## Reason-to-remedy routing
+## Implemented reason-to-remedy routing
 
-| Current state | Planned primary remedy | Admin role |
+| Current state | Primary remedy | Admin role |
 |---|---|---|
 | `email_mismatch` / `address_conflict_pending` | Review email choice | None |
 | identity confirmation plus current address pair | Combined person confirmation + email choice | None |
 | ordinary address verification without a stored/found conflict | Verify the displayed address | None |
-| duplicate active owner / ambiguous owner | Transitional durable repair action until a working AkoyaGO record remedy and structural retry exist; never permit a third-address overwrite under the pending tuple | No role in routine flow |
-| inactive person | Transitional durable repair action until the exact AkoyaGO/retry path is executable | No role in routine flow |
-| Contact linked elsewhere | Transitional durable repair action until the exact AkoyaGO/retry path is executable | No role in routine flow |
+| duplicate active owner / ambiguous owner | Fix the identified record in AkoyaGO, then **Retry record check**; never permit a third-address overwrite under the pending tuple | None |
+| inactive person | Reactivate/correct the identified record in AkoyaGO, then **Retry record check** | None |
+| Contact linked elsewhere | Correct the linkage in AkoyaGO, then **Retry record check** | None |
 | transient person/conflict read or write failure | Retry; Not a fit remains available where the card's existing `onExclude` control is wired | None |
 | unknown code | Keep the current terminal fallback until Retry and Not a fit are both real controls; then remove Admin dependency and fail closed | Transitional only |
 
-AkoyaGO deep-link shape is **UNKNOWN** until verified from an existing supported
-URL or live navigation. Implementation must not invent a record URL. If no
-stable deep link exists, show the bounded record name/identifier and explicit
-“Fix in AkoyaGO, then Retry” guidance.
+No supported AkoyaGO record deep-link helper or configured URL shape exists in
+the repository. [VERIFIED 2026-08-20 via CodeGraph/source search.] The
+implementation therefore does not invent a record URL: it shows the bounded
+record name/identifier and explicit “Fix in AkoyaGO, then Retry record check”
+guidance.
 
 ## Alert transition and destructive preflight
 
@@ -483,18 +487,48 @@ Run each gate and its self-test sequentially:
 9. `npm run check:types`;
 10. production build and a signed-in Preview smoke using a safe natural conflict.
 
-## Completion criteria
+## Completion status
 
-- A staff user can resolve a routine stored/found email conflict without Admin.
-- The action is an explicit, audited choice against a fresh exact tuple.
-- Combined identity/address cases have one coherent dialog and truthful partial
-  success.
-- No open repair alert hides the Workbench remedy.
-- Exceptional structural states remain fail-closed and point to AkoyaGO/retry,
-  not a superuser queue.
-- Matching legacy alerts close automatically after canonical success, without
-  becoming part of the success authority.
-- No alert infrastructure is removed until live callers and rows are verified.
+- **VERIFIED in source/tests:** a staff user can resolve a routine stored/found
+  email conflict without Admin through an explicit audited choice against a
+  fresh exact tuple.
+- **VERIFIED in source/tests:** combined identity/address cases use one dialog
+  and preserve truthful partial success.
+- **VERIFIED in source/tests:** an open repair alert does not hide the direct
+  Workbench remedy and no Find-card Admin link remains.
+- **VERIFIED in source/tests:** structural states stay fail-closed and point to
+  AkoyaGO plus a working **Retry record check** action.
+- **VERIFIED in source/tests:** matching legacy alerts auto-resolve after
+  canonical success without becoming success authority.
+- **VERIFIED by read-only Postgres probe 2026-08-20:** one active and three
+  resolved `reviewer_address_repair_requested` rows remain; all four have
+  persisted auto-resolve keys and request/candidate correlation. Alert
+  projection/detail infrastructure is therefore retained as bounded
+  compatibility. No rows were mutated.
+- **OPEN:** signed-in Preview smoke on a safe natural conflict and deliberate
+  production promotion.
+
+## `/sweep` reconciliation report (Mode A — changed fact)
+
+| Claim | Producer / entry point | Persistence / source of truth | Consumer | Strongest evidence | Status |
+|---|---|---|---|---|---|
+| Staff choose stored or found email directly | Find card → `CandidateEditModal` → address-trust route | ETag-guarded person trust bundle plus roster receipt/projection | Find readiness, promotion, Invite render/send | `e8c90f5`; modal/service/promotion tests | VERIFIED |
+| A choice is valid only for the fresh exact pending pair | `verifyPersonAndAddress` | current Dataverse person bundle and ETag | person writer / roster clear | third-address, non-conflict, stale-pair, and 412 tests | VERIFIED |
+| Staff-choice readiness is truthful and survives replay | trust parser + promotion services | non-null person `resolution` plus bounded roster `addressChoice` | roster/applicant projection and Invite gate | parser, roster, applicant, ordinary/applicant promotion tests | VERIFIED |
+| Structural fixes can be rechecked without Admin | Find card **Retry record check** | fresh person, ownership, and linkage reads; CAS roster refresh | candidate card | inactive/duplicate/linkage service and UI tests | VERIFIED |
+| Canonical success closes matching legacy alerts best-effort | address-trust service closeout helper | persisted open alert rows and their stored keys | Admin/pending projection plus operational recovery mirror | row/key/overcount/failure tests; live count probe | VERIFIED |
+| Alert infrastructure can be retired now | N/A | one active live row remains | Admin compatibility readers | read-only Postgres probe | PARTIAL — retain |
+
+Durable restatements reconciled in the enforcement contract, address-trust
+plan, API security matrix, reviewer identity/workbench wiki pages, Postgres and
+Dataverse Atlas pages, docs catalog, memory router, and session handoff. The
+disconfirming checks were direct non-conflict `staff_address_choice` calls,
+third-address submissions, stale ETags, unresolved duplicate ownership, failed
+alert closeout, CodeGraph search for a supported AkoyaGO deep-link helper, and
+the live alert count. All remained fail-closed or preserved canonical success
+as specified. **Remaining live stale claims in the in-scope current guidance:
+0. Remaining unknown: signed-in Preview behavior. Verdict: RECONCILED IN
+SOURCE; DEPLOYMENT NOT VERIFIED.**
 
 ## Adversarial review
 
