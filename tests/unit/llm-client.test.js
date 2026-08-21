@@ -502,6 +502,7 @@ describe('LLMClient.complete', () => {
     }));
     const client = new LLMClient({
       apiKey: 'sk-ant-test', model: 'm', appName: 'unit-test', userProfileId: 42,
+      requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26', requestRound: 2,
     });
     await client.complete({ messages: [] });
     expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
@@ -510,16 +511,23 @@ describe('LLMClient.complete', () => {
       inputTokens: 7,
       outputTokens: 3,
       stopReason: 'end_turn',
+      requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26',
+      requestRound: 2,
     }));
   });
 
   test('logs usage on failure with status:error', async () => {
     safeFetch.mockResolvedValueOnce(jsonResponse({ error: 'bad request' }, { status: 400 }));
-    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm', appName: 'unit-test' });
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test', model: 'm', appName: 'unit-test',
+      requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26', requestRound: 4,
+    });
     await expect(client.complete({ messages: [] })).rejects.toThrow();
     expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
       appName: 'unit-test',
       status: 'error',
+      requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26',
+      requestRound: 4,
     }));
   });
 

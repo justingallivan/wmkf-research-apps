@@ -30,6 +30,7 @@
     "029_reviewer_find_roster_blocked.sql",
     "030_operational_events.sql",
     "031_portal_upload_staging.sql",
-    "032_api_usage_stop_reason.sql"
+    "032_api_usage_stop_reason.sql",
+    "033_dynamics_explorer_request_telemetry.sql"
   ]
 }

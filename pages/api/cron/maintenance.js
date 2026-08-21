@@ -54,6 +54,17 @@ export default async function handler(req, res) {
       results.queryLog = { error: error.message };
     }
 
+    // 2a. Explorer request lifecycle rows share the query-log retention
+    // window. Feedback correlation is nulled by the FK; feedback retention is
+    // governed separately by its acknowledgement timestamp.
+    try {
+      results.dynamicsExplorerRequests =
+        await MaintenanceService.cleanupDynamicsExplorerRequests(config.query_log_days);
+      totalDeleted += results.dynamicsExplorerRequests;
+    } catch (error) {
+      results.dynamicsExplorerRequests = { error: error.message };
+    }
+
     // 2b. Reviewer identity shadow log cleanup (retention window + row cap)
     try {
       results.reviewerIdentityShadowLog =

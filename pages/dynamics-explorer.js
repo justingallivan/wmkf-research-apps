@@ -306,7 +306,7 @@ function DynamicsExplorer() {
                   // Finalize streaming message
                   setMessages(prev => prev.map(m =>
                     m.id === streamingMsgId
-                      ? { ...m, content: assistantContent, isStreaming: false, rounds: parsed.rounds, fileExports, documentLinks }
+                      ? { ...m, content: assistantContent, isStreaming: false, rounds: parsed.rounds, requestId: parsed.requestId || null, fileExports, documentLinks }
                       : m
                   ));
                 } else {
@@ -318,6 +318,7 @@ function DynamicsExplorer() {
                     content: assistantContent,
                     timestamp: Date.now(),
                     rounds: parsed.rounds,
+                    requestId: parsed.requestId || null,
                     fileExports,
                     documentLinks,
                   }]);
@@ -355,6 +356,7 @@ function DynamicsExplorer() {
                   content: `**Error:** ${parsed.message}${parsed.requestId ? `\n\nReference: \`${parsed.requestId}\`` : ''}`,
                   timestamp: Date.now(),
                   isError: true,
+                  requestId: parsed.requestId || null,
                 }]);
                 sawTerminalEvent = true;
                 setIsProcessing(false);
@@ -474,6 +476,7 @@ function DynamicsExplorer() {
           queryText: userMsg?.content || '',
           conversationContext: buildFeedbackContext(messageId),
           sessionId,
+          requestId: targetMsg?.requestId || null,
           autoDetected: messageId === suggestFeedbackId,
         }),
       });

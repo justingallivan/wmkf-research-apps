@@ -46,6 +46,10 @@ import {
 } from '../../../lib/utils/dynamics-explorer-serializer';
 import { buildResolvedTaxonomyPromptBlock } from '../../../lib/services/dynamics-explorer-taxonomy';
 import {
+  DynamicsExplorerRequestTelemetry,
+  normalizeSessionId,
+} from '../../../lib/services/dynamics-explorer-request-telemetry';
+import {
   expandRestrictedFieldNames,
   isLookupAliasType,
   lookupAliasFor,
@@ -92,37 +96,93 @@ export default async function handler(req, res) {
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
 
-  await loadModelOverrides();
-
   // Set up SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   const sendEvent = (event, data) => {
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    if (res.writableEnded || res.destroyed) return false;
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  // Minted before the try so the failure handler can quote the same id the
-  // server-side log carries — the user's "reference" for an escalation.
+  const { messages, sessionId: rawSessionId } = req.body || {};
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    sendEvent('error', { message: 'At least one message is required' });
+    res.end();
+    return;
+  }
+
+  const userProfileId = access.profileId;
+  const sessionId = normalizeSessionId(rawSessionId);
   const requestId = crypto.randomUUID();
+  const abortController = new AbortController();
+  let terminalIntent = false;
+  let disconnectObserved = false;
+  let completedRounds = 0;
+  let lastModel = null;
+  let lastStopReason = null;
+  let errorStage = 'context';
+
+  const finalizeLifecycle = (outcome, overrides = {}) =>
+    DynamicsExplorerRequestTelemetry.finalizeRequest({
+      requestId,
+      userProfileId,
+      sessionId,
+      outcome,
+      roundsUsed: completedRounds,
+      model: lastModel,
+      stopReason: lastStopReason,
+      errorStage: outcome === 'error' ? errorStage : null,
+      ...overrides,
+    });
+
+  const handleDisconnect = () => {
+    if (terminalIntent || disconnectObserved) return;
+    // LOAD-BEARING ordering: the abort rejection reaches the outer catch. Set
+    // the durable classification flag before aborting so that catch converges
+    // on client_disconnected instead of racing an `error` finalizer.
+    disconnectObserved = true;
+    abortController.abort();
+    void finalizeLifecycle('client_disconnected');
+  };
+
+  req.once?.('aborted', handleDisconnect);
+  res.once?.('close', handleDisconnect);
+
+  await DynamicsExplorerRequestTelemetry.startRequest({
+    requestId,
+    userProfileId,
+    sessionId,
+  });
+
+  if (disconnectObserved) {
+    req.off?.('aborted', handleDisconnect);
+    res.off?.('close', handleDisconnect);
+    return;
+  }
 
   try {
-    const { messages, sessionId } = req.body;
     const claudeApiKey = process.env.CLAUDE_API_KEY;
-    const userProfileId = access.profileId;
 
     if (!claudeApiKey) {
-      sendEvent('error', { message: 'Claude API key not configured on server' });
-      return res.end();
-    }
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      sendEvent('error', { message: 'At least one message is required' });
-      res.end();
+      errorStage = 'model';
+      terminalIntent = true;
+      await finalizeLifecycle('error');
+      sendEvent('error', {
+        message: 'Claude API key not configured on server',
+        requestId,
+      });
       return;
     }
+
+    await loadModelOverrides();
 
     const [userRole, restrictions] = await Promise.all([
       getUserRole(userProfileId),
@@ -148,10 +208,16 @@ export default async function handler(req, res) {
     let currentMessages = [...claudeMessages];
     const model = getModelForApp('dynamics-explorer');
     const fallbackModel = getFallbackModelForApp('dynamics-explorer');
+    lastModel = model;
 
     while (round < MAX_TOOL_ROUNDS) {
+      if (disconnectObserved) {
+        await finalizeLifecycle('client_disconnected');
+        return;
+      }
       round++;
 
+      errorStage = 'model';
       const claudeResponse = await callClaude({
         apiKey: claudeApiKey,
         model,
@@ -160,16 +226,30 @@ export default async function handler(req, res) {
         messages: currentMessages,
         tools: TOOL_DEFINITIONS,
         userProfileId,
+        requestId,
+        requestRound: round,
+        signal: abortController.signal,
         onTextDelta: (text) => {
           // Stream text chunks to client in real-time
           sendEvent('text_delta', { text });
         },
       });
+      completedRounds = round;
+      lastModel = claudeResponse.model || lastModel;
+      lastStopReason = claudeResponse.stopReason || null;
 
       const textBlocks = claudeResponse.content.filter(b => b.type === 'text');
       const toolBlocks = claudeResponse.content.filter(b => b.type === 'tool_use');
 
       if (toolBlocks.length === 0) {
+        const outcome = claudeResponse.refused || claudeResponse.stopReason === 'refusal'
+          ? 'refused'
+          : claudeResponse.stopReason === 'max_tokens'
+            ? 'truncated'
+            : 'completed';
+        terminalIntent = true;
+        await finalizeLifecycle(outcome);
+
         if (!claudeResponse._textStreamed) {
           // Text wasn't streamed (shouldn't happen, but fallback)
           const finalText = textBlocks.map(b => b.text).join('\n');
@@ -177,12 +257,12 @@ export default async function handler(req, res) {
         }
         // Check if response suggests failure — prompt user for feedback
         const finalText = textBlocks.map(b => b.text).join('\n');
-        const suggestFeedback = detectPossibleFailure(finalText);
-        sendEvent('complete', { rounds: round, suggestFeedback });
-        res.end();
+        const suggestFeedback = outcome !== 'completed' || detectPossibleFailure(finalText);
+        sendEvent('complete', { requestId, rounds: round, outcome, suggestFeedback });
         return;
       }
 
+      errorStage = 'tool';
       // Execute tool calls — parallel when multiple tools in one round
       const toolResults = [];
 
@@ -203,7 +283,7 @@ export default async function handler(req, res) {
         const restricted = checkRestriction(name, input, restrictions);
         if (restricted) {
           sendEvent('thinking', { message: `Blocked: ${restricted}` });
-          logQuery({ userProfileId, sessionId, queryType: name, tableName: input.table_name || null, queryParams: input, recordCount: 0, executionTime: 0, wasDenied: true, denialReason: restricted });
+          logQuery({ requestId, requestRound: round, userProfileId, sessionId, queryType: name, tableName: input.table_name || null, queryParams: input, recordCount: 0, executionTime: 0, wasDenied: true, denialReason: restricted });
           return { type: 'tool_result', tool_use_id: id, content: `DENIED: ${restricted}` };
         }
 
@@ -225,6 +305,8 @@ export default async function handler(req, res) {
         console.log(`[DynExp] Round ${round} ${name} → ${recordCount} records, ${executionTime}ms`);
 
         logQuery({
+          requestId,
+          requestRound: round,
           userProfileId,
           sessionId,
           queryType: name,
@@ -277,6 +359,11 @@ export default async function handler(req, res) {
         });
       });
 
+      if (disconnectObserved) {
+        await finalizeLifecycle('client_disconnected');
+        return;
+      }
+
       // Append assistant + tool results, then compact old rounds
       currentMessages.push({
         role: 'assistant',
@@ -292,10 +379,19 @@ export default async function handler(req, res) {
     }
 
     console.log(`[DynExp] Hit max rounds (${MAX_TOOL_ROUNDS}) without final answer`);
+    terminalIntent = true;
+    await finalizeLifecycle('max_rounds');
     sendEvent('response', { content: 'Reached maximum query steps. Please refine your question.' });
-    sendEvent('complete', { rounds: round, maxRoundsReached: true, suggestFeedback: true });
+    sendEvent('complete', { requestId, rounds: round, outcome: 'max_rounds', maxRoundsReached: true, suggestFeedback: true });
     });
   } catch (error) {
+    if (disconnectObserved) {
+      await finalizeLifecycle('client_disconnected');
+      return;
+    }
+
+    terminalIntent = true;
+    await finalizeLifecycle('error');
     console.error(`Dynamics Explorer chat error [requestId=${requestId}]:`, error);
     sendEvent('error', {
       message: describeChatFailure(error),
@@ -303,7 +399,9 @@ export default async function handler(req, res) {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   } finally {
-    res.end();
+    req.off?.('aborted', handleDisconnect);
+    res.off?.('close', handleDisconnect);
+    if (!res.writableEnded && !res.destroyed) res.end();
   }
 }
 
@@ -499,13 +597,15 @@ function summarizeToolResult(content) {
  * @param {Function} [opts.onTextDelta] - callback(text) for streaming text chunks
  * @returns {Promise<{content, model, usage}>}
  */
-async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages, tools, userProfileId, onTextDelta }) {
+async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages, tools, userProfileId, requestId, requestRound, signal, onTextDelta }) {
   const claude = new LLMClient({
     apiKey,
     model,
     fallbackModel,
     appName: 'dynamics-explorer',
     userProfileId,
+    requestId,
+    requestRound,
   });
   const r = await claude.stream({
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
@@ -513,6 +613,7 @@ async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages
     tools,
     maxTokens: 16000,
     outputConfig: { effort: 'low' },
+    signal,
     onTextDelta,
   });
   return {
@@ -524,6 +625,8 @@ async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages
       cache_creation_input_tokens: r.usage.cacheCreationTokens,
       cache_read_input_tokens: r.usage.cacheReadTokens,
     },
+    stopReason: r.stopReason,
+    refused: r.refused,
     _textStreamed: r.textStreamed, // flag so the caller knows text was already sent
   };
 }
@@ -2735,8 +2838,16 @@ async function getActiveRestrictions() {
   return result.rows;
 }
 
-function logQuery({ userProfileId, sessionId, queryType, tableName, queryParams, recordCount, executionTime, wasDenied = false, denialReason = null }) {
-  sql`INSERT INTO dynamics_query_log (user_profile_id, session_id, query_type, table_name, query_params, record_count, execution_time_ms, was_denied, denial_reason)
-    VALUES (${userProfileId || null}, ${sessionId || null}, ${queryType}, ${tableName}, ${JSON.stringify(queryParams)}, ${recordCount}, ${executionTime}, ${wasDenied}, ${denialReason})`
-    .catch(err => console.warn('Failed to log dynamics query:', err.message));
+function logQuery({ requestId, requestRound, userProfileId, sessionId, queryType, tableName, queryParams, recordCount, executionTime, wasDenied = false, denialReason = null }) {
+  const correlatedWrite = sql`INSERT INTO dynamics_query_log (user_profile_id, session_id, query_type, table_name, query_params, record_count, execution_time_ms, was_denied, denial_reason, request_id, request_round)
+    VALUES (${userProfileId || null}, ${sessionId || null}, ${queryType}, ${tableName}, ${JSON.stringify(queryParams)}, ${recordCount}, ${executionTime}, ${wasDenied}, ${denialReason}, ${requestId || null}, ${Number.isInteger(requestRound) ? requestRound : null})`;
+  correlatedWrite.catch(err => {
+    if (err?.code !== '42703') {
+      console.warn('Failed to log dynamics query:', err.message);
+      return;
+    }
+    sql`INSERT INTO dynamics_query_log (user_profile_id, session_id, query_type, table_name, query_params, record_count, execution_time_ms, was_denied, denial_reason)
+      VALUES (${userProfileId || null}, ${sessionId || null}, ${queryType}, ${tableName}, ${JSON.stringify(queryParams)}, ${recordCount}, ${executionTime}, ${wasDenied}, ${denialReason})`
+      .catch(fallbackError => console.warn('Failed to log dynamics query:', fallbackError.message));
+  });
 }

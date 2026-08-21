@@ -220,7 +220,30 @@ const v14Statements = [
     query_params JSONB,
     record_count INTEGER,
     execution_time_ms INTEGER,
+    request_id UUID,
+    request_round SMALLINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // One lifecycle row per authenticated, body-valid Explorer request.
+  `CREATE TABLE IF NOT EXISTS dynamics_explorer_requests (
+    request_id UUID PRIMARY KEY,
+    user_profile_id INTEGER REFERENCES user_profiles(id) ON DELETE SET NULL,
+    session_id VARCHAR(100),
+    outcome VARCHAR(24) NOT NULL DEFAULT 'running'
+      CONSTRAINT dynamics_explorer_requests_outcome_check
+      CHECK (outcome IN ('running', 'completed', 'truncated', 'max_rounds', 'refused', 'error', 'client_disconnected')),
+    rounds_used SMALLINT NOT NULL DEFAULT 0
+      CONSTRAINT dynamics_explorer_requests_rounds_check CHECK (rounds_used >= 0),
+    model VARCHAR(100),
+    stop_reason VARCHAR(50),
+    error_stage VARCHAR(50),
+    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMP,
+    CONSTRAINT dynamics_explorer_requests_terminal_shape CHECK (
+      (outcome = 'running' AND completed_at IS NULL)
+      OR (outcome <> 'running' AND completed_at IS NOT NULL)
+    )
   )`,
 
   // Indexes
@@ -230,6 +253,11 @@ const v14Statements = [
   `CREATE INDEX IF NOT EXISTS idx_dynamics_query_log_user ON dynamics_query_log(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_query_log_session ON dynamics_query_log(session_id)`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_query_log_created ON dynamics_query_log(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_query_log_request_round ON dynamics_query_log(request_id, request_round) WHERE request_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_explorer_requests_started ON dynamics_explorer_requests(started_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_explorer_requests_outcome_started ON dynamics_explorer_requests(outcome, started_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_explorer_requests_user_started ON dynamics_explorer_requests(user_profile_id, started_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_explorer_requests_session ON dynamics_explorer_requests(session_id)`,
 ];
 
 // V15: API usage logging for centralized key management
@@ -246,11 +274,14 @@ const v15Statements = [
     request_status VARCHAR(20) DEFAULT 'success',
     error_message TEXT,
     stop_reason VARCHAR(50),
+    request_id UUID,
+    request_round SMALLINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_api_usage_user ON api_usage_log(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_api_usage_app ON api_usage_log(app_name)`,
   `CREATE INDEX IF NOT EXISTS idx_api_usage_created ON api_usage_log(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_api_usage_request_round ON api_usage_log(request_id, request_round) WHERE request_id IS NOT NULL`,
 ];
 
 // V16 (user_app_access) and V17 (system_settings) migrated to Dataverse
@@ -348,12 +379,14 @@ const v23bStatements = [
     reviewed_by INTEGER REFERENCES user_profiles(id),
     reviewed_at TIMESTAMP,
     admin_note TEXT,
+    request_id UUID REFERENCES dynamics_explorer_requests(request_id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_feedback_user ON dynamics_feedback(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_feedback_created ON dynamics_feedback(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_feedback_status ON dynamics_feedback(status)`,
   `CREATE INDEX IF NOT EXISTS idx_dynamics_feedback_session ON dynamics_feedback(session_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_dynamics_feedback_request ON dynamics_feedback(request_id) WHERE request_id IS NOT NULL`,
 ];
 
 // V29: IRS exempt-organizations reference data (BMF extract).

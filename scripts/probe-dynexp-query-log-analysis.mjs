@@ -190,5 +190,71 @@ rows(await sql`
   ) later ON true
 `);
 
+const lifecycleShape = await sql`
+  SELECT to_regclass('public.dynamics_explorer_requests') IS NOT NULL AS available
+`;
+
+if (lifecycleShape.rows[0]?.available) {
+  section('9. Phase B request outcomes by month (stale running derived as abandoned)');
+  rows(await sql`
+    WITH classified AS (
+      SELECT
+        DATE_TRUNC('month', started_at)::date AS month,
+        CASE
+          WHEN outcome = 'running' AND started_at < NOW() - INTERVAL '10 minutes'
+            THEN 'abandoned'
+          ELSE outcome
+        END AS effective_outcome,
+        rounds_used
+      FROM dynamics_explorer_requests
+    )
+    SELECT
+      month,
+      effective_outcome,
+      COUNT(*)::int AS requests,
+      ROUND(AVG(rounds_used), 1) AS avg_rounds,
+      PERCENTILE_DISC(0.9) WITHIN GROUP (ORDER BY rounds_used)::int AS p90_rounds
+    FROM classified
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `);
+
+  section('10. Phase B request correlation completeness, last 45 days');
+  rows(await sql`
+    SELECT
+      COUNT(*)::int AS requests,
+      COUNT(*) FILTER (WHERE r.outcome <> 'running')::int AS terminal_requests,
+      COUNT(*) FILTER (
+        WHERE r.outcome = 'running' AND r.started_at < NOW() - INTERVAL '10 minutes'
+      )::int AS derived_abandoned,
+      COUNT(*) FILTER (WHERE q.rows > 0)::int AS requests_with_query_rows,
+      COUNT(*) FILTER (WHERE u.rows > 0)::int AS requests_with_usage_rows,
+      COUNT(*) FILTER (WHERE f.rows > 0)::int AS requests_with_feedback,
+      COALESCE(SUM(q.rows), 0)::int AS correlated_query_rows,
+      COALESCE(SUM(u.rows), 0)::int AS correlated_usage_rows,
+      COALESCE(SUM(f.rows), 0)::int AS correlated_feedback_rows
+    FROM dynamics_explorer_requests r
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS rows
+      FROM dynamics_query_log ql
+      WHERE ql.request_id = r.request_id
+    ) q ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS rows
+      FROM api_usage_log ul
+      WHERE ul.request_id = r.request_id
+    ) u ON true
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS rows
+      FROM dynamics_feedback df
+      WHERE df.request_id = r.request_id
+    ) f ON true
+    WHERE r.started_at >= NOW() - INTERVAL '45 days'
+  `);
+} else {
+  section('9-10. Phase B request telemetry');
+  console.log('Migration 033 is not applied; request-level analysis is unavailable.');
+}
+
 console.log('\nDone. All figures aggregate-only; no identifiers or row-level data emitted.');
 process.exit(0);

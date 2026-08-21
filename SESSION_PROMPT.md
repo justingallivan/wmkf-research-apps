@@ -1,4 +1,4 @@
-# Session 451 Prompt: Explorer Phase A Production-Live; Observation Pending
+# Session 451 Prompt: Explorer Phase B Built in Source; Production Proof Pending
 
 ## Session 450 Summary
 
@@ -98,8 +98,29 @@ documents and reconciled the production Log Drain's activation state.
      public Explorer route/auth boundary passed in both available browser
      surfaces. After owner authentication, “What tables are available?”
      completed in two read-only rounds. Immediate Production Postgres readback
-     found successful usage rows 5354/5355 with non-null `tool_use` and
-     `end_turn` stop reasons, 27/545 output tokens, and 1.851s/4.970s latency.
+   found successful usage rows 5354/5355 with non-null `tool_use` and
+   `end_turn` stop reasons, 27/545 output tokens, and 1.851s/4.970s latency.
+
+7. **Dynamics Explorer Phase B request telemetry is built in source.**
+   - Migration 033 plus fresh-install parity define one
+     `dynamics_explorer_requests` lifecycle row per authenticated, body-valid
+     request and nullable request/round correlation on query and usage logs;
+     feedback adds an optional `ON DELETE SET NULL` request link.
+   - The chat route awaits fail-soft start/finalize writes, classifies completed,
+     truncated, refused, max-round, error, and client-disconnected outcomes,
+     and marks disconnect before abort so a rejection cannot race to `error`.
+   - The browser returns the server request ID with successful assistant
+     messages. Feedback persists it only after authenticated-profile ownership
+     and exact non-null session verification; mismatch/outage remains a valid
+     uncorrelated feedback row.
+   - Daily maintenance retains lifecycle rows for 365 days; the aggregate-only
+     analysis probe reports monthly outcomes, derived abandonment, rounds, and
+     correlation completeness. Focused cross-layer tests and typecheck pass.
+   - One OAuth-authenticated read-only Claude Fable implementation review traced
+     caller→persistence→consumer and returned READY with no P0/P1 finding. Per
+     owner direction, no minor-point review loop was opened.
+   - This is source evidence only. Migration 033 is not applied, the branch is
+     not deployed, and Production joined-row proof remains open.
 
 ### Commits
 
@@ -124,12 +145,12 @@ documents and reconciled the production Log Drain's activation state.
 
 ### Verified Open
 
-1. **Implement Explorer campaign Phase B request telemetry.**
-   Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. The reviewed
-   plan keeps request lifecycle state in a dedicated table and correlates the
-   existing per-tool query log, per-model usage log, and verified feedback
-   without changing user answers or Dataverse behavior. No Phase B migration
-   or runtime code exists yet.
+1. **Promote and Production-prove Explorer campaign Phase B request telemetry.**
+   Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Source and
+   tests are complete. Next: merge/deploy deliberately, apply migration 033,
+   verify exact schema/tracker state, run one harmless signed-in Explorer
+   request, and read back the lifecycle/query/usage join. Do not claim Phase B
+   Production-live before those steps.
 
 2. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A

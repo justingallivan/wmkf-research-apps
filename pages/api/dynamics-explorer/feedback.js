@@ -2,7 +2,7 @@
  * API Route: /api/dynamics-explorer/feedback
  *
  * POST  — Submit feedback (thumbs up/down) from Dynamics Explorer chat
- *   Body: { feedbackType, category?, userNote?, queryText, conversationContext, sessionId, autoDetected? }
+ *   Body: { feedbackType, category?, userNote?, queryText, conversationContext, sessionId, requestId?, autoDetected? }
  * GET   — List feedback records (superuser only)
  *   Query: ?status=new|reviewed|resolved&type=positive|negative&limit=50
  * PATCH — Update feedback status (superuser only)
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     if (!access) return;
 
     try {
-      const { feedbackType, category, userNote, queryText, conversationContext, sessionId, autoDetected } = req.body;
+      const { feedbackType, category, userNote, queryText, conversationContext, sessionId, requestId, autoDetected } = req.body;
 
       if (!feedbackType || !['positive', 'negative'].includes(feedbackType)) {
         return res.status(400).json({ error: 'feedbackType must be "positive" or "negative"' });
@@ -32,6 +32,7 @@ export default async function handler(req, res) {
       const feedback = await FeedbackService.createFeedback({
         userProfileId: access.profileId,
         sessionId,
+        requestId,
         feedbackType,
         category: feedbackType === 'negative' ? category : null,
         userNote: userNote?.slice(0, 1000),
@@ -107,4 +108,3 @@ export default async function handler(req, res) {
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
-

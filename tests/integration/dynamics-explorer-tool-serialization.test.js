@@ -15,6 +15,8 @@ const mockSearchRecords = jest.fn();
 const mockResolveEntitySetName = jest.fn();
 const mockGetEntityAttributes = jest.fn();
 const mockBuildResolvedTaxonomyPromptBlock = jest.fn(() => Promise.resolve('resolved taxonomy'));
+const mockStartRequest = jest.fn(() => Promise.resolve(true));
+const mockFinalizeRequest = jest.fn(() => Promise.resolve(true));
 
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => jest.fn(() => Promise.resolve(true)),
@@ -80,6 +82,16 @@ jest.mock('../../lib/services/dynamics-explorer-taxonomy', () => ({
   buildResolvedTaxonomyPromptBlock: (...args) => mockBuildResolvedTaxonomyPromptBlock(...args),
 }));
 
+jest.mock('../../lib/services/dynamics-explorer-request-telemetry', () => ({
+  DynamicsExplorerRequestTelemetry: {
+    startRequest: (...args) => mockStartRequest(...args),
+    finalizeRequest: (...args) => mockFinalizeRequest(...args),
+  },
+  normalizeSessionId: value => (
+    typeof value === 'string' && value.length > 0 && value.length <= 100 ? value : null
+  ),
+}));
+
 jest.mock('../../lib/services/dynamics-context', () => ({
   withDynamicsContext: jest.fn((ctx, fn) => fn()),
   bypassDynamicsRestrictions: jest.fn((labelOrFn, maybeFn) => {
@@ -116,6 +128,8 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     clearAppAccessCache();
     jest.clearAllMocks();
     process.env.CLAUDE_API_KEY = 'test-key';
+    mockStartRequest.mockResolvedValue(true);
+    mockFinalizeRequest.mockResolvedValue(true);
 
     mockAuthenticatedUser(9, ['dynamics-explorer']);
     mockResolveEntitySetName.mockResolvedValue('akoya_requests');
@@ -206,6 +220,152 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     expect(toolResult).toContain('_aiContextBoundary');
     expect(toolResult).not.toContain('FULL EMAIL OR MEMO BODY');
     expect(toolResult).not.toContain('UNSENT_TAIL');
+  });
+
+  test('records a completed request lifecycle and returns the same request id to the client', async () => {
+    mockStream.mockReset().mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Done.' }],
+      model: 'claude-test',
+      usage: {},
+      stopReason: 'end_turn',
+      textStreamed: false,
+    });
+    const req = createMockReq({
+      method: 'POST',
+      body: {
+        messages: [{ role: 'user', content: 'show requests' }],
+        sessionId: 'session-1',
+      },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockStartRequest).toHaveBeenCalledWith(expect.objectContaining({
+      userProfileId: 9,
+      sessionId: 'session-1',
+    }));
+    const requestId = mockStartRequest.mock.calls[0][0].requestId;
+    expect(mockFinalizeRequest).toHaveBeenCalledWith(expect.objectContaining({
+      requestId,
+      outcome: 'completed',
+      roundsUsed: 1,
+      stopReason: 'end_turn',
+    }));
+    const stream = res.write.mock.calls.map(call => call[0]).join('');
+    expect(stream).toContain('event: complete');
+    expect(stream).toContain(`"requestId":"${requestId}"`);
+    expect(stream).toContain('"outcome":"completed"');
+  });
+
+  test.each([
+    ['max_tokens', false, 'truncated'],
+    ['refusal', true, 'refused'],
+  ])('classifies terminal stop %s (refused=%s) as the expected outcome', async (stopReason, refused, outcome) => {
+    mockStream.mockReset().mockResolvedValueOnce({
+      content: [{ type: 'text', text: '' }],
+      model: 'claude-test',
+      usage: {},
+      stopReason,
+      refused,
+      textStreamed: false,
+    });
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockFinalizeRequest).toHaveBeenCalledWith(expect.objectContaining({ outcome }));
+  });
+
+  test('records max_rounds after the fifteenth model round without a final answer', async () => {
+    mockStream.mockReset();
+    for (let round = 1; round <= 15; round++) {
+      mockStream.mockResolvedValueOnce({
+        content: [{
+          type: 'tool_use',
+          id: `tool-${round}`,
+          name: 'query_records',
+          input: { table_name: 'akoya_requests', select: 'akoya_requestnum', top: 1 },
+        }],
+        model: 'claude-test',
+        usage: {},
+        stopReason: 'tool_use',
+        textStreamed: false,
+      });
+    }
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockStream).toHaveBeenCalledTimes(15);
+    expect(mockFinalizeRequest).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: 'max_rounds',
+      roundsUsed: 15,
+      stopReason: 'tool_use',
+    }));
+    expect(res.write.mock.calls.map(call => call[0]).join('')).toContain('"outcome":"max_rounds"');
+  });
+
+  test('does not create a lifecycle row for a body-invalid request', async () => {
+    const req = createMockReq({ method: 'POST', body: { messages: [] } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mockStartRequest).not.toHaveBeenCalled();
+    expect(mockFinalizeRequest).not.toHaveBeenCalled();
+  });
+
+  test('classifies an in-flight abort as client_disconnected, never error', async () => {
+    const { EventEmitter } = require('events');
+    mockStream.mockReset().mockImplementationOnce(({ signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    }));
+    const req = Object.assign(new EventEmitter(), createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    }));
+    const res = Object.assign(new EventEmitter(), createMockRes());
+
+    const running = handler(req, res);
+    await Promise.resolve();
+    await Promise.resolve();
+    while (mockStream.mock.calls.length === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    req.emit('aborted');
+    await running;
+
+    const outcomes = mockFinalizeRequest.mock.calls.map(call => call[0].outcome);
+    expect(outcomes).toContain('client_disconnected');
+    expect(outcomes).not.toContain('error');
+    expect(res.write.mock.calls.map(call => call[0]).join('')).not.toContain('event: error');
+  });
+
+  test('correlates tool log rows with the request id and one-based model round', async () => {
+    const { sql } = require('@vercel/postgres');
+    const req = createMockReq({
+      method: 'POST',
+      body: { messages: [{ role: 'user', content: 'show requests' }] },
+    });
+    const res = createMockRes();
+
+    await handler(req, res);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const requestId = mockStartRequest.mock.calls[0][0].requestId;
+    const queryLogCall = sql.mock.calls.find(call => call[0].join(' ').includes('INSERT INTO dynamics_query_log'));
+    expect(queryLogCall).toBeDefined();
+    expect(queryLogCall[0].join(' ')).toContain('request_round');
+    expect(queryLogCall.slice(1)).toEqual(expect.arrayContaining([requestId, 1]));
   });
 
   // A5 — fail-loud typed errors. A Dynamics 400 for an unknown field must be
@@ -1237,6 +1397,11 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
       expect(payload.requestId).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
+      expect(mockFinalizeRequest).toHaveBeenCalledWith(expect.objectContaining({
+        requestId: payload.requestId,
+        outcome: 'error',
+        errorStage: 'model',
+      }));
     });
 
     test('keeps the raw provider error server-side', async () => {

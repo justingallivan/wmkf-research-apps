@@ -198,6 +198,31 @@ describe('Dynamics Explorer SSE terminal state', () => {
     expect(screen.getByText(/Reference:/)).toBeInTheDocument();
   });
 
+  test('successful feedback submits the completed request id for server verification', async () => {
+    fetch
+      .mockResolvedValueOnce(streamResponse([
+        sse('response', { content: 'Correlated answer' }),
+        sse('complete', {
+          requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26',
+          rounds: 1,
+          outcome: 'completed',
+        }),
+        EOF,
+      ]))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 7 }) });
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion();
+    expect(await screen.findByText('Correlated answer')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Helpful'));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(expect.objectContaining({
+      requestId: '2e0b0cbe-0dd6-4f1c-a19c-8a7c6e9fbb26',
+      feedbackType: 'positive',
+    }));
+  });
+
   test('a non-ok fetch still reports its status before any terminal event can be seen', async () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 503 });
     render(<DynamicsExplorerPage />);

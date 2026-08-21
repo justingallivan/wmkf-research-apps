@@ -38,6 +38,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     })),
     cleanupUsageLog: jest.fn(async () => 0),
     cleanupQueryLog: jest.fn(async () => 0),
+    cleanupDynamicsExplorerRequests: jest.fn(async () => 0),
     cleanupReviewerIdentityShadowLog: jest.fn(async () => 0),
     cleanupOperationalEvents: jest.fn(async () => 0),
     cleanupExpiredCache: jest.fn(async () => 0),
@@ -78,6 +79,29 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(FeedbackService.cleanupOldFeedback).toHaveBeenCalledWith(20);
     expect(res.body.results.feedback).toBe(5);
     expect(res.body.totalDeleted).toBe(5);
+  });
+
+  it('cleans Explorer request telemetry with query-log retention', async () => {
+    MaintenanceService.cleanupDynamicsExplorerRequests.mockResolvedValueOnce(8);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(MaintenanceService.cleanupDynamicsExplorerRequests).toHaveBeenCalledWith(365);
+    expect(res.body.results.dynamicsExplorerRequests).toBe(8);
+    expect(res.body.totalDeleted).toBe(8);
+  });
+
+  it('surfaces Explorer request cleanup failure without skipping later tasks', async () => {
+    MaintenanceService.cleanupDynamicsExplorerRequests
+      .mockRejectedValueOnce(new Error('request cleanup failed'));
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.dynamicsExplorerRequests)
+      .toEqual({ error: 'request cleanup failed' });
+    expect(res.body.failedSubtasks).toContain('dynamicsExplorerRequests');
+    expect(MaintenanceService.cleanupExpiredCache).toHaveBeenCalled();
   });
 
   it('reports Dynamics feedback cleanup failure instead of false zero-deletion success', async () => {

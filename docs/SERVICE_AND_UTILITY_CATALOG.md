@@ -28,7 +28,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### AI / prompt execution
 
-- **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging, API-key redaction. **Use this — not ad-hoc `fetch`** for new Anthropic API calls.
+- **`llm-client.js`** — Canonical Anthropic API wrapper (`complete()` + `stream()`). SSRF allowlist, abortable timeouts, 429/529 retry, single fallback-model swap, usage logging (including optional Explorer request/round correlation), API-key redaction. **Use this — not ad-hoc `fetch`** for new Anthropic API calls.
 - **`model-capabilities.js`** — Reviewed Anthropic model capability registry for request shaping (`temperature`, `output_config.effort`) and response semantics (refusals, retention class, max tokens). Unknown runtime ids fail closed for optional params; configured ids are guarded by `check:model-registry`.
 - **`model-review-validation.js`** — Shared write-time validator for tier keys and concrete Claude model ids. Admin model overrides and prompt publishes use it to reject unreviewed concrete Claude ids unless both capability and pricing entries exist.
 - **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, and attempts append-only audit rows in `wmkf_ai_runs`. Production consumers include Phase-I Dynamics summary, grantee title/abstract, field primer, peer-review summary, and review synthesis flows; inspect current callers before changing the contract.
@@ -43,6 +43,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`dynamics-service.js`** — Dynamics 365 / Dataverse client (OAuth, OData, Dataverse Search, email activities, `updateIfEmpty`, `logAiRun`). Impersonation contract documented in `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`.
 - **`dynamics-context.js`** — AsyncLocalStorage restriction context. `withDynamicsContext` / `bypassDynamicsRestrictions` for route + library callers; `enterDynamicsBypassForScript` for top-level scripts. **`DynamicsService.checkRestriction()` fails closed** when no context is set — every caller must opt in explicitly.
 - **`dynamics-explorer-taxonomy.js`** — Dynamics Explorer A2 layer (S200): 6h-cached, **fail-loud** live resolution of program / grantprogram / type / `wmkf_request_type` / distinct `akoya_requeststatus` over a fixed whitelist, with table-restriction gate + GUID/int/label validation, into a server-resolved system-prompt block (replaces the old hardcoded program GUIDs). Wraps `dataverse-export/live-taxonomy.js`.
+- **`dynamics-explorer-request-telemetry.js`** — Data-minimized one-row-per-request Explorer lifecycle writer. Starts `running`, atomically finalizes one terminal outcome, recovers a missing start with a conflict-safe terminal insert, and always fails soft toward the answer path. Stores no prompt, answer, tool output, query text, or exception message.
 - **`dynamics-odata-validator.js`** — Dynamics Explorer OData pre-flight validator (S200): tolerant tokenizer + live `getEntityAttributes` checks, synthesized Lookup/Customer/Owner `_value` aliases, restriction enforcement across navigation-path roots, invalid Edm.Guid comparison checks, and rejects for provably wrong lookup / `$expand` forms. Every `$expand` fails closed while any field-level restriction is configured because the related target cannot be resolved here; otherwise unknown shapes pass through. Reject-with-hint only, **no auto-correct**. Historical design: `docs/DYNAMICS_EXPLORER_ODATA_VALIDATOR_DESIGN.md`.
 - **`dataverse-identity-map.js`** / **`dynamics-identity-service.js`** — `user_profiles` ↔ Dynamics `systemuser` bridge; reconciliation CLI at `scripts/reconcile-dynamics-identities.js`.
 - **`program-director-resolver.js`** — Email → Dynamics `systemuser` bridge for Reviewer Finder's PD-filtered picker.
@@ -190,13 +191,13 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Admin / monitoring
 
-- **`feedback-service.js`** — `dynamics_feedback` thumbs + auto-detected failures.
+- **`feedback-service.js`** — `dynamics_feedback` thumbs + auto-detected failures; optional Explorer request correlation is accepted only after authenticated-profile ownership and exact non-null session verification, otherwise feedback is saved uncorrelated.
 - **`alert-service.js`** — `system_alerts` rows; health/maintenance/secret/log alerts; dedupe.
 - **`notification-service.js`** — System-alert row + category-routed email;
   explicit-recipients union and HTML-escaped body. Callers must establish the
   trusted ambient Dataverse context; the service no longer creates a hidden
   bypass around its Dynamics email transport.
-- **`maintenance-service.js`** — Cleanup operations; audit trail; Dataverse-configured retention.
+- **`maintenance-service.js`** — Cleanup operations; audit trail; Dataverse-configured retention, including Explorer request lifecycle rows on the query-log horizon with retained feedback correlations set null by FK.
 - **`portal-upload-staging.js`** — Actor/scope/resource-bound private Vercel Blob
   staging for external-grantee and staff replacement images. Owns short-lived
   client-token minting, atomic finalize leases, exact-path server reads, byte

@@ -21,8 +21,10 @@ related:
 
 **Status:** Active. Phase A is Production-live as of 2026-08-21 at commit
 `9a54620d`; migration `032_api_usage_stop_reason.sql` is applied and deployment
-`dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` is Ready on the Production aliases. Phases
-B-E remain planned from the S449 probe evidence.
+`dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` is Ready on the Production aliases. Phase B
+is implemented and verified in source on a feature branch; migration 033,
+deployment, and Production joined-row proof remain open. Phases C-E remain
+planned from the S449 probe evidence.
 
 **Objective:** make the Explorer trustworthy for staff outside the Research
 team — starting with SoCal — while making its behavior *measurable*, so the
@@ -120,7 +122,7 @@ Ordered so measurement lands before behavior changes.
 
 ### Phase B — Request-level telemetry
 
-- **IMPLEMENTATION-READY PLAN:**
+- **IMPLEMENTED IN SOURCE; NOT YET DEPLOYED/MIGRATED:**
   `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Preserve the unit of
   meaning of each log: a new `dynamics_explorer_requests` lifecycle table owns
   one row per request; nullable request/round columns correlate tool rows in
@@ -224,7 +226,7 @@ claim gets a dated probe first:
 | Unsupported/fallback models do not receive effort | `LLMClient._buildBody` and fallback rebuild | N/A | Anthropic request body | Capability registry + existing body-shaping tests + model gate | VERIFIED |
 | Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Deployed source + logger/client tests + migration 032 + fresh-install parity + Production schema/tracker readback + usage rows 5354/5355 | VERIFIED in Production (`tool_use`, then `end_turn`) |
 | Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Deployed source + route-config test | VERIFIED in Production at 4,096 |
-| Request-level rounds/outcomes are queryable | Chat handler | Planned `dynamics_explorer_requests` plus request/round correlations on existing logs | Future campaign analysis and verified feedback joins | Implementation-ready Phase B plan; no new schema/code yet | PLANNED |
+| Request-level rounds/outcomes are queryable | Chat handler + request telemetry service | Source-defined `dynamics_explorer_requests`; nullable request/round correlations on query/usage logs; verified optional feedback FK | Aggregate analysis probe and feedback review | Migration 033 + fresh-install parity + focused route/service/client/cleanup tests; Production migration/deployment not yet performed | VERIFIED IN SOURCE; PRODUCTION OPEN |
 
 **Sweep mode:** Mode A — changed fact. Source → persistence → consumer was
 traced before documentation edits. Searches covered source/tests, active docs,
@@ -256,3 +258,38 @@ and 5355 with non-null `tool_use` and `end_turn` stop reasons.
 window beyond this single two-round smoke. **Verdict:** RECONCILED for
 Production release and signed-in call telemetry; longer observation remains
 explicitly pending.
+
+## 7. Phase B source implementation and reconciliation report (2026-08-21)
+
+| Claim | Producer / entry | Persistence | Consumer | Evidence | Status |
+|---|---|---|---|---|---|
+| One accepted request has one lifecycle | Chat route + request telemetry service | `dynamics_explorer_requests` via migration 033 | Monthly outcome/round analysis | Focused service/route tests + Fable P0/P1 review | VERIFIED IN SOURCE |
+| Tool/model rows retain their own units | `logQuery` + `LLMClient`/usage logger | Nullable request/round fields on query/usage logs | Joined request diagnosis | Route/client/logger tests + pre-migration fallback tests | VERIFIED IN SOURCE |
+| Feedback correlation is non-authoritative | Browser request ID → feedback route/service | Nullable feedback FK after owner + exact-session verification | Admin feedback review | Client/service tests, mismatch/outage cases | VERIFIED IN SOURCE |
+| Retention preserves feedback | Maintenance cron/service | Request rows 365d; FK `ON DELETE SET NULL` | Aggregate analysis and retained feedback | Cleanup service/cron tests + migration | VERIFIED IN SOURCE |
+
+**Verification:** 121 focused tests; `check:types`; changed-file ESLint;
+migration-manifest, Atlas, API-route, route-boundary, model-registry,
+model-override-warming, prompt-injection, Dynamics-context, docs/fact/currency,
+canonical-pointer, symbol-reference, build-claim, agent-wiki, instruction, and
+agent-invariant gates plus applicable self-tests; Next.js webpack production
+build. The ordinary Turbopack build could not bind its local helper port in the
+host sandbox; the webpack production build completed successfully. The global
+memory-router gate retains one pre-existing unrelated overlong prose line in
+`.claude-memory/MEMORY.md`; this change did not touch that router.
+
+**Adversarial review:** one OAuth-authenticated, read-only Claude Fable
+implementation review, restricted to P0/P1 defects, returned **READY**. No
+material fix or follow-up review was required.
+
+**Sweep mode:** Mode A changed-fact reconciliation. Source → persistence →
+consumer was traced across code, migration/fresh setup, tests, analysis,
+retention, both Atlas surfaces, API matrix, service catalog, this plan, the
+detailed Phase B plan, campaign memory, and session handoff. Historical Phase A
+Production evidence and the pre-2026-08-08 `record_count` warning remain
+unchanged.
+
+**Remaining unverified external state:** migration 033 application/tracker
+readback, deployment, and one signed-in harmless request with joined
+lifecycle/query/usage evidence. **Verdict:** RECONCILED for source completion;
+not Production-live.

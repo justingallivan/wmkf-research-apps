@@ -17,7 +17,9 @@ related:
 
 # Dynamics Explorer Phase B — Request Telemetry Plan
 
-**Status:** PLANNED — Fable's material review findings are incorporated; no Phase B schema or runtime code exists yet
+**Status:** IMPLEMENTED AND FABLE-REVIEWED IN SOURCE — migration 033 is
+generated but not applied; the branch is not deployed and Production
+schema/runtime evidence remains open
 
 **Owner decision:** proceed with request-level measurement before changing Explorer behavior
 
@@ -25,8 +27,8 @@ related:
 
 ## 1. Outcome
 
-Phase B will make one Explorer chat request—not a browser session and not an
-individual tool call—the unit of analysis. After implementation, one query can
+Phase B makes one Explorer chat request—not a browser session and not an
+individual tool call—the unit of analysis. Once migration 033 is applied, one query can
 answer how many accepted requests completed, were truncated, exhausted the
 round limit, failed, or lost their client; how many model rounds they used; and
 which tool and model-usage rows belong to each request.
@@ -45,7 +47,7 @@ tool behavior, model choice, or the answer shown to the user.
 | Tool executions are logged | Each executed or denied tool calls `logQuery` | `dynamics_query_log` | Analysis scripts and 365-day cleanup | Chat route, setup schema, maintenance service | VERIFIED |
 | Model completion reasons are normalized | `LLMClient.complete/stream` | Nullable `api_usage_log.stop_reason` on completed calls | Usage analysis | `lib/services/llm-client.js`, migration 032 | VERIFIED |
 | Feedback is session-correlated | Explorer page posts `sessionId` | `dynamics_feedback` | Admin feedback surface | Explorer page, feedback route/service | VERIFIED |
-| Request outcomes are durable | N/A | N/A | N/A | No request table or terminal request write exists | NOT BUILT |
+| Request outcomes are durable | Chat route + `dynamics-explorer-request-telemetry.js` | `dynamics_explorer_requests` | Aggregate analysis probe | Source, migration 033, focused tests | VERIFIED IN SOURCE; NOT DEPLOYED/MIGRATED |
 
 The current `dynamics_query_log` aggregates remain a tool-call proxy, not a
 request measure. A browser `session_id` can contain several requests, and one
@@ -429,16 +431,18 @@ process death can always be distinguished from a lost client.
 - **Authoritative evidence:** chat/page/feedback/LLM/usage/maintenance source,
   Postgres setup and migrations, Atlas, committed aggregate probe, and current
   tests.
-- **Claims:** current request persistence is NOT BUILT; request UUID and round
-  counting are VERIFIED; terminal outcomes and cross-table correlation are
-  PLANNED.
+- **Claims:** request UUID, round counting, terminal classification, lifecycle
+  persistence, nullable cross-table correlation, verified feedback linkage,
+  and retention are VERIFIED IN SOURCE; Production migration/deployment and
+  joined-row evidence remain open.
 - **Durable restatements in scope:** this plan, the parent campaign plan,
   Explorer campaign memory, and session handoff.
 - **Historical surfaces left unchanged:** dated pre/post Aug 8 aggregate
   evidence and the March 2026 security review snapshot.
-- **Excluded from editing now:** Atlas and API matrix describe built state and
-  remain correct until implementation; this plan requires their update in the
-  implementation commit.
+- **Durable reconciliation:** both Atlas surfaces, the API matrix, service
+  catalog, parent campaign plan, campaign memory, and session handoff are
+  updated in this implementation commit with the source-versus-Production
+  boundary explicit.
 - **Remaining unknown:** exact disconnect coverage under platform process loss;
   it is deliberately represented as stale `running` → derived `abandoned`.
 
@@ -462,3 +466,18 @@ materially resolved. The review raised no other P0/P1 concern.
 
 The review transcript is retained in
 `docs/audits/dynamics-explorer-phase-b-fable-review-2026-08-21.md`.
+
+### Implementation review
+
+After implementation and local verification, OAuth-authenticated Claude Fable
+performed one read-only P0/P1-only review of the full diff from base
+`1b552cae`. It traced caller → persistence → consumer across the route,
+lifecycle service, migration/fresh setup, query/usage correlation, feedback
+verification, cleanup, analysis, documentation, and tests. Verdict: **READY**;
+no P0/P1 defect and no required change. Per owner direction, no second loop was
+opened for minor or speculative concerns.
+
+The implementation review record is retained in
+`docs/audits/dynamics-explorer-phase-b-fable-implementation-review-2026-08-21.md`.
+
+`[ADVERSARIAL-REVIEW-RECEIPT: docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md]`

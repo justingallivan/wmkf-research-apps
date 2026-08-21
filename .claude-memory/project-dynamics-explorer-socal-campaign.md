@@ -42,14 +42,20 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
    and 5355 recorded successful `tool_use` and `end_turn` stop reasons (27/545
    output tokens; 1.851s/4.970s). The longer latency/cap observation window
    remains open.
-2. Request-level telemetry remains Phase B, with an implementation-ready
-   contract in `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. A dedicated
-   `dynamics_explorer_requests` row will own the request lifecycle; nullable
-   request/round fields will correlate the existing per-tool query rows and
-   per-model usage rows, and verified request IDs may correlate feedback. Do
-   not put a synthetic terminal row into `dynamics_query_log`. `complete`
-   computes rounds but does not yet persist them. `record_count` rows before
-   2026-08-08 carry broken semantics.
+2. Phase B request telemetry is implemented and tested in source on
+   `codex/reviewer-email-conflict-self-service`; migration 033 is generated but
+   not yet applied and the branch is not deployed. One
+   `dynamics_explorer_requests` row owns each accepted request lifecycle;
+   nullable request/round fields correlate existing per-tool query and
+   per-model usage rows, and authenticated-profile + exact-session verification
+   gates optional feedback correlation. Disconnect classification is set before
+   abort so its rejection cannot win as `error`; stale `running` is derived as
+   `abandoned`. Do not put a synthetic terminal row into
+   `dynamics_query_log`. `record_count` rows before 2026-08-08 still carry
+   broken semantics. Next proof: deploy, apply migration 033, and read back one
+   harmless joined request. One OAuth-authenticated, read-only Claude Fable
+   implementation review returned READY with no P0/P1 finding; minor review
+   loops were explicitly excluded.
 3. Eval harness (golden questions, both Research and SoCal dialects) — organic
    traffic ~1 session/day cannot validate changes.
 4. Behavior: SoCal/program-aware LEXICON + conditional disambiguation
