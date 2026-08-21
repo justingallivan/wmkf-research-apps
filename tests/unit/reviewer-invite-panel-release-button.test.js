@@ -50,7 +50,7 @@ function renderPanel(candidates) {
 describe('ReviewerInvitePanel — release-pending affordance', () => {
   test('release button is visible and disabled with nothing selected', () => {
     renderPanel([accepted, pending]);
-    const btn = screen.getByRole('button', { name: /release pending invites as no longer needed/i });
+    const btn = screen.getByRole('button', { name: /^release invitee$/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute('title', expect.stringMatching(/has not yet responded/i));
   });
@@ -58,7 +58,7 @@ describe('ReviewerInvitePanel — release-pending affordance', () => {
   test('selecting a still-pending invitee enables it and shows the count', () => {
     renderPanel([accepted, pending]);
     fireEvent.click(screen.getByRole('checkbox', { name: /select pending reviewer/i }));
-    const btn = screen.getByRole('button', { name: /review & release 1 as no longer needed/i });
+    const btn = screen.getByRole('button', { name: /release invitee \(1\)/i });
     expect(btn).toBeEnabled();
     fireEvent.click(btn);
     expect(screen.getByTestId('release-modal')).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe('ReviewerInvitePanel — release-pending affordance', () => {
     renderPanel([accepted, pending]);
     expect(screen.getByRole('checkbox', { name: /select accepted reviewer/i })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: /release pending invites as no longer needed/i }),
+      screen.getByRole('button', { name: /^release invitee$/i }),
     ).toBeDisabled();
   });
 

@@ -620,12 +620,14 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
             {/* Always visible (disabled until a still-pending invitee is checked) —
                 owner discoverability report 2026-08-07: the appear-on-selection
                 version was unfindable when the quota email said to release
-                pending invitees. */}
+                pending invitees. Promoted from an underlined text link to a
+                peer button of Send invitation (owner report 2026-08-20: the
+                link form was still too easy to miss). */}
             <button
               type="button"
               onClick={handleWithdraw}
               disabled={selectedPending.length === 0}
-              className="text-sm text-gray-600 underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               title={
                 selectedPending.length === 0
                   ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
@@ -633,8 +635,8 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
               }
             >
               {selectedPending.length > 0
-                ? `Review & release ${selectedPending.length} as no longer needed`
-                : 'Release pending invites as no longer needed'}
+                ? `Release invitee${selectedPending.length > 1 ? 's' : ''} (${selectedPending.length})`
+                : 'Release invitee'}
             </button>
             <span className="text-xs text-gray-400">{invitable.length} invitable · {acceptedCount} accepted</span>
           </div>
