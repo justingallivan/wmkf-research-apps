@@ -852,7 +852,7 @@ person. Bundle-backed `staff_verified` is ready; legacy source-only values remai
 quick-check. High-confidence stored-versus-found contradictions on exact
 applicant-linked people persist `conflict_pending`, which blocks promotion and all
 outbound reviewer templates until staff chooses the stored or found address.
-In Production deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` (Ready and
+In Production deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` (Ready and
 signed-in read-only smoke-verified 2026-08-20), Find shows **Review email
 choice** for an email-only conflict and one **Review and confirm** action for a
 combined identity/email conflict. A legacy repair alert remains internal and

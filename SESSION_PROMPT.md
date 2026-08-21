@@ -34,7 +34,7 @@ documents and reconciled the production Log Drain's activation state.
      were absent. The action was not clicked and no Dataverse write was made.
    - [VERIFIED via source, 1,778 reviewer tests, typecheck, Vercel Turbopack
      build, read-only Postgres probe, and signed-in Production UI smoke on
-     2026-08-20. Production deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is
+     2026-08-20. Production deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` is
      Ready; card simplification commit `5c9c399d`.]
 
 2. **Reviewer repair alerts had previously become actionable from Admin.**
@@ -192,13 +192,20 @@ documents and reconciled the production Log Drain's activation state.
 
 ## Testing
 
-The self-service implementation passes 128 reviewer suites / 1,778 tests,
+The merged reviewer implementation passes 128 reviewer suites / 1,779 tests,
 typecheck, and a Vercel Turbopack production build. Deployment
-`dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is Ready and owns the Production aliases.
+`dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` is Ready and owns the Production aliases.
 The signed-in Production smoke verified Neville's simplified card without
 clicking its action; it did not select an address, mutate Dataverse, or prove
 the live write path. The earlier deployment's dialog smoke through neutral
 Cancel remains the evidence for the rendered exact-choice modal.
+
+The post-deploy smoke observed two Dataverse no-response timeouts at the shared
+30-second boundary (`/api/workbench/dashboard` and `resolve-request`) while the
+owner was also having trouble in AkoyaGO. A direct read-only Dataverse request
+then succeeded in 766 ms and the same Production dashboard recovered without a
+browser error. Treat this as a transient upstream availability incident, not a
+clean-error-window claim or evidence of a UI regression.
 
 The Session 450 claim-evidence pilot report was unavailable because its local
 observation state could not be read. No observation row was added.
