@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-20
 owner: product-engineering
 related:
+  - docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md
   - docs/DYNAMICS_EXPLORER_PATH_A_PLAN.md
   - docs/DYNAMICS_SCHEMA_ANNOTATION.md
   - shared/config/prompts/dynamics-explorer.js
@@ -119,10 +120,16 @@ Ordered so measurement lands before behavior changes.
 
 ### Phase B — Request-level telemetry
 
-- Mint/propagate `requestId` into `logQuery`; add columns (existing-DB
-  migration via `node scripts/apply-migrations.js` conventions):
-  `request_id`, `round`, `stop_reason`. Write one terminal row per request:
-  outcome (`completed | max_rounds | error | truncated`), rounds used, model.
+- **IMPLEMENTATION-READY PLAN:**
+  `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Preserve the unit of
+  meaning of each log: a new `dynamics_explorer_requests` lifecycle table owns
+  one row per request; nullable request/round columns correlate tool rows in
+  `dynamics_query_log` and model attempts in `api_usage_log`; verified request
+  IDs may correlate `dynamics_feedback`. Do not add a synthetic terminal row to
+  the per-tool query log.
+- Terminal outcomes are `completed | truncated | max_rounds | refused | error |
+  client_disconnected`; stale `running` rows are reported as derived
+  `abandoned`. Telemetry remains fail-soft toward the user.
 - Keep the 2026-08-08 era boundary documented wherever record_count trends
   are read (earlier rows are not comparable).
 - Acceptance: one SQL query answers "distribution of rounds and outcomes per
@@ -217,7 +224,7 @@ claim gets a dated probe first:
 | Unsupported/fallback models do not receive effort | `LLMClient._buildBody` and fallback rebuild | N/A | Anthropic request body | Capability registry + existing body-shaping tests + model gate | VERIFIED |
 | Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Deployed source + logger/client tests + migration 032 + fresh-install parity + Production schema/tracker readback + usage rows 5354/5355 | VERIFIED in Production (`tool_use`, then `end_turn`) |
 | Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Deployed source + route-config test | VERIFIED in Production at 4,096 |
-| Request-level rounds/outcomes are queryable | Chat handler | `dynamics_query_log` | Future campaign analysis | Phase B plan; no new schema/code in this slice | PLANNED |
+| Request-level rounds/outcomes are queryable | Chat handler | Planned `dynamics_explorer_requests` plus request/round correlations on existing logs | Future campaign analysis and verified feedback joins | Implementation-ready Phase B plan; no new schema/code yet | PLANNED |
 
 **Sweep mode:** Mode A — changed fact. Source → persistence → consumer was
 traced before documentation edits. Searches covered source/tests, active docs,

@@ -124,7 +124,14 @@ documents and reconciled the production Log Drain's activation state.
 
 ### Verified Open
 
-1. **Observe Explorer campaign Phase A over normal use.**
+1. **Implement Explorer campaign Phase B request telemetry.**
+   Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. The reviewed
+   plan keeps request lifecycle state in a dedicated table and correlates the
+   existing per-tool query log, per-model usage log, and verified feedback
+   without changing user answers or Dataverse behavior. No Phase B migration
+   or runtime code exists yet.
+
+2. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
    implementation report. Migration, deployment, and a signed-in two-round
    smoke are complete; usage rows proved both `tool_use` and `end_turn`
@@ -132,12 +139,12 @@ documents and reconciled the production Log Drain's activation state.
    distribution, output-at-cap events, and round latency against the prior
    6.5-second Sonnet average.
 
-2. **Observe Stage II Production outcomes through 2026-09-02.**
+3. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
    Production state and organic-observation window. Do not manufacture shared
    roster rows.
 
-3. **Finish Track A passive-safety closeout against the active drain.**
+4. **Finish Track A passive-safety closeout against the active drain.**
    Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
    `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`.
    The durable sink intentionally retains selected failures, so its 45 rows do

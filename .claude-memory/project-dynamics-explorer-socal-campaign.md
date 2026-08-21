@@ -42,10 +42,14 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
    and 5355 recorded successful `tool_use` and `end_turn` stop reasons (27/545
    output tokens; 1.851s/4.970s). The longer latency/cap observation window
    remains open.
-2. Request-level telemetry remains Phase B: persist requestId + round +
-   terminal request outcome in dynamics_query_log. `complete` computes rounds
-   but never persists them. record_count rows before 2026-08-08 carry broken
-   semantics.
+2. Request-level telemetry remains Phase B, with an implementation-ready
+   contract in `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. A dedicated
+   `dynamics_explorer_requests` row will own the request lifecycle; nullable
+   request/round fields will correlate the existing per-tool query rows and
+   per-model usage rows, and verified request IDs may correlate feedback. Do
+   not put a synthetic terminal row into `dynamics_query_log`. `complete`
+   computes rounds but does not yet persist them. `record_count` rows before
+   2026-08-08 carry broken semantics.
 3. Eval harness (golden questions, both Research and SoCal dialects) — organic
    traffic ~1 session/day cannot validate changes.
 4. Behavior: SoCal/program-aware LEXICON + conditional disambiguation
