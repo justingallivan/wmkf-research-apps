@@ -5,6 +5,7 @@
 const {
   createStaffVerifiedState,
   createConflictPendingState,
+  staffAddressChoiceProjection,
   addressConflictDisposition,
   receiptCanResolveConflict,
   parseAddressTrustState,
@@ -33,6 +34,72 @@ describe('reviewer address trust bundle', () => {
     };
     expect(addressTrustDecision(person)).toMatchObject({ status: 'staff_verified' });
     expect(emailConfidence(person)).toMatchObject({ action: 'ready', level: 'high' });
+  });
+
+  test('a resolved staff address choice is readable, invite-ready, and truthfully described', () => {
+    const conflict = createConflictPendingState({
+      email: BASE.email,
+      foundEmail: 'new@example.edu',
+      reason: 'email_mismatch',
+      requestId: BASE.requestId,
+      candidateKey: BASE.candidateKey,
+      detectedAt: '2026-07-31T21:00:00.000Z',
+    });
+    const state = createStaffVerifiedState({
+      ...BASE,
+      email: 'new@example.edu',
+      evidenceType: 'staff_address_choice',
+      evidenceUrl: null,
+      attestedAt: '2026-07-31T22:00:00.000Z',
+      resolution: {
+        conflict: conflict.conflict,
+        decision: 'use_found',
+        resolvedAt: '2026-07-31T22:00:00.000Z',
+      },
+    });
+    const parsed = parseAddressTrustState(state, { storedEmail: 'new@example.edu' });
+    expect(parsed.valid).toBe(true);
+    expect(staffAddressChoiceProjection(parsed.state, {
+      email: 'new@example.edu',
+      requestId: BASE.requestId,
+      candidateKey: BASE.candidateKey,
+    })).toEqual({ decision: 'use_found', selectedEmail: 'new@example.edu' });
+    expect(emailConfidence({
+      email: 'new@example.edu',
+      emailSource: 'staff_verified',
+      addressTrustStateJson: JSON.stringify(state),
+    })).toMatchObject({
+      action: 'ready',
+      reason: 'Staff selected this address after reviewing the stored and found values',
+    });
+  });
+
+  test('staff_address_choice fails closed without an exact same-candidate resolution', () => {
+    expect(() => createStaffVerifiedState({
+      ...BASE,
+      evidenceType: 'staff_address_choice',
+      evidenceUrl: null,
+    })).toThrow(/requires an exact conflict resolution/);
+
+    const conflict = createConflictPendingState({
+      email: BASE.email,
+      foundEmail: 'new@example.edu',
+      reason: 'email_mismatch',
+      requestId: BASE.requestId,
+      candidateKey: 'candidate:other',
+      detectedAt: '2026-07-31T21:00:00.000Z',
+    });
+    expect(() => createStaffVerifiedState({
+      ...BASE,
+      evidenceType: 'staff_address_choice',
+      evidenceUrl: null,
+      attestedAt: '2026-07-31T22:00:00.000Z',
+      resolution: {
+        conflict: conflict.conflict,
+        decision: 'keep_stored',
+        resolvedAt: '2026-07-31T22:00:00.000Z',
+      },
+    })).toThrow(/same request and candidate/);
   });
 
   test.each([
