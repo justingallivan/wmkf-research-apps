@@ -9,6 +9,7 @@ cataloged: 2026-07-31
 last_verified: 2026-07-31
 owner: product-engineering
 related:
+  - docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
   - docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
   - docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
@@ -157,6 +158,7 @@ paths, the send boundary, and a total reason-to-remedy contract.
 | D5 | A linked paper is valid independent evidence when staff open it and find the corresponding author's address. | Owner-decided |
 | D6 | **No dead ends:** every warning/block names the problem and provides a primary remedy; a state that staff cannot safely repair themselves provides retry plus a one-click durable repair request. | Owner-decided |
 | D7 | Invitation sending never creates or links a CRM Contact; identity-bearing acceptance remains the Contact-promotion event. | Implemented current contract |
+| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Owner-decided target on 2026-08-20; planned in `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md` |
 
 ## Approved implementation decisions
 
