@@ -495,7 +495,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const promotionDecision = getCandidatePromotionDecision(c);
   const needsIdentityConfirmation = promotionDecision?.decision === 'needs_identity_confirmation';
   const needsRecordRepair = promotionDecision?.decision === 'needs_record_repair';
-  const needsAddressVerification = !needsIdentityConfirmation && emailReadiness.action !== 'ready';
+  // A pending stored/found conflict remains directly actionable even when the
+  // candidate also needs identity confirmation. In that combined state the
+  // address action opens the confirm-mode dialog, which requires both an exact
+  // email choice and the explicit right-person checkbox before any write.
+  const needsAddressVerification = c.addressConflictPending === true
+    || (!needsIdentityConfirmation && emailReadiness.action !== 'ready');
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
   // could belong to a namesake while keeping the row actionable in Find.
@@ -593,13 +598,18 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   // Status → remedy routing. Require the exact handler for the candidate's
   // current state so the card never presents a primary action that dead-ends.
   // Routing only — no readiness/trust semantics are decided here.
+  const addressConflictHandler = needsIdentityConfirmation
+    ? onConfirmIdentity
+    : onReviewAddressConflict;
   const canReviewAddressConflict = c.addressConflictPending === true
-    && typeof onReviewAddressConflict === 'function';
-  const canEditAddress = c.addressConflictPending !== true && typeof onEdit === 'function';
-  const openAddressRemedy = (canManage && !identityUnverified
+    && typeof addressConflictHandler === 'function';
+  const canEditAddress = c.addressConflictPending !== true
+    && !identityUnverified
+    && typeof onEdit === 'function';
+  const openAddressRemedy = (canManage
     && c.conflictRecordUnavailable !== true
     && (canReviewAddressConflict || canEditAddress))
-    ? () => (canReviewAddressConflict ? onReviewAddressConflict(c) : onEdit(c))
+    ? () => (canReviewAddressConflict ? addressConflictHandler(c) : onEdit(c))
     : null;
   const openIdentityRemedy = (onConfirmIdentity && canManage) ? () => onConfirmIdentity(c) : null;
   const repairEligible = canManage && onRequestRepair

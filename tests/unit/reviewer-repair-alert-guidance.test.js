@@ -280,7 +280,9 @@ test('a routine email choice does not depend on repair-status lookup', () => {
   expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
 });
 
-test('the unresolved conflict card exposes Confirm identity and suppresses direct address review', () => {
+test('the unresolved conflict card exposes both email choice and Confirm identity through the safe confirm flow', () => {
+  const onReviewAddressConflict = jest.fn();
+  const onConfirmIdentity = jest.fn();
   render(
     <CandidateCard
       candidate={{
@@ -294,13 +296,15 @@ test('the unresolved conflict card exposes Confirm identity and suppresses direc
       }}
       readOnly
       onRequestRepair={jest.fn()}
-      onReviewAddressConflict={jest.fn()}
-      onConfirmIdentity={jest.fn()}
+      onReviewAddressConflict={onReviewAddressConflict}
+      onConfirmIdentity={onConfirmIdentity}
     />,
   );
 
   expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Review address conflict for Reviewer Name' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Review email choice for Reviewer Name' }));
+  expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
+  expect(onReviewAddressConflict).not.toHaveBeenCalled();
 });
 
 test('Invite-origin repair attention highlights the saved reviewer and exposes the repair action', async () => {

@@ -57,14 +57,14 @@ describe('candidate reasoning presentation contract', () => {
     });
   });
 
-  test('record-repair reasoning maps to the repair remedy', () => {
+  test('record-repair reasoning maps to the AkoyaGO retry remedy', () => {
     expect(getCandidateReasonPresentation({
       reasoning: 'The linked record is inactive.',
       applicantKnownReviewer: { status: 'inactive' },
     })).toMatchObject({
       kind: 'record_repair',
       label: 'Why this needs repair:',
-      remedyId: 'create_repair_request',
+      remedyId: 'retry_record_check',
     });
   });
 

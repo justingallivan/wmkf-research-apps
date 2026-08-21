@@ -89,6 +89,31 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
   expect(onEdit).not.toHaveBeenCalled();
 });
 
+test('a pending conflict that also needs identity confirmation keeps the email choice visible and uses the confirm-mode dialog', async () => {
+  const user = userEvent.setup();
+  const onReviewAddressConflict = jest.fn();
+  const onConfirmIdentity = jest.fn();
+  render(
+    <CandidateCard
+      candidate={{
+        ...QUICK_CHECK,
+        identityStatus: 'unresolved',
+        pdIdentityConfirmed: false,
+        addressConflictPending: true,
+      }}
+      checked={false}
+      onToggle={() => {}}
+      onReviewAddressConflict={onReviewAddressConflict}
+      onConfirmIdentity={onConfirmIdentity}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Confirm identity for Alexander Green' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Review email choice for Alexander Green' }));
+  expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
+  expect(onReviewAddressConflict).not.toHaveBeenCalled();
+});
+
 test('read-only (canManage=false) leaves the warning as inert text — no dead action offered', () => {
   renderCard({}, { canManage: false });
 
