@@ -228,7 +228,7 @@ test('repair attention scrolls to and highlights the matching reviewer card', as
   }));
 });
 
-test('an open repair request replaces the duplicate action and keeps identity confirmation available', () => {
+test('an open repair request stays internal while the card presents one executable next step', () => {
   render(
     <CandidateCard
       candidate={{
@@ -250,9 +250,10 @@ test('an open repair request replaces the duplicate action and keeps identity co
   );
 
   expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
-  expect(screen.getByText('Repair request pending')).toBeInTheDocument();
+  expect(screen.queryByText('Repair request pending')).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /pending repair request/i })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Review and confirm for Reviewer Name' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Confirm identity for Reviewer Name' })).not.toBeInTheDocument();
 });
 
 test('a routine email choice does not depend on repair-status lookup', () => {
@@ -277,10 +278,10 @@ test('a routine email choice does not depend on repair-status lookup', () => {
   expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Retry repair request status/i })).not.toBeInTheDocument();
   expect(retry).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Review and confirm for Reviewer Name' })).toBeInTheDocument();
 });
 
-test('the unresolved conflict card exposes both email choice and Confirm identity through the safe confirm flow', () => {
+test('the unresolved conflict card exposes one combined action through the safe confirm flow', () => {
   const onReviewAddressConflict = jest.fn();
   const onConfirmIdentity = jest.fn();
   render(
@@ -301,8 +302,9 @@ test('the unresolved conflict card exposes both email choice and Confirm identit
     />,
   );
 
-  expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Review email choice for Reviewer Name' }));
+  expect(screen.queryByRole('button', { name: 'Confirm identity for Reviewer Name' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Review email choice for Reviewer Name' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Review and confirm for Reviewer Name' }));
   expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
   expect(onReviewAddressConflict).not.toHaveBeenCalled();
 });

@@ -226,11 +226,11 @@ export function getCandidatePromotionDecision(candidate) {
 
 export const CANDIDATE_REASON_PRESENTATION = Object.freeze({
   suggestion: Object.freeze({
-    label: 'Suggested because:',
+    label: 'Why this reviewer was suggested:',
     remedyId: null,
   }),
   identity_review: Object.freeze({
-    label: 'Why this needs review:',
+    label: 'Identity concern:',
     remedyId: 'confirm_identity',
   }),
   record_repair: Object.freeze({
@@ -257,9 +257,13 @@ export function getCandidateReasonPresentation(candidate) {
   const unresolvedIdentity = candidate?.identityStatus === 'unresolved'
     || candidate?.verificationStatus === 'unresolved'
     || candidate?.needsIdentification === true;
+  // `reasoning` is overloaded: most rows carry the positive expertise rationale,
+  // while a smaller set carries an identity failure explanation. Do not relabel
+  // a positive recommendation as the reason the identity is questionable.
+  const describesIdentityConcern = /could not confirm|unable to confirm|could not be reconciled|different (?:people|person)|may be a different person|identity (?:conflict|mismatch)|ambiguous (?:identity|name)|orcid.+email.+(?:split|differ|different)/i.test(text);
   const kind = decision === 'needs_record_repair'
     ? 'record_repair'
-    : (explicitServerIdentityReview || unresolvedIdentity
+    : ((explicitServerIdentityReview || unresolvedIdentity) && describesIdentityConcern
         ? 'identity_review'
         : 'suggestion');
   return { kind, text, ...CANDIDATE_REASON_PRESENTATION[kind] };

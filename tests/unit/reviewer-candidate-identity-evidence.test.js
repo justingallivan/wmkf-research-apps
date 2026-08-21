@@ -103,7 +103,7 @@ function renderUnresolved(overrides = {}) {
   );
 }
 
-const TOGGLE = /Review evidence before confirming/;
+const TOGGLE = /Show supporting evidence/;
 
 describe('CandidateCard identity evidence disclosure', () => {
   test('offers the evidence collapsed, and only for an unresolved identity', () => {
@@ -111,7 +111,7 @@ describe('CandidateCard identity evidence disclosure', () => {
 
     const toggle = screen.getByRole('button', { name: TOGGLE });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText(/may be a different person with this name/)).toBeInTheDocument();
+    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
     // Collapsed: the evidence itself is absent from the DOM, not merely hidden.
     expect(screen.queryByText(/Quantitative MS of histone marks/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Address on file/)).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('CandidateCard identity evidence disclosure', () => {
 
     await user.click(screen.getByRole('button', { name: TOGGLE }));
 
-    expect(screen.getByRole('button', { name: /Hide evidence/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Hide supporting evidence/ })).toHaveAttribute('aria-expanded', 'true');
 
     // Affiliation + its provenance label.
     expect(screen.getByText(/Department of Biochemistry, Example University/)).toBeInTheDocument();

@@ -89,7 +89,7 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
   expect(onEdit).not.toHaveBeenCalled();
 });
 
-test('a pending conflict that also needs identity confirmation keeps the email choice visible and uses the confirm-mode dialog', async () => {
+test('a pending conflict that also needs identity confirmation exposes one combined next step', async () => {
   const user = userEvent.setup();
   const onReviewAddressConflict = jest.fn();
   const onConfirmIdentity = jest.fn();
@@ -108,8 +108,9 @@ test('a pending conflict that also needs identity confirmation keeps the email c
     />,
   );
 
-  expect(screen.getByRole('button', { name: 'Confirm identity for Alexander Green' })).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Review email choice for Alexander Green' }));
+  expect(screen.queryByRole('button', { name: 'Confirm identity for Alexander Green' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Review email choice for Alexander Green' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Review and confirm for Alexander Green' }));
   expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
   expect(onReviewAddressConflict).not.toHaveBeenCalled();
 });
@@ -218,7 +219,7 @@ test('a thin zero-match sample renders as one qualified expertise status with a 
 
   expect(screen.getByText(/0 of 3 retrieved papers matched the stated expertise/)).toBeInTheDocument();
   expect(screen.getByText(/not this person's full publication record/)).toBeInTheDocument();
-  expect(screen.getByText(/Suggested because:/).parentElement).toHaveTextContent('His work addresses the proposal risk.');
+  expect(screen.getByText(/Why this reviewer was suggested:/).parentElement).toHaveTextContent('His work addresses the proposal risk.');
   expect(screen.getByText(/Evidence includes high-confidence email \+ ORCID/)).toBeInTheDocument();
   expect(screen.queryByText(/0%|Low match|Expertise mismatch|Claude claimed/)).not.toBeInTheDocument();
   expect(container.firstChild).toHaveClass('bg-white');

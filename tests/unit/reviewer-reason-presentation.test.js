@@ -26,7 +26,7 @@ describe('candidate reasoning presentation contract', () => {
       identityStatus: 'unresolved',
     })).toMatchObject({
       kind: 'identity_review',
-      label: 'Why this needs review:',
+      label: 'Identity concern:',
       remedyId: 'confirm_identity',
     });
   });
@@ -39,7 +39,7 @@ describe('candidate reasoning presentation contract', () => {
       pdIdentityConfirmed: false,
     })).toMatchObject({
       kind: 'identity_review',
-      label: 'Why this needs review:',
+      label: 'Identity concern:',
       remedyId: 'confirm_identity',
     });
   });
@@ -52,7 +52,19 @@ describe('candidate reasoning presentation contract', () => {
       emailSource: 'institution_page',
     })).toMatchObject({
       kind: 'suggestion',
-      label: 'Suggested because:',
+      label: 'Why this reviewer was suggested:',
+      remedyId: null,
+    });
+  });
+
+  test('a positive expertise rationale stays a suggestion even while identity confirmation is required', () => {
+    expect(getCandidateReasonPresentation({
+      reasoning: 'Their CRISPR work directly addresses the proposal.',
+      identityStatus: 'unresolved',
+      serverIdentityReviewReason: 'identity_not_resolved',
+    })).toMatchObject({
+      kind: 'suggestion',
+      label: 'Why this reviewer was suggested:',
       remedyId: null,
     });
   });

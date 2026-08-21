@@ -501,6 +501,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   // email choice and the explicit right-person checkbox before any write.
   const needsAddressVerification = c.addressConflictPending === true
     || (!needsIdentityConfirmation && emailReadiness.action !== 'ready');
+  const needsCombinedReview = needsIdentityConfirmation && c.addressConflictPending === true;
 
   // Unresolved identity never enters Invite. Suppress contact/bibliometrics that
   // could belong to a namesake while keeping the row actionable in Find.
@@ -805,9 +806,13 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
 
           {identityUnverified && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-              <span className="font-medium">Identity confirmation required.</span>{' '}
-              {openIdentityRemedy
-                ? 'Review the evidence below. If it belongs to this person, use Confirm identity and correct the contact details. Otherwise choose Not a fit.'
+              <span className="font-medium">
+                {needsCombinedReview ? 'Review this reviewer before adding them.' : 'Identity confirmation required.'}
+              </span>{' '}
+              {needsCombinedReview
+                ? 'The institution and email found during search differ from the existing AkoyaGO record. Confirm this is the same person and choose which email to use.'
+                : openIdentityRemedy
+                  ? 'Review the supporting evidence. If it belongs to this person, confirm the identity and contact details. Otherwise choose Not a fit.'
                 : 'Review the evidence below. If it does not belong to this person, choose Not a fit. If it does, retry enrichment after the linked reviewer record is repaired.'}
             </div>
           )}
@@ -891,10 +896,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               >
                 <span aria-hidden="true">{evidenceOpen ? '▾' : '▸'}</span>{' '}
                 <span className="font-medium">
-                  {evidenceOpen ? 'Hide evidence' : 'Review evidence before confirming'}
-                </span>
-                <span className="text-gray-500">
-                  {' '}(unconfirmed — may be a different person with this name)
+                  {evidenceOpen ? 'Hide supporting evidence' : 'Show supporting evidence'}
                 </span>
               </button>
               {evidenceOpen && (
@@ -1142,11 +1144,15 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               <button
                 type="button"
                 onClick={openAddressRemedy}
-                aria-label={`${c.addressConflictPending ? 'Review email choice' : 'Verify address'} for ${c.name}`}
-                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                title="Review the evidence, correct the address if needed, and verify the exact person and address"
+                aria-label={`${needsCombinedReview ? 'Review and confirm' : c.addressConflictPending ? 'Review email choice' : 'Verify address'} for ${c.name}`}
+                className={needsCombinedReview
+                  ? 'rounded bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800'
+                  : 'rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100'}
+                title={needsCombinedReview
+                  ? 'Confirm the person and choose which email address to use'
+                  : 'Review the evidence, correct the address if needed, and verify the exact person and address'}
               >
-                {c.addressConflictPending ? 'Review email choice' : 'Verify address'}
+                {needsCombinedReview ? 'Review and confirm' : c.addressConflictPending ? 'Review email choice' : 'Verify address'}
               </button>
             )}
             {canManage && onRetryAddressCheck && (c.conflictRecordUnavailable === true || needsRecordRepair) && (
@@ -1170,14 +1176,6 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 Create repair request
               </button>
             )}
-            {repairRequest && (
-              <span
-                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900"
-                title="A repair request is already open"
-              >
-                Repair request pending
-              </span>
-            )}
             {!repairRequest && repairRequestsUnavailable && repairEligible && (
               <button
                 type="button"
@@ -1193,7 +1191,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             {/* Needs-identity-review escape hatch: a PD who recognizes the person can
                 confirm identity + correct the contact, which makes the row selectable
                 and lets it pass the save gate (bibliometrics still dropped server-side). */}
-            {openIdentityRemedy && (
+            {openIdentityRemedy && !needsCombinedReview && (
               <button
                 type="button"
                 onClick={openIdentityRemedy}

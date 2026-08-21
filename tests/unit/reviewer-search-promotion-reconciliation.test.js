@@ -377,7 +377,7 @@ test('record-repair conflicts stay on the AkoyaGO retry remedy even when the ser
   ));
 });
 
-test('a repair request created from the card immediately becomes pending', async () => {
+test('a repair request created from the card confirms receipt without adding an inert card action', async () => {
   const reviewer = {
     ...candidate('Pending Repair Reviewer', 'pending-repair@example.edu'),
     candidateKey: 'candidate:pending-repair',
@@ -416,7 +416,8 @@ test('a repair request created from the card immediately becomes pending', async
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: /create repair request/i }));
 
-  expect(await screen.findByText('Repair request pending')).toBeInTheDocument();
+  expect(await screen.findByText('Repair request created.')).toBeInTheDocument();
+  expect(screen.queryByText('Repair request pending')).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: /pending repair request/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /create repair request/i })).not.toBeInTheDocument();
 });
