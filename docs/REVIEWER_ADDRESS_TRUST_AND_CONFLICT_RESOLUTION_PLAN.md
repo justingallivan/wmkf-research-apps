@@ -3,7 +3,7 @@ title: Reviewer Address Trust and Actionable Conflict Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Address trust is production-live; direct Workbench stored/found self-service is implemented in source and awaits Preview/deployment verification."
+summary: "Address trust and direct Workbench stored/found self-service are Production-live; the signed-in choice dialog is smoke-verified through neutral Cancel."
 canonical: false
 cataloged: 2026-07-31
 last_verified: 2026-08-20
@@ -158,7 +158,7 @@ paths, the send boundary, and a total reason-to-remedy contract.
 | D5 | A linked paper is valid independent evidence when staff open it and find the corresponding author's address. | Owner-decided |
 | D6 | **No dead ends:** every warning/block names the problem and provides a primary remedy; a state that staff cannot safely repair themselves provides retry plus a one-click durable repair request. | Owner-decided |
 | D7 | Invitation sending never creates or links a CRM Contact; identity-bearing acceptance remains the Contact-promotion event. | Implemented current contract |
-| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Implemented in source on `codex/reviewer-email-conflict-self-service`; not deployed (2026-08-20) |
+| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Production-live in Ready deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd`; read-only signed-in smoke verified the dialog through Cancel (2026-08-20) |
 
 ## Approved implementation decisions
 
@@ -444,7 +444,7 @@ Creation itself uses a request/candidate-scoped transactional advisory lock and
 rechecks active/acknowledged state, so concurrent calls and different reason
 codes cannot create two open requests for the same candidate.
 
-**Implemented-in-source self-service follow-up (2026-08-20; not deployed):**
+**Production-live self-service follow-up (2026-08-20; read-only UI smoke verified):**
 the open-alert projection remains for compatibility but renders only **Repair
 request pending**; it no longer links Find users to Admin or hides **Review
 email choice**. The modal shows the fresh exact pair and records an explicit

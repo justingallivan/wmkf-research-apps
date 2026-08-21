@@ -3,7 +3,7 @@ title: Reviewer Email Conflict Self-Service Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Direct Workbench reviewer email choice is implemented in source; legacy alert compatibility remains during rollout."
+summary: "Direct Workbench reviewer email choice is Production-live; legacy alert compatibility remains while an active row exists."
 canonical: false
 cataloged: 2026-08-20
 last_verified: 2026-08-20
@@ -25,7 +25,7 @@ related:
 
 ## Decision and status
 
-**IMPLEMENTED IN SOURCE 2026-08-20; NOT DEPLOYED.** On 2026-08-20, the owner
+**PRODUCTION-LIVE AND READ-ONLY SMOKE-VERIFIED 2026-08-20.** On 2026-08-20, the owner
 rejected the reviewer-address Admin round trip for ordinary staff work. Staff
 already have broad authority over the underlying AkoyaGO data, and choosing
 between the address already stored for a person and a different address found
@@ -33,11 +33,14 @@ during reviewer search is within their role. The safety gate is a deliberate,
 audited choice after seeing both values—not escalation to a superuser.
 
 Reader support landed first in `f59dcff`; the bounded writer/UI/retry/alert
-implementation landed in `e8c90f5` on branch
-`codex/reviewer-email-conflict-self-service`. [VERIFIED via source and 390
-focused tests.] This plan supersedes the Admin-routing recommendation for
-routine stored-versus-found reviewer email conflicts. Production retains its
-prior behavior until this branch is deliberately promoted and smoke-tested.
+implementation landed in `e8c90f5`; the combined identity/conflict card fix
+landed in `ba5a22f`. [VERIFIED via source, 128 reviewer suites / 1,777 tests,
+typecheck, and Vercel's Turbopack production build.] Production deployment
+`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready. A signed-in Production smoke
+verified the direct action, exact stored/found controls, shared-person warning,
+independent identity checkbox, and neutral Cancel behavior. No address was
+selected and no Dataverse write was made. This plan supersedes the
+Admin-routing recommendation for routine stored-versus-found conflicts.
 
 ## Contract-reconcile surface
 
@@ -485,7 +488,7 @@ Run each gate and its self-test sequentially:
 7. `npm run check:fact-consistency` then its self-test;
 8. `npm run check:docs-catalog`;
 9. `npm run check:types`;
-10. production build and a signed-in Preview smoke using a safe natural conflict.
+10. production build and a signed-in authenticated smoke using a safe natural conflict. Dynamic Preview authentication was blocked by the unregistered Entra callback (`AADSTS50011`), so the read-only UI smoke ran on the deliberately promoted Production artifact.
 
 ## Completion status
 
@@ -505,14 +508,20 @@ Run each gate and its self-test sequentially:
   persisted auto-resolve keys and request/candidate correlation. Alert
   projection/detail infrastructure is therefore retained as bounded
   compatibility. No rows were mutated.
-- **OPEN:** signed-in Preview smoke on a safe natural conflict and deliberate
-  production promotion.
+- **VERIFIED in Production UI 2026-08-20:** direct **Review email choice** plus
+  non-linked **Repair request pending**, both exact address controls, the
+  shared-person warning, independent identity confirmation, and neutral Cancel.
+  Deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready.
+- **NOT LIVE-EXERCISED:** selecting either address and observing the resulting
+  Dataverse/roster/alert write. The bounded write contract remains verified by
+  service, route, promotion, readiness, and UI tests; Production was not
+  mutated merely to complete the smoke.
 
 ## `/sweep` reconciliation report (Mode A — changed fact)
 
 | Claim | Producer / entry point | Persistence / source of truth | Consumer | Strongest evidence | Status |
 |---|---|---|---|---|---|
-| Staff choose stored or found email directly | Find card → `CandidateEditModal` → address-trust route | ETag-guarded person trust bundle plus roster receipt/projection | Find readiness, promotion, Invite render/send | `e8c90f5`; modal/service/promotion tests | VERIFIED |
+| Staff choose stored or found email directly | Find card → `CandidateEditModal` → address-trust route | ETag-guarded person trust bundle plus roster receipt/projection | Find readiness, promotion, Invite render/send | `e8c90f5`, `ba5a22f`; modal/service/promotion tests; signed-in Production dialog smoke through Cancel | VERIFIED |
 | A choice is valid only for the fresh exact pending pair | `verifyPersonAndAddress` | current Dataverse person bundle and ETag | person writer / roster clear | third-address, non-conflict, stale-pair, and 412 tests | VERIFIED |
 | Staff-choice readiness is truthful and survives replay | trust parser + promotion services | non-null person `resolution` plus bounded roster `addressChoice` | roster/applicant projection and Invite gate | parser, roster, applicant, ordinary/applicant promotion tests | VERIFIED |
 | Structural fixes can be rechecked without Admin | Find card **Retry record check** | fresh person, ownership, and linkage reads; CAS roster refresh | candidate card | inactive/duplicate/linkage service and UI tests | VERIFIED |
@@ -527,8 +536,11 @@ third-address submissions, stale ETags, unresolved duplicate ownership, failed
 alert closeout, CodeGraph search for a supported AkoyaGO deep-link helper, and
 the live alert count. All remained fail-closed or preserved canonical success
 as specified. **Remaining live stale claims in the in-scope current guidance:
-0. Remaining unknown: signed-in Preview behavior. Verdict: RECONCILED IN
-SOURCE; DEPLOYMENT NOT VERIFIED.**
+0. Dynamic Preview auth remains unavailable for unregistered deployment URLs;
+the deliberately promoted Production artifact passed the signed-in read-only
+smoke instead. Remaining unknown: the live write outcome because no address
+choice was made. **Verdict: RECONCILED; PRODUCTION-LIVE WITH WRITE PATH
+TEST-VERIFIED BUT NOT LIVE-EXERCISED.**
 
 ## Adversarial review
 

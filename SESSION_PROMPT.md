@@ -1,4 +1,4 @@
-# Session 451 Prompt: Preview Reviewer Email Self-Service; Explorer Phase A Remains Open
+# Session 451 Prompt: Reviewer Email Self-Service Production-Live; Explorer Phase A Remains Open
 
 ## Session 450 Summary
 
@@ -10,7 +10,7 @@ documents and reconciled the production Log Drain's activation state.
 
 ### What Was Completed
 
-1. **Routine reviewer email conflicts became staff self-service in source.**
+1. **Routine reviewer email conflicts became Production-live staff self-service.**
    - Reader compatibility landed in `f59dcff`; runtime/UI/tests landed in
      `e8c90f5` on `codex/reviewer-email-conflict-self-service`.
    - Find shows **Review email choice**, requires an explicit **Keep stored** or
@@ -24,8 +24,17 @@ documents and reconciled the production Log Drain's activation state.
      using their persisted keys. A read-only Postgres probe found one active and
      three resolved rows, all with request/candidate correlation and stored
      keys, so compatibility readers were retained and no rows were mutated.
-   - [VERIFIED via source, 390 focused tests, typecheck, CodeGraph, and read-only
-     Postgres probe; NOT DEPLOYED.]
+   - A signed-in Production smoke on Neville Sanjana verified **Review email
+     choice** beside non-linked **Repair request pending**, both exact choices,
+     the shared-person warning, the independent identity checkbox, and neutral
+     Cancel behavior. No email choice or Dataverse write was made. Preview auth
+     was unavailable because the dynamic callback was not registered in Entra
+     (`AADSTS50011`), so the already-built artifact was deliberately promoted
+     before the read-only smoke.
+   - [VERIFIED via source, 1,777 reviewer tests, typecheck, Vercel Turbopack
+     build, read-only Postgres probe, and signed-in Production UI smoke on
+     2026-08-20. Production deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is
+     Ready; final smoke fix `ba5a22f`.]
 
 2. **Reviewer repair alerts had previously become actionable from Admin.**
    - PR #128 (`e74d1124`) added a bounded, server-re-read repair context,
@@ -81,21 +90,15 @@ documents and reconciled the production Log Drain's activation state.
 - `be21c450` - Merge PR #132
 - `f59dcff` - feat(reviewers): read staff email choices safely
 - `e8c90f5` - feat(reviewers): resolve email conflicts in workbench
+- `1c3545f` - docs(reviewers): reconcile email self-service contract
+- `0e9b25f` - chore(vercel): exclude local codegraph state
+- `ba5a22f` - fix(reviewers): expose combined email choice
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run a signed-in Preview smoke for the reviewer email-choice branch.**
-   Evidence: `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md`, commits
-   `f59dcff` and `e8c90f5`, and the retained active legacy alert. Use a safe
-   natural conflict. Verify **Review email choice** remains visible alongside
-   non-linked **Repair request pending**, both exact addresses render, cancel
-   changes nothing, and one deliberate choice produces truthful ready state on
-   reload. For a structural case, verify AkoyaGO guidance plus **Retry record
-   check**. Do not mutate Production merely to manufacture a case.
-
-2. **Explorer campaign Phase A: Sonnet 5 posture fix.**
+1. **Explorer campaign Phase A: Sonnet 5 posture fix.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A and
    Session 449 query-log measurements.
    Change `maxTokens` from 2,048 to 16,000, add
@@ -104,12 +107,12 @@ documents and reconciled the production Log Drain's activation state.
    `output_config`, and log `stop_reason`. This does not depend on the SoCal
    question set.
 
-3. **Observe Stage II Production outcomes through 2026-09-02.**
+2. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
    Production state and organic-observation window. Do not manufacture shared
    roster rows.
 
-4. **Finish Track A passive-safety closeout against the active drain.**
+3. **Finish Track A passive-safety closeout against the active drain.**
    Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
    `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`.
    The durable sink intentionally retains selected failures, so its 45 rows do
@@ -187,11 +190,11 @@ documents and reconciled the production Log Drain's activation state.
 
 ## Testing
 
-The self-service branch passes 390 focused reviewer tests and typecheck; the
-remaining required gates/build are the current task's final verification step.
-It has not been deployed or signed-in smoke-tested. PR #132's earlier focused
-reviewer/alert suites and all eight GitHub checks passed before its production
-deployment; those results do not verify the new self-service branch.
+The self-service implementation passes 128 reviewer suites / 1,777 tests,
+typecheck, and a Vercel Turbopack production build. Deployment
+`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready and owns the Production aliases.
+The signed-in Production smoke verified the card and dialog through Cancel; it
+did not select an address, mutate Dataverse, or prove the live write path.
 
 The Session 450 claim-evidence pilot report was unavailable because its local
 observation state could not be read. No observation row was added.

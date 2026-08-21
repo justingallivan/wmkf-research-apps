@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice semantics re-verified in source/tests 2026-08-20 on `codex/reviewer-email-conflict-self-service` (not deployed)
+**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice UI semantics are Production-live in Ready deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` and signed-in smoke-verified through neutral Cancel on 2026-08-20 (live choice write not exercised)
 **Live row count:** 4,474
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`

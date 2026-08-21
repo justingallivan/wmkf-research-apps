@@ -2,9 +2,10 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-08-20 in source/tests on
-`codex/reviewer-email-conflict-self-service` (not deployed) for the exact
-stored/found choice projection and replay; the broader roster lifecycle was
+**Last verified:** 2026-08-20 in source/tests and signed-in Production UI smoke
+on Ready deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` for the exact
+stored/found choice projection and neutral Cancel path; the live write was not
+exercised. The broader roster lifecycle was
 last verified 2026-08-03 in current `main` source/tests plus signed-in
 production no-send behavior. The stage-evidence and request-level
 reconciliation implementation is deployed through `7072d52a`, but Production

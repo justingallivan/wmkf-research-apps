@@ -19,8 +19,8 @@ related:
 **Status:** MAINTAINED current-state reference (owns the live behavioral guarantees below).
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
-**Last verified:** 2026-08-20 on branch
-`codex/reviewer-email-conflict-self-service` (not deployed) — Contract 3 was
+**Last verified:** 2026-08-20 in Ready Production deployment
+`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` — Contract 3 was
 re-traced through the fresh stored/found choice, exact resolved-bundle replay,
 structural retry, and legacy-alert closeout. Contracts 1–3 were previously
 re-traced through the canonical contact projection, v3/v4 attestation,
@@ -124,7 +124,7 @@ creating that ambiguous durable state.
 
 ---
 
-## 3. Reviewer address-action gate `[VERIFIED IN SOURCE 2026-08-20; NOT DEPLOYED]`
+## 3. Reviewer address-action gate `[PRODUCTION-LIVE; READ-ONLY UI SMOKE VERIFIED 2026-08-20]`
 
 **Contract.** On a first-contact **invitation**, the server independently computes
 `emailConfidence(person)` and applies one of five actions. A client-provided confidence label
