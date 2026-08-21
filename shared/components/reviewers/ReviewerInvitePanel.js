@@ -360,6 +360,10 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
   // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
   const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+  // A selection mixing not-yet-invited and still-pending rows disables BOTH
+  // actions (owner decision 2026-08-20): each button silently acting on only
+  // its own subset read as ambiguous. Staff pick one kind at a time.
+  const mixedSelection = selectedNotInvited.length > 0 && selectedPending.length > 0;
 
   // Staff review the rendered emails and can tune each one before anything is
   // sent (staff request, 2026-07-27). The release itself still happens
@@ -608,11 +612,17 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
             })}
           </ul>
 
+          {mixedSelection && (
+            <p className="text-xs text-amber-700 mt-3" role="alert">
+              Mixed selection: {selectedNotInvited.length} to invite and {selectedPending.length} to
+              release. Uncheck one kind to continue — invitations and releases are sent separately.
+            </p>
+          )}
           <div className="flex items-center gap-3 mt-3">
             <button
               type="button"
               onClick={() => openInvite(selectedNotInvited, false)}
-              disabled={selectedNotInvited.length === 0}
+              disabled={selectedNotInvited.length === 0 || mixedSelection}
               className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Send invitation{selectedNotInvited.length > 0 ? ` (${selectedNotInvited.length})` : ''}
@@ -626,12 +636,14 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
             <button
               type="button"
               onClick={handleWithdraw}
-              disabled={selectedPending.length === 0}
+              disabled={selectedPending.length === 0 || mixedSelection}
               className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               title={
-                selectedPending.length === 0
-                  ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
-                  : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
+                mixedSelection
+                  ? 'Selection mixes reviewers to invite and to release — uncheck one kind to continue'
+                  : selectedPending.length === 0
+                    ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
+                    : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
               }
             >
               {selectedPending.length > 0

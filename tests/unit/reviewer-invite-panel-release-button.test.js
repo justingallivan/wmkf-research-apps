@@ -40,6 +40,14 @@ const pending = {
   accepted: false,
   declined: false,
 };
+const fresh = {
+  suggestionId: 'S-new',
+  name: 'Fresh Candidate',
+  email: 'fresh@example.edu',
+  invited: false,
+  accepted: false,
+  declined: false,
+};
 
 function renderPanel(candidates) {
   return render(
@@ -62,6 +70,19 @@ describe('ReviewerInvitePanel — release-pending affordance', () => {
     expect(btn).toBeEnabled();
     fireEvent.click(btn);
     expect(screen.getByTestId('release-modal')).toBeInTheDocument();
+  });
+
+  test('mixed selection disables both actions and shows the warning', () => {
+    renderPanel([fresh, pending]);
+    fireEvent.click(screen.getByRole('checkbox', { name: /select fresh candidate/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /select pending reviewer/i }));
+    expect(screen.getByRole('button', { name: /send invitation \(1\)/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /release invitee \(1\)/i })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/mixed selection: 1 to invite and 1 to release/i);
+    // Unchecking one kind re-enables the other.
+    fireEvent.click(screen.getByRole('checkbox', { name: /select fresh candidate/i }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /release invitee \(1\)/i })).toBeEnabled();
   });
 
   test('accepted rows cannot feed the release flow (checkbox disabled)', () => {
