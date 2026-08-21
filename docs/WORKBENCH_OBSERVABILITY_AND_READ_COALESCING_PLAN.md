@@ -6,7 +6,7 @@ status: draft
 summary: "Staged plan: instrument the Workbench data path, then coalesce in-request duplicate Dataverse reads. Full Data Plane deferred until measured."
 canonical: false
 cataloged: 2026-08-14
-last_verified: 2026-08-15
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md
@@ -27,7 +27,9 @@ merged to `main` at `06a615fc`, and deployed to Production as
 `dpl_8wHbRErjdbaaqLtKNSfqHo8TUV3B` (READY 2026-08-16 03:01:20Z). The controlled Production
 after-baseline completed on deployment `dpl_3BU1Zstkn1ZhEhabfvNE5MFNpdpq`: all 44 target-route
 events succeeded and the empty/small/active+removed/decline strata matched the chunk-aware `after`
-formula. Track A continues concurrently; the Deferred section remains NOT authorized.**
+formula. Track A's operational closeout completed 2026-08-21 against the active Production Log
+Drain; its bounded evidence and limits are recorded below. The Deferred section remains NOT
+authorized.**
 Implementation record:
 `docs/audits/claude-workbench-observability-stage1-implementation-record-2026-08-15.md`. Produced
 by the Fable audit (`docs/FABLE_AUDIT_SECURITY_REFACTOR_MASTER_BRIEF.md`). Evidence: the three
@@ -290,24 +292,32 @@ instrumenting one of these seams covers another is false and must not reappear.
      **shared app-wide transports**, not Workbench-private — every server-side caller of
      `DynamicsService`, Graph, and `lib/dataverse/client.js` (other routes, crons, cold-start
      checks) emits events once the seams are wrapped. Sampling is therefore **100% of ALL seam
-     traffic** — a choice resting on the explicitly unverified volume/cost assumption below, **not**
-     on "workbench traffic" alone and not on any measured fact. Events from un-instrumented
+     traffic** — not "workbench traffic" alone. Events from un-instrumented
      callers simply carry no `correlationId`/`routeName` (the defined no-correlation behavior);
      the measurement window filters on `routeName` for its three target routes. The `event` name
      `workbench.dependency` names the initiative that introduced the stream, not a scope
-     restriction. **Volume/cost assumption `[ASSUMED — explicitly unverified]` (third-pass
-     correction):** whole-application dependency-call volume and its platform log cost have NOT
-     been measured; no evidence currently supports "low volume" as a fact. Validation: within the
-     first 48 hours after enabling 100% emission, count `workbench.dependency` lines per day via
-     the log-export workflow below. **Stop/re-scope threshold:** if daily event volume exceeds
-     ~50,000 lines/day, or platform log throttling/truncation is observed, or a visible log-cost
-     line item appears, STOP — revert (pure additive change) or land a named sampling knob as a
-     reviewed follow-up. Exceeding the threshold is a stop condition, not a silent implementer
-     tuning choice.
-   - **Query workflow (executable, historical, fail-closed):** `vercel logs` performs a
-     **historical query by default**; live streaming requires `--follow` (which this workflow does
-     not use — the previous live-tail framing was wrong). Flag existence and the actual Production
-     JSON record shape were preflighted at window start (2026-08-15). Each slice:
+     restriction.
+   - **48-hour operational closeout (2026-08-21):** the Production drain was created
+     `2026-08-19T21:07:30Z` and remained `enabled` at closeout, scoped only to this project,
+     Production Functions/Edge Functions, 100% sampling except its own webhook path. Vercel Usage
+     reported **577.7 MB / $0.29** through the first approximately 48 hours (about 289 MB/day and
+     $4.35 per 30 days if linear). That is whole-drain byte volume, not a telemetry-line count.
+     A cap-complete unfiltered control slice (`2026-08-21T21:00Z–21:05Z`) returned 15 request
+     records against a 500-record cap and 11 unique v1 telemetry events; the query-filtered slice
+     returned the same 11 event ids. All 11 validated, all were successes, with zero malformed
+     candidates, invalid contracts, unknown dependencies, or unknown operations. Five carried
+     expected `dataverse`/`resourceClass:'unknown'` without route correlation, consistent with the
+     documented app-wide allowlist boundary. Even a straight-line extrapolation of that five-minute
+     sample is about 3,168 telemetry events/day, well below the original ~50,000/day re-scope marker.
+     The Pro account does not expose the aggregate metrics query needed for a retrospective exact
+     daily line census, and the durable sink intentionally retains failures rather than all
+     successes. Closeout therefore does **not** claim an exact 24-hour line count or zero historical
+     platform throttling. The former binary "any visible cost" stop clause is retired in favor of
+     the measured cost above; that small known cost does not justify a new sampling mechanism.
+   - **Query workflow (historical pre-drain procedure, executable and fail-closed):** `vercel logs`
+     performs a **historical query by default**; live streaming requires `--follow` (which this
+     workflow does not use — the previous live-tail framing was wrong). Flag existence and the
+     actual Production JSON record shape were preflighted at window start (2026-08-15). Each slice:
 
      ```bash
      # Preconditions (one-time): `vercel login`; repo linked to the production project via
@@ -443,14 +453,12 @@ instrumenting one of these seams covers another is false and must not reappear.
        retention and result limits, or the `--json` record shape cannot be confirmed in
        preflight, the REQUIRED fallback is a Log Drain or the dashboard log export — incomplete
        CLI output is not valid measurement evidence.**
-     - **Retention at this window:** live API probes on 2026-08-15 verified the team is Pro,
-       Observability Plus is not enabled, and no Log Drain exists. [Current Vercel runtime-log
-       documentation](https://vercel.com/docs/logs/runtime) gives base Pro a one-day retention
-       window. Therefore the 48-hour Track A
-       window requires complete exports at least once per day (12-hour slices are the operating
-       target); waiting until hour 48 would irretrievably lose day-one evidence. The unfiltered
-       RAW files are restricted transient artifacts and are deleted after validation; only the
-       PII-safe telemetry slices are retained.
+     - **Retention at the original window:** live API probes on 2026-08-15 verified the team was
+       Pro, Observability Plus was not enabled, and no Log Drain yet existed. That is historical
+       pre-activation state. The Production drain has been live since 2026-08-19; selected failures
+       now persist under the operational-event retention contract. The unfiltered RAW files in the
+       historical CLI procedure remain restricted transient artifacts and are deleted after
+       validation; only PII-safe telemetry slices may be retained.
      - **Deduplication:** across overlapping slices, deduplicate **only on the parsed event's
        `eventId`** (unique per emitted event by construction — see the envelope contract).
        `requestId`+timestamp and full-line `sort -u` are prohibited: a request's `requestId` spans
@@ -466,11 +474,9 @@ instrumenting one of these seams covers another is false and must not reappear.
        slice.** Historical note: flag existence was inspected on CLI 59.0.0 during the
        third/fourth review passes — that is evidence about that inspection, not a current version
        requirement or an upgrade recommendation.
-   - **Retention:** platform log retention on the current Vercel plan must be **verified at window
-     start**. Historical queries can only reach records still within retention, so slices must be
-     captured on a cadence shorter than the retention period; if retention proves too short for
-     that cadence to be practical, the Log Drain / dashboard-export fallback becomes required.
-     `[NEEDS OWNER — plan-tier retention confirmation]`
+   - **Retention:** the active Log Drain is the selected-failure retention path; the historical
+     CLI-export cadence is no longer an open Track A prerequisite. Full success telemetry remains
+     subject to Vercel runtime-log retention and is sampled only for bounded diagnostics.
    - **Failure isolation:** emission is the try/catch-guarded `console.log` above; it cannot fail the
      request. If a durable sink is ever chosen later, that is a re-scope requiring migration, Atlas,
      retention, and privacy contracts — not an implementer option in this stage.
@@ -516,16 +522,22 @@ distinct tracks; neither may be represented as the other.
 
 #### Track A — passive operational safety
 
-- **Environment:** production.
-- **Duration:** the first 48 hours after deployment (opened at Production READY,
-  2026-08-16 00:53:40Z), followed by open-ended passive watching.
-- **Scope:** all app-wide `workbench.dependency` events from the three shared seams, not only the
-  target routes.
-- **Measure:** total lines/day, malformed/invalid events, log throttling or truncation, visible log
-  cost, and unexpected `unknown` classifications. Apply the existing ~50,000-lines/day
-  stop/re-scope threshold above.
-- **Non-gate:** absence of activity on a target Workbench route is an expected business-cadence
-  result, not evidence of safety or performance, and does not block Stage 2.
+**CLOSED 2026-08-21.** Production configuration, first-48-hour whole-drain volume/cost, a
+cap-complete telemetry contract sample, and continuing durable failure ingestion were verified.
+The active drain had carried 577.7 MB for $0.29; the complete five-minute control slice contained
+11 unique valid events with no malformed/invalid event and no unexpected dependency/operation
+classification. A read-only Postgres probe found 61 unique selected failure rows across
+2026-08-19–21 (11 structured dependency failures, 7 runtime 5xx, 43 error logs, no crashes or
+critical rows); all were resolved at closeout. Four long free-text error summaries had the
+application's deliberate 2,000-character cap, not structured-telemetry or Vercel platform
+truncation.
+
+The exact original daily-line and historical-throttling questions are not retroactively provable
+on this Pro account: Observability Plus aggregate metrics are unavailable, runtime logs are
+retention-bound, and the durable sink deliberately keeps only failures. They are recorded as
+limits, not carried forward as an engineering project. Normal operational watching continues via
+Vercel Usage and `/admin` Operational Events; no new sampler, table, or export job is authorized.
+Sparse target-route traffic remains an expected business-cadence result, not a safety signal.
 
 #### Track B — controlled read-only before/after baseline
 
@@ -594,10 +606,8 @@ pinned) and no longer resolves against the merged services. Post-merge state: `f
 is deleted in both services; the surviving `const CHUNK = 25` sites in the three census files are
 `reviewers-service.js:510`, `my-candidates-service.js:392,408` (the latter `fetchApplicantAkas`),
 and `decline-referrals-service.js:45`; the fail-soft `aggregateReviewHistory` catch sits at
-`my-candidates-service.js:175-178` and `projectRemovedCandidates` at `:426`. The open 48-hour Track A
-watch runs concurrently; sparse organic traffic and the calendar duration are not prerequisites,
-but an actual Track A stop condition (~50,000 telemetry events/day, platform
-throttling/truncation, or visible log cost) pauses promotion until resolved.
+`my-candidates-service.js:175-178` and `projectRemovedCandidates` at `:426`. Track A later closed on
+2026-08-21 with the bounded drain evidence above; it is no longer a promotion gate.
 
 **Why the original request-scoped-cache design was dropped (Opus P1-1, unchanged):** the
 duplicate-read contributors are separate HTTP requests with separate `withDalContext` scopes, and

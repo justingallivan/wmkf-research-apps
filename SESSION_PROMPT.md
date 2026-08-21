@@ -68,15 +68,15 @@ documents and reconciled the production Log Drain's activation state.
      reviewer branch was promoted.
 
 5. **Production Log Drain activation was reconciled.**
-   - [VERIFIED via read-only `operational_events` aggregate, 2026-08-20]
-     Production contains 45 `vercel-drain` rows, first seen
+   - [VERIFIED via read-only `operational_events` aggregate, 2026-08-20] The
+     initial activation probe found 45 `vercel-drain` rows, first seen
      `2026-08-19T21:21:58.177Z` and last seen
      `2026-08-20T20:33:58.144Z`; all rows in the 72-hour aggregate were
      resolved. The canonical runbook was corrected from “not activated” to
      LIVE.
-   - This proves signed drain ingestion, not the original Track A
-     whole-stream volume/malformed/truncation criteria. Track A therefore
-     remains a bounded verification item rather than being declared closed.
+   - That probe established activation only. Item 8 records the later
+     platform/cost/sample closeout rather than treating the 45-row failure
+     subset as a whole-stream measurement.
 
 6. **Dynamics Explorer Phase A is Production-live.**
    - Interactive Explorer calls now use a 16,000-token response ceiling and
@@ -131,6 +131,21 @@ documents and reconciled the production Log Drain's activation state.
      reported one completed August request, p90 rounds of 2, and complete
      observed query/usage correlation.
 
+8. **Track A passive-safety observation is closed.**
+   - [VERIFIED 2026-08-21 via Vercel Drains API/dashboard and Usage] The drain
+     is enabled for only this project, Production Functions/Edge Functions,
+     and 100% sampling except its own webhook. Its first approximately 48
+     hours carried 577.7 MB for $0.29.
+   - A cap-complete five-minute control contained 11 unique valid dependency
+     events with no malformed/invalid event and no unexpected dependency or
+     operation classification. A read-only Postgres probe found 61 unique
+     selected failure rows, all resolved, with no critical rows or crashes.
+   - Exact historical daily-line and platform-throttling counts are not
+     claimed because this Pro account lacks Observability Plus aggregate
+     metrics and the durable sink intentionally retains failures only. That
+     limitation is closed rather than spawning a new sampler/table solely to
+     satisfy the old measurement recipe.
+
 ### Commits
 
 - `997de04d` - feat(admin): guide reviewer repair alert resolution
@@ -176,15 +191,6 @@ documents and reconciled the production Log Drain's activation state.
    Production state and organic-observation window. Do not manufacture shared
    roster rows.
 
-4. **Finish Track A passive-safety closeout against the active drain.**
-   Evidence: `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` and
-   `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`.
-   The durable sink intentionally retains selected failures, so its 45 rows do
-   not establish total event volume, malformed-event count, throttling, or
-   truncation. Use complete platform/drain-health evidence for those original
-   criteria, then reconcile the two observability docs and close or explicitly
-   narrow Track A.
-
 ### Blocked on External Input
 
 1. **Explorer campaign Phases C-D (eval seeds and vernacular rubric).**
@@ -223,8 +229,9 @@ documents and reconciled the production Log Drain's activation state.
    Phase C harness before relying on it.
 4. Active/acknowledged repair alerts suppress duplicate creation; resolved
    alerts do not. Re-read live state before changing an alert status.
-5. Track A's durable `vercel-drain` rows are a selected failure subset, not a
-   complete dependency-event export.
+5. Track A is closed with bounded platform, cost, sample, and durable-failure
+   evidence. Do not reinterpret its selected `vercel-drain` rows as a complete
+   dependency-event export or claim an exact historical daily line count.
 
 ### Do Not Reopen Without New Decision
 

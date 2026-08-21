@@ -26,12 +26,15 @@ related:
 [VERIFIED via `apply-migrations` output + live probe: 23 columns, 8 indexes,
 tracker 29/29]. The app-recorded event path is LIVE.
 **Drain activation:** Production Log Drain ingestion is LIVE. A read-only
-Postgres aggregate probe on 2026-08-20 found 45 `source='vercel-drain'` rows,
-first observed at `2026-08-19T21:21:58.177Z` and most recently observed at
-`2026-08-20T20:33:58.144Z` [VERIFIED via `operational_events`]. Successful
-signed ingestion proves the drain and matching secret are active; it does not
-by itself prove whole-stream volume, malformed-event, throttling, or
-truncation acceptance for the separate Track A measurement program.
+Postgres aggregate probe on 2026-08-21 found 61 unique
+`source='vercel-drain'` failure rows from `2026-08-19T21:21:58.177Z` through
+`2026-08-21T06:05:33.472Z`; all were resolved at closeout [VERIFIED via
+`operational_events`]. Vercel's drain API/dashboard independently showed the
+drain enabled for only this project, Production Functions/Edge Functions, and
+100% sampling except the drain webhook itself. The first approximately 48
+hours carried 577.7 MB for $0.29. Track A operational closeout completed
+2026-08-21; see the staged plan for the cap-complete telemetry sample and the
+explicit limits on retrospective daily-line/throttling claims.
 
 ## Why
 
@@ -188,3 +191,22 @@ Focused Jest suites: `operational-event-service`, `vercel-log-drain-ingest`,
 notification / maintenance suites. Gates: migrations-manifest, api-routes(+
 self-test), atlas(+self-test), types, production build — see the session
 handoff for the exact run record.
+
+### Operational closeout (2026-08-21)
+
+- Vercel Drains API and dashboard: `enabled`; this project only; Production
+  Functions/Edge Functions; NDJSON; 100% sampling with a 0% self-path rule.
+- Vercel Usage: 577.7 MB / $0.29 from drain creation
+  (`2026-08-19T21:07:30Z`) through the approximately 48-hour closeout.
+- Cap-complete five-minute runtime-log control: 15 request records below the
+  500-record cap; 11 unique v1 dependency events; zero malformed/invalid,
+  unknown dependency, or unknown operation events. Five expected uncorrelated
+  Dataverse events used the deliberately closed `unknown` resource class.
+- Production Postgres: 61 unique selected failure rows, zero open, zero
+  critical, zero crashes; 11 dependency failures, 7 runtime 5xx, and 43 error
+  logs. Four free-text summaries reached the documented application cap; no
+  structured telemetry event was truncated.
+- The Pro account rejected aggregate metrics queries without Observability
+  Plus. Exact historical daily telemetry-line and platform-throttling counts
+  are therefore not claimed. This limitation is closed as a measurement
+  constraint, not converted into a new table or background collector.
