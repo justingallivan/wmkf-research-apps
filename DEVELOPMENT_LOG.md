@@ -10,6 +10,37 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Dynamics Explorer request telemetry is Production-live (Session 451)
+
+**Milestone:** Explorer now records one durable lifecycle row per authenticated,
+body-valid request and correlates its query, usage, and optional feedback evidence.
+**Sessions:** 451 (Phase A model posture and stop reasons; Phase B lifecycle,
+correlation, retention, analysis probe, Fable review, and signed-in proof).
+**Ship state:** `main` reached `ea125997`; migrations 032–033 were applied and
+exact-read back; deployment `dpl_4gAA5BU626uGeDBTzF9fSTHYD7Z3` is Ready. A
+signed-in two-round query persisted completed/end-turn lifecycle evidence with
+complete observed query/usage correlation. Organic observation remains open.
+**Why it matters:** Explorer quality decisions can now use request outcomes,
+rounds, latency, truncation, abandonment, and correlation instead of anecdotes.
+**Pointers:** `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`; commits
+`9a54620d`, `1b552cae`, `ea125997`, `dfc3e2a4`.
+
+## August 2026 — Reviewer identity conflicts became staff self-service (Session 451)
+
+**Milestone:** Routine stored-versus-found email conflicts no longer require an
+Admin round trip, and existing-person cards now explain their prior request context.
+**Sessions:** 450–451 (repair baseline, self-service resolution, card simplification,
+prior-request context, production smoke, and follow-up bounds fix).
+**Ship state:** staff make an explicit ETag-guarded Keep stored / Replace with
+found choice; combined identity/email cases expose one Review and confirm action;
+structural failures retain safe retry. Production Neville Sanjana evidence showed
+one actionable card and the bounded 2022 request context after `8c2fa489`.
+**Why it matters:** staff can resolve normal CRM ambiguity where they encounter it,
+with enough provenance to understand why the person already exists.
+**Pointers:** `docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md`;
+`docs/REVIEWER_EXISTING_RECORD_CONTEXT_PLAN.md`; commits `e8c90f5f`, `5c9c399d`,
+`e15846c1`, `8c2fa489`.
+
 ## August 2026 — Large grantee images now use durable direct Blob staging (Session 447)
 
 **Milestone:** The grantee submission and staff replacement flows no longer send large image
@@ -75,8 +106,12 @@ found 45 `vercel-drain` rows spanning `2026-08-19T21:21:58.177Z` through
 **Why it matters:** operators can open `/admin` after an alert, find the durable event by request
 number or entity id, and see whether it recovered — the honorarium-alert incident class is closed.
 Hardened by six Codex adversarial cycles (nine findings fixed) ending READY TO MERGE.
+Track A's safety watch closed on 2026-08-21 with bounded platform configuration,
+cost, cap-complete sample, and durable-failure evidence; it deliberately does not
+claim an exact historical daily line count or zero platform throttling.
 **Pointers:** `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md`;
-`docs/OPERATIONAL_OBSERVABILITY_HANDOFF_2026-08-19.md`; commits `ad9f1d79`…`2b1f59a2`, merge `9de8b348`.
+`docs/OPERATIONAL_OBSERVABILITY_HANDOFF_2026-08-19.md`; commits `ad9f1d79`…`2b1f59a2`,
+merge `9de8b348`, Track A closeout `561ec242`.
 
 ## August 2026 — Reviewer identity remediation shipped; affiliation policy proven in shadow (Session 445)
 

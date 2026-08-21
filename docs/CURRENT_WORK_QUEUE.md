@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-17
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -31,6 +31,13 @@ it is approved backlog.
 
 Work these items in order unless an operational incident or explicit owner decision changes the
 sequence.
+
+**Next-session override (owner decision 2026-08-21):** Begin Session 452 with
+the signed-in Site Visit handoff smoke in item 3. First obtain the exact
+request approval, then prove the same SharePoint item remains the Edit/Download
+authority and Dataverse records Review plus a complete handoff milestone. This
+is a bounded session-order decision; it does not silently prioritize the later
+Site Visit dossier/logistics or Final transaction.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |

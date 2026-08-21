@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-17
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-08-17.** This document owns long-term direction and principles. The
+**Last verified: 2026-08-21.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -135,6 +135,13 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
+**Owner-directed next-session override (2026-08-21):** Session 452 starts with
+the controlled signed-in smoke of the deployed Pre-Site-to-Site-Visit handoff.
+The exact request still requires explicit approval because the action changes
+the current governed artifact from Draft to Review and records a durable
+milestone. This bounded override does not advance the later Site Visit dossier,
+materials/logistics, or Final transaction.
+
 1. close the partially successful human-in-the-loop Initial Assessment pilot.
    Its 2026-08-10 target was a deliberately early **internal buffer, not an
    external commitment** (owner, 2026-08-10 / S412); it passed unmet because the
@@ -175,9 +182,11 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term 
    PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
    explicit no-wrap label, and the compact panel exposes Edit, Download, and
    confirmation-guarded Regenerate actions; their signed-in smoke remains open; and
-3. continue the approved Workbench lifecycle: map the Site Visit dossier and
-   narrow applicant-material upload, then create Final from an exact Pre-Site
-   row/version/hash. The full Editor Dashboard remains later reuse.
+3. smoke the deployed Site Visit handoff on an explicitly approved request,
+   proving that the same SharePoint item remains the working document and that
+   Dataverse records Review plus the complete handoff milestone. The broader
+   Site Visit dossier, narrow applicant-material upload, Final transaction, and
+   full Editor Dashboard remain later slices.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became

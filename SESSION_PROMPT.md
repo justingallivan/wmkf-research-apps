@@ -1,12 +1,13 @@
-# Session 451 Prompt: Explorer Phase B Production-Live and Join-Verified
+# Session 452 Prompt: Site Visit Handoff Smoke First
 
-## Session 450 Summary
+## Session 451 Summary
 
-Session 450 shipped the missing operational loop for reviewer repair alerts.
-The current feature branch then replaced that routine Admin round trip with a
-direct staff-owned stored/found email choice while retaining legacy alert
-compatibility. It also incorporated Claude's Dynamics Explorer campaign
-documents and reconciled the production Log Drain's activation state.
+Session 451 completed and production-proved the reviewer email-conflict
+self-service and existing-request context, shipped Dynamics Explorer Phases A
+and B, closed the Track A Log Drain safety watch, and verified the rotated Log
+Drain signature after the saved drain configuration resumed successful webhook
+deliveries. The owner set one explicit next-session priority: run the controlled
+Site Visit handoff smoke first.
 
 ### What Was Completed
 
@@ -166,19 +167,35 @@ documents and reconciled the production Log Drain's activation state.
 - `9a54620d` - feat(dynamics-explorer): tune interactive model posture
 - `1b552cae` - docs(dynamics-explorer): plan request telemetry
 - `ea125997` - feat(dynamics-explorer): add request telemetry
+- `dfc3e2a4` - docs(dynamics-explorer): record Phase B production release
+- `9016c3bf` - docs(reviewers): plan existing record request context
+- `e15846c1` - feat(reviewers): show existing request context on find cards
+- `8c2fa489` - fix(reviewers): bound prior request context correctly
+- `561ec242` - docs(observability): close Track A safety watch
 
 ## Next Items
 
 ### Verified Open
 
-1. **Observe Explorer campaign Phase B over normal use.**
+1. **FIRST ACTION: run the Site Visit handoff smoke.**
+   Evidence: owner decision 2026-08-21,
+   `docs/CURRENT_WORK_QUEUE.md`, current `SiteVisitTab`, and
+   `pages/api/workbench/pre-site-visit/start-site-visit.js`. Begin by obtaining
+   explicit approval for the exact request if it has not already been supplied.
+   Then use the signed-in Workbench to promote that request's exact Ready/Draft
+   Pre-Site item, verify the same SharePoint item remains Edit/Download
+   authority, and read back Review plus the complete milestone in Dataverse.
+   This is an intentional durable write; do not substitute an unapproved
+   request or expand the smoke into dossier/logistics or Final work.
+
+2. **Observe Explorer campaign Phase B over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Deployment,
    migration, exact schema/tracker readback, and one joined signed-in smoke are
    complete. Next: let organic staff requests accumulate, then run the
    aggregate probe to inspect outcome/round distribution and correlation
    completeness. Do not manufacture feedback or request traffic.
 
-2. **Observe Explorer campaign Phase A over normal use.**
+3. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
    implementation report. Migration, deployment, and a signed-in two-round
    smoke are complete; usage rows proved both `tool_use` and `end_turn`
@@ -186,7 +203,7 @@ documents and reconciled the production Log Drain's activation state.
    distribution, output-at-cap events, and round latency against the prior
    6.5-second Sonnet average.
 
-3. **Observe Stage II Production outcomes through 2026-09-02.**
+4. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
    Production state and organic-observation window. Do not manufacture shared
    roster rows.
@@ -200,11 +217,7 @@ documents and reconciled the production Log Drain's activation state.
 
 ### Owner Decision Needed
 
-1. **Choose an approved request for the Site Visit handoff smoke.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`. The action records a
-   durable Draft-to-Review milestone; do not click without explicit approval.
-
-2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
+1. **After 2026-09-02, retain or remove the Stage II rollout flag.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
    live environment and replacement deployment state before changing it.
 
@@ -247,6 +260,10 @@ documents and reconciled the production Log Drain's activation state.
 
 | File | Purpose |
 |---|---|
+| `shared/components/workbench/SiteVisitTab.js` | Signed-in handoff action, confirmation, and same-item Site Visit workspace UI |
+| `pages/api/workbench/pre-site-visit/start-site-visit.js` | Authenticated exact-body route for the guarded handoff |
+| `lib/services/pre-site-visit/site-visit-transition-service.js` | Draft→Review transition, stable SharePoint evidence, ETag fence, and milestone persistence |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Handoff contract and controlled-smoke acceptance evidence |
 | `shared/components/reviewers/ReviewerSearchSection.js` | One primary card action, direct email choice, structural retry, and internal pending-alert compatibility |
 | `shared/components/reviewers/CandidateEditModal.js` | Explicit Keep stored / Replace with found dialog |
 | `pages/api/workbench/reviewer-roster.js` | Roster projection of open repair alerts |

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-17
+last_verified: 2026-08-21
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -231,6 +231,11 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
+- **Next-session override (owner decision 2026-08-21):** begin Session 452
+  with the signed-in smoke of the deployed Pre-Site-to-Site-Visit handoff on
+  an explicitly approved request. It writes Draft→Review and a durable
+  milestone, so exact request approval remains the first prerequisite. This
+  does not promote the later Site Visit dossier/logistics or Final transaction.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
 - Current near-term sequence: synthesis lifecycle closure → governed artifact
