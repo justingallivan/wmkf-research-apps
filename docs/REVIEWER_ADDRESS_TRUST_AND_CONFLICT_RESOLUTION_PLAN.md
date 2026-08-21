@@ -158,7 +158,7 @@ paths, the send boundary, and a total reason-to-remedy contract.
 | D5 | A linked paper is valid independent evidence when staff open it and find the corresponding author's address. | Owner-decided |
 | D6 | **No dead ends:** every warning/block names the problem and provides a primary remedy; a state that staff cannot safely repair themselves provides retry plus a one-click durable repair request. | Owner-decided |
 | D7 | Invitation sending never creates or links a CRM Contact; identity-bearing acceptance remains the Contact-promotion event. | Implemented current contract |
-| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Production-live in Ready deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd`; read-only signed-in smoke verified the dialog through Cancel (2026-08-20) |
+| D8 | Routine stored-versus-found email conflicts are staff self-service: show both current values and require an explicit audited choice in Workbench; Admin is not a participant. | Production-live in Ready deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn`; read-only signed-in smoke verified Neville's one-action card and the dialog through Cancel (2026-08-20) |
 
 ## Approved implementation decisions
 
@@ -445,9 +445,11 @@ rechecks active/acknowledged state, so concurrent calls and different reason
 codes cannot create two open requests for the same candidate.
 
 **Production-live self-service follow-up (2026-08-20; read-only UI smoke verified):**
-the open-alert projection remains for compatibility but renders only **Repair
-request pending**; it no longer links Find users to Admin or hides **Review
-email choice**. The modal shows the fresh exact pair and records an explicit
+the open-alert projection remains internal for compatibility and deduplication
+but renders no pending-alert control on the Find card. Email-only cases show
+**Review email choice**; combined identity/email cases show one **Review and
+confirm** action instead of separate competing controls. The modal shows the
+fresh exact pair and records an explicit
 `keep_stored` or `use_found` `staff_address_choice` resolution under the person
 ETag. Matching legacy alerts are auto-resolved best-effort after canonical
 success. Duplicate-owner, inactive-person, and Contact-linkage states tell staff

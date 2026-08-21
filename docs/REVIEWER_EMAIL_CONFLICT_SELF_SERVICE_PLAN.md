@@ -34,12 +34,13 @@ audited choice after seeing both values—not escalation to a superuser.
 
 Reader support landed first in `f59dcff`; the bounded writer/UI/retry/alert
 implementation landed in `e8c90f5`; the combined identity/conflict card fix
-landed in `ba5a22f`. [VERIFIED via source, 128 reviewer suites / 1,777 tests,
-typecheck, and Vercel's Turbopack production build.] Production deployment
-`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready. A signed-in Production smoke
-verified the direct action, exact stored/found controls, shared-person warning,
-independent identity checkbox, and neutral Cancel behavior. No address was
-selected and no Dataverse write was made. This plan supersedes the
+landed in `ba5a22f`; the one-action card presentation landed in `5c9c399d`.
+[VERIFIED via source, 128 reviewer suites / 1,778 tests, typecheck, and Vercel's
+Turbopack production build.] Production deployment
+`dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is Ready. Signed-in Production smoke
+verified Neville's one-action card and, on the earlier artifact, the exact
+stored/found controls, shared-person warning, and neutral Cancel behavior. No
+address was selected and no Dataverse write was made. This plan supersedes the
 Admin-routing recommendation for routine stored-versus-found conflicts.
 
 ## Contract-reconcile surface
@@ -508,10 +509,12 @@ Run each gate and its self-test sequentially:
   persisted auto-resolve keys and request/candidate correlation. Alert
   projection/detail infrastructure is therefore retained as bounded
   compatibility. No rows were mutated.
-- **VERIFIED in Production UI 2026-08-20:** direct **Review email choice** plus
-  non-linked **Repair request pending**, both exact address controls, the
-  shared-person warning, independent identity confirmation, and neutral Cancel.
-  Deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready.
+- **VERIFIED in Production UI 2026-08-20:** email-only conflicts retain direct
+  **Review email choice**. Neville Sanjana's combined identity/email conflict
+  renders one **Review and confirm** action plus **Not a fit**, with no separate
+  identity, email, or pending-repair control. The earlier modal smoke verified
+  both exact address choices, the shared-person warning, and neutral Cancel.
+  Deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is Ready.
 - **NOT LIVE-EXERCISED:** selecting either address and observing the resulting
   Dataverse/roster/alert write. The bounded write contract remains verified by
   service, route, promotion, readiness, and UI tests; Production was not

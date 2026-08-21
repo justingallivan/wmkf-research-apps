@@ -3,8 +3,8 @@
 <!-- drain-table:file-purpose=atlas-state-page -->
 
 **Last verified:** 2026-08-20 in source/tests and signed-in Production UI smoke
-on Ready deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` for the exact
-stored/found choice projection and neutral Cancel path; the live write was not
+on Ready deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` for Neville's one-action
+card and the exact stored/found choice projection through neutral Cancel; the live write was not
 exercised. The broader roster lifecycle was
 last verified 2026-08-03 in current `main` source/tests plus signed-in
 production no-send behavior. The stage-evidence and request-level

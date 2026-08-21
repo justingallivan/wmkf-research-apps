@@ -20,7 +20,7 @@ related:
 **Owner:** reviewer-finder.
 **Created:** 2026-06-13 (S253).
 **Last verified:** 2026-08-20 in Ready Production deployment
-`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` — Contract 3 was
+`dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` — Contract 3 was
 re-traced through the fresh stored/found choice, exact resolved-bundle replay,
 structural retry, and legacy-alert closeout. Contracts 1–3 were previously
 re-traced through the canonical contact projection, v3/v4 attestation,

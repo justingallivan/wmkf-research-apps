@@ -1,4 +1,4 @@
-# Session 451 Prompt: Reviewer Email Self-Service Production-Live; Explorer Phase A Remains Open
+# Session 451 Prompt: Reviewer Card Action Simplified in Production; Explorer Phase A Remains Open
 
 ## Session 450 Summary
 
@@ -13,8 +13,11 @@ documents and reconciled the production Log Drain's activation state.
 1. **Routine reviewer email conflicts became Production-live staff self-service.**
    - Reader compatibility landed in `f59dcff`; runtime/UI/tests landed in
      `e8c90f5` on `codex/reviewer-email-conflict-self-service`.
-   - Find shows **Review email choice**, requires an explicit **Keep stored** or
-     **Replace with found** selection against a fresh server-read tuple, records
+   - An email-only conflict shows **Review email choice**. A combined identity
+     and email conflict shows one primary **Review and confirm** action rather
+     than separate email and identity controls. Both paths require an explicit
+     **Keep stored** or **Replace with found** selection against a fresh
+     server-read tuple, record
      `staff_address_choice` with a non-null ETag-guarded resolution, and makes
      that exact choice invite-ready without a second acknowledgement.
    - Duplicate-owner, inactive-person, and Contact-linkage states identify the
@@ -24,17 +27,15 @@ documents and reconciled the production Log Drain's activation state.
      using their persisted keys. A read-only Postgres probe found one active and
      three resolved rows, all with request/candidate correlation and stored
      keys, so compatibility readers were retained and no rows were mutated.
-   - A signed-in Production smoke on Neville Sanjana verified **Review email
-     choice** beside non-linked **Repair request pending**, both exact choices,
-     the shared-person warning, the independent identity checkbox, and neutral
-     Cancel behavior. No email choice or Dataverse write was made. Preview auth
-     was unavailable because the dynamic callback was not registered in Entra
-     (`AADSTS50011`), so the already-built artifact was deliberately promoted
-     before the read-only smoke.
-   - [VERIFIED via source, 1,777 reviewer tests, typecheck, Vercel Turbopack
+   - The card no longer renders the internal open-alert state as **Repair
+     request pending**. A signed-in Production smoke on Neville Sanjana verified
+     one explanation, **Review and confirm**, and **Not a fit**; the separate
+     **Review email choice**, **Confirm identity**, and pending-repair controls
+     were absent. The action was not clicked and no Dataverse write was made.
+   - [VERIFIED via source, 1,778 reviewer tests, typecheck, Vercel Turbopack
      build, read-only Postgres probe, and signed-in Production UI smoke on
-     2026-08-20. Production deployment `dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is
-     Ready; final smoke fix `ba5a22f`.]
+     2026-08-20. Production deployment `dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is
+     Ready; card simplification commit `5c9c399d`.]
 
 2. **Reviewer repair alerts had previously become actionable from Admin.**
    - PR #128 (`e74d1124`) added a bounded, server-re-read repair context,
@@ -43,12 +44,13 @@ documents and reconciled the production Log Drain's activation state.
    - PR #129 (`8b61be8d`) aligned that Admin guidance with the actions the
      destination card actually exposes.
 
-3. **Open repair requests still project onto the Find card for compatibility.**
-   - PR #132 (`be21c450`) established the Production baseline
+3. **Open repair requests remain internal compatibility state.**
+   - PR #132 (`be21c450`) historically established the Production baseline
      **Repair request pending · View in Admin**. The current feature branch
-     retains **Repair request pending** but removes its Admin link and keeps the
-     direct **Review email choice** action visible.
-   - **Confirm identity** remains available. A resolved alert no longer
+     retains the alert projection for deduplication but renders no pending-alert
+     control on the card. It shows **Review email choice** for email-only cases,
+     or one **Review and confirm** action for combined identity/email cases.
+   - Identity-only cases retain **Confirm identity**. A resolved alert no longer
      suppresses a later request if the underlying block persists.
    - Alert-status lookup is fail-soft for roster availability but fail-closed
      for duplicate creation. Creation is transactionally deduplicated under a
@@ -176,7 +178,7 @@ documents and reconciled the production Log Drain's activation state.
 
 | File | Purpose |
 |---|---|
-| `shared/components/reviewers/ReviewerSearchSection.js` | Direct email choice, structural retry, and pending-alert compatibility |
+| `shared/components/reviewers/ReviewerSearchSection.js` | One primary card action, direct email choice, structural retry, and internal pending-alert compatibility |
 | `shared/components/reviewers/CandidateEditModal.js` | Explicit Keep stored / Replace with found dialog |
 | `pages/api/workbench/reviewer-roster.js` | Roster projection of open repair alerts |
 | `lib/services/reviewer-address-trust-service.js` | Fresh pair validation, ETag resolution, structural retry, and alert closeout |
@@ -190,11 +192,13 @@ documents and reconciled the production Log Drain's activation state.
 
 ## Testing
 
-The self-service implementation passes 128 reviewer suites / 1,777 tests,
+The self-service implementation passes 128 reviewer suites / 1,778 tests,
 typecheck, and a Vercel Turbopack production build. Deployment
-`dpl_HQFzxDvNZz2JugB9mKQKbs9erimd` is Ready and owns the Production aliases.
-The signed-in Production smoke verified the card and dialog through Cancel; it
-did not select an address, mutate Dataverse, or prove the live write path.
+`dpl_BeAjDb82UZnK32y4muoSKcH1zQzn` is Ready and owns the Production aliases.
+The signed-in Production smoke verified Neville's simplified card without
+clicking its action; it did not select an address, mutate Dataverse, or prove
+the live write path. The earlier deployment's dialog smoke through neutral
+Cancel remains the evidence for the rendered exact-choice modal.
 
 The Session 450 claim-evidence pilot report was unavailable because its local
 observation state could not be read. No observation row was added.
