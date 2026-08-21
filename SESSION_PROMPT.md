@@ -1,4 +1,4 @@
-# Session 451 Prompt: Explorer Phase A Implemented; Promotion Pending
+# Session 451 Prompt: Explorer Phase A Production-Live; Observation Pending
 
 ## Session 450 Summary
 
@@ -78,7 +78,7 @@ documents and reconciled the production Log Drain's activation state.
      whole-stream volume/malformed/truncation criteria. Track A therefore
      remains a bounded verification item rather than being declared closed.
 
-6. **Dynamics Explorer Phase A is implemented and ready for promotion.**
+6. **Dynamics Explorer Phase A is Production-live.**
    - Interactive Explorer calls now use a 16,000-token response ceiling and
      `outputConfig: { effort: 'low' }`; the shared `LLMClient` converts that to
      Anthropic `output_config` only for reviewed effort-capable models. The
@@ -89,8 +89,17 @@ documents and reconciled the production Log Drain's activation state.
    - Focused and expanded verification passed: 123 Explorer/LLM tests,
      typecheck, migration/Atlas/model/API-route/route-boundary gates and their
      applicable self-tests, docs/fact/wiki gates, and a Next.js webpack
-     production build. The branch is not deployed and migration 032 has not
-     been applied to Production.
+     production build.
+   - Migration 032 applied at `2026-08-21T16:43:26.023Z`; exact readback
+     verified nullable `character varying(50)` `api_usage_log.stop_reason` and
+     the migration tracker row.
+   - Commit `9a54620d` deployed Ready as
+     `dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` and owns the Production aliases. The
+     public Explorer route/auth boundary passed in both available browser
+     surfaces. After owner authentication, “What tables are available?”
+     completed in two read-only rounds. Immediate Production Postgres readback
+     found successful usage rows 5354/5355 with non-null `tool_use` and
+     `end_turn` stop reasons, 27/545 output tokens, and 1.851s/4.970s latency.
 
 ### Commits
 
@@ -109,18 +118,19 @@ documents and reconciled the production Log Drain's activation state.
 - `1c3545f` - docs(reviewers): reconcile email self-service contract
 - `0e9b25f` - chore(vercel): exclude local codegraph state
 - `ba5a22f` - fix(reviewers): expose combined email choice
+- `9a54620d` - feat(dynamics-explorer): tune interactive model posture
 
 ## Next Items
 
 ### Verified Open
 
-1. **Promote Explorer campaign Phase A, then observe it.**
+1. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
-   implementation report. Promotion must apply migration 032 before the new
-   usage writer reaches Production, then deploy the branch and smoke one
-   signed-in Explorer question. The subsequent observation window should check
-   stop-reason distribution, output-at-cap events, and round latency against
-   the prior 6.5-second Sonnet average.
+   implementation report. Migration, deployment, and a signed-in two-round
+   smoke are complete; usage rows proved both `tool_use` and `end_turn`
+   persistence. The subsequent observation window should check stop-reason
+   distribution, output-at-cap events, and round latency against the prior
+   6.5-second Sonnet average.
 
 2. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
@@ -200,7 +210,7 @@ documents and reconciled the production Log Drain's activation state.
 | `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Reviewer address trust and retained alert compatibility |
 | `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Live drain/runbook and durable-event selection contract |
 | `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A criteria |
-| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A implemented on branch, promotion/observation pending |
+| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A Production-live and signed-in-smoked, longer observation pending |
 | `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions and field-probe findings |
 
 ## Testing
@@ -225,6 +235,8 @@ observation state could not be read. No observation row was added.
 
 Explorer Phase A separately passed 123 focused/expanded tests, typecheck, the
 relevant migration/data/model/route/docs gates and self-tests, and a Next.js
-webpack production build. That verification is local only; no migration,
-deployment, signed-in smoke, or production observation has occurred for Phase
-A yet.
+webpack production build. Migration 032 is applied and read back in Production;
+commit `9a54620d` is Ready on the Production aliases, and the public auth
+boundary passed. A signed-in two-round Explorer smoke succeeded and exact
+Production usage rows proved `tool_use`/`end_turn` persistence. Only the longer
+production observation window remains unverified.

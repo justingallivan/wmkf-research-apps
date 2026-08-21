@@ -7,7 +7,7 @@ metadata:
   status: active
   scope: dynamics
   originSessionId: abb437dd-056c-45cf-9188-a6ea7a903c05
-  modified: 2026-08-21T00:00:00.000Z
+  modified: 2026-08-21T16:53:00.000Z
 ---
 
 ## Recall Rule
@@ -31,11 +31,17 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
 
 ## Campaign shape (findings-backed, S449)
 
-1. Phase A model posture is implemented on the current feature branch
-   (2026-08-21), not yet Production-live: interactive calls use a 16K ceiling
-   plus low effort, while batch export stays at 4,096. Completed calls persist
-   normalized `stopReason` through `LLMClient` into nullable
-   `api_usage_log.stop_reason`; migration 032 must be applied during promotion.
+1. Phase A model posture is Production-live as of 2026-08-21 at commit
+   `9a54620d` / deployment `dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8`: interactive
+   calls use a 16K ceiling plus low effort, while batch export stays at 4,096.
+   Completed calls persist normalized `stopReason` through `LLMClient` into
+   nullable `api_usage_log.stop_reason`; migration 032 was applied at
+   `2026-08-21T16:43:26.023Z` and its column/tracker row were read back.
+   Public auth routing passed. The signed-in read-only question “What tables
+   are available?” then completed in two rounds; Production usage rows 5354
+   and 5355 recorded successful `tool_use` and `end_turn` stop reasons (27/545
+   output tokens; 1.851s/4.970s). The longer latency/cap observation window
+   remains open.
 2. Request-level telemetry remains Phase B: persist requestId + round +
    terminal request outcome in dynamics_query_log. `complete` computes rounds
    but never persists them. record_count rows before 2026-08-08 carry broken

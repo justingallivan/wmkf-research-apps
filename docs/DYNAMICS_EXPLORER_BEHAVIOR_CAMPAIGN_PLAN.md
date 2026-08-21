@@ -18,10 +18,10 @@ related:
 
 # Dynamics Explorer — Behavior Campaign Plan
 
-**Status:** Active. Phase A is implemented on the current feature branch
-(2026-08-21) but is not Production-live: promotion must apply migration
-`032_api_usage_stop_reason.sql`. Phases B-E remain planned from the S449 probe
-evidence.
+**Status:** Active. Phase A is Production-live as of 2026-08-21 at commit
+`9a54620d`; migration `032_api_usage_stop_reason.sql` is applied and deployment
+`dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` is Ready on the Production aliases. Phases
+B-E remain planned from the S449 probe evidence.
 
 **Objective:** make the Explorer trustworthy for staff outside the Research
 team — starting with SoCal — while making its behavior *measurable*, so the
@@ -39,8 +39,10 @@ recollection.
    `[VERIFIED via pages/api/dynamics-explorer/chat.js — the complete event
    emits rounds; logQuery writes no request id]`. Phase A now passes each
    completed call's normalized `stopReason` through `LLMClient` to
-   `api_usage_log.stop_reason`; migration 032 is tracked but not yet applied to
-   Production `[VERIFIED via source + migration, 2026-08-21]`.
+   `api_usage_log.stop_reason`; migration 032 was applied to Production at
+   `2026-08-21T16:43:26.023Z` and the nullable 50-character column plus
+   migration tracker row were read back `[VERIFIED via source + Production
+   schema/tracker probe, 2026-08-21]`.
 2. **Organic traffic cannot validate changes.** ~160 sessions in 6 months;
    post-fix era = 62 tool calls / 11 sessions / 15 request-bursts
    `[VERIFIED via dynamics_query_log aggregates, 2026-08-20]`.
@@ -54,7 +56,7 @@ recollection.
    thinking+output combined: 3 of 102 Sonnet calls hit exactly 2048 — silent
    hard truncations `[VERIFIED via api_usage_log output-token distribution]`.
    Latency rose ~3.5× (1.9s → 6.5s avg/round). Total Explorer spend ever
-   logged: $4.09 — cost is a non-issue at this volume. The branch now uses a
+   logged: $4.09 — cost is a non-issue at this volume. Production now uses a
    16,000-token ceiling and low effort for the interactive call only; the
    separate export batch remains at 4,096 `[VERIFIED via source + focused
    tests, 2026-08-21]`.
@@ -93,23 +95,27 @@ Ordered so measurement lands before behavior changes.
 
 ### Phase A — Model posture (small, immediate)
 
-- **IMPLEMENTED on branch 2026-08-21:** `maxTokens` 2048 → 16,000 in the
+- **PRODUCTION-LIVE 2026-08-21:** `maxTokens` 2048 → 16,000 in the
   interactive `callClaude` (a ceiling, not spend) plus
   `outputConfig: { effort: 'low' }`. `LLMClient` converts that to Anthropic's
   `output_config` only for effort-capable reviewed models and rebuilds the body
   under the fallback model's capabilities. The separate export batch remains
   at 4,096.
-- **IMPLEMENTED on branch 2026-08-21:** completed calls pass normalized
+- **PRODUCTION-LIVE 2026-08-21:** completed calls pass normalized
   `stopReason` into the existing fire-and-forget usage row. Fresh-install
   schema and existing-DB migration 032 add nullable
-  `api_usage_log.stop_reason`; production application is pending promotion.
+  `api_usage_log.stop_reason`; migration 032 is applied and the Production
+  schema/tracker readback matches the source contract.
 - Eval-harness case (Phase C) for a long multi-round conversation exercising
   `compactMessages` with thinking blocks present — clearing prior-turn
   `tool_use.input` while thinking blocks remain is `[ASSUMED]` safe, untested
   with a thinking model.
-- **Operational acceptance remains pending:** after deployment, no
-  output_tokens-at-cap events over the next observation window; round latency
-  materially down from the 6.5s Sonnet average.
+- **Signed-in Production smoke passed 2026-08-21:** the harmless question
+  “What tables are available?” completed in two read-only query rounds. Usage
+  rows `5354` and `5355` recorded successful `tool_use` and `end_turn` stop
+  reasons, 27 and 545 output tokens, and 1.851s and 4.970s latency. Over the
+  next observation window, require no output-tokens-at-cap events; round latency
+  should remain materially down from the 6.5s Sonnet average.
 
 ### Phase B — Request-level telemetry
 
@@ -188,8 +194,7 @@ claim gets a dated probe first:
 
 1. 10–20 real SoCal questions, in SoCal staff's own words (seeds Phases C+D).
 2. Answers to the population-served and `_socal` fill-rate questions above.
-3. Approval point per remaining phase; Phase A promotion follows the
-   appropriate tier in `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
+3. Approval point per remaining phase; Phase A promotion is complete.
 
 ## 5. Standing constraints
 
@@ -208,10 +213,10 @@ claim gets a dated probe first:
 
 | Claim | Producer / entry | Persistence | Consumer | Evidence | Status |
 |---|---|---|---|---|---|
-| Interactive calls use 16K + low effort | `/api/dynamics-explorer/chat` `callClaude` | N/A | Anthropic request body built by `LLMClient` | Source + route-config test | VERIFIED on branch |
+| Interactive calls use 16K + low effort | `/api/dynamics-explorer/chat` `callClaude` | N/A | Anthropic request body built by `LLMClient` | Deployed source + route-config test + Ready Production deployment + signed-in two-round smoke | VERIFIED in Production |
 | Unsupported/fallback models do not receive effort | `LLMClient._buildBody` and fallback rebuild | N/A | Anthropic request body | Capability registry + existing body-shaping tests + model gate | VERIFIED |
-| Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Source + logger/client tests + migration 032 + fresh-install parity | VERIFIED on branch; Production migration pending |
-| Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Source + route-config test | VERIFIED at 4,096 |
+| Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Deployed source + logger/client tests + migration 032 + fresh-install parity + Production schema/tracker readback + usage rows 5354/5355 | VERIFIED in Production (`tool_use`, then `end_turn`) |
+| Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Deployed source + route-config test | VERIFIED in Production at 4,096 |
 | Request-level rounds/outcomes are queryable | Chat handler | `dynamics_query_log` | Future campaign analysis | Phase B plan; no new schema/code in this slice | PLANNED |
 
 **Sweep mode:** Mode A — changed fact. Source → persistence → consumer was
@@ -230,6 +235,17 @@ first concurrent run collided with the Atlas self-test's temporary fixture;
 the isolated gate + self-test passed.
 
 **Remaining live stale statements:** 0 in the searched current-state scope.
-**Remaining unverified external state:** Production migration, deployment,
-signed-in smoke, and post-deploy observation. **Verdict:** RECONCILED for the
-tracked branch state; Production remains explicitly pending.
+**Production release evidence:** migration 032 applied at
+`2026-08-21T16:43:26.023Z`, followed by exact schema/tracker readback; commit
+`9a54620d` deployed Ready as `dpl_4d2fQegMKrZAnf6sHu9GsJ5QeqU8` and owns the
+Production aliases. The unauthenticated Explorer route correctly redirected to
+the Production sign-in page in both available browser surfaces. After the
+owner authenticated in Chrome, “What tables are available?” completed in two
+read-only rounds; immediate Postgres readback found successful usage rows 5354
+and 5355 with non-null `tool_use` and `end_turn` stop reasons.
+
+**Remaining live stale statements:** 0 in the searched current-state scope.
+**Remaining unverified external state:** the post-deploy latency/cap observation
+window beyond this single two-round smoke. **Verdict:** RECONCILED for
+Production release and signed-in call telemetry; longer observation remains
+explicitly pending.

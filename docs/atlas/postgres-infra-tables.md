@@ -200,9 +200,13 @@ activation runbook.
 Per-Claude-call ledger (model, tokens, cost, latency, status, and nullable
 provider stop reason). Written by `lib/services/llm-client.js` via
 `lib/utils/usage-logger.js` (`logUsage`). Not routed through `DatabaseService`.
-Migration `032_api_usage_stop_reason.sql` adds `stop_reason`; it is tracked but
-not yet applied to Production as of 2026-08-21. Historical and failed rows may
-remain null. Cost is computed locally from `lib/utils/model-pricing.js`; rows
+Migration `032_api_usage_stop_reason.sql` added `stop_reason` to Production at
+`2026-08-21T16:43:26.023Z`; exact readback verified a nullable
+`character varying(50)` column and the migration tracker row. Historical and
+failed rows may remain null. A signed-in two-round Production Explorer smoke
+then created usage rows 5354/5355 with non-null `tool_use`/`end_turn` stop
+reasons, proving the deployed writer-to-column path. Cost is computed locally
+from `lib/utils/model-pricing.js`; rows
 with an unknown model id land with `estimated_cost_cents = NULL` and are
 surfaced by the weekly `pricing-canary` cron. That same cron writes a
 `maintenance_runs` heartbeat and, when `CLAUDE_API_KEY` is available, compares
