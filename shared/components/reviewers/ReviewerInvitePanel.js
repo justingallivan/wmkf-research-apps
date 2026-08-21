@@ -627,7 +627,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
               type="button"
               onClick={handleWithdraw}
               disabled={selectedPending.length === 0}
-              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
               title={
                 selectedPending.length === 0
                   ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
