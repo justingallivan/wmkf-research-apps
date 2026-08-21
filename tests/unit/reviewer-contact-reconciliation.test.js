@@ -148,6 +148,66 @@ test('partial source results render available rows without claiming a total', as
   expect(result).not.toHaveProperty('totalCount');
 });
 
+test('a capped source count marks history partial even when Dataverse omits a next link', async () => {
+  const records = Array.from({ length: 25 }, (_, index) => ({
+    akoya_requestid: `prior-request-${index}`,
+    akoya_requestnum: String(1002000 + index),
+    akoya_fiscalyear: 'June 2026',
+  }));
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => ({
+        records: [],
+        totalCount: 0,
+        hasMore: false,
+      })),
+      findLegacyRequests: jest.fn(async () => ({
+        records,
+        totalCount: 26,
+        hasMore: false,
+      })),
+      findRequestsByIds: jest.fn(),
+    },
+  );
+
+  expect(result).toMatchObject({ complete: false });
+  expect(result).not.toHaveProperty('totalCount');
+  expect(result.requests).toHaveLength(3);
+});
+
+test('a valid meeting date sorts ahead of an undated row before fiscal-year fallback', async () => {
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => ({ records: [], hasMore: false })),
+      findLegacyRequests: jest.fn(async () => ({
+        records: [
+          {
+            akoya_requestid: 'dated-request',
+            akoya_requestnum: '1002000',
+            akoya_fiscalyear: null,
+            wmkf_meetingdate: '2026-06-04',
+          },
+          {
+            akoya_requestid: 'undated-request',
+            akoya_requestnum: '1003000',
+            akoya_fiscalyear: 'June 2027',
+            wmkf_meetingdate: null,
+          },
+        ],
+        hasMore: false,
+      })),
+      findRequestsByIds: jest.fn(),
+    },
+  );
+
+  expect(result.requests.map((row) => row.requestId))
+    .toEqual(['dated-request', 'undated-request']);
+});
+
 test('both history sources failing omits context instead of asserting zero history', async () => {
   await expect(loadPriorRequestContext(
     '33333333-3333-3333-3333-333333333333',
@@ -396,6 +456,7 @@ test('history is not read without an exact server-bound person match', async () 
 });
 
 test('history timeout preserves the candidate and a late result cannot mutate it', async () => {
+  jest.useFakeTimers();
   let resolveHistory;
   const lateHistory = new Promise((resolve) => { resolveHistory = resolve; });
   const rows = [candidate('Trusted Researcher', {
@@ -406,14 +467,16 @@ test('history timeout preserves the candidate and a late result cannot mutate it
     orcidId: ORCID,
   })];
 
-  const result = await reconcileReviewerContacts(rows, {
+  const pendingResult = reconcileReviewerContacts(rows, {
     requestId: CURRENT_REQUEST_ID,
     includePriorRequestContext: true,
-    priorRequestBudgetMs: 0,
+    priorRequestBudgetMs: 100,
     priorRequestContextLoader: jest.fn(() => lateHistory),
     lookup: jest.fn(async () => exactOrcidOutcome()),
   });
 
+  await jest.advanceTimersByTimeAsync(100);
+  const result = await pendingResult;
   expect(result).toBe(rows);
   expect(rows[0].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
   resolveHistory({
@@ -423,6 +486,34 @@ test('history timeout preserves the candidate and a late result cannot mutate it
   });
   await Promise.resolve();
   expect(rows[0].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
+  jest.useRealTimers();
+});
+
+test('prior request presentation time is shared across the candidate batch', async () => {
+  jest.useFakeTimers();
+  const rows = ['First exact match', 'Second exact match'].map((name) => candidate(name, {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+  }));
+  const priorRequestContextLoader = jest.fn(() => new Promise(() => {}));
+
+  const pendingResult = reconcileReviewerContacts(rows, {
+    requestId: CURRENT_REQUEST_ID,
+    includePriorRequestContext: true,
+    priorRequestBudgetMs: 100,
+    priorRequestContextLoader,
+    lookup: jest.fn(async () => exactOrcidOutcome()),
+  });
+
+  await jest.advanceTimersByTimeAsync(100);
+  await pendingResult;
+  expect(priorRequestContextLoader).toHaveBeenCalledTimes(1);
+  expect(rows[0].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
+  expect(rows[1].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
+  jest.useRealTimers();
 });
 
 test('trusted ORCID mismatch records durable conflict state without changing either address', async () => {
