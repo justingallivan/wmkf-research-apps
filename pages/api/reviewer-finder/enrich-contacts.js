@@ -236,6 +236,7 @@ export default async function handler(req, res) {
             skip: !!results.partial || !!results.timeout,
             requestId,
             actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+            includePriorRequestContext: true,
           }),
         );
       } catch (error) {

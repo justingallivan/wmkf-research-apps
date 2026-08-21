@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Row count re-probed 2026-08-15 PT (`2026-08-16T04:47:14Z`) via a direct read-only Dataverse `/$count` request; decline-referral per-row dismissal contract reconciled 2026-08-14 via source and focused tests; Wave 18 review-due override provisioned and runtime promoted 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, successful entity-set `$select` of `wmkf_reviewduedateoverride`, non-clobbering settings seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract originally reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
+**Last verified:** Row count re-probed 2026-08-15 PT (`2026-08-16T04:47:14Z`) via a direct read-only Dataverse `/$count` request; capped request-link context read verified in feature-branch source/tests 2026-08-21 (deployment pending); decline-referral per-row dismissal contract reconciled 2026-08-14 via source and focused tests; Wave 18 review-due override provisioned and runtime promoted 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, successful entity-set `$select` of `wmkf_reviewduedateoverride`, non-clobbering settings seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract originally reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
 **Live row count:** 793 (dated snapshot; rows are expected to change with normal reviewer activity)
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
@@ -181,6 +181,9 @@ Picklist extension on existing `wmkf_responsetype`: added `withdrawn_sufficient=
 
 Methods:
 - `findByPotentialReviewerAndRequest` — upsert lookup; disposition-aware (returns excluded rows so `upsert` can honor "excluded wins", but does not throw)
+- `findRequestLinksByPotentialReviewer` — request-lookup-only, newest-first,
+  capped read for optional existing-record context; deliberately does not run
+  the full merge/lifecycle projection or paginate beyond the presentation cap
 - `findById` — **THROWS on an applicant-excluded row** (action chokepoint; see Applicant disposition above)
 - `findByRequest(requestId, { selectedOnly })` — used by Review Manager request views; carries `notExcludedFilter()`
 - `findApplicantRecommendedByRequest(requestId)` — Workbench Find enrichment reader for applicant-suggested rows; filters by `_wmkf_request_value`, `wmkf_applicantdisposition=Recommended`, and `notExcludedFilter()` with **no** `wmkf_selected` constraint so unpromoted rows are enriched for PD review
@@ -230,6 +233,11 @@ Picklist maps live in the adapter (`RESPONSE_TYPE_MAP`, `REVIEW_STATUS_MAP`, `AP
 ## Read / write paths
 
 Read:
+- `lib/services/reviewer-contact-reconciliation.js` — for an exact
+  receipt-bound Potential Reviewer, reads capped `_wmkf_request_value` links,
+  unions them with the request entity's five legacy reviewer slots, and exposes
+  only bounded request summaries. Association means “listed,” not invited or
+  completed.
 - `pages/api/review-manager/{render-emails,send-emails,reviewers,download-review,regenerate-token}.js` — `download-review.js` resolves the SharePoint folder; `regenerate-token.js` reads the suggestion before minting a replacement token
 - `pages/api/reviewer-finder/{save-candidates,my-candidates}.js`
 - `lib/external/verify-suggestion-token.js` — load-bearing for every `/external/review/*` endpoint; reads with `$expand=wmkf_Request($select=...),wmkf_PotentialReviewer($select=...)` to hydrate the reviewer landing page in one round trip

@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30; capped legacy reviewer-slot context read verified in feature-branch source/tests 2026-08-21 (deployment pending)
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -41,7 +41,7 @@ People (lookups):
 - `akoya_primarycontactid` → `contacts`
 - `wmkf_projectleader`, `wmkf_researchleader`, `wmkf_ceo` → `contacts`
 - `wmkf_copi1..5` → `contacts` (legacy 5-slot Co-PI roster — superseded by `wmkf_apprequestperson` junction since S139; intake portal pilot will extend that junction with `wmkf_effortpct` / `wmkf_biosketchurl` / `wmkf_lineorder` and expand `wmkf_role` to PI / Co-PI / Senior Personnel / Key Personnel / Other per 2026-05-14 schema review)
-- `wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots — actual reviewer state lives in `wmkf_appreviewersuggestion`)
+- `wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots — actual reviewer state lives in `wmkf_appreviewersuggestion`; the slots remain a read-only source of prior-request recognition context for an exact server-resolved reviewer)
 - `wmkf_programdirector` (lead PD), `wmkf_programdirector2` (secondary, no reviewer assignment role) → `systemusers`
 - `wmkf_programcoordinator` → `systemusers`
 - `wmkf_grantprogram`, `wmkf_programareaserved` → vendor program entities
@@ -163,6 +163,10 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   Dynamics client intentionally
 - (NOT `pages/api/integrity-screener/*`, NOT `pages/api/virtual-review-panel.js` — both read no Dataverse. `integrity-service.js` imports only Postgres `sql`; `virtual-review-panel.js` is a single file (not a directory) that's PDF-upload-driven and Postgres-backed via `PanelReviewService`.)
 - `lib/dataverse/adapters/reviewer-suggestion.js` `findByPD` — joins requests by lead PD
+- `lib/services/reviewer-contact-reconciliation.js` →
+  `grantRequestAdapter.findByPotentialReviewerSlots` — capped read across the
+  five legacy reviewer lookups for optional Find-card prior-request context;
+  excludes the current request and never treats a slot as lifecycle proof
 
 ## Write paths
 

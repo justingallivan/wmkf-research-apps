@@ -87,6 +87,7 @@ import {
   activeInstitutionStage2Presentation,
 } from '../../utils/institution-stage2-presentation';
 import { STAFF_ADDRESS_CHOICE_REASON } from '../../../lib/utils/reviewer-address-trust';
+import { priorRequestCardSummary } from '../../utils/reviewer-prior-request-context';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -489,6 +490,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const eligibilityStatus = c.eligibilityStatus || enr.eligibilityStatus || 'unknown';
   const eligibilityEvidence = c.eligibilityEvidence || enr.eligibilityEvidence || null;
   const dataverseEvidence = enr.dataverseContactEvidence || null;
+  const priorRequestSummary = priorRequestCardSummary(dataverseEvidence?.priorRequestContext);
   const dataverseInstitutions = Array.isArray(dataverseEvidence?.institutions)
     ? dataverseEvidence.institutions.filter((entry) => entry?.value && dataverseInstitutionSourceLabel(entry.source))
     : [];
@@ -669,6 +671,13 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               {hIndex != null && <span>· h-index {hIndex}</span>}
               {citations != null && <span>· {citations.toLocaleString()} citations</span>}
               {previousResult && <span className="text-blue-700">· Found in an earlier search</span>}
+            </div>
+          )}
+
+          {priorRequestSummary && (
+            <div className="mt-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
+              <span className="font-medium">Already in AkoyaGO.</span>
+              {' '}{priorRequestSummary.replace(/^Already in AkoyaGO\.\s*/, '')}
             </div>
           )}
 

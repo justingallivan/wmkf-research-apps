@@ -6,7 +6,7 @@ status: active
 summary: "Direct Workbench reviewer email choice is Production-live; legacy alert compatibility remains while an active row exists."
 canonical: false
 cataloged: 2026-08-20
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
@@ -492,6 +492,13 @@ Run each gate and its self-test sequentially:
 10. production build and a signed-in authenticated smoke using a safe natural conflict. Dynamic Preview authentication was blocked by the unregistered Entra callback (`AADSTS50011`), so the read-only UI smoke ran on the deliberately promoted Production artifact.
 
 ## Completion status
+
+- **IMPLEMENTED ON THE FEATURE BRANCH; DEPLOYMENT PENDING 2026-08-21:** an
+  exact receipt-bound reviewer match now carries bounded prior-request context
+  from both suggestion links and legacy request slots. The card says **Already
+  in AkoyaGO** with the actual request number/title/cycle; the choice dialog
+  says that history does not establish which email is current. This does not
+  change the self-service decision or add an Admin action.
 
 - **VERIFIED in source/tests:** a staff user can resolve a routine stored/found
   email conflict without Admin through an explicit audited choice against a

@@ -154,6 +154,7 @@ test('adds a server identity receipt to enriched candidates when requestId is pr
     expect.objectContaining({
       skip: false,
       requestId: '11111111-1111-1111-1111-111111111111',
+      includePriorRequestContext: true,
     }),
   );
 });

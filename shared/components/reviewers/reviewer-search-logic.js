@@ -886,6 +886,31 @@ export function pruneDataverseContactEvidence(evidence) {
         return value && source ? [{ value, source }] : [];
       })
     : [];
+  const priorRequests = Array.isArray(evidence.priorRequestContext?.requests)
+    ? evidence.priorRequestContext.requests.slice(0, 3).flatMap((request) => {
+        const requestId = boundedText(request?.requestId, 80);
+        if (!requestId) return [];
+        return [{
+          requestId,
+          requestNumber: boundedText(request?.requestNumber, 80),
+          title: boundedText(request?.title, 500),
+          fiscalYear: boundedText(request?.fiscalYear, 120),
+          meetingDate: boundedText(request?.meetingDate, 40),
+        }];
+      })
+    : [];
+  const priorRequestComplete = evidence.priorRequestContext?.complete === true;
+  const priorRequestTotal = Number.isInteger(evidence.priorRequestContext?.totalCount)
+    && evidence.priorRequestContext.totalCount >= priorRequests.length
+    ? evidence.priorRequestContext.totalCount
+    : null;
+  const priorRequestContext = priorRequests.length > 0
+    ? {
+        complete: priorRequestComplete,
+        ...(priorRequestComplete && priorRequestTotal !== null ? { totalCount: priorRequestTotal } : {}),
+        requests: priorRequests,
+      }
+    : null;
   return {
     status: statuses.has(evidence.status) ? evidence.status : 'unavailable',
     matchKey: evidence.matchKey === 'email' || evidence.matchKey === 'orcid' ? evidence.matchKey : null,
@@ -894,6 +919,7 @@ export function pruneDataverseContactEvidence(evidence) {
     institutions,
     reason: reasons.has(evidence.reason) ? evidence.reason : null,
     checkedAt: boundedText(evidence.checkedAt, 80),
+    ...(priorRequestContext ? { priorRequestContext } : {}),
   };
 }
 

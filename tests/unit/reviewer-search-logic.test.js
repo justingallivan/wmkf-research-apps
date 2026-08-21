@@ -440,6 +440,63 @@ describe('Dataverse contact evidence survives a bounded roster round-trip', () =
       .toEqual(pruneDataverseContactEvidence(raw));
     expect(JSON.stringify(pruned)).not.toContain('must-not-survive');
   });
+
+  test('keeps at most three prior request summaries and strips raw/person fields', () => {
+    const raw = {
+      status: 'review_required',
+      matchKey: 'orcid',
+      reason: 'email_mismatch',
+      priorRequestContext: {
+        complete: true,
+        totalCount: 4,
+        potentialReviewerId: 'must-not-survive',
+        requests: [1, 2, 3, 4].map((index) => ({
+          requestId: `${index}1111111-1111-1111-1111-111111111111`,
+          requestNumber: index === 1 ? '1002278' : `10022${index}`,
+          title: index === 1 ? 'Deciphering the role of the secretome in aging' : `Request ${index}`,
+          fiscalYear: index === 1 ? 'June 2026' : 'March 2026',
+          meetingDate: index === 1 ? '2026-06-04' : '2026-03-01',
+          createdon: 'must-not-survive',
+          reviewerSlot: index,
+        })),
+      },
+    };
+
+    const pruned = pruneDataverseContactEvidence(raw);
+    expect(pruned.priorRequestContext).toMatchObject({ complete: true, totalCount: 4 });
+    expect(pruned.priorRequestContext.requests[0])
+      .toMatchObject({ requestNumber: '1002278', fiscalYear: 'June 2026' });
+    expect(pruned.priorRequestContext.requests).toHaveLength(3);
+    expect(JSON.stringify(pruned)).not.toContain('must-not-survive');
+    expect(JSON.stringify(pruned)).not.toContain('reviewerSlot');
+
+    const roundTrip = pruneCandidateForRoster({
+      name: 'Neville Sanjana',
+      contactEnrichment: { dataverseContactEvidence: raw },
+    });
+    expect(roundTrip.contactEnrichment.dataverseContactEvidence.priorRequestContext)
+      .toEqual(pruned.priorRequestContext);
+  });
+
+  test('partial prior request context cannot retain an authoritative total', () => {
+    expect(pruneDataverseContactEvidence({
+      status: 'known',
+      priorRequestContext: {
+        complete: false,
+        totalCount: 99,
+        requests: [{ requestId: '22222222-2222-2222-2222-222222222222', requestNumber: '1002278' }],
+      },
+    }).priorRequestContext).toEqual({
+      complete: false,
+      requests: [{
+        requestId: '22222222-2222-2222-2222-222222222222',
+        requestNumber: '1002278',
+        title: null,
+        fiscalYear: null,
+        meetingDate: null,
+      }],
+    });
+  });
 });
 
 describe('sanitizeInstitutionCOIDetails (S240)', () => {

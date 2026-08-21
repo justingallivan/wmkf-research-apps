@@ -4,7 +4,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice UI semantics are Production-live in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` and signed-in smoke-verified on Neville's one-action card plus the exact-choice dialog through neutral Cancel on 2026-08-20 (live choice write not exercised)
+**Last verified:** Row count re-probed 2026-08-13 via `scripts/reconcile-memory-claims.js`; Wave 13 metadata/population refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population`; Wave 17 metadata read back EXACT in Production and its receipt-backed runtime was exercised on Request `1002912` on 2026-07-31 PT / 2026-08-01 UTC; stored/found staff-choice UI semantics are Production-live in Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` and signed-in smoke-verified on Neville's one-action card plus the exact-choice dialog through neutral Cancel on 2026-08-20 (live choice write not exercised); exact-person prior-request context read verified in feature-branch source/tests 2026-08-21 (deployment pending)
 **Live row count:** 4,474
 **Entity set:** `wmkf_potentialreviewerses` (note Dynamics-pluralized form)
 **Adapter:** `lib/dataverse/adapters/potential-reviewer.js`
@@ -110,6 +110,10 @@ Methods:
 
 ## Read paths
 
+- `lib/services/reviewer-contact-reconciliation.js` — keeps an exact
+  receipt-bound ORCID match's person GUID server-side while using it for capped
+  canonical/legacy prior-request reads. The browser receives only bounded
+  request summaries, never this person GUID.
 - `pages/api/review-manager/send-emails.js` — outreach
 - `pages/api/review-manager/render-emails.js` — `DynamicsService.getRecord('wmkf_potentialreviewerses', personId)` to hydrate person fields per email draft
 - `pages/api/review-manager/reviewers.js` `fetchPotentialReviewers` — chunked OR-chain on `wmkf_potentialreviewersid` to hydrate the Review Manager reviewer list

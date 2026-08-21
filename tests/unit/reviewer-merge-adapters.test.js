@@ -20,17 +20,20 @@ beforeEach(() => {
     getRecord: DynamicsService.getRecord,
     updateRecord: DynamicsService.updateRecord,
     deleteRecord: DynamicsService.deleteRecord,
+    queryRecords: DynamicsService.queryRecords,
     queryAllRecords: DynamicsService.queryAllRecords,
   };
   DynamicsService.getRecord = jest.fn().mockResolvedValue({ wmkf_potentialreviewersid: LOSER });
   DynamicsService.updateRecord = jest.fn().mockResolvedValue(undefined);
   DynamicsService.deleteRecord = jest.fn().mockResolvedValue(undefined);
+  DynamicsService.queryRecords = jest.fn().mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
   DynamicsService.queryAllRecords = jest.fn().mockResolvedValue({ records: [], totalCount: 0 });
 });
 afterEach(() => {
   DynamicsService.getRecord = original.getRecord;
   DynamicsService.updateRecord = original.updateRecord;
   DynamicsService.deleteRecord = original.deleteRecord;
+  DynamicsService.queryRecords = original.queryRecords;
   DynamicsService.queryAllRecords = original.queryAllRecords;
 });
 
@@ -91,6 +94,28 @@ describe('reviewer-suggestion merge helpers', () => {
 
   test('findAllByPotentialReviewer rejects a non-GUID', async () => {
     await expect(suggestionAdapter.findAllByPotentialReviewer('not-a-guid')).rejects.toThrow(/GUID/);
+  });
+
+  test('findRequestLinksByPotentialReviewer is a bounded request-only read', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({
+      records: [{ _wmkf_request_value: KEEPER }], totalCount: 1, hasMore: false,
+    });
+
+    await suggestionAdapter.findRequestLinksByPotentialReviewer(LOSER);
+    expect(DynamicsService.queryRecords).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      {
+        select: '_wmkf_request_value',
+        filter: `_wmkf_potentialreviewer_value eq ${LOSER}`,
+        orderby: 'createdon desc',
+        top: 25,
+      },
+    );
+  });
+
+  test('findRequestLinksByPotentialReviewer rejects a non-GUID before querying', async () => {
+    await expect(suggestionAdapter.findRequestLinksByPotentialReviewer('not-a-guid')).rejects.toThrow(/GUID/);
+    expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
   });
 
   test('repointToPotentialReviewer rebinds to the keeper and passes ifMatch', async () => {

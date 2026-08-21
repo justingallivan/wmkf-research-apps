@@ -2,6 +2,7 @@
 
 import {
   compactDataverseContactEvidence,
+  loadPriorRequestContext,
   reconcileReviewerContacts,
   resolveTrustedReviewerPerson,
 } from '../../lib/services/reviewer-contact-reconciliation';
@@ -12,6 +13,8 @@ import {
 import { createServerIdentityDecisionReceipt } from '../../lib/services/reviewer-candidate-attestation';
 
 const ORCID = '0000-0002-1825-0097';
+const CURRENT_REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+const PRIOR_REQUEST_ID = '22222222-2222-2222-2222-222222222222';
 
 function candidate(name, enrichment = {}) {
   const row = {
@@ -26,6 +29,136 @@ function candidate(name, enrichment = {}) {
     serverIdentityDecisionReceipt: createServerIdentityDecisionReceipt(row),
   };
 }
+
+function exactOrcidOutcome() {
+  return {
+    outcome: 'confident',
+    match: {
+      reviewerId: '33333333-3333-3333-3333-333333333333',
+      matchKey: 'orcid',
+      nameConsistent: true,
+      context: { email: 'stored@example.edu' },
+    },
+    referencedReviewers: [{ reviewerId: 'hidden', institutions: [] }],
+    referencedContacts: [],
+  };
+}
+
+test('legacy request slots provide prior context when suggestion history is empty', async () => {
+  const findRequestsByIds = jest.fn();
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => ({ records: [], hasMore: false })),
+      findLegacyRequests: jest.fn(async () => ({
+        records: [{
+          akoya_requestid: PRIOR_REQUEST_ID,
+          akoya_requestnum: '1002278',
+          akoya_title: 'Deciphering the role of the secretome in aging',
+          akoya_fiscalyear: 'June 2026',
+          wmkf_meetingdate: '2026-06-04',
+          createdon: 'do-not-project',
+          _wmkf_potentialreviewer4_value: 'do-not-project',
+        }],
+        hasMore: false,
+      })),
+      findRequestsByIds,
+    },
+  );
+
+  expect(findRequestsByIds).not.toHaveBeenCalled();
+  expect(result).toEqual({
+    complete: true,
+    totalCount: 1,
+    requests: [{
+      requestId: PRIOR_REQUEST_ID,
+      requestNumber: '1002278',
+      title: 'Deciphering the role of the secretome in aging',
+      fiscalYear: 'June 2026',
+      meetingDate: '2026-06-04',
+    }],
+  });
+  expect(JSON.stringify(result)).not.toContain('potentialreviewer4');
+  expect(JSON.stringify(result)).not.toContain('createdon');
+});
+
+test('suggestion and legacy links exclude the current request, dedupe, sort, and cap', async () => {
+  const ids = [
+    PRIOR_REQUEST_ID,
+    CURRENT_REQUEST_ID,
+    '44444444-4444-4444-4444-444444444444',
+    '55555555-5555-5555-5555-555555555555',
+    '66666666-6666-6666-6666-666666666666',
+  ];
+  const records = [
+    { akoya_requestid: ids[0], akoya_requestnum: '1002278', akoya_fiscalyear: 'June 2026', wmkf_meetingdate: '2026-06-04' },
+    { akoya_requestid: ids[2], akoya_requestnum: '1002400', akoya_fiscalyear: 'September 2026', wmkf_meetingdate: '2026-09-10' },
+    { akoya_requestid: ids[3], akoya_requestnum: '1002100', akoya_fiscalyear: 'March 2026', wmkf_meetingdate: '2026-03-12' },
+    { akoya_requestid: ids[4], akoya_requestnum: '1001900', akoya_fiscalyear: 'December 2025', wmkf_meetingdate: '2025-12-01' },
+  ];
+  const findRequestsByIds = jest.fn(async (requestIds) => ({
+    records: records.filter((row) => requestIds.includes(row.akoya_requestid)),
+    hasMore: false,
+  }));
+
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => ({
+        records: ids.map((id) => ({ _wmkf_request_value: id })),
+        hasMore: false,
+      })),
+      findLegacyRequests: jest.fn(async () => ({ records: [records[0]], hasMore: false })),
+      findRequestsByIds,
+    },
+  );
+
+  expect(findRequestsByIds).toHaveBeenCalledWith(
+    [PRIOR_REQUEST_ID, ids[2], ids[3], ids[4]],
+    expect.objectContaining({ top: 4 }),
+  );
+  expect(result.complete).toBe(true);
+  expect(result.totalCount).toBe(4);
+  expect(result.requests.map((row) => row.requestNumber)).toEqual(['1002400', '1002278', '1002100']);
+  expect(JSON.stringify(result)).not.toContain(CURRENT_REQUEST_ID);
+});
+
+test('partial source results render available rows without claiming a total', async () => {
+  const result = await loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => { throw new Error('suggestions unavailable'); }),
+      findLegacyRequests: jest.fn(async () => ({
+        records: [{
+          akoya_requestid: PRIOR_REQUEST_ID,
+          akoya_requestnum: '1002278',
+          akoya_fiscalyear: 'June 2026',
+          wmkf_meetingdate: '2026-06-04',
+        }],
+        hasMore: true,
+      })),
+      findRequestsByIds: jest.fn(),
+    },
+  );
+
+  expect(result).toMatchObject({ complete: false, requests: [{ requestNumber: '1002278' }] });
+  expect(result).not.toHaveProperty('totalCount');
+});
+
+test('both history sources failing omits context instead of asserting zero history', async () => {
+  await expect(loadPriorRequestContext(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+    {
+      findSuggestionLinks: jest.fn(async () => { throw new Error('suggestions unavailable'); }),
+      findLegacyRequests: jest.fn(async () => { throw new Error('requests unavailable'); }),
+      findRequestsByIds: jest.fn(),
+    },
+  )).resolves.toBeNull();
+});
 
 test('confident exact email becomes known without exposing Dataverse ids', () => {
   const evidence = compactDataverseContactEvidence({
@@ -177,6 +310,119 @@ test('an ORCID explicitly grounded by a trusted identity anchor can become known
     matchKey: 'orcid',
     reason: null,
   });
+});
+
+test('exact trusted reconciliation attaches prior request context without exposing the person id', async () => {
+  const priorRequestContextLoader = jest.fn(async () => ({
+    complete: true,
+    totalCount: 1,
+    requests: [{
+      requestId: PRIOR_REQUEST_ID,
+      requestNumber: '1002278',
+      title: 'Deciphering the role of the secretome in aging',
+      fiscalYear: 'June 2026',
+      meetingDate: '2026-06-04',
+    }],
+  }));
+  const rows = [candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+  })];
+
+  await reconcileReviewerContacts(rows, {
+    requestId: CURRENT_REQUEST_ID,
+    includePriorRequestContext: true,
+    priorRequestContextLoader,
+    lookup: jest.fn(async () => exactOrcidOutcome()),
+  });
+
+  expect(priorRequestContextLoader).toHaveBeenCalledWith(
+    '33333333-3333-3333-3333-333333333333',
+    CURRENT_REQUEST_ID,
+  );
+  expect(rows[0].contactEnrichment.dataverseContactEvidence.priorRequestContext)
+    .toMatchObject({ requests: [{ requestNumber: '1002278', fiscalYear: 'June 2026' }] });
+  expect(JSON.stringify(rows[0].contactEnrichment.dataverseContactEvidence))
+    .not.toContain('33333333-3333-3333-3333-333333333333');
+});
+
+test('history is not read without an exact server-bound person match', async () => {
+  const cases = [
+    {
+      row: candidate('No receipt', {
+        identity: {
+          status: 'probable',
+          anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+        },
+        orcidId: ORCID,
+      }),
+      outcome: exactOrcidOutcome(),
+      removeReceipt: true,
+    },
+    {
+      row: candidate('Ambiguous person', {
+        identity: {
+          status: 'probable',
+          anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+        },
+        orcidId: ORCID,
+      }),
+      outcome: { outcome: 'candidates', referencedReviewers: [], referencedContacts: [] },
+    },
+    {
+      row: candidate('Provisional ORCID', {
+        identity: { status: 'unresolved', anchors: [] },
+        tierResults: { openalex_author: { orcid: ORCID } },
+      }),
+      outcome: exactOrcidOutcome(),
+    },
+  ];
+  const priorRequestContextLoader = jest.fn();
+
+  for (const testCase of cases) {
+    if (testCase.removeReceipt) delete testCase.row.serverIdentityDecisionReceipt;
+    await reconcileReviewerContacts([testCase.row], {
+      requestId: CURRENT_REQUEST_ID,
+      includePriorRequestContext: true,
+      priorRequestContextLoader,
+      lookup: jest.fn(async () => testCase.outcome),
+    });
+  }
+
+  expect(priorRequestContextLoader).not.toHaveBeenCalled();
+});
+
+test('history timeout preserves the candidate and a late result cannot mutate it', async () => {
+  let resolveHistory;
+  const lateHistory = new Promise((resolve) => { resolveHistory = resolve; });
+  const rows = [candidate('Trusted Researcher', {
+    identity: {
+      status: 'probable',
+      anchors: [{ type: 'orcid_public', canonicalKey: `orcid:${ORCID}` }],
+    },
+    orcidId: ORCID,
+  })];
+
+  const result = await reconcileReviewerContacts(rows, {
+    requestId: CURRENT_REQUEST_ID,
+    includePriorRequestContext: true,
+    priorRequestBudgetMs: 0,
+    priorRequestContextLoader: jest.fn(() => lateHistory),
+    lookup: jest.fn(async () => exactOrcidOutcome()),
+  });
+
+  expect(result).toBe(rows);
+  expect(rows[0].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
+  resolveHistory({
+    complete: true,
+    totalCount: 1,
+    requests: [{ requestId: PRIOR_REQUEST_ID, requestNumber: '1002278' }],
+  });
+  await Promise.resolve();
+  expect(rows[0].contactEnrichment.dataverseContactEvidence).not.toHaveProperty('priorRequestContext');
 });
 
 test('trusted ORCID mismatch records durable conflict state without changing either address', async () => {

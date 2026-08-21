@@ -153,6 +153,29 @@ describe('grant-request.findByIds (characterization)', () => {
   });
 });
 
+describe('grant-request.findByPotentialReviewerSlots', () => {
+  test('reads only bounded request context across all five legacy slots', async () => {
+    const result = { records: [{ akoya_requestid: GUID_A }], hasMore: false };
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue(result);
+
+    await expect(grantRequest.findByPotentialReviewerSlots(GUID_B)).resolves.toBe(result);
+    expect(q).toHaveBeenCalledWith('akoya_requests', {
+      select: 'akoya_requestid,akoya_requestnum,akoya_title,akoya_fiscalyear,wmkf_meetingdate',
+      filter: [1, 2, 3, 4, 5]
+        .map((slot) => `_wmkf_potentialreviewer${slot}_value eq ${GUID_B}`)
+        .join(' or '),
+      orderby: 'createdon desc',
+      top: 25,
+    });
+  });
+
+  test('rejects a non-GUID before querying', async () => {
+    const q = jest.spyOn(DynamicsService, 'queryRecords');
+    await expect(grantRequest.findByPotentialReviewerSlots('not-a-guid')).rejects.toThrow(/GUID/);
+    expect(q).not.toHaveBeenCalled();
+  });
+});
+
 // ──────────────── findMeetingDatesByProgramDirector ────────────────
 
 describe('grant-request.findMeetingDatesByProgramDirector (characterization)', () => {

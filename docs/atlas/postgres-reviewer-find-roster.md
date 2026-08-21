@@ -2,7 +2,8 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** 2026-08-20 in source/tests and signed-in Production UI smoke
+**Last verified:** 2026-08-21 feature-branch source/tests verify the bounded
+prior-request context projection (deployment pending); 2026-08-20 in source/tests and signed-in Production UI smoke
 on Ready deployment `dpl_9yZ9xTHqfNgLcbZxJDekZkAjqpPS` for Neville's one-action
 card and the exact stored/found choice projection through neutral Cancel; the live write was not
 exercised. The broader roster lifecycle was
@@ -96,6 +97,14 @@ accepted, review-received, or completed.
 | source_kind | text | Provenance kind: `cited_reference` \| `proposal_named` \| `applicant_suggested` \| `literature_retrieved` \| `grounded_seed` \| `barred_parametric`. Legacy rows may hold `claude_verified` or `database`; reads normalize those to a `provenance` DTO without rewriting the row. |
 | first_seen_at | timestamptz | |
 | updated_at | timestamptz | Roster mutation timestamp; `update_contact_draft` uses the server-read value as a compare-and-swap guard so a concurrent candidate refresh is not overwritten. |
+
+The pruned `candidate.contactEnrichment.dataverseContactEvidence` may also
+carry `priorRequestContext` for an exact receipt-bound reviewer match. It keeps
+only `complete`, an authoritative `totalCount` when complete, and at most three
+request `{requestId, requestNumber, title, fiscalYear, meetingDate}` summaries.
+Raw suggestion rows, reviewer-slot numbers, ETags, and the Potential Reviewer
+person GUID are stripped. This display context is not consumed by roster
+status, selectability, promotion, address readiness, or invitation policy.
 
 `update_contact_draft` accepts only website/affiliation and rejects unsafe schemes,
 documents, directories, and candidate-inconsistent profile URLs. For ordinary

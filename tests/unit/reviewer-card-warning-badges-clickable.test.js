@@ -115,6 +115,60 @@ test('a pending conflict that also needs identity confirmation exposes one combi
   expect(onReviewAddressConflict).not.toHaveBeenCalled();
 });
 
+test('existing AkoyaGO request context remains visible beside the one combined action', () => {
+  renderCard({
+    identityStatus: 'unresolved',
+    pdIdentityConfirmed: false,
+    addressConflictPending: true,
+    contactEnrichment: {
+      dataverseContactEvidence: {
+        status: 'review_required',
+        reason: 'email_mismatch',
+        priorRequestContext: {
+          complete: true,
+          totalCount: 1,
+          requests: [{
+            requestId: '22222222-2222-2222-2222-222222222222',
+            requestNumber: '1002278',
+            title: 'Deciphering the role of the secretome in aging',
+            fiscalYear: 'June 2026',
+            meetingDate: '2026-06-04',
+          }],
+        },
+      },
+    },
+  });
+
+  expect(screen.getByText(/Previously listed as a potential reviewer on #1002278/))
+    .toHaveTextContent('Deciphering the role of the secretome in aging (June 2026)');
+  expect(screen.getByRole('button', { name: 'Review and confirm for Alexander Green' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Review email choice|Confirm identity/ })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Admin|2022/i)).not.toBeInTheDocument();
+});
+
+test('existing AkoyaGO request context is not hidden by a separate repair warning', () => {
+  renderCard({
+    applicantKnownReviewer: { status: 'inactive' },
+    contactEnrichment: {
+      dataverseContactEvidence: {
+        status: 'known',
+        priorRequestContext: {
+          complete: false,
+          requests: [{
+            requestId: '22222222-2222-2222-2222-222222222222',
+            requestNumber: '1002278',
+            fiscalYear: 'June 2026',
+          }],
+        },
+      },
+    },
+  });
+
+  expect(screen.getByText(/Previously listed as a potential reviewer on #1002278/)).toBeInTheDocument();
+  expect(screen.getByText(/Additional request history may be available/)).toBeInTheDocument();
+  expect(screen.getByText(/Existing linked reviewer record needs repair/)).toBeInTheDocument();
+});
+
 test('read-only (canManage=false) leaves the warning as inert text — no dead action offered', () => {
   renderCard({}, { canManage: false });
 

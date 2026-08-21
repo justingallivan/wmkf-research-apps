@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -863,7 +863,21 @@ That resolved exact choice is invite-ready without a second send acknowledgement
 the card has no Admin link. Known duplicate-owner, inactive-person, and
 Contact-linkage blocks instead identify the AkoyaGO record and expose **Retry
 record check**, which freshly proves the structural repair before clearing the
-card. Matching legacy repair alerts auto-resolve best-effort after canonical
+card.
+
+**Existing-record request context (implemented on the current feature branch;
+deployment pending 2026-08-21):** after reconciliation proves one exact person
+from a trusted server identity receipt and anchor-grounded ORCID, it reads at
+most 25 canonical suggestion links and 25 legacy `wmkf_potentialreviewer1..5`
+request links in parallel. It excludes the current request, deduplicates by
+request GUID, and preserves at most three request number/title/cycle summaries
+in `dataverseContactEvidence.priorRequestContext`. The card says **Already in
+AkoyaGO** before the warning; the address dialog repeats the association and
+says it does not establish which email is current. A three-second presentation
+race may omit the context but cannot block or later mutate the card. This adds
+no action and changes no identity, email-readiness, promotion, or send rule.
+
+Matching legacy repair alerts auto-resolve best-effort after canonical
 success; their compatibility readers remain because a 2026-08-20 read-only
 probe found one active row. Ordinary conflict retries require a still-matching server-bound identity
 receipt plus anchor-grounded ORCID identity; an existing address receipt is

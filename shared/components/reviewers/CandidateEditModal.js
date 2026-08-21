@@ -28,6 +28,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { buildGoogleSearchUrl } from '../../../lib/utils/google-search-url';
+import {
+  priorRequestReference,
+  priorRequestRows,
+} from '../../utils/reviewer-prior-request-context';
 
 // Local value helpers for the merge picker. Mirror the service's norm/isSet
 // (reviewer-merge.js) so the UI's email-default and orphan detection agree with
@@ -144,6 +148,9 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           foundEmail: candidate.contactEnrichment.email,
         }
       : null
+  );
+  const priorRequests = priorRequestRows(
+    candidate.contactEnrichment?.dataverseContactEvidence?.priorRequestContext,
   );
 
   const handleSubmit = async (e) => {
@@ -559,6 +566,29 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
             />
             <p className="text-xs text-gray-400 mt-1">Correct this if the listed address belongs to an assistant or department.</p>
           </div>
+
+          {addressConflict && priorRequests.length > 0 && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
+              <p className="font-medium">Already in AkoyaGO</p>
+              {priorRequests.length === 1 ? (
+                <p className="mt-1">
+                  AkoyaGO previously listed this person on {priorRequestReference(priorRequests[0], { includeTitle: false })}.
+                </p>
+              ) : (
+                <>
+                  <p className="mt-1">AkoyaGO previously listed this person on these requests:</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {priorRequests.map((request) => (
+                      <li key={request.requestId}>{priorRequestReference(request)}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <p className="mt-1.5">
+                That may help you recognize the person, but it does not establish which email is current.
+              </p>
+            </div>
+          )}
 
           {addressConflict && (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">

@@ -6,7 +6,7 @@ status: active
 summary: "Reviewed plan to surface prior-request context on resolver-backed existing AkoyaGO reviewer cards without turning history into identity or email authority."
 canonical: false
 cataloged: 2026-08-20
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
@@ -38,6 +38,16 @@ no additional card action.
 The prior request is context, not proof. It may help staff recognize the person
 or understand an older email, but it must not confirm identity, choose an email,
 waive conflict checks, or make the candidate invite-ready.
+
+## Implementation status
+
+**IMPLEMENTED ON `codex/reviewer-email-conflict-self-service` 2026-08-21;
+deployment and signed-in smoke pending.** Source now includes the two capped
+association reads, exact receipt-bound reconciliation gate, three-second
+no-mutation presentation race, strict roster projection, neutral card/dialog
+copy, and focused adapter/service/projection/component/route tests. This is not
+yet a Production-live claim; the Tier-1 promotion and Neville smoke in the
+sequence below remain outstanding.
 
 ## Verified Neville path
 

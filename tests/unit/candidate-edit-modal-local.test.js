@@ -92,6 +92,44 @@ describe('CandidateEditModal — local (onApply) mode', () => {
     ));
   });
 
+  test('email-choice dialog explains prior AkoyaGO use without treating it as email proof', () => {
+    render(<CandidateEditModal
+      candidate={{
+        ...candidate,
+        addressConflict: {
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@example.edu',
+        },
+        contactEnrichment: {
+          dataverseContactEvidence: {
+            priorRequestContext: {
+              complete: true,
+              totalCount: 1,
+              requests: [{
+                requestId: '22222222-2222-2222-2222-222222222222',
+                requestNumber: '1002278',
+                title: 'Deciphering the role of the secretome in aging',
+                fiscalYear: 'June 2026',
+                meetingDate: '2026-06-04',
+              }],
+            },
+          },
+        },
+      }}
+      onApply={jest.fn()}
+      onVerifyAddress={jest.fn()}
+      requireAddressVerification
+      onClose={jest.fn()}
+      nameEditable={false}
+    />);
+
+    expect(screen.getByText(/previously listed this person on #1002278 \(June 2026\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not establish which email is current/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /keep stored@example.edu/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /replace with found@example.edu/i })).toBeInTheDocument();
+    expect(screen.queryByText(/2022|Admin/i)).not.toBeInTheDocument();
+  });
+
   test('requires an explicit conflict choice and stays open when the request reloads', async () => {
     const onClose = jest.fn();
     const onVerifyAddress = jest.fn(async () => false);
