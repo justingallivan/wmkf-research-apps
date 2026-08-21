@@ -109,7 +109,11 @@ A2's cached-taxonomy layer is the **shared foundation with Path B**.
 
 ## 6. Risks (expanded per review)
 
-- **Token budget (HIGH):** `describe_table` 12k-char cap (`chat.js:65-73`), `maxTokens: 2048` responses (`:415-420`), five inline schemas already in the system prompt. Resolved maps + live fields can crowd out useful context → need a field-budget strategy + the `full:true` gate.
+- **Token budget (HIGH):** `describe_table` retains its 12k-character cap and
+  five inline schemas remain in the system prompt. The interactive response
+  ceiling is now 16,000 with low effort (Phase A, 2026-08-21), but that is
+  output headroom rather than permission to grow tool results; resolved maps +
+  live fields still need a field-budget strategy + the `full:true` gate.
 - **Restriction inconsistency (HIGH) — resolved by §8.4:** `live-taxonomy`/`fetch-client` bypass `checkRestriction` (direct fetch), while Explorer fails closed without `withDynamicsContext` (`dynamics-context.js:4-8`). Mitigation: fixed whitelisted taxonomy surface + a restriction guard at the injection gate (§8.4).
 - **Cache correctness (MEDIUM):** A2 must own the taxonomy cache (TTL, invalidation, fail-loud) since the source module has none.
 - **Prompt-injection (MEDIUM) — resolved by A2 contract:** live program/type **names** from Dataverse records injected into the *system prompt*; the current untrusted-content boundary wraps only tool results (`chat.js:220-230`), not system-prompt metadata. Mitigation: fixed key→value table, shape-validated values, malformed labels dropped (A2 "Prompt-injection contract").

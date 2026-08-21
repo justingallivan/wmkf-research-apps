@@ -29,6 +29,7 @@
     "028_review_synthesis_jobs.sql",
     "029_reviewer_find_roster_blocked.sql",
     "030_operational_events.sql",
-    "031_portal_upload_staging.sql"
+    "031_portal_upload_staging.sql",
+    "032_api_usage_stop_reason.sql"
   ]
 }

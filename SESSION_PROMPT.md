@@ -1,4 +1,4 @@
-# Session 451 Prompt: Reviewer Card Action Simplified in Production; Explorer Phase A Remains Open
+# Session 451 Prompt: Explorer Phase A Implemented; Promotion Pending
 
 ## Session 450 Summary
 
@@ -78,6 +78,20 @@ documents and reconciled the production Log Drain's activation state.
      whole-stream volume/malformed/truncation criteria. Track A therefore
      remains a bounded verification item rather than being declared closed.
 
+6. **Dynamics Explorer Phase A is implemented and ready for promotion.**
+   - Interactive Explorer calls now use a 16,000-token response ceiling and
+     `outputConfig: { effort: 'low' }`; the shared `LLMClient` converts that to
+     Anthropic `output_config` only for reviewed effort-capable models. The
+     separate export batch remains at 4,096.
+   - Completed unary and streaming calls pass normalized `stopReason` into the
+     existing best-effort `api_usage_log` row. Fresh-install schema plus
+     migration `032_api_usage_stop_reason.sql` add the nullable column.
+   - Focused and expanded verification passed: 123 Explorer/LLM tests,
+     typecheck, migration/Atlas/model/API-route/route-boundary gates and their
+     applicable self-tests, docs/fact/wiki gates, and a Next.js webpack
+     production build. The branch is not deployed and migration 032 has not
+     been applied to Production.
+
 ### Commits
 
 - `997de04d` - feat(admin): guide reviewer repair alert resolution
@@ -100,14 +114,13 @@ documents and reconciled the production Log Drain's activation state.
 
 ### Verified Open
 
-1. **Explorer campaign Phase A: Sonnet 5 posture fix.**
-   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A and
-   Session 449 query-log measurements.
-   Change `maxTokens` from 2,048 to 16,000, add
-   `output_config: { effort: 'low' }` in
-   `pages/api/dynamics-explorer/chat.js`, verify the shared LLM client passes
-   `output_config`, and log `stop_reason`. This does not depend on the SoCal
-   question set.
+1. **Promote Explorer campaign Phase A, then observe it.**
+   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
+   implementation report. Promotion must apply migration 032 before the new
+   usage writer reaches Production, then deploy the branch and smoke one
+   signed-in Explorer question. The subsequent observation window should check
+   stop-reason distribution, output-at-cap events, and round latency against
+   the prior 6.5-second Sonnet average.
 
 2. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
@@ -187,7 +200,7 @@ documents and reconciled the production Log Drain's activation state.
 | `docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` | Reviewer address trust and retained alert compatibility |
 | `docs/OPERATIONAL_EVENTS_AND_LOG_DRAIN.md` | Live drain/runbook and durable-event selection contract |
 | `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A criteria |
-| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A is buildable now |
+| `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A implemented on branch, promotion/observation pending |
 | `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions and field-probe findings |
 
 ## Testing
@@ -209,3 +222,9 @@ clean-error-window claim or evidence of a UI regression.
 
 The Session 450 claim-evidence pilot report was unavailable because its local
 observation state could not be read. No observation row was added.
+
+Explorer Phase A separately passed 123 focused/expanded tests, typecheck, the
+relevant migration/data/model/route/docs gates and self-tests, and a Next.js
+webpack production build. That verification is local only; no migration,
+deployment, signed-in smoke, or production observation has occurred for Phase
+A yet.

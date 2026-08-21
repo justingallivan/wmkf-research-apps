@@ -7,7 +7,7 @@ metadata:
   status: active
   scope: dynamics
   originSessionId: abb437dd-056c-45cf-9188-a6ea7a903c05
-  modified: 2026-08-20T21:45:22.514Z
+  modified: 2026-08-21T00:00:00.000Z
 ---
 
 ## Recall Rule
@@ -31,12 +31,18 @@ vernacular support, Explorer telemetry, or the Explorer eval harness.
 
 ## Campaign shape (findings-backed, S449)
 
-1. Telemetry first: persist requestId + round + terminal outcome (and
-   stop_reason) in dynamics_query_log; `complete` computes rounds but never
-   persists it. record_count rows before 2026-08-08 carry broken semantics.
-2. Eval harness (golden questions, both Research and SoCal dialects) — organic
+1. Phase A model posture is implemented on the current feature branch
+   (2026-08-21), not yet Production-live: interactive calls use a 16K ceiling
+   plus low effort, while batch export stays at 4,096. Completed calls persist
+   normalized `stopReason` through `LLMClient` into nullable
+   `api_usage_log.stop_reason`; migration 032 must be applied during promotion.
+2. Request-level telemetry remains Phase B: persist requestId + round +
+   terminal request outcome in dynamics_query_log. `complete` computes rounds
+   but never persists them. record_count rows before 2026-08-08 carry broken
+   semantics.
+3. Eval harness (golden questions, both Research and SoCal dialects) — organic
    traffic ~1 session/day cannot validate changes.
-3. Behavior: SoCal/program-aware LEXICON + conditional disambiguation
+4. Behavior: SoCal/program-aware LEXICON + conditional disambiguation
    ("declined", "who leads this", default Request-type filter excludes
    concept pipeline); import per-program facts by reference from
    `lib/services/dataverse-export/constants.js` PER_PROGRAM_ANNOTATION

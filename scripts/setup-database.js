@@ -245,6 +245,7 @@ const v15Statements = [
     latency_ms INTEGER,
     request_status VARCHAR(20) DEFAULT 'success',
     error_message TEXT,
+    stop_reason VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_api_usage_user ON api_usage_log(user_profile_id)`,

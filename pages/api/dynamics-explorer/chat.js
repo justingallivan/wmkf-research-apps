@@ -511,7 +511,8 @@ async function callClaude({ apiKey, model, fallbackModel, systemPrompt, messages
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages,
     tools,
-    maxTokens: 2048,
+    maxTokens: 16000,
+    outputConfig: { effort: 'low' },
     onTextDelta,
   });
   return {

@@ -498,7 +498,7 @@ describe('LLMClient.complete', () => {
   test('logs usage on success when appName is set', async () => {
     safeFetch.mockResolvedValueOnce(jsonResponse({
       content: [{ type: 'text', text: 'hi' }],
-      model: 'm', usage: { input_tokens: 7, output_tokens: 3 },
+      model: 'm', usage: { input_tokens: 7, output_tokens: 3 }, stop_reason: 'end_turn',
     }));
     const client = new LLMClient({
       apiKey: 'sk-ant-test', model: 'm', appName: 'unit-test', userProfileId: 42,
@@ -509,6 +509,7 @@ describe('LLMClient.complete', () => {
       userProfileId: 42,
       inputTokens: 7,
       outputTokens: 3,
+      stopReason: 'end_turn',
     }));
   });
 
@@ -617,13 +618,20 @@ describe('LLMClient.stream', () => {
       { type: 'content_block_stop', index: 0 },
       { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
     ]));
-    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm' });
+    const client = new LLMClient({
+      apiKey: 'sk-ant-test', model: 'm', appName: 'dynamics-explorer', userProfileId: 42,
+    });
     const deltas = [];
     const r = await client.stream({ messages: [], onTextDelta: (t) => deltas.push(t) });
     expect(deltas).toEqual(['hel', 'lo']);
     expect(r.text).toBe('hello');
     expect(r.stopReason).toBe('end_turn');
     expect(r.textStreamed).toBe(true);
+    expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({
+      appName: 'dynamics-explorer',
+      userProfileId: 42,
+      stopReason: 'end_turn',
+    }));
   });
 
   test('reassembles tool_use blocks with parsed JSON inputs and does NOT forward text deltas', async () => {

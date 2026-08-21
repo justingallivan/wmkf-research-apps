@@ -18,8 +18,10 @@ related:
 
 # Dynamics Explorer — Behavior Campaign Plan
 
-**Status:** Draft (S449 exploratory session, 2026-08-20). No code written; every
-phase below is scoped from probe evidence gathered that session.
+**Status:** Active. Phase A is implemented on the current feature branch
+(2026-08-21) but is not Production-live: promotion must apply migration
+`032_api_usage_stop_reason.sql`. Phases B-E remain planned from the S449 probe
+evidence.
 
 **Objective:** make the Explorer trustworthy for staff outside the Research
 team — starting with SoCal — while making its behavior *measurable*, so the
@@ -33,23 +35,29 @@ recollection.
    broken semantics `[VERIFIED via commit 8873118f message]`. The
    `dynamics_feedback` table is empty `[VERIFIED via
    scripts/probe-dynamics-feedback-retention.mjs run, 2026-08-20]`. Rounds per
-   request and stop_reason are computed but never persisted `[VERIFIED via
-   pages/api/dynamics-explorer/chat.js — the complete event emits rounds;
-   logQuery writes no request id]`.
+   request and terminal request outcome are computed but never persisted
+   `[VERIFIED via pages/api/dynamics-explorer/chat.js — the complete event
+   emits rounds; logQuery writes no request id]`. Phase A now passes each
+   completed call's normalized `stopReason` through `LLMClient` to
+   `api_usage_log.stop_reason`; migration 032 is tracked but not yet applied to
+   Production `[VERIFIED via source + migration, 2026-08-21]`.
 2. **Organic traffic cannot validate changes.** ~160 sessions in 6 months;
    post-fix era = 62 tool calls / 11 sessions / 15 request-bursts
    `[VERIFIED via dynamics_query_log aggregates, 2026-08-20]`.
 3. **The round-exhaustion era appears closed** — pre-2026-08-08, ~19% of
    request-bursts (37/191, 2-minute-gap proxy) reached ≥15 tool calls; after,
    0/15 `[VERIFIED same probe; small post sample]`. Do not re-fix blind.
-4. **Sonnet 5 posture is mistuned.** The model override moved the app from
+4. **Sonnet 5 posture was mistuned before Phase A.** The model override moved the app from
    Haiku 4.5 to `claude-sonnet-5` by first August use `[VERIFIED via
    api_usage_log model column]`. Sonnet 5 runs adaptive thinking when the
    `thinking` param is omitted (chat.js omits it) and `maxTokens: 2048` caps
    thinking+output combined: 3 of 102 Sonnet calls hit exactly 2048 — silent
    hard truncations `[VERIFIED via api_usage_log output-token distribution]`.
    Latency rose ~3.5× (1.9s → 6.5s avg/round). Total Explorer spend ever
-   logged: $4.09 — cost is a non-issue at this volume.
+   logged: $4.09 — cost is a non-issue at this volume. The branch now uses a
+   16,000-token ceiling and low effort for the interactive call only; the
+   separate export batch remains at 4,096 `[VERIFIED via source + focused
+   tests, 2026-08-21]`.
 5. **The vernacular layer speaks Research only.** LEXICON lifecycle/outcome/
    people phrases map to Phase I/II fields, PI lookups, and Research defaults
    `[VERIFIED via shared/config/prompts/dynamics-explorer.js LEXICON]`. SoCal
@@ -85,18 +93,23 @@ Ordered so measurement lands before behavior changes.
 
 ### Phase A — Model posture (small, immediate)
 
-- `maxTokens` 2048 → 16,000 in `callClaude` (a ceiling, not spend) and
-  `output_config: { effort: 'low' }` for the Explorer's calls (owner-approved
-  compromise). Verify LLMClient passes `output_config` through; add if absent
-  `[ASSUMED: not yet checked]`.
-- Log `stop_reason` per call (Phase B row or api_usage_log column) so
-  truncation becomes visible.
+- **IMPLEMENTED on branch 2026-08-21:** `maxTokens` 2048 → 16,000 in the
+  interactive `callClaude` (a ceiling, not spend) plus
+  `outputConfig: { effort: 'low' }`. `LLMClient` converts that to Anthropic's
+  `output_config` only for effort-capable reviewed models and rebuilds the body
+  under the fallback model's capabilities. The separate export batch remains
+  at 4,096.
+- **IMPLEMENTED on branch 2026-08-21:** completed calls pass normalized
+  `stopReason` into the existing fire-and-forget usage row. Fresh-install
+  schema and existing-DB migration 032 add nullable
+  `api_usage_log.stop_reason`; production application is pending promotion.
 - Eval-harness case (Phase C) for a long multi-round conversation exercising
   `compactMessages` with thinking blocks present — clearing prior-turn
   `tool_use.input` while thinking blocks remain is `[ASSUMED]` safe, untested
   with a thinking model.
-- Acceptance: no output_tokens-at-cap events over the next observation window;
-  round latency materially down from the 6.5s Sonnet average.
+- **Operational acceptance remains pending:** after deployment, no
+  output_tokens-at-cap events over the next observation window; round latency
+  materially down from the 6.5s Sonnet average.
 
 ### Phase B — Request-level telemetry
 
@@ -175,8 +188,8 @@ claim gets a dated probe first:
 
 1. 10–20 real SoCal questions, in SoCal staff's own words (seeds Phases C+D).
 2. Answers to the population-served and `_socal` fill-rate questions above.
-3. Approval point per phase; Phase A can land first at the appropriate tier
-   per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
+3. Approval point per remaining phase; Phase A promotion follows the
+   appropriate tier in `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
 
 ## 5. Standing constraints
 
@@ -190,3 +203,33 @@ claim gets a dated probe first:
 - Session evidence and durable facts live in
   `.claude-memory/project-dynamics-explorer-socal-campaign.md`; reconcile
   both on change.
+
+## 6. Phase A implementation and reconciliation report (2026-08-21)
+
+| Claim | Producer / entry | Persistence | Consumer | Evidence | Status |
+|---|---|---|---|---|---|
+| Interactive calls use 16K + low effort | `/api/dynamics-explorer/chat` `callClaude` | N/A | Anthropic request body built by `LLMClient` | Source + route-config test | VERIFIED on branch |
+| Unsupported/fallback models do not receive effort | `LLMClient._buildBody` and fallback rebuild | N/A | Anthropic request body | Capability registry + existing body-shaping tests + model gate | VERIFIED |
+| Completed calls retain stop reason | Unary/stream normalizers → `_logSuccess` | `api_usage_log.stop_reason` via `usage-logger` | Operational SQL analysis | Source + logger/client tests + migration 032 + fresh-install parity | VERIFIED on branch; Production migration pending |
+| Export batch remains independently bounded | `callClaudeBatch` | N/A | Anthropic request | Source + route-config test | VERIFIED at 4,096 |
+| Request-level rounds/outcomes are queryable | Chat handler | `dynamics_query_log` | Future campaign analysis | Phase B plan; no new schema/code in this slice | PLANNED |
+
+**Sweep mode:** Mode A — changed fact. Source → persistence → consumer was
+traced before documentation edits. Searches covered source/tests, active docs,
+Atlas pages, agent wiki, memory, and `SESSION_PROMPT.md`; historical 2,048-token
+measurements remain explicitly historical. Live current-state contradictions
+were structurally corrected in this plan, both Atlas surfaces, the AI data-flow
+matrix, the shipped Path A plan, campaign memory, and the session handoff.
+
+**Verification:** 123 expanded Explorer/LLM tests; `check:types`;
+`check:migrations-manifest`; Atlas, model-registry, API-route, and
+route-service-boundary gates plus their self-tests; docs catalog,
+fact-consistency, and agent-wiki gates plus applicable self-tests; Next.js
+webpack production build. A route-boundary self-test was rerun alone after its
+first concurrent run collided with the Atlas self-test's temporary fixture;
+the isolated gate + self-test passed.
+
+**Remaining live stale statements:** 0 in the searched current-state scope.
+**Remaining unverified external state:** Production migration, deployment,
+signed-in smoke, and post-deploy observation. **Verdict:** RECONCILED for the
+tracked branch state; Production remains explicitly pending.
