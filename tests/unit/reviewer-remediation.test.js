@@ -25,3 +25,15 @@ test('unknown reviewer errors fail closed with retry and durable repair remedies
     ],
   });
 });
+
+test.each([
+  'person_inactive',
+  'email_conflict',
+  'ambiguous_email_owner',
+  'inactive_email_owner',
+  'contact_linked_elsewhere',
+])('%s routes to retry without an Admin repair detour', (code) => {
+  const actions = remediationFor(code).remediation.map((item) => item.action);
+  expect(actions).toContain('retry_record_check');
+  expect(actions).not.toContain('create_repair_request');
+});

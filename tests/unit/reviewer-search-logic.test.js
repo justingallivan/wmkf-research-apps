@@ -15,6 +15,7 @@ import {
   candidateWasSaved,
   correlateSaveResultsToRosterCandidates,
   getCandidatePromotionDecision,
+  getFindCandidateRepairGuidanceAction,
   getCandidateEmailReadiness,
   pruneCandidateForRoster,
   pruneEmailEvidence,
@@ -29,6 +30,17 @@ import {
 import { projectCanonicalApplicantContact } from '../../lib/utils/applicant-known-reviewer.js';
 const { PROVENANCE_KINDS, provenanceGroupOf, provenanceKindOf, provenanceLabelForCandidate } = require('../../lib/utils/reviewer-provenance');
 const { normalizeReviewerName: normName } = require('../../lib/utils/reviewer-name-match');
+
+test.each([
+  'person_inactive',
+  'email_conflict',
+  'ambiguous_email_owner',
+  'inactive_email_owner',
+  'contact_linked_elsewhere',
+])('structural state %s routes repair guidance to the executable retry', (serverRepairReason) => {
+  expect(getFindCandidateRepairGuidanceAction({ serverRepairReason }))
+    .toBe('retry_record_check');
+});
 
 describe('dedupeReviewerCandidates', () => {
   test('collapses exact-ORCID search aliases and keeps the staff-attested address projection', () => {

@@ -16,6 +16,11 @@ import {
 import {
   loadApplicantKnownReviewer,
 } from '../../lib/services/workbench/applicant-known-reviewer-service';
+import {
+  createConflictPendingState,
+  createStaffVerifiedState,
+  STAFF_ADDRESS_CHOICE_REASON,
+} from '../../lib/utils/reviewer-address-trust';
 
 const PERSON = '22222222-2222-2222-2222-222222222222';
 
@@ -73,6 +78,48 @@ test('trusted source stays ready; research-only source stays research_only', asy
   });
   await expect(loadApplicantKnownReviewer(PERSON)).resolves.toMatchObject({
     emailReadiness: { action: 'research_only' },
+  });
+});
+
+test('a resolved staff choice is projected and survives the bounded client projection', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  const candidateKey = 'candidate:rotem';
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: 'rotem@example.edu',
+    reason: 'email_mismatch',
+    requestId,
+    candidateKey,
+    detectedAt: '2026-08-20T19:00:00.000Z',
+  });
+  const resolved = createStaffVerifiedState({
+    email: 'rotem@example.edu',
+    requestId,
+    candidateKey,
+    evidenceType: 'staff_address_choice',
+    attestedAt: '2026-08-20T20:00:00.000Z',
+    resolution: {
+      conflict: conflict.conflict,
+      decision: 'use_found',
+      resolvedAt: '2026-08-20T20:00:00.000Z',
+    },
+  });
+  const selectedPerson = person({
+    wmkf_emailsource: 'staff_verified',
+    wmkf_addresstruststatejson: JSON.stringify(resolved),
+  });
+  getById.mockResolvedValueOnce(selectedPerson);
+  findByEmailCandidates.mockResolvedValueOnce({ one: true, id: PERSON, row: selectedPerson });
+
+  const known = await loadApplicantKnownReviewer(PERSON);
+  expect(known).toMatchObject({
+    addressTrustVerified: true,
+    addressChoice: { decision: 'use_found', selectedEmail: 'rotem@example.edu' },
+    emailReadiness: { action: 'ready', reason: STAFF_ADDRESS_CHOICE_REASON },
+  });
+  expect(pruneApplicantKnownReviewer(known)).toMatchObject({
+    addressChoice: { decision: 'use_found', selectedEmail: 'rotem@example.edu' },
+    emailReadiness: { action: 'ready', reason: STAFF_ADDRESS_CHOICE_REASON },
   });
 });
 

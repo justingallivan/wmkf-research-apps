@@ -76,20 +76,52 @@ describe('CandidateEditModal — local (onApply) mode', () => {
       nameEditable={false}
     />);
 
-    fireEvent.click(screen.getByRole('button', { name: /use found: found@example.edu/i }));
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.change(screen.getAllByPlaceholderText('https://...')[0], {
-      target: { value: 'https://example.edu/paper' },
-    });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Evidence checked/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/shared person record/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /replace with found@example.edu/i }));
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => expect(onVerifyAddress).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'found@example.edu' }),
       expect.objectContaining({
-        evidenceType: 'publication_corresponding_author',
-        evidenceUrl: 'https://example.edu/paper',
+        evidenceType: 'staff_address_choice',
+        evidenceUrl: null,
+        note: null,
       }),
     ));
+  });
+
+  test('requires an explicit conflict choice and stays open when the request reloads', async () => {
+    const onClose = jest.fn();
+    const onVerifyAddress = jest.fn(async () => false);
+    render(<CandidateEditModal
+      candidate={{
+        ...candidate,
+        addressConflict: {
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@example.edu',
+        },
+      }}
+      onApply={jest.fn()}
+      onVerifyAddress={onVerifyAddress}
+      requireAddressVerification
+      onClose={onClose}
+      nameEditable={false}
+    />);
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(await screen.findByText(/Choose whether to keep the stored address/i)).toBeInTheDocument();
+    expect(onVerifyAddress).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /keep stored@example.edu/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(await screen.findByText(/request reloaded while you were reviewing it/i)).toBeInTheDocument();
+    expect(onVerifyAddress).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'stored@example.edu' }),
+      { evidenceType: 'staff_address_choice', evidenceUrl: null, note: null },
+    );
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
@@ -115,5 +147,36 @@ describe('CandidateEditModal — identity confirmation', () => {
       evidenceType: 'publication_corresponding_author', evidenceUrl: null, note: null,
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('combines identity confirmation with the same explicit email choice', async () => {
+    const onClose = jest.fn();
+    const onConfirm = jest.fn(async () => true);
+    render(<CandidateEditModal
+      candidate={{
+        ...candidate,
+        addressConflict: {
+          storedEmail: 'stored@example.edu',
+          foundEmail: 'found@example.edu',
+        },
+      }}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      onVerifyAddress={jest.fn()}
+      requireAddressVerification
+      confirmMode
+      nameEditable={false}
+    />);
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /replace with found@example.edu/i }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /add to candidates/i }));
+
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'found@example.edu' }),
+      { evidenceType: 'staff_address_choice', evidenceUrl: null, note: null },
+    ));
+    expect(onClose).toHaveBeenCalled();
   });
 });

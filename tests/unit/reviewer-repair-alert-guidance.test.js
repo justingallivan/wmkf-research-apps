@@ -59,7 +59,7 @@ test('renders the repair decision context and explicit closeout sequence', async
     'https://example.edu/reviewer',
   );
   expect(screen.getByText(/Resolve this alert only after/)).toBeInTheDocument();
-  expect(screen.getByText(/choose Review address conflict/)).toBeInTheDocument();
+  expect(screen.getByText(/choose Review email choice/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Open reviewer in Workbench/ })).toHaveAttribute(
     'href',
     expect.stringContaining('repairCandidate='),
@@ -250,14 +250,12 @@ test('an open repair request replaces the duplicate action and keeps identity co
   );
 
   expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /Open pending repair request/i })).toHaveAttribute(
-    'href',
-    '/admin#system-alerts',
-  );
+  expect(screen.getByText('Repair request pending')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /pending repair request/i })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
 });
 
-test('an unavailable repair lookup fails closed only for duplicate creation', () => {
+test('a routine email choice does not depend on repair-status lookup', () => {
   const retry = jest.fn();
   render(
     <CandidateCard
@@ -277,8 +275,8 @@ test('an unavailable repair lookup fails closed only for duplicate creation', ()
   );
 
   expect(screen.queryByRole('button', { name: /Create repair request/i })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /Retry repair request status/i }));
-  expect(retry).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: /Retry repair request status/i })).not.toBeInTheDocument();
+  expect(retry).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Confirm identity for Reviewer Name' })).toBeInTheDocument();
 });
 

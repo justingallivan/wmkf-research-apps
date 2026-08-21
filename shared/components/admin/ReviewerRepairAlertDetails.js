@@ -171,7 +171,7 @@ export default function ReviewerRepairAlertDetails({ alert }) {
               </>
             ) : isAddressConflict && recommendedAction === 'review_address_conflict' ? (
               <>
-                <li>Open the reviewer in Workbench and choose Review address conflict on the highlighted card.</li>
+                <li>Open the reviewer in Workbench and choose Review email choice on the highlighted card.</li>
                 <li>Compare the two addresses against the evidence, choose the correct address, and submit the attestation.</li>
                 <li>Return here and Resolve this alert only after the reviewer card no longer shows the conflict.</li>
               </>

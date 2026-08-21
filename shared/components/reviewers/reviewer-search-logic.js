@@ -18,6 +18,7 @@ import {
   withReviewerCandidateKey as _withReviewerCandidateKey,
 } from '../../../lib/utils/reviewer-candidate-key';
 import { emailConfidence } from '../../../lib/utils/reviewer-invite';
+import { STAFF_ADDRESS_CHOICE_REASON } from '../../../lib/utils/reviewer-address-trust';
 import { projectReviewerContact } from '../../../lib/utils/reviewer-vetted-email';
 import { normalizeOrcid } from '../../../lib/utils/orcid-normalize';
 import {
@@ -90,6 +91,7 @@ export function getFindCandidateRepairGuidanceAction(candidate) {
   const identityUnverified = promotionDecision?.decision === 'needs_identity_confirmation'
     && promotionDecision?.reason === 'identity_not_resolved';
   if (candidate?.conflictRecordUnavailable === true) return 'use_primary_action';
+  if (promotionDecision?.decision === 'needs_record_repair') return 'retry_record_check';
   if (identityUnverified) {
     return canConfirmCandidateForPromotion(candidate) ? 'confirm_identity' : 'use_primary_action';
   }
@@ -233,7 +235,7 @@ export const CANDIDATE_REASON_PRESENTATION = Object.freeze({
   }),
   record_repair: Object.freeze({
     label: 'Why this needs repair:',
-    remedyId: 'create_repair_request',
+    remedyId: 'retry_record_check',
   }),
 });
 
@@ -322,15 +324,24 @@ export function getCandidateEmailReadiness(candidate) {
     };
   }
   const receipt = candidate?.addressTrustReceipt;
+  const addressChoiceEmail = typeof candidate?.addressChoice?.selectedEmail === 'string'
+    ? candidate.addressChoice.selectedEmail.trim().toLowerCase()
+    : null;
+  const resolvedStaffChoice = receipt?.evidenceType === 'staff_address_choice'
+    && ['keep_stored', 'use_found'].includes(candidate?.addressChoice?.decision)
+    && addressChoiceEmail === String(email).trim().toLowerCase();
   if (
     receipt?.personConfirmed === true
     && typeof receipt.email === 'string'
     && receipt.email.trim().toLowerCase() === String(email).trim().toLowerCase()
+    && (receipt.evidenceType !== 'staff_address_choice' || resolvedStaffChoice)
   ) {
     return {
       level: 'high',
       action: 'ready',
-      reason: 'Staff verified this exact person and address for promotion',
+      reason: resolvedStaffChoice
+        ? STAFF_ADDRESS_CHOICE_REASON
+        : 'Staff verified this exact person and address for promotion',
     };
   }
   const confidence = emailConfidence({

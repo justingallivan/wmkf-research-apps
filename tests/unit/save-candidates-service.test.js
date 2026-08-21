@@ -92,7 +92,10 @@ const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const reviewerSuggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request');
 const reviewerRosterStore = require('../../lib/services/reviewer-roster-store');
-const { createConflictPendingState } = require('../../lib/utils/reviewer-address-trust');
+const {
+  createConflictPendingState,
+  createStaffVerifiedState,
+} = require('../../lib/utils/reviewer-address-trust');
 const {
   verifyAutomatedIdentityAttestation,
   hasServerIdentityDecisionReceipt,
@@ -300,6 +303,36 @@ test.each([
 });
 
 test('server-owned identity and exact-address receipts recover a roster row whose contact edit invalidated its automated token', async () => {
+  const choiceConflict = createConflictPendingState({
+    email: 'ellen@old.example.edu',
+    foundEmail: 'zhonge@cs.princeton.edu',
+    reason: 'email_mismatch',
+    requestId: BASE.requestId,
+    candidateKey: 'candidate:ellen',
+    detectedAt: '2026-08-01T20:00:00.000Z',
+  });
+  const choiceReceipt = {
+    receiptId: 'receipt-ellen',
+    email: 'zhonge@cs.princeton.edu',
+    personConfirmed: true,
+    requestId: BASE.requestId,
+    candidateKey: 'candidate:ellen',
+    evidenceType: 'staff_address_choice',
+    evidenceUrl: null,
+    attestedAt: '2026-08-01T22:24:29.040Z',
+  };
+  const resolvedChoice = createStaffVerifiedState({
+    email: choiceReceipt.email,
+    requestId: BASE.requestId,
+    candidateKey: choiceReceipt.candidateKey,
+    evidenceType: choiceReceipt.evidenceType,
+    attestedAt: choiceReceipt.attestedAt,
+    resolution: {
+      conflict: choiceConflict.conflict,
+      decision: 'use_found',
+      resolvedAt: choiceReceipt.attestedAt,
+    },
+  });
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: false,
     reason: 'claim_mismatch',
@@ -320,22 +353,9 @@ test('server-owned identity and exact-address receipts recover a roster row whos
       source: 'automated_resolver',
       identityDigest: 'identity-digest-1',
     },
-    addressTrustReceipt: {
-      receiptId: 'receipt-ellen',
-      email: 'zhonge@cs.princeton.edu',
-      personConfirmed: true,
-      requestId: BASE.requestId,
-      candidateKey: 'candidate:ellen',
-    },
+    addressTrustReceipt: choiceReceipt,
   }]);
-  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
-    receiptId: 'receipt-ellen',
-    email: 'zhonge@cs.princeton.edu',
-    personConfirmed: true,
-    evidenceType: 'institution_page',
-    evidenceUrl: 'https://www.cs.princeton.edu/people/profile/zhonge',
-    attestedAt: '2026-08-01T22:24:29.040Z',
-  });
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce(choiceReceipt);
   lookupReviewerIdentity.mockResolvedValueOnce({
     outcome: 'confident',
     match: {
@@ -350,6 +370,7 @@ test('server-owned identity and exact-address receipts recover a roster row whos
     wmkf_name: 'Ellen Zhong',
     wmkf_emailaddress: 'zhonge@cs.princeton.edu',
     wmkf_emailsource: 'staff_verified',
+    wmkf_addresstruststatejson: JSON.stringify(resolvedChoice),
     wmkf_primaryaffiliation: 'Princeton University',
     statecode: 0,
     _etag: 'W/"ellen"',
@@ -388,6 +409,10 @@ test('server-owned identity and exact-address receipts recover a roster row whos
     expect.objectContaining({ name: 'Ellen Zhong', email: 'zhonge@cs.princeton.edu' }),
     expect.objectContaining({ candidateKey: 'candidate:ellen' }),
   );
+  const trustWrite = potentialReviewerAdapter.update.mock.calls
+    .map((call) => call[1]?.addressTrustStateJson)
+    .find(Boolean);
+  expect(JSON.parse(trustWrite).resolution).toMatchObject({ decision: 'use_found' });
 });
 
 test('server-owned identity receipt alone cannot authorize contact after an automated token mismatch', async () => {

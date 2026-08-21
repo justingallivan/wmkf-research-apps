@@ -86,6 +86,7 @@ import { DEFAULT_REVIEWER_COUNT } from '../../config/reviewerFinderPreferences';
 import {
   activeInstitutionStage2Presentation,
 } from '../../utils/institution-stage2-presentation';
+import { STAFF_ADDRESS_CHOICE_REASON } from '../../../lib/utils/reviewer-address-trust';
 
 // The four literature sources the discover endpoint understands. The user picks
 // which to query (parity with the standalone Reviewer Finder); at least one must
@@ -548,6 +549,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const staffVerifiedAddress = emailSource === 'staff_verified'
     || knownReviewer?.addressTrustVerified === true
     || c.addressTrustReceipt?.personConfirmed === true;
+  const staffSelectedAddress = emailActionReason === STAFF_ADDRESS_CHOICE_REASON;
   const identityStatus = needsIdentityConfirmation
     ? {
         tone: 'amber',
@@ -559,7 +561,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
         tone: 'green',
         label: 'Identity: verified',
         detail: staffVerifiedAddress
-          ? `${email} was verified by staff against recorded evidence${knownReviewer?.status === 'known' ? ' and is linked to an existing reviewer record' : ''}.`
+          ? `${email} was ${staffSelectedAddress
+            ? 'selected by staff after reviewing the stored and found values'
+            : 'verified by staff against recorded evidence'}${knownReviewer?.status === 'known' ? ' and is linked to an existing reviewer record' : ''}.`
           : `Evidence includes ${identityEvidence.join(' + ')}.`,
         }
       : emailAction === 'blocked'
@@ -599,7 +603,8 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
     : null;
   const openIdentityRemedy = (onConfirmIdentity && canManage) ? () => onConfirmIdentity(c) : null;
   const repairEligible = canManage && onRequestRepair
-    && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable || needsRecordRepair);
+    && c.addressConflictPending !== true
+    && (emailReadiness.action === 'blocked' || c.conflictRecordUnavailable);
   const openRepairRemedy = (!repairRequest && !repairRequestsUnavailable && repairEligible)
     ? () => onRequestRepair(c)
     : null;
@@ -1115,26 +1120,33 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
             </details>
           )}
 
+          {needsRecordRepair && (
+            <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              <span className="font-medium">Fix this reviewer record in AkoyaGO, then retry the check.</span>{' '}
+              Reviewer record: <code>{c.potentialReviewerId || knownReviewer?.potentialReviewerId || c.name}</code>
+            </div>
+          )}
+
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {openAddressRemedy && needsAddressVerification && (
               <button
                 type="button"
                 onClick={openAddressRemedy}
-                aria-label={`${c.addressConflictPending ? 'Review address conflict' : 'Verify address'} for ${c.name}`}
+                aria-label={`${c.addressConflictPending ? 'Review email choice' : 'Verify address'} for ${c.name}`}
                 className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
                 title="Review the evidence, correct the address if needed, and verify the exact person and address"
               >
-                {c.addressConflictPending ? 'Review address conflict' : 'Verify address'}
+                {c.addressConflictPending ? 'Review email choice' : 'Verify address'}
               </button>
             )}
-            {canManage && onRetryAddressCheck && c.conflictRecordUnavailable === true && (
+            {canManage && onRetryAddressCheck && (c.conflictRecordUnavailable === true || needsRecordRepair) && (
               <button
                 type="button"
                 onClick={() => onRetryAddressCheck(c)}
-                aria-label={`Retry conflict check for ${c.name}`}
+                aria-label={`${needsRecordRepair ? 'Retry record check' : 'Retry conflict check'} for ${c.name}`}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
               >
-                Retry conflict check
+                {needsRecordRepair ? 'Retry record check' : 'Retry conflict check'}
               </button>
             )}
             {openRepairRemedy && (
@@ -1149,14 +1161,12 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
               </button>
             )}
             {repairRequest && (
-              <a
-                href={repairRequest.adminUrl || '/admin#system-alerts'}
-                aria-label={`Open pending repair request for ${c.name} in Admin`}
-                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                title="This repair request is still open in the Admin alert queue"
+              <span
+                className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900"
+                title="A repair request is already open"
               >
-                Repair request pending · View in Admin
-              </a>
+                Repair request pending
+              </span>
             )}
             {!repairRequest && repairRequestsUnavailable && repairEligible && (
               <button
@@ -1165,7 +1175,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 disabled={!onRetryRepairStatus}
                 aria-label={`Retry repair request status for ${c.name}`}
                 className="rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                title="The Admin repair queue could not be checked, so creating another request is temporarily disabled"
+                title="Repair request status could not be checked, so creating another request is temporarily disabled"
               >
                 Repair status unavailable · Retry
               </button>
@@ -2124,7 +2134,7 @@ export default function ReviewerSearchSection({
       }),
     });
     const data = await response.json().catch(() => ({}));
-    if (genRef.current !== myGen) return;
+    if (genRef.current !== myGen) return false;
     if (!response.ok || !data.success || !data.candidate) {
       throw new Error(data.error || 'Could not save these contact details to the request.');
     }
@@ -2161,7 +2171,7 @@ export default function ReviewerSearchSection({
       }),
     });
     const data = await response.json().catch(() => ({}));
-    if (genRef.current !== myGen) return;
+    if (genRef.current !== myGen) return false;
     if (!response.ok || !data.success || !data.candidate) {
       // Verification can commit the server-owned roster receipt before an
       // ETag-guarded Dataverse adjudication fails. Reflect only that explicit
@@ -2175,6 +2185,7 @@ export default function ReviewerSearchSection({
     applyAuthoritativeRosterCandidate(key, data.candidate);
     setSelected((prev) => { const next = new Set(prev); next.add(key); return next; });
     setRosterNote(`${data.candidate.name || cand.name}: exact person and address verified.`);
+    return true;
   }, [requestId, applyAuthoritativeRosterCandidate]);
 
   const reviewAddressConflict = useCallback(async (cand) => {
@@ -2205,7 +2216,15 @@ export default function ReviewerSearchSection({
     const response = await fetch('/api/workbench/reviewer-address-trust', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId, candidateKey: key, action: 'retry_check' }),
+      body: JSON.stringify({
+        requestId,
+        candidateKey: key,
+        action: 'retry_check',
+        code: cand.serverRepairReason
+          || (getCandidatePromotionDecision(cand)?.decision === 'needs_record_repair'
+            ? getCandidatePromotionDecision(cand).reason
+            : null),
+      }),
     });
     const data = await response.json().catch(() => ({}));
     if (genRef.current !== myGen) return;
@@ -2217,7 +2236,7 @@ export default function ReviewerSearchSection({
       return;
     }
     applyAuthoritativeRosterCandidate(key, data.candidate);
-    setRosterNote(`${data.candidate.name || cand.name}: conflict check refreshed.`);
+    setRosterNote(`${data.candidate.name || cand.name}: record check refreshed. Add the reviewer to Invite again.`);
   }, [requestId, applyAuthoritativeRosterCandidate]);
 
   const requestAddressRepair = useCallback(async (cand) => {
@@ -2249,7 +2268,7 @@ export default function ReviewerSearchSection({
       }));
     }
     setRosterNote(response.ok && data.success
-      ? `${data.message} Repair queue: ${data.adminUrl || '/admin#system-alerts'}`
+      ? data.message
       : (data.message || data.error || 'Could not create a repair request. Retry from this reviewer card.'));
   }, [requestId]);
 
@@ -2269,13 +2288,38 @@ export default function ReviewerSearchSection({
   // The needs-identity-review candidate open in the "confirm this person" modal.
   const [confirmingContact, setConfirmingContact] = useState(null);
 
+  const openIdentityConfirmation = useCallback(async (cand) => {
+    if (!cand?.addressConflictPending) {
+      setConfirmingContact(cand);
+      return;
+    }
+    const key = candKey(cand);
+    if (!requestId || !key) return;
+    const myGen = genRef.current;
+    const response = await fetch('/api/workbench/reviewer-address-trust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId, candidateKey: key, action: 'get_address_conflict' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (genRef.current !== myGen) return;
+    if (!response.ok || !data.success || !data.conflict) {
+      setRosterNote(addressTrustFailureMessage(
+        data,
+        'Could not load the current email choice. Reload the reviewer card and try again.',
+      ));
+      return;
+    }
+    setConfirmingContact({ ...cand, addressConflict: data.conflict });
+  }, [requestId]);
+
   // PD confirms a needs-identity-review row IS the right person + supplies corrected
   // contact. The authenticated roster PATCH stores the request-scoped attestation
   // first; only then do we stamp manual contact + the UI marker/opaque id locally.
   const confirmIdentityContact = useCallback(async (cand, updates, evidence) => {
-    if (!cand) return;
+    if (!cand) return false;
     const key = candKey(cand);
-    if (!key || !requestId) return;
+    if (!key || !requestId) return false;
     const myGen = genRef.current;
     // An unverified Claude suggestion is ephemeral — it was never recorded on
     // the durable roster (S224), but confirm_identity only updates an existing
@@ -2292,6 +2336,7 @@ export default function ReviewerSearchSection({
       if (!recordRes.ok || !recordData.success) {
         throw new Error(recordData.error || 'Could not add this suggestion to the request roster. Please retry.');
       }
+      if (genRef.current !== myGen) return false;
     }
     const confirmedCandidate = {
       ...cand,
@@ -2316,7 +2361,7 @@ export default function ReviewerSearchSection({
     if (!response.ok || !data.success || !data.confirmationId) {
       throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
     }
-    if (genRef.current !== myGen) return;
+    if (genRef.current !== myGen) return false;
     const authoritativeConfirmed = data.candidate || confirmedCandidate;
     // The confirmation write has already committed. Keep that server truth in
     // the card even if the following address-evidence write fails and the modal
@@ -2329,7 +2374,7 @@ export default function ReviewerSearchSection({
       setRosterActive((prev) => dedupeByName([authoritativeConfirmed, ...prev]));
     }
     applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
-    await verifyAddressContact(authoritativeConfirmed, updates, evidence);
+    return verifyAddressContact(authoritativeConfirmed, updates, evidence);
   }, [requestId, unverified, verifyAddressContact, applyAuthoritativeRosterCandidate]);
 
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
@@ -2796,7 +2841,7 @@ export default function ReviewerSearchSection({
           serverRepairResults.forEach((result) => next.delete(result.rosterCandidateKey));
           return next;
         });
-        rosterWarnings.push('A reviewer record must be repaired before it can be added to Invite. Use “Create repair request” on the affected card.');
+        rosterWarnings.push('Fix the identified reviewer record in AkoyaGO, then use “Retry record check” on the affected card.');
       }
 
       const totalSucceeded = saved + promoted;
@@ -3330,7 +3375,7 @@ export default function ReviewerSearchSection({
                                   onReviewAddressConflict={reviewAddressConflict}
                                   onRetryAddressCheck={retryAddressCheck}
                                   onRetryInstitution={isApplicantOriginCandidate(c) ? enrichRecommended : undefined}
-                                  onConfirmIdentity={canConfirmForPromotion ? (cand) => setConfirmingContact(cand) : undefined}
+                                  onConfirmIdentity={canConfirmForPromotion ? openIdentityConfirmation : undefined}
                                   canManage={canManage}
                                   repairAttention={repairCandidateKey === candKey(c)}
                                   repairRequest={repairRequestsByCandidateKey[candKey(c)] || null}
@@ -3465,7 +3510,7 @@ export default function ReviewerSearchSection({
                             candidate={c}
                             readOnly
                             onExclude={excludeUnverifiedCandidate}
-                            onConfirmIdentity={canRescue ? (cand) => setConfirmingContact(cand) : undefined}
+                            onConfirmIdentity={canRescue ? openIdentityConfirmation : undefined}
                             canManage={canManage}
                           />;
                         })}

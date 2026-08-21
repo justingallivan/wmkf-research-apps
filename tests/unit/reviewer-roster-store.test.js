@@ -828,6 +828,104 @@ describe('address attestation', () => {
   });
 });
 
+describe('address conflict closeout', () => {
+  const receipt = {
+    receiptId: 'receipt-choice',
+    email: 'found@example.edu',
+    personConfirmed: true,
+    requestId: REQ,
+    candidateKey: 'candidate:ann',
+    evidenceType: 'staff_address_choice',
+    attestedAt: '2026-08-20T20:00:00.000Z',
+  };
+  const candidate = {
+    name: 'Ann Lee',
+    email: receipt.email,
+    emailSource: 'manual',
+    addressConflictPending: true,
+    addressTrustReceipt: receipt,
+    applicantKnownReviewer: {
+      status: 'known',
+      email: 'stored@example.edu',
+      addressConflictPending: true,
+    },
+    contactEnrichment: {
+      email: receipt.email,
+      emailSource: 'manual',
+      addressConflictPending: true,
+    },
+  };
+
+  test('projects the exact staff choice into both roster views', async () => {
+    sql
+      .mockResolvedValueOnce({ rows: [{
+        candidate_key: 'candidate:ann',
+        status: 'active',
+        source_kind: 'literature_retrieved',
+        updated_at_token: 'row-version-1',
+        candidate,
+      }] })
+      .mockResolvedValueOnce({ rows: [{
+        updated_at_token: 'row-version-2',
+        candidate: {
+          ...candidate,
+          emailSource: 'staff_verified',
+          addressConflictPending: false,
+          addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+          applicantKnownReviewer: {
+            ...candidate.applicantKnownReviewer,
+            email: receipt.email,
+            emailSource: 'staff_verified',
+            addressConflictPending: false,
+            addressTrustVerified: true,
+            addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+          },
+        },
+      }], rowCount: 1 });
+
+    await expect(store.clearAddressTrustBlocks(REQ, 'candidate:ann', {
+      receiptId: receipt.receiptId,
+      expectedUpdatedAt: 'row-version-1',
+      addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+    })).resolves.toMatchObject({
+      addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+      applicantKnownReviewer: {
+        addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+      },
+    });
+
+    const persisted = JSON.parse(allInterpolations().find((entry) => (
+      typeof entry === 'string' && entry.includes('addressChoice')
+    )));
+    expect(persisted).toMatchObject({
+      emailSource: 'staff_verified',
+      addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+      applicantKnownReviewer: {
+        email: receipt.email,
+        addressChoice: { decision: 'use_found', selectedEmail: receipt.email },
+        emailReadiness: { action: 'ready' },
+      },
+    });
+  });
+
+  test('fails closed when a staff-choice receipt has no matching projected decision', async () => {
+    sql.mockResolvedValueOnce({ rows: [{
+      candidate_key: 'candidate:ann',
+      status: 'active',
+      source_kind: 'literature_retrieved',
+      updated_at_token: 'row-version-1',
+      candidate,
+    }] });
+
+    await expect(store.clearAddressTrustBlocks(REQ, 'candidate:ann', {
+      receiptId: receipt.receiptId,
+      expectedUpdatedAt: 'row-version-1',
+      addressChoice: null,
+    })).resolves.toBeNull();
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('finalizeCandidatePromotion', () => {
   test('server-owned finalization persists exact Dataverse anchors and returns the key', async () => {
     sql.mockResolvedValueOnce({ rows: [{ candidate_key: 'candidate:ann' }], rowCount: 1 });

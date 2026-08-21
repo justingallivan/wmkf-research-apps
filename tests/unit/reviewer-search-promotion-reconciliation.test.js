@@ -305,7 +305,7 @@ test('same-person different-address conflict exposes identity confirmation on th
   expect(screen.getByDisplayValue(peter.website)).toBeInTheDocument();
 });
 
-test('record-repair conflicts stay on the repair remedy even when the server also labels them identity-choice-required', async () => {
+test('record-repair conflicts stay on the AkoyaGO retry remedy even when the server also labels them identity-choice-required', async () => {
   const reviewer = {
     ...candidate('Repair Reviewer', 'repair@example.edu'),
     candidateKey: 'orcid:0000-0002-1825-0097',
@@ -349,6 +349,13 @@ test('record-repair conflicts stay on the repair remedy even when the server als
         }],
       }, false, 422));
     }
+    if (target === '/api/workbench/reviewer-address-trust') {
+      return Promise.resolve(response({
+        success: true,
+        candidate: reviewer,
+        decision: 'structural_state_refreshed',
+      }));
+    }
     throw new Error(`unexpected fetch ${target}`);
   });
 
@@ -356,9 +363,18 @@ test('record-repair conflicts stay on the repair remedy even when the server als
   fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
   fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
+  const retryButton = await screen.findByRole('button', { name: /retry record check/i });
+  expect(screen.getByText(/Fix this reviewer record in AkoyaGO/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /confirm identity/i })).not.toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
+  fireEvent.click(retryButton);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/reviewer-address-trust',
+    expect.objectContaining({
+      method: 'POST',
+      body: expect.stringContaining('"code":"contact_linked_elsewhere"'),
+    }),
+  ));
 });
 
 test('a repair request created from the card immediately becomes pending', async () => {
@@ -400,11 +416,12 @@ test('a repair request created from the card immediately becomes pending', async
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: /create repair request/i }));
 
-  expect(await screen.findByRole('link', { name: /open pending repair request/i })).toBeInTheDocument();
+  expect(await screen.findByText('Repair request pending')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /pending repair request/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /create repair request/i })).not.toBeInTheDocument();
 });
 
-test('applicant promotion repair failure attaches the repair remedy to the exact applicant card', async () => {
+test('applicant promotion repair failure attaches the AkoyaGO retry remedy to the exact applicant card', async () => {
   const suggestionId = '44444444-4444-4444-4444-444444444444';
   const reviewer = {
     ...candidate('Applicant Repair Reviewer', 'applicant-repair@example.edu'),
@@ -446,7 +463,7 @@ test('applicant promotion repair failure attaches the repair remedy to the exact
   fireEvent.click(await screen.findByLabelText(`Select ${reviewer.name}`));
   fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByRole('button', { name: /create repair request/i })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: /retry record check/i })).toBeInTheDocument();
   expect(screen.queryByLabelText(`Select ${reviewer.name}`)).not.toBeInTheDocument();
 });
 

@@ -79,7 +79,12 @@ export default async function handler(req, res) {
       } else if (action === 'get_address_conflict') {
         result = await getAddressConflict({ requestId, candidateKey });
       } else if (action === 'retry_check') {
-        result = await retryAddressCheck({ requestId, candidateKey, ...actor });
+        result = await retryAddressCheck({
+          requestId,
+          candidateKey,
+          code: req.body?.code,
+          ...actor,
+        });
       } else {
         result = await createAddressRepairRequest({
           requestId,

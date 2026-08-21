@@ -547,7 +547,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                   )}
                   {isRepairTarget && canManage && (
                     <div className="mt-1.5 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                      <span className="font-medium">Admin repair alert:</span>{' '}
+                      <span className="font-medium">Repair follow-up:</span>{' '}
                       open the current invitation preview to review the exact address or repair requirement.
                       <button
                         type="button"

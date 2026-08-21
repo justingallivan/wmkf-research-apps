@@ -87,6 +87,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
   // before the candidate can be added (the deliberate identity-gate override).
   const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [addressConfirmed, setAddressConfirmed] = useState(false);
+  const [addressChoice, setAddressChoice] = useState(null);
   const [evidenceType, setEvidenceType] = useState('publication_corresponding_author');
   const [evidenceUrl, setEvidenceUrl] = useState('');
   const [evidenceNote, setEvidenceNote] = useState('');
@@ -120,6 +121,7 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       setErrorRemediation([]);
       setIdentityConfirmed(false);
       setAddressConfirmed(false);
+      setAddressChoice(null);
       setEvidenceType('publication_corresponding_author');
       setEvidenceUrl('');
       setEvidenceNote('');
@@ -157,23 +159,35 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       const normalizedEmail = formData.email.trim();
       const emailChanged = normalizedEmail.toLowerCase() !== String(candidate.email || '').trim().toLowerCase();
       const needsAddressVerification = !!onVerifyAddress && (requireAddressVerification || emailChanged || confirmMode);
+      const selectedEvidence = addressConflict
+        ? { evidenceType: 'staff_address_choice', evidenceUrl: null, note: null }
+        : {
+            evidenceType,
+            evidenceUrl: evidenceUrl.trim() || null,
+            note: evidenceNote.trim() || null,
+          };
       if (needsAddressVerification) {
         if (!normalizedEmail) {
           setError('An email address is required before it can be verified.');
           return;
         }
-        if (!addressConfirmed) {
+        if (addressConflict && !addressChoice) {
+          setError('Choose whether to keep the stored address or replace it with the newly found address.');
+          return;
+        }
+        if (!addressConflict && !addressConfirmed) {
           setError('Confirm that this is the correct person and exact address.');
           return;
         }
         if (
-          (evidenceType === 'publication_corresponding_author' || evidenceType === 'institution_page')
+          !addressConflict
+          && (evidenceType === 'publication_corresponding_author' || evidenceType === 'institution_page')
           && !evidenceUrl.trim()
         ) {
           setError('Paste the publication or institution page you used to verify the address.');
           return;
         }
-        if (evidenceType === 'other' && !evidenceNote.trim()) {
+        if (!addressConflict && evidenceType === 'other' && !evidenceNote.trim()) {
           setError('Briefly describe the evidence used to verify the address.');
           return;
         }
@@ -190,15 +204,15 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
           setError('An email is required to add and invite this reviewer.');
           return;
         }
-        await onConfirm({
+        const confirmed = await onConfirm({
           email: normalizedEmail,
           website: formData.website.trim(),
           affiliation: formData.affiliation.trim(),
-        }, {
-          evidenceType,
-          evidenceUrl: evidenceUrl.trim() || null,
-          note: evidenceNote.trim() || null,
-        });
+        }, selectedEvidence);
+        if (confirmed === false) {
+          setError('This request reloaded while you were reviewing it. Re-check the current reviewer card before saving.');
+          return;
+        }
         onClose();
         return;
       }
@@ -240,11 +254,14 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
       // before the modal closes.
       if (onApply) {
         if (needsAddressVerification) {
-          await onVerifyAddress({ ...updates, email: normalizedEmail }, {
-            evidenceType,
-            evidenceUrl: evidenceUrl.trim() || null,
-            note: evidenceNote.trim() || null,
-          });
+          const verified = await onVerifyAddress(
+            { ...updates, email: normalizedEmail },
+            selectedEvidence,
+          );
+          if (verified === false) {
+            setError('This request reloaded while you were reviewing it. Re-check the current reviewer card before saving.');
+            return;
+          }
         } else {
           await onApply(updates);
         }
@@ -484,7 +501,11 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="font-semibold text-gray-900">{confirmMode ? 'Confirm reviewer & correct contact' : 'Edit candidate'}</h3>
+          <h3 className="font-semibold text-gray-900">
+            {addressConflict
+              ? (confirmMode ? 'Confirm reviewer & choose email' : 'Review email choice')
+              : (confirmMode ? 'Confirm reviewer & correct contact' : 'Edit candidate')}
+          </h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
         </div>
 
@@ -532,36 +553,50 @@ export default function CandidateEditModal({ candidate, onClose, onSaved, onAppl
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 ${addressConflict ? 'bg-gray-100 text-gray-700' : ''}`}
               placeholder="researcher@university.edu"
+              readOnly={!!addressConflict}
             />
             <p className="text-xs text-gray-400 mt-1">Correct this if the listed address belongs to an assistant or department.</p>
           </div>
 
           {addressConflict && (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-900">
-              <p className="font-medium">Two different addresses were found. Choose one only after checking the evidence.</p>
+              <p className="font-medium">
+                {candidate.name || 'This person'} is already in AkoyaGO with a different email address. Which address should be used?
+              </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setFormData((data) => ({ ...data, email: addressConflict.storedEmail }))}
-                  className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
+                  onClick={() => {
+                    setAddressChoice('keep_stored');
+                    setFormData((data) => ({ ...data, email: addressConflict.storedEmail }));
+                  }}
+                  aria-pressed={addressChoice === 'keep_stored'}
+                  className={`rounded border px-2 py-1 font-mono ${addressChoice === 'keep_stored' ? 'border-blue-600 bg-blue-50 text-blue-900' : 'border-red-300 bg-white'}`}
                 >
-                  Use stored: {addressConflict.storedEmail}
+                  Keep {addressConflict.storedEmail}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFormData((data) => ({ ...data, email: addressConflict.foundEmail }))}
-                  className="rounded border border-red-300 bg-white px-2 py-1 font-mono"
+                  onClick={() => {
+                    setAddressChoice('use_found');
+                    setFormData((data) => ({ ...data, email: addressConflict.foundEmail }));
+                  }}
+                  aria-pressed={addressChoice === 'use_found'}
+                  className={`rounded border px-2 py-1 font-mono ${addressChoice === 'use_found' ? 'border-blue-600 bg-blue-50 text-blue-900' : 'border-red-300 bg-white'}`}
                 >
-                  Use found: {addressConflict.foundEmail}
+                  Replace with {addressConflict.foundEmail}
                 </button>
               </div>
-              <p className="mt-2">If neither belongs to this person, cancel and create a repair request from the reviewer card.</p>
+              <p className="mt-2">
+                This updates the shared person record, so the selected address will also be used for this reviewer on future requests.
+              </p>
+              <p className="mt-1">If neither address is right, cancel and investigate the person record in AkoyaGO.</p>
             </div>
           )}
 
-          {!!onVerifyAddress && (requireAddressVerification || confirmMode || formData.email.trim().toLowerCase() !== String(candidate.email || '').trim().toLowerCase()) && (
+          {!addressConflict && !!onVerifyAddress && (requireAddressVerification || confirmMode || formData.email.trim().toLowerCase() !== String(candidate.email || '').trim().toLowerCase()) && (
             <div className="space-y-3 rounded-md bg-blue-50 border border-blue-200 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-900">Email address</p>
               <label className="flex items-start gap-2">

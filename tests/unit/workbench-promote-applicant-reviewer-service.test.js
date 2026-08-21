@@ -55,6 +55,10 @@ jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () =>
 
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import {
+  createConflictPendingState,
+  createStaffVerifiedState,
+} from '../../lib/utils/reviewer-address-trust';
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 const SUG = '33333333-3333-3333-3333-333333333333';
@@ -254,6 +258,73 @@ test('research-only canonical contact requires evidence and becomes exact-bundle
   const body = await promoteApplicantReviewer(args());
   expect(selectIfUnengaged).toHaveBeenCalled();
   expect(body).toMatchObject({ success: true, emailAction: 'ready' });
+});
+
+test('promotion replay preserves a resolved staff email choice instead of minting a resolution-free bundle', async () => {
+  const candidateKey = 'candidate:applicant';
+  const receipt = {
+    receiptId: 'receipt-choice',
+    email: 'found@example.edu',
+    personConfirmed: true,
+    requestId: REQ,
+    candidateKey,
+    evidenceType: 'staff_address_choice',
+    evidenceUrl: null,
+    attestedAt: '2026-08-20T20:00:00.000Z',
+  };
+  const conflict = createConflictPendingState({
+    email: 'stored@example.edu',
+    foundEmail: receipt.email,
+    reason: 'email_mismatch',
+    requestId: REQ,
+    candidateKey,
+    detectedAt: '2026-08-20T19:00:00.000Z',
+  });
+  const resolved = createStaffVerifiedState({
+    email: receipt.email,
+    requestId: REQ,
+    candidateKey,
+    evidenceType: receipt.evidenceType,
+    attestedAt: receipt.attestedAt,
+    resolution: {
+      conflict: conflict.conflict,
+      decision: 'use_found',
+      resolvedAt: receipt.attestedAt,
+    },
+  });
+  getById.mockResolvedValue({
+    wmkf_emailaddress: receipt.email,
+    wmkf_emailsource: 'staff_verified',
+    wmkf_addresstruststatejson: JSON.stringify(resolved),
+    _etag: 'W/"person"',
+  });
+  findAddressTrustReceipt.mockResolvedValue(receipt);
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey,
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+    email: receipt.email,
+    emailSource: 'staff_verified',
+  });
+  loadApplicantKnownReviewerContext.mockResolvedValue({
+    applicantKnownReviewer: {
+      status: 'known',
+      potentialReviewerId: PERSON,
+      email: receipt.email,
+      emailSource: 'staff_verified',
+      addressTrustVerified: true,
+      emailReadiness: { level: 'high', action: 'ready', reason: 'Staff selected this address' },
+    },
+    contactId: null,
+  });
+
+  await promoteApplicantReviewer(args({ contact: { email: receipt.email } }));
+
+  const trustWrite = update.mock.calls
+    .map((call) => call[1]?.addressTrustStateJson)
+    .find(Boolean);
+  expect(JSON.parse(trustWrite).resolution).toMatchObject({ decision: 'use_found' });
 });
 
 test.each([

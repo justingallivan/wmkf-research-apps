@@ -84,7 +84,7 @@ test('a pending address conflict routes the badge to the conflict reviewer, not 
     />,
   );
 
-  await user.click(screen.getByRole('button', { name: 'Review address conflict for Alexander Green' }));
+  await user.click(screen.getByRole('button', { name: 'Review email choice for Alexander Green' }));
   expect(onReviewAddressConflict).toHaveBeenCalledTimes(1);
   expect(onEdit).not.toHaveBeenCalled();
 });
@@ -127,20 +127,22 @@ test('"Dataverse identity needs review" banner opens the confirm-identity remedy
   expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
 });
 
-test('"Existing linked reviewer record needs repair" banner opens the repair remedy', async () => {
+test('"Existing linked reviewer record needs repair" exposes the AkoyaGO retry remedy', async () => {
   const user = userEvent.setup();
-  const onRequestRepair = jest.fn();
+  const onRetryAddressCheck = jest.fn();
   render(
     <CandidateCard
       candidate={{ ...QUICK_CHECK, applicantKnownReviewer: { status: 'inactive' } }}
       checked={false}
       onToggle={() => {}}
-      onRequestRepair={onRequestRepair}
+      onRetryAddressCheck={onRetryAddressCheck}
+      canManage
     />,
   );
 
-  await user.click(screen.getByRole('button', { name: /needs repair/ }));
-  expect(onRequestRepair).toHaveBeenCalledTimes(1);
+  expect(screen.getByText(/Fix this reviewer record in AkoyaGO/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Retry record check/ }));
+  expect(onRetryAddressCheck).toHaveBeenCalledTimes(1);
 });
 
 test('ready identity evidence is summarized once and is not an action', () => {
