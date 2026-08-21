@@ -605,7 +605,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await expect(page.getByText('Dr. Pending Invitee')).toBeVisible();
     await page.getByLabel('Select Dr. Pending Invitee').check();
 
-    await page.getByRole('button', { name: /review & release 1 as no longer needed/i }).click();
+    await page.getByRole('button', { name: /release invitee \(1\)/i }).click();
     await expect(page.getByText('Review release emails')).toBeVisible();
     await expect.poll(() => withdrawRenderBodies.length).toBe(1);
 
@@ -661,7 +661,7 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.goto(workbenchUrl(baseURL));
     await page.getByLabel('Select Dr. Emailed Reviewer').check();
     await page.getByLabel('Select Dr. Failed Reviewer').check();
-    await page.getByRole('button', { name: /review & release 2 as no longer needed/i }).click();
+    await page.getByRole('button', { name: /release invitees \(2\)/i }).click();
 
     const modal = page.locator('.fixed').filter({ hasText: 'Review release emails' });
     // exact: the draft textarea also contains the name ("Dear Dr. Failed Reviewer,"),
