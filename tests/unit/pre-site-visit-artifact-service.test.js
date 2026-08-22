@@ -188,6 +188,35 @@ test('reopen history projects durable actor, reason, source, and milestone evide
   })]);
 });
 
+test('reopen history marks a retained expired copy as cleanup reconciliation work', () => {
+  const row = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
+    wmkf_reopenreasoncode: 'accidental_handoff',
+    wmkf_reopenreasonnote: 'The claim expired before activation.',
+    wmkf_orphancleanupjson: JSON.stringify([{
+      driveId: 'expired-drive',
+      itemId: 'expired-item',
+      reason: 'expired_reopen_attempt_retained',
+    }]),
+  };
+
+  expect(projectReopenHistory([row])).toEqual([
+    expect.objectContaining({
+      outcome: 'needs_reconciliation',
+      cleanupRequired: [expect.objectContaining({
+        driveId: 'expired-drive',
+        itemId: 'expired-item',
+      })],
+    }),
+  ]);
+});
+
 function createHarness({ mutatePersistedDraft = false, currentPointerRow = null } = {}) {
   let row = null;
   const prior = currentPointerRow ? { ...currentPointerRow } : null;
@@ -301,6 +330,7 @@ function createHarness({ mutatePersistedDraft = false, currentPointerRow = null 
     downloadFile: jest.fn().mockResolvedValue({ buffer: Buffer.from('normalized-docx') }),
     deleteFile: jest.fn().mockResolvedValue(undefined),
     newClaimToken: jest.fn().mockReturnValue(CLAIM_ID),
+    isGuardedReopenSchemaReady: jest.fn().mockReturnValue(true),
   };
 
   return {
@@ -381,9 +411,22 @@ test('generation cannot supersede a newer guarded-reopen correction cycle', asyn
   });
 
   expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument.mock.calls[0][0])
+    .toHaveProperty('wmkf_reopencycleid', originalCycle);
   expect(harness.request._wmkf_currentpresitevisit_value)
     .toBe(harness.currentPointerRow.wmkf_requestdocumentid);
   expect(harness.currentPointerRow.wmkf_reopencycleid).toBe(newerCycle);
+});
+
+test('flag-off generation omits the Wave 20 correction-cycle property from its create payload', async () => {
+  const harness = createHarness();
+  harness.dependencies.isGuardedReopenSchemaReady.mockReturnValue(false);
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.createDocument.mock.calls[0][0])
+    .not.toHaveProperty('wmkf_reopencycleid');
 });
 
 test('missing exact source identity stops before claim, Claude, render, or upload', async () => {

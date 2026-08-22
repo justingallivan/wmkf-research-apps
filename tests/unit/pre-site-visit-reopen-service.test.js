@@ -332,6 +332,7 @@ test('a competing Pre-Site generation blocks reopen before file access or mutati
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
     wmkf_generationkey: 'competing-generation-key',
     wmkf_claimtoken: 'competing-claim',
+    modifiedon: '2026-08-22T11:59:00Z',
   }));
 
   await expect(reopenPreSiteVisit(
@@ -342,6 +343,97 @@ test('a competing Pre-Site generation blocks reopen before file access or mutati
   expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
   expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
   expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('an expired competing reopen is failed with durable cleanup identity before a new operation proceeds', async () => {
+  const harness = createHarness();
+  const expiredId = '66666666-6666-4666-8666-666666666666';
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: expiredId,
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'expired-reopen-generation-key',
+    wmkf_claimtoken: 'expired-claim',
+    wmkf_reopencycleid: '77777777-7777-4777-8777-777777777777',
+    wmkf_reopenreasoncode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    wmkf_reopenreasonnote: 'The expired reopen was interrupted before activation.',
+    wmkf_sharepointsiteid: 'expired-site',
+    wmkf_sharepointdriveid: 'expired-drive',
+    wmkf_sharepointitemid: 'expired-item',
+    wmkf_sharepointweburl: 'https://sharepoint.test/expired.docx',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: 'expired-etag',
+    wmkf_filename: '1002379 Pre-Site Reopened expired.docx',
+    modifiedon: '2026-08-22T11:00:00Z',
+  }));
+  const originalGetMetadata = harness.dependencies.getFileMetadataById.getMockImplementation();
+  harness.dependencies.getFileMetadataById.mockImplementation(async (driveId, itemId, options) => {
+    if (driveId === 'expired-drive' && itemId === 'expired-item') {
+      return {
+        siteId: 'expired-site',
+        driveId,
+        id: itemId,
+        name: '1002379 Pre-Site Reopened expired.docx',
+        versionId: '1.0',
+        eTag: 'expired-etag',
+        lastModified: '2026-08-22T11:00:00Z',
+        size: 12,
+        webUrl: 'https://sharepoint.test/expired.docx',
+      };
+    }
+    return originalGetMetadata(driveId, itemId, options);
+  });
+
+  const result = await reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  );
+
+  expect(result).toMatchObject({ inProgress: false, artifact: { artifactId: SUCCESSOR_ID } });
+  const expired = harness.rows.find((row) => row.wmkf_requestdocumentid === expiredId);
+  expect(expired).toMatchObject({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_claimtoken: null,
+    wmkf_lasterrorcode: 'pre_site_reopen_claim_expired',
+    wmkf_sharepointdriveid: 'expired-drive',
+    wmkf_sharepointitemid: 'expired-item',
+  });
+  expect(JSON.parse(expired.wmkf_orphancleanupjson)).toEqual([
+    expect.objectContaining({
+      driveId: 'expired-drive',
+      itemId: 'expired-item',
+      reason: 'expired_reopen_attempt_retained',
+    }),
+  ]);
+});
+
+test('a Final descendant blocks before an expired attempt is reconciled or any file is read', async () => {
+  const harness = createHarness();
+  harness.request._wmkf_currentfinalwriteup_value = '88888888-8888-4888-8888-888888888888';
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'expired-reopen-generation-key',
+    wmkf_claimtoken: 'expired-claim',
+    wmkf_reopencycleid: '77777777-7777-4777-8777-777777777777',
+    wmkf_reopenreasoncode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    wmkf_reopenreasonnote: 'The expired reopen was interrupted before activation.',
+    modifiedon: '2026-08-22T11:00:00Z',
+  }));
+
+  await expect(reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_reopen_final_exists' });
+
+  expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
+  expect(harness.dependencies.getFileMetadataByPath).not.toHaveBeenCalled();
 });
 
 test('a retained failed attempt does not block a new audited reopen operation', async () => {

@@ -269,8 +269,9 @@ The minimum reopen transaction is a preserve-and-succeed operation:
    operation ID in a durable append-only reopen audit representation. Exact
    unchanged retry returns the same successor and never creates another row or
    file. A Failed attempt remains append-only evidence but does not permanently
-   block a later operation; changing the reason code or note rotates the client
-   operation ID before another submit.
+   block a later operation. The client operation ID is minted once when the
+   dialog opens; after the first submit its audit inputs are frozen for exact
+   retry, and staff must close/reopen the dialog to start a different operation.
 6. Show every durable reopen attempt with an explicit Completed, Failed, In
    progress, or Needs reconciliation outcome alongside its preserved source
    evidence. The new Draft may be edited or regenerated under the normal rules,
@@ -283,10 +284,13 @@ itself: `wmkf_ReopenCycleId`, `wmkf_ReopenReasonCode`, and
 standard created-by/created-on attribution. The client operation UUID is both
 the durable correction-cycle identity and the exact-operation dedupe input;
 the existing generation-key alternate key remains the uniqueness fence. Only
-superusers may invoke the route or receive the reopen-attempt history; other
-authorized Workbench readers receive the ordinary status without that audit
-projection. A second reopen is refused while a different correction-cycle
-generation is still in progress. Later generated drafts carry the same cycle ID
+superusers may invoke the route or receive the reopen-attempt history or nested
+correction details; other authorized Workbench readers receive artifacts with
+that audit data removed from both GET and generation responses. A second reopen
+is refused while a different generation has a live 15-minute lease. An expired
+reopen claim is atomically marked Failed before a new operation proceeds; if its
+copy exists, exact drive/item identity is retained in the row's cleanup queue
+and its history outcome becomes Needs reconciliation. Later generated drafts carry the same cycle ID
 in their generation identity, and final activation rechecks that the target's
 cycle still equals the current Draft pointer's cycle, so an older in-flight
 generation cannot supersede a newer correction cycle.
@@ -611,7 +615,7 @@ silently extend its paths or names to writeup publications.
    metadata, set `GUARDED_REOPEN_SCHEMA_READY=on`, then promote/redeploy the
    tested runtime and perform a controlled signed-in smoke. Runtime source may
    exist with the flag off because base registry reads exclude the Wave 20
-   projection, but guarded reopen remains unavailable until the explicit flag
+   projection and generation-create payload, but guarded reopen remains unavailable until the explicit flag
    and exact schema are both present. This must precede Final creation so an
    accidental handoff cannot become an unexplained Final lineage source.
 7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,

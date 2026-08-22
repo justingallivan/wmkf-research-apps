@@ -238,7 +238,7 @@ test('validates confirmation and submits one guarded reopen operation before ret
   expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument();
 });
 
-test('editing audit inputs after a failed submit starts a new client operation', async () => {
+test('a failed submit keeps one operation id and immutable audit inputs for safe retry', async () => {
   global.fetch
     .mockResolvedValueOnce(response({
       success: true,
@@ -280,16 +280,17 @@ test('editing audit inputs after a failed submit starts a new client operation',
 
   const firstCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/reopen'));
   const firstOperationId = JSON.parse(firstCall[1].body).clientOperationId;
-  fireEvent.change(screen.getByLabelText('Correction note'), {
-    target: { value: 'The handoff was started too early; retry after review.' },
-  });
+  expect(screen.getByLabelText('Reason')).toBeDisabled();
+  expect(screen.getByLabelText('Correction note')).toBeDisabled();
+  expect(screen.getByLabelText('Type request number 1002379 to confirm')).toBeDisabled();
+  expect(screen.getByText(/keeps its original reason and confirmation/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
 
   await waitFor(() => expect(
     global.fetch.mock.calls.filter(([url]) => url.endsWith('/reopen')),
   ).toHaveLength(2));
   const secondCall = global.fetch.mock.calls.filter(([url]) => url.endsWith('/reopen'))[1];
-  expect(JSON.parse(secondCall[1].body).clientOperationId).not.toBe(firstOperationId);
+  expect(JSON.parse(secondCall[1].body).clientOperationId).toBe(firstOperationId);
 });
 
 test('renders append-only guarded reopen history from the status contract', async () => {

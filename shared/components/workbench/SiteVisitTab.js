@@ -177,6 +177,7 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
       reasonNote: '',
       typedRequestNumber: '',
       clientOperationId: newClientOperationId(),
+      submitted: false,
     });
   };
 
@@ -201,6 +202,7 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
     activeController.current = controller;
     setReopeningRequestId(id);
     setReopenError(null);
+    setReopenForm((current) => (current ? { ...current, submitted: true } : current));
     try {
       const response = await fetch('/api/workbench/pre-site-visit/reopen', {
         method: 'POST',
@@ -435,9 +437,8 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                   onChange={(event) => setReopenForm((current) => ({
                     ...current,
                     reasonCode: event.target.value,
-                    clientOperationId: newClientOperationId(),
                   }))}
-                  disabled={reopening}
+                  disabled={reopening || reopenForm.submitted}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
                   <option value="">Select a reason</option>
@@ -456,12 +457,11 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                   onChange={(event) => setReopenForm((current) => ({
                     ...current,
                     reasonNote: event.target.value,
-                    clientOperationId: newClientOperationId(),
                   }))}
                   minLength={PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}
                   maxLength={PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength}
                   rows={4}
-                  disabled={reopening}
+                  disabled={reopening || reopenForm.submitted}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -477,9 +477,15 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                   value={reopenForm.typedRequestNumber}
                   onChange={(event) => setReopenForm((current) => ({ ...current, typedRequestNumber: event.target.value }))}
                   autoComplete="off"
-                  disabled={reopening}
+                  disabled={reopening || reopenForm.submitted}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
+                {reopenForm.submitted && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    This operation keeps its original reason and confirmation for safe retry.
+                    Cancel and reopen the dialog to start a different operation.
+                  </p>
+                )}
               </div>
               <div className="flex justify-end gap-2">
                 <button

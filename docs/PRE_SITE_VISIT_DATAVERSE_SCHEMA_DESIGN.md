@@ -174,10 +174,13 @@ audit entity is needed for this bounded operation. Dataverse formatted lookup
 annotation `_createdby_value_formatted` supplies the actor display name.
 
 Failed successor rows remain immutable attempt evidence but are excluded from
-the downstream blocker for a later client operation. An unchanged retry keeps
-the same client UUID and reclaims the same row/item; changing the reason code or
-note rotates the UUID. A different active Generating row blocks another reopen,
-and final generation activation compares the target correction cycle with the
+the downstream blocker for a later client operation. The dialog mints one UUID;
+after first submit its audit inputs are frozen so unchanged retry reclaims the
+same row/item, while closing/reopening starts a different operation. A different
+Generating row blocks reopen only while its 15-minute lease is live. An expired
+reopen row is marked Failed before fallthrough, and any retained copy is bound
+by stable drive/item identity in the cleanup queue for explicit reconciliation.
+Final generation activation compares the target correction cycle with the
 current Draft pointer so a stale older generation cannot replace a newer cycle.
 
 ### `akoya_request` relationships

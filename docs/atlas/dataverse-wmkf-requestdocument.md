@@ -162,12 +162,16 @@ correction-cycle generation salting are focused-test covered. No target
 preflight, metadata apply, runtime deployment, or business-row smoke has run.
 The adapter's base projection excludes the Wave 20 fields while the literal-on
 `GUARDED_REOPEN_SCHEMA_READY` interlock is disabled, and the reopen route then
-fails closed with 503. After schema apply/readback, enabling that non-sensitive
+fails closed with 503. The generation create payload also omits the Wave 20
+property while off. After schema apply/readback, enabling that non-sensitive
 flag exposes the fields. Failed attempts remain append-only evidence but do not
 block a distinct later operation; unchanged retry reclaims the same row/item.
-Competing generation blocks reopen, and generation activation rechecks exact
-correction-cycle equality against the current Draft pointer. Reopen history and
-actor attribution are returned only to superusers.
+A competing generation blocks reopen only under a live lease. Expired reopen
+claims are marked Failed, with any retained copy recorded by stable identity as
+cleanup work, before a new operation proceeds. Generation activation rechecks
+exact correction-cycle equality against the current Draft pointer. Reopen
+history, nested correction details, and actor attribution are returned only to
+superusers on both GET and generation responses.
 
 ## Ownership
 

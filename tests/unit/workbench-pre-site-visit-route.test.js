@@ -107,8 +107,14 @@ test('reads current/pending status without invoking generation', async () => {
 test('omits guarded-reopen audit history for non-superusers', async () => {
   getUserRole.mockResolvedValueOnce('staff');
   getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
-    currentArtifact: null,
-    pendingArtifact: null,
+    currentArtifact: {
+      artifactId: 'current-artifact',
+      correction: { reasonNote: 'Restricted note', actorName: 'Test Admin' },
+    },
+    pendingArtifact: {
+      artifactId: 'pending-artifact',
+      correction: { cycleId: 'restricted-cycle' },
+    },
     reopenHistory: [{ artifactId: 'restricted-audit-row' }],
   });
   const res = mockRes();
@@ -118,8 +124,34 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({
     success: true,
-    currentArtifact: null,
-    pendingArtifact: null,
+    currentArtifact: { artifactId: 'current-artifact' },
+    pendingArtifact: { artifactId: 'pending-artifact' },
+  });
+});
+
+test('omits correction audit details from a non-superuser generation response', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  generatePreSiteVisitArtifact.mockResolvedValueOnce({
+    artifact: {
+      artifactId: '33333333-3333-3333-8333-333333333333',
+      operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      correction: {
+        cycleId: '55555555-5555-4555-8555-555555555555',
+        reasonNote: 'Restricted note',
+        actorId: '66666666-6666-4666-8666-666666666666',
+      },
+    },
+    reused: false,
+    recovered: false,
+  });
+  const res = mockRes();
+
+  await handler(post(), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body.artifact).toEqual({
+    artifactId: '33333333-3333-3333-8333-333333333333',
+    operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
   });
 });
 
