@@ -2,8 +2,8 @@
 title: Memory Router Early-Warning Plan
 domain: docs-governance
 kind: plan
-status: draft
-summary: "Owner-approved design for an 8 KiB router early-warning notice across the checker, SessionStart/Stop hooks, and start/stop skills; pre-build review pending."
+status: active
+summary: "Built 8 KiB router early-warning notice across the checker, SessionStart/Stop hooks, and start/stop skills, with mutation-backed regression coverage."
 canonical: false
 cataloged: 2026-08-21
 last_verified: 2026-08-21
@@ -457,9 +457,11 @@ review]), so it runs via `node`:
 6. `npm run check:fact-consistency && npm run check:fact-consistency:self-test`.
 7. `npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test`
    (new module path referenced from docs).
-8. Live sanity: `node scripts/check-memory-router.js` in this worktree —
-   current router is 9,040 B, so the notice MUST appear; Phase 0 acceptance
-   sweep run with every remaining hit classified.
+8. Live sanity at build verification: `node scripts/check-memory-router.js`
+   ran against the then-9,040 B router and the notice appeared; Phase 0's
+   acceptance sweep classified every remaining hit. The later routine audit
+   in `docs/audits/memory-routine-audit-2026-08-21.md` dieted the router below
+   the notice threshold.
 
 If the hook test script must gate shipping, its `node` invocation is added to
 the verification list of this plan only — registering it as a package
@@ -472,9 +474,10 @@ the verification list of this plan only — registering it as a package
   exact-context, and status assertions are the mitigation. Blocking decisions
   remain untouched; only their pre-return dedup-key clear is added and pinned
   by T4.
-- **Notice fatigue:** the router is already ≥8 KiB, so the notice fires every
-  session until a diet runs — intended; the runbook's first routine audit
-  clears it. If ignored, posture equals today's, no worse.
+- **Notice fatigue:** at build time the router was already ≥8 KiB, so the
+  notice intentionally fired every session until the first runbook audit
+  dieted it below the trigger. If a later notice is ignored, posture remains
+  no worse than the pre-build state.
 - **Skip-on-failure trade:** if the thresholds module path breaks, hooks go
   silent instead of using stale numbers. Accepted because the CI/start gate
   fails loudly at require time in the same breakage (T6 covers the hook
@@ -508,8 +511,9 @@ the verification list of this plan only — registering it as a package
   SessionStart context; Stop context per the three-tier rules only, always
   advisory, exactly zero-or-one JSON object per Stop with content-preserving
   combination.
-- Self-test fixtures a–e and hook tests T1–T7 green; all §4 checks green
-  sequentially.
+- Self-test fixtures a–e and hook tests T1–T8 green; all §4 checks green
+  sequentially (T8 is the post-build blocker/save-failure coverage recorded
+  in the status header).
 - T1 mutation cases each fail the test suite for the intended reason; T7's
   forced key-write failure remains fail-open.
 - Phase 0 landed with a TRACKED

@@ -188,6 +188,25 @@ Site Visit handoff smoke first.
      invoked. The request showed no warning panel, so warning relocation remains
      component-test evidence rather than browser-smoke evidence.
 
+11. **The memory early-warning system is merged and its first routine audit is complete.**
+   - Fable branch `codex/fable-memory-hygiene-runbook` was merged into `main`
+     at full branch head `800eb8e4` as Tier 0. The merge includes the canonical
+     runbook, single-sourced router thresholds, the 8 KiB notice, SessionStart
+     and Stop advisories, mutation-backed hook tests, and the final adversarial
+     fixes.
+   - Every handoff-prescribed post-merge gate passed sequentially. Before the
+     diet, the new notice correctly fired at `9,040` B.
+   - The first routine audit dispositioned all `3/3` health-flagged files and
+     spot-verified five leaves against current source. One missing recall rule
+     was repaired; two oversize domain leaves remain accepted hygiene debt for
+     future domain-focused deep audits.
+   - The router diet removed no leaf memory file or leaf content. It moved
+     status and lower-risk direct routes behind their owning hubs, added the canonical
+     runbook route, and reduced `MEMORY.md` from `9,040` B / `66` lines / `63`
+     unique leaf refs to `5,911` B / `60` lines / `45` refs. The routine-audit
+     notice is now silent. Evidence:
+     `docs/audits/memory-routine-audit-2026-08-21.md`.
+
 ### Commits
 
 - `997de04d` - feat(admin): guide reviewer repair alert resolution
@@ -216,6 +235,8 @@ Site Visit handoff smoke first.
 - `ec8ed1f` - docs(domains): remove nonexistent former-domain references
 - `bd9dc06` - fix(workbench): harden site visit handoff receipt
 - `b3bb0ef6` - fix(workbench): clarify read-only handoff states
+- `800eb8e4` - docs(handoff): branch handoff for Codex — merge + first router diet
+- `00139331` - Merge remote-tracking branch `origin/codex/fable-memory-hygiene-runbook`
 
 ## Next Items
 
@@ -240,6 +261,13 @@ Site Visit handoff smoke first.
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
    Production state and organic-observation window. Do not manufacture shared
    roster rows.
+
+4. **Keep memory follow-up bounded to the canonical triggers.**
+   Evidence: `docs/MEMORY_HYGIENE_RUNBOOK.md` and the 2026-08-21 routine-audit
+   report. The two accepted oversize leaves should be reconsidered only in a
+   Dynamics- or prompt-focused deep audit. R4/R5 from the best-practices review
+   remain owner decisions; do not expand the early-warning mechanism without
+   that decision.
 
 ### Blocked on External Input
 
@@ -308,6 +336,8 @@ Site Visit handoff smoke first.
 | `docs/WORKBENCH_OBSERVABILITY_AND_READ_COALESCING_PLAN.md` | Track A criteria |
 | `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` | Explorer campaign; Phase A Production-live and signed-in-smoked, longer observation pending |
 | `.claude-memory/project-dynamics-explorer-socal-campaign.md` | Owner decisions and field-probe findings |
+| `docs/MEMORY_HYGIENE_RUNBOOK.md` | Canonical routine/deep audit and router-diet procedure |
+| `docs/audits/memory-routine-audit-2026-08-21.md` | First routine-audit evidence, dispositions, and before/after metrics |
 
 ## Testing
 

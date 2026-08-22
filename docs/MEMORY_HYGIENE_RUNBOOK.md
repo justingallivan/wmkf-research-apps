@@ -415,6 +415,7 @@ Append one row per audit (values from the §6 commands; do not estimate):
 | Date | Type | Router B (before→after) | Lines | Unique leaf refs | Leaf files | Active share | Health flagged (before→after) | Drift report age | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-08-21 | baseline (review) | 8,991 | 66 | 62 | 247 | 221/247 | 3→3 (dispositions recorded, fixes out of scope) | 4 d | `docs/audits/memory-hygiene-best-practices-review-2026-08-21.md` |
+| 2026-08-21 | routine | 9,040→5,911 | 66→60 | 63→45 | 248 | 222/248 | 3→2 | >24 h | `docs/audits/memory-routine-audit-2026-08-21.md` |
 
 Interpretation guardrails: router bytes trending toward 11 KiB means the
 routine cadence is too slow or diets too shallow; unique leaf refs climbing

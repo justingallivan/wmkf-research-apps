@@ -6,6 +6,20 @@ metadata:
   type: feedback
 ---
 
+## Recall Rule
+
+Read this when multi-agent edits are followed by intermittent Jest failures
+that committed source cannot produce.
+
+Do: prove the failure is impossible from HEAD, clear Jest's cache, and require
+repeated green verification. Treat any post-clear recurrence as real.
+
+Do not: label an ordinary red test as cache-related or claim cache causation
+without separate evidence.
+
+Ground truth: committed source, the failing test, and Jest's post-clear rerun;
+this memory records an incident lesson, not a guaranteed diagnosis.
+
 During the Stage 2 read-coalescing build (S438, branch
 `codex/claude-workbench-read-coalescing-stage2`), parallel cold-cache jest runs in a worktree
 where multiple builder agents had iterated produced 13–16 intermittent failures concentrated in
