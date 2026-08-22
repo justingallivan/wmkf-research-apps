@@ -467,7 +467,11 @@ function stop(input, root, file) {
 
   const unresolvedStaleDocs = unresolvedStaleDocWarnings(root, state);
   state.staleDocWarnings = unresolvedStaleDocs;
-  saveState(file, state);
+  // Deliberately NO uncaught save here: a state-I/O failure before the blocker
+  // decisions would fall to main()'s fail-open catch and cancel a deliberate
+  // exit(2). Every path below persists the pruned warnings instead — blocking
+  // exits via clearAdvisedKeyBeforeBlock (locally caught), the normal path via
+  // the advisory-stage saveState.
   const strictStaleDocs = unresolvedStaleDocs.filter((warning) => warning.strict);
   if (strictStaleDocs.length) {
     const summary = strictStaleDocs.map((warning) =>

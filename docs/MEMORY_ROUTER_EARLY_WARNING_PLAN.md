@@ -30,6 +30,26 @@ Build-time verification receipts:
 The sections below are retained as the reviewed design contract the build
 implements; §4 is the ongoing regression procedure.
 
+**Post-build review (fourth Codex review, of the built diff, 2026-08-21):
+two findings, both accepted and fixed in the commit carrying this note.**
+
+1. **Pre-block save bypass (high).** An uncaught `saveState` between the
+   invariant blocker and the strict-doc/review-receipt blockers meant a
+   state-I/O failure fell to `main()`'s fail-open catch and cancelled those
+   blockers (and the block-mode gate) with status 0. Fixed by removing that
+   save — every subsequent path persists the pruned warnings itself
+   (blocking exits via the locally caught `clearAdvisedKeyBeforeBlock`, the
+   normal path via the advisory-stage save). New T8 tests inject a save
+   failure per blocker (strict-doc / review-receipt / block-mode gate →
+   still exit 2) and pin the advisory-stage fail-open message; all three
+   blocker cases were verified to FAIL against the pre-fix hook.
+2. **Mutation tests accepted any exception (medium).** The T1 mutation loop
+   treated every throw from the contract assertion — including fixture or
+   spawn infrastructure failures — as detection. Fixed: each mutation now
+   carries a deviation oracle proving the mutant ran end-to-end and produced
+   its specific wrong output, and the contract rejection must be a genuine
+   `ERR_ASSERTION`.
+
 v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
 became a single-emission aggregation path; the crossing predicate became
 three tiers (crossing / growth-above / missing-baseline-suppressed);

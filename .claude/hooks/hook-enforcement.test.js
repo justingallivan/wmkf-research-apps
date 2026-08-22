@@ -909,34 +909,64 @@ test('T1: combined gate + router path carries both producers in order', () => {
   mrAssertCombinedContract(path.join(HOOK_DIR, 'session-lifecycle.js'));
 });
 
-test('T1 mutations: each seeded defect breaks the combined contract', () => {
+test('T1 mutations: each seeded defect produces its specific deviation and fails the contract by assertion', () => {
   const source = fs.readFileSync(path.join(HOOK_DIR, 'session-lifecycle.js'), 'utf8');
+  // Each entry carries a deviation oracle proving the mutant hook actually ran
+  // end-to-end and produced its INTENDED wrong output — an infrastructure
+  // failure (spawn error, fixture error, malformed mutant) satisfies neither
+  // the oracle nor the ERR_ASSERTION requirement below, so it can never be
+  // mistaken for mutation detection.
   const mutations = [
     ['dropped gate summary',
       '(blocking rollout is not enabled):\\n${summary}`',
-      '(blocking rollout is not enabled):`'],
+      '(blocking rollout is not enabled):`',
+      (result) => {
+        assert.strictEqual(result.status, 0, result.stderr);
+        const context = mrParseSingleJson(result.stdout).hookSpecificOutput.additionalContext;
+        assert.match(context, /blocking rollout is not enabled/, 'gate advisory header still present');
+        assert.doesNotMatch(context, /sentinel-gate-output/, 'gate summary body is dropped');
+      }],
     ['duplicated producer',
       'if (routerNote) stopAdvisories.push(routerNote);',
-      'if (routerNote) { stopAdvisories.push(routerNote); stopAdvisories.push(routerNote); }'],
+      'if (routerNote) { stopAdvisories.push(routerNote); stopAdvisories.push(routerNote); }',
+      (result) => {
+        assert.strictEqual(result.status, 0, result.stderr);
+        const context = mrParseSingleJson(result.stdout).hookSpecificOutput.additionalContext;
+        assert.strictEqual(context.split('Memory router crossing').length - 1, 2, 'router note appears exactly twice');
+      }],
     ['wrong hookEventName',
       "additionalContext('Stop', stopAdvisories.join('\\n\\n'));",
-      "additionalContext('PostToolUse', stopAdvisories.join('\\n\\n'));"],
+      "additionalContext('PostToolUse', stopAdvisories.join('\\n\\n'));",
+      (result) => {
+        assert.strictEqual(result.status, 0, result.stderr);
+        assert.strictEqual(mrParseSingleJson(result.stdout).hookSpecificOutput.hookEventName, 'PostToolUse');
+      }],
     ['advisory mode exits 2',
       "additionalContext('Stop', stopAdvisories.join('\\n\\n'));",
-      "additionalContext('Stop', stopAdvisories.join('\\n\\n'));\n  process.exit(2);"],
+      "additionalContext('Stop', stopAdvisories.join('\\n\\n'));\n  process.exit(2);",
+      (result) => {
+        assert.strictEqual(result.status, 2, 'mutant exits 2 on the advisory path');
+        assert.ok(mrParseSingleJson(result.stdout), 'advisory JSON was emitted before the mutant exit');
+      }],
   ];
-  for (const [label, find, replace] of mutations) {
+  for (const [label, find, replace, expectDeviation] of mutations) {
     assert.ok(source.includes(find), `mutation seam present: ${label}`);
     const mutantPath = path.join(HOOK_DIR, `session-lifecycle.mutant-${Date.now()}-${Math.random().toString(16).slice(2)}.js`);
     fs.writeFileSync(mutantPath, source.replace(find, replace));
     try {
-      let failed = false;
-      try {
-        mrAssertCombinedContract(mutantPath);
-      } catch {
-        failed = true;
-      }
-      assert.ok(failed, `mutation is caught by the T1 contract: ${label}`);
+      // 1. Deviation oracle: the mutant spawns, runs the combined path, and
+      //    produces its specific wrong behavior.
+      const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
+      const result = fx.runStop({}, mutantPath);
+      assert.strictEqual(result.error, undefined, `mutant process spawned: ${label}`);
+      expectDeviation(result);
+      // 2. Contract rejection: the T1 assertion fails on the mutant with a
+      //    genuine assertion error, not an incidental exception.
+      assert.throws(
+        () => mrAssertCombinedContract(mutantPath),
+        (err) => err && err.code === 'ERR_ASSERTION',
+        `contract rejects the mutant via assertion failure: ${label}`
+      );
     } finally {
       fs.rmSync(mutantPath, { force: true });
     }
@@ -1116,6 +1146,76 @@ test('T7: state-I/O failure in stop() never blocks and never emits partial JSON'
       const parsed = JSON.parse(trimmed); // exactly one well-formed object or nothing
       assert.strictEqual(typeof parsed.hookSpecificOutput.additionalContext, 'string');
     }
+  } finally {
+    fs.chmodSync(fx.stateFile, 0o644);
+  }
+});
+
+// T8: deterministic save-failure injection per blocker. Regression tests for
+// the pre-block uncaught saveState that let a state-I/O failure fall to
+// main()'s fail-open catch and cancel the strict-doc / review-receipt /
+// block-mode exits (Codex post-build review, 2026-08-21).
+test('T8: a state-save failure cannot cancel the strict-doc blocker', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const docRel = 'docs/fixture-plan.md';
+  const srcRel = 'scripts/fixture-src.js';
+  write(path.join(fx.root, docRel), '# Plan\nReads scripts/fixture-src.js on every save.\n');
+  fx.seedState({
+    lastAdvisedKey: { v: 2, key: 'seeded' },
+    staleDocWarnings: [{ docPath: docRel, changedPath: srcRel, term: srcRel, strict: true, createdAt: new Date().toISOString() }],
+  });
+  fs.chmodSync(fx.stateFile, 0o444);
+  try {
+    const result = fx.runStop();
+    assert.strictEqual(result.status, 2, `strict-doc block must survive a save failure: ${result.stderr} :: ${result.stdout}`);
+    assert.match(result.stderr, /doc staleness unresolved/);
+    assert.strictEqual(result.stdout, '', 'no advisory JSON on the blocking path');
+  } finally {
+    fs.chmodSync(fx.stateFile, 0o644);
+  }
+});
+
+test('T8: a state-save failure cannot cancel the review-receipt blocker', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const rel = 'docs/audits/fixture-review.md';
+  write(path.join(fx.root, rel), '# Verdict\nNEEDS WORK\n# Prioritized Findings\nRecommendation: change the order.\n');
+  fx.seedState({
+    lastAdvisedKey: { v: 2, key: 'seeded' },
+    adversarialReviewRequirements: { [rel]: { fingerprint: 'stale', requiredAt: new Date().toISOString() } },
+  });
+  fs.chmodSync(fx.stateFile, 0o444);
+  try {
+    const result = fx.runStop();
+    assert.strictEqual(result.status, 2, `review-receipt block must survive a save failure: ${result.stderr} :: ${result.stdout}`);
+    assert.match(result.stderr, /Adversarial review receipt/);
+    assert.strictEqual(result.stdout, '', 'no advisory JSON on the blocking path');
+  } finally {
+    fs.chmodSync(fx.stateFile, 0o644);
+  }
+});
+
+test('T8: a state-save failure cannot cancel the block-mode gate blocker', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
+  fs.chmodSync(fx.stateFile, 0o444);
+  try {
+    const result = fx.runStop({ CLAUDE_STOP_GATE_MODE: 'block' });
+    assert.strictEqual(result.status, 2, `block-mode gate must survive a save failure: ${result.stderr} :: ${result.stdout}`);
+    assert.match(result.stderr, /Session-owned changed-surface gate failure/);
+    assert.strictEqual(result.stdout, '', 'no advisory JSON on the blocking path');
+  } finally {
+    fs.chmodSync(fx.stateFile, 0o644);
+  }
+});
+
+test('T8: an advisory-stage save failure stays fail-open with the documented safe message', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  fs.chmodSync(fx.stateFile, 0o444); // first (and only) save in this path is the advisory-stage key write
+  try {
+    const result = fx.runStop();
+    assert.strictEqual(result.status, 0, `advisory path must stay fail-open: ${result.stderr}`);
+    const parsed = mrParseSingleJson(result.stdout);
+    assert.strictEqual(parsed.hookSpecificOutput.hookEventName, 'Stop');
+    assert.match(parsed.hookSpecificOutput.additionalContext, /failed safely/);
   } finally {
     fs.chmodSync(fx.stateFile, 0o644);
   }
