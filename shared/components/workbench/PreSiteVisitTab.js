@@ -284,6 +284,9 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
   const beyondSiteVisitHandoff = Boolean(readyFile)
     && !readyForSiteVisit
     && !promotedToSiteVisit;
+  const nonDraftWithoutReadyFile = Boolean(artifact)
+    && !readyForSiteVisit
+    && !readyFile;
   const downloadUrl = readyFile
     ? (() => {
       try {
@@ -474,7 +477,10 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                   {warnings.length > 0 && (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
                       <h4 className="font-semibold">Working document needs a quick edit check</h4>
-                      <p className="mt-1">Continue in Site Visit to review these warnings and edit the document.</p>
+                      <p className="mt-1">
+                        Use these warning details as your edit checklist, then continue in Site Visit
+                        to edit the document.
+                      </p>
                       <ul className="mt-2 list-disc space-y-1 pl-5">
                         {warnings.map((warning, index) => (
                           <li key={`${warning.code || 'warning'}-${index}`}>
@@ -515,7 +521,8 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                   <h3 className="font-semibold">Pre-Site Visit is read-only</h3>
                   <p className="mt-1">
                     This document has moved beyond the Pre-Site Visit draft stage. It cannot be
-                    edited, downloaded, or regenerated from this tab; use the active workflow stage.
+                    edited, downloaded, or regenerated from this tab. Working controls are not
+                    available here.
                   </p>
                   {readyFile.name && (
                     <p className="mt-2 text-xs">
@@ -538,6 +545,15 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                   </ul>
                 </div>
               )}
+            </div>
+          )}
+          {nonDraftWithoutReadyFile && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <h3 className="font-semibold">Pre-Site Visit is read-only</h3>
+              <p className="mt-1">
+                This document has moved beyond the Pre-Site Visit draft stage. Working controls are
+                not available here, and no current Word link was returned for this record.
+              </p>
             </div>
           )}
         </div>

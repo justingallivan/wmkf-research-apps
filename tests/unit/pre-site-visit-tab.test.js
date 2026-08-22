@@ -359,7 +359,7 @@ test('a promoted draft becomes a handoff receipt with work continuing in Site Vi
   expect(screen.getByRole('heading', { name: 'Pre-Site Visit handoff complete' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Working document needs a quick edit check' }))
     .toBeInTheDocument();
-  expect(screen.getByText(/continue in Site Visit to review these warnings/i)).toBeInTheDocument();
+  expect(screen.getByText(/use these warning details as your edit checklist/i)).toBeInTheDocument();
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
   expect(screen.getByText(/continue there to edit or download/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Continue in Site Visit' }));
@@ -385,6 +385,23 @@ test.each([
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
   expect(screen.getByText(/cannot be edited, downloaded, or regenerated from this tab/i))
     .toBeInTheDocument();
+});
+
+test('a non-Draft artifact without a current Word URL fails closed with an explanation', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: {
+      ...readyArtifact(),
+      lifecycleState: 100000001,
+      file: { name: '1002379 Pre-Site Visit.docx', webUrl: null },
+    },
+  }));
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Pre-Site Visit is read-only' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/no current Word link was returned/i)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Generate Word Draft' })).not.toBeInTheDocument();
 });
 
 
