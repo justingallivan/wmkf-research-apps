@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { registerTmpFixture } = require('./lib/selftest-fixture');
-const { validateStore, MAX_LINES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
+const { validateStore, countUniqueDirectLeafRefs, MAX_LINES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
 
 let failures = 0;
 function assert(cond, label) {
@@ -205,8 +205,18 @@ function exactBytesStore(targetBytes) {
   assert(NOTICE_BYTES < WARN_BYTES && WARN_BYTES < TARGET_BYTES, 'NOTICE_BYTES < WARN_BYTES < TARGET_BYTES ordering holds');
 }
 
+// 16 (R4). Unique leaf-reference metric deduplicates direct topic refs and
+// excludes docs/wiki paths even when their basename matches a topic file.
+{
+  const raw = '# Router\n- leaves: a.md; a.md; b.md; ../docs/a.md; docs/guide.md\n';
+  assert(
+    countUniqueDirectLeafRefs(raw, ['a.md', 'b.md', 'c.md']) === 2,
+    'unique direct leaf refs deduplicate leaves and exclude hub/doc links',
+  );
+}
+
 if (failures) {
   console.error(`memory-router self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('memory-router self-test OK — 19/19 cases behaved as expected.');
+console.log('memory-router self-test OK — 20/20 cases behaved as expected.');

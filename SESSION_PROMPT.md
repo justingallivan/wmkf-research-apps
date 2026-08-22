@@ -124,12 +124,7 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
 
 ### Owner Decision Needed
 
-1. **Memory best-practices recommendations R4/R5.**
-   Evidence: `docs/audits/memory-hygiene-best-practices-review-2026-08-21.md`
-   and the first routine-audit report. Do not expand the early-warning system
-   without an owner decision.
-
-2. **After 2026-09-02, retain or remove the Stage II rollout flag.**
+1. **After 2026-09-02, retain or remove the Stage II rollout flag.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
    the live environment and replacement deployment before changing it.
 

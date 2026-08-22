@@ -139,6 +139,21 @@ function validateStore(memDir) {
   return { errors, warnings };
 }
 
+/**
+ * Count unique root-level topic files directly referenced by the router.
+ * Duplicate references and links to docs/wiki hubs do not inflate this metric.
+ */
+function countUniqueDirectLeafRefs(raw, topicFiles) {
+  const topicSet = new Set(topicFiles);
+  const direct = new Set();
+  for (const ref of raw.match(/[A-Za-z0-9._/-]+\.md/g) || []) {
+    const normalized = path.posix.normalize(ref);
+    if (normalized === 'MEMORY.md' || normalized.includes('/')) continue;
+    if (topicSet.has(normalized)) direct.add(normalized);
+  }
+  return direct.size;
+}
+
 function main() {
   // --self-test points the validator at a fixture dir passed as the next arg.
   const selfTestIdx = process.argv.indexOf('--self-test');
@@ -157,10 +172,11 @@ function main() {
   }
 
   const raw = fs.readFileSync(path.join(memDir, 'MEMORY.md'), 'utf8');
-  const topicCount = fs.readdirSync(memDir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md').length;
-  console.log(`memory-router OK — MEMORY.md ${Buffer.byteLength(raw, 'utf8')} bytes / ${raw.split('\n').length} lines; ${topicCount} topic file(s), all links resolve + all carry a valid status.`);
+  const topicFiles = fs.readdirSync(memDir).filter((f) => f.endsWith('.md') && f !== 'MEMORY.md');
+  const uniqueLeafRefs = countUniqueDirectLeafRefs(raw, topicFiles);
+  console.log(`memory-router OK — MEMORY.md ${Buffer.byteLength(raw, 'utf8')} bytes / ${raw.split('\n').length} lines / ${uniqueLeafRefs} unique direct leaf ref(s); ${topicFiles.length} topic file(s), all links resolve + all carry a valid status.`);
 }
 
-module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN, VALID_STATUS };
+module.exports = { validateStore, countUniqueDirectLeafRefs, MAX_LINES, MAX_BYTES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN, VALID_STATUS };
 
 if (require.main === module) main();

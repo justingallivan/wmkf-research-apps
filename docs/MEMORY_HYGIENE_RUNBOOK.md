@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical procedure for auditing repository memory: routine and deep audits, triggers, router diet, classification rules, and acceptance criteria."
 canonical: true
 cataloged: 2026-08-21
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
@@ -102,7 +102,7 @@ Run the **routine audit** when ANY of:
 | Trigger | Check | Rationale |
 |---|---|---|
 | Calendar | ~2 weeks since the last routine audit | backstop only — the size trigger below is primary (mechanical since 2026-08-21: `check:memory-router` notice + SessionStart/Stop advisories, per `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`): at the worst observed regrowth (~500 B/day) a 6 KiB router reaches the 12 KiB cap in ~12 days, inside any calendar cadence |
-| Router size | `MEMORY.md` ≥ 8,192 B (the gate's OK line prints the size) | crossed silently on 2026-08-13; observed regrowth ≈166–500 B/day |
+| Router size | `MEMORY.md` ≥ 8,192 B (the gate's OK line prints size, lines, and unique direct leaf refs) | crossed silently on 2026-08-13; observed regrowth ≈166–500 B/day |
 | Health findings | `check:memory-health` flagged files ≥ 5 | steady inflow; resets do not persist |
 | Store growth | ≥ 25 new leaf files since the last audit | roughly one month of observed inflow |
 | Drift report | committed report older than 24 h **and** a session needs to cite "drift clean" | the checker itself warns; do not cite a stale report silently |
@@ -128,7 +128,8 @@ npm run check:memory-router            # note bytes/lines from the OK line
 npm run check:memory-health -- --json  # save/inspect the findings array
 npm run check:memory-drift:no-write    # note report age from the warning line
 
-# B. Router composition (read-only)
+# B. Router composition (read-only). The gate above owns unique leaf refs;
+# this independent view also records hub/doc refs.
 node -e "
 const fs=require('fs');const raw=fs.readFileSync('.claude-memory/MEMORY.md','utf8');
 const refs=raw.match(/[A-Za-z0-9._\/-]+\.md/g)||[];
@@ -216,12 +217,13 @@ Tool output is a worklist, never a verdict, in both directions:
   heading.
 - A zero is only a structural statement. Never cite "memory-health: 0" as
   semantic cleanliness; cite the audit that established it and its date.
-- Known measurement artifacts (record them as such rather than "fixing" the
-  leaf): `weak-basis` currently keys on a `last_verified` frontmatter key and
-  can flag a leaf whose body carries dated `[VERIFIED]` evidence; the router
-  gate counts lines by newline-split (one higher than `wc -l`). Apply
-  measurement artifacts in both directions — they can hide findings as well as
-  create them.
+- Known measurement boundaries: `weak-basis` accepts either a non-weak
+  `last_verified` value or the paired alternative of a parseable harness
+  `modified:` timestamp plus a dated in-body `[VERIFIED ...]` label. A missing
+  or malformed timestamp, an undated label, or explicit weak
+  `last_verified` prose still flags. The router gate counts lines by
+  newline-split (one higher than `wc -l`). Apply measurement artifacts in both
+  directions — they can hide findings as well as create them.
 
 ## 9. Classification vocabulary and decision rules
 
@@ -353,6 +355,7 @@ npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-
 npm run check:agent-wiki && npm run check:agent-wiki:self-test               # if wiki touched
 npm run check:docs-catalog                                                   # if top-level docs touched (regenerate first)
 npm run check:harness-framing && npm run check:harness-framing:self-test     # if router/feedback-memory wording touched
+npm test -- --runInBand tests/unit/check-memory-health.test.js               # if memory-health semantics changed
 npm run check:memory-health                                                  # advisory close-out reading
 npm run check:memory-drift:no-write                                          # advisory close-out reading
 ```

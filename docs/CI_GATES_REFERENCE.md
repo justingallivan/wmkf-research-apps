@@ -6,7 +6,7 @@ status: canonical
 summary: Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-27
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - docs/atlas/
@@ -249,6 +249,16 @@ Fails on:
 
 Together with `:fact-consistency`, scalar values + the generated doc + cross-document pointers are now machine-verified end-to-end.
 
+### `check:memory-router` — compact, valid memory routing
+
+Validates the `.claude-memory/MEMORY.md` byte/line/prose budgets, linked topic
+existence, and every topic file's frontmatter status. The successful output
+also reports the count of unique directly routed leaf-memory files; duplicate
+leaf references and docs/wiki hub links do not inflate that advisory metric.
+The metric is informational and does not change the router's warning or hard
+limits. Self-test: `npm run check:memory-router:self-test`, including a fixture
+that distinguishes direct leaves from duplicate and hub/doc references.
+
 ### `check:memory-drift` (advisory) — memory↔code drift
 
 Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_entity`, large `stale_row_count`, `doc_label_collision`, or any `probe_errors`.
@@ -262,7 +272,7 @@ The report's top-level `summary` describes current live drift only. The dated 20
 
 ### `check:memory-health` (advisory) — active-memory hygiene worklist (S348)
 
-Added S348 (audit Slice 5 from `docs/audits/memory-hygiene-control-audit-2026-07-02.md`). Runs `scripts/check-memory-health.js`. **Read-only, never fails** — complements `check:memory-router` (structure) with semantic-freshness signals. Reports per active leaf memory: `shadow-atlas` (structural claim, no Atlas/source/probe pointer), `weak-basis` (structural claim + stale/absent `last_verified`), `no-recall-rule`, `oversize-routed`, `stale-routed`. Parses both frontmatter conventions (top-level and `metadata:`-block `status:`). `--json` emits a machine-readable triage worklist; `--quiet` prints summary only. It is the intended starting point for future memory-triage passes (see `docs/audits/memory-triage-2026-07-08.md`). Wired into the `/start` advisory gate list.
+Added S348 (audit Slice 5 from `docs/audits/memory-hygiene-control-audit-2026-07-02.md`). Runs `scripts/check-memory-health.js`. **Read-only, never fails** — complements `check:memory-router` (structure) with semantic-freshness signals. Reports per active leaf memory: `shadow-atlas` (structural claim, no Atlas/source/probe pointer), `weak-basis` (structural claim + explicitly weak `last_verified`, or no acceptable basis), `no-recall-rule`, `oversize-routed`, `stale-routed`. An acceptable basis is either a non-weak `last_verified` value or both a parseable harness `modified:` timestamp and a dated in-body `[VERIFIED ...]` label. Explicit unknown/not-re-probed text still flags even when the alternative evidence shape is present. Parses top-level and `metadata:`-nested frontmatter keys. `--json` emits a machine-readable triage worklist; `--quiet` prints summary only. It is the intended starting point for future memory-triage passes (see `docs/audits/memory-triage-2026-07-08.md`). Wired into the `/start` advisory gate list. Focused coverage: `npm test -- --runInBand tests/unit/check-memory-health.test.js`.
 
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
@@ -371,6 +381,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:doc-symbol-refs` | `check:doc-symbol-refs:self-test` — positive (dangling), negative (existing/annotated/marker/glob/ellipsis/relative/URL/gitignored), and live-baseline-clean fixtures. |
 | `check:build-claim-freshness` | `check:build-claim-freshness:self-test` — positive (pending construction on an existing path: before/after/colon/to-be-created), negative (pending on absent path, plain ref, done-marker, "now lives at", bare-planned label, multi-path, ignore-marker, gitignored), and live-baseline-clean fixtures. |
 | `check:canonical-pointers` | `check:canonical-pointers:self-test` |
+| `check:memory-router` | `check:memory-router:self-test` — includes byte-boundary, prose/link/status, and unique-direct-leaf metric fixtures. |
 | `check:model-registry` | `check:model-registry:self-test` |
 | `check:agent-wiki` | `check:agent-wiki:self-test` |
 | `check:harness-framing` | `check:harness-framing:self-test` |

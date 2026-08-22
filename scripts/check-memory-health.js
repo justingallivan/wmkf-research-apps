@@ -21,8 +21,9 @@
  *                        do / do-not / ground-truth shape is not normalized.
  *   - weak-basis       : active file that makes a structural/live-state claim AND
  *                        whose `last_verified` is missing, empty, or says unknown /
- *                        not re-probed / not yet verified — the verification basis
- *                        is old memory-content, so recall is likely stale. Purely
+ *                        not re-probed / not yet verified, unless a valid harness
+ *                        `modified:` timestamp is paired with dated in-body
+ *                        `[VERIFIED ...]` evidence. Purely
  *                        behavioral (feedback-*) rules are NOT flagged: they have
  *                        nothing to probe, so an absent last_verified is expected.
  *   - oversize-routed  : active file over BYTE_THRESHOLD that is also routed from
@@ -65,18 +66,27 @@ const STRUCTURAL_RE = /\b(Postgres|Dataverse|Dynamics|\btable\b|\bentity\b|row c
 
 // Evidence that a structural claim IS grounded — an Atlas/source/probe pointer.
 const GROUNDED_RE = /APPLICATION_STATE_ATLAS|docs\/atlas\/|\[VERIFIED|\bprobe(d)?\b|\.sql\b|\.js\b|migrations?\//i;
+const DATED_VERIFIED_RE = /\[VERIFIED[^\]\r\n]*\b\d{4}-\d{2}-\d{2}\b[^\]\r\n]*\]/i;
 
 function parseFrontmatter(raw) {
   const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fm) return { block: null, status: null, lastVerified: null };
+  if (!fm) return { block: null, status: null, lastVerified: null, modified: null };
   const block = fm[1];
   const statusMatch = block.match(/^\s*status:\s*(.+?)\s*$/m);
   const lvMatch = block.match(/^\s*last_verified:\s*(.*?)\s*$/m);
+  const modifiedMatch = block.match(/^\s*modified:\s*(.*?)\s*$/m);
   return {
     block,
     status: statusMatch ? statusMatch[1].replace(/^['"]|['"]$/g, '') : null,
     lastVerified: lvMatch ? lvMatch[1].replace(/^['"]|['"]$/g, '') : null,
+    modified: modifiedMatch ? modifiedMatch[1].replace(/^['"]|['"]$/g, '') : null,
   };
+}
+
+function hasModifiedVerifiedBasis(modified, body) {
+  return Boolean(modified)
+    && Number.isFinite(Date.parse(modified))
+    && DATED_VERIFIED_RE.test(body);
 }
 
 /**
@@ -97,7 +107,7 @@ function analyzeStore(memDir) {
   const findings = [];
   for (const f of files) {
     const raw = fs.readFileSync(path.join(memDir, f), 'utf8');
-    const { block, status, lastVerified } = parseFrontmatter(raw);
+    const { block, status, lastVerified, modified } = parseFrontmatter(raw);
     const bytes = Buffer.byteLength(raw, 'utf8');
     const body = block ? raw.slice(raw.indexOf('---', 3) + 3) : raw;
     const flags = [];
@@ -115,8 +125,10 @@ function analyzeStore(memDir) {
       // Their basis is the correction itself, not a live-state probe; requiring a
       // `last_verified` date would contradict this check's documented contract.
       const isBehavioralFeedback = f.startsWith('feedback-');
+      const explicitlyWeakBasis = Boolean(lastVerified) && WEAK_BASIS_RE.test(lastVerified);
+      const hasAlternativeBasis = !lastVerified && hasModifiedVerifiedBasis(modified, body);
       if (makesStructuralClaim && !isBehavioralFeedback
-        && (!lastVerified || WEAK_BASIS_RE.test(lastVerified))) {
+        && (explicitlyWeakBasis || (!lastVerified && !hasAlternativeBasis))) {
         flags.push('weak-basis');
       }
 
@@ -189,6 +201,6 @@ function main() {
   console.log('structural claim against source/Atlas/probe before changing memory.');
 }
 
-module.exports = { analyzeStore, parseFrontmatter, BYTE_THRESHOLD };
+module.exports = { analyzeStore, parseFrontmatter, hasModifiedVerifiedBasis, BYTE_THRESHOLD };
 
 if (require.main === module) main();

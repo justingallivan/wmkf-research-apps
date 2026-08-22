@@ -6,7 +6,7 @@ status: active
 summary: "Built 8 KiB router early-warning notice across the checker, SessionStart/Stop hooks, and start/stop skills, with mutation-backed regression coverage."
 canonical: false
 cataloged: 2026-08-21
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - docs/MEMORY_HYGIENE_RUNBOOK.md
@@ -29,6 +29,12 @@ Build-time verification receipts:
 [RECHECKED after scripts/check-memory-router-self-test.js change: fixtures a–e implemented as cases 11–15, all green]
 The sections below are retained as the reviewed design contract the build
 implements; §4 is the ongoing regression procedure.
+
+**Later owner-approved follow-on (2026-08-22):** the companion review's R4/R5
+were implemented separately: the router gate now emits a unique-direct-leaf
+metric, and `weak-basis` accepts the paired harness `modified:` + dated
+in-body `[VERIFIED]` evidence shape with fail-closed complement tests. These
+follow-ons do not change this plan's thresholds or hook behavior.
 
 **Post-build review (fourth Codex review, of the built diff, 2026-08-21):
 two findings, both accepted and fixed in the commit carrying this note.**
@@ -209,9 +215,10 @@ addresses for the editor, re-derive before editing — the review doc is
   paragraph), `:518` context check, `:531` (Q14 tighten list item a),
   `:555` (R3 row). Analytical descriptions of the CURRENT 11 KiB band
   (`:39`, `:91`, `:116`, `:160-163`) are correct state and stay.
-- Pending-decision framing: review `:571` ("Owner decisions pending: R3–R5…"
-  — R3 leaves the pending list; R4/R5 remain pending), `:465` and `:556-557`
-  stay pending (R4/R5 unaffected).
+- Pending-decision framing at this plan's baseline: review `:571` ("Owner
+  decisions pending: R3–R5…" — R3 left the pending list in this plan; R4/R5
+  were unaffected here and were later owner-approved and implemented on
+  2026-08-22).
 - Off-by-one line refs: review `:117`, `:451`, `:555`.
 
 **Acceptance sweep (case-insensitive, semantic — classify raw results before

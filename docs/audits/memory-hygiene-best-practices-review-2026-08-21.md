@@ -103,10 +103,14 @@ Key verified mechanics:
   single-sourced.
 - **Health advisory** (`scripts/check-memory-health.js`): read-only, never
   fails; regex heuristics per active leaf — `no-recall-rule` (heading absence),
-  `weak-basis` (structural vocabulary + missing/weak `last_verified`, with a
-  documented `feedback-*` exemption), `oversize-routed` (routed + >5,120 B),
-  `shadow-atlas` (structural vocabulary with no grounding pointer),
-  `stale-routed` (retired but routed). Not in CI; `/start` only.
+  `weak-basis` (at this review's baseline: structural vocabulary + missing/weak
+  `last_verified`, with a documented `feedback-*` exemption),
+  `oversize-routed` (routed + >5,120 B), `shadow-atlas` (structural vocabulary
+  with no grounding pointer), `stale-routed` (retired but routed). Not in CI;
+  `/start` only. The owner-approved 2026-08-22 R5 follow-on expanded an
+  acceptable basis to include a parseable harness `modified:` timestamp paired
+  with a dated in-body `[VERIFIED ...]` label; explicit weak declarations and
+  malformed/undated complements still flag.
 - **Drift check** (`scripts/check-memory-drift.js`): evaluates the committed
   `docs/RECONCILIATION_REPORT.json`; blocks on spec-without-entity, >50%
   row-count drift, doc-label collisions, probe errors. The regeneration path
@@ -218,7 +222,7 @@ edits made, per scope):
 | File | Flags | Classification | Recommended disposition |
 |---|---|---|---|
 | `feedback-clear-jest-cache-in-shared-worktrees.md` | `no-recall-rule` | **Formatting debt only.** The content already contains a trigger and "How to apply"; only the literal `## Recall Rule` heading is absent. No factual claim at risk. | Add the heading during the next routine housekeeping pass. |
-| `project-dynamics-explorer-socal-campaign.md` | `weak-basis`, `oversize-routed` (6,899 B) | **Metadata gap + acceptable size for an active campaign hub.** Body evidence is fresh and probe-dated ([VERIFIED 2026-08-20/21] tags); the flag fires because frontmatter has `modified:` but no `last_verified:` key. Not semantically stale. | Add a `last_verified` frontmatter key; compress the Phase A/B production narrative into the campaign plan when the observation windows close. |
+| `project-dynamics-explorer-socal-campaign.md` | At this snapshot: `weak-basis`, `oversize-routed` (6,899 B); after R5: `oversize-routed` only | **Baseline measurement artifact + acceptable size for an active campaign hub.** Body evidence was fresh and probe-dated (`[VERIFIED 2026-08-20/21]` tags); the old checker flagged the missing `last_verified:` key despite the paired harness `modified:` timestamp. R5 resolved that false positive on 2026-08-22 without editing the leaf. | No metadata-only edit. Keep the evidence-backed accepted-size disposition; compress the Phase A/B production narrative into the campaign plan when the observation windows close. |
 | `project-prompt-governance.md` | `oversize-routed` (5,214 B) | **Marginal (94 B over threshold), fresh (2026-08-18), routed and load-bearing.** | Accept; compress opportunistically at next touch. |
 
 None of the three is a factual defect. This validates the advisory's design
@@ -379,12 +383,13 @@ Ordered by severity × likelihood.
    `test.yml`), so the exposure is bounded to cap breaches landing red in CI
    rather than being blocked locally — acceptable, but worth stating in the
    runbook rather than relying on the hook's reputation.
-7. **Health heuristics have known measurement artifacts.** `weak-basis` keys
-   on a `last_verified` frontmatter key; a leaf carrying only the
-   harness-stamped `modified` timestamp plus in-body `[VERIFIED date]` tags
-   still flags (observed on the SoCal leaf). Failure mode: alarm fatigue and
-   mechanical-silencing pressure — the exact behavior the 07-27 sweep
-   invariants forbid.
+7. **Health heuristics had a known measurement artifact.** At this review's
+   baseline, `weak-basis` keyed only on a `last_verified` frontmatter key; a
+   leaf carrying the harness-stamped `modified` timestamp plus in-body
+   `[VERIFIED date]` tags still flagged (observed on the SoCal leaf). **Resolved
+   2026-08-22 under owner-approved R5:** the checker now accepts that paired
+   evidence shape while continuing to flag missing/malformed timestamps,
+   undated labels, and explicit unknown/not-re-probed declarations.
 8. **Drift registry narrowness can be over-read.** "Memory drift clean" means
    the narrow registered claims pass against a possibly-stale committed
    report; it is not a memory-wide freshness statement. The 07-02 audit said
@@ -465,13 +470,14 @@ checker's exports). The earlier idea of simply lowering the warn threshold to
 merits.
 
 **Q5 — should leaf-reference count / leaf-to-hub ratio become a metric?** Yes,
-as an advisory trend metric, not a gate. Measured today: 113 total `.md` refs
+as an advisory trend metric, not a gate. Measured at this review: 113 total `.md` refs
 (103 unique) = 62 unique leaf refs + 41 unique hub/doc refs; the 07-29 diet
 landed at 41 unique leaf refs. Unique-leaf-refs is cheap to compute, tracks
 exactly the growth class that regrows (§8.2 lines carry leaf lists), and gives
-the diet a measurable target (return toward ~45). Adding it to the router
-gate's OK line is a proposed low-cost checker change (owner decision); until
-then the runbook computes it with a one-liner.
+the diet a measurable target (return toward ~45). **Resolved 2026-08-22 under
+owner-approved R4:** the router gate's OK line now reports unique directly
+routed leaf files; duplicate refs and hub/doc links do not inflate it. The
+runbook keeps its composition one-liner as an independent hub-count view.
 
 **Q6 — do health checks detect semantic staleness?** No — structural smells
 only, by documented design; the narrow exceptions are `check:doc-symbol-refs` /
@@ -536,13 +542,12 @@ table so metrics stop living only in per-audit snapshots.
 
 **Q14 — retain / tighten / replace / remove?** Retain everything (§7); nothing
 merits removal — each control catches a distinct, evidenced failure class.
-Tighten: (a) resolved 2026-08-21 — the warn-threshold idea was superseded by
-the owner-approved early-warning plan
-(`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`); the remaining items are
-owner-decision proposals, none implemented here:
-(b) advisory unique-leaf-ref count in the router gate output; (c) a
-`weak-basis` refinement accepting a harness `modified:` stamp plus in-body
-dated `[VERIFIED]` tags as a non-weak basis (kills the §8.7 artifact); (d)
+Resolved tightenings: (a) 2026-08-21 — the warn-threshold idea was superseded
+by the owner-approved early-warning plan
+(`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`); (b) 2026-08-22 — the router gate
+began emitting the advisory unique-direct-leaf count (R4); (c) 2026-08-22 —
+`weak-basis` began accepting the paired harness `modified:` + dated in-body
+`[VERIFIED]` shape with fail-closed complement cases (R5). Remaining proposal:
 consider a CI advisory step printing health counts so trends are visible
 between sessions. Replace/remove: none.
 
@@ -565,9 +570,9 @@ between sessions. Replace/remove: none.
 | R1 | Adopt `docs/MEMORY_HYGIENE_RUNBOOK.md`: routine audit (~2-weekly or triggered at router ≥8 KiB / ≥5 flagged files / ≥25 new leaves) + quarterly-or-event deep audit with the S154-V2 falsification disciplines | P0 | done (this branch) | ~30–60 min per routine run; hours per deep audit | closes §8.1–8.4; converts ad-hoc audits into a procedure with completion criteria |
 | R2 | Router-diet procedure: strip status/release narrative to SESSION_PROMPT/queue/plans; target ≤ ~6 KiB and ~≤45 unique leaf refs after each diet (matching runbook §10 — landing at 8 KiB would immediately re-fire the audit trigger) | P0 | procedural | one focused commit per cycle | §8.1–8.2; keeps the auto-loaded surface below the silent zone permanently |
 | R3 | **Resolved 2026-08-21 — superseded by the owner-approved early-warning plan** (`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`): an 8 KiB gate notice plus a thresholds module imported by the checker and both hooks, replacing the hardcoded copy at `.claude/hooks/session-lifecycle.js:285-286`; the bare 9,216 B warn-band lowering was considered and superseded, not rejected on merits | — (owner-decided) | tracked in the plan | per plan | same failure mode as the original R3 (§8.1: silent 8→11 KiB zone), addressed by the approved mechanism |
-| R4 | Owner decision: emit advisory unique-leaf-ref count from the router gate | P2 | ~30 min | none material | makes the Q5 metric self-updating |
-| R5 | Owner decision: refine `weak-basis` to accept harness `modified:` + in-body dated `[VERIFIED]` as basis | P2 | ~30 min + care | small recall loss for genuinely weak leaves | kills the observed false-positive class (§8.7); reduces silencing pressure |
-| R6 | Fix the three current advisory findings per §5 dispositions at next housekeeping (out of scope for this branch) | P2 | ~15 min | trivial | clears the worklist honestly, not mechanically |
+| R4 | **Resolved 2026-08-22:** emit advisory unique-direct-leaf count from the router gate; duplicates and hub/doc refs are excluded | — (owner-decided) | shipped with fixture coverage | none material | makes the Q5 metric self-updating |
+| R5 | **Resolved 2026-08-22:** refine `weak-basis` to accept harness `modified:` + in-body dated `[VERIFIED]` as basis, while explicit weak text and malformed/undated complements still flag | — (owner-decided) | shipped with focused Jest coverage | bounded by the explicit complements | kills the observed false-positive class (§8.7); reduces silencing pressure |
+| R6 | **Resolved/bounded 2026-08-22:** the missing recall rule was repaired in the first routine audit; R5 cleared the SoCal metadata-shaped flag; the two oversize findings retain evidence-backed accepted-debt dispositions | — | complete | none material | clears the actionable worklist honestly, not mechanically |
 | R7 | Keep drift regeneration owner-run only; routine audits stay `--no-write`; record report age whenever citing "drift clean" | P1 | procedural | none | prevents over-reading a stale committed report (§8.8) and accidental live probes |
 | R8 | Do not add new blocking memory gates now | — | — | — | every candidate (health, drift) has documented false-positive classes; blocking would invite mechanical silencing, the failure mode the 07-27 invariants exist to prevent |
 
@@ -580,9 +585,7 @@ between sessions. Replace/remove: none.
 - **UNKNOWN — live drift beyond the registry.** "Drift clean" covers the
   narrow registry against a 4-day-old report; a fresh regeneration requires
   owner-run live probes (standing rule) and was deliberately not performed.
-- **Owner decisions pending:** R4–R5 checker refinements (R3 was resolved
-  2026-08-21 — superseded by the approved early-warning plan,
-  `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`); whether the
+- **Owner decisions pending:** whether the
   routine audit lands as a skill (`/memory-audit`) or stays a runbook
   procedure; whether to schedule the first deep audit under the new runbook or
   fold it into the next natural trigger.
@@ -614,9 +617,9 @@ corrected in this version.
    validates the procedure and performs the overdue router diet (R2), including
    the §5 dispositions (R6).
 3. R3 was owner-decided 2026-08-21 (early-warning plan; implementation tracked
-   there). Owner decides R4–R5; implement approved checker changes with self-tests in
-   a separate commit per the gate-modification contract in
-   `docs/CI_GATES_REFERENCE.md`.
+   there). R4–R5 were owner-approved and implemented 2026-08-22 with router
+   self-test and focused memory-health Jest coverage per the gate-modification
+   contract in `docs/CI_GATES_REFERENCE.md`.
 4. First deep audit: at the next trigger event or 2026-Q4 start, whichever
    comes first; append its row to §11's trend table and the runbook's metrics
    log.
