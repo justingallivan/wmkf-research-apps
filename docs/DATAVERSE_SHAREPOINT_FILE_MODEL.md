@@ -102,11 +102,12 @@ hood.
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
-- **Post-handoff UI ownership (implemented on a feature branch, not deployed
-  2026-08-21):** Pre-Site working controls exist only for Draft. Review becomes
-  a handoff receipt whose one action routes to Site Visit; later and unknown
-  lifecycle values fail closed. Site Visit owns Edit/Download for the active
-  Review workspace.
+- **Post-handoff UI ownership (Production-deployed 2026-08-21; signed-in receipt
+  smoke open):** commit `b3bb0ef6`, Ready deployment
+  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, limits Pre-Site working controls to Draft.
+  Review becomes a handoff receipt whose one action routes to Site Visit; later
+  and unknown lifecycle values fail closed. Site Visit owns Edit/Download for
+  the active Review workspace.
 - **Initial Assessment pilot locator (deployed and exercised):** queries the
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
@@ -314,8 +315,8 @@ variable, persists its identity/version/hash manifest and all
 eight named fields in Wave 19, renders from Dataverse readback, uploads one
 stable Word item to `Artifacts/Pre-Site Visit/`, and atomically activates the
 current Ready row. The route returns a registry DTO. Draft-state Pre-Site UI
-exposes its stable Word link; branch-only hardening removes that link after
-Review and routes work through Site Visit instead. Request `1002379` exact Ready retry reused the same
+exposes its stable Word link; Production-deployed receipt hardening removes that
+link after Review and routes work through Site Visit instead. Request `1002379` exact Ready retry reused the same
 row/run/item without another model call or upload. **[DEPLOYED TO PRODUCTION
 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]** sole-current prompt v4
 `74409f95-509b-f111-b8db-6045bd008868` on `claude-sonnet-4-6` exact-readback

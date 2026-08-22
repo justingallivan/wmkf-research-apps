@@ -52,13 +52,12 @@ from the registry. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE
 SMOKE OPEN]** its compact action panel shows Generate before a draft
 exists and Edit, Download, and confirmation-guarded Regenerate actions only
 while the current Ready artifact remains Draft; detailed workflow guidance is
-behind an accessible help control. **[IMPLEMENTED ON FEATURE BRANCH, NOT
-DEPLOYED 2026-08-21]** after Review handoff, the Pre-Site tab becomes a
-read-only handoff receipt with one `Continue in Site Visit` action. It moves any
+behind an accessible help control. **[DEPLOYED TO PRODUCTION 2026-08-21;
+SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6`, Ready deployment
+`dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, makes the Pre-Site tab a read-only handoff
+receipt after Review with one `Continue in Site Visit` action. It moves any
 durable edit-check warnings inside that receipt and fails closed for later or
-unknown lifecycle values. Production continues to show the older promoted-state
-Edit/Download controls until this branch is deliberately promoted. Wave 19 is
-live in Production: its owner-approved
+unknown lifecycle values. Wave 19 is live in Production: its owner-approved
 metadata-only apply created all 12 attributes and two request lookups, and
 independent readback found 14 exact with no absence or divergence. Request
 `1002379` later created the first Ready Pre-Site row, completed governed v3 AI
@@ -78,7 +77,7 @@ or changing a request artifact.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, and the clearer handoff modal are Production-deployed, while the promoted-state receipt hardening is branch-only and Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21, and feature-branch receipt tests | PRODUCTION-PROVED / BRANCH-ONLY HARDENING |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, clearer handoff modal, and promoted-state receipt hardening are Production-deployed, while Final remains a placeholder | Workbench source; Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, and `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`; focused service/route/component tests; signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21; production auth-boundary smoke | PRODUCTION-DEPLOYED; SIGNED-IN RECEIPT SMOKE OPEN |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Request `1002379` has one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; current row GUID was not exposed by the browser proof | VERIFIED LIVE |
@@ -564,10 +563,12 @@ silently extend its paths or names to writeup publications.
    identity, returned the handoff timestamp after a fresh authenticated GET,
    and locked Pre-Site regeneration. The service's post-write reread requires
    the exact publication version, governed hash, and milestone time to match.
-5. **Promoted-state receipt hardening — implemented on a feature branch, not
-   deployed 2026-08-21.** Restrict Pre-Site working controls to Draft, route
-   Review warnings and work to Site Visit, fail closed for later/unknown states,
-   and reconcile the durable UI contract before deliberate promotion.
+5. **Promoted-state receipt hardening — Production-deployed 2026-08-21;
+   signed-in receipt smoke open.** Commit `b3bb0ef6`, Ready deployment
+   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, restricts Pre-Site working controls to
+   Draft, routes Review warnings and work to Site Visit, and fails closed for
+   later/unknown states. The public Workbench route reached the successful
+   sign-in page; no signed-in post-release document action was exercised.
 6. **Guarded correction/reopen.** Select the bounded audit/schema and permission
    representation, then implement the preserve-and-succeed transaction above.
    This must precede Final creation so an accidental handoff cannot become an

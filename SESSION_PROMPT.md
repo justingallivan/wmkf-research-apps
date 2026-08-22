@@ -170,6 +170,19 @@ Site Visit handoff smoke first.
      domain where an example or live app URL was intended. Commit `ec8ed1f`;
      zero remaining literal matches, focused tests and documentation gates green.
 
+10. **The post-handoff receipt is Production-deployed.**
+   - Commit `b3bb0ef6` is on `main`; Vercel deployment
+     `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` is Ready with the Production aliases.
+   - Pre-Site Edit, Download, filename, and Regenerate controls are Draft-only.
+     Review is a read-only receipt with one Site Visit continuation action and
+     visible warning checklist; later, unknown, and missing-link states fail
+     closed with an explanation.
+   - The focused component suite passed 23 tests, the Webpack production build
+     passed, and two read-only Claude Opus reviews returned APPROVE with no
+     actionable defects. The public Workbench route redirected successfully to
+     the Production sign-in page. A signed-in post-release receipt smoke remains
+     open and no durable business write was performed for release verification.
+
 ### Commits
 
 - `997de04d` - feat(admin): guide reviewer repair alert resolution
@@ -196,6 +209,8 @@ Site Visit handoff smoke first.
 - `8c2fa489` - fix(reviewers): bound prior request context correctly
 - `561ec242` - docs(observability): close Track A safety watch
 - `ec8ed1f` - docs(domains): remove nonexistent former-domain references
+- `bd9dc06` - fix(workbench): harden site visit handoff receipt
+- `b3bb0ef6` - fix(workbench): clarify read-only handoff states
 
 ## Next Items
 

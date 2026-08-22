@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff, same-item Edit/Download, fresh authenticated status readback, and regeneration lock
+  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff plus Ready Production receipt deployment dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi
 ---
 
 ## Recall Rule
@@ -134,6 +134,16 @@ timestamp on a fresh authenticated load, and locked Pre-Site regeneration. The
 service's post-write reread requires the exact publication version, governed
 hash, and non-null milestone time. Logistics/supporting files and Final remain
 later slices.
+
+**2026-08-21 post-handoff receipt (Production-deployed; signed-in receipt smoke
+open):** commit `b3bb0ef6`, Ready deployment
+`dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, removes Pre-Site Edit, Download, filename,
+and Regenerate controls after Review. The Pre-Site tab becomes a read-only
+handoff receipt with one Site Visit continuation action, keeps recorded edit
+warnings visible as the checklist, and fails closed for later, unknown, or
+missing-link states. Site Visit owns the active Review workspace controls. The
+public Workbench route redirected successfully through the Production sign-in
+boundary; a signed-in post-release receipt smoke has not yet been run.
 
 **2026-08-17 Proposal-tab Phase II documents (deployed at `83b9c68a`,
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`):** the Proposal tab now displays every
