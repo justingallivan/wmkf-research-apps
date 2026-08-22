@@ -766,6 +766,361 @@ test('session lifecycle detects unresolved strict same-session doc staleness', (
   assert.strictEqual(unresolvedStaleDocWarnings(root, state).length, 0);
 });
 
+// ---------------------------------------------------------------------------
+// Memory-router early-warning Stop advisories
+// (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md §4, tests T1–T7)
+// ---------------------------------------------------------------------------
+
+const {
+  advisedKeyDigest: mrAdvisedKeyDigest,
+  clearAdvisedKeyBeforeBlock: mrClearKey,
+  comparableAdvisedKey: mrComparableKey,
+  routerAdvisory: mrRouterAdvisory,
+} = require('./session-lifecycle');
+const MR_THRESHOLDS = require('../../scripts/lib/memory-router-thresholds.js');
+const ROUTER_REL = '.claude-memory/MEMORY.md';
+
+function mrCrossingText(startBytes, currentBytes) {
+  return `Memory router crossing: edits in this session carried .claude-memory/MEMORY.md from ${startBytes}B to ${currentBytes}B, over the ${MR_THRESHOLDS.NOTICE_BYTES}B routine-audit trigger. Run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10 now, or record the debt explicitly in SESSION_PROMPT.md.`;
+}
+
+// Fixture: a tmp repo root with a controllable router file, an optional
+// gate-mapped touched path whose npm script is deterministic, and a seeded
+// session-state file. Returns paths + helpers.
+function mrFixture({ routerStart = null, routerNow = null, touchRouter = false, gate = null } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-mr-stop-'));
+  write(path.join(root, 'CLAUDE.md'), '# Test instructions\n');
+  fs.mkdirSync(path.join(root, '.claude', 'skills'), { recursive: true });
+  fs.mkdirSync(path.join(root, '.claude-memory'), { recursive: true });
+  if (routerNow !== null) write(path.join(root, ROUTER_REL), 'x'.repeat(routerNow));
+  const touched = [];
+  if (touchRouter) touched.push(ROUTER_REL);
+  // A touched router matches GATE_MAP's `.claude-memory/` rule, which selects
+  // check:fact-consistency — so EVERY fixture defines both mapped scripts
+  // deterministically (fact-consistency always green; api-routes per `gate`).
+  write(path.join(root, 'gate.js'), `console.log('sentinel-gate-output');process.exit(${gate === 'fail' ? 1 : 0});\n`);
+  write(path.join(root, 'package.json'), JSON.stringify({
+    name: 'mr-fixture', version: '1.0.0',
+    scripts: {
+      'check:fact-consistency': 'node -e "process.exit(0)"',
+      'check:api-routes': 'node gate.js',
+    },
+  }));
+  if (gate) {
+    // 'pages/api/**' maps to check:api-routes in GATE_MAP.
+    touched.push('pages/api/test.js');
+    write(path.join(root, 'pages/api/test.js'), '// fixture route\n');
+  }
+  const sessionId = `mr-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const stateFile = statePath({ session_id: sessionId }, root);
+  const baselineInvariantFailures = checkAgentInvariants(root)
+    .filter((item) => !item.ok)
+    .map((item) => item.name);
+  const seedState = (extra = {}) => write(stateFile, JSON.stringify({
+    version: 3,
+    root,
+    baseline: {},
+    baselineInvariantFailures,
+    touched,
+    touchLog: touched.map((p) => ({ path: p, at: new Date().toISOString() })),
+    staleDocWarnings: [],
+    adversarialReviewRequirements: {},
+    adversarialReviewReceipts: {},
+    gateCache: {},
+    routerBytesAtStart: routerStart,
+    ...extra,
+  }));
+  seedState();
+  const runStop = (env = {}, hookFile = path.join(HOOK_DIR, 'session-lifecycle.js')) => spawnSync(
+    process.execPath, [hookFile, 'stop'],
+    {
+      cwd: root,
+      input: JSON.stringify({ cwd: root, session_id: sessionId }),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_STOP_GATE_MODE: '', ...env },
+    }
+  );
+  const readState = () => JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  return { root, stateFile, seedState, runStop, readState, sessionId };
+}
+
+// Replicates runGate()'s transform against an independent spawn, so the
+// expected advisory text is exact without being circular.
+function mrExpectedGateAdvisory(root) {
+  const r = spawnSync('npm', ['run', 'check:api-routes'], { cwd: root, encoding: 'utf8', env: process.env });
+  const output = `${r.stdout || ''}\n${r.stderr || ''}`.trim().split('\n').slice(-12).join('\n');
+  return `Advisory changed-surface gate failure (blocking rollout is not enabled):\n\`check:api-routes\` failed:\n${output}`;
+}
+
+function mrParseSingleJson(stdout) {
+  const trimmed = stdout.trim();
+  const parsed = JSON.parse(trimmed); // throws on zero/partial/multiple objects
+  return parsed;
+}
+
+// The full T1 contract for one hook file: exact object + exit status per
+// path. Returns nothing on success; throws on any deviation — reused verbatim
+// by the mutation subruns, which must make it throw.
+function mrAssertCombinedContract(hookFile) {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
+  const expected = {
+    hookSpecificOutput: {
+      hookEventName: 'Stop',
+      additionalContext: `${mrExpectedGateAdvisory(fx.root)}\n\n${mrCrossingText(7000, 9000)}`,
+    },
+  };
+  const result = fx.runStop({}, hookFile);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.deepStrictEqual(mrParseSingleJson(result.stdout), expected);
+}
+
+test('T1: no-advisory paths produce status 0 and byte-empty stdout', () => {
+  const none = mrFixture({ routerStart: 5000, routerNow: 5000, touchRouter: false });
+  const r1 = none.runStop();
+  assert.strictEqual(r1.status, 0, r1.stderr);
+  assert.strictEqual(r1.stdout, '');
+  const green = mrFixture({ routerStart: 5000, routerNow: 5000, touchRouter: false, gate: 'pass' });
+  const r2 = green.runStop();
+  assert.strictEqual(r2.status, 0, r2.stderr);
+  assert.strictEqual(r2.stdout, '');
+});
+
+test('T1: gate-only failure emits exactly the complete expected object', () => {
+  const fx = mrFixture({ routerStart: 5000, routerNow: 5000, touchRouter: false, gate: 'fail' });
+  const expected = {
+    hookSpecificOutput: { hookEventName: 'Stop', additionalContext: mrExpectedGateAdvisory(fx.root) },
+  };
+  const result = fx.runStop();
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.deepStrictEqual(mrParseSingleJson(result.stdout), expected);
+});
+
+test('T1: router-only crossing emits exactly the complete expected object', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const expected = {
+    hookSpecificOutput: { hookEventName: 'Stop', additionalContext: mrCrossingText(7000, 9000) },
+  };
+  const result = fx.runStop();
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.deepStrictEqual(mrParseSingleJson(result.stdout), expected);
+});
+
+test('T1: combined gate + router path carries both producers in order', () => {
+  mrAssertCombinedContract(path.join(HOOK_DIR, 'session-lifecycle.js'));
+});
+
+test('T1 mutations: each seeded defect breaks the combined contract', () => {
+  const source = fs.readFileSync(path.join(HOOK_DIR, 'session-lifecycle.js'), 'utf8');
+  const mutations = [
+    ['dropped gate summary',
+      '(blocking rollout is not enabled):\\n${summary}`',
+      '(blocking rollout is not enabled):`'],
+    ['duplicated producer',
+      'if (routerNote) stopAdvisories.push(routerNote);',
+      'if (routerNote) { stopAdvisories.push(routerNote); stopAdvisories.push(routerNote); }'],
+    ['wrong hookEventName',
+      "additionalContext('Stop', stopAdvisories.join('\\n\\n'));",
+      "additionalContext('PostToolUse', stopAdvisories.join('\\n\\n'));"],
+    ['advisory mode exits 2',
+      "additionalContext('Stop', stopAdvisories.join('\\n\\n'));",
+      "additionalContext('Stop', stopAdvisories.join('\\n\\n'));\n  process.exit(2);"],
+  ];
+  for (const [label, find, replace] of mutations) {
+    assert.ok(source.includes(find), `mutation seam present: ${label}`);
+    const mutantPath = path.join(HOOK_DIR, `session-lifecycle.mutant-${Date.now()}-${Math.random().toString(16).slice(2)}.js`);
+    fs.writeFileSync(mutantPath, source.replace(find, replace));
+    try {
+      let failed = false;
+      try {
+        mrAssertCombinedContract(mutantPath);
+      } catch {
+        failed = true;
+      }
+      assert.ok(failed, `mutation is caught by the T1 contract: ${label}`);
+    } finally {
+      fs.rmSync(mutantPath, { force: true });
+    }
+  }
+});
+
+test('T2: router advisory tiers (crossing / growth-above / missing baseline / untouched)', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-mr-tiers-'));
+  fs.mkdirSync(path.join(root, '.claude-memory'), { recursive: true });
+  write(path.join(root, ROUTER_REL), 'x'.repeat(9000));
+  const owned = [ROUTER_REL];
+  const crossing = mrRouterAdvisory(root, { routerBytesAtStart: 7000 }, owned);
+  assert.match(crossing, /Memory router crossing/);
+  write(path.join(root, ROUTER_REL), 'x'.repeat(9500));
+  const growth = mrRouterAdvisory(root, { routerBytesAtStart: 9000 }, owned);
+  assert.match(growth, /Memory router growth/);
+  assert.doesNotMatch(growth, /crossing/);
+  assert.strictEqual(mrRouterAdvisory(root, { routerBytesAtStart: null }, owned), null, 'missing baseline suppresses');
+  assert.strictEqual(mrRouterAdvisory(root, {}, owned), null, 'absent baseline field suppresses');
+  assert.strictEqual(mrRouterAdvisory(root, { routerBytesAtStart: 7000 }, []), null, 'untouched router suppresses');
+  write(path.join(root, ROUTER_REL), 'x'.repeat(9000));
+  assert.strictEqual(mrRouterAdvisory(root, { routerBytesAtStart: 9000 }, owned), null, 'already-over with no growth suppresses');
+});
+
+test('T3: dedup lifecycle — cross, silent repeat, shrink stores empty key, exact re-cross re-emits, legacy key never suppresses', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const r1 = fx.runStop();
+  assert.strictEqual(r1.status, 0, r1.stderr);
+  assert.match(mrParseSingleJson(r1.stdout).hookSpecificOutput.additionalContext, /Memory router crossing/);
+  const keyAfterCross = fx.readState().lastAdvisedKey;
+  assert.strictEqual(mrComparableKey(keyAfterCross) !== null, true, 'stored key is version-2 comparable');
+
+  const r2 = fx.runStop();
+  assert.strictEqual(r2.status, 0, r2.stderr);
+  assert.strictEqual(r2.stdout, '', 'identical state repeat is silent');
+
+  write(path.join(fx.root, ROUTER_REL), 'x'.repeat(5000)); // shrink below trigger
+  const r3 = fx.runStop();
+  assert.strictEqual(r3.status, 0, r3.stderr);
+  assert.strictEqual(r3.stdout, '', 'shrink is silent');
+  const keyAfterShrink = fx.readState().lastAdvisedKey;
+  assert.notDeepStrictEqual(keyAfterShrink, keyAfterCross, 'shrink stores the empty-advisory key');
+
+  write(path.join(fx.root, ROUTER_REL), 'x'.repeat(9000)); // byte-identical restore
+  const r4 = fx.runStop();
+  assert.strictEqual(r4.status, 0, r4.stderr);
+  assert.match(mrParseSingleJson(r4.stdout).hookSpecificOutput.additionalContext, /Memory router crossing/);
+  assert.deepStrictEqual(fx.readState().lastAdvisedKey, keyAfterCross, 'restored state reproduces the same key');
+
+  // Inherited legacy/unversioned key encoding the byte-identical state must
+  // never suppress the first v4 evaluation.
+  fx.seedState({ lastAdvisedKey: keyAfterCross.key });
+  const r5 = fx.runStop();
+  assert.strictEqual(r5.status, 0, r5.stderr);
+  assert.match(mrParseSingleJson(r5.stdout).hookSpecificOutput.additionalContext, /Memory router crossing/);
+  assert.deepStrictEqual(fx.readState().lastAdvisedKey, keyAfterCross, 'legacy value replaced by { v: 2, key }');
+});
+
+test('T4: block-mode gate failure exits 2 with no advisory JSON and a cleared key; unblock re-emits', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
+  const r1 = fx.runStop(); // advisory mode: emits combined, stores key
+  assert.strictEqual(r1.status, 0, r1.stderr);
+  assert.ok(mrParseSingleJson(r1.stdout));
+
+  const r2 = fx.runStop({ CLAUDE_STOP_GATE_MODE: 'block' });
+  assert.strictEqual(r2.status, 2, `expected block exit, got ${r2.status}: ${r2.stderr}`);
+  assert.match(r2.stderr, /Session-owned changed-surface gate failure/);
+  assert.strictEqual(r2.stdout, '', 'blocking exit emits no advisory JSON');
+  assert.strictEqual(fx.readState().lastAdvisedKey, undefined, 'blocking exit clears the stored key');
+
+  // block → shrink → exact restore → unblock: the restored advisory re-emits.
+  write(path.join(fx.root, ROUTER_REL), 'x'.repeat(5000));
+  write(path.join(fx.root, ROUTER_REL), 'x'.repeat(9000));
+  write(path.join(fx.root, 'gate.js'), "console.log('sentinel-gate-output');process.exit(0);\n"); // unblock
+  const r3 = fx.runStop();
+  assert.strictEqual(r3.status, 0, r3.stderr);
+  assert.match(mrParseSingleJson(r3.stdout).hookSpecificOutput.additionalContext, /Memory router crossing/);
+});
+
+test('T4: blocking review-receipt path clears the key; a failed clear still exits 2', () => {
+  // Blocking path with a healthy state file: key must be cleared.
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const rel = 'docs/audits/example.md';
+  write(path.join(fx.root, rel), '# Verdict\nNEEDS WORK\n# Prioritized Findings\nRecommendation: change the order.\n');
+  fx.seedState({
+    lastAdvisedKey: { v: 2, key: 'seeded' },
+    touched: [ROUTER_REL, rel],
+    adversarialReviewRequirements: { [rel]: { fingerprint: fingerprint(fx.root, rel), requiredAt: new Date().toISOString() } },
+  });
+  const r1 = fx.runStop();
+  assert.strictEqual(r1.status, 2, r1.stderr);
+  assert.match(r1.stderr, /Adversarial review receipt/);
+  assert.strictEqual(fx.readState().lastAdvisedKey, undefined, 'review-receipt block clears the key');
+
+  // Failed clear (unit, via the exported helper): saveState throws because the
+  // state path's parent is a FILE; the helper must swallow it — in stop() the
+  // process.exit(2) then still fires. Integration variant: the invariant
+  // blocking path runs before any other saveState; a read-only state file
+  // cannot cancel it.
+  const blockedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-mr-clear-'));
+  const parentAsFile = path.join(blockedDir, 'not-a-dir');
+  write(parentAsFile, 'file');
+  assert.doesNotThrow(() => mrClearKey(path.join(parentAsFile, 'state.json'), { lastAdvisedKey: { v: 2, key: 'x' } }));
+
+  const fx2 = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  fx2.seedState({ baselineInvariantFailures: [], lastAdvisedKey: { v: 2, key: 'seeded' } }); // AGENTS.md invariant is newly-broken in a bare tmp root
+  fs.chmodSync(fx2.stateFile, 0o444); // make every saveState (incl. the blocking clear) fail
+  try {
+    const r2 = fx2.runStop();
+    assert.strictEqual(r2.status, 2, `invariant block must still exit 2 when the clear cannot persist: ${r2.stderr}`);
+    assert.match(r2.stderr, /instruction invariant broken/);
+    assert.strictEqual(r2.stdout, '', 'no advisory JSON on the blocking path');
+  } finally {
+    fs.chmodSync(fx2.stateFile, 0o644);
+  }
+});
+
+test('T5: resume path preserves routerBytesAtStart', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const envFile = path.join(fx.root, 'claude-env');
+  write(envFile, '');
+  const result = spawnSync(
+    process.execPath, [path.join(HOOK_DIR, 'session-lifecycle.js'), 'start'],
+    {
+      cwd: fx.root,
+      input: JSON.stringify({ cwd: fx.root, session_id: fx.sessionId, hook_event_name: 'SessionStart' }),
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_ENV_FILE: envFile },
+    }
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(fx.readState().routerBytesAtStart, 7000, 'resume did not overwrite the baseline');
+});
+
+test('T6: unreadable thresholds module → hooks skip router advisories and never block', () => {
+  // Mirror of the hooks dir with real lib/ + scripts/check-agent-invariants
+  // but WITHOUT scripts/lib/memory-router-thresholds.js.
+  const mirror = fs.mkdtempSync(path.join(os.tmpdir(), 'wmkf-mr-nothresh-'));
+  // Same two-level depth as the real .claude/hooks so `../../scripts/...`
+  // resolves to mirror/scripts (which deliberately lacks the thresholds module).
+  const mirrorHooks = path.join(mirror, '.claude', 'hooks');
+  fs.mkdirSync(mirrorHooks, { recursive: true });
+  fs.mkdirSync(path.join(mirror, 'scripts', 'lib'), { recursive: true });
+  fs.symlinkSync(path.join(HOOK_DIR, 'lib'), path.join(mirrorHooks, 'lib'));
+  fs.symlinkSync(
+    path.resolve(HOOK_DIR, '../../scripts/check-agent-invariants.js'),
+    path.join(mirror, 'scripts', 'check-agent-invariants.js')
+  );
+  for (const hookName of ['session-lifecycle.js', 'memory-router-guard.js']) {
+    fs.copyFileSync(path.join(HOOK_DIR, hookName), path.join(mirrorHooks, hookName));
+  }
+
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  const rStop = fx.runStop({}, path.join(mirrorHooks, 'session-lifecycle.js'));
+  assert.strictEqual(rStop.status, 0, rStop.stderr);
+  assert.strictEqual(rStop.stdout, '', 'router advisory skipped without thresholds');
+
+  const bigWrite = {
+    tool_name: 'Write',
+    cwd: fx.root,
+    tool_input: { file_path: path.join(fx.root, ROUTER_REL), content: 'x'.repeat(20000) },
+  };
+  const rGuard = spawnSync(process.execPath, [path.join(mirrorHooks, 'memory-router-guard.js')], {
+    cwd: fx.root, input: JSON.stringify(bigWrite), encoding: 'utf8', env: process.env,
+  });
+  assert.strictEqual(rGuard.status, 0, 'guard fails open without thresholds');
+});
+
+test('T7: state-I/O failure in stop() never blocks and never emits partial JSON', () => {
+  const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true });
+  fs.chmodSync(fx.stateFile, 0o444); // every saveState in stop() now fails
+  try {
+    const result = fx.runStop();
+    assert.strictEqual(result.status, 0, `state-I/O failure must stay fail-open: ${result.stderr}`);
+    const trimmed = result.stdout.trim();
+    if (trimmed !== '') {
+      const parsed = JSON.parse(trimmed); // exactly one well-formed object or nothing
+      assert.strictEqual(typeof parsed.hookSpecificOutput.additionalContext, 'string');
+    }
+  } finally {
+    fs.chmodSync(fx.stateFile, 0o644);
+  }
+});
+
 if (failures) {
   console.error(`\nhook-enforcement test FAILED — ${failures} case(s).`);
   process.exit(1);
