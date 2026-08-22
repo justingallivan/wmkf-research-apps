@@ -39,6 +39,13 @@ environment values, secrets, or live-record data into the observation table.
 Review and commit any uncommitted changes with a descriptive message. Do NOT leave
 uncommitted changes — they may cause issues on another machine.
 
+**Stop-time router advisory:** if the Stop hook emits a memory-router crossing
+or growth advisory, edits in this session moved `.claude-memory/MEMORY.md`
+to/past (or grew it above) the routine-audit trigger — the advisory says which,
+and claims participation, not sole causation. Either run the router diet now
+(`docs/MEMORY_HYGIENE_RUNBOOK.md` §10) or record the debt explicitly in
+`SESSION_PROMPT.md`.
+
 ## Step 3: Update Documentation
 
 1. **Read current files** - Review SESSION_PROMPT.md and CLAUDE.md to understand existing structure

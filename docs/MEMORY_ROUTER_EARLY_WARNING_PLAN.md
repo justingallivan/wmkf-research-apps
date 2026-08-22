@@ -18,8 +18,17 @@ related:
 
 # Memory Router Early-Warning Plan
 
-**Status: DRAFT v4 — owner greenlit the direction 2026-08-21; nothing here is
-built.**
+**Status: BUILT 2026-08-21 (v4).** All five phases shipped on
+`codex/fable-memory-hygiene-runbook` as four commits: Phase 0 documents +
+tracked sweep manifest (`e1dd1dc3`), Phases 1–2 thresholds module + checker
+notice + hook conversions (`6b36f297`), Phase 3 Stop refactor + tests T1–T7
+(`2c540cef`), Phase 4 skill text (the commit carrying this status update).
+Build-time verification receipts:
+[RECHECKED after scripts/lib/memory-router-thresholds.js change: built as specified; ladder asserted by self-test case 15]
+[RECHECKED after scripts/check-memory-router.js change: notice verified live at the 9,040 B router; self-test 19/19]
+[RECHECKED after scripts/check-memory-router-self-test.js change: fixtures a–e implemented as cases 11–15, all green]
+The sections below are retained as the reviewed design contract the build
+implements; §4 is the ongoing regression procedure.
 
 v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
 became a single-emission aggregation path; the crossing predicate became
