@@ -300,7 +300,7 @@ test('renders append-only guarded reopen history from the status contract', asyn
     pendingArtifact: null,
     reopenHistory: [{
       artifactId: '77777777-7777-4777-8777-777777777777',
-      outcome: 'completed',
+      outcome: 'needs_reconciliation',
       correction: {
         cycleId: '88888888-8888-4888-8888-888888888888',
         reasonCode: PRE_SITE_REOPEN_REASON.WRONG_GOVERNED_INPUTS,
@@ -309,13 +309,19 @@ test('renders append-only guarded reopen history from the status contract', asyn
         createdAt: '2026-08-22T12:00:00Z',
       },
       source: { milestone: { versionId: '2.0' } },
+      cleanupRequired: [{
+        driveId: 'retained-drive',
+        itemId: 'retained-item',
+        reason: 'abandoned_failed_reopen_copy_retained',
+      }],
     }],
   }));
   render(<SiteVisitTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
   expect(await screen.findByText('Guarded reopen attempts')).toBeInTheDocument();
-  expect(screen.getByText('Completed')).toBeInTheDocument();
+  expect(screen.getByText('Needs reconciliation')).toBeInTheDocument();
   expect(screen.getByText('Wrong governed inputs')).toBeInTheDocument();
   expect(screen.getByText('The governed inputs were corrected after handoff.')).toBeInTheDocument();
   expect(screen.getByText(/source version 2.0/)).toBeInTheDocument();
+  expect(screen.getByText('A retained SharePoint copy requires reconciliation.')).toBeInTheDocument();
 });

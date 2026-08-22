@@ -46,10 +46,11 @@ function withoutCorrection(artifact) {
 }
 
 function staffSafePayload(payload) {
+  const pendingIsReopenAudit = Boolean(payload.pendingArtifact?.correction?.reasonCode);
   const sanitized = {
     ...payload,
     currentArtifact: withoutCorrection(payload.currentArtifact),
-    pendingArtifact: withoutCorrection(payload.pendingArtifact),
+    pendingArtifact: pendingIsReopenAudit ? null : withoutCorrection(payload.pendingArtifact),
     artifact: withoutCorrection(payload.artifact),
   };
   delete sanitized.reopenHistory;

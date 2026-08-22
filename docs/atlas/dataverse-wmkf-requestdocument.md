@@ -171,7 +171,11 @@ claims are marked Failed, with any retained copy recorded by stable identity as
 cleanup work, before a new operation proceeds. Generation activation rechecks
 exact correction-cycle equality against the current Draft pointer. Reopen
 history, nested correction details, and actor attribution are returned only to
-superusers on both GET and generation responses.
+superusers on both GET and generation responses; a pending reason-bearing reopen
+attempt is omitted entirely for other roles. A Failed row remains available to
+its exact operation retry, but a later distinct operation records any resolvable
+retained copy as cleanup work. Actor/time is attributed only to reason-bearing
+reopen events, never to later generated descendants that inherit only the cycle.
 
 ## Ownership
 

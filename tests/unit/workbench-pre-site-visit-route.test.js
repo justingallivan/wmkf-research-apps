@@ -113,7 +113,10 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     },
     pendingArtifact: {
       artifactId: 'pending-artifact',
-      correction: { cycleId: 'restricted-cycle' },
+      correction: {
+        cycleId: 'restricted-cycle',
+        reasonCode: 'accidental_handoff',
+      },
     },
     reopenHistory: [{ artifactId: 'restricted-audit-row' }],
   });
@@ -125,7 +128,29 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
   expect(res.body).toEqual({
     success: true,
     currentArtifact: { artifactId: 'current-artifact' },
-    pendingArtifact: { artifactId: 'pending-artifact' },
+    pendingArtifact: null,
+  });
+});
+
+test('keeps a regular pending generation visible to non-superusers without correction details', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    currentArtifact: null,
+    pendingArtifact: {
+      artifactId: 'pending-generation',
+      correction: { cycleId: 'inherited-cycle', reasonCode: null },
+    },
+    reopenHistory: [],
+  });
+  const res = mockRes();
+
+  await handler(get(), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    success: true,
+    currentArtifact: null,
+    pendingArtifact: { artifactId: 'pending-generation' },
   });
 });
 

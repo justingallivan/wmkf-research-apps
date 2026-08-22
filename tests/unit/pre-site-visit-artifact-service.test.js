@@ -3,6 +3,7 @@ import {
   buildPreSiteVisitInputSnapshot,
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
+  projectPreSiteVisitArtifact,
   projectReopenHistory,
   SECTION_FIELDS,
 } from '../../lib/services/pre-site-visit/artifact-service.js';
@@ -215,6 +216,30 @@ test('reopen history marks a retained expired copy as cleanup reconciliation wor
       })],
     }),
   ]);
+});
+
+test('a regenerated descendant carries the cycle without claiming its generator as reopen actor', () => {
+  const descendant = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
+    wmkf_reopenreasoncode: null,
+    _createdby_value: '88888888-8888-4888-8888-888888888888',
+    _createdby_value_formatted: 'Later Generator',
+    createdon: '2026-08-22T13:00:00Z',
+  };
+
+  expect(projectPreSiteVisitArtifact(descendant).correction).toMatchObject({
+    cycleId: descendant.wmkf_reopencycleid,
+    reasonCode: null,
+    actorId: null,
+    actorName: null,
+    createdAt: null,
+  });
 });
 
 function createHarness({ mutatePersistedDraft = false, currentPointerRow = null } = {}) {

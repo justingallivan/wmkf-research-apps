@@ -392,6 +392,11 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                         : 'Needs reconciliation'}
                 </p>
                 {entry.correction?.reasonNote && <p className="mt-1">{entry.correction.reasonNote}</p>}
+                {entry.cleanupRequired?.length > 0 && (
+                  <p className="mt-1 text-amber-800">
+                    A retained SharePoint copy requires reconciliation.
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-gray-500">
                   {entry.correction?.actorName || 'Recorded staff actor'}
                   {entry.correction?.createdAt

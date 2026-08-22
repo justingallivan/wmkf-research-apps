@@ -172,6 +172,9 @@ bind actor and time. The generation-key alternate key remains the uniqueness
 fence; the cycle ID alone is not treated as a new database key. No separate
 audit entity is needed for this bounded operation. Dataverse formatted lookup
 annotation `_createdby_value_formatted` supplies the actor display name.
+Actor/time attribution is projected only when the row carries a reopen reason,
+so later regenerated descendants may inherit the correction cycle without
+misidentifying their generator as the actor who authorized the reopen.
 
 Failed successor rows remain immutable attempt evidence but are excluded from
 the downstream blocker for a later client operation. The dialog mints one UUID;
@@ -180,6 +183,9 @@ same row/item, while closing/reopening starts a different operation. A different
 Generating row blocks reopen only while its 15-minute lease is live. An expired
 reopen row is marked Failed before fallthrough, and any retained copy is bound
 by stable drive/item identity in the cleanup queue for explicit reconciliation.
+A Failed row remains the exact retry target for its own client operation. When a
+different client operation supersedes it, any resolvable retained copy is then
+added to the same cleanup queue without replacing the original failure evidence.
 Final generation activation compares the target correction cycle with the
 current Draft pointer so a stale older generation cannot replace a newer cycle.
 

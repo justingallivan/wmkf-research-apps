@@ -290,10 +290,17 @@ that audit data removed from both GET and generation responses. A second reopen
 is refused while a different generation has a live 15-minute lease. An expired
 reopen claim is atomically marked Failed before a new operation proceeds; if its
 copy exists, exact drive/item identity is retained in the row's cleanup queue
-and its history outcome becomes Needs reconciliation. Later generated drafts carry the same cycle ID
+and its history outcome becomes Needs reconciliation. The same cleanup rule is
+applied when a different operation supersedes a Failed attempt that retained a
+copy; same-operation retry remains recoverable until that supersession. The
+history UI explicitly calls out retained copies requiring reconciliation.
+Later generated drafts carry the same cycle ID
 in their generation identity, and final activation rechecks that the target's
 cycle still equals the current Draft pointer's cycle, so an older in-flight
-generation cannot supersede a newer correction cycle.
+generation cannot supersede a newer correction cycle. Actor/time is shown only
+on the actual reason-bearing reopen event, not on later cycle-bearing generated
+descendants. Non-superuser status responses also omit a pending reopen-attempt
+row entirely while retaining ordinary pending-generation status.
 
 Wave 20 must pass a target read-only preflight and be explicitly applied before
 the feature is enabled. The base adapter projection excludes the new columns

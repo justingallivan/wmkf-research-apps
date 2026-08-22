@@ -449,7 +449,31 @@ test('a retained failed attempt does not block a new audited reopen operation', 
     wmkf_reopencycleid: '77777777-7777-4777-8777-777777777777',
     wmkf_reopenreasoncode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
     wmkf_reopenreasonnote: 'The earlier guarded reopen failed during its copy.',
+    wmkf_sharepointsiteid: 'failed-site',
+    wmkf_sharepointdriveid: 'failed-drive',
+    wmkf_sharepointitemid: 'failed-item',
+    wmkf_sharepointweburl: 'https://sharepoint.test/failed.docx',
+    wmkf_sharepointversionid: '1.0',
+    wmkf_sharepointetag: 'failed-etag',
+    wmkf_filename: '1002379 Pre-Site Reopened failed.docx',
   }));
+  const originalGetMetadata = harness.dependencies.getFileMetadataById.getMockImplementation();
+  harness.dependencies.getFileMetadataById.mockImplementation(async (driveId, itemId, options) => {
+    if (driveId === 'failed-drive' && itemId === 'failed-item') {
+      return {
+        siteId: 'failed-site',
+        driveId,
+        id: itemId,
+        name: '1002379 Pre-Site Reopened failed.docx',
+        versionId: '1.0',
+        eTag: 'failed-etag',
+        lastModified: '2026-08-22T11:00:00Z',
+        size: 12,
+        webUrl: 'https://sharepoint.test/failed.docx',
+      };
+    }
+    return originalGetMetadata(driveId, itemId, options);
+  });
 
   const result = await reopenPreSiteVisit(
     input(),
@@ -461,8 +485,19 @@ test('a retained failed attempt does not block a new audited reopen operation', 
     inProgress: false,
     artifact: { artifactId: SUCCESSOR_ID },
   });
-  expect(harness.rows.find((row) => row.wmkf_requestdocumentid === failedId))
-    .toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED });
+  const failed = harness.rows.find((candidate) => candidate.wmkf_requestdocumentid === failedId);
+  expect(failed).toMatchObject({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_sharepointdriveid: 'failed-drive',
+    wmkf_sharepointitemid: 'failed-item',
+  });
+  expect(JSON.parse(failed.wmkf_orphancleanupjson)).toEqual([
+    expect.objectContaining({
+      driveId: 'failed-drive',
+      itemId: 'failed-item',
+      reason: 'abandoned_failed_reopen_copy_retained',
+    }),
+  ]);
   expect(harness.rows).toHaveLength(3);
 });
 
@@ -502,6 +537,7 @@ test('retry after post-upload failure recovers the same item without uploading a
     harness.dependencies,
   )).rejects.toMatchObject({ httpStatus: 500 });
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+  expect(harness.rows[1].wmkf_orphancleanupjson).toBeUndefined();
 
   const retry = await reopenPreSiteVisit(
     input(),
@@ -510,6 +546,7 @@ test('retry after post-upload failure recovers the same item without uploading a
   );
   expect(retry).toMatchObject({ recovered: true, artifact: { artifactId: SUCCESSOR_ID } });
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+  expect(harness.rows[1].wmkf_orphancleanupjson).toBeUndefined();
 });
 
 test('retry after an ambiguous create retains and reclaims exactly one successor row', async () => {

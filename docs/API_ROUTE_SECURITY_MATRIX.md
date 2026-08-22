@@ -79,6 +79,14 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 ## Route Matrix
 
+Guarded-reopen response refinement (source-built 2026-08-22): the Pre-Site
+GET/POST route emits reopen history and nested correction details only to
+superusers, and it omits a pending reason-bearing reopen-attempt row entirely
+for other roles while preserving ordinary pending-generation status. The
+reopen writer preserves same-operation Failed recovery; when a distinct later
+operation supersedes that attempt, any resolvable retained copy is added to its
+stable-identity cleanup queue.
+
 | Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
 |---|---:|---|---|---|---|---|---|
 | `/api/admin/alerts` | GET, PATCH | Superuser | `requireSuperuser` | Global admin | Reads/updates `system_alerts` (PG); repair-context GET re-reads one alert-correlated request, reviewer roster row, and potential reviewer from Dataverse | Low | Shared helper. `repairContext=<alert id>` accepts only an active/acknowledged reviewer-repair alert and derives all downstream identifiers from its server-owned metadata. |
