@@ -875,11 +875,18 @@ function mrCombinedRun(hookFile) {
   return { expected, result: fx.runStop({}, hookFile) };
 }
 
-// The full T1 contract for one hook file: exact object + exit status.
-function mrAssertCombinedContract(hookFile) {
-  const { expected, result } = mrCombinedRun(hookFile);
+// Pure contract assertions over one already-captured run — no I/O, so a
+// throw here is always a genuine contract judgment, never an infrastructure
+// failure. The mutation subruns call THIS helper against the mutant's own
+// result, proving the suite's actual assertion rejects it.
+function mrAssertContractOnResult({ expected, result }) {
   assert.strictEqual(result.status, 0, result.stderr);
   assert.deepStrictEqual(mrParseSingleJson(result.stdout), expected);
+}
+
+// The full T1 contract for one hook file: exact object + exit status.
+function mrAssertCombinedContract(hookFile) {
+  mrAssertContractOnResult(mrCombinedRun(hookFile));
 }
 
 test('T1: no-advisory paths produce status 0 and byte-empty stdout', () => {
@@ -970,13 +977,15 @@ test('T1 mutations: each seeded defect produces its specific deviation and fails
       assert.strictEqual(result.error, undefined, `mutant process spawned: ${label}`);
       // 2. Deviation oracle: the mutant produced its specific wrong output.
       expectDeviation(result);
-      // 3. The same execution violates the exact T1 contract.
-      let body = null;
-      try { body = mrParseSingleJson(result.stdout); } catch { body = null; }
-      assert.notDeepStrictEqual(
-        { status: result.status, body },
-        { status: 0, body: expected },
-        `mutant output violates the exact contract: ${label}`
+      // 3. The suite's own contract assertion rejects this same result with
+      //    a genuine assertion failure. The helper is pure (no I/O), so an
+      //    infrastructure failure cannot produce the throw — and because it
+      //    is the SAME helper T1 uses, weakening the contract assertion
+      //    makes this subrun fail.
+      assert.throws(
+        () => mrAssertContractOnResult({ expected, result }),
+        (err) => err && err.code === 'ERR_ASSERTION',
+        `T1 contract assertion rejects the mutant result: ${label}`
       );
     } finally {
       fs.rmSync(mutantPath, { force: true });

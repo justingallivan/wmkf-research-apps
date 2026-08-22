@@ -49,10 +49,13 @@ two findings, both accepted and fixed in the commit carrying this note.**
    first fix added a per-mutation deviation oracle plus an
    `ERR_ASSERTION`-only rejection, but a fifth review showed the rejection
    still ran a SECOND execution whose own spawn failure converted to
-   `ERR_ASSERTION`. Final form: exactly one execution per mutant — spawn
-   health, the deviation oracle, and an explicit violates-the-exact-contract
-   check (`notDeepStrictEqual` against the same fixture's expected object)
-   all read the same result.
+   `ERR_ASSERTION`. A sixth review then showed a single-run
+   `notDeepStrictEqual` violation check is entailed by the oracle and never
+   exercises the suite's own assertion. Final form: exactly one execution
+   per mutant — spawn health and the deviation oracle read the result, then
+   the SAME pure contract-assertion helper T1 uses
+   (`mrAssertContractOnResult`, no I/O) must reject that result inside
+   `assert.throws` with `ERR_ASSERTION`.
 
 v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
 became a single-emission aggregation path; the crossing predicate became
