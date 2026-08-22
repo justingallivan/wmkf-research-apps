@@ -35,9 +35,10 @@ evidence audits (May, July, and August 2026). Those audits were effective but
 ad-hoc — each one reinvented its own method, scope, and reporting.
 
 The load-bearing quantitative finding is a **router sawtooth**: the router
-regrows at ~166–200 bytes/day after every diet, and **every enforcement layer is
-silent below the 11 KiB warn band**, so the proposed 8 KiB "comfort threshold"
-was crossed (on 2026-08-15) with zero signal from any control. Limits are
+regrew at ~166–500 bytes/day across the observed post-diet windows (recent
+windows at the lower end), and **every enforcement layer is silent below the
+11 KiB warn band**, so the proposed 8 KiB "comfort threshold" was crossed (on
+2026-08-13) with zero signal from any control. Limits are
 appropriate as backstops; what is missing is a scheduled, procedural diet
 trigger well below them. That, plus a codified deep-audit method (the S154-V2
 falsification disciplines), is what the new runbook supplies.
@@ -63,7 +64,9 @@ instruction edits were in scope.
 **Evidence classes used:** current source of the three checkers and two hooks
 (read in full); git history of `.claude-memory/MEMORY.md` (`git log --follow`
 plus `git show <commit>:.claude-memory/MEMORY.md | wc -c` at 20+ commits); the
-full 57-gate startup battery plus targeted re-runs of the three memory checks;
+full startup battery (56 of the 57 registered `check:*` scripts — all but the
+mutating `check:memory-drift`, whose read-only `:no-write` variant ran
+instead) plus targeted re-runs of the three memory checks;
 the committed drift report JSON; whole-file reads of the router, the three
 currently flagged leaf memories, the reorganization plan, and all eight prior
 memory audits; official Anthropic and OpenAI documentation and primary research
@@ -114,7 +117,7 @@ Key verified mechanics:
 - **Session lifecycle hook** (`.claude/hooks/session-lifecycle.js`): SessionStart
   emits the wiki-routing note and a router-pressure note **only above the 11 KiB
   warn band** — note this hook hardcodes its own 11/12 KiB constants
-  (`session-lifecycle.js:286-287`) rather than importing the checker's exports,
+  (`session-lifecycle.js:285-286`) rather than importing the checker's exports,
   so a threshold change must touch it separately (see R3); Stop runs
   changed-surface gates (advisory by default), enforces
   same-session doc-staleness markers and adversarial-review receipts for
@@ -138,7 +141,7 @@ Router size trajectory, measured directly from git (`git show
 | 2026-06-12 | `d89265bd` | 11,322 | regrowth ~500 B/day; guard hardened 2026-06-10 mid-window |
 | 2026-07-02 | (audit) | 11,255 → 5,941 | Slice 1 router diet (control audit) |
 | 2026-07-08 | (S348) | 8,149 | +~368 B/day since diet |
-| 2026-07-29 | `813da56a` | 11,298 → 5,175 | semantic reconciliation diet (~198 B/day regrowth over 27 days) |
+| 2026-07-29 | `813da56a`→`0f7fad66` | 11,298 → 5,175 | semantic reconciliation diet — `813da56a` is the before state, the diet landed in `0f7fad66` (~198 B/day regrowth over the prior 27 days) |
 | 2026-08-21 | `053bd9f9` | 8,991 | +3,816 B in 23 days (~166 B/day); 66 lines; passed 8 KiB on 2026-08-13 (`840d082d` = 8,193 B) |
 
 Leaf store and advisory-signal trajectory (from the prior audits, each verified
@@ -171,9 +174,12 @@ Two structural readings of this history:
 
 ## 5. Current check results (2026-08-21, this worktree)
 
-Startup battery: **all 57 registered `check:*` scripts and self-tests passed**,
-run sequentially per the fixture-race rule (`check:migrations-manifest` through
-`check:types`; log retained in the session scratchpad). Relevant details:
+Startup battery: **56 of the 57 registered `check:*` scripts passed — every
+gate and self-test except the mutating `check:memory-drift`, whose read-only
+`:no-write` variant ran in its place** — run sequentially per the fixture-race
+rule (`check:migrations-manifest` through `check:types`; the command set is
+the `/start` battery enumerated in `.claude/skills/start/SKILL.md`, so the
+claim is reproducible without the ephemeral session log). Relevant details:
 
 ```
 npm run check:memory-router
@@ -342,7 +348,8 @@ Ordered by severity × likelihood.
    comfort line was crossed silently on 2026-08-13. Failure mode: each cycle
    ends in a reactive, larger, riskier diet near the cap — or in the write-time
    guard blocking a legitimate edit mid-task. (Addressed procedurally by the
-   runbook's routine-audit trigger; optionally by a lower warn band, §10 Q4.)
+   runbook's routine-audit trigger and mechanically by the owner-approved
+   early-warning plan, `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`; see §10 Q4.)
 2. **Router lines re-accrete status narrative.** Current router text includes
    "Phase -1 done, findings accepted", "RESOLVED S396", "implementation and
    production smoke are complete", "org-open reviewer/document access accepted
@@ -390,8 +397,9 @@ Ordered by severity × likelihood.
   stabilization directive, new guardrail lines) *and* status narrative (§8.2).
   Partially legitimate growth is the honest reading — which is why the
   recommendation is a scheduled review, not a freeze.
-- **"All controls green" — tried to break them:** ran the full 57-gate battery
-  sequentially (all green); re-ran the three memory checks individually and
+- **"All controls green" — tried to break them:** ran the startup battery
+  sequentially (56 of 57 registered scripts, per §5; all green); re-ran the
+  three memory checks individually and
   reproduced every number; read both hooks' failure paths in source rather
   than trusting their descriptions (confirmed fail-open in
   `memory-router-guard.js` catch block; confirmed the Stop-hook's advisory
@@ -444,17 +452,17 @@ too late to change behavior (~1–2 weeks of margin at observed growth). The
 **8 KiB comfort threshold is directionally right but inert as a number alone**:
 it was already stated twice (07-02 acceptance criterion, 07-29 result) and
 still crossed silently, because nothing fires at 8 KiB. Adopt it as the
-**routine-audit diet trigger** (procedural, runbook-owned, no code change), and
-*optionally* also lower the warn threshold to ~9 KiB — 9,216 B. Caveat found in
-adversarial review: the SessionStart pressure note does NOT import
-`WARN_BYTES` — it hardcodes its own 11 KiB/12 KiB constants at
-`.claude/hooks/session-lifecycle.js:286-287`; only the write-time guard
-imports the checker's exports. A warn-band change must therefore touch both
-`scripts/check-memory-router.js` (+ self-test) and `session-lifecycle.js` (or,
-better, make the session hook import the constant) to deliver the earlier
-signal (proposed change, owner decision; cost: occasional earlier warnings +
-two files touched; benefit: signal precedes the runbook trigger; failure mode
-addressed: silent crossing).
+**routine-audit diet trigger** (procedural, runbook-owned). **Resolved
+2026-08-21:** the owner approved the early-warning plan
+(`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`), which makes the 8 KiB trigger
+mechanical — a notice in the router gate, single-sourced through a thresholds
+module imported by the checker and both hooks. That consolidation also
+removes the duplication the adversarial review found here (the SessionStart
+note hardcodes its own 11 KiB/12 KiB constants at
+`.claude/hooks/session-lifecycle.js:285-286` instead of importing the
+checker's exports). The earlier idea of simply lowering the warn threshold to
+~9 KiB (9,216 B) was considered and superseded by that plan, not rejected on
+merits.
 
 **Q5 — should leaf-reference count / leaf-to-hub ratio become a metric?** Yes,
 as an advisory trend metric, not a gate. Measured today: 113 total `.md` refs
@@ -515,9 +523,10 @@ last audit — roughly the observed monthly inflow); deep audit quarterly *or* o
 events (schema/migration wave touching remembered facts, incident traced to a
 stale memory, model/harness change altering memory behavior, or before relying
 on memory for destructive work). Rationale: routine cadence at half the
-observed diet period keeps the router permanently below the warn band; deep
-audits at the historical ad-hoc frequency (~6–8 weeks) formalized to quarterly
-plus triggers.
+observed diet period backstops the size trigger, which is primary — at the
+worst observed regrowth (~500 B/day) a 6 KiB router can reach the cap in ~12
+days, faster than any calendar cadence; deep audits at the historical ad-hoc
+frequency (~6–8 weeks) formalized to quarterly plus triggers.
 
 **Q13 — recording findings, unknowns, exceptions, ownership?** Continue the
 existing convention — dated report under `docs/audits/` with a point-in-time
@@ -527,8 +536,11 @@ table so metrics stop living only in per-audit snapshots.
 
 **Q14 — retain / tighten / replace / remove?** Retain everything (§7); nothing
 merits removal — each control catches a distinct, evidenced failure class.
-Tighten (all owner-decision proposals, none implemented here): (a) `WARN_BYTES`
-→ 9,216 B; (b) advisory unique-leaf-ref count in the router gate output; (c) a
+Tighten: (a) resolved 2026-08-21 — the warn-threshold idea was superseded by
+the owner-approved early-warning plan
+(`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`); the remaining items are
+owner-decision proposals, none implemented here:
+(b) advisory unique-leaf-ref count in the router gate output; (c) a
 `weak-basis` refinement accepting a harness `modified:` stamp plus in-body
 dated `[VERIFIED]` tags as a non-weak basis (kills the §8.7 artifact); (d)
 consider a CI advisory step printing health counts so trends are visible
@@ -552,7 +564,7 @@ between sessions. Replace/remove: none.
 |---|---|---|---|---|---|
 | R1 | Adopt `docs/MEMORY_HYGIENE_RUNBOOK.md`: routine audit (~2-weekly or triggered at router ≥8 KiB / ≥5 flagged files / ≥25 new leaves) + quarterly-or-event deep audit with the S154-V2 falsification disciplines | P0 | done (this branch) | ~30–60 min per routine run; hours per deep audit | closes §8.1–8.4; converts ad-hoc audits into a procedure with completion criteria |
 | R2 | Router-diet procedure: strip status/release narrative to SESSION_PROMPT/queue/plans; target ≤ ~6 KiB and ~≤45 unique leaf refs after each diet (matching runbook §10 — landing at 8 KiB would immediately re-fire the audit trigger) | P0 | procedural | one focused commit per cycle | §8.1–8.2; keeps the auto-loaded surface below the silent zone permanently |
-| R3 | Owner decision: lower the warn threshold to 9,216 B in `scripts/check-memory-router.js` (+ self-test) AND in the SessionStart pressure note, which hardcodes its own copy at `.claude/hooks/session-lifecycle.js:286-287` (preferably by importing the checker constant there) | P1 | ~30 min | earlier, occasionally noisier warnings; two files | signal precedes the 8 KiB procedural trigger instead of trailing it (§8.1); removes a threshold duplication found in adversarial review |
+| R3 | **Resolved 2026-08-21 — superseded by the owner-approved early-warning plan** (`docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`): an 8 KiB gate notice plus a thresholds module imported by the checker and both hooks, replacing the hardcoded copy at `.claude/hooks/session-lifecycle.js:285-286`; the bare 9,216 B warn-band lowering was considered and superseded, not rejected on merits | — (owner-decided) | tracked in the plan | per plan | same failure mode as the original R3 (§8.1: silent 8→11 KiB zone), addressed by the approved mechanism |
 | R4 | Owner decision: emit advisory unique-leaf-ref count from the router gate | P2 | ~30 min | none material | makes the Q5 metric self-updating |
 | R5 | Owner decision: refine `weak-basis` to accept harness `modified:` + in-body dated `[VERIFIED]` as basis | P2 | ~30 min + care | small recall loss for genuinely weak leaves | kills the observed false-positive class (§8.7); reduces silencing pressure |
 | R6 | Fix the three current advisory findings per §5 dispositions at next housekeeping (out of scope for this branch) | P2 | ~15 min | trivial | clears the worklist honestly, not mechanically |
@@ -568,11 +580,13 @@ between sessions. Replace/remove: none.
 - **UNKNOWN — live drift beyond the registry.** "Drift clean" covers the
   narrow registry against a 4-day-old report; a fresh regeneration requires
   owner-run live probes (standing rule) and was deliberately not performed.
-- **Owner decisions pending:** R3–R5 threshold/checker changes; whether the
+- **Owner decisions pending:** R4–R5 checker refinements (R3 was resolved
+  2026-08-21 — superseded by the approved early-warning plan,
+  `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`); whether the
   routine audit lands as a skill (`/memory-audit`) or stays a runbook
   procedure; whether to schedule the first deep audit under the new runbook or
   fold it into the next natural trigger.
-- **ASSUMED (labeled):** the ~166–200 B/day regrowth rate persists; it is
+- **ASSUMED (labeled):** the ~166–500 B/day regrowth range persists; it is
   derived from two inter-diet windows and one partial window and may change
   with project phase. The trigger design (size-based, not calendar-only)
   tolerates rate error in either direction.
@@ -599,7 +613,8 @@ corrected in this version.
    end-to-end (it will fire on the ≥8 KiB trigger immediately) — this both
    validates the procedure and performs the overdue router diet (R2), including
    the §5 dispositions (R6).
-3. Owner decides R3–R5; implement approved checker changes with self-tests in
+3. R3 was owner-decided 2026-08-21 (early-warning plan; implementation tracked
+   there). Owner decides R4–R5; implement approved checker changes with self-tests in
    a separate commit per the gate-modification contract in
    `docs/CI_GATES_REFERENCE.md`.
 4. First deep audit: at the next trigger event or 2026-Q4 start, whichever
