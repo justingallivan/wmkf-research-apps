@@ -122,6 +122,11 @@ npm run check:types                                                            #
 
 **This list is the full set as of 2026-07-11. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
+**Router notice:** if `check:memory-router` prints the routine-audit notice
+(router at/over the 8 KiB trigger), surface it in the Step 4 summary and
+propose the routine audit from `docs/MEMORY_HYGIENE_RUNBOOK.md` §6 (router
+diet §10) as a candidate task.
+
 **If any gate is red:** report it as the FIRST thing in the Step 4 summary, before recapping the previous session. A red gate is a P0 blocker for any new feature work in the affected area (data layer for `check:atlas`, API routes for `check:api-routes`, docs/memory drift for the rest), regardless of which session caused it. Treat fixing it as a candidate first task, not a side-note.
 
 ## Step 3: Load Context

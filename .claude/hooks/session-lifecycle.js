@@ -276,16 +276,89 @@ function unresolvedAdversarialReviewRequirements(root, state) {
 // the wiki is the retrieval launch-pad, but only if agents are reminded to read
 // it during planning, not just when a watched path is edited) and surface memory
 // router pressure early, before the write-time guard has to block an edit.
+function routerThresholds() {
+  // Single-sourced from the dependency-free constants module — no local
+  // fallback literals (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md Phase 2).
+  // Returns null when unavailable/invalid; callers skip their router notes
+  // (fail-open) and the check:memory-router gate remains the loud backstop.
+  try {
+    const t = require('../../scripts/lib/memory-router-thresholds.js');
+    if (
+      [t.NOTICE_BYTES, t.WARN_BYTES, t.TARGET_BYTES].every(Number.isFinite) &&
+      t.NOTICE_BYTES < t.WARN_BYTES && t.WARN_BYTES < t.TARGET_BYTES
+    ) {
+      return t;
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+const ROUTER_REL_PATH = '.claude-memory/MEMORY.md';
+
+function routerBytes(root) {
+  try {
+    return fs.statSync(path.join(root, ROUTER_REL_PATH)).size;
+  } catch {
+    return null;
+  }
+}
+
+// Dedup-key contract (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md Phase 3, v4):
+// cleared-and-saved immediately before EVERY blocking exit (locally caught, so
+// a state-I/O failure can never cancel the block); written as { v: 2, key }
+// on every advisory-stage evaluation. Legacy string keys are non-comparable.
+function clearAdvisedKeyBeforeBlock(file, state) {
+  try {
+    delete state.lastAdvisedKey;
+    saveState(file, state);
+  } catch {
+    // The blocking exit must still fire; a surviving stale key is the
+    // documented micro-residual, overwritten by the next successful
+    // advisory-stage write.
+  }
+}
+
+function advisedKeyDigest(advisories, fingerprintKey) {
+  return hash(JSON.stringify({ v: 2, advisories, fingerprint: fingerprintKey }));
+}
+
+function comparableAdvisedKey(value) {
+  return value && typeof value === 'object' && value.v === 2 && typeof value.key === 'string'
+    ? value.key
+    : null;
+}
+
+function routerAdvisory(root, state, owned) {
+  const thresholds = routerThresholds();
+  if (!thresholds) return null;
+  if (!owned.includes(ROUTER_REL_PATH)) return null; // no session-attributable edit
+  const current = routerBytes(root);
+  if (!Number.isFinite(current)) return null;
+  const startBytes = Number.isFinite(state.routerBytesAtStart) ? state.routerBytesAtStart : null;
+  if (startBytes === null) return null; // missing baseline (legacy/resumed state) → suppress; SessionStart covers it
+  if (startBytes < thresholds.NOTICE_BYTES && current >= thresholds.NOTICE_BYTES) {
+    return `Memory router crossing: edits in this session carried .claude-memory/MEMORY.md from ${startBytes}B to ${current}B, over the ${thresholds.NOTICE_BYTES}B routine-audit trigger. Run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10 now, or record the debt explicitly in SESSION_PROMPT.md.`;
+  }
+  if (startBytes >= thresholds.NOTICE_BYTES && current > startBytes) {
+    return `Memory router growth: .claude-memory/MEMORY.md was already at/over the ${thresholds.NOTICE_BYTES}B routine-audit trigger (${startBytes}B at session start) and edits in this session grew it to ${current}B. Run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10, or record the debt in SESSION_PROMPT.md.`;
+  }
+  return null;
+}
+
 function wikiAndRouterNotes(root) {
   const notes = [
     'Agent wiki: for reviewer-finder, external-reviewer portal, intake, or Dataverse/Dynamics work, read docs/agent-wiki/index.md first — it routes to the source files, Atlas pages, and prior hazards for that domain before you edit, and is the cheap home for domain detail. Update the matching topic page when you change durable behavior.',
   ];
+  const thresholds = routerThresholds();
+  if (!thresholds) return notes; // skip the size note; gate stays the backstop
   try {
     const memBytes = fs.statSync(path.join(root, '.claude-memory', 'MEMORY.md')).size;
-    const CAP = 12 * 1024;
-    const WARN = 11 * 1024;
-    if (memBytes > WARN) {
-      notes.push(`Memory router pressure: .claude-memory/MEMORY.md is ${memBytes}B, within ${CAP - memBytes}B of the ${CAP}B hard cap. Put the next domain's detail in a docs/agent-wiki/topics/ page and add only a terse router line — the write-time guard will block a bloating edit.`);
+    if (memBytes > thresholds.WARN_BYTES) {
+      notes.push(`Memory router pressure: .claude-memory/MEMORY.md is ${memBytes}B, within ${thresholds.TARGET_BYTES - memBytes}B of the ${thresholds.TARGET_BYTES}B hard cap. Put the next domain's detail in a docs/agent-wiki/topics/ page and add only a terse router line — the write-time guard will block a bloating edit.`);
+    } else if (memBytes >= thresholds.NOTICE_BYTES) {
+      notes.push(`Memory router notice: .claude-memory/MEMORY.md is ${memBytes}B, at/over the ${thresholds.NOTICE_BYTES}B routine-audit trigger. Run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10 (routine audit §6) before the ${thresholds.WARN_BYTES}B warn band.`);
     }
   } catch {
     // MEMORY.md unreadable; skip the pressure note.
@@ -327,6 +400,7 @@ function start(input, root, file) {
     adversarialReviewRequirements: {},
     adversarialReviewReceipts: {},
     gateCache: {},
+    routerBytesAtStart: routerBytes(root), // fresh sessions only; resume path above never overwrites
   };
   saveState(file, state);
 
@@ -386,13 +460,18 @@ function stop(input, root, file) {
   );
 
   if (newlyBrokenProtected.length) {
+    clearAdvisedKeyBeforeBlock(file, state);
     console.error(`Agent instruction invariant broken during this session: ${newlyBrokenProtected.map((item) => item.name).join(', ')}. Run \`npm run check:agent-invariants\` and repair the symlink(s) before stopping.`);
     process.exit(2);
   }
 
   const unresolvedStaleDocs = unresolvedStaleDocWarnings(root, state);
   state.staleDocWarnings = unresolvedStaleDocs;
-  saveState(file, state);
+  // Deliberately NO uncaught save here: a state-I/O failure before the blocker
+  // decisions would fall to main()'s fail-open catch and cancel a deliberate
+  // exit(2). Every path below persists the pruned warnings instead — blocking
+  // exits via clearAdvisedKeyBeforeBlock (locally caught), the normal path via
+  // the advisory-stage saveState.
   const strictStaleDocs = unresolvedStaleDocs.filter((warning) => warning.strict);
   if (strictStaleDocs.length) {
     const summary = strictStaleDocs.map((warning) =>
@@ -404,6 +483,7 @@ function stop(input, root, file) {
       'Re-open/update each doc claim, or add a visible marker near the claim: ' +
       '[RECHECKED after <changed-path> change: <file:line/probe>] or [STALE-ACCEPTED: <changed-path> — reason].'
     );
+    clearAdvisedKeyBeforeBlock(file, state);
     process.exit(2);
   }
 
@@ -420,12 +500,11 @@ function stop(input, root, file) {
       'If the owner deliberately accepts the residual, add a visible document marker: ' +
       '<!-- adversarial-review:waived reason=<specific reason> -->'
     );
+    clearAdvisedKeyBeforeBlock(file, state);
     process.exit(2);
   }
 
   const gates = gatesForPaths(owned);
-  if (gates.length === 0) return;
-
   const fingerprintKey = hash(owned.map((p) => `${p}:${fingerprint(root, p)}`).sort().join('\n'));
   const failures = [];
   for (const gate of gates) {
@@ -434,27 +513,37 @@ function stop(input, root, file) {
     state.gateCache[gate] = { ...result, fingerprintKey, checkedAt: new Date().toISOString() };
     if (!result.ok) failures.push({ gate, output: result.output });
   }
-  saveState(file, state);
 
-  if (!failures.length) return;
-  const summary = failures.map(({ gate, output }) => `\`${gate}\` failed:\n${output}`).join('\n\n');
   const mode = process.env.CLAUDE_STOP_GATE_MODE || 'advisory';
-  if (mode === 'block') {
+  if (failures.length && mode === 'block') {
+    const summary = failures.map(({ gate, output }) => `\`${gate}\` failed:\n${output}`).join('\n\n');
     console.error(`Session-owned changed-surface gate failure:\n${summary}`);
+    clearAdvisedKeyBeforeBlock(file, state);
     process.exit(2);
   }
 
-  // Advisory mode: surface each distinct failure state to Claude exactly once, then let
-  // the Stop proceed. additionalContext re-opens the turn, so re-emitting the same failure
-  // on every Stop would loop forever. De-dup on (failing gates + changed-surface
-  // fingerprint); once advised for that state, stay silent so the next Stop is clean. A new
-  // edit (new fingerprint) or a different failing gate re-surfaces; a fixed gate yields an
-  // empty `failures` and returns above.
-  const advisedKey = hash(`${failures.map((f) => f.gate).sort().join('\n')}|${fingerprintKey}`);
-  if (state.lastAdvisedKey === advisedKey) return;
-  state.lastAdvisedKey = advisedKey;
-  saveState(file, state);
-  additionalContext('Stop', `Advisory changed-surface gate failure (blocking rollout is not enabled):\n${summary}`);
+  // Advisory stage — single emission point (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md
+  // Phase 3). Every advisory producer appends here in a fixed order; the
+  // versioned dedup key is stored on EVERY evaluation (including the empty
+  // set) BEFORE any optional emission, so no normal exit can preserve a stale
+  // suppressing key. additionalContext re-opens the turn, so an identical
+  // state must stay silent; any changed advisory set or fingerprint re-arms.
+  const stopAdvisories = [];
+  if (failures.length) {
+    const summary = failures.map(({ gate, output }) => `\`${gate}\` failed:\n${output}`).join('\n\n');
+    stopAdvisories.push(`Advisory changed-surface gate failure (blocking rollout is not enabled):\n${summary}`);
+  }
+  const routerNote = routerAdvisory(root, state, owned);
+  if (routerNote) stopAdvisories.push(routerNote);
+
+  const digest = advisedKeyDigest(stopAdvisories, fingerprintKey);
+  const previous = comparableAdvisedKey(state.lastAdvisedKey);
+  state.lastAdvisedKey = { v: 2, key: digest };
+  saveState(file, state); // persists gateCache + key; failure falls to the outer fail-open catch before any emission
+
+  if (stopAdvisories.length === 0) return;
+  if (previous === digest) return; // identical advised state → silent
+  additionalContext('Stop', stopAdvisories.join('\n\n'));
 }
 
 async function main() {
@@ -475,13 +564,19 @@ async function main() {
 if (require.main === module) main();
 
 module.exports = {
+  advisedKeyDigest,
   changedOwnedPaths,
+  clearAdvisedKeyBeforeBlock,
+  comparableAdvisedKey,
   detectStaleDocWarnings,
   dirtyPaths,
   fingerprint,
   gatesForPaths,
   record,
   recordAdversarialReview,
+  routerAdvisory,
+  routerBytes,
+  routerThresholds,
   statePath,
   unresolvedAdversarialReviewRequirements,
   unresolvedStaleDocWarnings,

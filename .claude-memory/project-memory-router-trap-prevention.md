@@ -30,7 +30,7 @@ enforcement was **warn-only and at session start** — the session that bloated 
 felt the cost; a later session got the red gate. With this project's high durable-fact
 write-rate, periodic big-bang cleanups always lose the race.
 
-**Prevention (installed 2026-06-10), three layers:**
+**Prevention (installed 2026-06-10; early-warning ladder added 2026-08-21), three layers:**
 
 1. **Write-time enforcement.** `.claude/hooks/memory-router-guard.js` (PreToolUse
    Write|Edit) blocks an edit to MEMORY.md that pushes a budget dimension *further past
@@ -38,14 +38,20 @@ write-rate, periodic big-bang cleanups always lose the race.
    (prose measured with `.md` refs stripped, cap 200). The comparison is monotonic
    before/after, NOT exact-token, so a partial cleanup of an already-over-budget file —
    and any net-neutral/shrinking edit — always passes (it can never wedge a fix).
-   Thresholds single-sourced from `scripts/check-memory-router.js`. The gate was also
+   Thresholds single-sourced from `scripts/lib/memory-router-thresholds.js` (since
+   2026-08-21; the checker re-exports them, both hooks import them and skip fail-open
+   if the module is unloadable — no fallback literals). The gate was also
    hardened: 12KB warn→hard-fail + the 200-char prose cap (file-ref lists exempt, so a
    line may route to many files). NOTE: harness/auto-memory writes don't go through the
    Write/Edit tools, so they bypass this PreToolUse hook — `check:memory-router` stays
    the backstop (at session start / CI) for anything the hook can't see.
 
-2. **Signal.** Gate emits an 11KB early-warning band (warns, doesn't fail); the
-   SessionStart hook surfaces router pressure when within ~1KB of the cap.
+2. **Signal (ladder since 2026-08-21).** Gate: notice at >=8KiB (routine-audit
+   trigger -> `docs/MEMORY_HYGIENE_RUNBOOK.md` s10 diet), warn band >11KiB, hard fail
+   over the 12KiB cap. SessionStart surfaces the same >=8KiB notice plus near-cap
+   pressure; the Stop hook adds a crossing/growth advisory when the session's own
+   edits moved the router to/past the trigger (participation, not sole causation).
+   Canonical: `docs/MEMORY_HYGIENE_RUNBOOK.md` + `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`.
 
 3. **Incentive / discoverability — the load-bearing one.** Detail defaulted to the
    router because the wiki was a one-page trial nobody read. The
