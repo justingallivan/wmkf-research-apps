@@ -392,7 +392,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {readyFile && (
+            {readyFile && !promotedToSiteVisit && (
               <>
                 <a
                   href={readyFile.webUrl}
@@ -443,41 +443,37 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
           )}
           {readyFile && (
             <div className="mt-4 text-sm text-gray-700">
-              <p>
-                Latest draft:{' '}
-                <a
-                  href={readyFile.webUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-green-800 underline"
-                >
-                  {readyFile.name || 'Open Word draft'}
-                </a>
-              </p>
-              {warnings.length > 0 && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
-                  <h3 className="font-semibold">Draft needs a quick edit check</h3>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {warnings.map((warning, index) => (
-                      <li key={`${warning.code || 'warning'}-${index}`}>
-                        {warning.message || 'The draft completed with a review warning.'}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {!promotedToSiteVisit && (
+                <p>
+                  Latest draft:{' '}
+                  <a
+                    href={readyFile.webUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-green-800 underline"
+                  >
+                    {readyFile.name || 'Open Word draft'}
+                  </a>
+                </p>
               )}
               {promotedToSiteVisit ? (
-                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                  <h3 className="font-semibold text-green-900">Site Visit in progress</h3>
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <h3 className="font-semibold text-green-900">Pre-Site Visit complete</h3>
                   <p className="mt-1">
-                    This draft is now the Site Visit workspace and can no longer be regenerated here.
+                    This document was promoted and is now managed in the Site Visit workspace.
+                    Continue there to edit or download the working document.
                   </p>
+                  {readyFile.name && (
+                    <p className="mt-2 text-xs text-green-900">
+                      Promoted document: <span className="font-medium">{readyFile.name}</span>
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() => onSelectTab?.('site-visit')}
                     className="mt-3 rounded-lg border border-green-300 bg-white px-4 py-2 font-medium text-green-900 hover:bg-green-100"
                   >
-                    Open Site Visit workspace
+                    Continue in Site Visit
                   </button>
                 </div>
               ) : readyForSiteVisit ? (
@@ -499,6 +495,18 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                   </button>
                 </div>
               ) : null}
+              {warnings.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
+                  <h3 className="font-semibold">Draft needs a quick edit check</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {warnings.map((warning, index) => (
+                      <li key={`${warning.code || 'warning'}-${index}`}>
+                        {warning.message || 'The draft completed with a review warning.'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

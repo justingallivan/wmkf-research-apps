@@ -332,7 +332,7 @@ test('a late Site Visit transition cannot navigate after the request changes', a
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
-test('a promoted draft cannot be regenerated and links to the Site Visit workspace', async () => {
+test('a promoted draft becomes a handoff receipt with work continuing in Site Visit', async () => {
   const promoted = {
     ...readyArtifact(),
     lifecycleState: 100000001,
@@ -346,12 +346,15 @@ test('a promoted draft cannot be regenerated and links to the Site Visit workspa
   global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: promoted }));
   render(<PreSiteVisitTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
-  expect(await screen.findByText(/now the Site Visit workspace/i)).toBeInTheDocument();
+  expect(await screen.findByText(/now managed in the Site Visit workspace/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Site Visit in progress' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Open Site Visit workspace' }));
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '1002379 Pre-Site Visit.docx' })).not.toBeInTheDocument();
+  expect(screen.getByText('Promoted document:')).toHaveTextContent('1002379 Pre-Site Visit.docx');
+  expect(screen.getByRole('heading', { name: 'Pre-Site Visit complete' })).toBeInTheDocument();
+  expect(screen.getByText(/continue there to edit or download/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Continue in Site Visit' }));
   expect(onSelectTab).toHaveBeenCalledWith('site-visit');
 });
 
