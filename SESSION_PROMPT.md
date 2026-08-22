@@ -1,11 +1,11 @@
-# Session 453 Prompt: Guarded Pre-Site Correction/Reopen
+# Session 454 Prompt: Guarded Pre-Site Release Preparation
 
-## Session 452 Summary
+## Session 453 Summary
 
-Session 452 completed the controlled Production Site Visit handoff, hardened
-the promoted Pre-Site tab into a read-only receipt, designed the correction,
-informational-distribution, and AkoyaGo publication follow-ons, and merged the
-memory-hygiene early-warning system plus its first routine audit/router diet.
+Session 453 implemented and independently hardened guarded Pre-Site reopen on
+`codex/guarded-reopen`. The feature remains source-built and deliberately not
+live: Wave 20 was not applied, the readiness flag was not enabled, and no
+runtime deployment or business-row smoke occurred.
 
 ### What Was Completed
 
@@ -76,6 +76,21 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
      deployment. The local and remote branch remain available for provenance.
    - `main` was clean and synchronized with `origin/main` before this handoff.
 
+8. **Guarded Pre-Site reopen is source-complete and Opus-approved.**
+   - The preserve-and-succeed service, superuser route/UI, exact-operation
+     retry, cycle-salted regeneration, Wave 20 readiness interlock, append-only
+     history, and stable-identity cleanup reconciliation are implemented.
+   - Failed attempts remain exact-retry targets for their own operation; a
+     different operation records any resolvable retained copy as cleanup work.
+     Expired live claims follow the same cleanup contract before fallthrough.
+   - Correction history and nested audit details are superuser-only across
+     status, generation, and Site Visit handoff responses. Non-superusers do
+     not receive pending reason-bearing reopen rows. Actor/time attribution is
+     limited to the actual reason-bearing reopen event.
+   - Multiple independent Claude Opus review rounds closed every P0–P3 finding.
+     The final report returned **APPROVE — no actionable findings remain** at
+     `/Users/gallivan/.claude/plans/perform-the-final-read-only-soft-parrot.md`.
+
 ### Commits
 
 - `a089cf80` — docs(workbench): record production site visit handoff
@@ -89,6 +104,11 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
 - `800eb8e4` — docs(handoff): branch handoff for Codex — merge + first router diet
 - `00139331` — merge the Fable memory-hygiene branch into `main`
 - `fb8dfab2` — docs(memory): complete first routine audit and router diet
+- `1e14f651` — feat(workbench): add guarded pre-site reopen
+- `6ce85d36` — fix(workbench): harden guarded reopen review findings
+- `7096c6d4` — fix(workbench): close opus guarded reopen findings
+- `7167d94` — fix(workbench): reconcile guarded reopen residuals
+- `5545d0b` — fix(workbench): redact reopen audit on handoff
 
 ## Next Items
 
@@ -101,9 +121,10 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
    The feature is source-built, not live: no target schema preflight/apply or
    runtime deployment has been authorized. Next run the read-only target
    preflight, stop on divergence, obtain explicit owner approval before the
-   Wave 20 apply, require exact metadata readback, and only then deliberately
-   promote runtime and perform a separately approved signed-in smoke. Never
-   deploy the adapter before those columns exist, and do not use Production
+   Wave 20 apply, require exact metadata readback, deliberately enable the
+   literal-on readiness flag, and only then promote runtime and perform a
+   separately approved signed-in smoke. Base adapter reads and creates are
+   flag-safe before provisioning, but reopen must remain unavailable. Do not use Production
    Request `1002379` for a durable reopen test without exact approval.
 
 2. **Observe Dynamics Explorer Phases A and B through organic use.**
@@ -202,13 +223,11 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
   docs, fact, symbol, type, claim-freshness, framing, currency, and clean-diff
   gate passed sequentially. The router self-test passed 19/19 with existing
   advisory MaxListeners warnings.
-- Guarded reopen branch: focused service, route, artifact, and component tests
-  pass 54/54; TypeScript and targeted ESLint pass with only the existing
-  `[requestId].js` hook warning. A fresh adversarial contract review returned
-  SHIP after lifecycle-race, target-drift, and attempt-status hardening. The
-  production Webpack build and relevant route, DAL/context, status, Atlas,
-  documentation, and fact gates pass. The default Turbopack build remains
-  host-blocked by an internal CSS worker bind permission error, while the
-  Webpack build succeeds.
+- Guarded reopen branch: seven focused service, route, artifact, and component
+  suites pass 101/101; TypeScript and scoped ESLint pass. The production Webpack
+  build and relevant API-route, lifecycle/auth, route/service, DAL/context,
+  GUID, status, Atlas, documentation, fact, currency, and invariant gates pass.
+  The final independent Claude Opus acceptance review returned APPROVE with no
+  actionable findings.
 - Stop-time claim-evidence pilot: local observation state was unavailable, so no
   observation row was added and no advisory classification was invented.
