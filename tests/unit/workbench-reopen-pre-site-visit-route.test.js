@@ -12,11 +12,15 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 jest.mock('../../lib/services/pre-site-visit/reopen-service', () => ({
   reopenPreSiteVisit: jest.fn(),
 }));
+jest.mock('../../lib/utils/guarded-reopen-readiness', () => ({
+  isGuardedReopenSchemaReady: jest.fn(),
+}));
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { reopenPreSiteVisit } from '../../lib/services/pre-site-visit/reopen-service';
+import { isGuardedReopenSchemaReady } from '../../lib/utils/guarded-reopen-readiness';
 import handler from '../../pages/api/workbench/pre-site-visit/reopen';
 import { PRE_SITE_REOPEN_REASON } from '../../shared/config/requestDocument';
 
@@ -53,6 +57,7 @@ beforeEach(() => {
     session: { user: { dynamicsSystemuserId: USER_ID } },
   });
   getUserRole.mockResolvedValue('superuser');
+  isGuardedReopenSchemaReady.mockReturnValue(true);
   reopenPreSiteVisit.mockResolvedValue({
     artifact: { artifactId: ARTIFACT_ID, operationStatus: 100000001 },
     reused: false,
@@ -104,6 +109,21 @@ test('rejects missing and unexpected fields before entering DAL context', async 
   expect(reopenPreSiteVisit).not.toHaveBeenCalled();
 });
 
+test('fails closed before DAL access while Wave 20 readiness is off', async () => {
+  isGuardedReopenSchemaReady.mockReturnValueOnce(false);
+  const res = mockRes();
+
+  await handler({ method: 'POST', body: body() }, res);
+
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({
+    error: 'Guarded reopen is unavailable until its Dataverse schema is verified.',
+    code: 'pre_site_reopen_schema_not_ready',
+  });
+  expect(withDalContext).not.toHaveBeenCalled();
+  expect(reopenPreSiteVisit).not.toHaveBeenCalled();
+});
+
 test('runs guarded reopen in authenticated DAL context with the session actor', async () => {
   const res = mockRes();
   const requestBody = body();
@@ -143,4 +163,3 @@ test('preserves governed conflict codes without exposing internal errors', async
     code: 'pre_site_reopen_transition_conflict',
   });
 });
-

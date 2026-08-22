@@ -122,16 +122,34 @@ function validateSpec() {
   if (expected.size) throw new Error('One or more guarded-reopen attributes are missing.');
 }
 
-async function probeAttribute(token, attribute) {
+async function probeAttribute(token, attribute, readMetadata = getJson) {
   const logicalName = attribute.schemaName.toLowerCase();
   const cast = CAST[attribute.type];
-  const response = await getJson(
+  const basePath = `/EntityDefinitions(LogicalName='${spec.entityLogicalName}')/`
+    + `Attributes(LogicalName='${logicalName}')`;
+  const uncast = await readMetadata(
     token,
-    `/EntityDefinitions(LogicalName='${spec.entityLogicalName}')/`
-      + `Attributes(LogicalName='${logicalName}')/Microsoft.Dynamics.CRM.${cast}`
+    `${basePath}?$select=LogicalName,AttributeType`,
+  );
+  if (uncast.status === 404) return { state: 'absent', notes: [] };
+  if (uncast.body?.AttributeType !== attribute.type) {
+    return {
+      state: 'divergent',
+      notes: [`AttributeType ${uncast.body?.AttributeType} != ${attribute.type}`],
+    };
+  }
+
+  const response = await readMetadata(
+    token,
+    `${basePath}/Microsoft.Dynamics.CRM.${cast}`
       + `?$select=${attributeSelect(attribute)}`,
   );
-  if (response.status === 404) return { state: 'absent', notes: [] };
+  if (response.status === 404) {
+    return {
+      state: 'divergent',
+      notes: [`${cast} cast was unavailable for an existing ${attribute.type} attribute`],
+    };
+  }
 
   const notes = [];
   if (response.body?.AttributeType !== attribute.type) {
@@ -154,7 +172,7 @@ async function probeAttribute(token, attribute) {
   return { state: notes.length ? 'divergent' : 'exact', notes };
 }
 
-function runSelfTest() {
+async function runSelfTest() {
   validateSpec();
   const stringFields = new Set(attributeSelect({ type: 'String' }).split(','));
   const memoFields = new Set(attributeSelect({ type: 'Memo' }).split(','));
@@ -163,6 +181,30 @@ function runSelfTest() {
   }
   if (!memoFields.has('Format') || memoFields.has('FormatName')) {
     throw new Error('Memo metadata projection is incorrect.');
+  }
+  const stringAttribute = spec.attributes.find((attribute) => attribute.type === 'String');
+  const absent = await probeAttribute(null, stringAttribute, async () => ({ status: 404, body: null }));
+  if (absent.state !== 'absent') throw new Error('A missing uncast attribute must classify absent.');
+  let readCount = 0;
+  const wrongType = await probeAttribute(null, stringAttribute, async () => {
+    readCount += 1;
+    return {
+      status: 200,
+      body: { LogicalName: 'wmkf_reopencycleid', AttributeType: 'Memo' },
+    };
+  });
+  if (wrongType.state !== 'divergent' || readCount !== 1) {
+    throw new Error('An existing wrong-type attribute must classify divergent before a cast.');
+  }
+  readCount = 0;
+  const wrongCast = await probeAttribute(null, stringAttribute, async () => {
+    readCount += 1;
+    return readCount === 1
+      ? { status: 200, body: { LogicalName: 'wmkf_reopencycleid', AttributeType: 'String' } }
+      : { status: 404, body: null };
+  });
+  if (wrongCast.state !== 'divergent' || readCount !== 2) {
+    throw new Error('A typed-cast 404 for an existing expected-type attribute must classify divergent.');
   }
   console.log('PASS: wave20 guarded-reopen spec and metadata projections are valid.');
 }
@@ -202,9 +244,11 @@ async function main() {
   }
 }
 
-if (selfTest) runSelfTest();
+if (selfTest) runSelfTest().catch((error) => {
+  console.error(`ERROR: ${error.message}`);
+  process.exit(1);
+});
 else main().catch((error) => {
   console.error(`ERROR: ${error.message}`);
   process.exit(1);
 });
-

@@ -65,9 +65,11 @@ version, governed DOCX hash, and handoff timestamp in the existing
 **[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded correction
 branch adds the preserve-and-succeed service, superuser route/UI, history
 projection, and an additive Wave 20 spec. No target preflight, schema apply,
-runtime deployment, or business-row smoke has run. The adapter selects the new
-columns, so promotion before target provisioning would make Request Document
-reads fail.
+runtime deployment, or business-row smoke has run. The base adapter projection
+omits the new columns until `GUARDED_REOPEN_SCHEMA_READY` is literal `on`; the
+reopen route returns 503 while it is off. This lets source deploy safely before
+provisioning without making ordinary Request Document reads query absent
+columns, while keeping guarded reopen mechanically unavailable.
 
 A PDF distribution copy is a separate Request Document row because one
 registry row must identify exactly one SharePoint file. Its
@@ -168,7 +170,15 @@ Existing `wmkf_SourceDocument`, `wmkf_sourceversionid`, and
 `createdby`/`createdon`, written under the session's Dynamics impersonation,
 bind actor and time. The generation-key alternate key remains the uniqueness
 fence; the cycle ID alone is not treated as a new database key. No separate
-audit entity is needed for this bounded operation.
+audit entity is needed for this bounded operation. Dataverse formatted lookup
+annotation `_createdby_value_formatted` supplies the actor display name.
+
+Failed successor rows remain immutable attempt evidence but are excluded from
+the downstream blocker for a later client operation. An unchanged retry keeps
+the same client UUID and reclaims the same row/item; changing the reason code or
+note rotates the UUID. A different active Generating row blocks another reopen,
+and final generation activation compares the target correction cycle with the
+current Draft pointer so a stale older generation cannot replace a newer cycle.
 
 ### `akoya_request` relationships
 
@@ -400,14 +410,22 @@ Wave 20 has a separate strict order and is not covered by the completed Wave
 19 steps:
 
 1. Run `node scripts/preflight-guarded-reopen-schema.mjs --target=<target>`
-   read-only and classify all three attributes absent/exact/divergent.
+   read-only and classify all three attributes absent/exact/divergent. The
+   preflight first probes the uncast attribute path, so an existing wrong-type
+   attribute is divergent rather than misreported as absent by a typed-cast
+   404.
 2. Stop on any divergence. If absent, obtain explicit owner approval before
    `node scripts/apply-dataverse-schema.js --target=<target> --wave=20-guarded-reopen --execute`.
 3. Re-run the preflight and require three exact, zero absent/divergent.
-4. Only then promote the runtime branch whose adapter selects these columns.
+4. Set the non-sensitive deployment flag `GUARDED_REOPEN_SCHEMA_READY=on`
+   only after that exact readback, then promote/redeploy the runtime. Literal
+   `on` is the only enabling value; unset and invalid values fail closed.
 5. After deliberate runtime release approval, perform one controlled signed-in
    superuser smoke plus exact retry/readback. Do not use Request `1002379`
    without separately approved mutation authority.
+6. After the first correction cycle exists, never unset the readiness flag as
+   a rollback. Roll runtime back while retaining the exact schema and flag;
+   hiding the cycle field would make generation identity incomplete.
 
 ## Remaining decisions
 

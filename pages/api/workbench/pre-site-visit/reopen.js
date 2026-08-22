@@ -10,6 +10,7 @@ import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { reopenPreSiteVisit } from '../../../../lib/services/pre-site-visit/reopen-service';
+import { isGuardedReopenSchemaReady } from '../../../../lib/utils/guarded-reopen-readiness';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../../shared/config/requestDocument';
 
 const BODY_KEYS = new Set([
@@ -66,6 +67,12 @@ export default async function handler(req, res) {
     || Object.keys(req.body).length !== BODY_KEYS.size) {
     return res.status(400).json({
       error: 'POST body must contain exactly the guarded-reopen fields',
+    });
+  }
+  if (!isGuardedReopenSchemaReady()) {
+    return res.status(503).json({
+      error: 'Guarded reopen is unavailable until its Dataverse schema is verified.',
+      code: 'pre_site_reopen_schema_not_ready',
     });
   }
 

@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/utils/auth', () => ({
+  getUserRole: jest.fn(),
+  requireAppAccess: jest.fn(),
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
@@ -11,7 +14,7 @@ jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
   getPreSiteVisitArtifactStatus: jest.fn(),
 }));
 
-import { requireAppAccess } from '../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import {
@@ -22,6 +25,7 @@ import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
+const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -43,8 +47,10 @@ function get(requestId = REQUEST_ID) {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({
+    profileId: PROFILE_ID,
     session: { user: { dynamicsSystemuserId: '22222222-2222-2222-2222-222222222222' } },
   });
+  getUserRole.mockResolvedValue('superuser');
   generatePreSiteVisitArtifact.mockResolvedValue({
     artifact: {
       artifactId: '33333333-3333-3333-3333-333333333333',
@@ -60,6 +66,7 @@ beforeEach(() => {
   getPreSiteVisitArtifactStatus.mockResolvedValue({
     currentArtifact: null,
     pendingArtifact: null,
+    reopenHistory: [],
   });
 });
 test('rejects methods other than GET/POST before authentication', async () => {
@@ -79,6 +86,7 @@ test('reads current/pending status without invoking generation', async () => {
   getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
     currentArtifact,
     pendingArtifact: null,
+    reopenHistory: [],
   });
   const res = mockRes();
 
@@ -88,7 +96,31 @@ test('reads current/pending status without invoking generation', async () => {
   expect(getPreSiteVisitArtifactStatus).toHaveBeenCalledWith({ requestId: REQUEST_ID });
   expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({ success: true, currentArtifact, pendingArtifact: null });
+  expect(res.body).toEqual({
+    success: true,
+    currentArtifact,
+    pendingArtifact: null,
+    reopenHistory: [],
+  });
+});
+
+test('omits guarded-reopen audit history for non-superusers', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    currentArtifact: null,
+    pendingArtifact: null,
+    reopenHistory: [{ artifactId: 'restricted-audit-row' }],
+  });
+  const res = mockRes();
+
+  await handler(get(), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    success: true,
+    currentArtifact: null,
+    pendingArtifact: null,
+  });
 });
 
 test('rejects an invalid GET request id before reading status', async () => {

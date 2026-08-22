@@ -160,8 +160,14 @@ fields. Source service, superuser route, status/history projection, Site Visit
 dialog, exact-operation dedupe, post-upload recovery, ETag changeset, and
 correction-cycle generation salting are focused-test covered. No target
 preflight, metadata apply, runtime deployment, or business-row smoke has run.
-Because the adapter selects the new fields, schema must be applied and read
-back exact before runtime promotion.
+The adapter's base projection excludes the Wave 20 fields while the literal-on
+`GUARDED_REOPEN_SCHEMA_READY` interlock is disabled, and the reopen route then
+fails closed with 503. After schema apply/readback, enabling that non-sensitive
+flag exposes the fields. Failed attempts remain append-only evidence but do not
+block a distinct later operation; unchanged retry reclaims the same row/item.
+Competing generation blocks reopen, and generation activation rechecks exact
+correction-cycle equality against the current Draft pointer. Reopen history and
+actor attribution are returned only to superusers.
 
 ## Ownership
 
@@ -332,3 +338,9 @@ transition.
    service post-write reread required the exact version/hash/time milestone.
 
 No live command in this sequence is authorized merely by this page.
+
+For Wave 20, run the guarded-reopen preflight, stop on divergence, obtain
+explicit apply approval, apply and re-read three exact fields, then set
+`GUARDED_REOPEN_SCHEMA_READY=on` and promote/redeploy the runtime. Once the
+environment contains a correction cycle, retain both the schema and flag during
+rollback so generation continues to see the cycle identity.

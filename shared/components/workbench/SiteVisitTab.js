@@ -209,7 +209,7 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
           requestId: id,
           expectedArtifactId,
           clientOperationId: reopenForm.clientOperationId,
-          requestNumber,
+          requestNumber: reopenForm.typedRequestNumber,
           reasonCode: reopenForm.reasonCode,
           reasonNote: reopenForm.reasonNote.trim(),
         }),
@@ -432,7 +432,11 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                 <select
                   id="reopen-reason"
                   value={reopenForm.reasonCode}
-                  onChange={(event) => setReopenForm((current) => ({ ...current, reasonCode: event.target.value }))}
+                  onChange={(event) => setReopenForm((current) => ({
+                    ...current,
+                    reasonCode: event.target.value,
+                    clientOperationId: newClientOperationId(),
+                  }))}
                   disabled={reopening}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
@@ -449,7 +453,11 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
                 <textarea
                   id="reopen-note"
                   value={reopenForm.reasonNote}
-                  onChange={(event) => setReopenForm((current) => ({ ...current, reasonNote: event.target.value }))}
+                  onChange={(event) => setReopenForm((current) => ({
+                    ...current,
+                    reasonNote: event.target.value,
+                    clientOperationId: newClientOperationId(),
+                  }))}
                   minLength={PRE_SITE_REOPEN_CONTRACT.minimumReasonNoteLength}
                   maxLength={PRE_SITE_REOPEN_CONTRACT.maximumReasonNoteLength}
                   rows={4}

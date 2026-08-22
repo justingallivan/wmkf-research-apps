@@ -238,6 +238,60 @@ test('validates confirmation and submits one guarded reopen operation before ret
   expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument();
 });
 
+test('editing audit inputs after a failed submit starts a new client operation', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({
+      success: true,
+      currentArtifact: artifact(100000001),
+      pendingArtifact: null,
+      reopenHistory: [],
+    }))
+    .mockResolvedValueOnce(response({
+      error: 'The first attempt failed.',
+      code: 'pre_site_reopen_copy_verification_failed',
+    }, 409))
+    .mockResolvedValueOnce(response({
+      success: true,
+      artifact: artifact(100000000),
+      reused: false,
+      recovered: false,
+      inProgress: false,
+    }))
+    .mockResolvedValueOnce(response({
+      success: true,
+      currentArtifact: artifact(100000000),
+      pendingArtifact: null,
+      reopenHistory: [],
+    }));
+  render(<SiteVisitTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  fireEvent.change(screen.getByLabelText('Reason'), {
+    target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF },
+  });
+  fireEvent.change(screen.getByLabelText('Correction note'), {
+    target: { value: 'The handoff was started too early.' },
+  });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), {
+    target: { value: '1002379' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
+  expect(await screen.findByText('The first attempt failed.')).toBeInTheDocument();
+
+  const firstCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/reopen'));
+  const firstOperationId = JSON.parse(firstCall[1].body).clientOperationId;
+  fireEvent.change(screen.getByLabelText('Correction note'), {
+    target: { value: 'The handoff was started too early; retry after review.' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Draft Successor' }));
+
+  await waitFor(() => expect(
+    global.fetch.mock.calls.filter(([url]) => url.endsWith('/reopen')),
+  ).toHaveLength(2));
+  const secondCall = global.fetch.mock.calls.filter(([url]) => url.endsWith('/reopen'))[1];
+  expect(JSON.parse(secondCall[1].body).clientOperationId).not.toBe(firstOperationId);
+});
+
 test('renders append-only guarded reopen history from the status contract', async () => {
   global.fetch.mockResolvedValueOnce(response({
     success: true,

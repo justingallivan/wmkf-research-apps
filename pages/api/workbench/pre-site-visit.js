@@ -6,7 +6,7 @@
  * Visit Word draft and return its registry/SharePoint identity.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
@@ -55,7 +55,13 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
         const status = await getPreSiteVisitArtifactStatus({ requestId });
-        return res.status(200).json({ success: true, ...status });
+        const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+        if (role === 'superuser') {
+          return res.status(200).json({ success: true, ...status });
+        }
+        const staffStatus = { ...status };
+        delete staffStatus.reopenHistory;
+        return res.status(200).json({ success: true, ...staffStatus });
       }
 
       if (!req.body

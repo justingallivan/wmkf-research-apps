@@ -130,7 +130,7 @@ function createHarness() {
       const row = {
         wmkf_requestdocumentid: SUCCESSOR_ID,
         _createdby_value: ACTOR_ID,
-        '_createdby_value@OData.Community.Display.V1.FormattedValue': 'Test Admin',
+        _createdby_value_formatted: 'Test Admin',
         createdon: '2026-08-22T11:00:00Z',
         modifiedon: '2026-08-22T11:00:00Z',
         _etag: `row-${++etag}`,
@@ -208,6 +208,7 @@ function createHarness() {
     hashDocx: jest.fn().mockResolvedValue(SOURCE_HASH),
     newClaimToken: jest.fn().mockReturnValue('claim-token'),
     now: jest.fn().mockReturnValue(new Date('2026-08-22T12:00:00Z')),
+    isGuardedReopenSchemaReady: jest.fn().mockReturnValue(true),
   };
 
   return {
@@ -321,6 +322,69 @@ test('a downstream derived artifact blocks reopening before file access', async 
   )).rejects.toMatchObject({ code: 'pre_site_reopen_downstream_exists' });
   expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
   expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+});
+
+test('a competing Pre-Site generation blocks reopen before file access or mutation', async () => {
+  const harness = createHarness();
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'competing-generation-key',
+    wmkf_claimtoken: 'competing-claim',
+  }));
+
+  await expect(reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_reopen_generation_in_progress' });
+  expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('a retained failed attempt does not block a new audited reopen operation', async () => {
+  const harness = createHarness();
+  const failedId = '66666666-6666-4666-8666-666666666666';
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: failedId,
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: 'failed-reopen-generation-key',
+    wmkf_claimtoken: null,
+    wmkf_reopencycleid: '77777777-7777-4777-8777-777777777777',
+    wmkf_reopenreasoncode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    wmkf_reopenreasonnote: 'The earlier guarded reopen failed during its copy.',
+  }));
+
+  const result = await reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  );
+
+  expect(result).toMatchObject({
+    inProgress: false,
+    artifact: { artifactId: SUCCESSOR_ID },
+  });
+  expect(harness.rows.find((row) => row.wmkf_requestdocumentid === failedId))
+    .toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED });
+  expect(harness.rows).toHaveLength(3);
+});
+
+test('schema interlock fails closed before reading Dataverse', async () => {
+  const harness = createHarness();
+  harness.dependencies.isGuardedReopenSchemaReady.mockReturnValue(false);
+
+  await expect(reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_reopen_schema_not_ready', httpStatus: 503 });
+  expect(harness.dependencies.getRequest).not.toHaveBeenCalled();
+  expect(harness.dependencies.findByRequest).not.toHaveBeenCalled();
 });
 
 test('an atomic transition conflict leaves the preserved Review row and pointer unchanged', async () => {

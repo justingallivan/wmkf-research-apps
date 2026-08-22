@@ -267,7 +267,10 @@ The minimum reopen transaction is a preserve-and-succeed operation:
    the successor in the same ETag-guarded changeset.
 5. Persist actor, time, reason, source and successor identities, and the client
    operation ID in a durable append-only reopen audit representation. Exact
-   retry returns the same successor and never creates another row or file.
+   unchanged retry returns the same successor and never creates another row or
+   file. A Failed attempt remains append-only evidence but does not permanently
+   block a later operation; changing the reason code or note rotates the client
+   operation ID before another submit.
 6. Show every durable reopen attempt with an explicit Completed, Failed, In
    progress, or Needs reconciliation outcome alongside its preserved source
    evidence. The new Draft may be edited or regenerated under the normal rules,
@@ -280,12 +283,21 @@ itself: `wmkf_ReopenCycleId`, `wmkf_ReopenReasonCode`, and
 standard created-by/created-on attribution. The client operation UUID is both
 the durable correction-cycle identity and the exact-operation dedupe input;
 the existing generation-key alternate key remains the uniqueness fence. Only
-superusers may invoke the route. The status response projects these rows as
-user-facing attempts with explicit outcomes. Later generated drafts carry the same cycle ID in their
-generation identity so the preserved pre-reopen row cannot be rediscovered or
-reactivated. Wave 20 must pass a target read-only preflight and be explicitly
-applied before this branch can be promoted, because the adapter selects these
-columns unconditionally.
+superusers may invoke the route or receive the reopen-attempt history; other
+authorized Workbench readers receive the ordinary status without that audit
+projection. A second reopen is refused while a different correction-cycle
+generation is still in progress. Later generated drafts carry the same cycle ID
+in their generation identity, and final activation rechecks that the target's
+cycle still equals the current Draft pointer's cycle, so an older in-flight
+generation cannot supersede a newer correction cycle.
+
+Wave 20 must pass a target read-only preflight and be explicitly applied before
+the feature is enabled. The base adapter projection excludes the new columns
+while `GUARDED_REOPEN_SCHEMA_READY` is off, and the reopen route fails closed
+with 503. After exact metadata readback, set the non-sensitive flag to literal
+`on` and deploy/redeploy the runtime. Once a correction cycle exists in an
+environment, do not unset the flag as a rollback; generation identity depends
+on the cycle field remaining visible.
 
 ### Logistics
 
@@ -596,10 +608,12 @@ silently extend its paths or names to writeup publications.
 6. **Guarded correction/reopen — source complete on `codex/guarded-reopen`
    2026-08-22; promotion blocked on schema/release sequence.** Run the read-only
    target preflight, obtain explicit approval, apply Wave 20, re-read exact
-   metadata, then promote the tested runtime and perform a controlled signed-in
-   smoke. Do not merge the runtime first: its registry reads select the new
-   columns. This must precede Final creation so an accidental handoff cannot
-   become an unexplained Final lineage source.
+   metadata, set `GUARDED_REOPEN_SCHEMA_READY=on`, then promote/redeploy the
+   tested runtime and perform a controlled signed-in smoke. Runtime source may
+   exist with the flag off because base registry reads exclude the Wave 20
+   projection, but guarded reopen remains unavailable until the explicit flag
+   and exact schema are both present. This must precede Final creation so an
+   accidental handoff cannot become an unexplained Final lineage source.
 7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
    select/provision the durable distribution representation, then implement
    exact snapshot, preview, explicit send, resume-safe retry, and history.

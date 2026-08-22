@@ -169,7 +169,7 @@ test('reopen history projects durable actor, reason, source, and milestone evide
     wmkf_reopenreasoncode: 'accidental_handoff',
     wmkf_reopenreasonnote: 'The handoff happened too early.',
     _createdby_value: '88888888-8888-4888-8888-888888888888',
-    '_createdby_value@OData.Community.Display.V1.FormattedValue': 'Test Admin',
+    _createdby_value_formatted: 'Test Admin',
     createdon: '2026-08-22T12:00:00Z',
   };
 
@@ -345,6 +345,45 @@ test('generation cannot replace a draft that becomes the Site Visit workspace in
     .toBe(harness.currentPointerRow.wmkf_requestdocumentid);
   expect(harness.currentPointerRow.wmkf_lifecyclestate)
     .toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+});
+
+test('generation cannot supersede a newer guarded-reopen correction cycle', async () => {
+  const originalCycle = '66666666-6666-4666-8666-666666666666';
+  const newerCycle = '77777777-7777-4777-8777-777777777777';
+  const harness = createHarness({
+    currentPointerRow: {
+      wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+      wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_reopencycleid: originalCycle,
+      wmkf_filename: '1002379 Pre-Site Visit correction.docx',
+      _etag: 'correction-1',
+      createdon: '2026-08-21T12:00:00Z',
+    },
+  });
+  const upload = harness.dependencies.uploadFile.getMockImplementation();
+  harness.dependencies.uploadFile.mockImplementationOnce(async (...args) => {
+    const metadata = await upload(...args);
+    harness.currentPointerRow.wmkf_reopencycleid = newerCycle;
+    harness.currentPointerRow._etag = 'correction-2';
+    return metadata;
+  });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({
+    code: 'pre_site_visit_correction_cycle_changed',
+    httpStatus: 409,
+  });
+
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(harness.request._wmkf_currentpresitevisit_value)
+    .toBe(harness.currentPointerRow.wmkf_requestdocumentid);
+  expect(harness.currentPointerRow.wmkf_reopencycleid).toBe(newerCycle);
 });
 
 test('missing exact source identity stops before claim, Claude, render, or upload', async () => {
