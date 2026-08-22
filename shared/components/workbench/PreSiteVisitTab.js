@@ -281,6 +281,9 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
     === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const readyForSiteVisit = artifact?.lifecycleState
     === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
+  const beyondSiteVisitHandoff = Boolean(readyFile)
+    && !readyForSiteVisit
+    && !promotedToSiteVisit;
   const downloadUrl = readyFile
     ? (() => {
       try {
@@ -392,7 +395,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {readyFile && !promotedToSiteVisit && (
+            {readyFile && readyForSiteVisit && (
               <>
                 <a
                   href={readyFile.webUrl}
@@ -411,7 +414,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                 </a>
               </>
             )}
-            {!promotedToSiteVisit && (
+            {(!artifact || readyForSiteVisit) && (
               <button
                 type="button"
                 onClick={generateWithConfirmation}
@@ -443,7 +446,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
           )}
           {readyFile && (
             <div className="mt-4 text-sm text-gray-700">
-              {!promotedToSiteVisit && (
+              {readyForSiteVisit && (
                 <p>
                   Latest draft:{' '}
                   <a
@@ -458,7 +461,7 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
               )}
               {promotedToSiteVisit ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                  <h3 className="font-semibold text-green-900">Pre-Site Visit complete</h3>
+                  <h3 className="font-semibold text-green-900">Pre-Site Visit handoff complete</h3>
                   <p className="mt-1">
                     This document was promoted and is now managed in the Site Visit workspace.
                     Continue there to edit or download the working document.
@@ -467,6 +470,19 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                     <p className="mt-2 text-xs text-green-900">
                       Promoted document: <span className="font-medium">{readyFile.name}</span>
                     </p>
+                  )}
+                  {warnings.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
+                      <h4 className="font-semibold">Working document needs a quick edit check</h4>
+                      <p className="mt-1">Continue in Site Visit to review these warnings and edit the document.</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {warnings.map((warning, index) => (
+                          <li key={`${warning.code || 'warning'}-${index}`}>
+                            {warning.message || 'The document completed with a review warning.'}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                   <button
                     type="button"
@@ -494,10 +510,25 @@ export default function PreSiteVisitTab({ requestId, onSelectTab }) {
                     Start Site Visit
                   </button>
                 </div>
+              ) : beyondSiteVisitHandoff ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                  <h3 className="font-semibold">Pre-Site Visit is read-only</h3>
+                  <p className="mt-1">
+                    This document has moved beyond the Pre-Site Visit draft stage. It cannot be
+                    edited, downloaded, or regenerated from this tab; use the active workflow stage.
+                  </p>
+                  {readyFile.name && (
+                    <p className="mt-2 text-xs">
+                      Document: <span className="font-medium">{readyFile.name}</span>
+                    </p>
+                  )}
+                </div>
               ) : null}
-              {warnings.length > 0 && (
+              {!promotedToSiteVisit && warnings.length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
-                  <h3 className="font-semibold">Draft needs a quick edit check</h3>
+                  <h3 className="font-semibold">
+                    {readyForSiteVisit ? 'Draft needs a quick edit check' : 'Document has recorded edit warnings'}
+                  </h3>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {warnings.map((warning, index) => (
                       <li key={`${warning.code || 'warning'}-${index}`}>

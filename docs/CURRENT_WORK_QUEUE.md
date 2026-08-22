@@ -104,8 +104,11 @@ sequence.
   v3 is deployed and locally verified with an explicit no-wrap label. Ready
   deployment `dpl_58hstAQNBP8ATqfBXtYczC9tFziE` also includes the compact
   Pre-Site action panel: hidden contextual help, Generate before a draft exists,
-  and Edit, Download, and confirmation-guarded Regenerate actions when Ready.
-  The signed-in Word Online v3 and compact-action/download smoke remain open.
+  and Edit, Download, and confirmation-guarded Regenerate actions when
+  Ready/Draft. The signed-in Word Online v3 and compact-action/download smoke
+  remain open. **[IMPLEMENTED ON FEATURE BRANCH, NOT DEPLOYED 2026-08-21]** the
+  promoted-state panel is now a read-only handoff receipt with one Site Visit
+  continuation action; later and unknown lifecycle states also fail closed.
 
 - Initial Assessment substantive human edit: Request `1003109`'s canonical
   SharePoint item advanced to version `2.0`, attributed to Justin Gallivan.

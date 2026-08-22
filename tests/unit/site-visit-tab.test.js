@@ -100,7 +100,9 @@ test('requires confirmation before starting the stage', async () => {
 
   fireEvent.click(await screen.findByRole('button', { name: 'Start Site Visit Stage' }));
 
-  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('same SharePoint file'));
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('exact current SharePoint version'));
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('continue editing the same file in Word'));
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Pre-Site regeneration will be disabled'));
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
@@ -145,4 +147,3 @@ test('a late promotion response from another request cannot publish stale worksp
   await waitFor(() => expect(screen.getByRole('button', { name: 'Start Site Visit Stage' })).toBeEnabled());
   expect(screen.queryByText('Site Visit in progress')).not.toBeInTheDocument();
 });
-

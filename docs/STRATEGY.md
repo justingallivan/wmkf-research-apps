@@ -180,8 +180,12 @@ separate slices.
    Recommendation-label alignment defect. **[INFERRED FROM SCREENSHOT + OOXML
    WIDTH]** implicit wrapping was the remaining layout variable. **[DEPLOYED TO
    PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
-   explicit no-wrap label, and the compact panel exposes Edit, Download, and
-   confirmation-guarded Regenerate actions; their signed-in smoke remains open.
+   explicit no-wrap label, and the Production compact panel exposes Edit,
+   Download, and confirmation-guarded Regenerate actions for Ready drafts;
+   their signed-in smoke remains open. **[IMPLEMENTED ON FEATURE BRANCH, NOT
+   DEPLOYED 2026-08-21]** promoted Pre-Site work now becomes a read-only handoff
+   receipt, routes Edit/Download through Site Visit, keeps warnings actionable,
+   and fails closed for every non-Draft lifecycle.
 
 The deployed Site Visit handoff's controlled signed-in proof is complete on
 Request `1002379`: the same SharePoint item remains the working document,

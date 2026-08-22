@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit dossier, and Final Writeup lineage."
+summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-21
@@ -50,9 +50,15 @@ the same guarded route, then navigate to the Site Visit tab after success. The P
 now calls the Production durable writer and shows the stable Word file returned
 from the registry. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE
 SMOKE OPEN]** its compact action panel shows Generate before a draft
-exists and Edit, Download, and confirmation-guarded Regenerate actions when a
-Ready draft exists; detailed workflow guidance is behind an accessible help
-control. Wave 19 is live in Production: its owner-approved
+exists and Edit, Download, and confirmation-guarded Regenerate actions only
+while the current Ready artifact remains Draft; detailed workflow guidance is
+behind an accessible help control. **[IMPLEMENTED ON FEATURE BRANCH, NOT
+DEPLOYED 2026-08-21]** after Review handoff, the Pre-Site tab becomes a
+read-only handoff receipt with one `Continue in Site Visit` action. It moves any
+durable edit-check warnings inside that receipt and fails closed for later or
+unknown lifecycle values. Production continues to show the older promoted-state
+Edit/Download controls until this branch is deliberately promoted. Wave 19 is
+live in Production: its owner-approved
 metadata-only apply created all 12 attributes and two request lookups, and
 independent readback found 14 exact with no absence or divergence. Request
 `1002379` later created the first Ready Pre-Site row, completed governed v3 AI
@@ -72,7 +78,7 @@ or changing a request artifact.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site, the Site Visit handoff, and the clearer Pre-Site handoff modal are Production-deployed, while Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, and signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21 | PRODUCTION-PROVED |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, and the clearer handoff modal are Production-deployed, while the promoted-state receipt hardening is branch-only and Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21, and feature-branch receipt tests | PRODUCTION-PROVED / BRANCH-ONLY HARDENING |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Request `1002379` has one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; current row GUID was not exposed by the browser proof | VERIFIED LIVE |
@@ -131,14 +137,23 @@ version/hash captured when the action runs.
 - Show source readiness for the exact proposal narrative, authoritative Dataverse
   metadata, governed prompt/model configuration, and Word template.
 - Generate or retry the Pre-Site draft through one durable operation.
-- Show the current Ready Word document with a compact status plus Edit,
+- While the current Ready artifact is Draft, show its compact status plus Edit,
   Download, and confirmation-guarded Regenerate actions. Keep detailed source,
   provenance, and manual-completion guidance available through contextual help
   rather than permanently occupying the panel.
-- When a Ready artifact has editorial diagnostics, show a compact “Draft needs
-  a quick edit check” warning panel beside the document link. A handled failure
-  must refresh status once, display the durable support reference, and never
-  repeat the generation POST automatically.
+- Once the current artifact is Review, remove all Pre-Site Edit, Download,
+  filename-link, and Regenerate controls. Show a read-only handoff receipt with
+  the promoted filename as plain text and one `Continue in Site Visit` action;
+  the Site Visit tab owns all working-document actions. Later and unknown
+  lifecycle values also fail closed and show a read-only stage notice rather
+  than controls that the server will reject.
+- When a Ready Draft artifact has editorial diagnostics, show a compact “Draft
+  needs a quick edit check” warning panel beside its document link. After
+  handoff, keep those warnings inside the receipt immediately above the Site
+  Visit continuation action so they remain actionable without restoring a
+  misleading direct file link. A handled failure must refresh status once,
+  display the durable support reference, and never repeat the generation POST
+  automatically.
 - Show the Draft→Review handoff as a separate next-stage panel, not as a document
   action. Its confirmation modal must explain same-file reuse, exact-version
   recording, continued Word editing, and the regeneration lock before calling
@@ -206,6 +221,53 @@ claim, render, or upload work once the lifecycle is Review.
 The tab should display the current Word item and its latest version metadata so
 the PD can confirm which document is the workspace. The application must not
 replace that stable item as a side effect of receiving site-visit files.
+
+### Content correction and guarded reopen
+
+**[OWNER DIRECTION 2026-08-21; CONTRACT DECIDED; SCHEMA AND RUNTIME PLANNED,
+NOT BUILT.]** Ordinary correction and lifecycle reopening are different
+operations:
+
+- A typo, missing fact, or later Site Visit observation is corrected by editing
+  the current Word document from the Site Visit tab. That does not reopen
+  Pre-Site generation or change lifecycle state.
+- Reopen is an exception for an accidental handoff or a draft generated from
+  the wrong governed inputs when staff truly needs another Pre-Site generation
+  cycle. It is never a generic Undo button and never mutates the prior Review
+  row back to Draft in place.
+
+The minimum reopen transaction is a preserve-and-succeed operation:
+
+1. Require an authorized staff actor, a reason code plus note, a typed request
+   number confirmation, the expected current artifact ID, and a client
+   operation ID. The server independently resolves the Request pointer and all
+   file authority.
+2. Require the pointer to target a Ready/Review Pre-Site Word row with a
+   complete handoff milestone. Re-read the same stable SharePoint item around
+   an exact-version download/hash and require it still to match the recorded
+   handoff version/hash. A post-handoff Word edit therefore blocks automatic
+   reopen; staff continues correcting that live document or uses a separately
+   approved reconciliation procedure.
+3. Fail closed if a current Final row, retained Board/PDF snapshot, completed
+   external distribution, or AkoyaGo publication already derives from this
+   handoff. Those downstream consumers require an explicit supersession and
+   redistribution design rather than a hidden rollback.
+4. Create a new Ready/Draft Pre-Site successor row and a new stable Word item
+   by copying the exact verified handoff bytes. Link the successor to the prior
+   Review row and exact source version/hash. Preserve the prior row, file, and
+   handoff milestone; mark it superseded only as the Request pointer moves to
+   the successor in the same ETag-guarded changeset.
+5. Persist actor, time, reason, source and successor identities, and the client
+   operation ID in a durable append-only reopen audit representation. Exact
+   retry returns the same successor and never creates another row or file.
+6. Show the preserved handoff and reopen event in history. The new Draft may be
+   edited or regenerated under the normal rules, and a later Site Visit handoff
+   records a new milestone on the successor rather than overwriting the old
+   milestone.
+
+The exact audit/schema representation and permission role must be selected and
+provisioned before implementation. Dataverse field audit alone is not the
+application dedupe key or the user-facing recovery record.
 
 ### Logistics
 
@@ -299,16 +361,71 @@ non-superseded lifecycle.
    minimum design copies Word and lineage only.
 4. Define Editor Dashboard Reviewed acknowledgements separately. They are not
    document lifecycle or approval fields.
-5. Complete the AkoyaGo publication-projection discovery below before proposing
+5. Select the smallest durable reopen-audit representation and explicit
+   permission role before adding the guarded successor operation.
+6. Select the durable informational-distribution attempt representation only
+   after the unresolved-recipient and Dynamics activity-status probes establish
+   the executable email contract.
+7. Complete the AkoyaGo publication-projection discovery below before proposing
    any publication-purpose field, relationship, entity, filename contract, or
    SharePoint destination.
 
-## PDF snapshots
+## PDF snapshots and informational email distribution
 
 When a frozen PDF is needed for an external Board member or consultant, create
 a separate Request Document row and SharePoint item. Link it to the exact Word
 row with `wmkf_SourceDocument` and persist the source Word version/hash. A
 current writeup pointer always targets Word, never PDF.
+
+**[OWNER DIRECTION 2026-08-21; PRODUCT AND RELIABILITY CONTRACT DECIDED;
+RECIPIENT-CHANNEL PROBE, SCHEMA, AND RUNTIME PLANNED, NOT BUILT.]** Distribution
+is informational: recipients receive the exact frozen PDF as an attachment so
+they know what to expect at the Site Visit. They are not asked to edit the Word
+workspace, and promotion never sends automatically.
+
+The minimum staff flow is `Create/Reuse Snapshot → Compose → Preview → Explicit
+Send → History`:
+
+1. Freeze the exact current Word row/item/version/hash under the same
+   before/after metadata and governed-content checks used by other milestone
+   operations. Claim or reuse the deterministic PDF snapshot row/item and
+   verify its own identity/version/hash after upload.
+2. Resolve an explicit To/CC recipient set. It may combine approved Dataverse
+   system users/contacts with staff-entered external addresses for Board or
+   consultant recipients who have no app account. The server normalizes and
+   deduplicates addresses, rejects invalid or conflicting recipients, and
+   shows every final address in preview. Before build, a non-production probe
+   must confirm the tenant's Dynamics unresolved-recipient behavior; the UI
+   must not promise free-form delivery until that succeeds.
+3. Produce an editable subject/body draft plus attachment, source-version, and
+   confidentiality details. Preview produces a content hash over recipients,
+   subject/body/template version, snapshot identity/hash, Request, and actor.
+   Any change invalidates the preview and requires another confirmation.
+4. Send only the exact confirmed preview under the authenticated actor. A
+   recipient-resolution failure sends to nobody; the application does not
+   silently send to a valid subset.
+5. Record one durable distribution attempt keyed by the exact preview and
+   client operation ID. At minimum it stores source and snapshot identities,
+   recipient set, subject/body/template hashes, actor/time, Dynamics email ID,
+   state, attempt count, last completed step, and bounded error evidence.
+
+The send state machine is `prepared → activity_created → attachment_added →
+send_requested → sent`, with a retryable failure state that retains the last
+completed step. The existing `DynamicsService.createAndSendEmail` helper is not
+sufficient orchestration by itself: it creates the activity, attaches, and
+sends sequentially but returns the email ID only after all steps, so a failure
+or lost response can leave durable partial work and a blind retry can create a
+duplicate. The implementation must instead persist the email ID immediately
+after activity creation, resume attachment/send against that same activity,
+and query the activity status before retrying an ambiguous send response.
+
+Exact retry of `sent` returns the existing distribution receipt. Attachment
+failure reuses the existing draft; send failure never creates another activity.
+Changed recipients, body, template, source Word version, or PDF bytes require a
+new preview and distribution identity. Transport acceptance is recorded as
+sent; it is not a claim that every inbox delivered the message. A later Word
+version marks the prior distribution `changed since sent` and offers a new
+snapshot/preview/send cycle while preserving what earlier recipients saw.
 
 ## AkoyaGo publication projection
 
@@ -403,6 +520,12 @@ silently extend its paths or names to writeup publications.
   regeneration, review refresh, or Final creation.
 - Treat SharePoint native versions as the human-edit history. Do not allocate a
   second application revision counter.
+- Reopen by creating an exact preserved successor, never by clearing or
+  rewriting the only Review milestone. Exact retry must resolve the same
+  successor; any downstream derivative or post-handoff edit fails closed.
+- Persist distribution progress after each durable email step. A retry resumes
+  the same activity and never infers whole success from a count or from an
+  attachment/upload alone.
 
 ## Delivery slices and gates
 
@@ -441,22 +564,33 @@ silently extend its paths or names to writeup publications.
    identity, returned the handoff timestamp after a fresh authenticated GET,
    and locked Pre-Site regeneration. The service's post-write reread requires
    the exact publication version, governed hash, and milestone time to match.
-5. **Site Visit logistics design.** Inventory and map every desired logistics
+5. **Promoted-state receipt hardening — implemented on a feature branch, not
+   deployed 2026-08-21.** Restrict Pre-Site working controls to Draft, route
+   Review warnings and work to Site Visit, fail closed for later/unknown states,
+   and reconcile the durable UI contract before deliberate promotion.
+6. **Guarded correction/reopen.** Select the bounded audit/schema and permission
+   representation, then implement the preserve-and-succeed transaction above.
+   This must precede Final creation so an accidental handoff cannot become an
+   unexplained Final lineage source.
+7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
+   select/provision the durable distribution representation, then implement
+   exact snapshot, preview, explicit send, resume-safe retry, and history.
+8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
-6. **Site Visit dossier.** Implement governed supporting-file listing/upload
+9. **Site Visit dossier.** Implement governed supporting-file listing/upload
    paths and logistics around the now-built Word-workspace handoff. Keep
    applicant upload work as its own security-reviewed slice.
-7. **Final copy operation and tab.** Freeze exact source version/hash, create a
-   new Final row/item, transition the current pointer, and verify safe retry and
-   deliberate regeneration.
-8. **AkoyaGo publication discovery and contract.** Run the signed-in AkoyaGo,
+10. **AkoyaGo publication discovery and contract.** Run the signed-in AkoyaGo,
    historical-convention, Power Automate, and non-governed SharePoint tests
    above. Decide paths, filenames, representations, permissions, triggers, and
    persistence only from that evidence; this slice performs no business-file
    publication or schema write.
-9. **PDF and Editor Dashboard follow-ons.** Add only after the Word lifecycle is
-   proven end to end and keep external distribution distinct from the AkoyaGo
-   publication projection.
+11. **Final copy operation and tab.** Freeze exact source version/hash, create a
+   new Final row/item, transition the current pointer, and verify safe retry and
+   deliberate regeneration.
+12. **Editor Dashboard follow-on.** Add after the Word lifecycle is proven end
+   to end. Keep its review acknowledgement distinct from document lifecycle,
+   external distribution, and the AkoyaGo publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →
 SharePoint bytes → current pointer → UI consumer and test partial failure,
@@ -469,6 +603,14 @@ strategy; this plan itself performs no deployment.
   populated content is reproducible from Dataverse and exact AI evidence.
 - Opening the Site Visit tab leads to the same Pre-Site Word item; observations
   saved in Word are preserved in SharePoint version history.
+- After handoff, the Pre-Site tab is a read-only receipt; only the Site Visit tab
+  exposes working-document actions, and every non-Draft lifecycle fails closed.
+- A guarded reopen preserves the prior Review row/file/milestone, creates one
+  exact Draft successor on exact retry, and refuses post-handoff edits or
+  downstream derivatives without explicit reconciliation.
+- An informational send attaches the exact frozen PDF approved in preview,
+  persists stepwise attempt state, and resumes without duplicate email activity
+  after attachment, send, or response failure.
 - Every Site Visit supporting file appears in the correct governed category and
   has one registry row with stable Graph identity.
 - Creating Final copies the exact latest/selected Site Visit-stage Pre-Site Word

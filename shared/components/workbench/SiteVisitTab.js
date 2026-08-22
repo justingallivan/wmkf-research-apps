@@ -93,7 +93,8 @@ export default function SiteVisitTab({ requestId, onSelectTab }) {
     if (!eligible || starting || !requestId) return;
     if (!window.confirm(
       'Start the Site Visit stage using this exact Word draft? '
-      + 'The same SharePoint file will become the working document and Pre-Site regeneration will be disabled.',
+      + 'The exact current SharePoint version will be recorded. Staff will continue editing '
+      + 'the same file in Word, and Pre-Site regeneration will be disabled.',
     )) return;
 
     const id = requestId;

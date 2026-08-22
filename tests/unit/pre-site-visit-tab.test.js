@@ -336,6 +336,10 @@ test('a promoted draft becomes a handoff receipt with work continuing in Site Vi
   const promoted = {
     ...readyArtifact(),
     lifecycleState: 100000001,
+    warnings: [{
+      code: 'section_over_target',
+      message: 'A generated section is longer than suggested and may need editing.',
+    }],
     milestone: {
       versionId: '2.0',
       contentHash: 'gdc1:handoff',
@@ -352,10 +356,35 @@ test('a promoted draft becomes a handoff receipt with work continuing in Site Vi
   expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: '1002379 Pre-Site Visit.docx' })).not.toBeInTheDocument();
   expect(screen.getByText('Promoted document:')).toHaveTextContent('1002379 Pre-Site Visit.docx');
-  expect(screen.getByRole('heading', { name: 'Pre-Site Visit complete' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Pre-Site Visit handoff complete' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Working document needs a quick edit check' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/continue in Site Visit to review these warnings/i)).toBeInTheDocument();
+  expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
   expect(screen.getByText(/continue there to edit or download/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Continue in Site Visit' }));
   expect(onSelectTab).toHaveBeenCalledWith('site-visit');
+});
+
+test.each([
+  ['Board Ready', 100000002],
+  ['Superseded', 100000003],
+  ['Final', 100000004],
+  ['unknown', 999999999],
+])('a Ready %s artifact fails closed in the Pre-Site tab', async (_label, lifecycleState) => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: { ...readyArtifact(), lifecycleState },
+  }));
+  render(<PreSiteVisitTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Pre-Site Visit is read-only' }))
+    .toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '1002379 Pre-Site Visit.docx' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
+  expect(screen.getByText(/cannot be edited, downloaded, or regenerated from this tab/i))
+    .toBeInTheDocument();
 });
 
 

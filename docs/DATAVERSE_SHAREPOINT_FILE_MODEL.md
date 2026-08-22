@@ -102,6 +102,11 @@ hood.
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
+- **Post-handoff UI ownership (implemented on a feature branch, not deployed
+  2026-08-21):** Pre-Site working controls exist only for Draft. Review becomes
+  a handoff receipt whose one action routes to Site Visit; later and unknown
+  lifecycle values fail closed. Site Visit owns Edit/Download for the active
+  Review workspace.
 - **Initial Assessment pilot locator (deployed and exercised):** queries the
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
@@ -276,6 +281,20 @@ PATCH. It performs no SharePoint write or copy. Review locks the Pre-Site
 producer before it loads inputs, resolves a prompt, calls Claude, claims a row,
 renders, or uploads. Exact completed retries are idempotent.
 
+**[OWNER DIRECTION 2026-08-21; PLANNED, NOT BUILT.]** Reopening Pre-Site
+preparation is a successor operation, not an in-place Review→Draft demotion.
+For an accidental handoff or wrong governed input, the service must verify that
+the current Ready/Review item still exactly matches its handoff milestone and
+has no derived Final, retained snapshot, completed informational distribution,
+or AkoyaGo publication. It then copies those exact bytes to one new stable Word
+item, creates one linked Ready/Draft successor row with the exact source
+row/version/hash, and atomically moves the Request pointer while preserving and
+superseding the prior Review row without clearing its milestone. Actor, reason,
+operation ID, source, and successor require a durable append-only audit record;
+exact retry returns the same successor. A post-handoff Word edit or downstream
+consumer fails closed for explicit reconciliation. Ordinary content correction
+continues in the live Site Visit Word file and does not reopen generation.
+
 The Pre-Site stable proposal core may exist before every review is received.
 It is drafted from the exact Proposal Narrative through the governed
 `pre-site-visit.proposal-core.generate` prompt, which iterates the useful body
@@ -294,8 +313,9 @@ passes it as a bounded Claude
 variable, persists its identity/version/hash manifest and all
 eight named fields in Wave 19, renders from Dataverse readback, uploads one
 stable Word item to `Artifacts/Pre-Site Visit/`, and atomically activates the
-current Ready row. The route returns a registry DTO and the tab exposes its
-stable Word link. Request `1002379` exact Ready retry reused the same
+current Ready row. The route returns a registry DTO. Draft-state Pre-Site UI
+exposes its stable Word link; branch-only hardening removes that link after
+Review and routes work through Site Visit instead. Request `1002379` exact Ready retry reused the same
 row/run/item without another model call or upload. **[DEPLOYED TO PRODUCTION
 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]** sole-current prompt v4
 `74409f95-509b-f111-b8db-6045bd008868` on `claude-sonnet-4-6` exact-readback
@@ -409,6 +429,31 @@ Staff collaborators use the canonical SharePoint Word file. External Board
 members or consultants who join a visit receive a PDF attachment representing
 an exact frozen Pre-Site version. An anonymous or guest SharePoint document
 link is not required for this minimum contract.
+
+**[OWNER DIRECTION 2026-08-21; INFORMATIONAL DISTRIBUTION CONTRACT DECIDED;
+RECIPIENT-CHANNEL PROBE, SCHEMA, AND RUNTIME PLANNED.]** Promotion does not send
+email. Staff explicitly creates or reuses the exact PDF snapshot, selects To/CC
+recipients, previews the editable subject/body plus attachment/source details,
+and confirms the exact preview before send. The server normalizes/deduplicates
+all addresses and sends to nobody if any selected recipient fails validation.
+Dataverse-resolved parties and staff-entered external Board/consultant addresses
+are product requirements, but the tenant's unresolved-recipient behavior must
+pass a non-production Dynamics probe before the UI promises free-form delivery.
+
+One durable distribution attempt must retain the exact Word and PDF
+identities/versions/hashes, recipient set, subject/body/template hashes,
+actor/time, Dynamics email activity ID, client operation ID, state, attempt
+count, last completed step, and bounded error evidence. Its state machine is
+`prepared → activity_created → attachment_added → send_requested → sent`.
+The existing composed Dynamics helper is not a sufficient retry coordinator
+because a create or attachment may survive an exception before the helper
+returns the email ID. Runtime must persist the ID after creation, resume the
+same activity after attachment/send failure, and query status before retrying
+an ambiguous send response. Exact sent retry returns the existing receipt;
+changed recipients, body, template, source version, or PDF bytes require a new
+preview and attempt. `sent` means transport acceptance, not inbox delivery.
+History preserves what each audience received and marks an older distribution
+changed-since-sent when the Word workspace advances.
 
 **[OWNER DIRECTION 2026-08-21; PLANNED, NOT BUILT.]** The Workbench must also
 plan for an **AkoyaGo publication projection** so important governed writeups
