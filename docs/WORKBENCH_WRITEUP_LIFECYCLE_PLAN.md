@@ -11,6 +11,7 @@ owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
+  - docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
@@ -298,6 +299,9 @@ non-superseded lifecycle.
    minimum design copies Word and lineage only.
 4. Define Editor Dashboard Reviewed acknowledgements separately. They are not
    document lifecycle or approval fields.
+5. Complete the AkoyaGo publication-projection discovery below before proposing
+   any publication-purpose field, relationship, entity, filename contract, or
+   SharePoint destination.
 
 ## PDF snapshots
 
@@ -305,6 +309,81 @@ When a frozen PDF is needed for an external Board member or consultant, create
 a separate Request Document row and SharePoint item. Link it to the exact Word
 row with `wmkf_SourceDocument` and persist the source Word version/hash. A
 current writeup pointer always targets Word, never PDF.
+
+## AkoyaGo publication projection
+
+**[OWNER DIRECTION 2026-08-21; PRODUCT PURPOSE DECIDED; STORAGE, SCHEMA,
+FILENAMES, AND REPRESENTATION DISCOVERY-GATED; PLANNED, NOT BUILT.]** Some staff
+will continue to find important request documents through the AkoyaGo Documents
+interface, and existing or future Power Automate flows may need a predictable
+way to resolve them. The Workbench therefore needs a publication projection
+that makes selected governed writeups discoverable from that surface without
+turning the projection into a second independently authoritative document.
+
+This direction does **not** decide that publications live at the request root,
+inside a named subfolder, behind an additional SharePoint Document Location, or
+as any particular kind of copy or link. It does not approve example filenames,
+new Dataverse columns or entities, Word-versus-PDF output, or automatic
+publication at a lifecycle transition. Those are candidate designs that require
+the discovery and bounded proof below. The existing Power Automate proposal-file
+contract governs `Reviewer Materials` and `AI Materials` inputs only; do not
+silently extend its paths or names to writeup publications.
+
+### Invariants that do not depend on the storage decision
+
+- The governed Workbench artifact and its registered SharePoint item remain the
+  source of truth. A publication is a one-way derived representation, never an
+  independently synchronized editing peer.
+- Every publication attempt identifies one exact source Request Document row,
+  SharePoint item, version, and content hash before creating or updating a
+  destination.
+- Staff and automation receive a verified discoverability contract. They do not
+  infer the current document from a generated working filename, a broad folder
+  scan, or a `(1)`-style duplicate.
+- Repeating an exact completed publication must not create another visible
+  publication. A materially changed source requires a deliberate update or new
+  publication according to the later approved contract.
+- Before updating an existing destination, compare its current identity,
+  version, and content with the last successfully published state. Unexpected
+  staff edits or replacement fail closed for reconciliation rather than being
+  silently overwritten or merged back into the working artifact.
+- Workbench lifecycle completion and AkoyaGo publication are separate durable
+  outcomes. A publication failure must remain visible and retryable without
+  rolling back a completed handoff or falsely reporting the combined action as
+  wholly successful.
+- The publication record must preserve, by whatever schema is ultimately
+  approved, source identity/version/hash, destination identity/version/hash,
+  purpose or representation, state, actor/time, and retry/failure evidence.
+- External informational distribution remains a distinct consumer contract. A
+  frozen PDF used as an email attachment may reuse publication machinery, but
+  an AkoyaGo-visible copy is not automatically the exact copy sent externally.
+
+### Required discovery before design
+
+1. Inspect representative current and historical requests in the signed-in
+   AkoyaGo Documents interface. Record which root files, subfolders, and
+   additional Document Locations are actually visible and usable to staff.
+2. Inventory relevant Power Automate flows and historical writeup conventions.
+   Record exact path, filename, trigger, replacement, versioning, and duplicate
+   assumptions; do not infer them from the proposal-input contract.
+3. In an approved non-governed test location, compare the smallest viable
+   destination patterns: request root, a dedicated publication folder, an
+   additional Document Location, a materialized file, or a supported link-like
+   representation. Verify AkoyaGo visibility and Power Automate consumption,
+   not only successful Graph creation.
+4. Determine the required representations for each milestone—Word, PDF, or
+   both—and whether AkoyaGo users need read-only reference or an editing path.
+   If a projection can be edited, define drift detection and reconciliation
+   before implementation.
+5. Test first publication, exact retry, changed-source republish, unexpected
+   destination edit, partial failure, and recovery. Confirm whether updating a
+   destination preserves the intended SharePoint item identity and version
+   history.
+6. Only after those results, choose the destination/path and filename contract,
+   publication triggers, permission model, minimum Dataverse shape, Power
+   Automate handoff, and UI status/actions. Reconcile the resulting contract
+   into this plan, the SharePoint file model, the state Atlas, route-security
+   matrix, service catalog, tests, and operational gates before building it.
 
 ## Failure, retry, and concurrency rules
 
@@ -370,8 +449,14 @@ current writeup pointer always targets Word, never PDF.
 7. **Final copy operation and tab.** Freeze exact source version/hash, create a
    new Final row/item, transition the current pointer, and verify safe retry and
    deliberate regeneration.
-8. **PDF and Editor Dashboard follow-ons.** Add only after the Word lifecycle is
-   proven end to end.
+8. **AkoyaGo publication discovery and contract.** Run the signed-in AkoyaGo,
+   historical-convention, Power Automate, and non-governed SharePoint tests
+   above. Decide paths, filenames, representations, permissions, triggers, and
+   persistence only from that evidence; this slice performs no business-file
+   publication or schema write.
+9. **PDF and Editor Dashboard follow-ons.** Add only after the Word lifecycle is
+   proven end to end and keep external distribution distinct from the AkoyaGo
+   publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →
 SharePoint bytes → current pointer → UI consumer and test partial failure,
@@ -393,3 +478,6 @@ strategy; this plan itself performs no deployment.
   Pre-Site or Final file.
 - Overview and the future Editor Dashboard can derive the current Pre-Site and
   Final documents from Request lookups without filename or folder joins.
+- Staff who rely on AkoyaGo and approved Power Automate consumers can resolve
+  the intended published representation through a tested contract, while the
+  Workbench can prove its exact governed source and detect destination drift.

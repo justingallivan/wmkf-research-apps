@@ -12,6 +12,8 @@ related:
   - scripts/probe-sharepoint-write.js
   - docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
+  - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
+  - docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md
 ---
 
 # Dataverse / SharePoint File Storage Model
@@ -90,6 +92,12 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
+- **AkoyaGo publication projection (owner direction 2026-08-21; planned and
+  discovery-gated):** selected governed writeups must remain discoverable to
+  staff who use the AkoyaGo Documents interface and to approved Power Automate
+  consumers. The governed artifact remains authoritative; destination,
+  representation, naming, schema, triggers, and permissions are not yet
+  decided or implemented.
 - **Site Visit handoff (Production-proved 2026-08-21):** keeps
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
@@ -401,6 +409,42 @@ Staff collaborators use the canonical SharePoint Word file. External Board
 members or consultants who join a visit receive a PDF attachment representing
 an exact frozen Pre-Site version. An anonymous or guest SharePoint document
 link is not required for this minimum contract.
+
+**[OWNER DIRECTION 2026-08-21; PLANNED, NOT BUILT.]** The Workbench must also
+plan for an **AkoyaGo publication projection** so important governed writeups
+remain findable to staff who work from the request's AkoyaGo Documents surface
+and to approved Power Automate flows. This is additive to the canonical Word
+workspace and the external PDF distribution contract. It does not authorize a
+second independently editable source of truth.
+
+The exact AkoyaGo-visible destination is **UNKNOWN** pending signed-in discovery:
+the request root, a dedicated folder, an additional SharePoint Document
+Location, a materialized copy, and a supported link-like representation remain
+candidates. Filename conventions, Word/PDF representations, publication
+triggers, permission behavior, and the minimum Dataverse schema are likewise
+undecided. Example paths and filenames discussed before discovery are not a
+contract. The existing Power Automate proposal-file contract applies only to
+the exact `Reviewer Materials` and `AI Materials` inputs and is not evidence for
+a writeup-publication naming scheme.
+
+Regardless of the eventual storage design, a publication must retain the exact
+source Request Document row/item/version/hash, the destination's stable
+identity/version/hash, its purpose or representation, actor/time, and durable
+success/failure state. Exact retry must not create a duplicate. Updating a
+published destination must first detect unexpected staff changes and fail
+closed rather than overwrite them or merge them back into the governed source.
+Lifecycle completion and publication are separate outcomes: a failed
+publication stays retryable and visible without undoing a completed Site Visit
+handoff or claiming combined success.
+
+Before schema or runtime work, inspect representative historical/current
+AkoyaGo request Documents views, inventory the relevant Power Automate flows
+and old naming/replacement assumptions, and run approved non-governed tests of
+candidate destinations and representations. The discovery must prove AkoyaGo
+visibility, Power Automate consumption, first publish, exact retry,
+changed-source republish, destination-drift handling, partial failure, recovery,
+and SharePoint item/version behavior. The bounded discovery and implementation
+gates live in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 There is no separate Site Visit Writeup. The PD adds site observations and
 other visit-stage prose directly to the Pre-Site Word workspace. Creating the
