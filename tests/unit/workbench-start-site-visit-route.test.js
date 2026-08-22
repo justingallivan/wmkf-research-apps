@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/utils/auth', () => ({
+  getUserRole: jest.fn(),
+  requireAppAccess: jest.fn(),
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
@@ -10,7 +13,7 @@ jest.mock('../../lib/services/pre-site-visit/site-visit-transition-service', () 
   startSiteVisitStage: jest.fn(),
 }));
 
-import { requireAppAccess } from '../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { startSiteVisitStage } from '../../lib/services/pre-site-visit/site-visit-transition-service';
@@ -31,10 +34,20 @@ function mockRes() {
 beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({
+    profileId: 42,
     session: { user: { dynamicsSystemuserId: USER_ID } },
   });
+  getUserRole.mockResolvedValue('read_write');
   startSiteVisitStage.mockResolvedValue({
-    artifact: { artifactId: ARTIFACT_ID, lifecycleState: 100000001 },
+    artifact: {
+      artifactId: ARTIFACT_ID,
+      lifecycleState: 100000001,
+      correction: {
+        reasonCode: 'accidental_handoff',
+        reasonNote: 'Restricted correction note.',
+        actorName: 'Test Admin',
+      },
+    },
     reused: false,
   });
 });
@@ -75,7 +88,27 @@ test('runs the transition inside authenticated DAL context with the session acto
     actingUserSystemId: USER_ID,
   });
   expect(res.statusCode).toBe(200);
-  expect(res.body).toMatchObject({ success: true, reused: false });
+  expect(res.body).toEqual({
+    success: true,
+    artifact: { artifactId: ARTIFACT_ID, lifecycleState: 100000001 },
+    reused: false,
+  });
+});
+
+test('returns correction audit details to a superuser transition caller', async () => {
+  getUserRole.mockResolvedValueOnce('superuser');
+  const res = mockRes();
+  await handler({
+    method: 'POST',
+    body: { requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID },
+  }, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body.artifact.correction).toEqual({
+    reasonCode: 'accidental_handoff',
+    reasonNote: 'Restricted correction note.',
+    actorName: 'Test Admin',
+  });
 });
 
 test('maps governed transition errors without losing the machine code', async () => {
@@ -96,4 +129,3 @@ test('maps governed transition errors without losing the machine code', async ()
     code: 'site_visit_transition_conflict',
   });
 });
-

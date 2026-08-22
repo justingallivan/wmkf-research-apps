@@ -286,7 +286,7 @@ the durable correction-cycle identity and the exact-operation dedupe input;
 the existing generation-key alternate key remains the uniqueness fence. Only
 superusers may invoke the route or receive the reopen-attempt history or nested
 correction details; other authorized Workbench readers receive artifacts with
-that audit data removed from both GET and generation responses. A second reopen
+that audit data removed from GET, generation, and Site Visit handoff responses. A second reopen
 is refused while a different generation has a live 15-minute lease. An expired
 reopen claim is atomically marked Failed before a new operation proceeds; if its
 copy exists, exact drive/item identity is retained in the row's cleanup queue

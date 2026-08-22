@@ -83,6 +83,8 @@ Guarded-reopen response refinement (source-built 2026-08-22): the Pre-Site
 GET/POST route emits reopen history and nested correction details only to
 superusers, and it omits a pending reason-bearing reopen-attempt row entirely
 for other roles while preserving ordinary pending-generation status. The
+Start Site Visit transition applies the same nested-correction redaction to its
+returned artifact for non-superusers. The
 reopen writer preserves same-operation Failed recovery; when a distinct later
 operation supersedes that attempt, any resolvable retained copy is added to its
 stable-identity cleanup queue.
