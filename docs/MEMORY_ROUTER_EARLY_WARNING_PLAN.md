@@ -18,24 +18,36 @@ related:
 
 # Memory Router Early-Warning Plan
 
-**Status: DRAFT v2 — owner greenlit the direction 2026-08-21; nothing here is
-built.** v1 received a Codex adversarial review (verdict: needs-attention,
-five findings, all accepted). v2 incorporates them:
+**Status: DRAFT v3 — owner greenlit the direction 2026-08-21; nothing here is
+built.**
 
-1. Stop-hook advisory redesigned as a single-emission aggregation path (v1's
-   placement was suppressed on the no-gate/green-gate early returns, or risked
-   emitting two adjacent JSON objects).
-2. Crossing predicate replaced with three explicit tiers (true crossing /
-   growth-above / missing-baseline-suppressed) and ownership-honest wording.
-3. Thresholds moved to one dependency-free constants module; consumers carry
-   zero fallback literals and skip their advisory on import failure.
-4. Test procedure corrected (`node`, not `npx jest` — the hook test file is a
-   standalone runner outside `jest.config.js` `testMatch`); exact-boundary and
-   lifecycle fixtures added; comparator pinned to `>=`.
-5. Phase 0 expanded to a semantic sweep of the predecessor audit's R3/Q4/Q14/
-   open-decision/adoption text, not just the date/count corrections.
+v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
+became a single-emission aggregation path; the crossing predicate became
+three tiers (crossing / growth-above / missing-baseline-suppressed);
+thresholds moved to one dependency-free constants module with zero consumer
+literals; the test procedure was corrected to the standalone `node` runner
+with exact-boundary fixtures; Phase 0 grew the owner-decision semantic sweep.
 
-This plan awaits a second pre-build adversarial review of the v2 diff.
+v2 → v3 (second Codex review, three findings, all accepted and re-verified
+against the live files):
+
+1. **Dedup empty-state contract fixed.** v2 stored `lastAdvisedKey` only on
+   emission, so a shrink left the old crossing key K in place and a
+   byte-identical re-cross was suppressed. v3: the key is stored on EVERY
+   stop evaluation — including the hash of the empty set — and emission
+   requires non-empty AND changed (§ Phase 3, §3, T3).
+2. **T1/T3 assertions strengthened from counts to exact content.** v2's
+   `≤1 JSON object` passed on zero output and on lost gate advisories; v2
+   also had no gate-only case. v3 asserts exact object counts AND required
+   text fragments per path, adds the gate-only path, an exact byte-identical
+   re-cross replay, and a combined router+block-mode case (exit 2, no
+   advisory JSON).
+3. **Phase 0 acceptance greps broadened from literal to semantic,
+   case-insensitive patterns**, with the known live sites enumerated from a
+   fresh grep at `2ef75439` — v2's patterns missed "full 57-gate battery",
+   "optionally by a lower warn band", and "Owner decisions pending".
+
+This plan awaits a third pre-build adversarial review of the v3 diff.
 
 ## 1. Problem and evidence
 
@@ -50,8 +62,8 @@ This plan awaits a second pre-build adversarial review of the v2 diff.
   - SessionStart pressure note with **locally hardcoded** `CAP = 12 * 1024`,
     `WARN = 11 * 1024` [VERIFIED via `.claude/hooks/session-lifecycle.js:285-286`
     — it does not import the checker; the write guard imports but ALSO keeps
-    truthiness-fallback literals, `memory-router-guard.js:31-33`, which v2 now
-    treats as part of the same duplication defect];
+    truthiness-fallback literals, `memory-router-guard.js:31-33`, which this
+    plan treats as part of the same duplication defect];
   - the write-time guard blocks only over-cap worsening
     [`memory-router-guard.js:65-78`] and fails open [`:123-125`];
   - the Stop hook has no router-size awareness at all, and its control flow
@@ -63,7 +75,8 @@ This plan awaits a second pre-build adversarial review of the v2 diff.
   reaches 11 KiB in ~10 days and the 12 KiB cap in ~12.5 — inside a two-week
   calendar cadence. The 8,192 B routine-audit trigger in
   `docs/MEMORY_HYGIENE_RUNBOOK.md` §5 is currently prose only; it was crossed
-  silently on 2026-08-13 (`840d082d`, 8,193 B).
+  silently on 2026-08-13 (`840d082d`, 8,193 B). The router measured 9,040 B at
+  `2ef75439`.
 
 Goal: make the 8 KiB trigger fire mechanically at session start, in CI logs,
 and — when the current session's edits are implicated — at session stop, so
@@ -77,7 +90,7 @@ at `bytes >= NOTICE_BYTES` (8,192 B). The existing `> WARN_BYTES` and
 
 ### Phase 0 — document corrections and semantic sweep (no control changes)
 
-Apply to the two shipped documents, then re-grep for every restatement:
+Apply to the two shipped documents, then run the acceptance sweep below:
 
 1. Sweep ALL restatements of the 8 KiB crossing date to 2026-08-13 (the §1
    executive-conclusion restatement was missed by the first fix pass) and
@@ -88,28 +101,54 @@ Apply to the two shipped documents, then re-grep for every restatement:
    56 of 57 [DERIVED-FROM: package.json check:* census + session gate log; independent of TBD count]
    — every registered script except the mutating `check:memory-drift`, whose
    `:no-write` variant ran instead — listing the omission explicitly so the
-   claim is reproducible without the ephemeral scratchpad log.
+   claim is reproducible without the ephemeral scratchpad log. This includes
+   the "full 57-gate battery" phrasings, not only the "all 57" literal.
 4. Runbook §19: before `git checkout -- docs/RECONCILIATION_REPORT.json`,
    require `git diff -- docs/RECONCILIATION_REPORT.json` and restore only when
    the diff is solely the accidental regeneration; otherwise stop and confirm
    with the owner.
 5. Runbook §5/§10 cadence rationale: size trigger primary (mechanical, per
    this plan), calendar backstop, worst-case math stated.
-6. **Owner-decision reconciliation (Codex v1 finding 5):** the owner approved
-   this plan's mechanism on 2026-08-21. Rewrite every live restatement in the
-   review doc that still presents the warn-band decision as pending or frames
-   R3 as a bare `WARN_BYTES` lowering: R3 itself, Q4's proposal sentence,
-   Q14(a), §13 "Owner decisions pending", and §14 adoption step 3. New
-   framing: R3 is superseded by this plan (8 KiB notice + threshold
-   consolidation); a separate 9,216 B warn-band lowering is NOT adopted —
-   record it as considered-and-superseded, not rejected-on-merits.
+6. **Owner-decision reconciliation:** the owner approved this plan's
+   mechanism on 2026-08-21. Rewrite every live restatement in the review doc
+   that still presents the warn-band decision as pending or frames R3 as a
+   bare `WARN_BYTES` lowering. New framing: R3 is superseded by this plan
+   (8 KiB notice + threshold consolidation); a separate 9,216 B warn-band
+   lowering is NOT adopted — record it as considered-and-superseded, not
+   rejected-on-merits.
 7. Fix the review doc's `session-lifecycle.js:286-287` line references to
    `:285-286` (off-by-one carried from both v1 reviews; grep-verified).
 
-Acceptance greps for Phase 0 (all must return only historical/quoted
-contexts): `2026-08-15` (crossing date), `all 57`, `9,216|9216`,
-`286-287`, `WARN_BYTES to`, `owner decision` within the review doc's live
-sections.
+**Known live sites to edit** (grep-enumerated at `2ef75439`; line numbers are
+addresses for the editor, re-derive before editing — the review doc is
+`docs/audits/memory-hygiene-best-practices-review-2026-08-21.md`):
+
+- 57-count claims: review `:66` ("full 57-gate startup battery"), `:174`
+  ("all 57 registered"), `:393` ("full 57-gate battery").
+- Warn-band-as-pending sites: review `:345` ("optionally by a lower warn
+  band, §10 Q4"), `:442-455` (Q4 answer incl. "~9 KiB — 9,216 B" caveat
+  paragraph), `:518` context check, `:531` (Q14 tighten list item a),
+  `:555` (R3 row). Analytical descriptions of the CURRENT 11 KiB band
+  (`:39`, `:91`, `:116`, `:160-163`) are correct state and stay.
+- Pending-decision framing: review `:571` ("Owner decisions pending: R3–R5…"
+  — R3 leaves the pending list; R4/R5 remain pending), `:465` and `:556-557`
+  stay pending (R4/R5 unaffected).
+- Off-by-one line refs: review `:117`, `:451`, `:555`.
+
+**Acceptance sweep (case-insensitive, semantic — then manually classify each
+hit live vs historical/quoted):**
+
+```bash
+rg -n -i "57-gate|all 57" docs/ | rg -v "56 of 57"
+rg -n -i "warn band|warn threshold|9 KiB|9,?216" docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
+rg -n -i "owner decisions?" docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
+rg -n "286-287" docs/
+rg -n "2026-08-15" docs/MEMORY_HYGIENE_RUNBOOK.md docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
+```
+
+Completion requires every remaining hit to be classified in the Phase 0
+commit message or audit note as historical/quoted/correct-current-state —
+zero unclassified live hits, not zero hits.
 
 ### Phase 1 — thresholds module + checker notice
 
@@ -151,25 +190,36 @@ sections.
   without blocking (explicit fail-open, replacing the current
   truthiness-fallback literals at `:31-33`). Behavior below the caps is
   unchanged.
-- Acceptance grep (Codex v1 finding 3): after Phases 1–2,
+- Acceptance grep: after Phases 1–2,
   `rg -n "1024" scripts/check-memory-router.js .claude/hooks/memory-router-guard.js .claude/hooks/session-lifecycle.js`
   returns **zero** threshold definitions — the only hits allowed anywhere are
   in `scripts/lib/memory-router-thresholds.js`.
 
 ### Phase 3 — Stop-hook single-emission aggregation + crossing tiers
 
-**Structural change first (Codex v1 finding 1):** refactor `stop()` so that
-every advisory producer appends to a `stopAdvisories` array and the function
-has exactly ONE `additionalContext('Stop', …)` call site at the end, emitting
-only when the array is non-empty. Blocking paths (`exit 2` for symlink
-invariants, strict doc staleness, review receipts, and `block`-mode gate
-failures) are untouched and still return before any advisory emission. The
-existing gate advisory's message text is unchanged; only its emission point
-moves. Dedup becomes composite: `state.lastAdvisedKey =
-hash(sorted advisory texts + changed-surface fingerprint)` — a repeat Stop
-with identical state stays silent; any new/changed advisory re-arms.
+**Structural change first:** refactor `stop()` so that every advisory
+producer appends to a `stopAdvisories` array and the function has exactly ONE
+`additionalContext('Stop', …)` call site at the end. Blocking paths (`exit 2`
+for symlink invariants, strict doc staleness, review receipts, and
+`block`-mode gate failures) are untouched and still return before any
+advisory evaluation. The existing gate advisory's message text is unchanged;
+only its emission point moves.
 
-**Router-size producer, three tiers (Codex v1 finding 2):**
+**Dedup contract (v3, replaces v2's set-on-emission rule):**
+
+- On EVERY `stop()` evaluation that reaches the advisory stage, compute
+  `advisedKey = hash(sorted advisory texts + changed-surface fingerprint)` —
+  including for the empty set (hash of empty + fingerprint) — and STORE it in
+  `state.lastAdvisedKey` unconditionally.
+- EMIT only when the advisory set is non-empty AND `advisedKey` differs from
+  the previously stored value.
+- Consequences (these are the T3 assertions): a repeat Stop in an identical
+  failing state stays silent; a shrink below the trigger stores the
+  empty-state key and emits nothing; a subsequent byte-identical re-cross
+  produces the old key K ≠ empty-state key and EMITS again. Reintroduced
+  router debt cannot hide behind a stale key.
+
+**Router-size producer, three tiers:**
 
 - `start()` (fresh-session branch only — the resume path at
   `session-lifecycle.js:310-317` returns before state creation and must not
@@ -216,15 +266,15 @@ with identical state stays silent; any new/changed advisory re-arms.
   `:310-317` — [VERIFIED this session]); read once per `stop()`; tolerates
   absence (tier 3 suppression); dies with the tmp state file. No transition
   can wedge a session.
-- **`lastAdvisedKey` lifecycle (changed):** now keyed over the full advisory
-  set + fingerprint. Set on emission; compared on every Stop; re-armed by any
-  state change (new gate failure, router size change, new edit fingerprint);
-  a shrink below the trigger removes the router advisory from the set, which
-  changes the key, and the resulting empty set emits nothing.
+- **`lastAdvisedKey` lifecycle (v3 contract):** written on every advisory
+  evaluation — non-empty key on emission or suppressed-duplicate, empty-state
+  key when the set is empty. There is no reachable stop() advisory path that
+  leaves a stale key behind, which is what closes the v2
+  shrink-then-identical-re-cross hole. Old state files carrying a v2-era key
+  are safe in both directions: any first v3 evaluation overwrites the key.
 - **Stop output contract:** exactly zero or one JSON object on stdout per
   Stop invocation, in every path combination (none / gate-only / router-only /
-  both). This is the invariant Codex v1 finding 1 demanded; it is test case
-  T1 below.
+  both), with content preservation asserted by exact-fragment tests (T1).
 
 ## 4. Test and verification plan
 
@@ -236,17 +286,28 @@ review]), so it runs via `node`:
 1. `npm run check:memory-router && npm run check:memory-router:self-test`
    (new fixtures a–e).
 2. `node .claude/hooks/hook-enforcement.test.js` — extended with:
-   - T1 single-emission: no-gate, green-gate, failing-gate+router,
-     router-only, and both-advisories paths each produce ≤1 JSON object,
-     parsed cleanly;
-   - T2 tiers: crossing fires; growth-above fires with distinct wording;
+   - **T1 exact emission-and-content, five paths:**
+     no-advisory (no-gate and green-gate variants) → exactly ZERO JSON
+     objects on stdout;
+     gate-only failure (advisory mode, router untouched) → exactly ONE JSON
+     object whose `additionalContext` contains the gate-failure text;
+     router-only → exactly ONE object containing the router-tier text and no
+     gate text;
+     combined gate-failure + router → exactly ONE object containing BOTH the
+     gate fragment and the router fragment. Objects parsed, not
+     pattern-counted, so a dropped gate advisory fails the combined case;
+   - **T2 tiers:** crossing fires; growth-above fires with distinct wording;
      missing baseline suppresses; untouched router suppresses;
-   - T3 lifecycle: below→cross→dedup(repeat Stop silent)→shrink(silent)→
-     re-cross(re-arms);
-   - T4 advisory-mode: router advisory never exits 2 under either
+   - **T3 dedup lifecycle with exact replay:** cross(state K) → emits;
+     repeat Stop at K → silent; shrink below trigger → silent AND stored key
+     becomes the empty-state key; restore the exact prior bytes and edit
+     fingerprint (byte-identical K) → EMITS again;
+   - **T4 modes and blocking:** router advisory never exits 2 under either
      `CLAUDE_STOP_GATE_MODE` value; blocking paths still exit 2 untouched;
-   - T5 resume: existing-state `start` preserves `routerBytesAtStart`;
-   - T6 thresholds module unreadable → hooks skip advisories, exit 0.
+     combined router + block-mode gate failure → exit 2 with ZERO advisory
+     JSON on stdout;
+   - **T5 resume:** existing-state `start` preserves `routerBytesAtStart`;
+   - **T6 thresholds module unreadable → hooks skip advisories, exit 0.**
 3. `npm run check:instruction-architecture` (hook wiring/shape).
 4. `npm run check:harness-framing && npm run check:harness-framing:self-test`
    (skill + hook wording).
@@ -255,48 +316,60 @@ review]), so it runs via `node`:
 7. `npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test`
    (new module path referenced from docs).
 8. Live sanity: `node scripts/check-memory-router.js` in this worktree —
-   current router is 8,991 B, so the notice MUST appear; Phase 0 grep list
-   returns clean.
+   current router is 9,040 B, so the notice MUST appear; Phase 0 acceptance
+   sweep run with every remaining hit classified.
 
 If the hook test script must gate shipping, its `node` invocation is added to
 the verification list of this plan only — registering it as a package
 `check:*` script is out of scope (new-gate decisions belong to the owner).
 
-## 5. Risks and author's adversarial pass (v2)
+## 5. Risks and author's adversarial pass (v3)
 
-- **Stop refactor regression risk (new, accepted):** moving the existing gate
-  advisory's emission point touches reviewed behavior; T1's five path cases
-  are the mitigation, and the blocking paths are deliberately untouched.
+- **Stop refactor regression risk (accepted):** moving the existing gate
+  advisory's emission point touches reviewed behavior; T1's exact-content
+  assertions (not counts) are the mitigation, and the blocking paths are
+  deliberately untouched.
 - **Notice fatigue:** the router is already ≥8 KiB, so the notice fires every
   session until a diet runs — intended; the runbook's first routine audit
   clears it. If ignored, posture equals today's, no worse.
-- **Skip-on-failure trade (replaces v1's fallback literals):** if the
-  thresholds module path breaks, hooks go silent instead of using stale
-  numbers. Accepted because the CI/start gate fails loudly at require time in
-  the same breakage, making the regression visible the same day (T6 covers
-  the hook side).
-- **Guard surface widening:** v2 touches `memory-router-guard.js` (v1 did
-  not). Bounded: import + validation swap only; block/allow logic untouched;
-  the guard's own failure mode remains fail-open.
-- **`warnings` channel overload:** unchanged from v1 — notice never fails the
-  gate; promoting 8 KiB to a failure would violate review R8 (no new blocking
+- **Skip-on-failure trade:** if the thresholds module path breaks, hooks go
+  silent instead of using stale numbers. Accepted because the CI/start gate
+  fails loudly at require time in the same breakage (T6 covers the hook
+  side).
+- **Unconditional key store (new in v3):** `lastAdvisedKey` is now written on
+  every advisory evaluation, adding one `saveState` on paths that previously
+  wrote nothing. Bounded: the state file is already rewritten by `record()`
+  on every tool use; one more small write at Stop is immaterial, and a write
+  failure falls into the hook's existing fail-open catch.
+- **Guard surface widening:** this plan touches `memory-router-guard.js`
+  (import + validation swap only; block/allow logic untouched; failure mode
+  remains fail-open).
+- **`warnings` channel overload:** unchanged — notice never fails the gate;
+  promoting 8 KiB to a failure would violate review R8 (no new blocking
   memory gates).
 - **Import cycle check:** thresholds module requires nothing; checker and
   hooks require it; nothing requires the hooks. No cycle possible.
+- **Line-number rot in Phase 0's site list:** the enumerated review-doc line
+  numbers are addresses valid at `2ef75439` and MUST be re-derived by grep at
+  edit time; the acceptance sweep, not the address list, is the completion
+  authority.
 - **Deliberately out of scope:** elapsed-time trigger (cross-session state);
   changes to `WARN_BYTES`/`TARGET_BYTES` values; new blocking gates; router
-  content edits; registering the hook test as a package script.
+  content edits (the pending diet is runbook work, not this plan);
+  registering the hook test as a package script.
 
 ## 6. Acceptance criteria
 
 - Threshold literals exist in exactly one file (grep in Phase 2 proves it).
 - Notice visible at ≥8,192 B in: gate output (hence `/start` and CI logs);
   SessionStart context; Stop context per the three-tier rules only, always
-  advisory, single JSON object per Stop.
+  advisory, exactly zero-or-one JSON object per Stop with content-preserving
+  combination.
 - Self-test fixtures a–e and hook tests T1–T6 green; all §4 checks green
   sequentially.
-- Phase 0 landed with its acceptance greps clean, including the R3/Q4/Q14/
-  §13/§14 owner-decision reconciliation and the `285-286` line-ref fix.
+- Phase 0 landed with the case-insensitive acceptance sweep run and EVERY
+  remaining hit explicitly classified (live-fixed / historical / quoted /
+  correct-current-state); zero unclassified live hits.
 - Commits separate: Phase 0 (docs) / Phases 1–2 (thresholds + consumers) /
   Phase 3 (Stop refactor) / Phase 4 (skills); worktree clean after each.
 
@@ -306,5 +379,6 @@ Each phase is one commit; `git revert` restores cleanly. The thresholds
 module is additive; reverting Phase 2 alone returns consumers to their prior
 copies (guard literals, hook constants) without breaking the checker, because
 the checker re-exports the same names either way. Reverting Phase 3 restores
-the current `stop()` verbatim; the optional state field is ignored by old
+the current `stop()` verbatim; the optional state fields (`routerBytesAtStart`,
+the v3 `lastAdvisedKey` semantics) are ignored or safely overwritten by old
 code in both directions.
