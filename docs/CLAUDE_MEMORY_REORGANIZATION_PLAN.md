@@ -388,6 +388,12 @@ Suggested new lightweight check:
 > pressure note surface it before the block. Harness/auto-memory writes bypass the
 > PreToolUse hook, so `check:memory-router` remains the backstop. Rationale + the
 > three-layer design: memory `project-memory-router-trap-prevention`.
+>
+> **Update 2026-08-21:** the signal layer now starts earlier — the gate and the
+> SessionStart hook emit a routine-audit notice at ≥8 KiB, the Stop hook adds a
+> crossing/growth advisory when the session's own edits are implicated, and all
+> thresholds are single-sourced from `scripts/lib/memory-router-thresholds.js`.
+> Canonical: `docs/MEMORY_HYGIENE_RUNBOOK.md` + `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`.
 
 Do not block this reorganization on writing a perfect CI gate. The first deliverable is a better memory structure.
 

@@ -101,7 +101,7 @@ Run the **routine audit** when ANY of:
 
 | Trigger | Check | Rationale |
 |---|---|---|
-| Calendar | ~2 weeks since the last routine audit | backstop only — the size trigger below is primary (mechanical once `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md` ships): at the worst observed regrowth (~500 B/day) a 6 KiB router reaches the 12 KiB cap in ~12 days, inside any calendar cadence |
+| Calendar | ~2 weeks since the last routine audit | backstop only — the size trigger below is primary (mechanical since 2026-08-21: `check:memory-router` notice + SessionStart/Stop advisories, per `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md`): at the worst observed regrowth (~500 B/day) a 6 KiB router reaches the 12 KiB cap in ~12 days, inside any calendar cadence |
 | Router size | `MEMORY.md` ≥ 8,192 B (the gate's OK line prints the size) | crossed silently on 2026-08-13; observed regrowth ≈166–500 B/day |
 | Health findings | `check:memory-health` flagged files ≥ 5 | steady inflow; resets do not persist |
 | Store growth | ≥ 25 new leaf files since the last audit | roughly one month of observed inflow |

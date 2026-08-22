@@ -73,10 +73,20 @@ v3 → v4 (third pre-build review, three findings, all accepted):
    commands, raw counts, and one classification row per hit; and a completion
    manifest diff rejects any current hit without a row (§2 Phase 0, §6).
 
-This v4 plan incorporates the third pre-build review and awaits the requested
-separate read-only review.
+This v4 plan incorporates the third pre-build review. The requested separate
+read-only review of the v4 edit was completed 2026-08-21 before the build; it
+found one flaw (a blanket fail-open rule that would have let a `saveState`
+failure cancel a deliberate blocking `exit(2)`), fixed in this v4 text.
 
 ## 1. Problem and evidence
+
+The repo-control claims in this section describe the **pre-build baseline**
+as of 2026-08-21 (`2ef75439`), preserved as the problem record; the Phase 1–4
+build (receipts in the status header) revised each control listed below —
+threshold sourcing, the notice tier, and the Stop advisory changed; the write
+guard's block-only-over-cap-worsening semantics did not — and current
+behavior is documented in `docs/MEMORY_HYGIENE_RUNBOOK.md` and §2 below. The
+harness load-limit facts and observed regrowth data remain current-as-written.
 
 - The harness loads only the first 200 lines / 25 KB of `MEMORY.md`; content
   past that is silently dropped (current official Claude Code memory docs,
@@ -101,7 +111,8 @@ separate read-only review.
   companion review §4). At the worst observed rate, a 6 KiB post-diet router
   reaches 11 KiB in ~10 days and the 12 KiB cap in ~12.5 — inside a two-week
   calendar cadence. The 8,192 B routine-audit trigger in
-  `docs/MEMORY_HYGIENE_RUNBOOK.md` §5 is currently prose only; it was crossed
+  `docs/MEMORY_HYGIENE_RUNBOOK.md` §5 was prose only at this baseline
+  (mechanical since Phase 1, `6b36f297`); it was crossed
   silently on 2026-08-13 (`840d082d`, 8,193 B). The router measured 9,040 B at
   `2ef75439`.
 
