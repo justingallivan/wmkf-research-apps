@@ -130,10 +130,10 @@ model or transport rule.
 ```bash
 npm run check:memory-health -- --quiet
 rg -n "gpt-5\\.5|codex:codex-rescue|BILL API|PNI|NOT built yet: Chunk 4 UI|project-e2e-reviewer-rebaseline-parked|Proposed Skill Support" .claude-memory docs .claude/skills
-curl -I https://applications.wmkf.org/
-curl -I https://reviews.wmkf.org/
-curl -I https://grantees.wmkf.org/
-curl -I https://submissions.wmkf.org/
+curl -I https://applications.wmkeck.org/
+curl -I https://reviews.wmkeck.org/
+curl -I https://grantees.wmkeck.org/
+curl -I https://submissions.wmkeck.org/
 curl -I https://wmkfresearch.vercel.app/
 curl -I https://wmkfresearch.vercel.app/api/health
 ```

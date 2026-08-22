@@ -77,7 +77,7 @@ Send emails through the Dataverse API using the built-in email activity entity a
      "description": "<html>email body</html>",
      "directioncode": true,
      "email_activity_parties": [
-       { "participationtypemask": 1, "addressused": "sender@wmkf.org" },
+       { "participationtypemask": 1, "addressused": "sender@wmkeck.org" },
        { "participationtypemask": 2, "addressused": "recipient@example.com" }
      ]
    }
@@ -102,7 +102,7 @@ Send emails through the Dataverse API using the built-in email activity entity a
 
 1. **Does our app's service principal have the `prvSendEmail` privilege?** This is typically part of an "Email Sender" or custom security role in Dynamics.
 2. **Which mailbox or queue should outgoing emails route through?** Options:
-   - A **shared mailbox/queue** (e.g., `grants@wmkf.org`) — preferred, avoids tying emails to a specific person's account
+   - A **shared mailbox/queue** (e.g., `grants@wmkeck.org`) — preferred, avoids tying emails to a specific person's account
    - A **service account mailbox**
 3. **Is Server-Side Synchronization already configured** for that mailbox? (It likely is if your Dynamics instance already sends email.)
 4. **Are there mail flow rules or transport policies** we should be aware of? (e.g., disclaimers, DLP, external recipient restrictions)
@@ -200,10 +200,10 @@ Create a security group that contains only the mailbox(es) the app is allowed to
 
 ```powershell
 # Create the group
-New-DistributionGroup -Name "WMKF App Email Senders" -Type Security -ManagedBy "admin@wmkf.org"
+New-DistributionGroup -Name "WMKF App Email Senders" -Type Security -ManagedBy "admin@wmkeck.org"
 
 # Add the designated sending mailbox
-Add-DistributionGroupMember -Identity "WMKF App Email Senders" -Member "grants@wmkf.org"
+Add-DistributionGroupMember -Identity "WMKF App Email Senders" -Member "grants@wmkeck.org"
 ```
 
 ### Step 3: Create the Application Access Policy
@@ -225,12 +225,12 @@ Test that the app can access the allowed mailbox and is denied access to others.
 ```powershell
 # Should return: "Granted"
 Test-ApplicationAccessPolicy `
-  -Identity "grants@wmkf.org" `
+  -Identity "grants@wmkeck.org" `
   -AppId "<your-app-client-id>"
 
 # Should return: "Denied"
 Test-ApplicationAccessPolicy `
-  -Identity "someother@wmkf.org" `
+  -Identity "someother@wmkeck.org" `
   -AppId "<your-app-client-id>"
 ```
 

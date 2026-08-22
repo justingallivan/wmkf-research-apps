@@ -41,7 +41,7 @@ beforeEach(() => {
   readRequiredEmailDefaults.mockReset().mockResolvedValue(defaultsOk());
   resolveSignatureForRequest.mockReset().mockResolvedValue({ signature: 'Program Director' });
   buildReviewDueIcs.mockReset().mockReturnValue(null);
-  process.env.NOTIFICATION_EMAIL_FROM = 'fallback@wmkf.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'fallback@wmkeck.org';
 });
 
 afterAll(() => {
@@ -162,7 +162,7 @@ describe('sendAcceptanceConfirmationEmail — PD lookup fallback', () => {
 
     const out = await sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer });
     expect(out).toEqual({ sent: true });
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'fallback@wmkf.org' }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'fallback@wmkeck.org' }));
   });
 
   test('disabled PD → falls back to NOTIFICATION_EMAIL_FROM', async () => {
@@ -177,7 +177,7 @@ describe('sendAcceptanceConfirmationEmail — PD lookup fallback', () => {
     const reviewer = { wmkf_emailaddress: 'jane@reviewer.org' };
 
     await sendAcceptanceConfirmationEmail({ suggestion: {}, request, reviewer });
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'fallback@wmkf.org' }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ from: 'fallback@wmkeck.org' }));
   });
 });
 

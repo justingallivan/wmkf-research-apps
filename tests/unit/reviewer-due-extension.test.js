@@ -80,7 +80,7 @@ beforeEach(() => {
   getSystemUserById.mockResolvedValue({
     systemuserid: PD_ID,
     fullname: 'Pat Director',
-    internalemailaddress: 'pd@wmkf.org',
+    internalemailaddress: 'pd@wmkeck.org',
     isdisabled: false,
   });
   readRequiredEmailDefaults.mockResolvedValue({
@@ -124,7 +124,7 @@ test('saves first, then automatically sends the confirmed reviewer a fixed-subje
   );
   expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
     subject: 'Updated review deadline: A Better Telescope',
-    from: 'pd@wmkf.org',
+    from: 'pd@wmkeck.org',
     to: 'confirmed@example.org',
     actingUserSystemId: PD_ID,
     noFallback: true,
@@ -381,7 +381,7 @@ test('fails before writing when sender or confirmed recipient prerequisites are 
 
   getSystemUserById.mockResolvedValueOnce({
     systemuserid: PD_ID,
-    internalemailaddress: 'pd@wmkf.org',
+    internalemailaddress: 'pd@wmkeck.org',
     isdisabled: false,
   });
   suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({ wmkf_revieweremail: null }));

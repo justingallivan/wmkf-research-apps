@@ -195,7 +195,7 @@ describe('workbench route correlation wiring', () => {
 
       jest.doMock('../../lib/utils/auth', () => ({
         requireAppAccess: jest.fn(async () => ({
-          session: { user: { azureEmail: 'pd@wmkf.org', dynamicsSystemuserId: 'user-1' } },
+          session: { user: { azureEmail: 'pd@wmkeck.org', dynamicsSystemuserId: 'user-1' } },
         })),
       }));
 

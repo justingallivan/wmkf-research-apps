@@ -408,7 +408,7 @@ describe('getReviewers — characterization', () => {
       { key: 'feasibility', order: 2, label: 'Feasibility', type: 'text' },
     ]);
 
-    const out = await getReviewers({ proposalId: 'req-a1', azureEmail: 'staff@wmkf.org' });
+    const out = await getReviewers({ proposalId: 'req-a1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out).toEqual({
       success: true,
@@ -596,7 +596,7 @@ describe('getReviewers — characterization', () => {
     ]);
     getActiveQuestionSet.mockResolvedValueOnce([]);
 
-    const out = await getReviewers({ proposalId: 'req-b1', azureEmail: 'staff@wmkf.org' });
+    const out = await getReviewers({ proposalId: 'req-b1', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).not.toHaveBeenCalled();
     expect(out).toEqual({
@@ -743,7 +743,7 @@ describe('getMyCandidates — characterization', () => {
       'person-c1': { reviewCount: 3, lastReviewAt: '2026-07-01T00:00:00Z' },
     });
 
-    const out = await getMyCandidates({ requestId: 'req-c1', azureEmail: 'staff@wmkf.org' });
+    const out = await getMyCandidates({ requestId: 'req-c1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out).toEqual({
       success: true,
@@ -866,7 +866,7 @@ describe('getMyCandidates — characterization', () => {
       },
     ]);
 
-    const out = await getMyCandidates({ requestId: 'req-d1', azureEmail: 'staff@wmkf.org' });
+    const out = await getMyCandidates({ requestId: 'req-d1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out).toEqual({
       success: true,
@@ -932,7 +932,7 @@ describe('getMyCandidates — characterization', () => {
       },
     ]);
 
-    const out = await getMyCandidates({ requestId: 'req-e1', azureEmail: 'staff@wmkf.org' });
+    const out = await getMyCandidates({ requestId: 'req-e1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out.totalCandidates).toBe(1);
     expect(out.proposals).toHaveLength(1);
@@ -976,7 +976,7 @@ describe('getMyCandidates — characterization', () => {
     findByRequest.mockResolvedValueOnce([]);
     findRemovedByRequest.mockResolvedValueOnce([]);
 
-    const out = await getMyCandidates({ requestId: 'req-f1', azureEmail: 'staff@wmkf.org' });
+    const out = await getMyCandidates({ requestId: 'req-f1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out).toEqual({ success: true, proposals: [], totalCandidates: 0 });
     expect(queryReviewersImpl).not.toHaveBeenCalled();
@@ -1017,7 +1017,7 @@ describe('getMyCandidates — characterization', () => {
       },
     });
 
-    const out = await getMyCandidates({ azureEmail: 'pd@wmkf.org' });
+    const out = await getMyCandidates({ azureEmail: 'pd@wmkeck.org' });
 
     expect(queryReviewersImpl).not.toHaveBeenCalled();
     expect(out.totalCandidates).toBe(1);
@@ -1050,7 +1050,7 @@ describe('getMyCandidates — characterization', () => {
     findRemovedByRequest.mockResolvedValueOnce([]);
     aggregateReviewHistory.mockRejectedValueOnce(new Error('history query timed out'));
 
-    const out = await getMyCandidates({ requestId: 'req-g1', azureEmail: 'staff@wmkf.org' });
+    const out = await getMyCandidates({ requestId: 'req-g1', azureEmail: 'staff@wmkeck.org' });
 
     expect(out.totalCandidates).toBe(1);
     expect(out.proposals[0].candidates[0]).toMatchObject({

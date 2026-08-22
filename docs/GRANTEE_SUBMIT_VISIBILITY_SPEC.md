@@ -429,8 +429,8 @@ Where the shipped code differs from, or resolves, the plan above:
   caches per request, and — load-bearing — **trims and lowercases** the address. That normalization is
   not cosmetic: `AlertRecipients` lowercases category recipients `[VERIFIED via alert-recipients.js:68]`
   while `sendAdminEmail` dedupes the union with a case-**sensitive** `Set`
-  `[VERIFIED via notification-service.js:158-161]`, so an un-normalized `PD@wmkf.org` alongside a
-  configured `pd@wmkf.org` survives as two entries and emails the PD twice. The service now keeps only
+  `[VERIFIED via notification-service.js:158-161]`, so an un-normalized `PD@wmkeck.org` alongside a
+  configured `pd@wmkeck.org` survives as two entries and emails the PD twice. The service now keeps only
   one read of its own — `_wmkf_projectleader_value` for the PI name, taken from the `_formatted`
   annotation rather than a separate contact read.
 - **…but with `skipCache: true`, added for this caller.** The resolver caches for 10 minutes

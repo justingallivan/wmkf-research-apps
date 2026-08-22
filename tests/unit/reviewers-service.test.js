@@ -106,14 +106,14 @@ describe('patchReviewers', () => {
 describe('getReviewers', () => {
   test('proposalId scope: unknown request → empty DTO (no programDirector key)', async () => {
     getRequestById.mockRejectedValueOnce(new Error('Get record failed (404)'));
-    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
     expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0 });
     expect(resolvePD).not.toHaveBeenCalled();
   });
 
   test('default scope: unresolved PD → empty DTO WITH programDirector:null', async () => {
     resolvePD.mockResolvedValueOnce(null);
-    const out = await getReviewers({ azureEmail: 'someone@wmkf.org' });
+    const out = await getReviewers({ azureEmail: 'someone@wmkeck.org' });
     expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0, programDirector: null });
   });
 
@@ -137,7 +137,7 @@ describe('getReviewers', () => {
       { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, wmkf_accepted: false },
     ]);
     getActiveQuestionSet.mockResolvedValueOnce([{ key: 'impact', order: 1, label: 'Impact?', type: 'picklist' }]);
-    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
     expect(out.success).toBe(true);
     expect(out.totalReviewers).toBe(1); // non-accepted row filtered out
     expect(out.proposals).toHaveLength(1);
@@ -175,7 +175,7 @@ describe('getReviewers', () => {
       }],
     });
 
-    const out = await getReviewers({ azureEmail: 'pd@wmkf.org' });
+    const out = await getReviewers({ azureEmail: 'pd@wmkeck.org' });
 
     expect(out.proposals[0].reviewDeadline).toBe('2026-09-09');
   });
@@ -195,7 +195,7 @@ describe('getReviewers', () => {
       })),
     );
 
-    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     // Stage 2 read coalescing collapsed the former person + researcher sibling
     // reads into ONE chunked read over the same entity/filter/select. An
@@ -222,7 +222,7 @@ describe('getReviewers', () => {
       { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-b', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
     ]);
 
-    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     expect(queryReviewers).toHaveBeenCalledTimes(1);
   });
@@ -235,7 +235,7 @@ describe('getReviewers', () => {
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: null, wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
     ]);
 
-    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     expect(queryReviewers).not.toHaveBeenCalled();
   });
@@ -251,7 +251,7 @@ describe('getReviewers', () => {
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
     ]);
 
-    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     const actualSelectFields = queryReviewers.mock.calls[0][0].select.split(',');
     for (const field of [...FORMER_PERSON_SELECT, ...FORMER_RESEARCHER_SELECT]) {
@@ -280,7 +280,7 @@ describe('getReviewers', () => {
       }],
     });
 
-    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     const found = out.proposals[0].reviewers.find((r) => r.suggestionId === IDS[0]);
     expect(found).toMatchObject({
@@ -319,7 +319,7 @@ describe('getReviewers', () => {
       }],
     });
 
-    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' });
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
 
     expect(out.proposals[0].reviewers[0].affiliation).toBe('Fallback Org');
   });
@@ -333,7 +333,7 @@ describe('getReviewers', () => {
     ]);
     queryReviewers.mockRejectedValueOnce(new Error('dataverse 500'));
 
-    await expect(getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkf.org' }))
+    await expect(getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' }))
       .rejects.toThrow('dataverse 500');
   });
 });

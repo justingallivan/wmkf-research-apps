@@ -246,7 +246,7 @@ describe('getReviewers — call-count acceptance', () => {
       reviewerSuggestionRow({ id: 'sug-1c', requestId: 'req-1', personId: 'rp-2' }),
     ]);
 
-    await getReviewers({ proposalId: 'req-1', azureEmail: 'staff@wmkf.org' });
+    await getReviewers({ proposalId: 'req-1', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(3));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(1);
@@ -266,7 +266,7 @@ describe('getReviewers — call-count acceptance', () => {
       personIds.map((pid, i) => reviewerSuggestionRow({ id: `sug-2-${i}`, requestId: 'req-2', personId: pid })),
     );
 
-    await getReviewers({ proposalId: 'req-2', azureEmail: 'staff@wmkf.org' });
+    await getReviewers({ proposalId: 'req-2', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(26));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(2);
@@ -285,7 +285,7 @@ describe('getReviewers — call-count acceptance', () => {
       reviewerSuggestionRow({ id: 'sug-8', requestId: 'req-8', personId: null }),
     ]);
 
-    await getReviewers({ proposalId: 'req-8', azureEmail: 'staff@wmkf.org' });
+    await getReviewers({ proposalId: 'req-8', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(0));
     expect(queryReviewersImpl).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe('getMyCandidates — call-count acceptance', () => {
     ]);
     findRemovedByRequest.mockResolvedValueOnce([]);
 
-    await getMyCandidates({ requestId: 'req-3', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-3', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(2));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(1);
@@ -320,7 +320,7 @@ describe('getMyCandidates — call-count acceptance', () => {
       removedRow({ id: 'sug-4-removed', personId: 'rm-0' }),
     ]);
 
-    await getMyCandidates({ requestId: 'req-4', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-4', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(1));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(1);
@@ -343,7 +343,7 @@ describe('getMyCandidates — call-count acceptance', () => {
       removedRow({ id: 'sug-5-removed-b', personId: 'rm-1' }),
     ]);
 
-    await getMyCandidates({ requestId: 'req-5', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-5', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(2) + q(2));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(2);
@@ -368,7 +368,7 @@ describe('getMyCandidates — call-count acceptance', () => {
       removedRow({ id: 'sug-6-removed', personId: 'rm-0' }),
     ]);
 
-    await getMyCandidates({ requestId: 'req-6', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-6', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(26) + q(1));
     expect(queryReviewersImpl).toHaveBeenCalledTimes(3);
@@ -403,7 +403,7 @@ describe('getMyCandidates — call-count acceptance', () => {
     findByRequest.mockResolvedValueOnce([]);
     findRemovedByRequest.mockResolvedValueOnce([]);
 
-    await getMyCandidates({ requestId: 'req-7', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-7', azureEmail: 'staff@wmkeck.org' });
 
     expect(queryReviewersImpl).toHaveBeenCalledTimes(q(0) + q(0));
     expect(queryReviewersImpl).not.toHaveBeenCalled();
@@ -458,7 +458,7 @@ describe('whole-page composite — the formula, not a magic number', () => {
       reviewerSuggestionRow({ id: 'sug-10-rev-b', requestId: 'req-10-reviewers', personId: 'rp-1' }),
       reviewerSuggestionRow({ id: 'sug-10-rev-c', requestId: 'req-10-reviewers', personId: 'rp-2' }),
     ]);
-    await getReviewers({ proposalId: 'req-10-reviewers', azureEmail: 'staff@wmkf.org' });
+    await getReviewers({ proposalId: 'req-10-reviewers', azureEmail: 'staff@wmkeck.org' });
 
     getRequestById.mockResolvedValueOnce({ akoya_requestid: 'req-10-candidates', akoya_requestnum: 'R-10b', akoya_title: 'T' });
     findByRequest.mockResolvedValueOnce([
@@ -468,7 +468,7 @@ describe('whole-page composite — the formula, not a magic number', () => {
     findRemovedByRequest.mockResolvedValueOnce([
       removedRow({ id: 'sug-10-removed', personId: 'rm-0' }),
     ]);
-    await getMyCandidates({ requestId: 'req-10-candidates', azureEmail: 'staff@wmkf.org' });
+    await getMyCandidates({ requestId: 'req-10-candidates', azureEmail: 'staff@wmkeck.org' });
 
     const stored = normalizeDeclineReferrals([{ name: 'Composite Referral', email: 'composite@example.com' }]).storedValue;
     findByRequest.mockResolvedValueOnce([
