@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff plus first Ready Production receipt deployment dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi
+  last_verified: 2026-08-21 via signed-in Request 1002379 Draft→Review handoff and post-release receipt→Site Visit same-item smoke
 ---
 
 ## Recall Rule
@@ -135,15 +135,17 @@ service's post-write reread requires the exact publication version, governed
 hash, and non-null milestone time. Logistics/supporting files and Final remain
 later slices.
 
-**2026-08-21 post-handoff receipt (Production-deployed; signed-in receipt smoke
-open):** commit `b3bb0ef6` first reached Production in Ready deployment
+**2026-08-21 post-handoff receipt (Production-proved):** commit `b3bb0ef6` first reached Production in Ready deployment
 `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and removes Pre-Site Edit, Download, filename,
 and Regenerate controls after Review. The Pre-Site tab becomes a read-only
 handoff receipt with one Site Visit continuation action, keeps recorded edit
 warnings visible as the checklist, and fails closed for later, unknown, or
 missing-link states. Site Visit owns the active Review workspace controls. The
-public Workbench route redirected successfully through the Production sign-in
-boundary; a signed-in post-release receipt smoke has not yet been run.
+signed-in Request `1002379` smoke hard-reloaded the deployed bundle, verified
+zero Pre-Site work controls plus one continuation action, and reached Site
+Visit's expected same-file Edit/Download workspace and handoff time. It invoked
+no document or write action. This request had no visible warning, so warning
+relocation remains component-test evidence rather than browser-smoke evidence.
 
 **2026-08-17 Proposal-tab Phase II documents (deployed at `83b9c68a`,
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`):** the Proposal tab now displays every

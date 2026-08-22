@@ -52,12 +52,16 @@ from the registry. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE
 SMOKE OPEN]** its compact action panel shows Generate before a draft
 exists and Edit, Download, and confirmation-guarded Regenerate actions only
 while the current Ready artifact remains Draft; detailed workflow guidance is
-behind an accessible help control. **[DEPLOYED TO PRODUCTION 2026-08-21;
-SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6` first reached Production in
+behind an accessible help control. **[DEPLOYED TO PRODUCTION AND SIGNED-IN
+RECEIPT SMOKE PASSED 2026-08-21]** commit `b3bb0ef6` first reached Production in
 Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes the Pre-Site tab a read-only handoff
 receipt after Review with one `Continue in Site Visit` action. It moves any
 durable edit-check warnings inside that receipt and fails closed for later or
-unknown lifecycle values. Wave 19 is live in Production: its owner-approved
+unknown lifecycle values. Signed-in Request `1002379` verified that receipt,
+zero Pre-Site work controls, one continuation action, and the expected same-file
+Site Visit Edit/Download workspace without invoking a write. The request carried
+no visible warning, so post-handoff warning rendering remains component-test
+evidence rather than part of this browser smoke. Wave 19 is live in Production: its owner-approved
 metadata-only apply created all 12 attributes and two request lookups, and
 independent readback found 14 exact with no absence or divergence. Request
 `1002379` later created the first Ready Pre-Site row, completed governed v3 AI
@@ -77,7 +81,7 @@ or changing a request artifact.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, clearer handoff modal, and promoted-state receipt hardening are Production-deployed, while Final remains a placeholder | Workbench source; Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, and `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`; focused service/route/component tests; signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21; production auth-boundary smoke | PRODUCTION-DEPLOYED; SIGNED-IN RECEIPT SMOKE OPEN |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, clearer handoff modal, and promoted-state receipt hardening are Production-deployed, while Final remains a placeholder | Workbench source; Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, and `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`; focused service/route/component tests; signed-in Request `1002379` Draft→Review handoff and post-release receipt→Site Visit navigation with same-item status/readback on 2026-08-21 | PRODUCTION-PROVED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Request `1002379` has one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; current row GUID was not exposed by the browser proof | VERIFIED LIVE |
@@ -563,12 +567,15 @@ silently extend its paths or names to writeup publications.
    identity, returned the handoff timestamp after a fresh authenticated GET,
    and locked Pre-Site regeneration. The service's post-write reread requires
    the exact publication version, governed hash, and milestone time to match.
-5. **Promoted-state receipt hardening — Production-deployed 2026-08-21;
-   signed-in receipt smoke open.** Commit `b3bb0ef6` first reached Production in
+5. **Promoted-state receipt hardening — Production-proved 2026-08-21.**
+   Commit `b3bb0ef6` first reached Production in
    Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and restricts Pre-Site working controls to
    Draft, routes Review warnings and work to Site Visit, and fails closed for
-   later/unknown states. The public Workbench route reached the successful
-   sign-in page; no signed-in post-release document action was exercised.
+   later/unknown states. After a hard reload onto the deployed bundle, signed-in
+   Request `1002379` showed the receipt with zero work controls and one Site
+   Visit continuation action. Site Visit showed the expected same Word item,
+   Edit/Download, and handoff time. No document or write action was invoked;
+   this request had no visible warning, so warning rendering remains test-proven.
 6. **Guarded correction/reopen.** Select the bounded audit/schema and permission
    representation, then implement the preserve-and-succeed transaction above.
    This must precede Final creation so an accidental handoff cannot become an

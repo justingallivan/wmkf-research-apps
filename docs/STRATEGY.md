@@ -182,11 +182,13 @@ separate slices.
    PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
    explicit no-wrap label, and the Production compact panel exposes Edit,
    Download, and confirmation-guarded Regenerate actions for Ready drafts;
-   their signed-in smoke remains open. **[DEPLOYED TO PRODUCTION 2026-08-21;
-   SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6` first reached Production in
+   their signed-in smoke remains open. **[DEPLOYED TO PRODUCTION AND SIGNED-IN
+   RECEIPT SMOKE PASSED 2026-08-21]** commit `b3bb0ef6` first reached Production in
    Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes promoted Pre-Site work a read-only
    handoff receipt, routes Edit/Download through Site Visit, keeps warnings
-   actionable, and fails closed for every non-Draft lifecycle.
+   actionable, and fails closed for every non-Draft lifecycle. Signed-in Request
+   `1002379` confirmed the receipt has no work controls and its one continuation
+   action reaches Site Visit's same-file Edit/Download workspace without a write.
 
 The deployed Site Visit handoff's controlled signed-in proof is complete on
 Request `1002379`: the same SharePoint item remains the working document,

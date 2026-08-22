@@ -102,12 +102,14 @@ hood.
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
-- **Post-handoff UI ownership (Production-deployed 2026-08-21; signed-in receipt
-  smoke open):** commit `b3bb0ef6` first reached Production in Ready deployment
+- **Post-handoff UI ownership (Production-deployed and signed-in receipt smoke
+  passed 2026-08-21):** commit `b3bb0ef6` first reached Production in Ready deployment
   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and limits Pre-Site working controls to Draft.
   Review becomes a handoff receipt whose one action routes to Site Visit; later
   and unknown lifecycle values fail closed. Site Visit owns Edit/Download for
-  the active Review workspace.
+  the active Review workspace. Signed-in Request `1002379` verified the receipt,
+  absence of Pre-Site work controls, one continuation action, and same-item Site
+  Visit Edit/Download without invoking a document or write action.
 - **Initial Assessment pilot locator (deployed and exercised):** queries the
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting

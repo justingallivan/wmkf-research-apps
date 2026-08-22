@@ -237,13 +237,13 @@ document inventory, and individual implementation plans do not establish priorit
   recorded the complete milestone under the service's post-write readback, and
   locked Pre-Site regeneration. The later Site Visit dossier/logistics and
   Final transaction remain separate.
-- **Production-deployed post-handoff receipt (2026-08-21; signed-in receipt
-  smoke open):** commit `b3bb0ef6` first reached Production in Ready deployment
+- **Production-proved post-handoff receipt (2026-08-21):** commit `b3bb0ef6` first reached Production in Ready deployment
   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes Pre-Site controls Draft-only.
   Review displays a read-only receipt with one Site Visit continuation action;
-  later, unknown, and missing-link states fail closed. The public Workbench
-  route passed its sign-in-boundary smoke; no signed-in post-release document
-  action was exercised.
+  later, unknown, and missing-link states fail closed. Signed-in Request
+  `1002379` verified zero Pre-Site work controls, one continuation action, and
+  the expected same-item Site Visit Edit/Download workspace and handoff time.
+  No document or write action was invoked; the request showed no warning panel.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
 - Current near-term sequence: synthesis lifecycle closure → governed artifact

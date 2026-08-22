@@ -106,12 +106,15 @@ sequence.
   Pre-Site action panel: hidden contextual help, Generate before a draft exists,
   and Edit, Download, and confirmation-guarded Regenerate actions when
   Ready/Draft. The signed-in Word Online v3 and compact-action/download smoke
-  remain open. **[DEPLOYED TO PRODUCTION 2026-08-21; SIGNED-IN RECEIPT SMOKE
-  OPEN]** commit `b3bb0ef6` first reached Production in Ready deployment
+  remain open. **[DEPLOYED TO PRODUCTION AND SIGNED-IN RECEIPT SMOKE PASSED
+  2026-08-21]** commit `b3bb0ef6` first reached Production in Ready deployment
   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes the promoted-state panel a
   read-only handoff receipt with one Site Visit continuation action; later and
-  unknown lifecycle states also fail closed. The production auth-boundary smoke
-  redirected the Workbench route to the successful sign-in page.
+  unknown lifecycle states also fail closed. After a hard reload of the
+  previously open browser tab, signed-in Request `1002379` showed the receipt
+  with no Pre-Site work controls; its one continuation action opened Site Visit,
+  where the expected same Word item exposed Edit/Download and the recorded
+  handoff time. No document or write action was invoked.
 
 - Initial Assessment substantive human edit: Request `1003109`'s canonical
   SharePoint item advanced to version `2.0`, attributed to Justin Gallivan.

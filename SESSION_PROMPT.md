@@ -181,9 +181,12 @@ Site Visit handoff smoke first.
      closed with an explanation.
    - The focused component suite passed 23 tests, the Webpack production build
      passed, and two read-only Claude Opus reviews returned APPROVE with no
-     actionable defects. The public Workbench route redirected successfully to
-     the Production sign-in page. A signed-in post-release receipt smoke remains
-     open and no durable business write was performed for release verification.
+     actionable defects. After a hard reload onto the deployed client bundle,
+     signed-in Request `1002379` showed the receipt with zero Pre-Site work
+     controls and one continuation action. It reached Site Visit's expected same
+     Word item, Edit/Download, and handoff time. No document or write action was
+     invoked. The request showed no warning panel, so warning relocation remains
+     component-test evidence rather than browser-smoke evidence.
 
 ### Commits
 
