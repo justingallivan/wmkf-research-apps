@@ -28,7 +28,9 @@ const {
   nearestAtlasClaim,
   parseClaimAudit,
   probeEntitySetCount,
+  writeAuthoritativeReport,
 } = require('../../scripts/reconcile-memory-claims.js');
+const { reportIsFresh } = require('../../scripts/check-memory-drift.js');
 
 // Minimal Response-shaped stub. fetchWithTimeout returns a Response;
 // production code reads .status, .ok, .text(), and .json() on it.
@@ -143,6 +145,89 @@ describe('probeEntitySetCount', () => {
 });
 
 describe('reconciliation report semantics', () => {
+  const completedProbeNotes = { dataverse: 'completed', postgres: 'completed' };
+
+  test('does not replace an authoritative report when a live probe fails', () => {
+    const writeFile = jest.fn();
+    const failedReport = {
+      generated: new Date().toISOString(),
+      summary: { live_drift_findings: 0, probe_errors: 1 },
+      probe_notes: { dataverse: 'probe_error: fetch failed', postgres: 'completed' },
+    };
+
+    expect(() => writeAuthoritativeReport(failedReport, '/tmp/report.json', writeFile))
+      .toThrow(/preserved existing/);
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  test('does not replace an authoritative report when a probe was skipped', () => {
+    const writeFile = jest.fn();
+    const skippedReport = {
+      generated: new Date().toISOString(),
+      summary: { live_drift_findings: 0, probe_errors: 0 },
+      probe_notes: { dataverse: 'completed', postgres: 'probe_skipped: missing DATABASE_URL' },
+    };
+
+    expect(() => writeAuthoritativeReport(skippedReport, '/tmp/report.json', writeFile))
+      .toThrow(/preserved existing/);
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  test('fails closed when probe status fields are missing or malformed', () => {
+    const writeFile = jest.fn();
+    const malformedReport = {
+      generated: new Date().toISOString(),
+      summary: { live_drift_findings: 0, probe_errors: null },
+      probe_notes: { dataverse: 'completed', postgres: 'completed' },
+    };
+
+    expect(() => writeAuthoritativeReport(malformedReport, '/tmp/report.json', writeFile))
+      .toThrow(/probe_errors=missing/);
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
+  test('writes a report only when both live probes completed cleanly', () => {
+    const writeFile = jest.fn();
+    const report = {
+      generated: new Date().toISOString(),
+      summary: { live_drift_findings: 0, probe_errors: 0 },
+      probe_notes: completedProbeNotes,
+    };
+
+    writeAuthoritativeReport(report, '/tmp/report.json', writeFile);
+
+    expect(writeFile).toHaveBeenCalledTimes(1);
+    expect(writeFile.mock.calls[0][1]).toContain('"probe_errors": 0');
+  });
+
+  test('treats a recent failed or incomplete report as stale so the gate retries', () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-drift-freshness-'));
+    const reportPath = path.join(tempDir, 'report.json');
+    const generated = '2026-08-22T12:00:00.000Z';
+    const now = Date.parse('2026-08-22T12:01:00.000Z');
+
+    try {
+      fs.writeFileSync(reportPath, JSON.stringify({
+        generated,
+        summary: { probe_errors: 1 },
+        probe_notes: { dataverse: 'probe_error: fetch failed', postgres: 'completed' },
+      }));
+      expect(reportIsFresh(reportPath, now)).toBe(false);
+
+      fs.writeFileSync(reportPath, JSON.stringify({
+        generated,
+        summary: { probe_errors: 0 },
+        probe_notes: completedProbeNotes,
+      }));
+      expect(reportIsFresh(reportPath, now)).toBe(true);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('keeps historical classifications out of the current live summary', () => {
     const historical = buildHistoricalClaimAudit([
       { status: 'stale' },

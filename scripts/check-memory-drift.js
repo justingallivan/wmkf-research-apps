@@ -19,12 +19,19 @@ const reportPath = path.join(repoRoot, 'docs', 'RECONCILIATION_REPORT.json');
 const reconcileScript = path.join(repoRoot, 'scripts', 'reconcile-memory-claims.js');
 const maxAgeMs = 24 * 60 * 60 * 1000;
 
-function reportIsFresh() {
-  if (!fs.existsSync(reportPath)) return false;
+function reportIsFresh(targetPath = reportPath, now = Date.now()) {
+  if (!fs.existsSync(targetPath)) return false;
   try {
-    const parsed = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
     const generated = Date.parse(parsed.generated);
-    return Number.isFinite(generated) && Date.now() - generated < maxAgeMs;
+    const probeErrors = parsed.summary?.probe_errors;
+    const probesCompleted = parsed.probe_notes?.dataverse === 'completed'
+      && parsed.probe_notes?.postgres === 'completed';
+    return Number.isFinite(generated)
+      && now - generated < maxAgeMs
+      && Number.isFinite(probeErrors)
+      && probeErrors === 0
+      && probesCompleted;
   } catch {
     return false;
   }
@@ -115,4 +122,6 @@ function main() {
   console.log(`memory drift clean: ${liveDriftFindings} live drift findings; ${specWithoutEntity.length} spec/entity blockers; ${largeStaleCounts.length} large row-count drifts; ${docCollisions.length} doc collisions; ${probeErrors} probe errors.`);
 }
 
-main();
+module.exports = { reportIsFresh };
+
+if (require.main === module) main();

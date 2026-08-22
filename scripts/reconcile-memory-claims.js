@@ -131,6 +131,26 @@ function buildLiveSummary({
   };
 }
 
+/**
+ * Replace the tracked reconciliation report only after both live sources
+ * completed without probe errors. A failed probe is not current truth and must
+ * not destroy the last authoritative snapshot or make a retry look "fresh".
+ */
+function writeAuthoritativeReport(report, outputPath = reportPath, writeFile = fs.writeFileSync) {
+  const probeErrors = report.summary?.probe_errors;
+  const probesCompleted = report.probe_notes?.dataverse === 'completed'
+    && report.probe_notes?.postgres === 'completed';
+  if (!Number.isFinite(probeErrors) || probeErrors !== 0 || !probesCompleted) {
+    const dataverse = report.probe_notes?.dataverse || 'missing';
+    const postgres = report.probe_notes?.postgres || 'missing';
+    throw new Error(
+      `reconciliation probes were not authoritative; preserved existing ${rel(outputPath)} `
+      + `(probe_errors=${Number.isFinite(probeErrors) ? probeErrors : 'missing'}, dataverse=${dataverse}, postgres=${postgres})`,
+    );
+  }
+  writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+}
+
 function logicalFromSchemaName(schemaName) {
   if (!schemaName) return null;
   return schemaName.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
@@ -694,7 +714,7 @@ async function main() {
     ? (dataverseWarning.startsWith('probe_error:') ? dataverseWarning : `probe_skipped: ${dataverseWarning}`)
     : 'completed';
 
-  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  writeAuthoritativeReport(report);
 
   console.log(`Wrote ${rel(reportPath)}`);
   console.log(`Live drift findings: ${summary.live_drift_findings}; probe errors: ${summary.probe_errors}`);
@@ -716,6 +736,7 @@ module.exports = {
   nearestAtlasClaim,
   parseClaimAudit,
   probeEntitySetCount,
+  writeAuthoritativeReport,
 };
 
 if (require.main === module) {
