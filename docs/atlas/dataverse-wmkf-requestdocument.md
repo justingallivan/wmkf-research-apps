@@ -6,9 +6,11 @@ status: active
 summary: Governed request-artifact registry; core flow, native version restore, and first-stage recovery pass while administrative controls remain.
 canonical: false
 owner: product-engineering
+last_verified: 2026-08-22
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
+  - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -148,6 +150,18 @@ edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+
+**[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded-reopen
+feature branch adds an additive Wave 20 spec for `wmkf_ReopenCycleId` (String
+36), `wmkf_ReopenReasonCode` (String 50), and `wmkf_ReopenReasonNote` (Memo
+2000). The successor row itself is the append-only reopen event when combined
+with its existing source lookup/version/hash and standard created-by/created-on
+fields. Source service, superuser route, status/history projection, Site Visit
+dialog, exact-operation dedupe, post-upload recovery, ETag changeset, and
+correction-cycle generation salting are focused-test covered. No target
+preflight, metadata apply, runtime deployment, or business-row smoke has run.
+Because the adapter selects the new fields, schema must be applied and read
+back exact before runtime promotion.
 
 ## Ownership
 

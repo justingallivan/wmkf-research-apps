@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -284,8 +284,10 @@ PATCH. It performs no SharePoint write or copy. Review locks the Pre-Site
 producer before it loads inputs, resolves a prompt, calls Claude, claims a row,
 renders, or uploads. Exact completed retries are idempotent.
 
-**[OWNER DIRECTION 2026-08-21; PLANNED, NOT BUILT.]** Reopening Pre-Site
-preparation is a successor operation, not an in-place Review→Draft demotion.
+**[OWNER DIRECTION 2026-08-21; SOURCE IMPLEMENTED AND FOCUSED-TESTED ON
+`codex/guarded-reopen` 2026-08-22; WAVE 20 NOT APPLIED; RUNTIME NOT DEPLOYED.]**
+Reopening Pre-Site preparation is a successor operation, not an in-place
+Review→Draft demotion.
 For an accidental handoff or wrong governed input, the service must verify that
 the current Ready/Review item still exactly matches its handoff milestone and
 has no derived Final, retained snapshot, completed informational distribution,
@@ -297,6 +299,16 @@ operation ID, source, and successor require a durable append-only audit record;
 exact retry returns the same successor. A post-handoff Word edit or downstream
 consumer fails closed for explicit reconciliation. Ordinary content correction
 continues in the live Site Visit Word file and does not reopen generation.
+The branch implements that record on the successor row with three bounded Wave
+20 fields (cycle/client UUID, reason code, reason note), existing source and
+source-version/hash fields, and standard Dataverse created-by/created-on
+attribution. The route is superuser-only. Later Pre-Site generation keys are
+salted by the correction cycle so unchanged governed inputs cannot reactivate
+the preserved row. The service re-reads both source and verified target identities
+immediately before its ETag-guarded transition, and durable incomplete or failed
+rows remain visible as attempts rather than completed history. Target metadata has
+not been probed or changed; schema apply, runtime promotion, and a signed-in
+controlled smoke remain explicit later gates.
 
 The Pre-Site stable proposal core may exist before every review is received.
 It is drafted from the exact Proposal Narrative through the governed

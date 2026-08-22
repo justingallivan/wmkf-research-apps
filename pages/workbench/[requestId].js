@@ -183,6 +183,8 @@ function WorkbenchRequest() {
         <SiteVisitTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          requestNumber={ctx?.requestNumber || requestNumber || ''}
+          isSuperuser={isSuperuser}
           onSelectTab={selectTab}
         />
       ) : activeTab === 'status' ? (

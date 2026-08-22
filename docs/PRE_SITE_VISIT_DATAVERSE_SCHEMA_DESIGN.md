@@ -3,10 +3,10 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19 schema, production-proved Pre-Site writer, and deployed Site Visit handoff contract."
+summary: "Production-live Wave 19 and Site Visit handoff, plus source-built guarded reopen awaiting Wave 20 provisioning and deployment."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -16,6 +16,8 @@ related:
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave19-pre-site-draft/02_akoya_request_writeup_pointers.json
   - scripts/preflight-pre-site-draft-schema.mjs
+  - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
+  - scripts/preflight-guarded-reopen-schema.mjs
 ---
 
 # Pre-Site Visit Dataverse Schema Design
@@ -60,6 +62,13 @@ row's lifecycle to Review and records the exact verified SharePoint publication
 version, governed DOCX hash, and handoff timestamp in the existing
 `wmkf_milestone*` fields. It creates no new row, lookup, or SharePoint item.
 
+**[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded correction
+branch adds the preserve-and-succeed service, superuser route/UI, history
+projection, and an additive Wave 20 spec. No target preflight, schema apply,
+runtime deployment, or business-row smoke has run. The adapter selects the new
+columns, so promotion before target provisioning would make Request Document
+reads fail.
+
 A PDF distribution copy is a separate Request Document row because one
 registry row must identify exactly one SharePoint file. Its
 `wmkf_SourceDocument` lookup points to the Word row, and the existing source
@@ -95,6 +104,8 @@ akoya_request
 | Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
 | The metadata-only Wave 19 apply itself created a Pre-Site business row | Immediate post-apply inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE (historical apply boundary) |
 | The deployed writer later created the first Pre-Site business row | Post-generation inventory plus exact row/run/item/pointer readback for Request `1002379` | VERIFIED LIVE |
+| Wave 20 reopen fields exist in Production | Tracked spec and self-test only; no target metadata probe/apply was authorized or run | UNKNOWN LIVE / PLANNED APPLY |
+| Guarded reopen service, route, UI, and retry/recovery contract exist | `codex/guarded-reopen` source plus focused service/route/artifact/component tests | VERIFIED IN SOURCE / NOT DEPLOYED |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -139,6 +150,25 @@ input snapshot. The separate Proposal Bibliography is not included because it
 does not govern PSV generation identity. The existing `wmkf_SourceDocument`
 lookup and source version/hash remain reserved for lineage from one governed
 output artifact to another, such as Word → PDF or Pre-Site → Final.
+
+### Guarded-reopen Wave 20 attributes — source only, not provisioned
+
+The successor `wmkf_requestdocument` row is the durable append-only correction
+event. Wave 20 adds only the fields that existing registry lineage and standard
+Dataverse audit columns do not already provide:
+
+| Logical name | Type / limit | Contract |
+|---|---|---|
+| `wmkf_reopencycleid` | String / 36 | Client operation UUID. Dedupe/correction-cycle identity; later generated drafts retain it in their generation identity. |
+| `wmkf_reopenreasoncode` | String / 50 | Closed application reason code (`accidental_handoff` or `wrong_governed_inputs`). |
+| `wmkf_reopenreasonnote` | Memo / 2,000 | Required bounded staff explanation. |
+
+Existing `wmkf_SourceDocument`, `wmkf_sourceversionid`, and
+`wmkf_sourcecontenthash` bind the exact preserved handoff. Standard
+`createdby`/`createdon`, written under the session's Dynamics impersonation,
+bind actor and time. The generation-key alternate key remains the uniqueness
+fence; the cycle ID alone is not treated as a new database key. No separate
+audit entity is needed for this bounded operation.
 
 ### `akoya_request` relationships
 
@@ -365,6 +395,19 @@ current-status, compact actions/download, and Word Online v3 proof remain open.
 Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these
 fields; Dataverse rejects a `$select` containing an absent attribute.
+
+Wave 20 has a separate strict order and is not covered by the completed Wave
+19 steps:
+
+1. Run `node scripts/preflight-guarded-reopen-schema.mjs --target=<target>`
+   read-only and classify all three attributes absent/exact/divergent.
+2. Stop on any divergence. If absent, obtain explicit owner approval before
+   `node scripts/apply-dataverse-schema.js --target=<target> --wave=20-guarded-reopen --execute`.
+3. Re-run the preflight and require three exact, zero absent/divergent.
+4. Only then promote the runtime branch whose adapter selects these columns.
+5. After deliberate runtime release approval, perform one controlled signed-in
+   superuser smoke plus exact retry/readback. Do not use Request `1002379`
+   without separately approved mutation authority.
 
 ## Remaining decisions
 

@@ -4,6 +4,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SiteVisitTab from '../../shared/components/workbench/SiteVisitTab';
+import { PRE_SITE_REOPEN_REASON } from '../../shared/config/requestDocument';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -146,4 +147,120 @@ test('a late promotion response from another request cannot publish stale worksp
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Start Site Visit Stage' })).toBeEnabled());
   expect(screen.queryByText('Site Visit in progress')).not.toBeInTheDocument();
+});
+
+test('only superusers can see the guarded reopen control', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    currentArtifact: artifact(100000001),
+    pendingArtifact: null,
+    reopenHistory: [],
+  }));
+  render(<SiteVisitTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
+  expect(await screen.findByText('Site Visit in progress')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Reopen Pre-Site Draft' })).not.toBeInTheDocument();
+});
+
+test('validates confirmation and submits one guarded reopen operation before returning to Pre-Site', async () => {
+  const onSelectTab = jest.fn();
+  global.fetch
+    .mockResolvedValueOnce(response({
+      success: true,
+      currentArtifact: artifact(100000001),
+      pendingArtifact: null,
+      reopenHistory: [],
+    }))
+    .mockResolvedValueOnce(response({
+      success: true,
+      artifact: artifact(100000000),
+      reused: false,
+      recovered: false,
+      inProgress: false,
+    }))
+    .mockResolvedValueOnce(response({
+      success: true,
+      currentArtifact: artifact(100000000),
+      pendingArtifact: null,
+      reopenHistory: [{
+        artifactId: ARTIFACT_ID,
+        correction: {
+          cycleId: '33333333-3333-4333-8333-333333333333',
+          reasonCode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+          reasonNote: 'The handoff was started too early.',
+          actorName: 'Test Admin',
+          createdAt: '2026-08-22T12:00:00Z',
+        },
+        source: { milestone: { versionId: '2.0' } },
+      }],
+    }));
+  render(
+    <SiteVisitTab
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      isSuperuser
+      onSelectTab={onSelectTab}
+    />,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Reopen Pre-Site Draft' }));
+  const submit = screen.getByRole('button', { name: 'Create Draft Successor' });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Reason'), {
+    target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF },
+  });
+  fireEvent.change(screen.getByLabelText('Correction note'), {
+    target: { value: 'The handoff was started too early.' },
+  });
+  fireEvent.change(screen.getByLabelText('Type request number 1002379 to confirm'), {
+    target: { value: '1002379' },
+  });
+  expect(submit).toBeEnabled();
+  fireEvent.click(submit);
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/pre-site-visit/reopen',
+    expect.objectContaining({
+      method: 'POST',
+      body: expect.any(String),
+      signal: expect.any(AbortSignal),
+    }),
+  ));
+  const reopenCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/reopen'));
+  expect(JSON.parse(reopenCall[1].body)).toMatchObject({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    requestNumber: '1002379',
+    reasonCode: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF,
+    reasonNote: 'The handoff was started too early.',
+    clientOperationId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+  });
+  await waitFor(() => expect(onSelectTab).toHaveBeenCalledWith('pre-site-visit'));
+  expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument();
+});
+
+test('renders append-only guarded reopen history from the status contract', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    currentArtifact: artifact(100000001),
+    pendingArtifact: null,
+    reopenHistory: [{
+      artifactId: '77777777-7777-4777-8777-777777777777',
+      outcome: 'completed',
+      correction: {
+        cycleId: '88888888-8888-4888-8888-888888888888',
+        reasonCode: PRE_SITE_REOPEN_REASON.WRONG_GOVERNED_INPUTS,
+        reasonNote: 'The governed inputs were corrected after handoff.',
+        actorName: 'Test Admin',
+        createdAt: '2026-08-22T12:00:00Z',
+      },
+      source: { milestone: { versionId: '2.0' } },
+    }],
+  }));
+  render(<SiteVisitTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  expect(await screen.findByText('Guarded reopen attempts')).toBeInTheDocument();
+  expect(screen.getByText('Completed')).toBeInTheDocument();
+  expect(screen.getByText('Wrong governed inputs')).toBeInTheDocument();
+  expect(screen.getByText('The governed inputs were corrected after handoff.')).toBeInTheDocument();
+  expect(screen.getByText(/source version 2.0/)).toBeInTheDocument();
 });

@@ -94,14 +94,17 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
 
 ### Verified Open
 
-1. **Design and build guarded correction/reopen next.**
-   Evidence: `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` “Content correction and
-   guarded reopen” plus implementation-order item 6. The operation is planned,
-   not built. First select the smallest durable append-only audit
-   representation and explicit permission role; then trace the preserve-and-
-   succeed transaction caller → restriction context → Dataverse registry →
-   SharePoint bytes → current pointer → UI. Do not clear Review in place or
-   mutate the preserved handoff artifact.
+1. **Promote guarded correction/reopen only through its schema-first release sequence.**
+   Evidence: source, Wave 20 spec, strict route, superuser UI, append-only
+   attempt audit, exact retry/recovery, final source/target identity rereads,
+   lifecycle-race guard, and focused tests exist on `codex/guarded-reopen`.
+   The feature is source-built, not live: no target schema preflight/apply or
+   runtime deployment has been authorized. Next run the read-only target
+   preflight, stop on divergence, obtain explicit owner approval before the
+   Wave 20 apply, require exact metadata readback, and only then deliberately
+   promote runtime and perform a separately approved signed-in smoke. Never
+   deploy the adapter before those columns exist, and do not use Production
+   Request `1002379` for a durable reopen test without exact approval.
 
 2. **Observe Dynamics Explorer Phases A and B through organic use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` and
@@ -182,6 +185,9 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
 | `shared/components/workbench/PreSiteVisitTab.js` | Draft controls and promoted-state read-only receipt |
 | `pages/api/workbench/pre-site-visit/start-site-visit.js` | Authenticated exact-body handoff route |
 | `lib/services/pre-site-visit/site-visit-transition-service.js` | Draft→Review transaction and exact post-write reread |
+| `lib/services/pre-site-visit/reopen-service.js` | Source-built preserve-and-succeed service; not deployable before Wave 20 |
+| `lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json` | Additive guarded-reopen audit fields awaiting target preflight/apply |
+| `scripts/preflight-guarded-reopen-schema.mjs` | Read-only Wave 20 metadata classifier plus local self-test |
 | `docs/MEMORY_HYGIENE_RUNBOOK.md` | Canonical routine/deep audit and router-diet procedure |
 | `docs/audits/memory-routine-audit-2026-08-21.md` | First audit evidence, dispositions, and metrics |
 | `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md` | Built warning/advisory architecture and constraints |
@@ -196,5 +202,13 @@ memory-hygiene early-warning system plus its first routine audit/router diet.
   docs, fact, symbol, type, claim-freshness, framing, currency, and clean-diff
   gate passed sequentially. The router self-test passed 19/19 with existing
   advisory MaxListeners warnings.
+- Guarded reopen branch: focused service, route, artifact, and component tests
+  pass 54/54; TypeScript and targeted ESLint pass with only the existing
+  `[requestId].js` hook warning. A fresh adversarial contract review returned
+  SHIP after lifecycle-race, target-drift, and attempt-status hardening. The
+  production Webpack build and relevant route, DAL/context, status, Atlas,
+  documentation, and fact gates pass. The default Turbopack build remains
+  host-blocked by an internal CSS worker bind permission error, while the
+  Webpack build succeeds.
 - Stop-time claim-evidence pilot: local observation state was unavailable, so no
   observation row was added and no advisory classification was invented.
