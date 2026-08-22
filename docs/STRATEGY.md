@@ -183,8 +183,8 @@ separate slices.
    explicit no-wrap label, and the Production compact panel exposes Edit,
    Download, and confirmation-guarded Regenerate actions for Ready drafts;
    their signed-in smoke remains open. **[DEPLOYED TO PRODUCTION 2026-08-21;
-   SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6`, Ready deployment
-   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, makes promoted Pre-Site work a read-only
+   SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6` first reached Production in
+   Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes promoted Pre-Site work a read-only
    handoff receipt, routes Edit/Download through Site Visit, keeps warnings
    actionable, and fails closed for every non-Draft lifecycle.
 

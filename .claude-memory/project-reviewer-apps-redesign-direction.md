@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff plus Ready Production receipt deployment dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi
+  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff plus first Ready Production receipt deployment dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi
 ---
 
 ## Recall Rule
@@ -136,8 +136,8 @@ hash, and non-null milestone time. Logistics/supporting files and Final remain
 later slices.
 
 **2026-08-21 post-handoff receipt (Production-deployed; signed-in receipt smoke
-open):** commit `b3bb0ef6`, Ready deployment
-`dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, removes Pre-Site Edit, Download, filename,
+open):** commit `b3bb0ef6` first reached Production in Ready deployment
+`dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and removes Pre-Site Edit, Download, filename,
 and Regenerate controls after Review. The Pre-Site tab becomes a read-only
 handoff receipt with one Site Visit continuation action, keeps recorded edit
 warnings visible as the checklist, and fails closed for later, unknown, or

@@ -238,8 +238,8 @@ document inventory, and individual implementation plans do not establish priorit
   locked Pre-Site regeneration. The later Site Visit dossier/logistics and
   Final transaction remain separate.
 - **Production-deployed post-handoff receipt (2026-08-21; signed-in receipt
-  smoke open):** commit `b3bb0ef6`, Ready deployment
-  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, makes Pre-Site controls Draft-only.
+  smoke open):** commit `b3bb0ef6` first reached Production in Ready deployment
+  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes Pre-Site controls Draft-only.
   Review displays a read-only receipt with one Site Visit continuation action;
   later, unknown, and missing-link states fail closed. The public Workbench
   route passed its sign-in-boundary smoke; no signed-in post-release document

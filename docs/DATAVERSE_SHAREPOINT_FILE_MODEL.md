@@ -103,8 +103,8 @@ hood.
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
 - **Post-handoff UI ownership (Production-deployed 2026-08-21; signed-in receipt
-  smoke open):** commit `b3bb0ef6`, Ready deployment
-  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, limits Pre-Site working controls to Draft.
+  smoke open):** commit `b3bb0ef6` first reached Production in Ready deployment
+  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and limits Pre-Site working controls to Draft.
   Review becomes a handoff receipt whose one action routes to Site Visit; later
   and unknown lifecycle values fail closed. Site Visit owns Edit/Download for
   the active Review workspace.

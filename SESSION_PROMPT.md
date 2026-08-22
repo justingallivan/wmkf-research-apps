@@ -172,7 +172,9 @@ Site Visit handoff smoke first.
 
 10. **The post-handoff receipt is Production-deployed.**
    - Commit `b3bb0ef6` is on `main`; Vercel deployment
-     `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` is Ready with the Production aliases.
+     `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` was the first Ready Production
+     deployment carrying the receipt code. Later documentation-only deployments
+     do not change the runtime behavior recorded here.
    - Pre-Site Edit, Download, filename, and Regenerate controls are Draft-only.
      Review is a read-only receipt with one Site Visit continuation action and
      visible warning checklist; later, unknown, and missing-link states fail

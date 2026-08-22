@@ -107,8 +107,8 @@ sequence.
   and Edit, Download, and confirmation-guarded Regenerate actions when
   Ready/Draft. The signed-in Word Online v3 and compact-action/download smoke
   remain open. **[DEPLOYED TO PRODUCTION 2026-08-21; SIGNED-IN RECEIPT SMOKE
-  OPEN]** commit `b3bb0ef6`, Ready deployment
-  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, makes the promoted-state panel a
+  OPEN]** commit `b3bb0ef6` first reached Production in Ready deployment
+  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes the promoted-state panel a
   read-only handoff receipt with one Site Visit continuation action; later and
   unknown lifecycle states also fail closed. The production auth-boundary smoke
   redirected the Workbench route to the successful sign-in page.

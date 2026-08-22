@@ -53,8 +53,8 @@ SMOKE OPEN]** its compact action panel shows Generate before a draft
 exists and Edit, Download, and confirmation-guarded Regenerate actions only
 while the current Ready artifact remains Draft; detailed workflow guidance is
 behind an accessible help control. **[DEPLOYED TO PRODUCTION 2026-08-21;
-SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6`, Ready deployment
-`dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, makes the Pre-Site tab a read-only handoff
+SIGNED-IN RECEIPT SMOKE OPEN]** commit `b3bb0ef6` first reached Production in
+Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes the Pre-Site tab a read-only handoff
 receipt after Review with one `Continue in Site Visit` action. It moves any
 durable edit-check warnings inside that receipt and fails closed for later or
 unknown lifecycle values. Wave 19 is live in Production: its owner-approved
@@ -564,8 +564,8 @@ silently extend its paths or names to writeup publications.
    and locked Pre-Site regeneration. The service's post-write reread requires
    the exact publication version, governed hash, and milestone time to match.
 5. **Promoted-state receipt hardening — Production-deployed 2026-08-21;
-   signed-in receipt smoke open.** Commit `b3bb0ef6`, Ready deployment
-   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, restricts Pre-Site working controls to
+   signed-in receipt smoke open.** Commit `b3bb0ef6` first reached Production in
+   Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and restricts Pre-Site working controls to
    Draft, routes Review warnings and work to Site Visit, and fails closed for
    later/unknown states. The public Workbench route reached the successful
    sign-in page; no signed-in post-release document action was exercised.
