@@ -135,12 +135,12 @@ index and workflow surface, not a second editor or document store.
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
 
-**Owner-directed next-session override (2026-08-21):** Session 452 starts with
-the controlled signed-in smoke of the deployed Pre-Site-to-Site-Visit handoff.
-The exact request still requires explicit approval because the action changes
-the current governed artifact from Draft to Review and records a durable
-milestone. This bounded override does not advance the later Site Visit dossier,
-materials/logistics, or Final transaction.
+**Production proof completed 2026-08-21:** after explicit owner approval, the
+controlled signed-in Request `1002379` smoke promoted the current Pre-Site Word
+workspace from Draft to Review, retained the exact SharePoint Edit/Download
+identity, recorded the handoff milestone, and locked Pre-Site regeneration.
+The later Site Visit dossier, materials/logistics, and Final transaction remain
+separate slices.
 
 1. close the partially successful human-in-the-loop Initial Assessment pilot.
    Its 2026-08-10 target was a deliberately early **internal buffer, not an
@@ -181,12 +181,14 @@ materials/logistics, or Final transaction.
    WIDTH]** implicit wrapping was the remaining layout variable. **[DEPLOYED TO
    PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
    explicit no-wrap label, and the compact panel exposes Edit, Download, and
-   confirmation-guarded Regenerate actions; their signed-in smoke remains open; and
-3. smoke the deployed Site Visit handoff on an explicitly approved request,
-   proving that the same SharePoint item remains the working document and that
-   Dataverse records Review plus the complete handoff milestone. The broader
-   Site Visit dossier, narrow applicant-material upload, Final transaction, and
-   full Editor Dashboard remain later slices.
+   confirmation-guarded Regenerate actions; their signed-in smoke remains open.
+
+The deployed Site Visit handoff's controlled signed-in proof is complete on
+Request `1002379`: the same SharePoint item remains the working document,
+Review is current, the complete milestone is enforced by post-write readback,
+and regeneration is locked. The broader Site Visit dossier, narrow
+applicant-material upload, Final transaction, and full Editor Dashboard remain
+later slices.
 
 The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
 v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became

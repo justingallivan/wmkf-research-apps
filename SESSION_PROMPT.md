@@ -1,4 +1,4 @@
-# Session 452 Prompt: Site Visit Handoff Smoke First
+# Session 452 Prompt: Site Visit Handoff Smoke Completed
 
 ## Session 451 Summary
 
@@ -147,6 +147,29 @@ Site Visit handoff smoke first.
      limitation is closed rather than spawning a new sampler/table solely to
      satisfy the old measurement recipe.
 
+9. **The controlled Production Site Visit handoff smoke passed.**
+   - The owner explicitly approved Production Request `1002379` before the
+     durable action. The signed-in Workbench promoted the exact current
+     Pre-Site Word workspace from Draft to Review and displayed **Site Visit in
+     progress** with handoff time `8/21/2026, 5:22:36 PM`.
+   - The Site Visit and Pre-Site tabs retained the same exact filename and
+     SharePoint Edit/Download URL. A fresh page load independently returned the
+     Review state and timestamp; the Pre-Site tab removed regeneration and
+     identified the document as the Site Visit workspace.
+   - The transition service returns success only after its post-write reread
+     matches the exact SharePoint publication version, governed content hash,
+     and non-null milestone time. The browser did not print those opaque values,
+     so this evidence relies on that enforced service readback plus the fresh
+     authenticated GET, not a separate direct Production Dataverse probe.
+   - The broader Site Visit dossier/logistics and Final copy transaction remain
+     later slices. [VERIFIED via signed-in Production Workbench, same-item links,
+     fresh authenticated GET, and source-enforced post-write readback on
+     2026-08-21.]
+   - The nonexistent former domain was also removed from every tracked
+     source/doc/test reference and replaced with the established `wmkeck.org`
+     domain where an example or live app URL was intended. Commit `ec8ed1f`;
+     zero remaining literal matches, focused tests and documentation gates green.
+
 ### Commits
 
 - `997de04d` - feat(admin): guide reviewer repair alert resolution
@@ -172,30 +195,20 @@ Site Visit handoff smoke first.
 - `e15846c1` - feat(reviewers): show existing request context on find cards
 - `8c2fa489` - fix(reviewers): bound prior request context correctly
 - `561ec242` - docs(observability): close Track A safety watch
+- `ec8ed1f` - docs(domains): remove nonexistent former-domain references
 
 ## Next Items
 
 ### Verified Open
 
-1. **FIRST ACTION: run the Site Visit handoff smoke.**
-   Evidence: owner decision 2026-08-21,
-   `docs/CURRENT_WORK_QUEUE.md`, current `SiteVisitTab`, and
-   `pages/api/workbench/pre-site-visit/start-site-visit.js`. Begin by obtaining
-   explicit approval for the exact request if it has not already been supplied.
-   Then use the signed-in Workbench to promote that request's exact Ready/Draft
-   Pre-Site item, verify the same SharePoint item remains Edit/Download
-   authority, and read back Review plus the complete milestone in Dataverse.
-   This is an intentional durable write; do not substitute an unapproved
-   request or expand the smoke into dossier/logistics or Final work.
-
-2. **Observe Explorer campaign Phase B over normal use.**
+1. **Observe Explorer campaign Phase B over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Deployment,
    migration, exact schema/tracker readback, and one joined signed-in smoke are
    complete. Next: let organic staff requests accumulate, then run the
    aggregate probe to inspect outcome/round distribution and correlation
    completeness. Do not manufacture feedback or request traffic.
 
-3. **Observe Explorer campaign Phase A over normal use.**
+2. **Observe Explorer campaign Phase A over normal use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Phase A
    implementation report. Migration, deployment, and a signed-in two-round
    smoke are complete; usage rows proved both `tool_use` and `end_turn`
@@ -203,7 +216,7 @@ Site Visit handoff smoke first.
    distribution, output-at-cap events, and round latency against the prior
    6.5-second Sonnet average.
 
-4. **Observe Stage II Production outcomes through 2026-09-02.**
+3. **Observe Stage II Production outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` exact-on
    Production state and organic-observation window. Do not manufacture shared
    roster rows.

@@ -6,7 +6,7 @@ status: active
 summary: "Production-live Wave 19 schema, production-proved Pre-Site writer, and deployed Site Visit handoff contract."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -54,8 +54,8 @@ canonical-current lookups to its active Pre-Site and Final Word rows. There is
 no Site Visit writeup lookup because staff add Site Visit observations directly
 to the Pre-Site Word workspace.
 
-**[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the current Ready/Draft
-Pre-Site row now has a guarded Site Visit handoff writer. It changes that same
+**[PRODUCTION-PROVED 2026-08-21]** a guarded Site Visit handoff writer promotes
+the current Ready/Draft Pre-Site row. It changes that same
 row's lifecycle to Review and records the exact verified SharePoint publication
 version, governed DOCX hash, and handoff timestamp in the existing
 `wmkf_milestone*` fields. It creates no new row, lookup, or SharePoint item.
@@ -87,11 +87,11 @@ akoya_request
 | Claim | Strongest evidence | Status |
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
-| Production has four Request Document rows: three Initial Assessments and one Ready/Draft Pre Site Visit | Read-only production inventory after Request `1002379` generation on 2026-08-17 | VERIFIED LIVE |
+| The 2026-08-17 Production snapshot had four Request Document rows: three Initial Assessments and one Ready/Draft Pre Site Visit | Read-only production inventory after Request `1002379` generation on 2026-08-17; current count requires re-probe | VERIFIED HISTORICAL SNAPSHOT |
 | Prompt `pre-site-visit.proposal-core.generate` v4 is sole-current on `claude-sonnet-4-6` and exactly matches the tracked resilience contract | Audited Admin publication plus exact Production readback on 2026-08-18 | VERIFIED LIVE |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
-| The Workbench Pre-Site route persists a business draft | Request `1002379` created Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer | VERIFIED LIVE |
+| The Workbench Pre-Site route persists a business draft | Request `1002379` created Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer | VERIFIED HISTORICAL GENERATION PROOF |
 | Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
 | The metadata-only Wave 19 apply itself created a Pre-Site business row | Immediate post-apply inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE (historical apply boundary) |
 | The deployed writer later created the first Pre-Site business row | Post-generation inventory plus exact row/run/item/pointer readback for Request `1002379` | VERIFIED LIVE |
@@ -315,8 +315,12 @@ The deployed Site Visit transition is a separate authenticated service
 and route. It reads the current pointer and stable SharePoint item, performs no
 AI or SharePoint write, and updates only the current Request Document row. It
 also makes `generatePreSiteVisitArtifact` reject a promoted current row before
-input loading or any model/claim/render/upload side effect. The first signed-in
-Production handoff smoke remains open.
+input loading or any model/claim/render/upload side effect. After exact owner
+approval, signed-in Production Request `1002379` completed Draft→Review on
+2026-08-21, retained the same exact SharePoint Edit/Download identity, returned
+the handoff timestamp after a fresh authenticated GET, and locked regeneration.
+The success path's post-write reread requires the exact publication version,
+governed hash, and milestone time to match.
 
 ## Deployment and compatibility sequence
 

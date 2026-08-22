@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-20
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -90,7 +90,7 @@ hood.
 - **Workbench:** creates or finds the registered artifact, displays its state
   and preview, opens it in Word, and exposes authorized recovery/milestone
   actions.
-- **Site Visit handoff (deployed 2026-08-17; signed-in handoff smoke open):** keeps
+- **Site Visit handoff (Production-proved 2026-08-21):** keeps
   the same stable Pre-Site Word item, verifies one exact current SharePoint
   publication version around a DOCX download/hash, records the version/hash/time
   on the row, and moves lifecycle Draft→Review under its Dataverse ETag.
@@ -335,8 +335,11 @@ exact in Production. The immediate post-apply inventory reported only three
 Initial Assessment registry rows, so the schema apply itself created no
 business row. The deployed writer later created Ready/Draft Request `1002379`
 row `aeb223a2-849a-f111-b8db-70a8a59cded0`, stable SharePoint item
-`01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Current
-inventory is four rows: three Initial Assessments and one Pre Site Visit.
+`01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer. The
+dated 2026-08-17 inventory was four rows: three Initial Assessments and one Pre
+Site Visit. The 2026-08-21 signed-in handoff proves the current pointer is now
+Ready/Review; it did not refresh the aggregate count or expose the current row
+GUID.
 SharePoint Word remains authoritative for
 staff prose after document creation; the named Dataverse fields are the
 structured generation/automation representation and do not claim automatic
@@ -411,8 +414,12 @@ version.
 
 ### Site Visit dossier and transcript-derived artifacts
 
-The Site Visit Word-workspace handoff is built and locally verified but not
-deployed. The structured logistics and supporting-file dossier remains planned.
+The Site Visit Word-workspace handoff is Production-deployed and passed its
+controlled signed-in Request `1002379` Draft→Review smoke on 2026-08-21. The
+same SharePoint item remained the Edit/Download workspace; a fresh authenticated
+load returned Review plus the handoff time, and the service's post-write reread
+required the exact version/hash/time milestone. The structured logistics and
+supporting-file dossier remains planned.
 The full tab joins:
 
 - visit date;

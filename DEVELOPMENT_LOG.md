@@ -140,7 +140,10 @@ document-listing expansion, owner-directed promotion).
 changes Draft→Review under ETag, locks regeneration, and keeps the same Word item. The Proposal tab
 lists exact `Phase II` folder files with scoped View/Download; deployment
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM` is READY. The signed-in Request `1002379`
-live-folder View/Download smoke passed on 2026-08-20; the mutating handoff smoke remains.
+live-folder View/Download smoke passed on 2026-08-20. After exact owner approval,
+the controlled Draft→Review handoff passed on 2026-08-21: the same SharePoint
+Edit/Download identity remained current, a fresh authenticated load returned the
+handoff timestamp, and Pre-Site regeneration was locked.
 **Why it matters:** PDs can continue editing one Word workspace through the visit without a parallel
 Site Visit memo, while staff can finally read both Phase I and Phase II submissions in one request.
 **Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`;

@@ -231,11 +231,12 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- **Next-session override (owner decision 2026-08-21):** begin Session 452
-  with the signed-in smoke of the deployed Pre-Site-to-Site-Visit handoff on
-  an explicitly approved request. It writes Draft→Review and a durable
-  milestone, so exact request approval remains the first prerequisite. This
-  does not promote the later Site Visit dossier/logistics or Final transaction.
+- **Production-proved Site Visit handoff (2026-08-21):** after exact owner
+  approval, signed-in Request `1002379` moved the current Pre-Site Word
+  workspace Draft→Review, kept the same SharePoint Edit/Download identity,
+  recorded the complete milestone under the service's post-write readback, and
+  locked Pre-Site regeneration. The later Site Visit dossier/logistics and
+  Final transaction remain separate.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
 - Current near-term sequence: synthesis lifecycle closure → governed artifact
@@ -289,9 +290,11 @@ document inventory, and individual implementation plans do not establish priorit
   stable Word-link UI. Request `1002379` then created Ready/Draft row
   `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run
   `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item
-  `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Exact
-  Ready retry reused the same identities; current inventory is four Request
-  Documents, including one Pre Site Visit.
+  `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer. Exact
+  Ready retry reused the same identities; the dated 2026-08-17 inventory was
+  four Request Documents, including one Pre Site Visit. The 2026-08-21
+  signed-in handoff proves the current pointer is now Ready/Review; it did not
+  refresh the aggregate count or expose the current row GUID.
 - Pre-Site input direction (owner-decided 2026-08-17; source/test contract
   revised 2026-08-17): draft factual material from the exact AI Materials
   narrative only through governed `pre-site-visit.proposal-core.generate`;

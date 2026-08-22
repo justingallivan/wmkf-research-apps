@@ -136,10 +136,13 @@ items exact and zero divergent. **[VERIFIED IN PRODUCTION 2026-08-17]** commit
 `abfe5529` deployed the Request Document adapter and Pre-Site writer. Request
 `1002379` created Ready/Draft row `aeb223a2-849a-f111-b8db-70a8a59cded0`,
 governed v3 AI run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable SharePoint
-item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Its
+item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer. Its
 input manifest has exactly one Proposal Narrative source and no bibliography.
-Exact retry reused the same row/run/item. Current inventory reports four rows:
-three Initial Assessments and one Pre Site Visit, all Ready/Draft. There is
+Exact retry reused the same row/run/item. The dated 2026-08-17 inventory
+reported four rows: three Initial Assessments and one Pre Site Visit, all then
+Ready/Draft. The 2026-08-21 signed-in handoff proves the current pointer is now
+Ready/Review; it did not refresh the aggregate count or expose the current row
+GUID. There is
 intentionally no Site Visit writeup pointer: staff observations remain direct
 edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
@@ -156,15 +159,16 @@ Exact design and deployment boundary:
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
 - `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and the
-  Production writer uses it as the current-pointer/fence. Request `1002379`
-  points to Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`.
+  Production writer/transition use it as the current-pointer/fence. Request
+  `1002379` now resolves through that pointer to the Ready/Review Site Visit
+  workspace; the 2026-08-21 browser proof did not expose its row GUID.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
   independent Final Word row. Final will record the exact source Pre-Site
   row/version/hash; no writer populates this lookup yet.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
-- **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** the Site Visit transition
+- **[PRODUCTION-PROVED 2026-08-21]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version
   around DOCX download/hash, then ETag-conditionally sets lifecycle Review and
@@ -307,7 +311,10 @@ transition.
    recycle recovery also pass. Workbench version-history display shipped S413
    (2026-08-10, read-only). Administrator policy/access evidence, administrator
    restore, and retained Board snapshot copies remain open. The separate
-   Pre-Site→Site Visit lifecycle milestone writer is deployed; the first
-   controlled signed-in Draft→Review transition and readback remain open.
+   Pre-Site→Site Visit lifecycle milestone writer is deployed and the first
+   controlled signed-in Draft→Review transition passed on Request `1002379`.
+   The same exact SharePoint Edit/Download identity remained current, a fresh
+   authenticated load returned the handoff time and Review state, and the
+   service post-write reread required the exact version/hash/time milestone.
 
 No live command in this sequence is authorized merely by this page.

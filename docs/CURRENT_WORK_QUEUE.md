@@ -32,18 +32,10 @@ it is approved backlog.
 Work these items in order unless an operational incident or explicit owner decision changes the
 sequence.
 
-**Next-session override (owner decision 2026-08-21):** Begin Session 452 with
-the signed-in Site Visit handoff smoke in item 3. First obtain the exact
-request approval, then prove the same SharePoint item remains the Edit/Download
-authority and Dataverse records Review plus a complete handoff milestone. This
-is a bounded session-order decision; it does not silently prioritize the later
-Site Visit dossier/logistics or Final transaction.
-
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
 | 1 | Close the remaining Initial Assessment pilot gates | **[VERIFIED IN SOURCE 2026-08-16]** Initial Assessment and Field Primer now require the exact active `AI Materials/ProposalNarrative_{Request#}.pdf`; a read-only live Request `1002788` extraction returned non-empty text. No governed artifact was generated from that new source in this change. Earlier Requests `1002788` and `1003109` remain production evidence for artifact mechanics, lineage, exact-input reuse, interrupted-finalization recovery, and attributed editing, but their older Phase I/Reviewer Materials inputs are superseded. Both artifact consumers still resolve the same stable item. Graph-current metadata display is live; a disposable production-library probe also proved previous-version inspection/restore and signed-in first-stage recycle recovery. Before declaring the pilot gate complete, obtain administrator evidence for version limits, second-stage recovery, Purview retention, and editor least privilege, then implement Workbench administrator restore and milestone snapshots. **IT screenshots 2026-08-20 (S448) closed most administrator evidence:** version policy fully read (major-only, keep 500, no age limit); the second-stage recycle bin exists and held both 2026-07-30 probe files, refuting the 2026-08-10 "no second-stage bin" report; Members hold the built-in **Edit** level ("limited control" was a pane caption) and the connected M365 group is **Public**, so any internal user presumptively can edit/delete. Purview retention and the Edit level's exact Delete flags remain open and owner-accepted-open absent a pressing need. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` audit section and `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` item 5. | Current metadata, native version restore, and first-stage recovery are proven; administrator policy/access evidence and product history/milestone controls are recorded or completed. |
 | 2 | First deadline-bound writeup slice | **[VERIFIED IN PRODUCTION 2026-08-17]** Request `1002379` proved the exact Proposal Narrative, authoritative Dataverse metadata, governed generation, durable Ready row, stable Word upload, current pointer, and exact no-duplicate retry; the bibliography remains excluded. **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]** Application commit `46903bc4` and Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4` add the resilience contract, durable edit-check warnings, guarded unchanged retry, typed support references, and render contract v5. Sole-current prompt v4 `74409f95-509b-f111-b8db-6045bd008868` on `claude-sonnet-4-6` exact-readback matches body, system prompt, variables, output schema, temperature, and token budget. Release verification generated no request artifact and performed no SharePoint write. | Run one explicitly approved signed-in generation proving Ready-with-warning and one hard-failure case, then verify the Dataverse envelope/run/item/pointer and exact no-duplicate retry. Controlled partial-failure recovery and the full Editor Dashboard remain later proof/reuse. |
-| 3 | Promote the Pre-Site draft into the Site Visit workspace | **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN HANDOFF SMOKE OPEN]** Commit `32b16f5f` reached Ready deployment `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`. The Site Visit tab and authenticated transition route reuse the current Pre-Site SharePoint item, verify a stable exact publication version around DOCX download/hash, ETag-conditionally change the current row from Draft to Review, record the `wmkf_milestone*` handoff version/hash/time, and lock Pre-Site regeneration before any AI or mutation. Focused tests cover success, idempotency, stale browser state, file/version races, ETag conflicts, unknown states, and request-switch races. Commit `5f316a29` and Ready deployment `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm` add the separate Pre-Site next-stage panel and explanatory confirmation modal that calls the same guarded route. | Run a signed-in controlled handoff smoke on an explicitly approved request, proving the same item remains Edit/Download authority and Dataverse readback contains Review plus a complete milestone. Supporting files/logistics and Final remain separate later slices. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 
@@ -86,6 +78,16 @@ Site Visit dossier/logistics or Final transaction.
   Full record with slot/junction ids: `outputs/phantom-copi-incident-2026-08-12.md`.
 
 ## Completed in this execution
+
+- Site Visit workspace handoff: **[PRODUCTION-PROVED 2026-08-21]** after the
+  owner's exact approval, signed-in Request `1002379` transitioned its current
+  Pre-Site Word workspace from Draft to Review. Site Visit and Pre-Site retained
+  the same exact SharePoint Edit/Download URL and filename; a fresh authenticated
+  GET returned **Site Visit in progress** with handoff time
+  `8/21/2026, 5:22:36 PM`, and Pre-Site regeneration was locked. The service's
+  success path includes a post-write reread that requires the exact publication
+  version, governed hash, and milestone time to match. Supporting-file dossier,
+  logistics, and Final remain separate later slices.
 
 - Pre-Site durable-generation production proof: commit `abfe5529` reached Ready
   Vercel deployment `dpl_CF7ia9TYyT5ZU5hyv2TNWUYnPb3H`. Signed-in Request

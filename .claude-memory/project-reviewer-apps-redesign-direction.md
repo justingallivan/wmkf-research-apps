@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has Production-proved Pre-Site and Initial Assessment writers plus a deployed Site Visit handoff; Final remains planned.
+description: The unified Request Workbench has Production-proved Pre-Site and Initial Assessment writers plus a Production-proved Site Visit handoff; Final remains planned.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-20 via signed-in Request 1002379 Phase II filename/View/Download smoke, Ready resilience deployment, sole-current prompt-v4 exact readback, and Dataverse/SharePoint lineage readback
+  last_verified: 2026-08-21 via signed-in Request 1002379 Site Visit Draft→Review handoff, same-item Edit/Download, fresh authenticated status readback, and regeneration lock
 ---
 
 ## Recall Rule
@@ -90,7 +90,7 @@ three Initial Assessment rows and no Pre-Site row. Commit `abfe5529` then
 deployed the durable adapter/writer, JSON route, and stable Word-link UI.
 Signed-in Request `1002379` created Ready/Draft row
 `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 AI run
-`ba0f42b9-849a-f111-b8db-6045bd008868`, the request pointer, and stable Word
+`ba0f42b9-849a-f111-b8db-6045bd008868`, the then-current request pointer, and stable Word
 item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Its input manifest contains only
 the Proposal Narrative; exact Ready retry reused the same identities.
 **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]**
@@ -114,7 +114,7 @@ signed-in current-status, compact actions/download, and Word Online v3 proof
 remain open.
 
 **2026-08-17 Site Visit handoff implementation (deployed at `32b16f5f`,
-`dpl_85CjVsicns1rA6VxJzsJdkXigoTw`; signed-in handoff smoke open):** the Site
+`dpl_85CjVsicns1rA6VxJzsJdkXigoTw`; Production-proved 2026-08-21):** the Site
 Visit tab shows the current Ready/Draft Pre-Site Word item and a
 confirmation-guarded `Start Site Visit Stage` action. The
 server independently resolves `wmkf_CurrentPreSiteVisit`, treats the client
@@ -127,8 +127,13 @@ Exact Review retries are idempotent; stale identity, file/version races,
 unknown/incomplete states, and ETag conflicts fail closed. Commit `5f316a29`
 deployed the clearer Pre-Site next-stage panel and explanatory consequence
 modal through Ready deployment `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`; it calls
-the same guarded route. The first signed-in handoff smoke remains open;
-logistics/supporting files and Final remain later slices.
+the same guarded route. After exact owner approval, signed-in Request `1002379`
+completed Draft→Review on 2026-08-21, retained the same SharePoint
+Edit/Download identity, returned **Site Visit in progress** and the handoff
+timestamp on a fresh authenticated load, and locked Pre-Site regeneration. The
+service's post-write reread requires the exact publication version, governed
+hash, and non-null milestone time. Logistics/supporting files and Final remain
+later slices.
 
 **2026-08-17 Proposal-tab Phase II documents (deployed at `83b9c68a`,
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM`):** the Proposal tab now displays every
@@ -210,8 +215,9 @@ planned. Current authority is
   Initial Assessment, Pre Site Visit Writeup, Reviewers, Reviews, Status,
   Awardee, and Site Visit) and one placeholder (Final Writeup). **[PRODUCTION-LIVE 2026-08-17]** Pre
   Site Visit Writeup has a durable registry-backed route/UI and controlled
-  Request `1002379` proof. **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN
-  HANDOFF SMOKE OPEN]** Site Visit has the guarded same-item handoff/workspace UI; Final remains a
+  Request `1002379` proof. **[PRODUCTION-PROVED 2026-08-21]** Site Visit has the
+  guarded same-item handoff/workspace UI and Request `1002379` completed the
+  Draft→Review transition with fresh same-item status readback; Final remains a
   placeholder.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and

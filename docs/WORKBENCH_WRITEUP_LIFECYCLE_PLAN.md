@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -22,7 +22,7 @@ related:
 ## Decision and current status
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
-HANDOFF DEPLOYED; SIGNED-IN HANDOFF SMOKE OPEN; FINAL PLANNED.]** The three Workbench
+HANDOFF PRODUCTION-PROVED 2026-08-21; FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -71,10 +71,10 @@ or changing a request artifact.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site, the Site Visit handoff, and the clearer Pre-Site handoff modal are Production-deployed, while Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, and signed-in Request `1002379` Pre-Site evidence | DEPLOYED / SIGNED-IN HANDOFF SMOKE OPEN |
+| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site, the Site Visit handoff, and the clearer Pre-Site handoff modal are Production-deployed, while Final remains a placeholder | Workbench source, Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw` and `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, focused service/route/component tests, and signed-in Request `1002379` Draft→Review handoff with fresh authenticated same-item status readback on 2026-08-21 | PRODUCTION-PROVED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
-| Production contains one Ready/Draft Pre-Site Request Document row for Request `1002379` | Read-only Production inventory and exact row/pointer readback | VERIFIED LIVE |
+| Request `1002379` has one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; current row GUID was not exposed by the browser proof | VERIFIED LIVE |
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
 | Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
@@ -351,14 +351,17 @@ current writeup pointer always targets Word, never PDF.
    Generate before a draft exists; Edit, Download, and confirmation-guarded
    Regenerate when Ready. Signed-in current-status, action-panel, download, and
    Word Online v3 proof remain open.
-4. **Site Visit Word-workspace handoff — deployed 2026-08-17; signed-in handoff
-   smoke open.** Commit `32b16f5f` reached Ready production deployment
+4. **Site Visit Word-workspace handoff — Production-proved 2026-08-21.**
+   Commit `32b16f5f` reached Ready production deployment
    `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`. The Site Visit tab confirms the action,
    records the exact stable Word version/hash/time under an ETag fence, reuses
    the same item for Edit/Download, and locks Pre-Site regeneration. A clearer
    Pre-Site next-stage panel and consequence modal are deployed in commit
-   `5f316a29`. The controlled signed-in
-   Draft→Review handoff and Dataverse/SharePoint readback remain open.
+   `5f316a29`. After exact owner approval, signed-in Request `1002379`
+   completed Draft→Review, retained the same exact SharePoint Edit/Download
+   identity, returned the handoff timestamp after a fresh authenticated GET,
+   and locked Pre-Site regeneration. The service's post-write reread requires
+   the exact publication version, governed hash, and milestone time to match.
 5. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 6. **Site Visit dossier.** Implement governed supporting-file listing/upload
