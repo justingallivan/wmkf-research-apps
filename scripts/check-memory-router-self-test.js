@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { registerTmpFixture } = require('./lib/selftest-fixture');
-const { validateStore, MAX_LINES, TARGET_BYTES, WARN_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
+const { validateStore, MAX_LINES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN } = require('./check-memory-router.js');
 
 let failures = 0;
 function assert(cond, label) {
@@ -148,8 +148,65 @@ const goodTopic = '---\nname: x\ndescription: y\nmetadata:\n  type: project\n  s
   assert(warnings.some((w) => w.includes('hard cap')), 'early-warning band warns');
 }
 
+// Exact-byte fixture builder for the notice-band cases: '# Router\n' (9 bytes)
+// + filler + '\n'. The filler line does not start with '- ', so the prose cap
+// never applies; line count stays tiny.
+function exactBytesStore(targetBytes) {
+  const header = '# Router\n';
+  const body = header + 'x'.repeat(targetBytes - Buffer.byteLength(header, 'utf8') - 1) + '\n';
+  if (Buffer.byteLength(body, 'utf8') !== targetBytes) {
+    throw new Error(`fixture builder produced ${Buffer.byteLength(body, 'utf8')} bytes, wanted ${targetBytes}`);
+  }
+  return body;
+}
+
+// 11 (plan fixture a). Exactly NOTICE_BYTES → exactly one notice warning, no
+// errors — pins the >= comparator at the boundary.
+{
+  const dir = mkStore(exactBytesStore(NOTICE_BYTES), { 'a.md': goodTopic });
+  const { errors, warnings } = validateStore(dir);
+  assert(errors.length === 0, 'exact NOTICE_BYTES store does not fail');
+  assert(warnings.filter((w) => w.includes('routine-audit trigger')).length === 1, 'exact NOTICE_BYTES store gets exactly one notice');
+  assert(!warnings.some((w) => w.includes('hard cap')), 'exact NOTICE_BYTES store gets no near-cap warning');
+}
+
+// 12 (plan fixture b). One byte under NOTICE_BYTES → no byte warning at all.
+{
+  const dir = mkStore(exactBytesStore(NOTICE_BYTES - 1), { 'a.md': goodTopic });
+  const { errors, warnings } = validateStore(dir);
+  assert(errors.length === 0, 'sub-notice store does not fail');
+  assert(warnings.length === 0, 'sub-notice store gets no byte warning');
+}
+
+// 13 (plan fixture c). Inside the notice band (well under WARN_BYTES) →
+// notice text, not near-cap text.
+{
+  const dir = mkStore(exactBytesStore(NOTICE_BYTES + 108), { 'a.md': goodTopic });
+  const { errors, warnings } = validateStore(dir);
+  assert(errors.length === 0, 'notice-band store does not fail');
+  assert(warnings.some((w) => w.includes('routine-audit trigger')), 'notice-band store gets the notice');
+  assert(!warnings.some((w) => w.includes('hard cap')), 'notice-band store gets no near-cap warning');
+}
+
+// 14 (plan fixture d). One byte over WARN_BYTES → near-cap warning ONLY
+// (ladder exclusivity: the notice must not also fire).
+{
+  const dir = mkStore(exactBytesStore(WARN_BYTES + 1), { 'a.md': goodTopic });
+  const { errors, warnings } = validateStore(dir);
+  assert(errors.length === 0, 'warn-band store does not fail');
+  assert(warnings.some((w) => w.includes('hard cap')), 'warn-band store gets the near-cap warning');
+  assert(!warnings.some((w) => w.includes('routine-audit trigger')), 'warn-band store does not also get the notice');
+}
+
+// 15 (plan fixture e). Threshold ladder ordering + numeric sanity — a future
+// edit to the thresholds module cannot silently invert or corrupt the ladder.
+{
+  assert(Number.isFinite(NOTICE_BYTES) && Number.isFinite(WARN_BYTES) && Number.isFinite(TARGET_BYTES), 'thresholds are finite numbers');
+  assert(NOTICE_BYTES < WARN_BYTES && WARN_BYTES < TARGET_BYTES, 'NOTICE_BYTES < WARN_BYTES < TARGET_BYTES ordering holds');
+}
+
 if (failures) {
   console.error(`memory-router self-test FAILED — ${failures} case(s).`);
   process.exit(1);
 }
-console.log('memory-router self-test OK — 14/14 cases behaved as expected.');
+console.log('memory-router self-test OK — 19/19 cases behaved as expected.');

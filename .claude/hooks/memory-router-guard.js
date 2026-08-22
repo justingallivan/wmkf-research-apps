@@ -22,15 +22,26 @@
 const fs = require('fs');
 const path = require('path');
 
-let THRESH;
+// Thresholds come ONLY from the dependency-free constants module — no local
+// fallback literals (they were drift-capable copies; see
+// docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md Phase 2). If the module is missing
+// or invalid, THRESH stays null and the guard exits without blocking
+// (fail-open); check:memory-router fails loudly in the same breakage.
+let THRESH = null;
 try {
-  THRESH = require('../../scripts/check-memory-router.js');
+  const t = require('../../scripts/lib/memory-router-thresholds.js');
+  if (
+    [t.TARGET_BYTES, t.MAX_LINES, t.MAX_PROSE_LEN].every(Number.isFinite) &&
+    t.MAX_PROSE_LEN > 0 && t.MAX_LINES > 0 && t.TARGET_BYTES > 0
+  ) {
+    THRESH = t;
+  }
 } catch {
-  THRESH = {};
+  THRESH = null;
 }
-const TARGET_BYTES = THRESH.TARGET_BYTES || 12 * 1024;
-const MAX_LINES = THRESH.MAX_LINES || 150;
-const MAX_PROSE_LEN = THRESH.MAX_PROSE_LEN || 200;
+const TARGET_BYTES = THRESH && THRESH.TARGET_BYTES;
+const MAX_LINES = THRESH && THRESH.MAX_LINES;
+const MAX_PROSE_LEN = THRESH && THRESH.MAX_PROSE_LEN;
 
 // Same prose measurement as the gate: drop `.md` refs + separators, then size.
 function proseLen(line) {
@@ -88,6 +99,7 @@ let input = '';
 process.stdin.on('data', (chunk) => { input += chunk; });
 process.stdin.on('end', () => {
   try {
+    if (!THRESH) return; // thresholds unavailable/invalid → fail open, never block
     const data = JSON.parse(input || '{}');
     if (!data || (data.tool_name !== 'Write' && data.tool_name !== 'Edit')) return;
     const root = path.resolve(data.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd());

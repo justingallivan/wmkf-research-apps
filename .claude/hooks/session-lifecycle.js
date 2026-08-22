@@ -276,16 +276,37 @@ function unresolvedAdversarialReviewRequirements(root, state) {
 // the wiki is the retrieval launch-pad, but only if agents are reminded to read
 // it during planning, not just when a watched path is edited) and surface memory
 // router pressure early, before the write-time guard has to block an edit.
+function routerThresholds() {
+  // Single-sourced from the dependency-free constants module — no local
+  // fallback literals (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md Phase 2).
+  // Returns null when unavailable/invalid; callers skip their router notes
+  // (fail-open) and the check:memory-router gate remains the loud backstop.
+  try {
+    const t = require('../../scripts/lib/memory-router-thresholds.js');
+    if (
+      [t.NOTICE_BYTES, t.WARN_BYTES, t.TARGET_BYTES].every(Number.isFinite) &&
+      t.NOTICE_BYTES < t.WARN_BYTES && t.WARN_BYTES < t.TARGET_BYTES
+    ) {
+      return t;
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
 function wikiAndRouterNotes(root) {
   const notes = [
     'Agent wiki: for reviewer-finder, external-reviewer portal, intake, or Dataverse/Dynamics work, read docs/agent-wiki/index.md first — it routes to the source files, Atlas pages, and prior hazards for that domain before you edit, and is the cheap home for domain detail. Update the matching topic page when you change durable behavior.',
   ];
+  const thresholds = routerThresholds();
+  if (!thresholds) return notes; // skip the size note; gate stays the backstop
   try {
     const memBytes = fs.statSync(path.join(root, '.claude-memory', 'MEMORY.md')).size;
-    const CAP = 12 * 1024;
-    const WARN = 11 * 1024;
-    if (memBytes > WARN) {
-      notes.push(`Memory router pressure: .claude-memory/MEMORY.md is ${memBytes}B, within ${CAP - memBytes}B of the ${CAP}B hard cap. Put the next domain's detail in a docs/agent-wiki/topics/ page and add only a terse router line — the write-time guard will block a bloating edit.`);
+    if (memBytes > thresholds.WARN_BYTES) {
+      notes.push(`Memory router pressure: .claude-memory/MEMORY.md is ${memBytes}B, within ${thresholds.TARGET_BYTES - memBytes}B of the ${thresholds.TARGET_BYTES}B hard cap. Put the next domain's detail in a docs/agent-wiki/topics/ page and add only a terse router line — the write-time guard will block a bloating edit.`);
+    } else if (memBytes >= thresholds.NOTICE_BYTES) {
+      notes.push(`Memory router notice: .claude-memory/MEMORY.md is ${memBytes}B, at/over the ${thresholds.NOTICE_BYTES}B routine-audit trigger. Run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10 (routine audit §6) before the ${thresholds.WARN_BYTES}B warn band.`);
     }
   } catch {
     // MEMORY.md unreadable; skip the pressure note.

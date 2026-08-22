@@ -43,11 +43,18 @@ const path = require('path');
 const MEM_DIR = path.join(__dirname, '..', '.claude-memory');
 const MEMORY_MD = path.join(MEM_DIR, 'MEMORY.md');
 
-const MAX_LINES = 150;        // hard cap (plan: stay below even after growth)
-const MAX_BYTES = 18 * 1024;  // legacy ceiling (retained for API stability; unreachable — TARGET fails first)
-const TARGET_BYTES = 12 * 1024; // hard cap (hardened 2026-06-10; was warn-only)
-const WARN_BYTES = 11 * 1024; // early-warning band below the cap (warns, does not fail)
-const MAX_PROSE_LEN = 200;    // per `- ` router entry, after stripping `.md` refs + separators
+// Thresholds are single-sourced from scripts/lib/memory-router-thresholds.js
+// (docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md Phase 1). Re-exported below for
+// API stability — the write-time guard and the self-test import them from
+// this module.
+const {
+  MAX_LINES,
+  MAX_BYTES,
+  TARGET_BYTES,
+  WARN_BYTES,
+  NOTICE_BYTES,
+  MAX_PROSE_LEN,
+} = require('./lib/memory-router-thresholds.js');
 const VALID_STATUS = new Set(['active', 'stale', 'closed', 'superseded']);
 
 /**
@@ -73,6 +80,8 @@ function validateStore(memDir) {
     errors.push(`MEMORY.md is ${bytes} bytes (over the ${TARGET_BYTES}-byte cap).`);
   } else if (bytes > WARN_BYTES) {
     warnings.push(`MEMORY.md is ${bytes} bytes, within ${TARGET_BYTES - bytes}B of the ${TARGET_BYTES}B hard cap — route the next domain's detail to a docs/agent-wiki/topics/ page, not a new router line.`);
+  } else if (bytes >= NOTICE_BYTES) {
+    warnings.push(`MEMORY.md is ${bytes} bytes, at/over the ${NOTICE_BYTES}-byte routine-audit trigger — run the router diet per docs/MEMORY_HYGIENE_RUNBOOK.md §10 before the ${WARN_BYTES}-byte warn band.`);
   }
 
   // Router-prose density: a `- ` entry whose prose (file refs + separators
@@ -152,6 +161,6 @@ function main() {
   console.log(`memory-router OK — MEMORY.md ${Buffer.byteLength(raw, 'utf8')} bytes / ${raw.split('\n').length} lines; ${topicCount} topic file(s), all links resolve + all carry a valid status.`);
 }
 
-module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, WARN_BYTES, MAX_PROSE_LEN, VALID_STATUS };
+module.exports = { validateStore, MAX_LINES, MAX_BYTES, TARGET_BYTES, WARN_BYTES, NOTICE_BYTES, MAX_PROSE_LEN, VALID_STATUS };
 
 if (require.main === module) main();
