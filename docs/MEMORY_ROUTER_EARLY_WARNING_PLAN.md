@@ -45,10 +45,14 @@ two findings, both accepted and fixed in the commit carrying this note.**
    blocker cases were verified to FAIL against the pre-fix hook.
 2. **Mutation tests accepted any exception (medium).** The T1 mutation loop
    treated every throw from the contract assertion — including fixture or
-   spawn infrastructure failures — as detection. Fixed: each mutation now
-   carries a deviation oracle proving the mutant ran end-to-end and produced
-   its specific wrong output, and the contract rejection must be a genuine
-   `ERR_ASSERTION`.
+   spawn infrastructure failures — as detection. Fixed in two rounds: the
+   first fix added a per-mutation deviation oracle plus an
+   `ERR_ASSERTION`-only rejection, but a fifth review showed the rejection
+   still ran a SECOND execution whose own spawn failure converted to
+   `ERR_ASSERTION`. Final form: exactly one execution per mutant — spawn
+   health, the deviation oracle, and an explicit violates-the-exact-contract
+   check (`notDeepStrictEqual` against the same fixture's expected object)
+   all read the same result.
 
 v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
 became a single-emission aggregation path; the crossing predicate became

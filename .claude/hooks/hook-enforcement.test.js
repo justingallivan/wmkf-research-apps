@@ -858,10 +858,13 @@ function mrParseSingleJson(stdout) {
   return parsed;
 }
 
-// The full T1 contract for one hook file: exact object + exit status per
-// path. Returns nothing on success; throws on any deviation — reused verbatim
-// by the mutation subruns, which must make it throw.
-function mrAssertCombinedContract(hookFile) {
+// One combined-path execution for one hook file, returning both the exact
+// expected contract (computed from the same fixture) and the actual result.
+// The mutation subruns use ONE such execution per mutant: spawn health, the
+// deviation oracle, and the contract-violation check all read the same
+// result, so a second execution's infrastructure failure can never
+// masquerade as contract rejection.
+function mrCombinedRun(hookFile) {
   const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
   const expected = {
     hookSpecificOutput: {
@@ -869,7 +872,12 @@ function mrAssertCombinedContract(hookFile) {
       additionalContext: `${mrExpectedGateAdvisory(fx.root)}\n\n${mrCrossingText(7000, 9000)}`,
     },
   };
-  const result = fx.runStop({}, hookFile);
+  return { expected, result: fx.runStop({}, hookFile) };
+}
+
+// The full T1 contract for one hook file: exact object + exit status.
+function mrAssertCombinedContract(hookFile) {
+  const { expected, result } = mrCombinedRun(hookFile);
   assert.strictEqual(result.status, 0, result.stderr);
   assert.deepStrictEqual(mrParseSingleJson(result.stdout), expected);
 }
@@ -954,18 +962,21 @@ test('T1 mutations: each seeded defect produces its specific deviation and fails
     const mutantPath = path.join(HOOK_DIR, `session-lifecycle.mutant-${Date.now()}-${Math.random().toString(16).slice(2)}.js`);
     fs.writeFileSync(mutantPath, source.replace(find, replace));
     try {
-      // 1. Deviation oracle: the mutant spawns, runs the combined path, and
-      //    produces its specific wrong behavior.
-      const fx = mrFixture({ routerStart: 7000, routerNow: 9000, touchRouter: true, gate: 'fail' });
-      const result = fx.runStop({}, mutantPath);
+      // ONE execution per mutant — spawn health, deviation oracle, and the
+      // contract-violation check all read this same result, so no separate
+      // run's infrastructure failure can be mistaken for detection.
+      const { expected, result } = mrCombinedRun(mutantPath);
+      // 1. Spawn health: an infrastructure failure fails loudly here.
       assert.strictEqual(result.error, undefined, `mutant process spawned: ${label}`);
+      // 2. Deviation oracle: the mutant produced its specific wrong output.
       expectDeviation(result);
-      // 2. Contract rejection: the T1 assertion fails on the mutant with a
-      //    genuine assertion error, not an incidental exception.
-      assert.throws(
-        () => mrAssertCombinedContract(mutantPath),
-        (err) => err && err.code === 'ERR_ASSERTION',
-        `contract rejects the mutant via assertion failure: ${label}`
+      // 3. The same execution violates the exact T1 contract.
+      let body = null;
+      try { body = mrParseSingleJson(result.stdout); } catch { body = null; }
+      assert.notDeepStrictEqual(
+        { status: result.status, body },
+        { status: 0, body: expected },
+        `mutant output violates the exact contract: ${label}`
       );
     } finally {
       fs.rmSync(mutantPath, { force: true });
