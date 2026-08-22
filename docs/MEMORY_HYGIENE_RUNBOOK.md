@@ -102,7 +102,7 @@ Run the **routine audit** when ANY of:
 | Trigger | Check | Rationale |
 |---|---|---|
 | Calendar | ~2 weeks since the last routine audit | half the observed diet period keeps the router below the warn band |
-| Router size | `MEMORY.md` ≥ 8,192 B (the gate's OK line prints the size) | crossed silently on 2026-08-15; observed regrowth ≈166–500 B/day |
+| Router size | `MEMORY.md` ≥ 8,192 B (the gate's OK line prints the size) | crossed silently on 2026-08-13; observed regrowth ≈166–500 B/day |
 | Health findings | `check:memory-health` flagged files ≥ 5 | steady inflow; resets do not persist |
 | Store growth | ≥ 25 new leaf files since the last audit | roughly one month of observed inflow |
 | Drift report | committed report older than 24 h **and** a session needs to cite "drift clean" | the checker itself warns; do not cite a stale report silently |

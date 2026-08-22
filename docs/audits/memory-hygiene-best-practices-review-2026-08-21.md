@@ -113,7 +113,10 @@ Key verified mechanics:
   historical audit anchor).
 - **Session lifecycle hook** (`.claude/hooks/session-lifecycle.js`): SessionStart
   emits the wiki-routing note and a router-pressure note **only above the 11 KiB
-  warn band**; Stop runs changed-surface gates (advisory by default), enforces
+  warn band** — note this hook hardcodes its own 11/12 KiB constants
+  (`session-lifecycle.js:286-287`) rather than importing the checker's exports,
+  so a threshold change must touch it separately (see R3); Stop runs
+  changed-surface gates (advisory by default), enforces
   same-session doc-staleness markers and adversarial-review receipts for
   high-risk docs.
 - **Storage invariant:** durable memory lives in git-tracked `.claude-memory/`;
@@ -136,7 +139,7 @@ Router size trajectory, measured directly from git (`git show
 | 2026-07-02 | (audit) | 11,255 → 5,941 | Slice 1 router diet (control audit) |
 | 2026-07-08 | (S348) | 8,149 | +~368 B/day since diet |
 | 2026-07-29 | `813da56a` | 11,298 → 5,175 | semantic reconciliation diet (~198 B/day regrowth over 27 days) |
-| 2026-08-21 | `053bd9f9` | 8,991 | +3,816 B in 23 days (~166 B/day); 66 lines; passed 8 KiB on 2026-08-15 |
+| 2026-08-21 | `053bd9f9` | 8,991 | +3,816 B in 23 days (~166 B/day); 66 lines; passed 8 KiB on 2026-08-13 (`840d082d` = 8,193 B) |
 
 Leaf store and advisory-signal trajectory (from the prior audits, each verified
 against its own document):
@@ -148,7 +151,7 @@ against its own document):
 | 2026-07-08 | 211 | 129 → 124 flagged (advisory shipped this day) | `docs/audits/memory-triage-2026-07-08.md` |
 | 2026-07-22 | — | 117 → 97 flagged | `docs/audits/memory-health-evidence-triage-2026-07-22.md` |
 | 2026-07-27 | 223 | 97 → 0 flagged (full-queue sweep; the report itself warns the zero is structural, not semantic) | `docs/audits/documentation-memory-hygiene-sweep-2026-07-27.md` |
-| 2026-08-15 | ~246 | 8 → 0 flagged; checker's feedback exemption implemented | `docs/audits/memory-housekeeping-2026-08-15.md` |
+| 2026-08-15 | 243→245 (intra-day, `dc15f0bb`→`614f05be`) | 8 → 0 flagged; checker's feedback exemption implemented | `docs/audits/memory-housekeeping-2026-08-15.md` |
 | 2026-08-21 | 247 | 3 files flagged (§5) | this review |
 
 Two structural readings of this history:
@@ -189,9 +192,10 @@ npm run check:memory-drift:no-write
 ```
 
 The committed drift report was generated 2026-08-17T14:27:54Z; its five
-`stale_row_count` entries are one-row deltas (793 vs 794 on the reviewer
-suggestion entity, counted under alias variants) — far below the 50% blocking
-threshold. So the snapshot claim holds: **blocking criteria pass, and the
+`stale_row_count` entries are small deltas — three alias variants of the
+reviewer suggestion entity at 793→794 (one row) and two alias variants of the
+potential-reviewer entity at 4,474→4,478 (four rows) — far below the 50%
+blocking threshold. So the snapshot claim holds: **blocking criteria pass, and the
 committed report is stale** (4 days old against a 24-hour freshness contract);
 the checker discloses this itself.
 
@@ -335,7 +339,7 @@ Ordered by severity × likelihood.
 
 1. **No trigger between "healthy" and "nearly at cap" (the sawtooth gap).**
    All signals sleep below 11 KiB; regrowth is ~166–500 B/day; the 8 KiB
-   comfort line was crossed silently on 2026-08-15. Failure mode: each cycle
+   comfort line was crossed silently on 2026-08-13. Failure mode: each cycle
    ends in a reactive, larger, riskier diet near the cap — or in the write-time
    guard blocking a legitimate edit mid-task. (Addressed procedurally by the
    runbook's routine-audit trigger; optionally by a lower warn band, §10 Q4.)
@@ -441,10 +445,16 @@ too late to change behavior (~1–2 weeks of margin at observed growth). The
 it was already stated twice (07-02 acceptance criterion, 07-29 result) and
 still crossed silently, because nothing fires at 8 KiB. Adopt it as the
 **routine-audit diet trigger** (procedural, runbook-owned, no code change), and
-*optionally* also lower `WARN_BYTES` to ~9 KiB — 9,216 B — so the SessionStart
-pressure note leads the procedural trigger rather than trailing it (proposed
-change, owner decision; cost: occasional earlier warnings; benefit: signal
-precedes the runbook trigger; failure mode addressed: silent crossing).
+*optionally* also lower the warn threshold to ~9 KiB — 9,216 B. Caveat found in
+adversarial review: the SessionStart pressure note does NOT import
+`WARN_BYTES` — it hardcodes its own 11 KiB/12 KiB constants at
+`.claude/hooks/session-lifecycle.js:286-287`; only the write-time guard
+imports the checker's exports. A warn-band change must therefore touch both
+`scripts/check-memory-router.js` (+ self-test) and `session-lifecycle.js` (or,
+better, make the session hook import the constant) to deliver the earlier
+signal (proposed change, owner decision; cost: occasional earlier warnings +
+two files touched; benefit: signal precedes the runbook trigger; failure mode
+addressed: silent crossing).
 
 **Q5 — should leaf-reference count / leaf-to-hub ratio become a metric?** Yes,
 as an advisory trend metric, not a gate. Measured today: 113 total `.md` refs
@@ -529,7 +539,7 @@ between sessions. Replace/remove: none.
 | Metric | 06-04 | 07-02 | 07-08 | 07-29 | 08-15 | **08-21** | Direction |
 |---|---:|---:|---:|---:|---:|---:|---|
 | Router bytes | 26,173→7,331 | 11,255→5,941 | 8,149 | 11,298→5,175 | 8,517 | **8,991** | sawtooth, ~166–500 B/day regrowth |
-| Router lines | 143→69 | 100→57 | — | 85→56 | 64 | **66** | stable-ish |
+| Router lines (`wc -l`; 07-02 as reported by its audit) | 154→69 | 100→57 | — | 84→55 | 64 | **65** (checker prints 66 by newline-split) | stable-ish |
 | Unique leaf refs in router | — | — | — | 41 (post-diet) | — | **62** | +21 since diet |
 | Leaf files | 118 | 191 | 211 | 226 | 243 | **247** | +~1.3/day, decelerating |
 | Active share | — | 179/191 | — | — | — | **221/247** | ~90–94% |
@@ -541,8 +551,8 @@ between sessions. Replace/remove: none.
 | # | Recommendation | Priority | Effort | Cost | Benefit / failure mode addressed |
 |---|---|---|---|---|---|
 | R1 | Adopt `docs/MEMORY_HYGIENE_RUNBOOK.md`: routine audit (~2-weekly or triggered at router ≥8 KiB / ≥5 flagged files / ≥25 new leaves) + quarterly-or-event deep audit with the S154-V2 falsification disciplines | P0 | done (this branch) | ~30–60 min per routine run; hours per deep audit | closes §8.1–8.4; converts ad-hoc audits into a procedure with completion criteria |
-| R2 | Router-diet procedure: strip status/release narrative to SESSION_PROMPT/queue/plans; target ≤8 KiB and ~≤45 unique leaf refs after each diet | P0 | procedural | one focused commit per cycle | §8.1–8.2; keeps the auto-loaded surface below the silent zone permanently |
-| R3 | Owner decision: lower `WARN_BYTES` to 9,216 B in `scripts/check-memory-router.js` (+ self-test) | P1 | ~15 min | earlier, occasionally noisier warnings | signal precedes the 8 KiB procedural trigger instead of trailing it (§8.1) |
+| R2 | Router-diet procedure: strip status/release narrative to SESSION_PROMPT/queue/plans; target ≤ ~6 KiB and ~≤45 unique leaf refs after each diet (matching runbook §10 — landing at 8 KiB would immediately re-fire the audit trigger) | P0 | procedural | one focused commit per cycle | §8.1–8.2; keeps the auto-loaded surface below the silent zone permanently |
+| R3 | Owner decision: lower the warn threshold to 9,216 B in `scripts/check-memory-router.js` (+ self-test) AND in the SessionStart pressure note, which hardcodes its own copy at `.claude/hooks/session-lifecycle.js:286-287` (preferably by importing the checker constant there) | P1 | ~30 min | earlier, occasionally noisier warnings; two files | signal precedes the 8 KiB procedural trigger instead of trailing it (§8.1); removes a threshold duplication found in adversarial review |
 | R4 | Owner decision: emit advisory unique-leaf-ref count from the router gate | P2 | ~30 min | none material | makes the Q5 metric self-updating |
 | R5 | Owner decision: refine `weak-basis` to accept harness `modified:` + in-body dated `[VERIFIED]` as basis | P2 | ~30 min + care | small recall loss for genuinely weak leaves | kills the observed false-positive class (§8.7); reduces silencing pressure |
 | R6 | Fix the three current advisory findings per §5 dispositions at next housekeeping (out of scope for this branch) | P2 | ~15 min | trivial | clears the worklist honestly, not mechanically |
@@ -566,6 +576,20 @@ between sessions. Replace/remove: none.
   derived from two inter-diet windows and one partial window and may change
   with project phase. The trigger design (size-based, not calendar-only)
   tolerates rate error in either direction.
+
+## 13a. Adversarial review record
+
+Both deliverables received a fresh-context adversarial review (read-only, at
+commit `312224ee`) instructed to refute rather than confirm. Verdict: **SOUND
+WITH FIXES** — no architecture, control-behavior, CI, or classification claim
+failed; both embedded runbook procedures executed as written. Six findings (one
+MAJOR: the original R3 scoped the warn-band change to the checker only, while
+the SessionStart note hardcodes its own thresholds; plus five precision issues:
+the 8 KiB crossing date was 2026-08-13 not -15; R2's diet target contradicted
+runbook §10; the drift-entry description omitted the second entity; two
+line-count cells mixed commits/conventions; one leaf-count cell was imprecise
+across intra-day commits). All six were independently re-verified and are
+corrected in this version.
 
 ## 14. Proposed adoption plan
 
