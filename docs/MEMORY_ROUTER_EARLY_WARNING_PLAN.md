@@ -18,7 +18,7 @@ related:
 
 # Memory Router Early-Warning Plan
 
-**Status: DRAFT v3 — owner greenlit the direction 2026-08-21; nothing here is
+**Status: DRAFT v4 — owner greenlit the direction 2026-08-21; nothing here is
 built.**
 
 v1 → v2 (first Codex review, five findings, all accepted): Stop advisory
@@ -47,7 +47,25 @@ against the live files):
    fresh grep at `2ef75439` — v2's patterns missed "full 57-gate battery",
    "optionally by a lower warn band", and "Owner decisions pending".
 
-This plan awaits a third pre-build adversarial review of the v3 diff.
+v3 → v4 (third pre-build review, three findings, all accepted):
+
+1. **Dedup now closes every Stop exit and migration path.** Every blocking
+   exit clears and saves the stored key; advisory-stage evaluations write a
+   versioned key whose SHA-256 input is domain-separated JSON; inherited
+   pre-v4 values never compare equal; and explicit replay, migration, and
+   `saveState`-failure tests pin the contract (§2 Phase 3, §3, T3/T4/T7).
+2. **T1 now proves the complete hook output contract.** Each path
+   deep-compares exit status and the complete parsed object, including the
+   exact ordered context string. Mutation cases prove that a dropped gate
+   summary, duplicate producer, wrong event name, or advisory-mode exit 2
+   makes the suite fail (§4 T1).
+3. **Phase 0 now leaves tracked, line-complete sweep evidence.** The negative
+   filter is removed; a dated audit artifact records the baseline SHA, exact
+   commands, raw counts, and one classification row per hit; and a completion
+   manifest diff rejects any current hit without a row (§2 Phase 0, §6).
+
+This v4 plan incorporates the third pre-build review and awaits the requested
+separate read-only review.
 
 ## 1. Problem and evidence
 
@@ -90,7 +108,21 @@ at `bytes >= NOTICE_BYTES` (8,192 B). The existing `> WARN_BYTES` and
 
 ### Phase 0 — document corrections and semantic sweep (no control changes)
 
-Apply to the two shipped documents, then run the acceptance sweep below:
+Before editing the two shipped documents, create the tracked audit artifact
+`docs/audits/memory-early-warning-phase0-sweep-<date>.md`. Record the baseline
+commit SHA, then place the exact commands below in a stable command block before
+running them. The artifact itself is in the `docs/` search domain, so its
+command-block hit is expected and must receive a `quoted` row; classification
+rows identify hits by command ID and `file:line` without repeating matched
+phrases, preventing a self-expanding manifest.
+
+Run the commands once against that initialized baseline, record each command's
+raw hit count, and add exactly one baseline-manifest row for every `file:line`
+hit. Do not copy matched text into the artifact; the locator and rationale are
+sufficient and avoid creating new search hits. Allowed classifications are
+`live-fixed`, `historical`, `quoted`, and `correct-current-state`; a line
+mixing stale and current claims is `live-fixed`, because classification
+happens before any filtering. Then apply the corrections:
 
 1. Sweep ALL restatements of the 8 KiB crossing date to 2026-08-13 (the §1
    executive-conclusion restatement was missed by the first fix pass) and
@@ -135,20 +167,31 @@ addresses for the editor, re-derive before editing — the review doc is
   stay pending (R4/R5 unaffected).
 - Off-by-one line refs: review `:117`, `:451`, `:555`.
 
-**Acceptance sweep (case-insensitive, semantic — then manually classify each
-hit live vs historical/quoted):**
+**Acceptance sweep (case-insensitive, semantic — classify raw results before
+filtering):**
 
 ```bash
-rg -n -i "57-gate|all 57" docs/ | rg -v "56 of 57"
+rg -n -i "57-gate|all 57" docs/
 rg -n -i "warn band|warn threshold|9 KiB|9,?216" docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
 rg -n -i "owner decisions?" docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
 rg -n "286-287" docs/
 rg -n "2026-08-15" docs/MEMORY_HYGIENE_RUNBOOK.md docs/audits/memory-hygiene-best-practices-review-2026-08-21.md
 ```
 
-Completion requires every remaining hit to be classified in the Phase 0
-commit message or audit note as historical/quoted/correct-current-state —
-zero unclassified live hits, not zero hits.
+After the corrections, rerun those exact commands without filters. Record the
+completion raw counts and add one completion-manifest row per current
+`file:line` hit. Retain disappeared baseline rows as `live-fixed`; classify
+every remaining row `historical`, `quoted`, or `correct-current-state`.
+
+**Completion check (documented manual diff; no new `package.json` gate):** for
+each command, normalize the rerun output to sorted `command-id|file:line`
+entries and diff it against the sorted completion-manifest locators in the
+artifact. Any current hit missing a manifest row, any manifest locator absent
+from the current output, any duplicate locator, or any current `live-fixed`
+row fails Phase 0. Record the zero-diff result and confirm the artifact is
+tracked with `git ls-files --error-unmatch
+docs/audits/memory-early-warning-phase0-sweep-<date>.md`. Completion requires
+the tracked artifact and zero unclassified live hits, not zero raw hits.
 
 ### Phase 1 — thresholds module + checker notice
 
@@ -199,25 +242,53 @@ zero unclassified live hits, not zero hits.
 
 **Structural change first:** refactor `stop()` so that every advisory
 producer appends to a `stopAdvisories` array and the function has exactly ONE
-`additionalContext('Stop', …)` call site at the end. Blocking paths (`exit 2`
-for symlink invariants, strict doc staleness, review receipts, and
-`block`-mode gate failures) are untouched and still return before any
-advisory evaluation. The existing gate advisory's message text is unchanged;
-only its emission point moves.
+`additionalContext('Stop', …)` call site at the end. Blocking behavior remains
+unchanged: symlink-invariant failures, strict doc staleness, review-receipt
+failures, and `block`-mode gate failures still exit 2 before advisory
+evaluation. Immediately before EVERY such blocking return, delete
+`state.lastAdvisedKey` and call `saveState(state)` inside the hook's existing
+outer fail-open `try/catch`. Thus the next unblocked Stop must re-evaluate and
+may emit. This cannot create a Stop loop: clearing the key emits no context and
+requests no retry; a still-blocked invocation exits 2 for the original guard,
+while the first unblocked invocation writes its new version-2 key before
+returning. Remove the no-gate and all-gates-green early returns: no-gate,
+green-gate, empty-advisory, and suppressed-duplicate paths all flow through
+the key-writing finalizer before returning. Together with the blocking clears,
+every normal `stop()` exit therefore writes or clears the stored key. The
+existing gate advisory's message text is unchanged; only its emission point
+moves.
 
-**Dedup contract (v3, replaces v2's set-on-emission rule):**
+**Dedup contract (v4, replaces v3's unversioned concatenation):**
 
-- On EVERY `stop()` evaluation that reaches the advisory stage, compute
-  `advisedKey = hash(sorted advisory texts + changed-surface fingerprint)` —
-  including for the empty set (hash of empty + fingerprint) — and STORE it in
-  `state.lastAdvisedKey` unconditionally.
-- EMIT only when the advisory set is non-empty AND `advisedKey` differs from
-  the previously stored value.
+- Preserve producer order in `orderedAdvisories = [...stopAdvisories]`. On
+  EVERY `stop()` evaluation that reaches the advisory stage, compute
+  `digest = SHA-256(JSON.stringify({ v: 2, advisories: orderedAdvisories,
+  fingerprint }))`, including for the empty advisory array, then STORE
+  `state.lastAdvisedKey = { v: 2, key: digest }` unconditionally before any
+  optional emission. JSON serialization supplies field and array boundaries;
+  the `v: 2` domain separates this contract, so distinct structures cannot
+  collide without a SHA-256 collision.
+- A previous key is comparable only when it is an object with `v === 2` and a
+  valid `key` string. A legacy string or object with any other/missing version
+  is non-comparable and therefore cannot suppress the first v4 emission, even
+  if it encodes byte-identical advisory text and fingerprint state.
+- EMIT only when the advisory set is non-empty AND the comparable previous
+  digest differs. State-I/O failure semantics differ by path (review fix to
+  the v4 draft — the blanket outer-catch rule would let an I/O error cancel a
+  deliberate blocker): an advisory-stage write failure falls into the
+  existing outer fail-open catch (no exit 2, no partial/malformed JSON);
+  a BLOCKING-exit clear is wrapped in its own LOCAL try/catch so the
+  `exit(2)` always still fires. The stale key that survives a failed
+  blocking clear is an accepted micro-residual — it requires a state-I/O
+  failure plus the exact block→shrink→restore sequence, and any later
+  successful advisory-stage write overwrites it.
 - Consequences (these are the T3 assertions): a repeat Stop in an identical
   failing state stays silent; a shrink below the trigger stores the
   empty-state key and emits nothing; a subsequent byte-identical re-cross
-  produces the old key K ≠ empty-state key and EMITS again. Reintroduced
-  router debt cannot hide behind a stale key.
+  produces the old digest K ≠ empty-state digest and EMITS again. A blocking
+  exit between the cross and shrink clears the key; after shrink, exact
+  restore, and unblock, the advisory is re-evaluated and EMITS. Reintroduced
+  router debt cannot hide behind a stale or legacy key.
 
 **Router-size producer, three tiers:**
 
@@ -266,15 +337,21 @@ only its emission point moves.
   `:310-317` — [VERIFIED this session]); read once per `stop()`; tolerates
   absence (tier 3 suppression); dies with the tmp state file. No transition
   can wedge a session.
-- **`lastAdvisedKey` lifecycle (v3 contract):** written on every advisory
-  evaluation — non-empty key on emission or suppressed-duplicate, empty-state
-  key when the set is empty. There is no reachable stop() advisory path that
-  leaves a stale key behind, which is what closes the v2
-  shrink-then-identical-re-cross hole. Old state files carrying a v2-era key
-  are safe in both directions: any first v3 evaluation overwrites the key.
+- **`lastAdvisedKey` lifecycle (v4 contract):** cleared and saved immediately
+  before every blocking exit; written as `{ v: 2, key: digest }` on every
+  advisory-stage evaluation — non-empty digest on emission or
+  suppressed-duplicate, empty-advisory digest when the set is empty. No
+  reachable normal `stop()` exit can preserve a stale suppressing key.
+  Comparison rejects every inherited string and every object whose version is
+  not 2, so the first v4 advisory-stage evaluation re-emits when non-empty and
+  then overwrites the legacy value. An advisory-stage write failure uses the
+  outer fail-open catch and cannot turn Stop into a blocker; a blocking-exit
+  clear failure is locally caught so it cannot turn a blocker into a
+  pass-through (review fix; pinned by T4).
 - **Stop output contract:** exactly zero or one JSON object on stdout per
   Stop invocation, in every path combination (none / gate-only / router-only /
-  both), with content preservation asserted by exact-fragment tests (T1).
+  both), with the full object, ordered context, and exit status asserted by
+  deep equality (T1).
 
 ## 4. Test and verification plan
 
@@ -286,28 +363,46 @@ review]), so it runs via `node`:
 1. `npm run check:memory-router && npm run check:memory-router:self-test`
    (new fixtures a–e).
 2. `node .claude/hooks/hook-enforcement.test.js` — extended with:
-   - **T1 exact emission-and-content, five paths:**
-     no-advisory (no-gate and green-gate variants) → exactly ZERO JSON
-     objects on stdout;
-     gate-only failure (advisory mode, router untouched) → exactly ONE JSON
-     object whose `additionalContext` contains the gate-failure text;
-     router-only → exactly ONE object containing the router-tier text and no
-     gate text;
-     combined gate-failure + router → exactly ONE object containing BOTH the
-     gate fragment and the router fragment. Objects parsed, not
-     pattern-counted, so a dropped gate advisory fails the combined case;
+   - **T1 complete output-object and status contract, five paths:** every
+     fixture asserts the process exit status. No-advisory (no-gate and
+     green-gate variants) requires status 0 and byte-empty stdout. Gate-only,
+     router-only, and combined advisory paths require status 0, exactly one
+     JSON value, and `deepStrictEqual(parsed, expectedObject)`, where the
+     COMPLETE expected object is
+     `{ hookSpecificOutput: { hookEventName: 'Stop', additionalContext:
+     expectedContext } }` with no omitted or extra fields. Build
+     combined-path `expectedContext` as the exact gate text constructed from
+     the fixture's gate name and sentinel gate output, followed by the
+     production separator and exact router-tier text in producer order
+     (omitting only components absent from other paths); never use fragments
+     or `contains`. Add four isolated mutation subruns that replace the
+     producer seam one mutation at a time — dropped gate summary, duplicated
+     producer, wrong `hookEventName`, and advisory-mode exit 2.
+     Each deliberately broken inner run MUST make the standalone suite exit
+     nonzero; the outer mutation check passes only after observing all four
+     failures;
    - **T2 tiers:** crossing fires; growth-above fires with distinct wording;
      missing baseline suppresses; untouched router suppresses;
    - **T3 dedup lifecycle with exact replay:** cross(state K) → emits;
      repeat Stop at K → silent; shrink below trigger → silent AND stored key
-     becomes the empty-state key; restore the exact prior bytes and edit
-     fingerprint (byte-identical K) → EMITS again;
+     becomes the version-2 empty-advisory key; restore the exact prior bytes
+     and edit fingerprint (byte-identical K) → EMITS again. Also seed an
+     inherited byte-identical legacy/unversioned key before the first v4
+     evaluation and assert it re-emits and is replaced by `{ v: 2, key }`;
    - **T4 modes and blocking:** router advisory never exits 2 under either
-     `CLAUDE_STOP_GATE_MODE` value; blocking paths still exit 2 untouched;
+     `CLAUDE_STOP_GATE_MODE` value; every symlink-invariant, strict-doc,
+     review-receipt, and block-mode-gate fixture still exits 2 and persists a
+     cleared key;
      combined router + block-mode gate failure → exit 2 with ZERO advisory
-     JSON on stdout;
+     JSON on stdout and a cleared saved key. Exercise
+     block → shrink → exact restore → unblock and assert the restored advisory
+     re-emits. Also force `saveState` to fail during a blocking clear and
+     assert the process STILL exits 2 (the local try/catch review fix);
    - **T5 resume:** existing-state `start` preserves `routerBytesAtStart`;
-   - **T6 thresholds module unreadable → hooks skip advisories, exit 0.**
+   - **T6 thresholds module unreadable → hooks skip advisories, exit 0;**
+   - **T7 key-state I/O failure:** force `saveState` to fail on the
+     advisory-stage key write and assert the existing fail-open catch returns
+     without exit 2 and without partial/malformed advisory JSON.
 3. `npm run check:instruction-architecture` (hook wiring/shape).
 4. `npm run check:harness-framing && npm run check:harness-framing:self-test`
    (skill + hook wording).
@@ -323,12 +418,13 @@ If the hook test script must gate shipping, its `node` invocation is added to
 the verification list of this plan only — registering it as a package
 `check:*` script is out of scope (new-gate decisions belong to the owner).
 
-## 5. Risks and author's adversarial pass (v3)
+## 5. Risks and author's adversarial pass (v4)
 
 - **Stop refactor regression risk (accepted):** moving the existing gate
-  advisory's emission point touches reviewed behavior; T1's exact-content
-  assertions (not counts) are the mitigation, and the blocking paths are
-  deliberately untouched.
+  advisory's emission point touches reviewed behavior; T1's complete-object,
+  exact-context, and status assertions are the mitigation. Blocking decisions
+  remain untouched; only their pre-return dedup-key clear is added and pinned
+  by T4.
 - **Notice fatigue:** the router is already ≥8 KiB, so the notice fires every
   session until a diet runs — intended; the runbook's first routine audit
   clears it. If ignored, posture equals today's, no worse.
@@ -336,11 +432,11 @@ the verification list of this plan only — registering it as a package
   silent instead of using stale numbers. Accepted because the CI/start gate
   fails loudly at require time in the same breakage (T6 covers the hook
   side).
-- **Unconditional key store (new in v3):** `lastAdvisedKey` is now written on
-  every advisory evaluation, adding one `saveState` on paths that previously
-  wrote nothing. Bounded: the state file is already rewritten by `record()`
-  on every tool use; one more small write at Stop is immaterial, and a write
-  failure falls into the hook's existing fail-open catch.
+- **Key-state writes (expanded in v4):** `lastAdvisedKey` is written on every
+  advisory evaluation and cleared on every blocking exit, adding one small
+  `saveState` on paths that previously wrote nothing. Bounded: the state file
+  is already rewritten by `record()` on every tool use; failures fall into
+  the existing fail-open catch and T7 proves they never block Stop.
 - **Guard surface widening:** this plan touches `memory-router-guard.js`
   (import + validation swap only; block/allow logic untouched; failure mode
   remains fail-open).
@@ -365,11 +461,17 @@ the verification list of this plan only — registering it as a package
   SessionStart context; Stop context per the three-tier rules only, always
   advisory, exactly zero-or-one JSON object per Stop with content-preserving
   combination.
-- Self-test fixtures a–e and hook tests T1–T6 green; all §4 checks green
+- Self-test fixtures a–e and hook tests T1–T7 green; all §4 checks green
   sequentially.
-- Phase 0 landed with the case-insensitive acceptance sweep run and EVERY
-  remaining hit explicitly classified (live-fixed / historical / quoted /
-  correct-current-state); zero unclassified live hits.
+- T1 mutation cases each fail the test suite for the intended reason; T7's
+  forced key-write failure remains fail-open.
+- Phase 0 landed with a TRACKED
+  `docs/audits/memory-early-warning-phase0-sweep-<date>.md` containing the
+  baseline SHA, exact unfiltered commands, baseline and completion raw hit
+  counts, and one classification row per `file:line` hit
+  (`live-fixed` / `historical` / `quoted` / `correct-current-state`). The
+  completion manifest diff is zero, with no current hit lacking a row and no
+  current `live-fixed` row.
 - Commits separate: Phase 0 (docs) / Phases 1–2 (thresholds + consumers) /
   Phase 3 (Stop refactor) / Phase 4 (skills); worktree clean after each.
 
@@ -380,5 +482,6 @@ module is additive; reverting Phase 2 alone returns consumers to their prior
 copies (guard literals, hook constants) without breaking the checker, because
 the checker re-exports the same names either way. Reverting Phase 3 restores
 the current `stop()` verbatim; the optional state fields (`routerBytesAtStart`,
-the v3 `lastAdvisedKey` semantics) are ignored or safely overwritten by old
-code in both directions.
+the v4 `{ v: 2, key }` `lastAdvisedKey` semantics) are ignored or safely
+overwritten by old code in both directions. Reverting Phase 0 also removes its
+tracked dated audit artifact with the document corrections it evidences.
