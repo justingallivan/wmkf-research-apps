@@ -10,6 +10,23 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Memory hygiene gained enforceable early warnings and a canonical runbook (Session 452)
+
+**Milestone:** Repository memory now has one canonical routine/deep-audit and
+router-diet procedure plus mechanical early warnings before `MEMORY.md` becomes
+load-bearing and bloated.
+**Sessions:** 452 (best-practices review, adversarial plan revisions, Fable build,
+Codex merge verification, first routine audit, and router diet).
+**Ship state:** Fable head `800eb8e4` merged at `00139331`; single-sourced
+thresholds, the 8 KiB notice, SessionStart/Stop advisories, and mutation-backed
+hook tests are active. The first audit closed 3/3 findings and reduced the router
+from 9,040 B to 5,911 B without deleting leaf content (`fb8dfab2`).
+**Why it matters:** memory growth now produces a bounded maintenance signal and
+has a repeatable evidence-first cleanup path instead of relying on ad hoc pruning.
+**Pointers:** `docs/MEMORY_HYGIENE_RUNBOOK.md`;
+`docs/audits/memory-routine-audit-2026-08-21.md`; commits `800eb8e4`, `00139331`,
+`fb8dfab2`.
+
 ## August 2026 — Dynamics Explorer request telemetry is Production-live (Session 451)
 
 **Milestone:** Explorer now records one durable lifecycle row per authenticated,
@@ -130,24 +147,27 @@ and independent-identity boundaries instead of another string-matching exception
 **Pointers:** `docs/REVIEWER_CONTACT_LEADS_SPEC.md`;
 `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`; commits `d9c29c7d`, `5fcd913c`, `23a40e89`.
 
-## August 2026 — Pre-Site-to-Site-Visit handoff and Phase II proposal access are Production-live (Session 444)
+## August 2026 — Pre-Site-to-Site-Visit handoff and Phase II proposal access are Production-live (Sessions 443–444, 452)
 
 **Milestone:** The Workbench now carries one governed Pre-Site Word workspace into the Site Visit
 stage and displays the final two-phase cycle's Phase II proposal files alongside Phase I.
-**Sessions:** 443–444 (schema/prompt/template production proof, guarded lifecycle build, UI refinement,
-document-listing expansion, owner-directed promotion).
-**Ship state:** `main` reached `83b9c68a`; the handoff records an exact SharePoint version/hash/time,
+**Sessions:** 443–444 and 452 (schema/prompt/template production proof, guarded lifecycle build,
+document-listing expansion, owner-directed promotion, and promoted-state receipt hardening).
+**Ship state:** The handoff records an exact SharePoint version/hash/time,
 changes Draft→Review under ETag, locks regeneration, and keeps the same Word item. The Proposal tab
 lists exact `Phase II` folder files with scoped View/Download; deployment
 `dpl_BiottKiZuBra2xpfv8quSaZ8jjVM` is READY. The signed-in Request `1002379`
 live-folder View/Download smoke passed on 2026-08-20. After exact owner approval,
 the controlled Draft→Review handoff passed on 2026-08-21: the same SharePoint
 Edit/Download identity remained current, a fresh authenticated load returned the
-handoff timestamp, and Pre-Site regeneration was locked.
+handoff timestamp, and Pre-Site regeneration was locked. Commit `b3bb0ef6`
+then made Pre-Site a read-only receipt after promotion; signed-in Production
+showed zero Pre-Site work controls and one continuation action into the same
+Site Visit Word item.
 **Why it matters:** PDs can continue editing one Word workspace through the visit without a parallel
 Site Visit memo, while staff can finally read both Phase I and Phase II submissions in one request.
 **Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`;
-commits `32b16f5f`, `5f316a29`, `83b9c68a`.
+commits `32b16f5f`, `5f316a29`, `83b9c68a`, `b3bb0ef6`, `43c8eab1`.
 
 ## August 2026 — Workbench duplicate Dataverse reads coalesced in Production (Session 440)
 
