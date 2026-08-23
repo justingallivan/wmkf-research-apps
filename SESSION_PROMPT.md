@@ -1,209 +1,185 @@
-# Session 455 Prompt: Close Frozen Distribution Review Findings
+# Session 456 Prompt: Release Frozen Pre-Site Distribution Safely
 
-## Session 454 Summary
+## Session 455 Summary
 
-Session 454 completed the pricing-canary correction and built the first
-cross-system frozen Pre-Site distribution implementation on
-`codex/frozen-pdf-distribution`. The branch is deliberately unmerged and must
-remain isolated until the independent review findings below are fixed and
-re-reviewed. No migration, deployment, Production snapshot, Dynamics activity,
-or email send occurred.
+Session 455 closed the material plan and code review findings for frozen Pre-Site
+distribution on `codex/frozen-pdf-distribution`. The branch remains isolated from
+`main`. No migration was applied, deployment was promoted, Dynamics activity was
+created, or email was sent.
 
 ### What Was Completed
 
-1. **The Claude 5 pricing canary was corrected.**
-   - Commit `47051aba` updated model capability/resolution and pricing surfaces so
-     Sonnet medium resolves to Sonnet 5 while intentional Haiku and Opus choices
-     remain intact.
-   - Focused pricing, resolver, and LLM-client tests were added or updated.
+1. **The lifecycle now recognizes retained distribution snapshots exactly.**
+   - `[SOURCE-VERIFIED]` `request-workbench-distribution-docx` and
+     `request-workbench-distribution-pdf` are the only classified distribution
+     producers; missing and lookalike values fail closed.
+   - Retained DOCX/PDF rows no longer block guarded reopen, appear as editable
+     drafts, get superseded by draft activation, or create false activation
+     conflicts. Other descendants and competing generations still block.
+   - A stale prepared send cannot cross a guarded reopen: the source pointer and
+     native version are checked under the send lease and again immediately before
+     transport.
 
-2. **Frozen Pre-Site DOCX/PDF distribution became source-built.**
-   - Commit `8a240e77` adds an authenticated Workbench flow to retain the exact
-     current Word version, optionally derive PDF from the retained Word item,
-     preview the complete message, and send DOCX, PDF, or both through Dynamics.
-   - Known staff/consultant addresses receive syntax normalization,
-     deduplication, and To/Cc conflict rejection. The owner explicitly rejected
-     an identity-confidence or directory-membership gate for this workflow.
-   - The exact preview binds source/version/hash, selected attachment identities,
-     recipients, subject/body/template, sender, and Dynamics actor.
-   - Postgres migration 034 defines the attempt/recovery ledger; SharePoint plus
-     Request Document rows own retained file identity; Dynamics owns the email.
-   - Per-attachment receipts, a send-intent marker, a lease, correlation recovery,
-     and status readback support exact retry without creating another activity.
+2. **Dynamics send and recovery contracts now fail closed.**
+   - Exact sent receipts remain read-only and retryable when impersonation is off;
+     every non-sent attempt requires literal
+     `DYNAMICS_IMPERSONATION_ENABLED=true` before acquiring a lease or writing.
+   - A recovered or newly created activity ID is fenced into Postgres before exact
+     content assertions. Correlation ambiguity and recovery errors are preserved
+     instead of being swallowed.
+   - The send lease is renewed immediately before `SendEmail`; losing it blocks
+     transport.
 
-3. **The implementation passed its scoped source verification.**
-   - Six focused suites passed 55/55 tests.
-   - TypeScript, scoped ESLint, migration manifest, API security, Atlas,
-     route/service boundary, trust-boundary GUID, Dataverse access/context,
-     OData, wiki, symbol, fact, documentation, and build-claim gates passed.
-   - `npm run build -- --webpack` completed successfully with only the existing
-     dynamic-dependency warnings.
+3. **Graph snapshot identity and reuse are stable.**
+   - `[SOURCE-VERIFIED]` Metadata read by stable drive/item ID is authoritative;
+     provisional upload/path tags are not treated as native publication versions.
+   - PDF conversion proves the retained Word native version/eTag before and after
+     conversion.
+   - Ready reuse requires a stable metadata window plus exact size, byte, and hash
+     proof. Byte-identical metadata drift refreshes the registry row with an
+     eTag-conditional update; content drift fails closed.
 
-4. **Independent Claude review found promotion-blocking gaps.**
-   - Claude identified itself as `claude-fable-5` and left a local, gitignored
-     report at
-     `outputs/codex-handoff-frozen-distribution-review-2026-08-23.md`.
-   - Codex independently traced the cited callers and confirmed nine actionable
-     findings. The possible Dynamics subject limit remains an unverified live
-     metadata preflight item, not a confirmed code defect.
-   - The existing durable design resolves the report's apparent product question:
-     guarded reopen must remain allowed after both prepared and sent
-     distributions because each retained snapshot preserves what earlier
-     recipients saw and a later Word version begins a new preview/send cycle.
+4. **Fresh-install and existing-database schemas are reconciled in source.**
+   - Setup and migration 034 use the same eight named CHECK constraints.
+   - Migration 034 reconciles known anonymous legacy constraints before adding
+     any missing canonical constraints.
+   - `[NOT LIVE]` Migration 034 remains source-declared but unapplied; the expected
+     source/live difference is recorded in `docs/RECONCILIATION_REPORT.json`.
 
-5. **The session ended without promotion or external side effects.**
-   - Migration 034 was not applied.
-   - The feature branch was not merged into `main` and did not auto-deploy.
-   - No live Graph, Dataverse, Dynamics email, or Postgres business write was
-     performed for this feature.
-   - The stop-time claim-evidence report could not read local observation state;
-     no observation row was fabricated.
+5. **Claude Opus review was bounded and resolved once.**
+   - The plan review found four material gaps: stale sends after reopen, lease
+     expiry at transport, swallowed recovery ambiguity, and legacy constraint
+     reconciliation. All four were incorporated before implementation.
+   - The code review found two material Graph issues: byte-identical Ready rows
+     could dead-end after metadata drift, and provisional upload tags could cause
+     a false first-prepare conflict. Both were corrected in one pass.
+   - No additional review loop was started; nits and speculative tail-chasing were
+     intentionally excluded.
+
+6. **The corrected implementation passed scoped verification.**
+   - Seventeen focused suites passed 207/207 tests.
+   - Five targeted mutation checks each proved its lifecycle exclusion fixture
+     failed when the corresponding exclusion was removed.
+   - Migration, API-route, Atlas, enum, TypeScript, documentation, build-claim,
+     Dataverse boundary, lifecycle authorization, service-boundary, agent,
+     instruction, and memory gates passed with their required self-tests.
+   - `npm run build -- --webpack` passed with only existing dependency and
+     `localStorage` warnings.
 
 ### Commits
 
-- `47051aba` — fix pricing canary for Claude 5 models
-- `8a240e77` — feat(workbench): add frozen pre-site distribution
+- `0167a8b3` — fix(pre-site): harden frozen distribution contracts
+- `acad76c4` — fix(pre-site): reconcile settled snapshot metadata
 
-## Next Items
+## Primary Next Steps
 
-### Verified Open
+### Owner Authorization Required
 
-1. **Exclude distribution snapshots consistently from editable Pre-Site lifecycle consumers.**
-   Evidence: `lib/services/pre-site-visit/reopen-service.js` `assertNoDownstream`;
-   `lib/services/pre-site-visit/artifact-service.js` `wordRows`, `pendingRow`,
-   `priorReady`, and `activeReadyWords`; producer prefix
-   `request-workbench-distribution` in `distribution-service.js`.
-   Required behavior: retained distribution DOCX/PDF rows never block guarded
-   reopen, surface as pending drafts, get superseded by draft activation, or make
-   activation readback report a false conflict. Use one deliberately shared or
-   exactly mirrored predicate across all affected consumers and add
-   discriminating fixtures that contain a distribution row.
+1. **Apply and read back migration 034 in the intended database.**
+   - Reconfirm the target and current live shape first.
+   - Apply only with `node scripts/apply-migrations.js`; never use
+     `scripts/setup-database.js` on an existing database.
+   - Read back `schema_migrations`, all columns, eight named CHECK constraints,
+     unique constraints, and indexes before treating the ledger as live.
 
-2. **Make the direct Dynamics send path fail closed on disabled impersonation.**
-   Evidence: `lib/services/dynamics/write-core.js` `_withCallerId` omits
-   `MSCRMCallerID` unless `DYNAMICS_IMPERSONATION_ENABLED === 'true'`, while only
-   composed `createAndSendEmail` currently preflights `noFallback`.
-   Required behavior: `sendPreSiteDistribution` rejects before any Dynamics write
-   when the authenticated actor is present but impersonation is not explicitly
-   enabled. Do not change the behavior-frozen shared write primitives.
+2. **Deploy the feature branch through the governed release path.**
+   - Follow `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`; do not merge
+     runtime work directly into `main` merely to obtain a test deployment.
+   - Confirm the deployment has the literal impersonation and Dataverse interlock
+     settings before any write-path exercise.
 
-3. **Close retained-file conversion and version-identity races.**
-   Evidence: PDF conversion uses the snapshot item's current content, and
-   `GraphService.uploadFile` can return `cTag` where distribution code expects a
-   native publication version.
-   Required behavior: prove the Word snapshot version/eTag remains the confirmed
-   input across PDF conversion; after upload, read stable metadata by drive/item
-   and persist only its native `publication.versionId`, failing closed when it is
-   absent or changed.
+3. **Approve a controlled non-production Dynamics preflight and recipient.**
+   Verify before any Production send:
+   - the tenant's `email.subject` maximum length;
+   - raw `addressused` unresolved-recipient behavior;
+   - description, address, and correlation round-trip fidelity;
+   - status-code meanings `{3,6,7}`;
+   - repeated `SendEmail` behavior for the same activity.
 
-4. **Persist the Dynamics activity identity before exact round-trip assertions.**
-   Evidence: `assertEmailActivityMatches` currently runs before
-   `recordEmailActivity`; Dynamics HTML normalization could otherwise leave every
-   retry recovering the same unpersisted draft and failing forever.
-   Required behavior: once create or unique correlation recovery yields one
-   activity ID, fence/persist that ID before validating exact content. A mismatch
-   must still fail closed and must never create a replacement activity.
+4. **After migration and deployment, run authenticated read-only UI verification.**
+   Confirm compose, frozen preview, DOCX/PDF selection, history, and guarded reopen
+   behavior without sending.
 
-5. **Restore schema and deployment-contract parity.**
-   Evidence: migration 034 names all CHECK constraints; the fresh-install v40
-   mirror uses anonymous CHECKs. The lifecycle plan also removed the unresolved-
-   recipient tenant probe without evidence that the tenant supports raw
-   `addressused` consultant recipients.
-   Required behavior: use the migration's constraint names in
-   `scripts/setup-database.js` and restore unresolved-recipient behavior as an
-   explicit pre-deployment go/no-go probe. Do not apply migration 034 yet.
+5. **Perform one separately approved controlled non-production send/readback.**
+   Use an explicitly approved recipient and exact artifact selection. Production
+   proof remains a separate authorization boundary.
 
-6. **Obtain a fresh independent re-review after fixes.**
-   Evidence: the current Claude review is a findings handoff, not approval.
-   Required behavior: run all focused distribution suites plus affected
-   pre-site artifact/reopen suites and relevant gates, commit the fixes on this
-   branch, then request a read-only Claude Opus/Fable review. Promotion remains
-   blocked until actionable findings close.
+### Standing Organic Observation
 
-7. **Continue standing organic-use observations without manufacturing evidence.**
-   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`,
+1. Continue accumulating real Dynamics Explorer and Stage II outcomes under
+   `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`,
    `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`, and
-   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Description: accumulate real Dynamics Explorer and Stage II outcomes; do not
-   generate synthetic staff traffic or shared-roster rows.
-
-### Blocked on External Input
-
-1. **Explorer campaign Phases C-D.**
-   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Section 4.
-   Blocked on 10-20 real Southern California questions and owner answers about
-   population-served and `_socal` program-area usage.
-
-### Owner Decision Needed
-
-1. **After 2026-09-02, retain or remove the Stage II rollout flag.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-   Re-probe the live environment and replacement deployment before changing it.
+   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Do not manufacture
+   staff traffic or shared-roster evidence.
+2. Explorer campaign Phases C-D remain blocked on 10-20 real Southern California
+   questions and owner answers about population-served and `_socal` program-area
+   usage.
+3. After 2026-09-02, re-probe the live environment and replacement deployment
+   before deciding whether to retain or remove the Stage II rollout flag.
 
 ### Parked
 
-1. **Frozen distribution release operations.** Apply/read back migration 034,
-   deploy, run authenticated read-only UI verification, and perform a separately
-   approved controlled send only after fixes and re-review.
-2. **Site Visit logistics and governed supporting-file dossier.** Map live
-   Dataverse facts before proposing schema.
-3. **AkoyaGo publication projection.** Complete signed-in AkoyaGo, historical
-   path/filename, Power Automate, and non-governed SharePoint discovery first.
-4. **Final Writeup copy transaction.** Freeze and copy an exact Site Visit-stage
-   source version/hash only after the earlier lifecycle slices are closed.
-5. **`NEXTAUTH_SECRET` rotation and Sensitive conversion.** Reopen only with a
-   coordinated session-invalidation window.
+1. Site Visit logistics and its governed supporting-file dossier, pending live
+   Dataverse fact mapping.
+2. AkoyaGo publication projection, pending signed-in AkoyaGo, historical
+   path/filename, Power Automate, and non-governed SharePoint discovery.
+3. Final Writeup copy transaction, until the earlier lifecycle slices close.
+4. `NEXTAUTH_SECRET` rotation and Sensitive conversion, until a coordinated
+   session-invalidation window exists.
 
-### Verify Before Acting
+### Do Not Reopen Without a New Decision
 
-1. **Dynamics `email.subject` maximum length.** Claude suspected the standard
-   field may be 200 characters while source accepts 500. Verify tenant metadata
-   before promotion; do not change the limit from memory alone.
-2. **Unresolved-recipient behavior.** Probe the non-production tenant before any
-   live consultant send. Runtime currently creates To/Cc parties with raw
-   `addressused` and no party lookup.
-3. **Dynamics round-trip behavior.** Verify description/address fidelity,
-   correlation consistency, status-code meanings `{3,6,7}`, and repeated
-   `SendEmail` behavior on the same activity before Production proof.
-4. **Migration 034.** Apply only through `node scripts/apply-migrations.js` after
-   source fixes and review approval; then read back the exact table/constraints.
-5. **Production Dataverse reads are owner-run.** Never set
+1. Automatic email on Site Visit promotion; the owner chose explicit preview and
+   send of DOCX, PDF, or both.
+2. Identity-confidence or directory-membership gating for known
+   staff/consultant recipients.
+3. Editing a preserved Review row in place; correction uses an audited Draft
+   successor while earlier distribution snapshots remain retained.
+4. Allowing an unsent preview prepared against an earlier source version to send
+   after guarded reopen.
+5. Repeating plan or code review without a new material change or finding.
+6. Treating an AkoyaGo-visible publication as a second editable source of truth.
+
+## Operational Gotchas
+
+1. Only the exact producer names ending in `-docx` and `-pdf` are distribution
+   snapshots; broader prefix matching would weaken lifecycle blockers.
+2. An exact sent retry may read its receipt with impersonation disabled. Any
+   non-sent path must reject unless the flag is literally `true`.
+3. Stable-ID Graph metadata owns native version/eTag. Ready-row metadata may be
+   refreshed only after stable-window and exact byte/hash proof.
+4. `docs/RECONCILIATION_REPORT.json` should continue to show migration 034 as
+   source-declared/live-absent until the authorized migration and readback finish.
+5. Production Dataverse reads are owner-run. Never set
    `DATAVERSE_ALLOW_PROD_READS` in an agent session.
-6. **Request `1002379` remains an audited guarded-reopen successor.** Do not
-   regenerate or start another Site Visit handoff without new exact durable-write
+6. Request `1002379` remains an audited guarded-reopen successor. Do not
+   regenerate or start another Site Visit handoff without exact durable-write
    approval.
-
-### Do Not Reopen Without New Decision
-
-1. Automatic email on Site Visit promotion; the owner chose explicit preview
-   and send of DOCX, PDF, or both.
-2. Identity-confidence or directory-membership gating for the known
-   staff/consultant distribution workflow.
-3. Editing the preserved Review row in place; correction uses a separately
-   audited Draft successor.
-4. Treating an AkoyaGo-visible publication as a second editable source of truth.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `lib/services/pre-site-visit/distribution-service.js` | Frozen source/snapshot, preview, Dynamics recovery, and history coordinator |
-| `lib/services/pre-site-visit/distribution-store.js` | Postgres attempt ledger and fenced step receipts |
-| `lib/db/migrations/034_pre_site_distribution_attempts.sql` | Existing-database distribution ledger migration, not applied |
-| `lib/services/pre-site-visit/artifact-service.js` | Current/pending Pre-Site projection and Ready activation consumers needing snapshot exclusion |
-| `lib/services/pre-site-visit/reopen-service.js` | Guarded reopen downstream check needing snapshot exclusion |
-| `shared/components/workbench/PreSiteDistributionPanel.js` | DOCX/PDF/both compose, preview, send, and history UI |
-| `lib/dataverse/adapters/email-activity.js` | Dynamics activity/attachment reads and granular writes |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Canonical frozen-distribution and later-version contract |
+| `shared/config/requestDocument.js` | Exact shared distribution contract and classifier |
+| `lib/services/pre-site-visit/distribution-service.js` | Frozen source/snapshot, preview, Dynamics recovery, and send coordinator |
+| `lib/services/pre-site-visit/distribution-store.js` | Attempt ledger, send lease, and fenced receipts |
+| `lib/db/migrations/034_pre_site_distribution_attempts.sql` | Existing-database ledger migration; not applied |
+| `scripts/setup-database.js` | Fresh-install mirror with canonical named constraints |
+| `lib/services/pre-site-visit/artifact-service.js` | Editable lifecycle projection and activation |
+| `lib/services/pre-site-visit/reopen-service.js` | Guarded reopen descendant checks |
+| `lib/services/graph-service.js` | Stable metadata, version, and byte retrieval |
+| `lib/dataverse/adapters/email-activity.js` | Dynamics email activity and attachment adapter |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Canonical lifecycle and release contract |
 
 ## Testing
 
 ```bash
-rtk npx jest --runInBand tests/unit/pre-site-distribution-service.test.js tests/unit/pre-site-distribution-panel.test.js tests/unit/email-activity-adapter.test.js tests/unit/graph-service-versions.test.js tests/unit/dynamics-service-caller-id.test.js tests/unit/site-visit-tab.test.js
+rtk npx jest --runInBand tests/unit/pre-site-distribution-service.test.js tests/unit/pre-site-distribution-panel.test.js tests/unit/request-document-distribution.test.js tests/unit/pre-site-visit-artifact-service.test.js tests/unit/pre-site-visit-reopen-service.test.js tests/unit/email-activity-adapter.test.js tests/unit/graph-service-versions.test.js tests/unit/dynamics-service-caller-id.test.js
+rtk npm run check:migrations-manifest
 rtk npm run check:types
 rtk npm run check:api-routes
 rtk npm run check:atlas
 rtk npm run check:dataverse-access-layer
+rtk npm run check:agent-invariants
 rtk npm run build -- --webpack
 ```
-
