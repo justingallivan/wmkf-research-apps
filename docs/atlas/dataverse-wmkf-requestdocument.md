@@ -141,17 +141,17 @@ governed v3 AI run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable SharePoint
 item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer. Its
 input manifest has exactly one Proposal Narrative source and no bibliography.
 Exact retry reused the same row/run/item. The dated 2026-08-17 inventory
-reported four rows: three Initial Assessments and one Pre Site Visit, all then
-Ready/Draft. The 2026-08-21 signed-in handoff proves the current pointer is now
-Ready/Review; it did not refresh the aggregate count or expose the current row
-GUID. There is
+reported four rows. The 2026-08-23 post-reopen probe reports 10 rows: three
+Initial Assessments and seven Pre Site Visits; nine Ready/one Failed and six
+Draft/four Superseded. Request `1002379` now points to the Ready/Draft
+successor identified below. There is
 intentionally no Site Visit writeup pointer: staff observations remain direct
 edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
-**[PRODUCTION-DEPLOYED 2026-08-23; DURABLE REOPEN SMOKE OPEN.]** Guarded reopen
+**[PRODUCTION-PROVED 2026-08-23.]** Guarded reopen
 adds the Production-live Wave 20 fields `wmkf_ReopenCycleId` (String
 36), `wmkf_ReopenReasonCode` (String 50), and `wmkf_ReopenReasonNote` (Memo
 2000). The successor row itself is the append-only reopen event when combined
@@ -163,8 +163,12 @@ Production apply created exactly those three attributes; delayed typed-metadata
 readback reported 3 exact, 0 absent, 0 divergent. The non-sensitive readiness
 flag is literal `on`, and merge `af986d92` is Ready in deployment
 `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised the
-extended read-only Pre-Site status path without application errors or writes;
-no guarded-reopen business-row mutation has run.
+extended read-only Pre-Site status path without application errors or writes.
+After exact owner approval, signed-in Request `1002379` preserved and
+superseded source `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6`, created current
+Ready/Draft successor `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` plus one distinct
+SharePoint copy, and left no Final pointer or cleanup work. Exact retry reused
+that same row/item; postcheck found one cycle row and matching governed bytes.
 The adapter's base projection excludes the Wave 20 fields while the literal-on
 `GUARDED_REOPEN_SCHEMA_READY` interlock is disabled, and the reopen route then
 fails closed with 503. The generation create payload also omits the Wave 20
@@ -193,8 +197,9 @@ reopen events, never to later generated descendants that inherit only the cycle.
   pointer and shared concurrency fence for Initial Assessment activation.
 - `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and the
   Production writer/transition use it as the current-pointer/fence. Request
-  `1002379` now resolves through that pointer to the Ready/Review Site Visit
-  workspace; the 2026-08-21 browser proof did not expose its row GUID.
+  `1002379` now resolves through that pointer to Ready/Draft guarded-reopen
+  successor `888982b6-0a9f-f111-b8dc-7ced8d3d15a6`; the prior Ready/Review row
+  is preserved as Superseded.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
   independent Final Word row. Final will record the exact source Pre-Site
   row/version/hash; no writer populates this lookup yet.

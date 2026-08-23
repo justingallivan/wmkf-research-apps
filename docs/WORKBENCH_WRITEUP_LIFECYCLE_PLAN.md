@@ -24,8 +24,8 @@ related:
 ## Decision and current status
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
-HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN SOURCE-BUILT ON FEATURE
-BRANCH 2026-08-22 BUT SCHEMA/DEPLOYMENT NOT RUN; FINAL PLANNED.]** The three Workbench
+HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
+2026-08-23; FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -68,8 +68,9 @@ metadata-only apply created all 12 attributes and two request lookups, and
 independent readback found 14 exact with no absence or divergence. Request
 `1002379` later created the first Ready Pre-Site row, completed governed v3 AI
 run, populated the request pointer, and uploaded the stable Word item. Exact
-Ready retry reused those same identities. Current inventory is four Request
-Documents: three Initial Assessments and one Pre Site Visit.
+Ready retry reused those same identities. The 2026-08-23 post-reopen inventory
+is 10 Request Documents: three Initial Assessments and seven Pre Site Visits;
+nine are Ready, one Failed, six Draft, and four Superseded.
 
 **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]** The Pre-Site producer
 now distinguishes editorial deviations from integrity failures: usable drafts
@@ -86,11 +87,11 @@ or changing a request artifact.
 | The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, clearer handoff modal, and promoted-state receipt hardening are Production-deployed, while Final remains a placeholder | Workbench source; Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, and `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`; focused service/route/component tests; signed-in Request `1002379` Draft→Review handoff and post-release receipt→Site Visit navigation with same-item status/readback on 2026-08-21 | PRODUCTION-PROVED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
-| Request `1002379` has one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; current row GUID was not exposed by the browser proof | VERIFIED LIVE |
+| Request `1002379` had one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; superseded by the approved 2026-08-23 guarded reopen | VERIFIED HISTORICAL STATE |
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
 | Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
-| Guarded reopen preserves the handoff and creates one successor | Merge `af986d92`; focused service/route/artifact/component tests; Ready Production deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`; signed-in read-only Request `1002788` extended-status smoke | DEPLOYED / DURABLE MUTATION SMOKE OPEN |
+| Guarded reopen preserves the handoff and creates one successor | Merge `af986d92`; focused tests; Ready deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`; signed-in Request `1002788` read-only smoke; approved Request `1002379` durable mutation, exact retry reuse, and Dataverse/Graph byte/cardinality readback | PRODUCTION-PROVED |
 | Wave 20 guarded-reopen fields exist in Production | Approved 2026-08-23 additive apply followed by typed metadata readback: 3 exact, 0 absent, 0 divergent | VERIFIED LIVE |
 
 ## Ownership model
@@ -231,8 +232,7 @@ replace that stable item as a side effect of receiving site-visit files.
 
 ### Content correction and guarded reopen
 
-**[OWNER DIRECTION 2026-08-21; PRODUCTION-DEPLOYED 2026-08-23; DURABLE
-REOPEN SMOKE OPEN.]**
+**[OWNER DIRECTION 2026-08-21; PRODUCTION-PROVED 2026-08-23.]**
 Ordinary correction and lifecycle reopening are different
 operations:
 
@@ -616,15 +616,15 @@ silently extend its paths or names to writeup publications.
    Visit continuation action. Site Visit showed the expected same Word item,
    Edit/Download, and handoff time. No document or write action was invoked;
    this request had no visible warning, so warning rendering remains test-proven.
-6. **Guarded correction/reopen — Production-deployed 2026-08-23; durable
-   mutation smoke open.** Wave 20 is 3 exact/0 divergent, the Production
+6. **Guarded correction/reopen — Production-proved 2026-08-23.** Wave 20 is 3 exact/0 divergent, the Production
    readiness flag is literal `on`, and merge `af986d92` is Ready in deployment
    `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised
-   the extended read-only status path without writes. Complete one controlled
-   superuser reopen plus exact retry/readback only after approving an eligible
-   test row and its expected durable successor/copy/cleanup effects; do not use
-   Request `1002379` without exact approval. This proof must precede Final
-   creation so an accidental handoff cannot become an unexplained Final lineage source.
+   the extended read-only status path without writes. After exact owner
+   approval, Request `1002379` created one preserved Ready/Draft successor and
+   distinct SharePoint copy; exact retry reused the same row/item and
+   Dataverse/Graph readback proved pointer, lifecycle, audit, cardinality, and
+   byte coherence. This proof now precedes Final creation so an accidental
+   handoff cannot become an unexplained Final lineage source.
 7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
    select/provision the durable distribution representation, then implement
    exact snapshot, preview, explicit send, resume-safe retry, and history.

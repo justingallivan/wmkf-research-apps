@@ -3,7 +3,7 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19, Site Visit handoff, and Wave 20 guarded reopen; durable reopen mutation smoke remains approval-gated."
+summary: "Production-live Wave 19, Site Visit handoff, and Production-proved Wave 20 guarded reopen with exact retry reuse."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-23
@@ -34,8 +34,9 @@ apply created no Pre-Site business row. No application runtime or SharePoint
 artifact was added by the schema operation. **[VERIFIED IN PRODUCTION
 2026-08-17]** commit `abfe5529` deployed the adapter, durable writer, JSON
 route, and stable Word-link UI. Request `1002379` then created the first Ready
-Pre-Site business row and SharePoint Word item; current inventory is four
-Request Documents: three Initial Assessments and one Pre Site Visit.
+Pre-Site business row and SharePoint Word item. The 2026-08-23 post-reopen
+inventory is 10 Request Documents: three Initial Assessments and seven Pre Site
+Visits; nine are Ready, one Failed, six Draft, and four Superseded.
 
 **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]**
 The Production runtime normalizes valid provider output,
@@ -62,14 +63,18 @@ row's lifecycle to Review and records the exact verified SharePoint publication
 version, governed DOCX hash, and handoff timestamp in the existing
 `wmkf_milestone*` fields. It creates no new row, lookup, or SharePoint item.
 
-**[PRODUCTION-DEPLOYED 2026-08-23; DURABLE REOPEN SMOKE OPEN.]** The guarded
+**[PRODUCTION-PROVED 2026-08-23.]** The guarded
 correction branch provides the preserve-and-succeed service, superuser route/UI,
 history projection, and additive Wave 20 fields. Production typed-metadata
 readback is 3 exact/0 absent/0 divergent; the non-sensitive readiness flag is
 literal `on`; merge `af986d92` is Ready in deployment
 `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised the
-extended read-only status path without application errors or writes. No
-guarded-reopen business-row mutation has run. The base adapter projection
+extended read-only status path without application errors or writes. After
+exact owner approval, signed-in Request `1002379` created one Ready/Draft
+successor and one distinct SharePoint copy while preserving and superseding the
+prior Review row. Exact unchanged retry returned the same row/item, and
+Dataverse/Graph postcheck proved one cycle row plus identical governed source
+and successor bytes. The base adapter projection
 omits the new columns until `GUARDED_REOPEN_SCHEMA_READY` is literal `on`; the
 reopen route returns 503 while it is off. This lets source deploy safely before
 provisioning without making ordinary Request Document reads query absent
@@ -111,7 +116,7 @@ akoya_request
 | The metadata-only Wave 19 apply itself created a Pre-Site business row | Immediate post-apply inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE (historical apply boundary) |
 | The deployed writer later created the first Pre-Site business row | Post-generation inventory plus exact row/run/item/pointer readback for Request `1002379` | VERIFIED LIVE |
 | Wave 20 reopen fields exist in Production | Approved 2026-08-23 apply plus typed metadata readback: 3 exact, 0 absent, 0 divergent | VERIFIED LIVE |
-| Guarded reopen service, route, UI, and retry/recovery contract exist | Merge `af986d92`, focused tests, Ready deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`, signed-in read-only Request `1002788` status smoke | DEPLOYED / DURABLE MUTATION SMOKE OPEN |
+| Guarded reopen service, route, UI, and retry/recovery contract exist | Merge `af986d92`, focused tests, Ready deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`, signed-in read-only Request `1002788` status smoke, and approved Request `1002379` durable mutation/exact-retry/readback | PRODUCTION-PROVED |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -157,7 +162,7 @@ does not govern PSV generation identity. The existing `wmkf_SourceDocument`
 lookup and source version/hash remain reserved for lineage from one governed
 output artifact to another, such as Word → PDF or Pre-Site → Final.
 
-### Guarded-reopen Wave 20 attributes — source only, not provisioned
+### Guarded-reopen Wave 20 attributes — Production-provisioned
 
 The successor `wmkf_requestdocument` row is the durable append-only correction
 event. Wave 20 adds only the fields that existing registry lineage and standard
@@ -420,7 +425,7 @@ same preflight and apply before runtime code deployed there selects these
 fields; Dataverse rejects a `$select` containing an absent attribute.
 
 Wave 20 Production completed this strict order on 2026-08-23. Reuse it for any
-other target; the final durable mutation proof remains open:
+other target; Production also completed the durable mutation proof:
 
 1. Run `node scripts/preflight-guarded-reopen-schema.mjs --target=<target>`
    read-only and classify all three attributes absent/exact/divergent. The
@@ -433,10 +438,10 @@ other target; the final durable mutation proof remains open:
 4. Set the non-sensitive deployment flag `GUARDED_REOPEN_SCHEMA_READY=on`
    only after that exact readback, then promote/redeploy the runtime. Literal
    `on` is the only enabling value; unset and invalid values fail closed.
-5. **Production partial:** signed-in Request `1002788` passed the read-only
-   extended-status smoke. The controlled superuser reopen plus exact
-   retry/readback remains open and requires separately approved mutation
-   authority. Do not use Request `1002379` without that authority.
+5. **Production complete:** signed-in Request `1002788` passed the read-only
+   extended-status smoke. After exact owner approval, signed-in Request
+   `1002379` completed one superuser reopen; exact retry and authoritative
+   Dataverse/Graph readback proved one successor row/item and exact copied bytes.
 6. After the first correction cycle exists, never unset the readiness flag as
    a rollback. Roll runtime back while retaining the exact schema and flag;
    hiding the cycle field would make generation identity incomplete.

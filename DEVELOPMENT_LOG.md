@@ -10,6 +10,22 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Guarded Pre-Site reopen passed durable Production proof (Session 454)
+
+**Milestone:** The superuser correction path now has end-to-end Production
+evidence for preserve-and-succeed behavior and exact retry reuse.
+**Sessions:** 453–454 (schema-first release, Opus hardening, signed-in mutation,
+authoritative readback, and same-operation retry).
+**Ship state:** Wave 20 is 3 exact/0 divergent with literal-on readiness;
+deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp` is Ready. Approved Request
+`1002379` created one Ready/Draft successor and distinct SharePoint copy,
+preserved the prior Review row as Superseded, moved the request pointer, and
+reused the same row/item on exact retry.
+**Why it matters:** accidental handoffs can be corrected without destroying the
+recorded milestone, duplicating a retry, or creating unexplained Final lineage.
+**Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`;
+`docs/atlas/dataverse-wmkf-requestdocument.md`; merge `af986d92`.
+
 ## August 2026 — Memory hygiene gained enforceable early warnings and a canonical runbook (Session 452)
 
 **Milestone:** Repository memory now has one canonical routine/deep-audit and

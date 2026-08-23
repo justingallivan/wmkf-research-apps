@@ -284,12 +284,15 @@ PATCH. It performs no SharePoint write or copy. Review locks the Pre-Site
 producer before it loads inputs, resolves a prompt, calls Claude, claims a row,
 renders, or uploads. Exact completed retries are idempotent.
 
-**[OWNER DIRECTION 2026-08-21; PRODUCTION-DEPLOYED 2026-08-23; DURABLE
-REOPEN SMOKE OPEN.]** Wave 20 readback is 3 exact/0 divergent, the Production
+**[OWNER DIRECTION 2026-08-21; PRODUCTION-PROVED 2026-08-23.]** Wave 20 readback is 3 exact/0 divergent, the Production
 readiness flag is literal `on`, and merge `af986d92` is Ready in deployment
 `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised the
-extended read-only status path without a write; no reopen successor/copy has
-been created in Production.
+extended read-only status path without a write. After exact owner approval,
+signed-in Request `1002379` created one Ready/Draft successor and one distinct
+SharePoint copy, preserved and superseded the Review source, and moved the
+request pointer atomically. Exact unchanged retry reused the same row/item;
+Dataverse/Graph postcheck proved one cycle row, distinct item identities,
+stable reads, and identical governed source/successor bytes.
 Reopening Pre-Site preparation is a successor operation, not an in-place
 Review→Draft demotion.
 For an accidental handoff or wrong governed input, the service must verify that

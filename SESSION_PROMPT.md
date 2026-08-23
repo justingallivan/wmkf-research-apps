@@ -8,8 +8,10 @@ applied to Production and independently read back as three exact fields with
 zero absent/divergent; the non-sensitive literal-on readiness flag was set;
 merge `af986d92` deployed Ready as `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`.
 A signed-in read-only Request `1002788` Pre-Site-tab smoke exercised the
-extended status path without application errors or writes. No guarded-reopen
-business-row mutation has been run.
+extended status path without application errors or writes. **[PRODUCTION-PROVED
+2026-08-23]** after exact owner approval, signed-in Request `1002379` completed
+the durable guarded reopen and an exact unchanged retry reused the same
+successor row and SharePoint item.
 
 ### What Was Completed
 
@@ -95,6 +97,24 @@ business-row mutation has been run.
      The final report returned **APPROVE — no actionable findings remain** at
      `/Users/gallivan/.claude/plans/perform-the-final-read-only-soft-parrot.md`.
 
+9. **Guarded Pre-Site reopen passed the controlled Production mutation smoke.**
+   - Exact owner approval bound the action to Request `1002379`. The signed-in
+     superuser flow used reason `accidental_handoff` and created successor row
+     `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` plus SharePoint item
+     `01G4GVMS5W3ILDTXPFENHY6VXJCK54GDPF`.
+   - Dataverse readback showed the request pointer on that Ready/Draft
+     successor, source row `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6` preserved
+     as Superseded, no Final pointer, one cycle row, and no cleanup work.
+   - Exact retry with cycle `0f107ddd-8d1f-4d68-abfc-b6cb5b3f0b9f` returned
+     the same row/item with `reused: true`; it ran without a Production write
+     acknowledgement, so any unexpected mutation path would have failed closed.
+   - Independent Graph postcheck found both source and successor stable across
+     reread, both governed hashes exact, and copied bytes identical. The
+     preserved source's live eTag had advanced from its registry snapshot while
+     drive/item/version/last-modified/size/hash remained exact; the service had
+     already required the live eTag to stay stable across verification and
+     activation.
+
 ### Commits
 
 - `a089cf80` — docs(workbench): record production site visit handoff
@@ -118,24 +138,14 @@ business-row mutation has been run.
 
 ### Verified Open
 
-1. **Run a controlled guarded-reopen mutation smoke only on a separately approved test record.**
-   Evidence: Production Wave 20 metadata is three exact/zero divergent, the
-   literal-on Production flag is set, merge `af986d92` is Ready in deployment
-   `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`, and signed-in Request `1002788` loaded
-   the read-only extended Pre-Site status path without application errors.
-   The remaining proof is one eligible superuser reopen plus exact unchanged
-   retry/readback; it creates a durable successor row and SharePoint copy, so
-   it requires a named approved record and expected-write/cleanup authority.
-   Do not use Production Request `1002379` without exact approval.
-
-2. **Observe Dynamics Explorer Phases A and B through organic use.**
+1. **Observe Dynamics Explorer Phases A and B through organic use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` and
    `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Deployment, migrations,
    exact schema readback, and one signed-in correlated request are complete.
    Accumulate normal staff traffic, then run the aggregate probes; do not
    manufacture requests or feedback.
 
-3. **Observe Stage II institution outcomes through 2026-09-02.**
+2. **Observe Stage II institution outcomes through 2026-09-02.**
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Do not
    manufacture shared-roster rows. Re-probe live state before deciding whether
    the rollout flag should remain.
@@ -153,7 +163,7 @@ business-row mutation has been run.
    Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
    the live environment and replacement deployment before changing it.
 
-### Parked / Sequenced After Reopen
+### Parked / Sequenced After Guarded-Reopen Proof
 
 1. Frozen PDF and informational email distribution — first probe Dynamics
    unresolved-recipient behavior and select the durable distribution-attempt
@@ -174,9 +184,11 @@ business-row mutation has been run.
 
 ### Verify Before Acting
 
-1. Request `1002379` is already Review/Site Visit. Do not regenerate it, clear
-   its lifecycle, or use it for a reopen test without a separately approved
-   exact durable-write request.
+1. Request `1002379` now points to guarded-reopen successor
+   `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` in Ready/Draft. Do not regenerate it
+   or start another Site Visit handoff without a new exact durable-write
+   approval; the preserved prior Review row is Superseded and remains audit
+   evidence.
 2. The template-v3 Word Online and latest warning-bearing generation paths do
    not have complete signed-in smoke coverage. The promoted Request `1002379`
    cannot supply that evidence without a successor/reopen or another approved
@@ -187,6 +199,12 @@ business-row mutation has been run.
    owner-only live regeneration only when a current claim actually requires it.
 5. `dynamics_query_log.record_count` rows before 2026-08-08 have broken
    semantics; never trend across that boundary.
+6. The 2026-08-23 inventory found `pre-site-visit.proposal-core.generate` v5
+   (`3d76ee40-5e9b-f111-b8db-70a8a5ae4225`) current on `claude-sonnet-5`,
+   published 2026-08-18, while several durable prompt-governance surfaces still
+   say v4 is sole-current. Treat that as a separate prompt-governance drift
+   audit before any new generation claim; this guarded-reopen proof copied
+   preserved bytes and made no model call.
 
 ### Do Not Reopen Without New Decision
 
@@ -207,7 +225,7 @@ business-row mutation has been run.
 | `shared/components/workbench/PreSiteVisitTab.js` | Draft controls and promoted-state read-only receipt |
 | `pages/api/workbench/pre-site-visit/start-site-visit.js` | Authenticated exact-body handoff route |
 | `lib/services/pre-site-visit/site-visit-transition-service.js` | Draft→Review transaction and exact post-write reread |
-| `lib/services/pre-site-visit/reopen-service.js` | Production-deployed preserve-and-succeed service; durable mutation smoke remains separately approval-gated |
+| `lib/services/pre-site-visit/reopen-service.js` | Production-proved preserve-and-succeed service; Request `1002379` verified one successor/copy and exact retry reuse |
 | `lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json` | Production-live additive guarded-reopen audit fields; 3 exact/0 divergent on 2026-08-23 |
 | `scripts/preflight-guarded-reopen-schema.mjs` | Read-only Wave 20 metadata classifier plus local self-test |
 | `docs/MEMORY_HYGIENE_RUNBOOK.md` | Canonical routine/deep audit and router-diet procedure |
@@ -231,6 +249,9 @@ business-row mutation has been run.
   The final independent Claude Opus acceptance review returned APPROVE with no
   actionable findings. Production deployment
   `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp` is Ready; signed-in Request `1002788`
-  exercised the read-only extended status projection without writes.
+  exercised the read-only extended status projection without writes. After
+  exact approval, signed-in Request `1002379` created one preserved-successor
+  cycle; authoritative Dataverse/Graph readback and an unchanged service retry
+  proved one row/item, exact copied bytes, pointer coherence, and reuse.
 - Stop-time claim-evidence pilot: local observation state was unavailable, so no
   observation row was added and no advisory classification was invented.
