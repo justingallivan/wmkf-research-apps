@@ -1,259 +1,209 @@
-# Session 454 Prompt: Guarded Pre-Site Release Preparation
+# Session 455 Prompt: Close Frozen Distribution Review Findings
 
-## Session 453 Summary
+## Session 454 Summary
 
-Session 453 implemented and independently hardened guarded Pre-Site reopen on
-`codex/guarded-reopen`. **[PRODUCTION-DEPLOYED 2026-08-23]** Wave 20 was
-applied to Production and independently read back as three exact fields with
-zero absent/divergent; the non-sensitive literal-on readiness flag was set;
-merge `af986d92` deployed Ready as `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`.
-A signed-in read-only Request `1002788` Pre-Site-tab smoke exercised the
-extended status path without application errors or writes. **[PRODUCTION-PROVED
-2026-08-23]** after exact owner approval, signed-in Request `1002379` completed
-the durable guarded reopen and an exact unchanged retry reused the same
-successor row and SharePoint item.
+Session 454 completed the pricing-canary correction and built the first
+cross-system frozen Pre-Site distribution implementation on
+`codex/frozen-pdf-distribution`. The branch is deliberately unmerged and must
+remain isolated until the independent review findings below are fixed and
+re-reviewed. No migration, deployment, Production snapshot, Dynamics activity,
+or email send occurred.
 
 ### What Was Completed
 
-1. **The controlled Production Site Visit handoff passed.**
-   - The owner explicitly approved the durable Production action for Request
-     `1002379`.
-   - The signed-in Workbench promoted the exact current Pre-Site Word workspace
-     from Draft to Review and recorded the handoff at `8/21/2026, 5:22:36 PM`.
-   - The Site Visit and Pre-Site views retained the same filename and exact
-     SharePoint Edit/Download identity. A fresh authenticated load returned the
-     Review state and milestone time, and regeneration was locked.
-   - The transition service reports success only after an exact post-write
-     reread of the SharePoint publication version, governed hash, and non-null
-     milestone time. The browser did not expose those opaque values, so the
-     proof remains bounded to the enforced service reread plus fresh UI/API
-     state.
+1. **The Claude 5 pricing canary was corrected.**
+   - Commit `47051aba` updated model capability/resolution and pricing surfaces so
+     Sonnet medium resolves to Sonnet 5 while intentional Haiku and Opus choices
+     remain intact.
+   - Focused pricing, resolver, and LLM-client tests were added or updated.
 
-2. **Promoted Pre-Site is now a Production-proven read-only receipt.**
-   - Pre-Site Edit, Download, filename, and Regenerate controls render only for
-     Draft. Review shows one continuation action into Site Visit; later,
-     missing-link, and unknown states fail closed.
-   - Signed-in Request `1002379` showed zero Pre-Site work controls and one
-     continuation action. Site Visit opened the expected same Word item with
-     Edit/Download and the recorded handoff time. No second write or document
-     action was invoked.
-   - The request had no visible edit-check warning, so promoted-warning
-     placement remains component-test evidence rather than browser-smoke
-     evidence.
+2. **Frozen Pre-Site DOCX/PDF distribution became source-built.**
+   - Commit `8a240e77` adds an authenticated Workbench flow to retain the exact
+     current Word version, optionally derive PDF from the retained Word item,
+     preview the complete message, and send DOCX, PDF, or both through Dynamics.
+   - Known staff/consultant addresses receive syntax normalization,
+     deduplication, and To/Cc conflict rejection. The owner explicitly rejected
+     an identity-confidence or directory-membership gate for this workflow.
+   - The exact preview binds source/version/hash, selected attachment identities,
+     recipients, subject/body/template, sender, and Dynamics actor.
+   - Postgres migration 034 defines the attempt/recovery ledger; SharePoint plus
+     Request Document rows own retained file identity; Dynamics owns the email.
+   - Per-attachment receipts, a send-intent marker, a lease, correlation recovery,
+     and status readback support exact retry without creating another activity.
 
-3. **The remaining Workbench lifecycle was designed but not misrepresented as built.**
-   - Guarded correction/reopen preserves the Review row/file/milestone and
-     creates an exact Draft successor under a durable audit and explicit
-     permission contract. It must precede Final creation.
-   - **[SOURCE-IMPLEMENTED 2026-08-23; migration/deployment/live proof
-     pending]** informational sharing is an explicit retained-DOCX/PDF/both
-     preview/send/history flow; it never asks recipients to edit the live Word
-     workspace and never sends automatically on promotion.
-   - AkoyaGo publication is a one-way derived projection, not a second source
-     of truth. Exact path, filename, representation, permission, schema, and
-     Power Automate contracts remain discovery-gated.
-   - Site Visit logistics, dossier/supporting files, and the Final copy
-     transaction remain later slices.
+3. **The implementation passed its scoped source verification.**
+   - Six focused suites passed 55/55 tests.
+   - TypeScript, scoped ESLint, migration manifest, API security, Atlas,
+     route/service boundary, trust-boundary GUID, Dataverse access/context,
+     OData, wiki, symbol, fact, documentation, and build-claim gates passed.
+   - `npm run build -- --webpack` completed successfully with only the existing
+     dynamic-dependency warnings.
 
-4. **The nonexistent former domain was removed from tracked sources.**
-   - Established `wmkeck.org` examples replaced it where a real domain was
-     intended. The repository search and relevant documentation gates passed.
+4. **Independent Claude review found promotion-blocking gaps.**
+   - Claude identified itself as `claude-fable-5` and left a local, gitignored
+     report at
+     `outputs/codex-handoff-frozen-distribution-review-2026-08-23.md`.
+   - Codex independently traced the cited callers and confirmed nine actionable
+     findings. The possible Dynamics subject limit remains an unverified live
+     metadata preflight item, not a confirmed code defect.
+   - The existing durable design resolves the report's apparent product question:
+     guarded reopen must remain allowed after both prepared and sent
+     distributions because each retained snapshot preserves what earlier
+     recipients saw and a later Word version begins a new preview/send cycle.
 
-5. **The memory-hygiene early-warning architecture is active.**
-   - Fable branch `codex/fable-memory-hygiene-runbook` was merged into `main` at
-     exact branch head `800eb8e4` via merge commit `00139331`.
-   - The system adds single-sourced router thresholds, the 8 KiB routine-audit
-     notice, SessionStart and Stop advisories, mutation-backed hook tests, and
-     the canonical routine/deep-audit and router-diet runbook.
-   - Every handoff-prescribed merge gate passed sequentially.
-
-6. **The first routine memory audit and router diet are complete.**
-   - All three health findings and five sampled leaves received explicit
-     dispositions. One missing recall rule was fixed; two oversize leaves remain
-     accepted, bounded hygiene debt for future domain-focused deep audits.
-   - No memory file or leaf content was deleted. The router fell from `9,040` B
-     / `66` lines / `63` direct leaf references to `5,911` B / `60` lines /
-     `45` direct leaf references, below both the notice trigger and the
-     approximately 6 KiB diet target.
-   - The committed drift report was older than 24 hours and was deliberately
-     not regenerated because no session claim relied on it being fresh.
-
-7. **The Claude/Fable workstream was closed safely.**
-   - Its clean worktree was removed after merge, verification, push, and
-     deployment. The local and remote branch remain available for provenance.
-   - `main` was clean and synchronized with `origin/main` before this handoff.
-
-8. **Guarded Pre-Site reopen is source-complete and Opus-approved.**
-   - The preserve-and-succeed service, superuser route/UI, exact-operation
-     retry, cycle-salted regeneration, Wave 20 readiness interlock, append-only
-     history, and stable-identity cleanup reconciliation are implemented.
-   - Failed attempts remain exact-retry targets for their own operation; a
-     different operation records any resolvable retained copy as cleanup work.
-     Expired live claims follow the same cleanup contract before fallthrough.
-   - Correction history and nested audit details are superuser-only across
-     status, generation, and Site Visit handoff responses. Non-superusers do
-     not receive pending reason-bearing reopen rows. Actor/time attribution is
-     limited to the actual reason-bearing reopen event.
-   - Multiple independent Claude Opus review rounds closed every P0–P3 finding.
-     The final report returned **APPROVE — no actionable findings remain** at
-     `/Users/gallivan/.claude/plans/perform-the-final-read-only-soft-parrot.md`.
-
-9. **Guarded Pre-Site reopen passed the controlled Production mutation smoke.**
-   - Exact owner approval bound the action to Request `1002379`. The signed-in
-     superuser flow used reason `accidental_handoff` and created successor row
-     `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` plus SharePoint item
-     `01G4GVMS5W3ILDTXPFENHY6VXJCK54GDPF`.
-   - Dataverse readback showed the request pointer on that Ready/Draft
-     successor, source row `76a0d4b2-8b9a-f111-b8db-7ced8d3d15a6` preserved
-     as Superseded, no Final pointer, one cycle row, and no cleanup work.
-   - Exact retry with cycle `0f107ddd-8d1f-4d68-abfc-b6cb5b3f0b9f` returned
-     the same row/item with `reused: true`; it ran without a Production write
-     acknowledgement, so any unexpected mutation path would have failed closed.
-   - Independent Graph postcheck found both source and successor stable across
-     reread, both governed hashes exact, and copied bytes identical. The
-     preserved source's live eTag had advanced from its registry snapshot while
-     drive/item/version/last-modified/size/hash remained exact; the service had
-     already required the live eTag to stay stable across verification and
-     activation.
+5. **The session ended without promotion or external side effects.**
+   - Migration 034 was not applied.
+   - The feature branch was not merged into `main` and did not auto-deploy.
+   - No live Graph, Dataverse, Dynamics email, or Postgres business write was
+     performed for this feature.
+   - The stop-time claim-evidence report could not read local observation state;
+     no observation row was fabricated.
 
 ### Commits
 
-- `a089cf80` — docs(workbench): record production site visit handoff
-- `ec8ed1f0` — docs(domains): remove nonexistent former-domain references
-- `bebabb90` — docs: plan AkoyaGo writeup publication discovery
-- `66c0c7ef` — fix(workbench): route promoted pre-site work to site visit
-- `bd9dc060` — fix(workbench): harden site visit handoff receipt
-- `b3bb0ef6` — fix(workbench): clarify read-only handoff states
-- `429ac992` — docs(workbench): record production handoff receipt
-- `43c8eab1` — docs(workbench): record signed-in receipt smoke
-- `800eb8e4` — docs(handoff): branch handoff for Codex — merge + first router diet
-- `00139331` — merge the Fable memory-hygiene branch into `main`
-- `fb8dfab2` — docs(memory): complete first routine audit and router diet
-- `1e14f651` — feat(workbench): add guarded pre-site reopen
-- `6ce85d36` — fix(workbench): harden guarded reopen review findings
-- `7096c6d4` — fix(workbench): close opus guarded reopen findings
-- `7167d94` — fix(workbench): reconcile guarded reopen residuals
-- `5545d0b` — fix(workbench): redact reopen audit on handoff
+- `47051aba` — fix pricing canary for Claude 5 models
+- `8a240e77` — feat(workbench): add frozen pre-site distribution
 
 ## Next Items
 
 ### Verified Open
 
-1. **Observe Dynamics Explorer Phases A and B through organic use.**
-   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` and
-   `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`. Deployment, migrations,
-   exact schema readback, and one signed-in correlated request are complete.
-   Accumulate normal staff traffic, then run the aggregate probes; do not
-   manufacture requests or feedback.
+1. **Exclude distribution snapshots consistently from editable Pre-Site lifecycle consumers.**
+   Evidence: `lib/services/pre-site-visit/reopen-service.js` `assertNoDownstream`;
+   `lib/services/pre-site-visit/artifact-service.js` `wordRows`, `pendingRow`,
+   `priorReady`, and `activeReadyWords`; producer prefix
+   `request-workbench-distribution` in `distribution-service.js`.
+   Required behavior: retained distribution DOCX/PDF rows never block guarded
+   reopen, surface as pending drafts, get superseded by draft activation, or make
+   activation readback report a false conflict. Use one deliberately shared or
+   exactly mirrored predicate across all affected consumers and add
+   discriminating fixtures that contain a distribution row.
 
-2. **Observe Stage II institution outcomes through 2026-09-02.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Do not
-   manufacture shared-roster rows. Re-probe live state before deciding whether
-   the rollout flag should remain.
+2. **Make the direct Dynamics send path fail closed on disabled impersonation.**
+   Evidence: `lib/services/dynamics/write-core.js` `_withCallerId` omits
+   `MSCRMCallerID` unless `DYNAMICS_IMPERSONATION_ENABLED === 'true'`, while only
+   composed `createAndSendEmail` currently preflights `noFallback`.
+   Required behavior: `sendPreSiteDistribution` rejects before any Dynamics write
+   when the authenticated actor is present but impersonation is not explicitly
+   enabled. Do not change the behavior-frozen shared write primitives.
+
+3. **Close retained-file conversion and version-identity races.**
+   Evidence: PDF conversion uses the snapshot item's current content, and
+   `GraphService.uploadFile` can return `cTag` where distribution code expects a
+   native publication version.
+   Required behavior: prove the Word snapshot version/eTag remains the confirmed
+   input across PDF conversion; after upload, read stable metadata by drive/item
+   and persist only its native `publication.versionId`, failing closed when it is
+   absent or changed.
+
+4. **Persist the Dynamics activity identity before exact round-trip assertions.**
+   Evidence: `assertEmailActivityMatches` currently runs before
+   `recordEmailActivity`; Dynamics HTML normalization could otherwise leave every
+   retry recovering the same unpersisted draft and failing forever.
+   Required behavior: once create or unique correlation recovery yields one
+   activity ID, fence/persist that ID before validating exact content. A mismatch
+   must still fail closed and must never create a replacement activity.
+
+5. **Restore schema and deployment-contract parity.**
+   Evidence: migration 034 names all CHECK constraints; the fresh-install v40
+   mirror uses anonymous CHECKs. The lifecycle plan also removed the unresolved-
+   recipient tenant probe without evidence that the tenant supports raw
+   `addressused` consultant recipients.
+   Required behavior: use the migration's constraint names in
+   `scripts/setup-database.js` and restore unresolved-recipient behavior as an
+   explicit pre-deployment go/no-go probe. Do not apply migration 034 yet.
+
+6. **Obtain a fresh independent re-review after fixes.**
+   Evidence: the current Claude review is a findings handoff, not approval.
+   Required behavior: run all focused distribution suites plus affected
+   pre-site artifact/reopen suites and relevant gates, commit the fixes on this
+   branch, then request a read-only Claude Opus/Fable review. Promotion remains
+   blocked until actionable findings close.
+
+7. **Continue standing organic-use observations without manufacturing evidence.**
+   Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`,
+   `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`, and
+   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
+   Description: accumulate real Dynamics Explorer and Stage II outcomes; do not
+   generate synthetic staff traffic or shared-roster rows.
 
 ### Blocked on External Input
 
-1. **Explorer campaign Phases C–D.**
+1. **Explorer campaign Phases C-D.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` Section 4.
-   Blocked on 10–20 real Southern California questions and owner answers about
+   Blocked on 10-20 real Southern California questions and owner answers about
    population-served and `_socal` program-area usage.
 
 ### Owner Decision Needed
 
 1. **After 2026-09-02, retain or remove the Stage II rollout flag.**
-   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Re-probe
-   the live environment and replacement deployment before changing it.
+   Evidence: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
+   Re-probe the live environment and replacement deployment before changing it.
 
-### Parked / Sequenced After Guarded-Reopen Proof
+### Parked
 
-1. Frozen Word/PDF informational email distribution — source-built with
-   Postgres migration 034 as the selected attempt ledger. Apply/read back the
-   migration before deployment, then run authenticated read-only verification
-   and a separately approved controlled send/readback.
-2. Site Visit logistics and governed supporting-file dossier — map current
+1. **Frozen distribution release operations.** Apply/read back migration 034,
+   deploy, run authenticated read-only UI verification, and perform a separately
+   approved controlled send only after fixes and re-review.
+2. **Site Visit logistics and governed supporting-file dossier.** Map live
    Dataverse facts before proposing schema.
-3. AkoyaGo publication projection — complete signed-in AkoyaGo, historical
-   filename/path, Power Automate, and non-governed SharePoint discovery before
-   selecting a storage or filename contract.
-4. Final Writeup copy transaction — follows guarded reopen; freeze and copy an
-   exact Site Visit-stage source version/hash into a new governed Final item.
-5. `NEXTAUTH_SECRET` rotation and Vercel Sensitive conversion — reopen only
-   with a coordinated session-invalidation window.
-6. Reviewer multipart direct-upload conversion — complete consumer discovery
-   and obtain an owner decision first.
-7. Stage III institution identity authority — blocked until the execution-point
-   contract exists.
+3. **AkoyaGo publication projection.** Complete signed-in AkoyaGo, historical
+   path/filename, Power Automate, and non-governed SharePoint discovery first.
+4. **Final Writeup copy transaction.** Freeze and copy an exact Site Visit-stage
+   source version/hash only after the earlier lifecycle slices are closed.
+5. **`NEXTAUTH_SECRET` rotation and Sensitive conversion.** Reopen only with a
+   coordinated session-invalidation window.
 
 ### Verify Before Acting
 
-1. Request `1002379` now points to guarded-reopen successor
-   `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` in Ready/Draft. Do not regenerate it
-   or start another Site Visit handoff without a new exact durable-write
-   approval; the preserved prior Review row is Superseded and remains audit
-   evidence.
-2. The template-v3 Word Online and latest warning-bearing generation paths do
-   not have complete signed-in smoke coverage. The promoted Request `1002379`
-   cannot supply that evidence without a successor/reopen or another approved
-   request.
-3. Production Dataverse reads are owner-run. Never set
-   `DATAVERSE_ALLOW_PROD_READS` yourself.
-4. The memory drift report was older than 24 hours at the routine audit. Run
-   owner-only live regeneration only when a current claim actually requires it.
-5. `dynamics_query_log.record_count` rows before 2026-08-08 have broken
-   semantics; never trend across that boundary.
-6. The 2026-08-23 inventory found `pre-site-visit.proposal-core.generate` v5
-   (`3d76ee40-5e9b-f111-b8db-70a8a5ae4225`) current on `claude-sonnet-5`,
-   published 2026-08-18, while several durable prompt-governance surfaces still
-   say v4 is sole-current. Treat that as a separate prompt-governance drift
-   audit before any new generation claim; this guarded-reopen proof copied
-   preserved bytes and made no model call.
+1. **Dynamics `email.subject` maximum length.** Claude suspected the standard
+   field may be 200 characters while source accepts 500. Verify tenant metadata
+   before promotion; do not change the limit from memory alone.
+2. **Unresolved-recipient behavior.** Probe the non-production tenant before any
+   live consultant send. Runtime currently creates To/Cc parties with raw
+   `addressused` and no party lookup.
+3. **Dynamics round-trip behavior.** Verify description/address fidelity,
+   correlation consistency, status-code meanings `{3,6,7}`, and repeated
+   `SendEmail` behavior on the same activity before Production proof.
+4. **Migration 034.** Apply only through `node scripts/apply-migrations.js` after
+   source fixes and review approval; then read back the exact table/constraints.
+5. **Production Dataverse reads are owner-run.** Never set
+   `DATAVERSE_ALLOW_PROD_READS` in an agent session.
+6. **Request `1002379` remains an audited guarded-reopen successor.** Do not
+   regenerate or start another Site Visit handoff without new exact durable-write
+   approval.
 
 ### Do Not Reopen Without New Decision
 
-1. Automatic email on Site Visit promotion — the owner chose explicit preview
-   and send of a frozen DOCX, PDF, or both.
-2. Editing or reopening the preserved Review row in place — correction uses a
-   separately audited Draft successor.
-3. Treating an AkoyaGo-visible publication as a second editable source of truth.
-4. Asker-profile-based program biasing in Dynamics Explorer or raising
-   `MAX_TOOL_ROUNDS` without new post-telemetry evidence.
+1. Automatic email on Site Visit promotion; the owner chose explicit preview
+   and send of DOCX, PDF, or both.
+2. Identity-confidence or directory-membership gating for the known
+   staff/consultant distribution workflow.
+3. Editing the preserved Review row in place; correction uses a separately
+   audited Draft successor.
+4. Treating an AkoyaGo-visible publication as a second editable source of truth.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Current lifecycle truth, correction/email/publication contracts, and implementation order |
-| `shared/components/workbench/SiteVisitTab.js` | Site Visit handoff action and same-item workspace UI |
-| `shared/components/workbench/PreSiteVisitTab.js` | Draft controls and promoted-state read-only receipt |
-| `pages/api/workbench/pre-site-visit/start-site-visit.js` | Authenticated exact-body handoff route |
-| `lib/services/pre-site-visit/site-visit-transition-service.js` | Draft→Review transaction and exact post-write reread |
-| `lib/services/pre-site-visit/reopen-service.js` | Production-proved preserve-and-succeed service; Request `1002379` verified one successor/copy and exact retry reuse |
-| `lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json` | Production-live additive guarded-reopen audit fields; 3 exact/0 divergent on 2026-08-23 |
-| `scripts/preflight-guarded-reopen-schema.mjs` | Read-only Wave 20 metadata classifier plus local self-test |
-| `docs/MEMORY_HYGIENE_RUNBOOK.md` | Canonical routine/deep audit and router-diet procedure |
-| `docs/audits/memory-routine-audit-2026-08-21.md` | First audit evidence, dispositions, and metrics |
-| `docs/MEMORY_ROUTER_EARLY_WARNING_PLAN.md` | Built warning/advisory architecture and constraints |
+| `lib/services/pre-site-visit/distribution-service.js` | Frozen source/snapshot, preview, Dynamics recovery, and history coordinator |
+| `lib/services/pre-site-visit/distribution-store.js` | Postgres attempt ledger and fenced step receipts |
+| `lib/db/migrations/034_pre_site_distribution_attempts.sql` | Existing-database distribution ledger migration, not applied |
+| `lib/services/pre-site-visit/artifact-service.js` | Current/pending Pre-Site projection and Ready activation consumers needing snapshot exclusion |
+| `lib/services/pre-site-visit/reopen-service.js` | Guarded reopen downstream check needing snapshot exclusion |
+| `shared/components/workbench/PreSiteDistributionPanel.js` | DOCX/PDF/both compose, preview, send, and history UI |
+| `lib/dataverse/adapters/email-activity.js` | Dynamics activity/attachment reads and granular writes |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Canonical frozen-distribution and later-version contract |
 
-## Testing and Operational Evidence
+## Testing
 
-- Workbench receipt: focused component suite 23/23, Webpack production build,
-  two read-only Claude Opus reviews with APPROVE, Ready deployment
-  `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`, and signed-in Request `1002379` receipt →
-  Site Visit same-item smoke.
-- Memory merge/audit: every handoff-prescribed memory-router, hook, instruction,
-  docs, fact, symbol, type, claim-freshness, framing, currency, and clean-diff
-  gate passed sequentially. The router self-test passed 19/19 with existing
-  advisory MaxListeners warnings.
-- Guarded reopen branch: seven focused service, route, artifact, and component
-  suites pass 101/101; TypeScript and scoped ESLint pass. The production Webpack
-  build and relevant API-route, lifecycle/auth, route/service, DAL/context,
-  GUID, status, Atlas, documentation, fact, currency, and invariant gates pass.
-  The final independent Claude Opus acceptance review returned APPROVE with no
-  actionable findings. Production deployment
-  `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp` is Ready; signed-in Request `1002788`
-  exercised the read-only extended status projection without writes. After
-  exact approval, signed-in Request `1002379` created one preserved-successor
-  cycle; authoritative Dataverse/Graph readback and an unchanged service retry
-  proved one row/item, exact copied bytes, pointer coherence, and reuse.
-- Stop-time claim-evidence pilot: local observation state was unavailable, so no
-  observation row was added and no advisory classification was invented.
+```bash
+rtk npx jest --runInBand tests/unit/pre-site-distribution-service.test.js tests/unit/pre-site-distribution-panel.test.js tests/unit/email-activity-adapter.test.js tests/unit/graph-service-versions.test.js tests/unit/dynamics-service-caller-id.test.js tests/unit/site-visit-tab.test.js
+rtk npm run check:types
+rtk npm run check:api-routes
+rtk npm run check:atlas
+rtk npm run check:dataverse-access-layer
+rtk npm run build -- --webpack
+```
+
