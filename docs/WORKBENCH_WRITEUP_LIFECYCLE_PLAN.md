@@ -440,7 +440,9 @@ Send → History`:
    publication version/eTag (never an upload/path cTag substitute). When
    selected, compare the retained Word publication version/eTag immediately
    before and after Graph conversion, then retain and verify the deterministic
-   PDF row/item the same way.
+   PDF row/item the same way. A later metadata-only publication-version/eTag
+   change may refresh a Ready snapshot row under Dataverse ETag concurrency
+   only after a stable reread proves the retained bytes and hashes unchanged.
 2. Accept an explicit To/CC set of known staff and consultants. Staff entry is
    authoritative; normalize and deduplicate addresses, reject invalid syntax or
    To/CC conflicts, show every final address in preview, and never send a valid

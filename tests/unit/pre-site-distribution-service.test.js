@@ -60,7 +60,10 @@ test('prepare rejects a missing attachment selection before any persistence or f
   }, {})).rejects.toMatchObject({ code: 'distribution_attachment_mode_required' });
 });
 
-function createPrepareHarness({ mutateWordDuringPdf = false } = {}) {
+function createPrepareHarness({
+  mutateWordDuringPdf = false,
+  provisionalWordETag = 'word-etag',
+} = {}) {
   const sourceDocumentId = '44444444-4444-4444-8444-444444444444';
   const sourceBytes = Buffer.from('governed-word-bytes');
   const pdfBytes = Buffer.from('%PDF-frozen-bytes');
@@ -82,6 +85,8 @@ function createPrepareHarness({ mutateWordDuringPdf = false } = {}) {
   const snapshots = [];
   let snapshotSequence = 0;
   let wordMetadataReads = 0;
+  let settledWordVersion = '1.0';
+  let settledWordETag = 'word-etag';
 
   const metadata = (itemId, versionId, eTag, size, name) => ({
     siteId: 'snapshot-site',
@@ -164,7 +169,7 @@ function createPrepareHarness({ mutateWordDuringPdf = false } = {}) {
     getFileMetadataByPath: jest.fn(async () => null),
     uploadFile: jest.fn(async (_library, _folder, filename, buffer, contentType) => (
       contentType === PRE_SITE_VISIT_CONTRACT.contentType
-        ? metadata('word-snapshot', 'ctag-provisional', 'word-etag', buffer.length, filename)
+        ? metadata('word-snapshot', 'ctag-provisional', provisionalWordETag, buffer.length, filename)
         : metadata('pdf-snapshot', 'ctag-pdf', 'pdf-etag', buffer.length, filename)
     )),
     getFileMetadataById: jest.fn(async (driveId, itemId) => {
@@ -181,8 +186,10 @@ function createPrepareHarness({ mutateWordDuringPdf = false } = {}) {
       }
       if (itemId === 'word-snapshot') {
         wordMetadataReads += 1;
-        const versionId = mutateWordDuringPdf && wordMetadataReads >= 3 ? '2.0' : '1.0';
-        return metadata(itemId, versionId, 'word-etag', sourceBytes.length, 'snapshot.docx');
+        const versionId = mutateWordDuringPdf && wordMetadataReads >= 3
+          ? '2.0'
+          : settledWordVersion;
+        return metadata(itemId, versionId, settledWordETag, sourceBytes.length, 'snapshot.docx');
       }
       if (itemId === 'pdf-snapshot') {
         return metadata(itemId, '1.0', 'pdf-etag', pdfBytes.length, 'snapshot.pdf');
@@ -223,7 +230,14 @@ function createPrepareHarness({ mutateWordDuringPdf = false } = {}) {
     now: jest.fn(() => new Date('2026-08-23T12:00:00Z')),
   };
 
-  return { dependencies, snapshots };
+  return {
+    dependencies,
+    snapshots,
+    setWordPublication(versionId, eTag) {
+      settledWordVersion = versionId;
+      settledWordETag = eTag;
+    },
+  };
 }
 
 function prepareInput(overrides = {}) {
@@ -252,6 +266,39 @@ test('prepare persists native Graph publication versions instead of provisional 
     .toEqual(['1.0', '1.0']);
   expect(harness.snapshots.map((row) => row.wmkf_sharepointversionid))
     .toEqual(['1.0', '1.0']);
+});
+
+test('prepare accepts the settled stable-ID eTag when the upload response eTag is provisional', async () => {
+  const harness = createPrepareHarness({ provisionalWordETag: 'upload-response-etag' });
+
+  const result = await preparePreSiteDistribution(
+    prepareInput({ attachmentMode: 'docx' }),
+    harness.dependencies,
+  );
+
+  expect(result.attempt.attachments[0].versionId).toBe('1.0');
+  expect(harness.snapshots[0].wmkf_sharepointetag).toBe('word-etag');
+});
+
+test('byte-identical Ready snapshot metadata drift refreshes the registry and remains reusable', async () => {
+  const harness = createPrepareHarness();
+  await preparePreSiteDistribution(
+    prepareInput({ attachmentMode: 'docx' }),
+    harness.dependencies,
+  );
+  harness.setWordPublication('2.0', 'word-etag-2');
+
+  const result = await preparePreSiteDistribution(prepareInput({
+    operationId: '99999999-9999-4999-8999-999999999999',
+    attachmentMode: 'docx',
+  }), harness.dependencies);
+
+  expect(result.attempt.attachments[0].versionId).toBe('2.0');
+  expect(harness.snapshots[0]).toMatchObject({
+    wmkf_sharepointversionid: '2.0',
+    wmkf_sharepointetag: 'word-etag-2',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+  });
 });
 
 test('prepare rejects PDF conversion when the frozen Word publication changes mid-conversion', async () => {
