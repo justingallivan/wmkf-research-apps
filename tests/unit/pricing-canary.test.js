@@ -77,6 +77,14 @@ describe('pricing-canary model registry discovery', () => {
     })).toEqual({ status: 'reviewed_dated', matchedKey: 'claude-sonnet-4-6' });
   });
 
+  it('treats the exact reviewed Opus 5 id as covered by both registries', () => {
+    const unreviewed = findUnreviewedLiveClaudeModels([
+      { id: 'claude-opus-5', display_name: 'Claude Opus 5', created_at: AFTER_REVIEW_AT },
+    ], { reviewedAt: LAST_CAPABILITY_REVIEWED_AT });
+
+    expect(unreviewed).toEqual([]);
+  });
+
   it('flags newer same-family ids that only match an ancestor prefix', () => {
     const unreviewed = findUnreviewedLiveClaudeModels([
       { id: 'claude-sonnet-4-6-20260701', display_name: 'Sonnet 4.6', created_at: '2026-07-01T00:00:00Z' },

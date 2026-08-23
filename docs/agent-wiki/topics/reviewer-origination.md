@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-08
+last_verified: 2026-08-23
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -87,8 +87,11 @@ Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08
 - Keep targeted hardening for Claude's senior-bias and the
   niche/pivot/sparse tail are REAL (the S231 probe found 2/10 analyze under-deliveries).
   Treat that tail as a sparse-case toolkit, not an engine replacement.
-- Model: origination now runs on **Opus 4.8** by default, not Sonnet (S286,
-  baseConfig `reviewer-finder`: `{ model: 'opus', fallback: 'sonnet' }`). On a niche
+- Model: live origination now uses the reviewed **Opus tier**, which resolves to
+  **Opus 5** (verified 2026-08-23 through the Production Admin Models surface). The
+  source fallback remains the concrete `claude-opus-4-8` pin in baseConfig; the live
+  `model_override:reviewer-finder:model=opus` Dataverse setting takes precedence. The
+  S286 switch away from Sonnet was justified by a niche
   out-of-mainstream proposal (synthetic torpor; req 1002821) Sonnet 4.6 fell into a
   token-repetition/hallucination loop: it could confidently name only the ~6 reviewers
   the applicant already cited in the proposal prose, then padded the fixed 15-quota with
@@ -101,10 +104,11 @@ Holistic-review analysis: `docs/audits/reviewer-holistic-review-fable-2026-07-08
   raised 4096→8192 (`ClaudeReviewerService.MAX_TOKENS`). **Caveat:** live model resolution
   is governed by the `model_override:reviewer-finder:model` admin setting in Dataverse
   `wmkf_appsystemsettings` (loaded via `loadModelOverrides()`), which takes precedence
-  over baseConfig — switching prod to Opus requires clearing/updating that override in
-  `/admin` (and confirming no `CLAUDE_MODEL_REVIEWER_FINDER` env var pins it in Vercel). Opus 4.8 also deprecates the `temperature` API param (`llm-client`
-  omits it for that model); the reviewer-finder had no temperature UI control and the dead
-  route-level plumbing was removed.
+  over baseConfig. Changing the live tier or introducing an env pin requires the
+  model-change checklist and confirmation in `/admin`; an env override would be baked
+  into the deployment. Opus 4.8 and Opus 5 both reject non-default `temperature`, so
+  `llm-client` omits it from either request; the reviewer-finder had no temperature UI
+  control and the dead route-level plumbing was removed.
 
 Read the `## Direction` bullets below as the lane mechanics under this posture — a
 sparse-tail toolkit, not a mandate to replace Claude.

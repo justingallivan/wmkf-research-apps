@@ -219,7 +219,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain. |  |
+| [PROMPT_CACHING_AUDIT.md](PROMPT_CACHING_AUDIT.md) | plan | active |  | July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain. | 2026-08-23 |
 
 ## observability
 

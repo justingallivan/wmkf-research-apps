@@ -4,6 +4,7 @@ domain: llm-platform
 kind: plan
 status: active
 summary: "July 2026 cache audit: R1/R3 and identical-rerun Executor mitigation shipped; cross-document composition and conditional R5 remain."
+last_verified: 2026-08-23
 ---
 
 # Prompt Caching Audit and Standardized Remediation
@@ -105,7 +106,8 @@ Notable audit corrections to prior beliefs (`.claude-memory/project-cache-hit-ra
   remedy doesn't pay. Marked stale-in-part in memory.
 - **[Historical July-audit observation, superseded for current guidance]** the audit treated
   `claude-opus-4-8` as requiring a 4096-token prefix. Current official guidance lists
-  **1024 tokens** for Opus 4.8 and Sonnet 4.6; Opus 4.6/4.5 and Haiku 4.5 require **4096**.
+  **512 tokens** for Opus 5, **1024 tokens** for Opus 4.8, Sonnet 5, and Sonnet 4.6;
+  Opus 4.6/4.5 and Haiku 4.5 require **4096**.
   Verify the concrete configured model before judging a candidate. See Anthropic's
   [prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
 
@@ -146,8 +148,9 @@ minutes then hit on the shared template.
 - `composeScorePrompt` batch loop (`claude-reviewer-service.js:708`;
   `reviewer-prompt-composer.js:144-149`): reorder stable template + proposal_summary ahead
   of a breakpoint, per-batch nonce+candidates behind it — **only if** the stable prefix
-  clears the current configured model's floor (the reviewer-finder default is Opus 4.8,
-  currently 1024 tokens), and without moving the nonce boundary ahead of stable
+  clears the current configured model's floor (the live reviewer-finder Opus tier resolves
+  to Opus 5, currently 512 tokens; its concrete source fallback is Opus 4.8 at 1024),
+  and without moving the nonce boundary ahead of stable
   text (prompt-injection defense stays intact).
 - `process-phase-i-writeup-1` (`pages/api/process-phase-i-writeup.js:144`): hoist the
   ~1.8k-token static block into a marked system block — **only if** multi-file uploads are
@@ -169,8 +172,9 @@ tools, rules, rosters) leads and is marked at its largest boundary; all dynamic 
 (nonce preambles, documents, per-request variables) trails the marker; nonces are
 per-conversation/per-document, never per-call, unless the site is genuinely single-shot;
 no marker without a verified floor for the concrete model and a repeat-within-TTL call
-pattern. Current official guidance: Opus 4.8 and Sonnet 4.6 are 1024; Opus 4.6/4.5 and
-Haiku 4.5 are 4096. See [Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+pattern. Current official guidance: Opus 5 is 512; Opus 4.8, Sonnet 5, and Sonnet 4.6
+are 1024; Opus 4.6/4.5 and Haiku 4.5 are 4096. See
+[Anthropic prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
 
 ## 4. Verification for the remediation session
 

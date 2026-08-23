@@ -6,7 +6,7 @@ status: active
 summary: "Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-26
+last_verified: 2026-08-23
 owner: product-engineering
 related:
   - lib/services/llm-client.js
@@ -22,6 +22,16 @@ registry and static validation, reviewed admin overrides, capability-aware reque
 deprecated-parameter retry, discovery canary, Admin Models status, and replay artifacts.
 This document remains active because each future model change still needs its review,
 validation, rollout, and replay procedure.
+
+**Current registry state (verified 2026-08-23):** Production tier overrides resolve
+`sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`. Both exact ids are covered
+by the reviewed capability and pricing registries; the degraded-path tier fallbacks now
+use the same generation. `reviewer-finder` still has a concrete `claude-opus-4-8`
+source fallback in `shared/config/baseConfig.js`, while its live Dataverse override uses
+the `opus` tier. Opus 5 is priced at $5/$25 per million input/output tokens. Sonnet 5's
+launch price of $2/$10 is permanent; Anthropic cancelled the previously announced
+September increase. The pricing canary auto-resolves its unknown-model alert after a
+run finds no unpriced usage ids.
 
 **Enforcement boundary (verified 2026-07-26):** `check:model-registry` and its
 self-test are registered package checks and part of the `/start` battery, but
@@ -148,9 +158,10 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 
 3. **Tier-vs-pin policy.** Tier keys are the default; **pin a concrete id for high-risk
    workflows** (expensive, user-visible, long-running, quality-sensitive — e.g. reviewer
-   origination) until the new model passes the pre-flip checklist (§4). Keep
-   `reviewer-finder` pinned to `claude-opus-4-8` until the remaining transport/admin
-   coverage is complete and the replay checklist passes.
+   origination) until the new model passes the pre-flip checklist (§4). The
+   `reviewer-finder` source fallback remains the reviewed `claude-opus-4-8` pin, while
+   the live Dataverse override intentionally tracks the reviewed `opus` tier (currently
+   `claude-opus-5`). Changing either policy still requires the replay checklist.
 
 4. **Explicit first, narrow self-healing second.** The registry + gate are the primary
    defense. `LLMClient` now has a **narrow** runtime retry-once safety net for
@@ -185,7 +196,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 
 | Phase | What | Effort | Risk |
 |---|---|---|---|
-| 0 (done S286) | Keep `reviewer-finder` pinned to `claude-opus-4-8`; unpinning requires registry + gate + replay checklist. | S | Low |
+| 0 (done S286; live override later moved to tier) | Keep a reviewed concrete source fallback for `reviewer-finder`; live Dataverse may select the reviewed `opus` tier only after registry + gate + replay evidence. | S | Low |
 | 1 (done S287) | Add capability registry with exact/prefix matching, unknown handling, `reviewedAt`/`source`, and unit tests. | M | Med |
 | 2a (done S287) | Wire `LLMClient._buildBody` + 529 rebuild through capabilities; normalize refusal metadata. | M | Med |
 | 2b (done S288) | Fix `lib/services/multi-llm-service.js` Claude request shaping and refusal metadata. | M | Med |
@@ -218,7 +229,7 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
    requested, actual model returned, fallback usage, pass/fail notes.
 9. Only then advance the tier fallback or remove a concrete pin.
 
-## §5 — "Anthropic shipped a new model" runbook (target state, once §2/§3 land)
+## §5 — "Anthropic shipped a new model" runbook
 
 Add capability entry → add/confirm pricing prefix → run `check:model-registry` +
 pricing self-test → run §4 replay if reviewer-finder is affected → record reviewed

@@ -169,8 +169,8 @@ describe('LLMClient.complete', () => {
       const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'sonnet' });
       const body = client._buildBody({ messages: [{ role: 'user', content: 'hi' }], temperature: 0.2 }, false);
 
-      expect(body.model).toBe('claude-sonnet-4-6');
-      expect(body.temperature).toBe(0.2);
+      expect(body.model).toBe('claude-sonnet-5');
+      expect(body.temperature).toBeUndefined();
     });
   });
 

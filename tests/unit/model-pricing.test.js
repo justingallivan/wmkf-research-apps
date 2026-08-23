@@ -26,6 +26,10 @@ describe('pricing table — S181 bug fixes pinned', () => {
     expect(MODEL_PRICING['claude-mythos-5']).toEqual({ input: 1000, output: 5000 });
   });
 
+  test('Sonnet 5 is $2/$10 after Anthropic made the launch rate permanent', () => {
+    expect(MODEL_PRICING['claude-sonnet-5']).toEqual({ input: 200, output: 1000 });
+  });
+
   test('Haiku 4.5 is $1/$5 (was $0.80/$4 in the pre-S181 bug)', () => {
     expect(MODEL_PRICING['claude-haiku-4-5']).toEqual({ input: 100, output: 500 });
   });
@@ -34,8 +38,8 @@ describe('pricing table — S181 bug fixes pinned', () => {
     expect(MODEL_PRICING['claude-haiku-3-5']).toEqual({ input: 80, output: 400 });
   });
 
-  test('Opus 4.5/4.6/4.7 are at the new $5/$25 tier', () => {
-    for (const m of ['claude-opus-4-5', 'claude-opus-4-6', 'claude-opus-4-7']) {
+  test('Opus 5 and 4.5+ are at the $5/$25 tier', () => {
+    for (const m of ['claude-opus-5', 'claude-opus-4-5', 'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8']) {
       expect(MODEL_PRICING[m]).toEqual({ input: 500, output: 2500 });
     }
   });
@@ -63,6 +67,11 @@ describe('lookupPricing — matcher semantics', () => {
     expect(lookupPricing('claude-fable-5')).toBe(MODEL_PRICING['claude-fable-5']);
     expect(lookupPricing('claude-fable-5-20260609')).toBe(MODEL_PRICING['claude-fable-5']);
     expect(lookupPricing('claude-mythos-5')).toBe(MODEL_PRICING['claude-mythos-5']);
+  });
+
+  test('Opus 5 exact and dated-like ids route to the reviewed Opus 5 entry', () => {
+    expect(lookupPricing('claude-opus-5')).toBe(MODEL_PRICING['claude-opus-5']);
+    expect(lookupPricing('claude-opus-5-20260820')).toBe(MODEL_PRICING['claude-opus-5']);
   });
 
   test('longest-prefix-first beats the .includes() bug — dated Opus 4.7 goes to the 4.7 tier, not Opus 4', () => {

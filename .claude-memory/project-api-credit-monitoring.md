@@ -5,7 +5,7 @@ type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: global
-last_verified: 2026-07-12 — migration high-water mark 024 confirmed via lib/db/migrations/ (024_reviewer_acceptance_jobs.sql is highest); Anthropic-console facts (auto-reload ON, $500/mo spend limit) are organizational, not probeable
+last_verified: 2026-08-23 — pricing/capability registries and migration high-water mark 033 confirmed from source; Anthropic-console facts (auto-reload ON, $500/mo spend limit) are organizational, not probeable
 ---
 
 ## Recall Rule
@@ -19,7 +19,7 @@ Do:
 
 Do not:
 - Rebuild the removed low-balance estimator/anchor machinery — Anthropic-native auto-reload + spend limits replaced it (S181).
-- Assume there is a numbered migration `032` for `model_pricing_audit` — it's created in `scripts/setup-database.js`, not a numbered migration. (Check `lib/db/migrations/` for the current highest number — `024` as of 2026-07-08, S348; there is no `032`.)
+- Assume migration `032_api_usage_stop_reason.sql` creates `model_pricing_audit` — that table is created in `scripts/setup-database.js`, not a numbered migration. (The current numbered high-water mark is `033_dynamics_explorer_request_telemetry.sql`.)
 
 Ground truth: `lib/utils/model-pricing.js`, `pages/api/admin/stats.js`, `pages/api/cron/{spend-check,pricing-canary,pricing-refresh}.js`, `api_usage_log` table; Anthropic console for reconciliation.
 
@@ -41,9 +41,9 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 - **Daily-spend threshold alert** (`/api/cron/spend-check.js`) — kept as a runaway-cost detector (code wedged in a loop, prompt mistakenly looping a large input). Different failure mode than budget approaching.
 
 **Pricing accuracy machinery (S181):**
-- **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Bug fixes: Haiku 4.5 = $1/$5 (was $0.80/$4); Opus 4.5/4.6/4.7 = $5/$25 (were inheriting Opus 4 $15/$75). 1h cache write multiplier (2×) added.
-- **`/api/cron/pricing-canary`** — weekly (Mon 10am UTC). Scans last 7d of `api_usage_log` for unknown model ids + flags if `LAST_REVIEWED_AT` >60 days old. Free signal, no Admin API needed.
-- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration — there is no `032`; check `lib/db/migrations/` for the current highest number, `024` as of 2026-07-08). [verified S209; migration high-water mark refreshed 2026-07-08 S348]
+- **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Current reviewed rates include Haiku 4.5 = $1/$5, Opus 5 and Opus 4.5+ = $5/$25, and Sonnet 5 = $2/$10 per million input/output tokens. Sonnet 5's previously announced September increase was cancelled. 1h cache write multiplier (2×) is included.
+- **`/api/cron/pricing-canary`** — weekly (Mon 10am UTC). Scans last 7d of `api_usage_log` for unknown model ids + flags if `LAST_REVIEWED_AT` >60 days old. It also compares live Anthropic model discovery against exact capability + pricing coverage and auto-resolves the keyed alert once coverage is complete. Free signal, no Admin API needed.
+- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration; numbered migration `032` is the unrelated API-usage stop-reason migration, and the current high-water mark is `033`). [verified from source 2026-08-23]
 - **Storage decision:** pricing source of truth stays in code; cron alerts and humans edit. No auto-overwrite — protects against billing-system glitches corrupting prices.
 
 **Local code removed (S181):**
