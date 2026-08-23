@@ -739,7 +739,9 @@ const v40Statements = [
     source_content_hash TEXT,
     source_byte_hash CHAR(64),
     source_filename TEXT,
-    attachment_mode TEXT NOT NULL CHECK (attachment_mode IN ('docx', 'pdf', 'both')),
+    attachment_mode TEXT NOT NULL
+      CONSTRAINT pre_site_distribution_mode_check
+      CHECK (attachment_mode IN ('docx', 'pdf', 'both')),
     to_recipients JSONB NOT NULL,
     cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
     subject TEXT NOT NULL,
@@ -773,12 +775,15 @@ const v40Statements = [
     dynamics_statuscode INTEGER,
     dynamics_senton TIMESTAMPTZ,
     state TEXT NOT NULL DEFAULT 'preparing'
+      CONSTRAINT pre_site_distribution_state_check
       CHECK (state IN ('preparing', 'prepared', 'activity_created', 'attachments_added', 'send_requested', 'sent')),
     docx_attached_at TIMESTAMPTZ,
     pdf_attached_at TIMESTAMPTZ,
     send_requested_at TIMESTAMPTZ,
     sent_at TIMESTAMPTZ,
-    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    attempt_count INTEGER NOT NULL DEFAULT 0
+      CONSTRAINT pre_site_distribution_attempt_count_nonnegative
+      CHECK (attempt_count >= 0),
     lease_token UUID,
     locked_until TIMESTAMPTZ,
     last_error_code TEXT,
@@ -786,14 +791,17 @@ const v40Statements = [
     last_failed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (jsonb_typeof(to_recipients) = 'array' AND jsonb_array_length(to_recipients) > 0
+    CONSTRAINT pre_site_distribution_recipient_shape
+      CHECK (jsonb_typeof(to_recipients) = 'array' AND jsonb_array_length(to_recipients) > 0
       AND jsonb_typeof(cc_recipients) = 'array'),
-    CHECK (draft_hash ~ '^[0-9a-f]{64}$'
+    CONSTRAINT pre_site_distribution_hash_shape
+      CHECK (draft_hash ~ '^[0-9a-f]{64}$'
       AND (preview_hash IS NULL OR preview_hash ~ '^[0-9a-f]{64}$')
       AND (source_byte_hash IS NULL OR source_byte_hash ~ '^[0-9a-f]{64}$')
       AND (docx_byte_hash IS NULL OR docx_byte_hash ~ '^[0-9a-f]{64}$')
       AND (pdf_byte_hash IS NULL OR pdf_byte_hash ~ '^[0-9a-f]{64}$')),
-    CHECK (state = 'preparing' OR (
+    CONSTRAINT pre_site_distribution_prepared_shape
+      CHECK (state = 'preparing' OR (
       source_drive_id IS NOT NULL
       AND source_item_id IS NOT NULL
       AND source_version_id IS NOT NULL
@@ -819,9 +827,11 @@ const v40Statements = [
         AND pdf_size > 0
       ))
     )),
-    CHECK ((lease_token IS NULL AND locked_until IS NULL)
+    CONSTRAINT pre_site_distribution_lease_shape
+      CHECK ((lease_token IS NULL AND locked_until IS NULL)
       OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)),
-    CHECK ((state = 'sent' AND dynamics_email_id IS NOT NULL
+    CONSTRAINT pre_site_distribution_sent_shape
+      CHECK ((state = 'sent' AND dynamics_email_id IS NOT NULL
       AND send_requested_at IS NOT NULL AND sent_at IS NOT NULL) OR state <> 'sent')
   )`,
   `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_request_history

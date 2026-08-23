@@ -78,6 +78,17 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 });
 
+export const PRE_SITE_DISTRIBUTION_CONTRACT = Object.freeze({
+  producerPrefix: 'request-workbench-distribution',
+  templateVersion: 'pre-site-frozen-distribution-v1',
+});
+
+export function isPreSiteDistributionSnapshot(row) {
+  const producer = String(row?.wmkf_producer || '');
+  return producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`
+    || producer === `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`;
+}
+
 export const PRE_SITE_REOPEN_REASON = Object.freeze({
   ACCIDENTAL_HANDOFF: 'accidental_handoff',
   WRONG_GOVERNED_INPUTS: 'wrong_governed_inputs',

@@ -271,13 +271,23 @@ SHA-256 byte digest in `wmkf_contenthash`; governed DOCX rows continue to use
 the `gdc1:` normalized hash scheme. Each generation key includes the exact
 source row/version/hash, raw source-byte hash, representation, and distribution
 contract version. The Request's current pointer never targets either snapshot.
+The exact distribution producer namespace is also excluded from editable
+Pre-Site status, activation/supersession cardinality, and guarded-reopen
+downstream/competing-generation checks. This is a narrow informational-row
+classification: absent, unknown, or lookalike producers retain ordinary
+fail-closed lifecycle behavior. Snapshot Ready finalization uses stable-ID
+Graph native publication version/eTag readback, and PDF conversion fences the
+retained Word publication identity before and after conversion.
 
 **[SOURCE-IMPLEMENTED 2026-08-23; NOT DEPLOYED/LIVE-PROVED.]** Postgres table
 `pre_site_distribution_attempts` stores the selected attachment mode, exact
 preview and selected file hashes, recipients/content/actor, granular send
 state, Dynamics activity ID/status, leases, and bounded failure evidence. It
 coordinates recovery only; SharePoint and Request Document rows remain file
-authority, and Dynamics remains email-activity authority.
+authority, and Dynamics remains email-activity authority. A non-sent attempt
+requires literal Dynamics impersonation, revalidates the current source under
+its lease, persists a created/recovered activity ID before exact assertions,
+and renews the lease immediately before transport.
 
 ## Structured snapshot contracts
 

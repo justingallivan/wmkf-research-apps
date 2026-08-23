@@ -256,10 +256,13 @@ The minimum reopen transaction is a preserve-and-succeed operation:
    handoff version/hash. A post-handoff Word edit therefore blocks automatic
    reopen; staff continues correcting that live document or uses a separately
    approved reconciliation procedure.
-3. Fail closed if a current Final row, retained Board/PDF snapshot, completed
-   external distribution, or AkoyaGo publication already derives from this
-   handoff. Those downstream consumers require an explicit supersession and
-   redistribution design rather than a hidden rollback.
+3. Fail closed if a current Final row, AkoyaGo publication, or any other
+   non-distribution downstream artifact already derives from this handoff.
+   Frozen distribution snapshot rows are retained informational evidence, not
+   editable lifecycle children: prepared or sent snapshots remain preserved
+   and do not block guarded reopen. An unsent prepared attempt cannot be sent
+   after reopen moves the current pointer/source version; staff must prepare a
+   new exact preview for the new cycle.
 4. Create a new Ready/Draft Pre-Site successor row and a new stable Word item
    by copying the exact verified handoff bytes. Link the successor to the prior
    Review row and exact source version/hash. Preserve the prior row, file, and
@@ -433,8 +436,11 @@ Send → History`:
 
 1. Freeze the exact current Word row/item/version/hash under before/after
    metadata and governed-content checks. Claim or reuse the deterministic Word
-   snapshot; when selected, convert that retained item to a deterministic PDF
-   row/item and verify each selected attachment's identity/version/hash.
+   snapshot, then finalize only from a stable-ID Graph readback with native
+   publication version/eTag (never an upload/path cTag substitute). When
+   selected, compare the retained Word publication version/eTag immediately
+   before and after Graph conversion, then retain and verify the deterministic
+   PDF row/item the same way.
 2. Accept an explicit To/CC set of known staff and consultants. Staff entry is
    authoritative; normalize and deduplicate addresses, reject invalid syntax or
    To/CC conflicts, show every final address in preview, and never send a valid
@@ -445,8 +451,11 @@ Send → History`:
    subject/body/template version, snapshot identity/hash, Request, and actor.
    Any change invalidates the preview and requires another confirmation.
 4. Send only the exact confirmed preview under the authenticated actor. A
-   recipient-validation failure sends to nobody; the application does not
-   silently send to a valid subset.
+   non-sent attempt requires literal-enabled Dynamics impersonation before its
+   lease is claimed. Under that lease, the server revalidates that the request
+   pointer and native source version still match the prepared attempt. A
+   recipient-validation or stale-source failure sends to nobody; the
+   application does not silently send to a valid subset.
 5. Record one durable Postgres distribution attempt keyed by the exact preview
    and client operation ID. At minimum it stores source and Word/PDF snapshot
    identities,
@@ -460,9 +469,12 @@ the exact last completed attachment. The existing
 itself: it creates the activity, attaches, and
 sends sequentially but returns the email ID only after all steps, so a failure
 or lost response can leave durable partial work and a blind retry can create a
-duplicate. The implementation instead persists the email ID immediately
-after activity creation, resume attachment/send against that same activity,
-and query the activity status before retrying an ambiguous send response.
+duplicate. The implementation instead persists the email ID immediately after
+creation or unique correlation recovery and before exact activity-content
+assertions, resumes attachment/send against that same activity, preserves
+correlation ambiguity as the actionable failure, queries status before
+retrying an ambiguous send response, renews the same fenced lease, and repeats
+the current-source fence immediately before transport.
 
 Exact retry of `sent` returns the existing distribution receipt. Attachment
 failure reuses the existing draft; send failure never creates another activity.
@@ -630,9 +642,14 @@ silently extend its paths or names to writeup publications.
    handoff cannot become an unexplained Final lineage source.
 7. **Frozen Word/PDF informational email — source-built 2026-08-23.** The
    DOCX/PDF/both snapshot, exact preview, explicit send, resume-safe retry, and
-   history path is implemented. Apply Postgres migration 034 before deployment,
-   then run authenticated read-only UI verification and one separately approved
-   controlled send/readback before claiming Production proof.
+   history path is implemented. Apply Postgres migration 034 before deployment.
+   In non-production, first record go/no-go evidence that raw `addressused`
+   To/Cc parties resolve and send under the tenant's unresolved-recipient
+   policy, confirm the target `email.subject` maximum, and prove exact
+   description/address/correlation round-trip plus status codes `{3,6,7}` and
+   repeated `SendEmail` behavior. Then run authenticated read-only UI
+   verification and one separately approved controlled send/readback before
+   claiming Production proof.
 8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload
@@ -665,7 +682,9 @@ strategy; this plan itself performs no deployment.
   exposes working-document actions, and every non-Draft lifecycle fails closed.
 - A guarded reopen preserves the prior Review row/file/milestone, creates one
   exact Draft successor on exact retry, and refuses post-handoff edits or
-  downstream derivatives without explicit reconciliation.
+  non-distribution downstream derivatives without explicit reconciliation;
+  retained frozen-distribution snapshots remain preserved evidence and do not
+  block the new editable cycle.
 - An informational send attaches the exact frozen Word DOCX, PDF, or both
   approved in preview, persists stepwise attempt state, and resumes without a
   duplicate email activity after attachment, send, or response failure.

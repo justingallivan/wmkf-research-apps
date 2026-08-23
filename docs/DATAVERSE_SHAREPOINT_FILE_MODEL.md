@@ -481,9 +481,11 @@ send_requested → sent`,
 with separate Word/PDF attachment timestamps so `both` can resume between files.
 The existing composed Dynamics helper is not a sufficient retry coordinator
 because a create or attachment may survive an exception before the helper
-returns the email ID. Runtime must persist the ID after creation, resume the
-same activity after attachment/send failure, and query status before retrying
-an ambiguous send response. Exact sent retry returns the existing receipt;
+returns the email ID. Runtime persists the ID after creation or unique
+correlation recovery and before exact activity-content assertions, resumes the
+same activity after attachment/send failure, and renews the fenced lease
+immediately before transport. Correlation ambiguity remains a failure rather
+than authorizing a replacement create. Exact sent retry returns the existing receipt;
 changed attachment mode, recipients, body, template, source version, or
 selected attachment bytes require a new preview and attempt. `sent` means
 transport acceptance, not inbox delivery.

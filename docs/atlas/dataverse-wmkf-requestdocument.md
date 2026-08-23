@@ -222,7 +222,10 @@ Document row was created by this source work.
   `pre_site_distribution_attempts` owns exact preview/send orchestration, while
   Dynamics owns the email activity and transport status. A DOCX snapshot uses
   the governed `gdc1:` content hash; a PDF row uses raw SHA-256 bytes in the
-  same generic `wmkf_contenthash` field.
+  same generic `wmkf_contenthash` field. The exact distribution producer
+  namespace is excluded from editable Pre-Site status, activation cardinality,
+  supersession, and guarded-reopen downstream/competing-generation checks;
+  missing or lookalike producers retain ordinary fail-closed lifecycle behavior.
 - **[PRODUCTION-PROVED 2026-08-21]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version

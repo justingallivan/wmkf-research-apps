@@ -178,6 +178,10 @@ bounded error evidence. Attachment bytes are never stored. States are
 `preparing`, `prepared`, `activity_created`, `attachments_added`,
 `send_requested`, and `sent`; per-kind attachment timestamps plus a lease fence
 allow recovery between Word and PDF or after an ambiguous SendEmail response.
+The Dynamics activity ID becomes durable before exact activity assertions, and
+the same fenced lease is renewed immediately before transport; a lost renewal
+cannot call `SendEmail`. Send also rejects when the current Pre-Site pointer or
+native source version no longer matches the prepared attempt.
 `sent_at` means Dynamics accepted or status readback proved the transport
 request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and

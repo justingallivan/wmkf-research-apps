@@ -1,5 +1,7 @@
 import schema from '../../lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json';
 import {
+  isPreSiteDistributionSnapshot,
+  PRE_SITE_DISTRIBUTION_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_LABEL,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_LABEL,
@@ -34,6 +36,23 @@ it.each([
 it('fails closed on an unknown registry value', () => {
   expect(requestDocumentLabel(REQUEST_DOCUMENT_OPERATION_LABEL, 999999999)).toBeNull();
   expect(requestDocumentLabel(REQUEST_DOCUMENT_OPERATION_LABEL, null)).toBeNull();
+});
+
+it('recognizes only the exact frozen-distribution producer namespace', () => {
+  expect(isPreSiteDistributionSnapshot({
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`,
+  })).toBe(true);
+  expect(isPreSiteDistributionSnapshot({
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`,
+  })).toBe(true);
+  expect(isPreSiteDistributionSnapshot({ wmkf_producer: PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix }))
+    .toBe(false);
+  expect(isPreSiteDistributionSnapshot({
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-unknown`,
+  })).toBe(false);
+  expect(isPreSiteDistributionSnapshot({ wmkf_producer: `x-${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx` }))
+    .toBe(false);
+  expect(isPreSiteDistributionSnapshot({})).toBe(false);
 });
 
 it('pins the Initial Assessment proposal text as a bounded untrusted override', () => {
