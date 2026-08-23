@@ -3,9 +3,13 @@
 ## Session 453 Summary
 
 Session 453 implemented and independently hardened guarded Pre-Site reopen on
-`codex/guarded-reopen`. The feature remains source-built and deliberately not
-live: Wave 20 was not applied, the readiness flag was not enabled, and no
-runtime deployment or business-row smoke occurred.
+`codex/guarded-reopen`. **[PRODUCTION-DEPLOYED 2026-08-23]** Wave 20 was
+applied to Production and independently read back as three exact fields with
+zero absent/divergent; the non-sensitive literal-on readiness flag was set;
+merge `af986d92` deployed Ready as `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`.
+A signed-in read-only Request `1002788` Pre-Site-tab smoke exercised the
+extended status path without application errors or writes. No guarded-reopen
+business-row mutation has been run.
 
 ### What Was Completed
 
@@ -114,18 +118,15 @@ runtime deployment or business-row smoke occurred.
 
 ### Verified Open
 
-1. **Promote guarded correction/reopen only through its schema-first release sequence.**
-   Evidence: source, Wave 20 spec, strict route, superuser UI, append-only
-   attempt audit, exact retry/recovery, final source/target identity rereads,
-   lifecycle-race guard, and focused tests exist on `codex/guarded-reopen`.
-   The feature is source-built, not live: no target schema preflight/apply or
-   runtime deployment has been authorized. Next run the read-only target
-   preflight, stop on divergence, obtain explicit owner approval before the
-   Wave 20 apply, require exact metadata readback, deliberately enable the
-   literal-on readiness flag, and only then promote runtime and perform a
-   separately approved signed-in smoke. Base adapter reads and creates are
-   flag-safe before provisioning, but reopen must remain unavailable. Do not use Production
-   Request `1002379` for a durable reopen test without exact approval.
+1. **Run a controlled guarded-reopen mutation smoke only on a separately approved test record.**
+   Evidence: Production Wave 20 metadata is three exact/zero divergent, the
+   literal-on Production flag is set, merge `af986d92` is Ready in deployment
+   `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`, and signed-in Request `1002788` loaded
+   the read-only extended Pre-Site status path without application errors.
+   The remaining proof is one eligible superuser reopen plus exact unchanged
+   retry/readback; it creates a durable successor row and SharePoint copy, so
+   it requires a named approved record and expected-write/cleanup authority.
+   Do not use Production Request `1002379` without exact approval.
 
 2. **Observe Dynamics Explorer Phases A and B through organic use.**
    Evidence: `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md` and
@@ -206,8 +207,8 @@ runtime deployment or business-row smoke occurred.
 | `shared/components/workbench/PreSiteVisitTab.js` | Draft controls and promoted-state read-only receipt |
 | `pages/api/workbench/pre-site-visit/start-site-visit.js` | Authenticated exact-body handoff route |
 | `lib/services/pre-site-visit/site-visit-transition-service.js` | Draft→Review transaction and exact post-write reread |
-| `lib/services/pre-site-visit/reopen-service.js` | Source-built preserve-and-succeed service; not deployable before Wave 20 |
-| `lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json` | Additive guarded-reopen audit fields awaiting target preflight/apply |
+| `lib/services/pre-site-visit/reopen-service.js` | Production-deployed preserve-and-succeed service; durable mutation smoke remains separately approval-gated |
+| `lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json` | Production-live additive guarded-reopen audit fields; 3 exact/0 divergent on 2026-08-23 |
 | `scripts/preflight-guarded-reopen-schema.mjs` | Read-only Wave 20 metadata classifier plus local self-test |
 | `docs/MEMORY_HYGIENE_RUNBOOK.md` | Canonical routine/deep audit and router-diet procedure |
 | `docs/audits/memory-routine-audit-2026-08-21.md` | First audit evidence, dispositions, and metrics |
@@ -228,6 +229,8 @@ runtime deployment or business-row smoke occurred.
   build and relevant API-route, lifecycle/auth, route/service, DAL/context,
   GUID, status, Atlas, documentation, fact, currency, and invariant gates pass.
   The final independent Claude Opus acceptance review returned APPROVE with no
-  actionable findings.
+  actionable findings. Production deployment
+  `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp` is Ready; signed-in Request `1002788`
+  exercised the read-only extended status projection without writes.
 - Stop-time claim-evidence pilot: local observation state was unavailable, so no
   observation row was added and no advisory classification was invented.

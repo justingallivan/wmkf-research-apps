@@ -151,15 +151,20 @@ Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
-**[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded-reopen
-feature branch adds an additive Wave 20 spec for `wmkf_ReopenCycleId` (String
+**[PRODUCTION-DEPLOYED 2026-08-23; DURABLE REOPEN SMOKE OPEN.]** Guarded reopen
+adds the Production-live Wave 20 fields `wmkf_ReopenCycleId` (String
 36), `wmkf_ReopenReasonCode` (String 50), and `wmkf_ReopenReasonNote` (Memo
 2000). The successor row itself is the append-only reopen event when combined
 with its existing source lookup/version/hash and standard created-by/created-on
 fields. Source service, superuser route, status/history projection, Site Visit
 dialog, exact-operation dedupe, post-upload recovery, ETag changeset, and
-correction-cycle generation salting are focused-test covered. No target
-preflight, metadata apply, runtime deployment, or business-row smoke has run.
+correction-cycle generation salting are focused-test covered. The approved
+Production apply created exactly those three attributes; delayed typed-metadata
+readback reported 3 exact, 0 absent, 0 divergent. The non-sensitive readiness
+flag is literal `on`, and merge `af986d92` is Ready in deployment
+`dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised the
+extended read-only Pre-Site status path without application errors or writes;
+no guarded-reopen business-row mutation has run.
 The adapter's base projection excludes the Wave 20 fields while the literal-on
 `GUARDED_REOPEN_SCHEMA_READY` interlock is disabled, and the reopen route then
 fails closed with 503. The generation create payload also omits the Wave 20
@@ -347,8 +352,9 @@ transition.
 
 No live command in this sequence is authorized merely by this page.
 
-For Wave 20, run the guarded-reopen preflight, stop on divergence, obtain
-explicit apply approval, apply and re-read three exact fields, then set
-`GUARDED_REOPEN_SCHEMA_READY=on` and promote/redeploy the runtime. Once the
-environment contains a correction cycle, retain both the schema and flag during
-rollback so generation continues to see the cycle identity.
+Wave 20's Production sequence completed 2026-08-23: clean absent-only
+preflight, approved additive apply, exact typed readback, literal-on readiness
+flag, and Ready runtime promotion. The remaining controlled proof is a durable
+superuser reopen plus exact retry/readback on a separately approved test row.
+Once the environment contains a correction cycle, retain both the schema and
+flag during rollback so generation continues to see the cycle identity.

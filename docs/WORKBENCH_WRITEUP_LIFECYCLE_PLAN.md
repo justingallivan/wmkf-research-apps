@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -90,8 +90,8 @@ or changing a request artifact.
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
 | Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
-| Guarded reopen preserves the handoff and creates one successor | `codex/guarded-reopen` service/route/UI plus focused service, route, artifact-identity, and component tests; no target schema preflight/apply or runtime deployment has run | VERIFIED IN SOURCE / NOT LIVE |
-| Wave 20 guarded-reopen fields exist in a target Dataverse environment | Tracked additive spec and read-only preflight self-test only; no target metadata probe was authorized or run | PLANNED / UNVERIFIED LIVE |
+| Guarded reopen preserves the handoff and creates one successor | Merge `af986d92`; focused service/route/artifact/component tests; Ready Production deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`; signed-in read-only Request `1002788` extended-status smoke | DEPLOYED / DURABLE MUTATION SMOKE OPEN |
+| Wave 20 guarded-reopen fields exist in Production | Approved 2026-08-23 additive apply followed by typed metadata readback: 3 exact, 0 absent, 0 divergent | VERIFIED LIVE |
 
 ## Ownership model
 
@@ -231,8 +231,8 @@ replace that stable item as a side effect of receiving site-visit files.
 
 ### Content correction and guarded reopen
 
-**[OWNER DIRECTION 2026-08-21; SOURCE IMPLEMENTED AND FOCUSED-TESTED ON
-`codex/guarded-reopen` 2026-08-22; WAVE 20 NOT APPLIED; RUNTIME NOT DEPLOYED.]**
+**[OWNER DIRECTION 2026-08-21; PRODUCTION-DEPLOYED 2026-08-23; DURABLE
+REOPEN SMOKE OPEN.]**
 Ordinary correction and lifecycle reopening are different
 operations:
 
@@ -616,15 +616,15 @@ silently extend its paths or names to writeup publications.
    Visit continuation action. Site Visit showed the expected same Word item,
    Edit/Download, and handoff time. No document or write action was invoked;
    this request had no visible warning, so warning rendering remains test-proven.
-6. **Guarded correction/reopen — source complete on `codex/guarded-reopen`
-   2026-08-22; promotion blocked on schema/release sequence.** Run the read-only
-   target preflight, obtain explicit approval, apply Wave 20, re-read exact
-   metadata, set `GUARDED_REOPEN_SCHEMA_READY=on`, then promote/redeploy the
-   tested runtime and perform a controlled signed-in smoke. Runtime source may
-   exist with the flag off because base registry reads exclude the Wave 20
-   projection and generation-create payload, but guarded reopen remains unavailable until the explicit flag
-   and exact schema are both present. This must precede Final creation so an
-   accidental handoff cannot become an unexplained Final lineage source.
+6. **Guarded correction/reopen — Production-deployed 2026-08-23; durable
+   mutation smoke open.** Wave 20 is 3 exact/0 divergent, the Production
+   readiness flag is literal `on`, and merge `af986d92` is Ready in deployment
+   `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised
+   the extended read-only status path without writes. Complete one controlled
+   superuser reopen plus exact retry/readback only after approving an eligible
+   test row and its expected durable successor/copy/cleanup effects; do not use
+   Request `1002379` without exact approval. This proof must precede Final
+   creation so an accidental handoff cannot become an unexplained Final lineage source.
 7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
    select/provision the durable distribution representation, then implement
    exact snapshot, preview, explicit send, resume-safe retry, and history.

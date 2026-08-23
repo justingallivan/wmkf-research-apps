@@ -3,10 +3,10 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19 and Site Visit handoff, plus source-built guarded reopen awaiting Wave 20 provisioning and deployment."
+summary: "Production-live Wave 19, Site Visit handoff, and Wave 20 guarded reopen; durable reopen mutation smoke remains approval-gated."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -62,10 +62,14 @@ row's lifecycle to Review and records the exact verified SharePoint publication
 version, governed DOCX hash, and handoff timestamp in the existing
 `wmkf_milestone*` fields. It creates no new row, lookup, or SharePoint item.
 
-**[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded correction
-branch adds the preserve-and-succeed service, superuser route/UI, history
-projection, and an additive Wave 20 spec. No target preflight, schema apply,
-runtime deployment, or business-row smoke has run. The base adapter projection
+**[PRODUCTION-DEPLOYED 2026-08-23; DURABLE REOPEN SMOKE OPEN.]** The guarded
+correction branch provides the preserve-and-succeed service, superuser route/UI,
+history projection, and additive Wave 20 fields. Production typed-metadata
+readback is 3 exact/0 absent/0 divergent; the non-sensitive readiness flag is
+literal `on`; merge `af986d92` is Ready in deployment
+`dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`. Signed-in Request `1002788` exercised the
+extended read-only status path without application errors or writes. No
+guarded-reopen business-row mutation has run. The base adapter projection
 omits the new columns until `GUARDED_REOPEN_SCHEMA_READY` is literal `on`; the
 reopen route returns 503 while it is off. This lets source deploy safely before
 provisioning without making ordinary Request Document reads query absent
@@ -106,8 +110,8 @@ akoya_request
 | Wave 19 fields and current pointers exist in Dataverse | 2026-08-17 owner-approved apply followed by independent Production preflight: 0 absent, 0 divergent, 14 exact | VERIFIED LIVE |
 | The metadata-only Wave 19 apply itself created a Pre-Site business row | Immediate post-apply inventory: three Request Document rows, all Initial Assessments | VERIFIED FALSE (historical apply boundary) |
 | The deployed writer later created the first Pre-Site business row | Post-generation inventory plus exact row/run/item/pointer readback for Request `1002379` | VERIFIED LIVE |
-| Wave 20 reopen fields exist in Production | Tracked spec and self-test only; no target metadata probe/apply was authorized or run | UNKNOWN LIVE / PLANNED APPLY |
-| Guarded reopen service, route, UI, and retry/recovery contract exist | `codex/guarded-reopen` source plus focused service/route/artifact/component tests | VERIFIED IN SOURCE / NOT DEPLOYED |
+| Wave 20 reopen fields exist in Production | Approved 2026-08-23 apply plus typed metadata readback: 3 exact, 0 absent, 0 divergent | VERIFIED LIVE |
+| Guarded reopen service, route, UI, and retry/recovery contract exist | Merge `af986d92`, focused tests, Ready deployment `dpl_BbtmRghhSYa7EPiQkWxsmdkgRozp`, signed-in read-only Request `1002788` status smoke | DEPLOYED / DURABLE MUTATION SMOKE OPEN |
 
 The reproducible inventory is
 `scripts/probe-pre-site-dataverse-inventory.mjs`. The deployment preflight is
@@ -415,8 +419,8 @@ Production now has Wave 19. Other target environments must still pass the
 same preflight and apply before runtime code deployed there selects these
 fields; Dataverse rejects a `$select` containing an absent attribute.
 
-Wave 20 has a separate strict order and is not covered by the completed Wave
-19 steps:
+Wave 20 Production completed this strict order on 2026-08-23. Reuse it for any
+other target; the final durable mutation proof remains open:
 
 1. Run `node scripts/preflight-guarded-reopen-schema.mjs --target=<target>`
    read-only and classify all three attributes absent/exact/divergent. The
@@ -429,9 +433,10 @@ Wave 20 has a separate strict order and is not covered by the completed Wave
 4. Set the non-sensitive deployment flag `GUARDED_REOPEN_SCHEMA_READY=on`
    only after that exact readback, then promote/redeploy the runtime. Literal
    `on` is the only enabling value; unset and invalid values fail closed.
-5. After deliberate runtime release approval, perform one controlled signed-in
-   superuser smoke plus exact retry/readback. Do not use Request `1002379`
-   without separately approved mutation authority.
+5. **Production partial:** signed-in Request `1002788` passed the read-only
+   extended-status smoke. The controlled superuser reopen plus exact
+   retry/readback remains open and requires separately approved mutation
+   authority. Do not use Request `1002379` without that authority.
 6. After the first correction cycle exists, never unset the readiness flag as
    a rollback. Roll runtime back while retaining the exact schema and flag;
    hiding the cycle field would make generation identity incomplete.
