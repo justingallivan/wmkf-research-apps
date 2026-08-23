@@ -6,9 +6,11 @@ status: active
 summary: Governed request-artifact registry; core flow, native version restore, and first-stage recovery pass while administrative controls remain.
 canonical: false
 owner: product-engineering
+last_verified: 2026-08-22
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
+  - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -148,6 +150,32 @@ edits in the Pre-Site Word workspace.
 Exact design and deployment boundary:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+
+**[VERIFIED IN SOURCE 2026-08-22; NOT LIVE-VERIFIED.]** The guarded-reopen
+feature branch adds an additive Wave 20 spec for `wmkf_ReopenCycleId` (String
+36), `wmkf_ReopenReasonCode` (String 50), and `wmkf_ReopenReasonNote` (Memo
+2000). The successor row itself is the append-only reopen event when combined
+with its existing source lookup/version/hash and standard created-by/created-on
+fields. Source service, superuser route, status/history projection, Site Visit
+dialog, exact-operation dedupe, post-upload recovery, ETag changeset, and
+correction-cycle generation salting are focused-test covered. No target
+preflight, metadata apply, runtime deployment, or business-row smoke has run.
+The adapter's base projection excludes the Wave 20 fields while the literal-on
+`GUARDED_REOPEN_SCHEMA_READY` interlock is disabled, and the reopen route then
+fails closed with 503. The generation create payload also omits the Wave 20
+property while off. After schema apply/readback, enabling that non-sensitive
+flag exposes the fields. Failed attempts remain append-only evidence but do not
+block a distinct later operation; unchanged retry reclaims the same row/item.
+A competing generation blocks reopen only under a live lease. Expired reopen
+claims are marked Failed, with any retained copy recorded by stable identity as
+cleanup work, before a new operation proceeds. Generation activation rechecks
+exact correction-cycle equality against the current Draft pointer. Reopen
+history, nested correction details, and actor attribution are returned only to
+superusers on GET, generation, and Site Visit handoff responses; a pending reason-bearing reopen
+attempt is omitted entirely for other roles. A Failed row remains available to
+its exact operation retry, but a later distinct operation records any resolvable
+retained copy as cleanup work. Actor/time is attributed only to reason-bearing
+reopen events, never to later generated descendants that inherit only the cycle.
 
 ## Ownership
 
@@ -318,3 +346,9 @@ transition.
    service post-write reread required the exact version/hash/time milestone.
 
 No live command in this sequence is authorized merely by this page.
+
+For Wave 20, run the guarded-reopen preflight, stop on divergence, obtain
+explicit apply approval, apply and re-read three exact fields, then set
+`GUARDED_REOPEN_SCHEMA_READY=on` and promote/redeploy the runtime. Once the
+environment contains a correction cycle, retain both the schema and flag during
+rollback so generation continues to see the cycle identity.

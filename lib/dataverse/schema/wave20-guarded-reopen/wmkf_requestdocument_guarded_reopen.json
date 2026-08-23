@@ -1,0 +1,29 @@
+{
+  "name": "wmkf_requestdocument-guarded-reopen",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Additive guarded-reopen audit and correction-cycle fields. Runtime must not select these fields until the target environment passes the read-only preflight and this wave is applied with explicit approval.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReopenCycleId",
+      "displayName": "Reopen Cycle ID",
+      "description": "Client-minted UUID that deduplicates one guarded reopen and salts every later generated draft in that correction cycle.",
+      "maxLength": 36
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ReopenReasonCode",
+      "displayName": "Reopen Reason Code",
+      "description": "Closed application reason code on the append-only successor row that records the guarded reopen event.",
+      "maxLength": 50
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_ReopenReasonNote",
+      "displayName": "Reopen Reason Note",
+      "description": "Required bounded staff explanation on the append-only successor row that records the guarded reopen event.",
+      "maxLength": 2000
+    }
+  ]
+}

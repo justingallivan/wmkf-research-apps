@@ -4,7 +4,7 @@
  * Promotes the current Ready Pre-Site Word item into the Site Visit workspace.
  */
 
-import { requireAppAccess } from '../../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
@@ -27,6 +27,13 @@ function sendError(res, error) {
   });
 }
 
+function withoutCorrection(artifact) {
+  if (!artifact) return artifact;
+  const sanitized = { ...artifact };
+  delete sanitized.correction;
+  return sanitized;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -35,6 +42,8 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
+  const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+  const includeCorrectionAudit = role === 'superuser';
 
   return withDalContext('workbench-start-site-visit', async () => {
     try {
@@ -61,10 +70,12 @@ export default async function handler(req, res) {
         expectedArtifactId,
         actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
       });
-      return res.status(200).json({ success: true, ...result });
+      const payload = includeCorrectionAudit
+        ? result
+        : { ...result, artifact: withoutCorrection(result.artifact) };
+      return res.status(200).json({ success: true, ...payload });
     } catch (error) {
       return sendError(res, error);
     }
   });
 }
-

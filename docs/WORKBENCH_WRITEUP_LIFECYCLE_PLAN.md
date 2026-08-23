@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -16,6 +16,7 @@ related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave19-pre-site-draft/02_akoya_request_writeup_pointers.json
+  - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
 ---
 
 # Workbench Writeup Lifecycle Plan
@@ -23,7 +24,8 @@ related:
 ## Decision and current status
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
-HANDOFF PRODUCTION-PROVED 2026-08-21; FINAL PLANNED.]** The three Workbench
+HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN SOURCE-BUILT ON FEATURE
+BRANCH 2026-08-22 BUT SCHEMA/DEPLOYMENT NOT RUN; FINAL PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -88,6 +90,8 @@ or changing a request artifact.
 | `akoya_request` has `akoya_sitevisitdate` and `akoya_sitevisitnotes`; the latter is not an approved workspace for this design | Read-only Production metadata inventory plus owner decision | VERIFIED / NOT REPURPOSED |
 | The current Reviews flow persists structured synthesis in `akoya_request.wmkf_reviewsynthesisjson` | `review-synthesis.generate` prompt and Reviews callers | VERIFIED |
 | Current Pre-Site and Final request lookups exist | 2026-08-17 post-apply Production preflight: both relationships exact; all 14 Wave 19 items exact and 0 divergent | VERIFIED LIVE |
+| Guarded reopen preserves the handoff and creates one successor | `codex/guarded-reopen` service/route/UI plus focused service, route, artifact-identity, and component tests; no target schema preflight/apply or runtime deployment has run | VERIFIED IN SOURCE / NOT LIVE |
+| Wave 20 guarded-reopen fields exist in a target Dataverse environment | Tracked additive spec and read-only preflight self-test only; no target metadata probe was authorized or run | PLANNED / UNVERIFIED LIVE |
 
 ## Ownership model
 
@@ -227,8 +231,9 @@ replace that stable item as a side effect of receiving site-visit files.
 
 ### Content correction and guarded reopen
 
-**[OWNER DIRECTION 2026-08-21; CONTRACT DECIDED; SCHEMA AND RUNTIME PLANNED,
-NOT BUILT.]** Ordinary correction and lifecycle reopening are different
+**[OWNER DIRECTION 2026-08-21; SOURCE IMPLEMENTED AND FOCUSED-TESTED ON
+`codex/guarded-reopen` 2026-08-22; WAVE 20 NOT APPLIED; RUNTIME NOT DEPLOYED.]**
+Ordinary correction and lifecycle reopening are different
 operations:
 
 - A typo, missing fact, or later Site Visit observation is corrected by editing
@@ -262,15 +267,48 @@ The minimum reopen transaction is a preserve-and-succeed operation:
    the successor in the same ETag-guarded changeset.
 5. Persist actor, time, reason, source and successor identities, and the client
    operation ID in a durable append-only reopen audit representation. Exact
-   retry returns the same successor and never creates another row or file.
-6. Show the preserved handoff and reopen event in history. The new Draft may be
-   edited or regenerated under the normal rules, and a later Site Visit handoff
-   records a new milestone on the successor rather than overwriting the old
-   milestone.
+   unchanged retry returns the same successor and never creates another row or
+   file. A Failed attempt remains append-only evidence but does not permanently
+   block a later operation. The client operation ID is minted once when the
+   dialog opens; after the first submit its audit inputs are frozen for exact
+   retry, and staff must close/reopen the dialog to start a different operation.
+6. Show every durable reopen attempt with an explicit Completed, Failed, In
+   progress, or Needs reconciliation outcome alongside its preserved source
+   evidence. The new Draft may be edited or regenerated under the normal rules,
+   and a later Site Visit handoff records a new milestone on the successor rather
+   than overwriting the old milestone.
 
-The exact audit/schema representation and permission role must be selected and
-provisioned before implementation. Dataverse field audit alone is not the
-application dedupe key or the user-facing recovery record.
+The selected bounded representation is the successor Request Document row
+itself: `wmkf_ReopenCycleId`, `wmkf_ReopenReasonCode`, and
+`wmkf_ReopenReasonNote`, plus its existing source/version/hash lineage and
+standard created-by/created-on attribution. The client operation UUID is both
+the durable correction-cycle identity and the exact-operation dedupe input;
+the existing generation-key alternate key remains the uniqueness fence. Only
+superusers may invoke the route or receive the reopen-attempt history or nested
+correction details; other authorized Workbench readers receive artifacts with
+that audit data removed from GET, generation, and Site Visit handoff responses. A second reopen
+is refused while a different generation has a live 15-minute lease. An expired
+reopen claim is atomically marked Failed before a new operation proceeds; if its
+copy exists, exact drive/item identity is retained in the row's cleanup queue
+and its history outcome becomes Needs reconciliation. The same cleanup rule is
+applied when a different operation supersedes a Failed attempt that retained a
+copy; same-operation retry remains recoverable until that supersession. The
+history UI explicitly calls out retained copies requiring reconciliation.
+Later generated drafts carry the same cycle ID
+in their generation identity, and final activation rechecks that the target's
+cycle still equals the current Draft pointer's cycle, so an older in-flight
+generation cannot supersede a newer correction cycle. Actor/time is shown only
+on the actual reason-bearing reopen event, not on later cycle-bearing generated
+descendants. Non-superuser status responses also omit a pending reopen-attempt
+row entirely while retaining ordinary pending-generation status.
+
+Wave 20 must pass a target read-only preflight and be explicitly applied before
+the feature is enabled. The base adapter projection excludes the new columns
+while `GUARDED_REOPEN_SCHEMA_READY` is off, and the reopen route fails closed
+with 503. After exact metadata readback, set the non-sensitive flag to literal
+`on` and deploy/redeploy the runtime. Once a correction cycle exists in an
+environment, do not unset the flag as a rollback; generation identity depends
+on the cycle field remaining visible.
 
 ### Logistics
 
@@ -364,8 +402,10 @@ non-superseded lifecycle.
    minimum design copies Word and lineage only.
 4. Define Editor Dashboard Reviewed acknowledgements separately. They are not
    document lifecycle or approval fields.
-5. Select the smallest durable reopen-audit representation and explicit
-   permission role before adding the guarded successor operation.
+5. **Selected and source-built 2026-08-22; target provisioning/deployment
+   pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
+   identity, existing source/version/hash lineage, standard actor/time, and a
+   superuser-only route.
 6. Select the durable informational-distribution attempt representation only
    after the unresolved-recipient and Dynamics activity-status probes establish
    the executable email contract.
@@ -576,10 +616,15 @@ silently extend its paths or names to writeup publications.
    Visit continuation action. Site Visit showed the expected same Word item,
    Edit/Download, and handoff time. No document or write action was invoked;
    this request had no visible warning, so warning rendering remains test-proven.
-6. **Guarded correction/reopen.** Select the bounded audit/schema and permission
-   representation, then implement the preserve-and-succeed transaction above.
-   This must precede Final creation so an accidental handoff cannot become an
-   unexplained Final lineage source.
+6. **Guarded correction/reopen — source complete on `codex/guarded-reopen`
+   2026-08-22; promotion blocked on schema/release sequence.** Run the read-only
+   target preflight, obtain explicit approval, apply Wave 20, re-read exact
+   metadata, set `GUARDED_REOPEN_SCHEMA_READY=on`, then promote/redeploy the
+   tested runtime and perform a controlled signed-in smoke. Runtime source may
+   exist with the flag off because base registry reads exclude the Wave 20
+   projection and generation-create payload, but guarded reopen remains unavailable until the explicit flag
+   and exact schema are both present. This must precede Final creation so an
+   accidental handoff cannot become an unexplained Final lineage source.
 7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
    select/provision the durable distribution representation, then implement
    exact snapshot, preview, explicit send, resume-safe retry, and history.

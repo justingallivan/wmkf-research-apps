@@ -3,6 +3,8 @@ import {
   buildPreSiteVisitInputSnapshot,
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
+  projectPreSiteVisitArtifact,
+  projectReopenHistory,
   SECTION_FIELDS,
 } from '../../lib/services/pre-site-visit/artifact-service.js';
 import {
@@ -125,11 +127,127 @@ test('institution changes alter the immutable Pre-Site artifact identity', () =>
   expect(aka.generationKey).not.toBe(formal.generationKey);
 });
 
-function createHarness({ mutatePersistedDraft = false } = {}) {
+test('a guarded reopen cycle prevents later generation from rediscovering the preserved row', () => {
+  const inputSnapshot = buildPreSiteVisitInputSnapshot(inputFixture());
+  const promptIdentity = {
+    promptId: PROMPT_ID,
+    promptName: PRE_SITE_VISIT_CONTRACT.promptName,
+    promptVersion: 4,
+  };
+  const original = buildPreSiteVisitIdentity({
+    requestId: REQUEST_ID,
+    inputSnapshot,
+    promptIdentity,
+  });
+  const reopened = buildPreSiteVisitIdentity({
+    requestId: REQUEST_ID,
+    inputSnapshot,
+    promptIdentity,
+    reopenCycleId: '66666666-6666-4666-8666-666666666666',
+  });
+
+  expect(reopened.inputFingerprint).toBe(original.inputFingerprint);
+  expect(reopened.generationKey).not.toBe(original.generationKey);
+});
+
+test('reopen history projects durable actor, reason, source, and milestone evidence', () => {
+  const source = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_filename: '1002379 Pre-Site Visit.docx',
+    wmkf_milestoneversionid: '2.0',
+    wmkf_milestonecontenthash: 'gdc1:handoff',
+    wmkf_milestonecreatedat: '2026-08-20T12:00:00Z',
+  };
+  const successor = {
+    ...source,
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    _wmkf_sourcedocument_value: ARTIFACT_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
+    wmkf_reopenreasoncode: 'accidental_handoff',
+    wmkf_reopenreasonnote: 'The handoff happened too early.',
+    _createdby_value: '88888888-8888-4888-8888-888888888888',
+    _createdby_value_formatted: 'Test Admin',
+    createdon: '2026-08-22T12:00:00Z',
+  };
+
+  expect(projectReopenHistory([source, successor])).toEqual([expect.objectContaining({
+    artifactId: successor.wmkf_requestdocumentid,
+    outcome: 'completed',
+    correction: expect.objectContaining({
+      cycleId: successor.wmkf_reopencycleid,
+      actorName: 'Test Admin',
+      reasonCode: 'accidental_handoff',
+    }),
+    source: expect.objectContaining({
+      artifactId: ARTIFACT_ID,
+      milestone: expect.objectContaining({ versionId: '2.0' }),
+    }),
+  })]);
+});
+
+test('reopen history marks a retained expired copy as cleanup reconciliation work', () => {
+  const row = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
+    wmkf_reopenreasoncode: 'accidental_handoff',
+    wmkf_reopenreasonnote: 'The claim expired before activation.',
+    wmkf_orphancleanupjson: JSON.stringify([{
+      driveId: 'expired-drive',
+      itemId: 'expired-item',
+      reason: 'expired_reopen_attempt_retained',
+    }]),
+  };
+
+  expect(projectReopenHistory([row])).toEqual([
+    expect.objectContaining({
+      outcome: 'needs_reconciliation',
+      cleanupRequired: [expect.objectContaining({
+        driveId: 'expired-drive',
+        itemId: 'expired-item',
+      })],
+    }),
+  ]);
+});
+
+test('a regenerated descendant carries the cycle without claiming its generator as reopen actor', () => {
+  const descendant = {
+    wmkf_requestdocumentid: ARTIFACT_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
+    wmkf_reopenreasoncode: null,
+    _createdby_value: '88888888-8888-4888-8888-888888888888',
+    _createdby_value_formatted: 'Later Generator',
+    createdon: '2026-08-22T13:00:00Z',
+  };
+
+  expect(projectPreSiteVisitArtifact(descendant).correction).toMatchObject({
+    cycleId: descendant.wmkf_reopencycleid,
+    reasonCode: null,
+    actorId: null,
+    actorName: null,
+    createdAt: null,
+  });
+});
+
+function createHarness({ mutatePersistedDraft = false, currentPointerRow = null } = {}) {
   let row = null;
+  const prior = currentPointerRow ? { ...currentPointerRow } : null;
   const request = {
     akoya_requestid: REQUEST_ID,
-    _wmkf_currentpresitevisit_value: null,
+    _wmkf_currentpresitevisit_value: prior?.wmkf_requestdocumentid || null,
     _etag: 'request-1',
   };
   let etag = 1;
@@ -179,7 +297,10 @@ function createHarness({ mutatePersistedDraft = false } = {}) {
       records: row ? [{ ...row }] : [],
     })),
     findByRequest: jest.fn().mockImplementation(async () => ({
-      records: row ? [{ ...row }] : [],
+      records: [
+        ...(row ? [{ ...row }] : []),
+        ...(prior ? [{ ...prior }] : []),
+      ],
     })),
     createDocument: jest.fn().mockImplementation(async (payload) => {
       row = {
@@ -234,6 +355,7 @@ function createHarness({ mutatePersistedDraft = false } = {}) {
     downloadFile: jest.fn().mockResolvedValue({ buffer: Buffer.from('normalized-docx') }),
     deleteFile: jest.fn().mockResolvedValue(undefined),
     newClaimToken: jest.fn().mockReturnValue(CLAIM_ID),
+    isGuardedReopenSchemaReady: jest.fn().mockReturnValue(true),
   };
 
   return {
@@ -242,8 +364,95 @@ function createHarness({ mutatePersistedDraft = false } = {}) {
     setRow(value) { row = value; },
     get request() { return request; },
     get uploaded() { return uploaded; },
+    get currentPointerRow() { return prior; },
   };
 }
+
+test('generation cannot replace a draft that becomes the Site Visit workspace in flight', async () => {
+  const harness = createHarness({
+    currentPointerRow: {
+      wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+      wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_filename: '1002379 Pre-Site Visit prior.docx',
+      _etag: 'prior-1',
+      createdon: '2026-08-21T12:00:00Z',
+    },
+  });
+  const upload = harness.dependencies.uploadFile.getMockImplementation();
+  harness.dependencies.uploadFile.mockImplementationOnce(async (...args) => {
+    const metadata = await upload(...args);
+    harness.currentPointerRow.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+    harness.currentPointerRow._etag = 'prior-2';
+    return metadata;
+  });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({ code: 'pre_site_visit_regeneration_locked', httpStatus: 409 });
+
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(harness.request._wmkf_currentpresitevisit_value)
+    .toBe(harness.currentPointerRow.wmkf_requestdocumentid);
+  expect(harness.currentPointerRow.wmkf_lifecyclestate)
+    .toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+});
+
+test('generation cannot supersede a newer guarded-reopen correction cycle', async () => {
+  const originalCycle = '66666666-6666-4666-8666-666666666666';
+  const newerCycle = '77777777-7777-4777-8777-777777777777';
+  const harness = createHarness({
+    currentPointerRow: {
+      wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+      wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_reopencycleid: originalCycle,
+      wmkf_filename: '1002379 Pre-Site Visit correction.docx',
+      _etag: 'correction-1',
+      createdon: '2026-08-21T12:00:00Z',
+    },
+  });
+  const upload = harness.dependencies.uploadFile.getMockImplementation();
+  harness.dependencies.uploadFile.mockImplementationOnce(async (...args) => {
+    const metadata = await upload(...args);
+    harness.currentPointerRow.wmkf_reopencycleid = newerCycle;
+    harness.currentPointerRow._etag = 'correction-2';
+    return metadata;
+  });
+
+  await expect(generatePreSiteVisitArtifact(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  )).rejects.toMatchObject({
+    code: 'pre_site_visit_correction_cycle_changed',
+    httpStatus: 409,
+  });
+
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument.mock.calls[0][0])
+    .toHaveProperty('wmkf_reopencycleid', originalCycle);
+  expect(harness.request._wmkf_currentpresitevisit_value)
+    .toBe(harness.currentPointerRow.wmkf_requestdocumentid);
+  expect(harness.currentPointerRow.wmkf_reopencycleid).toBe(newerCycle);
+});
+
+test('flag-off generation omits the Wave 20 correction-cycle property from its create payload', async () => {
+  const harness = createHarness();
+  harness.dependencies.isGuardedReopenSchemaReady.mockReturnValue(false);
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
+  expect(harness.dependencies.createDocument.mock.calls[0][0])
+    .not.toHaveProperty('wmkf_reopencycleid');
+});
 
 test('missing exact source identity stops before claim, Claude, render, or upload', async () => {
   const harness = createHarness();

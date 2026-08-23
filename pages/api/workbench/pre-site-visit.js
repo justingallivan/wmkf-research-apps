@@ -6,7 +6,7 @@
  * Visit Word draft and return its registry/SharePoint identity.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
@@ -38,6 +38,25 @@ function sendError(res, error) {
   });
 }
 
+function withoutCorrection(artifact) {
+  if (!artifact) return artifact;
+  const sanitized = { ...artifact };
+  delete sanitized.correction;
+  return sanitized;
+}
+
+function staffSafePayload(payload) {
+  const pendingIsReopenAudit = Boolean(payload.pendingArtifact?.correction?.reasonCode);
+  const sanitized = {
+    ...payload,
+    currentArtifact: withoutCorrection(payload.currentArtifact),
+    pendingArtifact: pendingIsReopenAudit ? null : withoutCorrection(payload.pendingArtifact),
+    artifact: withoutCorrection(payload.artifact),
+  };
+  delete sanitized.reopenHistory;
+  return sanitized;
+}
+
 export default async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader('Allow', 'GET, POST');
@@ -46,6 +65,8 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
+  const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+  const includeCorrectionAudit = role === 'superuser';
 
   return withDalContext('workbench-pre-site-visit', async () => {
     try {
@@ -55,7 +76,8 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
         const status = await getPreSiteVisitArtifactStatus({ requestId });
-        return res.status(200).json({ success: true, ...status });
+        const payload = includeCorrectionAudit ? status : staffSafePayload(status);
+        return res.status(200).json({ success: true, ...payload });
       }
 
       if (!req.body
@@ -75,7 +97,8 @@ export default async function handler(req, res) {
       });
       const generating = result.artifact.operationStatus
         === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
-      return res.status(generating ? 202 : 200).json({ success: true, ...result });
+      const payload = includeCorrectionAudit ? result : staffSafePayload(result);
+      return res.status(generating ? 202 : 200).json({ success: true, ...payload });
     } catch (error) {
       return sendError(res, error);
     }

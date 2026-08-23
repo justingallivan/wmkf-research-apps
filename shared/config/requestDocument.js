@@ -78,6 +78,23 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 });
 
+export const PRE_SITE_REOPEN_REASON = Object.freeze({
+  ACCIDENTAL_HANDOFF: 'accidental_handoff',
+  WRONG_GOVERNED_INPUTS: 'wrong_governed_inputs',
+});
+
+export const PRE_SITE_REOPEN_REASON_LABEL = Object.freeze({
+  [PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF]: 'Accidental handoff',
+  [PRE_SITE_REOPEN_REASON.WRONG_GOVERNED_INPUTS]: 'Wrong governed inputs',
+});
+
+export const PRE_SITE_REOPEN_CONTRACT = Object.freeze({
+  version: '1',
+  producer: 'request-workbench-reopen',
+  minimumReasonNoteLength: 10,
+  maximumReasonNoteLength: 2000,
+});
+
 export function requestDocumentLabel(map, value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
