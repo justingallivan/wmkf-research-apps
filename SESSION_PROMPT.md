@@ -45,8 +45,9 @@ successor row and SharePoint item.
    - Guarded correction/reopen preserves the Review row/file/milestone and
      creates an exact Draft successor under a durable audit and explicit
      permission contract. It must precede Final creation.
-   - Informational sharing is an explicit frozen-PDF preview/send/history flow;
-     it never asks external Board/consultant recipients to edit the Word
+   - **[SOURCE-IMPLEMENTED 2026-08-23; migration/deployment/live proof
+     pending]** informational sharing is an explicit retained-DOCX/PDF/both
+     preview/send/history flow; it never asks recipients to edit the live Word
      workspace and never sends automatically on promotion.
    - AkoyaGo publication is a one-way derived projection, not a second source
      of truth. Exact path, filename, representation, permission, schema, and
@@ -165,9 +166,10 @@ successor row and SharePoint item.
 
 ### Parked / Sequenced After Guarded-Reopen Proof
 
-1. Frozen PDF and informational email distribution — first probe Dynamics
-   unresolved-recipient behavior and select the durable distribution-attempt
-   representation.
+1. Frozen Word/PDF informational email distribution — source-built with
+   Postgres migration 034 as the selected attempt ledger. Apply/read back the
+   migration before deployment, then run authenticated read-only verification
+   and a separately approved controlled send/readback.
 2. Site Visit logistics and governed supporting-file dossier — map current
    Dataverse facts before proposing schema.
 3. AkoyaGo publication projection — complete signed-in AkoyaGo, historical
@@ -209,7 +211,7 @@ successor row and SharePoint item.
 ### Do Not Reopen Without New Decision
 
 1. Automatic email on Site Visit promotion — the owner chose explicit preview
-   and send of a frozen informational PDF.
+   and send of a frozen DOCX, PDF, or both.
 2. Editing or reopening the preserved Review row in place — correction uses a
    separately audited Draft successor.
 3. Treating an AkoyaGo-visible publication as a second editable source of truth.

@@ -7,7 +7,7 @@ summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md)
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
   - scripts/audit-postgres-state.js
@@ -74,6 +74,7 @@ The canonical reference for the live state of the application's data layer.
 | `contact` | 5,000+ | reviewer promotion target | (covered in adapter `lib/dataverse/adapters/contact.js`) |
 | `account` | 4,601 | organization pivot | (Wave 2 intake portal will extend) |
 | `systemuser` | 222 | internal staff | (used for impersonation; see `dataverse-identity-map.js`) |
+| `emails` / `activitymimeattachments` | probe required | Standard Dynamics outbound email activity and attachment records. Existing guarded transport writes remain in `DynamicsService`; source-built Pre-Site distribution now reads exact activity/status/attachment recovery state through `email-activity.js`. No distribution activity was created or live-probed in this change. | (covered in adapter `lib/dataverse/adapters/email-activity.js`) |
 | `wmkf_ai_run` | probe required | append-only AI invocation audit ledger; includes governed Production Request `1002379` Pre-Site v3 run `ba0f42b9-849a-f111-b8db-6045bd008868` plus the earlier controlled attempts | [dataverse-wmkf-ai-run-and-prompt.md](atlas/dataverse-wmkf-ai-run-and-prompt.md) |
 | `wmkf_ai_prompt` | 24 (2026-08-18 PT: prior 23 rows plus successful immutable Pre-Site v4 publication) | staff-editable prompt rows for Executor; includes governed `initial-assessment.generate` v1 and sole-current `pre-site-visit.proposal-core.generate` v4 | same page |
 | `wmkf_granteedeliverable` | 14 | **LIVE S271** grantee deliverable package lifecycle/image/date side table; production schema and service-principal CRUD verified; row count refreshed 2026-08-12 via `check:memory-drift` | [dataverse-wmkf-granteedeliverable.md](atlas/dataverse-wmkf-granteedeliverable.md) |
@@ -104,6 +105,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Portal upload staging | `portal_upload_staging` (private Blob ownership, finalize lease/idempotency, candidate reconciliation; no published content authority) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer acceptance follow-up | `reviewer_acceptance_jobs` (post-accept side-effect queue; Dataverse suggestion row remains accepted-state source) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Review synthesis lifecycle | `review_synthesis_jobs` (generation queue/currentness ledger; no review text; Dataverse request memo remains content source) — **[VERIFIED 2026-07-28 via controlled automatic smoke and post-deploy probes] migration 028 applied; Production automation enabled; job `2` completed in one claim with AI run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6`; exact cleanup returned zero eligible requests; final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` Ready** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
+| Pre-Site informational distribution | `pre_site_distribution_attempts` (exact preview, cross-system send recovery, transport receipt; no attachment bytes) — **[VERIFIED IN SOURCE 2026-08-23; migration 034 not yet applied or live-probed]** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer authoring | `review_drafts` (autosave scratchpad; Dataverse `wmkf_appreviewanswer` is the submitted system of record) | [postgres-review-drafts.md](atlas/postgres-review-drafts.md) |
 | Monitoring | `health_check_history`, `system_alerts`, `maintenance_runs`, `api_usage_log` | same |
 | Operational observability | `operational_events` (migration 030; app-recorded failures/recoveries mirrored from `NotificationService.notify` + explicit seams, plus selected Vercel Log Drain rows via `/api/webhooks/vercel-log-drain`; admin surface `/api/admin/operational-events`) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
@@ -112,11 +114,11 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 ## Adapter inventory (`lib/dataverse/adapters/`)
 
-**[VERIFIED 2026-07-29 via directory inventory]** The adapter layer contains
-20 files:
+**[VERIFIED 2026-08-23 via directory inventory]** The adapter layer contains
+21 files:
 
 `account.js`, `ai-prompt.js`, `ai-run.js`, `app-request-person.js`,
-`contact.js`, `grant-cycle.js`, `grant-request.js`,
+`contact.js`, `email-activity.js`, `grant-cycle.js`, `grant-request.js`,
 `grantee-deliverable.js`, `membership.js`, `policy.js`, `request-document.js`,
 `potential-reviewer.js`, `proposal-budget-line.js`, `researcher.js`,
 `review-answer.js`, `review-question.js`, `reviewer-suggestion.js`,
@@ -158,12 +160,13 @@ The high-leverage services for data-layer work — full source remains authorita
 | `panel-review-service.js`, `multi-llm-service.js` | `panel_reviews`, `panel_review_items` | none | Virtual Review Panel; Claude request shaping uses `model-capabilities.js` |
 | `feedback-service.js` | `dynamics_feedback`, `dynamics_explorer_requests` | none | optional request correlation requires authenticated-profile ownership plus exact non-null session match; verification failure saves feedback uncorrelated |
 | `notification-service.js`, `alert-service.js`, `maintenance-service.js`, `health-checker.js` | `system_alerts`, `health_check_history`, `maintenance_runs`, `dynamics_explorer_requests` | none | maintenance deletes Explorer request rows at the query-log retention horizon; feedback FK becomes null |
-| `graph-service.js` | none | none (Microsoft Graph, separate token cache) | SharePoint files, including current metadata readback by stable drive/item identity |
+| `graph-service.js` | none | none (Microsoft Graph, separate token cache) | SharePoint files, including current metadata readback by stable drive/item identity, exact historical-version bytes, and current-item PDF conversion |
 | `external-token.js` | none (read/write live on `wmkf_appreviewersuggestion` extension fields) | `wmkf_appreviewersuggestion` | HMAC JWT primitive |
 | `review-upload.js` | none | `wmkf_appreviewersuggestion` (PATCH) + SharePoint | shared writer for staff + reviewer paths |
 | `grantee-deliverable-record.js` | none | `wmkf_granteedeliverable` | canonical package helper; read-only `getDeliverableForRequest()` never creates, staff write paths use `ensureDeliverableForRequest()` and `patchDeliverable()` |
 | `initial-assessment/artifact-service.js` | none | `akoya_request`, `wmkf_requestdocument`, `wmkf_ai_prompt`, `wmkf_ai_run`, and SharePoint `akoya_request` | governed Initial Assessment producer/read model; requires exactly one active `AI Materials/ProposalNarrative_{Request#}.pdf` before side effects, exact retry convergence, Ready-row no-overwrite, atomic request-pointer/Ready/supersession activation, operator-visible retained-item cleanup work without silent eviction, and stable Graph identity. **[VERIFIED IN SOURCE 2026-08-16 via focused tests and read-only live Request `1002788` extraction]** the new exact AI input resolves with non-empty text. Historical Request `1002788` artifact generation preserves mechanics-only evidence from its earlier Phase I source; Request `1003109` production-proved the superseded outbound-package input contract and recovery mechanics. Production adds response-only Graph-current metadata overlay by stable identity, with explicit missing/unavailable fallbacks and no Dataverse write. Cleanup is manual (no drain). |
 | `pre-site-visit/proposal-core-service.js` / `artifact-service.js` / `docx-renderer.js` / `reopen-service.js` | none | reads `akoya_request`, applicant `account` (`akoya_aka`, `name`, city/state), Co-PI junction, exact Proposal Narrative, governed prompt, and Pre-Site registry/pointer state; POST writes governed run/document/pointer/SharePoint state; GET status writes nothing; reopen writes one successor row/item under literal-on Wave 20 readiness | **[PRODUCTION-PROVED 2026-08-23.]** Request `1002379` previously proved initial generation, exact Ready retry, and Ready/Review handoff. After exact owner approval, guarded reopen preserved and superseded that Review source, created current Ready/Draft successor `888982b6-0a9f-f111-b8dc-7ced8d3d15a6` plus one distinct SharePoint copy, and moved the request pointer. Exact unchanged retry reused the same row/item; Dataverse/Graph postcheck proved one cycle row and exact copied bytes. The producer's resilience, correction-cycle, lease, cleanup, actor-redaction, and fail-closed contracts remain as documented in the service catalog and Request Document Atlas page. |
+| `pre-site-visit/distribution-service.js` / `distribution-store.js` | `pre_site_distribution_attempts` (R/W after migration 034) | reads current `akoya_request`/`wmkf_requestdocument`; creates retained snapshot rows and granular Dynamics email/attachment/send activity | **[VERIFIED IN SOURCE 2026-08-23; not deployed/live-proved.]** Retains exact Word first, derives PDF from that immutable item, supports DOCX/PDF/both, binds a content-hashed preview, persists each activity/attachment/send-intent step under a lease, recovers by Dynamics correlation/status, and reports source-version drift in history. Recipient entry by known staff is authoritative; syntax/dedupe/To-Cc conflict checks remain fail-closed. |
 | `reviewer-finder/load-proposal-service.js` | none | `akoya_request` and SharePoint `akoya_request` | default ingestion prefers exactly one active `Reviewer Materials/Proposal_{Request#}.pdf`, then falls back only to exactly one active current-cycle `Phase I/ProjectDescription.pdf`; neither/ambiguity fails before download/Blob write and returns the server-listed picker data. Explicit server-listed `fileKey` supports deliberate historical/ad-hoc staff override. This Reviewer Finder compatibility rule does not change external reviewer-material visibility or governed Initial Assessment input. |
 | `claude-reviewer-service.js` | none | none | legacy; new code uses `llm-client.js` |
 | `discovery-service.js` external clients (`pubmed-service.js`, `openalex-service.js`, `arxiv-service.js`, `biorxiv-service.js`, `chemrxiv-service.js`, `orcid-service.js`, `serp-contact-service.js`) | none | none | external research-DB clients |

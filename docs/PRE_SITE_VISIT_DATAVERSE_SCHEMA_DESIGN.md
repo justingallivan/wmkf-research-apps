@@ -80,10 +80,13 @@ reopen route returns 503 while it is off. This lets source deploy safely before
 provisioning without making ordinary Request Document reads query absent
 columns, while keeping guarded reopen mechanically unavailable.
 
-A PDF distribution copy is a separate Request Document row because one
-registry row must identify exactly one SharePoint file. Its
-`wmkf_SourceDocument` lookup points to the Word row, and the existing source
-version/hash fields identify the exact Word version exported to PDF.
+A frozen distribution always retains a separate Word snapshot Request Document
+row because one registry row identifies exactly one SharePoint file. Its
+`wmkf_SourceDocument` lookup points to the editable Word row, and the existing
+source version/hash fields identify the exact version frozen. When PDF is
+selected, a second row points to the retained Word snapshot and identifies the
+exact snapshot version/hash converted through Graph. The outgoing email may
+attach the Word snapshot, PDF, or both.
 
 ```text
 akoya_request
@@ -95,8 +98,10 @@ akoya_request
         ├── stable Word file identity ◀──────┘
         ├── Draft → Review + exact Site Visit handoff milestone
         ├── native Word versions then include Site Visit observations
-        └── wmkf_requestdocument (Pre Site Visit, PDF)
-              └── SourceDocument + exact source version/hash
+        └── wmkf_requestdocument (Pre Site Visit, frozen Word snapshot)
+              ├── SourceDocument + exact editable-Word version/hash
+              └── wmkf_requestdocument (Pre Site Visit, PDF snapshot)
+                    └── SourceDocument + exact Word-snapshot version/hash
   └── wmkf_CurrentFinalWriteup ──────────────┐
       wmkf_requestdocument (Final Writeup, Word, current)
         └── SourceDocument + exact Pre-Site version/hash ◀──┘
@@ -254,15 +259,25 @@ conditional PATCH persists Review plus `wmkf_milestoneversionid`,
 `wmkf_milestonecontenthash`, and `wmkf_milestonecreatedat`. An exact completed
 Review retry is idempotent.
 
-### PDF row
+### Distribution snapshot rows
 
-A PDF row also uses artifact type `Pre Site Visit`, but has
-`wmkf_contenttype = application/pdf` and normally leaves the eight proposal-
-core fields empty. Its `wmkf_SourceDocument` lookup targets the exact Word row;
-`wmkf_sourceversionid` and `wmkf_sourcecontenthash` record the exact Word
-version exported. Its generation key includes the Word row ID, source version,
-source content hash, PDF renderer/version, and content type. The Request's
-current pointer never targets the PDF row.
+The retained DOCX row and optional PDF row both use artifact type `Pre Site
+Visit`, lifecycle `Board Ready`, and producer-specific generation identities;
+they leave the eight proposal-core fields empty. The DOCX row points to the
+editable Word source. The PDF row points to the retained DOCX row, so PDF bytes
+and Word bytes share provable lineage even if the workspace advances during a
+later operation. The PDF row uses `wmkf_contenttype = application/pdf` and a raw
+SHA-256 byte digest in `wmkf_contenthash`; governed DOCX rows continue to use
+the `gdc1:` normalized hash scheme. Each generation key includes the exact
+source row/version/hash, raw source-byte hash, representation, and distribution
+contract version. The Request's current pointer never targets either snapshot.
+
+**[SOURCE-IMPLEMENTED 2026-08-23; NOT DEPLOYED/LIVE-PROVED.]** Postgres table
+`pre_site_distribution_attempts` stores the selected attachment mode, exact
+preview and selected file hashes, recipients/content/actor, granular send
+state, Dynamics activity ID/status, leases, and bounded failure evidence. It
+coordinates recovery only; SharePoint and Request Document rows remain file
+authority, and Dynamics remains email-activity authority.
 
 ## Structured snapshot contracts
 

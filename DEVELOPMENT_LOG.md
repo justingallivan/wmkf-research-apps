@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Frozen Pre-Site distribution became source-complete
+
+**Milestone:** Workbench can prepare an exact retained Pre-Site Word snapshot,
+derive PDF from that immutable item, and send DOCX, PDF, or both through one
+confirmed, recovery-safe Dynamics email activity.
+**Ship state:** Source/tests/docs are complete on a release branch; Postgres
+migration 034, deployment, authenticated smoke, and any controlled send remain
+pending. No Production snapshot, attempt, activity, or email was created.
+**Why it matters:** staff can share exactly what they reviewed while retries
+resume each durable file/activity/attachment/send-intent step without duplicate
+email, and history identifies when the editable Word source later advances.
+**Pointers:** `lib/services/pre-site-visit/distribution-service.js`;
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+
 ## August 2026 — Guarded Pre-Site reopen passed durable Production proof (Session 454)
 
 **Milestone:** The superuser correction path now has end-to-end Production

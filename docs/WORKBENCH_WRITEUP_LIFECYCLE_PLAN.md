@@ -406,67 +406,70 @@ non-superseded lifecycle.
    pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, standard actor/time, and a
    superuser-only route.
-6. Select the durable informational-distribution attempt representation only
-   after the unresolved-recipient and Dynamics activity-status probes establish
-   the executable email contract.
+6. **Selected and source-built 2026-08-23; migration/deployment/live proof
+   pending:** Postgres `pre_site_distribution_attempts` is the exact-preview and
+   recovery ledger; retained file identities remain in SharePoint plus Request
+   Document rows, and Dynamics owns the email activity.
 7. Complete the AkoyaGo publication-projection discovery below before proposing
    any publication-purpose field, relationship, entity, filename contract, or
    SharePoint destination.
 
-## PDF snapshots and informational email distribution
+## Frozen snapshots and informational email distribution
 
-When a frozen PDF is needed for an external Board member or consultant, create
-a separate Request Document row and SharePoint item. Link it to the exact Word
-row with `wmkf_SourceDocument` and persist the source Word version/hash. A
-current writeup pointer always targets Word, never PDF.
+Every informational send first retains a separate Word snapshot Request
+Document row and SharePoint item linked to the exact editable Word row/version/
+hash. If staff selects PDF or both, Graph converts that retained immutable Word
+item and a second Request Document row links to the Word snapshot. A current
+writeup pointer always targets the editable Word workspace, never a snapshot.
 
-**[OWNER DIRECTION 2026-08-21; PRODUCT AND RELIABILITY CONTRACT DECIDED;
-RECIPIENT-CHANNEL PROBE, SCHEMA, AND RUNTIME PLANNED, NOT BUILT.]** Distribution
-is informational: recipients receive the exact frozen PDF as an attachment so
-they know what to expect at the Site Visit. They are not asked to edit the Word
-workspace, and promotion never sends automatically.
+**[OWNER DIRECTION 2026-08-23; SOURCE-IMPLEMENTED, NOT DEPLOYED OR LIVE-PROVED.]**
+Distribution is informational. Staff can attach the retained Word DOCX, the
+derived PDF, or both; recipients are not asked to edit the live workspace, and
+promotion never sends automatically. Migration
+`034_pre_site_distribution_attempts.sql` is a deployment prerequisite.
 
 The minimum staff flow is `Create/Reuse Snapshot → Compose → Preview → Explicit
 Send → History`:
 
-1. Freeze the exact current Word row/item/version/hash under the same
-   before/after metadata and governed-content checks used by other milestone
-   operations. Claim or reuse the deterministic PDF snapshot row/item and
-   verify its own identity/version/hash after upload.
-2. Resolve an explicit To/CC recipient set. It may combine approved Dataverse
-   system users/contacts with staff-entered external addresses for Board or
-   consultant recipients who have no app account. The server normalizes and
-   deduplicates addresses, rejects invalid or conflicting recipients, and
-   shows every final address in preview. Before build, a non-production probe
-   must confirm the tenant's Dynamics unresolved-recipient behavior; the UI
-   must not promise free-form delivery until that succeeds.
-3. Produce an editable subject/body draft plus attachment, source-version, and
-   confidentiality details. Preview produces a content hash over recipients,
+1. Freeze the exact current Word row/item/version/hash under before/after
+   metadata and governed-content checks. Claim or reuse the deterministic Word
+   snapshot; when selected, convert that retained item to a deterministic PDF
+   row/item and verify each selected attachment's identity/version/hash.
+2. Accept an explicit To/CC set of known staff and consultants. Staff entry is
+   authoritative; normalize and deduplicate addresses, reject invalid syntax or
+   To/CC conflicts, show every final address in preview, and never send a valid
+   subset after one address fails. No identity-confidence or directory-membership
+   gate is part of this workflow.
+3. Produce an editable subject/body draft plus selected attachments and source
+   version. Preview produces a content hash over recipients,
    subject/body/template version, snapshot identity/hash, Request, and actor.
    Any change invalidates the preview and requires another confirmation.
 4. Send only the exact confirmed preview under the authenticated actor. A
-   recipient-resolution failure sends to nobody; the application does not
+   recipient-validation failure sends to nobody; the application does not
    silently send to a valid subset.
-5. Record one durable distribution attempt keyed by the exact preview and
-   client operation ID. At minimum it stores source and snapshot identities,
+5. Record one durable Postgres distribution attempt keyed by the exact preview
+   and client operation ID. At minimum it stores source and Word/PDF snapshot
+   identities,
    recipient set, subject/body/template hashes, actor/time, Dynamics email ID,
    state, attempt count, last completed step, and bounded error evidence.
 
-The send state machine is `prepared → activity_created → attachment_added →
-send_requested → sent`, with a retryable failure state that retains the last
-completed step. The existing `DynamicsService.createAndSendEmail` helper is not
-sufficient orchestration by itself: it creates the activity, attaches, and
+The send state machine is `preparing → prepared → activity_created →
+attachments_added → send_requested → sent`; separate Word/PDF timestamps retain
+the exact last completed attachment. The existing
+`DynamicsService.createAndSendEmail` helper is not sufficient orchestration by
+itself: it creates the activity, attaches, and
 sends sequentially but returns the email ID only after all steps, so a failure
 or lost response can leave durable partial work and a blind retry can create a
-duplicate. The implementation must instead persist the email ID immediately
+duplicate. The implementation instead persists the email ID immediately
 after activity creation, resume attachment/send against that same activity,
 and query the activity status before retrying an ambiguous send response.
 
 Exact retry of `sent` returns the existing distribution receipt. Attachment
 failure reuses the existing draft; send failure never creates another activity.
-Changed recipients, body, template, source Word version, or PDF bytes require a
-new preview and distribution identity. Transport acceptance is recorded as
-sent; it is not a claim that every inbox delivered the message. A later Word
+Changed attachment mode, recipients, body, template, source Word version, or
+selected attachment bytes require a new preview and distribution identity.
+Transport acceptance is recorded as sent; it is not a claim that every inbox
+delivered the message. A later Word
 version marks the prior distribution `changed since sent` and offers a new
 snapshot/preview/send cycle while preserving what earlier recipients saw.
 
@@ -515,7 +518,7 @@ silently extend its paths or names to writeup publications.
   approved, source identity/version/hash, destination identity/version/hash,
   purpose or representation, state, actor/time, and retry/failure evidence.
 - External informational distribution remains a distinct consumer contract. A
-  frozen PDF used as an email attachment may reuse publication machinery, but
+  frozen DOCX/PDF attachment may reuse publication machinery, but
   an AkoyaGo-visible copy is not automatically the exact copy sent externally.
 
 ### Required discovery before design
@@ -625,9 +628,11 @@ silently extend its paths or names to writeup publications.
    Dataverse/Graph readback proved pointer, lifecycle, audit, cardinality, and
    byte coherence. This proof now precedes Final creation so an accidental
    handoff cannot become an unexplained Final lineage source.
-7. **Frozen PDF and informational email.** Probe Dynamics unresolved recipients,
-   select/provision the durable distribution representation, then implement
-   exact snapshot, preview, explicit send, resume-safe retry, and history.
+7. **Frozen Word/PDF informational email — source-built 2026-08-23.** The
+   DOCX/PDF/both snapshot, exact preview, explicit send, resume-safe retry, and
+   history path is implemented. Apply Postgres migration 034 before deployment,
+   then run authenticated read-only UI verification and one separately approved
+   controlled send/readback before claiming Production proof.
 8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload
@@ -661,9 +666,9 @@ strategy; this plan itself performs no deployment.
 - A guarded reopen preserves the prior Review row/file/milestone, creates one
   exact Draft successor on exact retry, and refuses post-handoff edits or
   downstream derivatives without explicit reconciliation.
-- An informational send attaches the exact frozen PDF approved in preview,
-  persists stepwise attempt state, and resumes without duplicate email activity
-  after attachment, send, or response failure.
+- An informational send attaches the exact frozen Word DOCX, PDF, or both
+  approved in preview, persists stepwise attempt state, and resumes without a
+  duplicate email activity after attachment, send, or response failure.
 - Every Site Visit supporting file appears in the correct governed category and
   has one registry row with stable Graph identity.
 - Creating Final copies the exact latest/selected Site Visit-stage Pre-Site Word

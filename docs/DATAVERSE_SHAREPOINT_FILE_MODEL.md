@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -374,9 +374,11 @@ canonical Ready Pre-Site Word pointer, and
 `akoya_request.wmkf_CurrentFinalWriteup` as the canonical Ready Final Word
 pointer. There is intentionally no Site Visit writeup pointer. `wmkf_ai_run`
 remains the append-only execution audit rather than the editable business
-record. A PDF is a separate registry row whose `wmkf_SourceDocument`, source
-version, and source hash identify the exact Word version exported. Full field,
-transition, and cross-tab contracts:
+record. A retained Word distribution snapshot is a separate registry row whose
+`wmkf_SourceDocument`, source version, and source hash identify the exact
+editable Word version frozen. When PDF is selected, a second registry row
+links to that retained Word row and records the Word-snapshot version/hash
+converted through Graph. Full field, transition, and cross-tab contracts:
 `docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md` and
 `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
@@ -447,41 +449,53 @@ format remains in flux during the transition to a single-phase submission.
 The D26 structure is a starting point to iterate through the versioned template,
 not a permanent layout contract.
 
-Staff collaborators use the canonical SharePoint Word file. External Board
-members or consultants who join a visit receive a PDF attachment representing
-an exact frozen Pre-Site version. An anonymous or guest SharePoint document
-link is not required for this minimum contract.
+Staff collaborators continue to use the canonical SharePoint Word workspace.
+For informational email, authorized staff can attach an exact frozen Word
+snapshot, a PDF converted from that retained Word snapshot, or both. An
+anonymous or guest SharePoint document link is not required for this minimum
+contract.
 
-**[OWNER DIRECTION 2026-08-21; INFORMATIONAL DISTRIBUTION CONTRACT DECIDED;
-RECIPIENT-CHANNEL PROBE, SCHEMA, AND RUNTIME PLANNED.]** Promotion does not send
-email. Staff explicitly creates or reuses the exact PDF snapshot, selects To/CC
-recipients, previews the editable subject/body plus attachment/source details,
-and confirms the exact preview before send. The server normalizes/deduplicates
-all addresses and sends to nobody if any selected recipient fails validation.
-Dataverse-resolved parties and staff-entered external Board/consultant addresses
-are product requirements, but the tenant's unresolved-recipient behavior must
-pass a non-production Dynamics probe before the UI promises free-form delivery.
+**[OWNER DIRECTION 2026-08-23; SOURCE-IMPLEMENTED, NOT DEPLOYED OR LIVE-PROVED.]**
+Promotion does not send email. Staff explicitly creates or reuses the retained
+snapshot set, selects Word, PDF, or both, enters To/CC recipients, previews the
+editable subject/body plus exact attachments, and confirms that preview before
+send. Recipients are known staff members or consultants; staff entry is
+authoritative, so the server applies syntax validation, lowercase
+normalization, deduplication, and To/CC conflict checks without an
+identity-confidence or directory-membership gate. Any invalid recipient rejects
+the whole operation before a send.
 
-One durable distribution attempt must retain the exact Word and PDF
-identities/versions/hashes, recipient set, subject/body/template hashes,
+Migration `034_pre_site_distribution_attempts.sql` adds the Postgres
+coordination ledger and must be applied before runtime deployment. SharePoint
+and `wmkf_requestdocument` own retained file identities; Postgres owns exact
+preview/send recovery; Dynamics owns the email activity. No Production row,
+snapshot, activity, or email has been created by this source implementation.
+
+One durable distribution attempt retains the exact source Word, retained Word,
+and selected PDF identities/versions/hashes, recipient set,
+subject/body/template hashes,
 actor/time, Dynamics email activity ID, client operation ID, state, attempt
 count, last completed step, and bounded error evidence. Its state machine is
-`prepared → activity_created → attachment_added → send_requested → sent`.
+`preparing → prepared → activity_created → attachments_added →
+send_requested → sent`,
+with separate Word/PDF attachment timestamps so `both` can resume between files.
 The existing composed Dynamics helper is not a sufficient retry coordinator
 because a create or attachment may survive an exception before the helper
 returns the email ID. Runtime must persist the ID after creation, resume the
 same activity after attachment/send failure, and query status before retrying
 an ambiguous send response. Exact sent retry returns the existing receipt;
-changed recipients, body, template, source version, or PDF bytes require a new
-preview and attempt. `sent` means transport acceptance, not inbox delivery.
-History preserves what each audience received and marks an older distribution
-changed-since-sent when the Word workspace advances.
+changed attachment mode, recipients, body, template, source version, or
+selected attachment bytes require a new preview and attempt. `sent` means
+transport acceptance, not inbox delivery.
+History preserves what each audience received and compares the recorded source
+version with the current Word pointer/version to mark a prior distribution
+changed-since-preview when the workspace advances.
 
 **[OWNER DIRECTION 2026-08-21; PLANNED, NOT BUILT.]** The Workbench must also
 plan for an **AkoyaGo publication projection** so important governed writeups
 remain findable to staff who work from the request's AkoyaGo Documents surface
 and to approved Power Automate flows. This is additive to the canonical Word
-workspace and the external PDF distribution contract. It does not authorize a
+workspace and the frozen-attachment distribution contract. It does not authorize a
 second independently editable source of truth.
 
 The exact AkoyaGo-visible destination is **UNKNOWN** pending signed-in discovery:
@@ -810,9 +824,10 @@ records controls are verified:
 
 Working prose remains editable and recoverable. An official milestone remains
 identifiable even after later edits to the working document. The current app
-can download, search, upload, and delete SharePoint files, but it does not yet
-implement Graph version-history, restore, retention, or milestone-snapshot
-operations.
+can download, search, upload, and delete SharePoint files; source now also
+implements exact prior-version download plus retained Pre-Site Word/PDF
+distribution snapshots. Administrator restore, retention enforcement, and
+general Board-milestone controls remain separate open work.
 
 ### Controlled target-library audit — 2026-07-30 local / 2026-07-31 UTC
 

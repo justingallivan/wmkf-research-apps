@@ -725,6 +725,114 @@ const v39Statements = [
      ON portal_upload_staging (expires_at, status)`,
 ];
 
+// V40: Frozen Pre-Site distribution orchestration ledger. Existing databases
+// use migration 034_pre_site_distribution_attempts.sql; attachment bytes stay
+// in SharePoint and email activities stay in Dynamics.
+const v40Statements = [
+  `CREATE TABLE IF NOT EXISTS pre_site_distribution_attempts (
+    operation_id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    source_document_id UUID NOT NULL,
+    source_drive_id TEXT,
+    source_item_id TEXT,
+    source_version_id TEXT,
+    source_content_hash TEXT,
+    source_byte_hash CHAR(64),
+    source_filename TEXT,
+    attachment_mode TEXT NOT NULL CHECK (attachment_mode IN ('docx', 'pdf', 'both')),
+    to_recipients JSONB NOT NULL,
+    cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+    subject TEXT NOT NULL,
+    body_text TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    from_email TEXT NOT NULL,
+    acting_user_system_id UUID NOT NULL,
+    draft_hash CHAR(64) NOT NULL,
+    preview_hash CHAR(64),
+    template_version TEXT NOT NULL,
+    docx_snapshot_document_id UUID,
+    docx_drive_id TEXT,
+    docx_item_id TEXT,
+    docx_version_id TEXT,
+    docx_web_url TEXT,
+    docx_filename TEXT,
+    docx_content_type TEXT,
+    docx_byte_hash CHAR(64),
+    docx_size BIGINT,
+    pdf_snapshot_document_id UUID,
+    pdf_drive_id TEXT,
+    pdf_item_id TEXT,
+    pdf_version_id TEXT,
+    pdf_web_url TEXT,
+    pdf_filename TEXT,
+    pdf_content_type TEXT,
+    pdf_byte_hash CHAR(64),
+    pdf_size BIGINT,
+    dynamics_email_id UUID,
+    dynamics_statecode INTEGER,
+    dynamics_statuscode INTEGER,
+    dynamics_senton TIMESTAMPTZ,
+    state TEXT NOT NULL DEFAULT 'preparing'
+      CHECK (state IN ('preparing', 'prepared', 'activity_created', 'attachments_added', 'send_requested', 'sent')),
+    docx_attached_at TIMESTAMPTZ,
+    pdf_attached_at TIMESTAMPTZ,
+    send_requested_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
+    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    lease_token UUID,
+    locked_until TIMESTAMPTZ,
+    last_error_code TEXT,
+    last_error_message TEXT,
+    last_failed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (jsonb_typeof(to_recipients) = 'array' AND jsonb_array_length(to_recipients) > 0
+      AND jsonb_typeof(cc_recipients) = 'array'),
+    CHECK (draft_hash ~ '^[0-9a-f]{64}$'
+      AND (preview_hash IS NULL OR preview_hash ~ '^[0-9a-f]{64}$')
+      AND (source_byte_hash IS NULL OR source_byte_hash ~ '^[0-9a-f]{64}$')
+      AND (docx_byte_hash IS NULL OR docx_byte_hash ~ '^[0-9a-f]{64}$')
+      AND (pdf_byte_hash IS NULL OR pdf_byte_hash ~ '^[0-9a-f]{64}$')),
+    CHECK (state = 'preparing' OR (
+      source_drive_id IS NOT NULL
+      AND source_item_id IS NOT NULL
+      AND source_version_id IS NOT NULL
+      AND source_content_hash IS NOT NULL
+      AND source_byte_hash IS NOT NULL
+      AND preview_hash IS NOT NULL
+      AND docx_snapshot_document_id IS NOT NULL
+      AND docx_drive_id IS NOT NULL
+      AND docx_item_id IS NOT NULL
+      AND docx_version_id IS NOT NULL
+      AND docx_filename IS NOT NULL
+      AND docx_content_type IS NOT NULL
+      AND docx_byte_hash IS NOT NULL
+      AND docx_size > 0
+      AND (attachment_mode = 'docx' OR (
+        pdf_snapshot_document_id IS NOT NULL
+        AND pdf_drive_id IS NOT NULL
+        AND pdf_item_id IS NOT NULL
+        AND pdf_version_id IS NOT NULL
+        AND pdf_filename IS NOT NULL
+        AND pdf_content_type IS NOT NULL
+        AND pdf_byte_hash IS NOT NULL
+        AND pdf_size > 0
+      ))
+    )),
+    CHECK ((lease_token IS NULL AND locked_until IS NULL)
+      OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)),
+    CHECK ((state = 'sent' AND dynamics_email_id IS NOT NULL
+      AND send_requested_at IS NOT NULL AND sent_at IS NOT NULL) OR state <> 'sent')
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_request_history
+     ON pre_site_distribution_attempts (request_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_source
+     ON pre_site_distribution_attempts (source_document_id, source_version_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_recovery
+     ON pre_site_distribution_attempts (state, locked_until, updated_at)
+     WHERE state <> 'sent'`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1449,6 +1557,24 @@ async function runMigration() {
       }
     }
 
+    // Run V40 table creation (frozen Pre-Site distribution ledger)
+    console.log(`\nApplying v40 schema updates - Pre-Site distribution attempts (${v40Statements.length} statements)...`);
+    for (let i = 0; i < v40Statements.length; i++) {
+      const statement = v40Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v40-${i + 1}/${v40Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v40-${i + 1}/${v40Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v40-${i + 1}/${v40Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1507,7 +1633,9 @@ async function runMigration() {
     console.log('  • review_synthesis_jobs (automatic/manual generation ledger — drained by cron)');
     console.log('\nV39 new table (Private portal upload staging):');
     console.log('  • portal_upload_staging (actor-bound private Blob staging + finalize idempotency)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39)');
+    console.log('\nV40 new table (Frozen Pre-Site distribution):');
+    console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);

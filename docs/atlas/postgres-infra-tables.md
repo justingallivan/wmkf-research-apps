@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema):** 2026-05-07. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-08-23. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -162,6 +162,30 @@ content source of truth. PR #98 corrected the automatic Executor run-source
 mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
+
+### `pre_site_distribution_attempts` — SOURCE-DECLARED; NOT APPLIED/LIVE-PROBED
+
+**Source of truth:** Postgres exact-preview and cross-system recovery ledger.
+Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
+setup. SharePoint plus `wmkf_requestdocument` remain retained-file authority,
+and Dynamics remains email-activity/transport authority.
+
+One client operation UUID binds one Request, exact editable source Word
+identity/version/governed hash/raw byte hash, attachment mode (`docx`, `pdf`, or
+`both`), exact retained Word/PDF identities and byte hashes, normalized To/Cc,
+subject/body/template/sender/actor, preview hash, Dynamics activity/status, and
+bounded error evidence. Attachment bytes are never stored. States are
+`preparing`, `prepared`, `activity_created`, `attachments_added`,
+`send_requested`, and `sent`; per-kind attachment timestamps plus a lease fence
+allow recovery between Word and PDF or after an ambiguous SendEmail response.
+`sent_at` means Dynamics accepted or status readback proved the transport
+request, not inbox delivery. Read/write paths:
+`lib/services/pre-site-visit/distribution-store.js` and
+`lib/services/pre-site-visit/distribution-service.js`.
+
+**[VERIFIED IN SOURCE/TESTS 2026-08-23.]** Migration apply, Production schema
+readback, authenticated UI smoke, and any controlled send remain pending. No
+Production table row or email was created during implementation.
 
 ## Portal upload staging
 

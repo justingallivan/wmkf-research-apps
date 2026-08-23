@@ -9,6 +9,10 @@ import { PRE_SITE_REOPEN_REASON } from '../../shared/config/requestDocument';
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
+jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => ({
+  __esModule: true,
+  default: () => <div>Frozen distribution panel</div>,
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_REQUEST_ID = '33333333-3333-4333-8333-333333333333';

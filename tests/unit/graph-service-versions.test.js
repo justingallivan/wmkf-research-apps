@@ -62,6 +62,50 @@ afterEach(() => {
   global.fetch = setupFetch;
 });
 
+it('downloads an exact historical version through a pre-authenticated redirect without forwarding auth', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const bytes = Buffer.from('historical-word');
+  global.fetch = jest.fn(async (url, options) => {
+    if (String(url).startsWith('https://graph.microsoft.com/')) {
+      return {
+        ok: false,
+        status: 302,
+        headers: { get: (name) => (name.toLowerCase() === 'location' ? 'https://download.test/version' : null) },
+        text: jest.fn(async () => ''),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: jest.fn(() => null) },
+      arrayBuffer: jest.fn(async () => bytes),
+      text: jest.fn(async () => ''),
+    };
+  });
+
+  await expect(GraphService.downloadFileVersion('drive/id', 'item/id', '2.0')).resolves.toEqual(bytes);
+  expect(global.fetch.mock.calls[0][0]).toContain('/drives/drive%2Fid/items/item%2Fid/versions/2.0/content');
+  expect(global.fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer token');
+  expect(global.fetch.mock.calls[1][1].headers).toBeUndefined();
+});
+
+it('downloads Graph PDF conversion bytes from the frozen Word item', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const bytes = Buffer.from('%PDF-test');
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: jest.fn(() => null) },
+    arrayBuffer: jest.fn(async () => bytes),
+    text: jest.fn(async () => ''),
+  }));
+
+  await expect(GraphService.downloadFileAsPdf('drive', 'word-item')).resolves.toEqual(bytes);
+  expect(global.fetch.mock.calls[0][0]).toBe(
+    'https://graph.microsoft.com/v1.0/drives/drive/items/word-item/content?format=pdf',
+  );
+});
+
 it('marks the authoritative current version even when a page reports it late', async () => {
   routeGraph({
     item: itemResponse('4.0'),
