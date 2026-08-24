@@ -96,6 +96,11 @@ consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`
 production prompt rules live in
 `shared/config/prompts/expertise-finder.js`. The isolated
 `modules/expertise_matching` reference/demo has no production caller.
+Migration 035 adds nullable normalized `preferred_email`, maintained by the
+existing roster editor and consumed by the Site Visit recipient directory for
+Board/Consultant suggestions. The immutable roster row ID remains the external
+recipient identity; names are never join keys. **[VERIFIED LIVE 2026-08-24:
+column exact; zero preferred-email values before staff population.]**
 
 ## Integrity Screener
 
@@ -166,12 +171,15 @@ returned zero eligible/enqueued/claimed/failed.
 ### `pre_site_distribution_attempts` — LIVE; ONE SENT PRODUCTION PROOF
 
 **Source of truth:** Postgres exact-preview and cross-system recovery ledger.
-Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
-setup. **[VERIFIED LIVE 2026-08-24 via canonical migration, schema/tracker
-readback, and the first approved send]** migration 034 was applied at
-`2026-08-23T23:39:34.686Z`; the table
-has 55 columns, eight named CHECK constraints plus its primary key, four indexes
-including the primary-key index, one `sent` row, and no pending manifest migration.
+Migrations `034_pre_site_distribution_attempts.sql` and
+`035_site_visit_logistics.sql`; mirrored in the fresh-install setup.
+**[VERIFIED LIVE 2026-08-24 via canonical migrations, schema/tracker readback,
+and the first approved base send]** migration 034 was applied at
+`2026-08-23T23:39:34.686Z`; migration 035 was applied at
+`2026-08-24T20:23:13.965Z`. The table has 66 columns, including the 11 additive
+calendar/Site Visit/material-link fields, one `sent` base-proof row, zero
+calendar attempts, and no pending manifest migration. The migration-035
+calendar/hash/material constraints and columns read back exact.
 SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
@@ -187,6 +195,13 @@ The Dynamics activity ID becomes durable before exact activity assertions, and
 the same fenced lease is renewed immediately before transport; a lost renewal
 cannot call `SendEmail`. Send also rejects when the current Pre-Site pointer or
 native source version no longer matches the prepared attempt.
+Migration 035 additionally binds optional governed material-link snapshots and
+one informational calendar attachment to the same exact preview: Site Visit
+ID/ETag/snapshot, deterministic ICS filename/type/hash/size, material-link
+JSON, and a separate calendar attachment receipt. Calendar-enabled attempts
+cannot advance past attachment recovery without that receipt. The calendar is
+rebuilt from the stored bounded snapshot and byte-hash checked before send;
+selected links and the live Site Visit ETag are re-resolved under the lease.
 `sent_at` means Dynamics accepted or status readback proved the transport
 request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and

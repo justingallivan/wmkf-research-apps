@@ -489,9 +489,10 @@ other target; Production also completed the durable mutation proof:
 - Which staff-facing Dataverse form, if any, exposes the named fields before
   Word creation. Direct unrestricted edits to Ready rows are not part of this
   design.
-- The remaining Site Visit logistics mapping and Institutional Funding History
-  result field are later bounded schema decisions. Neither is silently folded
-  into Wave 19.
+- Site Visit logistics is now a separate Production-deployed Wave 21 contract
+  on the existing `wmkf_sitevisit` Activity; it was not folded into Wave 19.
+  The Institutional Funding History result field remains a later bounded
+  schema decision.
 
 The cross-tab lifecycle, Site Visit file paths, and Final copy transaction are
 specified in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.

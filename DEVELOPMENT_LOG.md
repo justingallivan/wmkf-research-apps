@@ -10,6 +10,28 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Site Visit logistics and informational calendar distribution reached Production (Session 459)
+
+**Milestone:** Workbench now manages request-bound Site Visit schedule,
+time zone, format, location/link, organizer/attendees, governed material links,
+and an optional informational calendar attachment.
+**Sessions:** 459 (live schema mapping, bounded Opus plan/code reviews,
+implementation, migration/schema apply, reversible sandbox proof, Preview, and
+Production promotion).
+**Ship state:** Wave 21 is exact in sandbox and Production; migration 035 is
+applied/read back; Preview/Production readiness is literal `on`; main commit
+`ffaa293b` is Ready in Production deployment
+`dpl_A3PED8cA22G88dAKL4jafBAro5tn`. The sandbox proved nested ActivityParty
+create and atomic same-ID replacement with exact cleanup. Production auth and
+error-log smokes passed; no Production Site Visit row or calendar send was
+created without real event details.
+**Why it matters:** staff can populate recipients from reconciled WMKF staff and
+Board/Consultant roster identities, enter the event once, link governed
+materials, and send an exact-preview `METHOD:PUBLISH` attachment without
+claiming RSVP or update/cancel semantics.
+**Pointers:** `docs/atlas/dataverse-wmkf-sitevisit.md`;
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; commit `ffaa293b`.
+
 ## August 2026 — Frozen Pre-Site distribution reached Production and passed its first live send (Sessions 457–458)
 
 **Milestone:** Exact DOCX/PDF/both snapshot preview, recovery-safe Dynamics

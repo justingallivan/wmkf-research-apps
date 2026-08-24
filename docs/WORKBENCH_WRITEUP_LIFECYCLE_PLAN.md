@@ -25,7 +25,8 @@ related:
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
-2026-08-23; FINAL PLANNED.]** The three Workbench
+2026-08-23; SITE VISIT LOGISTICS PRODUCTION-DEPLOYED 2026-08-24; FINAL
+PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
@@ -331,8 +332,9 @@ native `location` field. The sandbox still lacks `wmkf_requestdocument`, so it
 can prove Activity/calendar transport but not the full governed material-link
 projection.
 
-**[OWNER DIRECTION 2026-08-24; OPUS PLAN REVIEW `READY WITH NAMED CHANGES`;
-SOURCE-BUILT; LIVE PROMOTION PENDING.]** The first logistics slice uses the custom Activity rather
+**[OWNER DIRECTION 2026-08-24; OPUS PLAN AND CODE REVIEWS `READY WITH NAMED
+CHANGES`; PRODUCTION-DEPLOYED; SIGNED-IN SAVE/SEND PROOF OPEN.]** The first
+logistics slice uses the custom Activity rather
 than standard `appointment`, because the custom entity and Request relationship
 already express the intended domain. It adds only four structured Dataverse
 fields needed for round-trip editing:
@@ -510,8 +512,11 @@ non-superseded lifecycle.
 
 ### Later bounded schema decisions
 
-1. Map Site Visit logistics to existing Dataverse data, then propose only the
-   missing fields/relationships.
+1. **Completed for the first logistics slice 2026-08-24:** Wave 21 adds only
+   visit format, IANA time zone, location/link, and the server-owned attendee
+   reference map to the existing `wmkf_sitevisit` Activity. Sandbox and
+   Production preflights report all four exact; no new relationship or status
+   field was added.
 2. Define the Institutional Funding History result field, its governed prompt,
    refresh semantics, and how it is incorporated into a new Pre-Site version.
 3. Decide whether Final needs any additional generated/structured fields. The
@@ -774,8 +779,16 @@ silently extend its paths or names to writeup publications.
    `574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
    Dynamics appended its CRM tracking token after transport acceptance. The
    proof stops at Dynamics Sent; recipient inbox delivery remains unverified.
-8. **Site Visit logistics design.** Inventory and map every desired logistics
-   fact before proposing or applying any further schema.
+8. **Site Visit logistics and calendar extension — Production-deployed
+   2026-08-24; signed-in business proof open.** Wave 21 is exact in sandbox and
+   Production, migration 035 is applied/read back, the readiness flag is
+   literal `on` in Preview/Production, and deployment
+   `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready. Reversible sandbox proof covers
+   nested ActivityParty create, ETag-fenced field edits, atomic same-ID party
+   replacement, and exact sentinel cleanup. Production HTTP smoke proved the
+   auth boundary and error logs were clean. No Production Site Visit row or
+   calendar/link distribution was created, because no actual event details
+   were supplied.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload
    paths and logistics around the now-built Word-workspace handoff. Keep
    applicant upload work as its own security-reviewed slice.

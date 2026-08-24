@@ -363,6 +363,16 @@ document inventory, and individual implementation plans do not establish priorit
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and
   Board/consultant participants; no separate visit-status field is needed.
+  **[PRODUCTION-DEPLOYED 2026-08-24; SIGNED-IN BUSINESS PROOF OPEN]** the
+  existing `wmkf_sitevisit` Activity now owns that schedule, IANA zone,
+  format, location/link, organizer/attendee parties, and server-owned recipient
+  reference map. Wave 21 is exact in sandbox and Production; migration 035
+  extends the existing distribution ledger and roster email mapping; the
+  readiness flag is literal `on` in Preview/Production; deployment
+  `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready. Calendar attachment semantics
+  are informational `METHOD:PUBLISH`, not RSVP/update/cancellation scheduling.
+  Reversible sandbox write/cleanup proof passed; no Production Site Visit row
+  or calendar/link send was created during release.
   Its file categories are applicant slides, other applicant materials,
   recording, transcript, and transcript summary. Staff observations are direct
   edits in the existing Pre-Site Word workspace; do not add a separate

@@ -1,142 +1,129 @@
-# Session 459 Prompt: Map Site Visit Logistics After Proven Distribution
+# Session 460 Prompt: Prove Site Visit Logistics with Real Event Details
 
-## Session 458 Summary
+## Session 459 Summary
 
-Session 458 completed the first explicitly approved Production frozen Pre-Site
-distribution for Request `1002379`. The full prepare, preview, send, history,
-and independent readback path is now Production-proved at Dynamics transport
-level. Retained artifacts and receipts remain audit evidence; inbox delivery is
-not yet independently verified.
+Session 459 mapped, built, reviewed, provisioned, and deployed the first Site
+Visit logistics slice. The code is on `main`; Production is Ready. The remaining
+business proof requires real date/time/location and attendee choices. Do not
+invent them.
 
 ### What Was Completed
 
-1. **The request and live state were verified before mutation.**
-   - `[VERIFIED via Production Dataverse/Workbench]` Request `1002379`
-     (`54e2b88b-04b9-f011-bbd3-6045bd02b4cc`) was in Review with current
-     Pre-Site row `888982b6-0a9f-f111-b8dc-7ced8d3d15a6`, source version `1.0`,
-     and no distribution ledger row.
-   - The owner named `jgallivan@wmkeck.org`, approved the PDF-only preview, and
-     separately confirmed the live send.
+1. **Live Dataverse shape was verified before design.**
+   - `[VERIFIED via Production/sandbox probes]` the existing custom Activity
+     `wmkf_sitevisit` already supplied Request binding, UTC schedule, notes,
+     state/status, and organizer/required/optional ActivityParty roles; both
+     targets had zero rows.
+   - Wave 21 adds only format, IANA time zone, location/link, and the server-owned
+     attendee-reference map. All four fields now read back exact in sandbox and
+     Production.
 
-2. **The exact snapshot preview was prepared and independently checked.**
-   - Operation `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb` retained Ready/Board Ready
-     DOCX row `0b1ac77f-d79f-f111-b8dc-6045bd018a07` and PDF row
-     `e28d3283-d79f-f111-b8dc-70a8a59cded0`.
-   - The selected PDF is `PreSite_1002379_faa275f3b1b4722e.pdf`, 133,265 bytes,
-     SHA-256 `574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
-   - Independent Graph downloads matched the persisted sizes and hashes.
+2. **The full caller → persistence → consumer slice was implemented.**
+   - Workbench Site Visit has a logistics editor for local date/time, named IANA
+     zone and DST choice, format, location/link, organizer, staff/Board/
+     Consultant attendees, manual applicant addresses, and notes.
+   - WMKF staff resolves through active `user_profiles` plus enabled Dataverse
+     `systemusers`; Board/Consultants resolve by immutable
+     `expertise_roster.id` plus maintained `preferred_email`.
+   - The existing frozen distribution preview/send/history path now supports
+     governed material links and one deterministic informational
+     `METHOD:PUBLISH` calendar attachment. It does not claim RSVP or reliable
+     update/cancellation behavior.
 
-3. **The confirmed Production send completed once.**
-   - `[VERIFIED via Postgres]` the ledger reached `sent` in one attempt with no
-     error; send was requested at `2026-08-24T16:24:35.965Z` and reconciled at
-     `2026-08-24T16:24:38.514Z`.
-   - `[VERIFIED via Dataverse]` email activity
-     `33ce6346-d89f-f111-b8db-6045bd07a06d` reached Sent (`statuscode=3`,
-     `senton=2026-08-24T16:25:01Z`). Sender and To were both
-     `jgallivan@wmkeck.org`; `createdBy` matched the authenticated actor.
-   - Exactly one MIME attachment existed, with the selected PDF filename,
-     content type, size, and SHA-256. Workbench history showed Accepted by
-     Dynamics and the Dynamics ID.
-   - Dynamics appended `CRM:0153199` to the persisted subject after transport
-     acceptance. Preview exactness therefore describes the pre-transport
-     subject; inbox delivery remains unverified.
+3. **Persistence and failure contracts were proved.**
+   - Migration 035 was applied at `2026-08-24T20:23:13.965Z`; the 11 additive
+     distribution columns and constraints read back exact. The prior sent base
+     proof row is unchanged; there are zero calendar attempts and zero populated
+     roster preferred emails before staff population.
+   - Direct ActivityParty create is unsupported (`0x80040800`). A reversible
+     sandbox sentinel proved nested-party create, Wave 21 round trip, ETag-fenced
+     field edit, atomic delete/recreate of the same Activity GUID when roles
+     change, and exact cleanup/readback absence.
+   - Focused tests pass: 8 suites, 60 tests. Types, relevant ESLint (0 errors),
+     migration manifest, API route, route/service, GUID trust, Dataverse DAL, and
+     Dynamics context gates pass. Webpack Production build passes with only the
+     repository's known dynamic-dependency warnings.
 
-4. **Production observability remained clean.**
-   - A bounded error-level Vercel scan after the send returned no entries.
-   - The retained DOCX/PDF rows, ledger row, Dynamics activity, and attachment
-     were intentionally not deleted; they are the first durable proof set.
+4. **Bounded Opus reviews closed.**
+   - The plan review returned `READY WITH NAMED CHANGES`; the first slice was
+     narrowed to honest `METHOD:PUBLISH`, structured fields, immutable roster
+     identity, and controlled proof.
+   - The final code review returned `READY WITH NAMED CHANGES`. The material
+     finding—unsupported direct ActivityParty writes—was confirmed live and
+     fixed with the proved atomic same-ID replacement. The remaining findings
+     were confirmed/refuted with source and regression tests. Do not restart a
+     review loop without a material new change.
 
-5. **Review remained bounded.**
-   - Claude OAuth was verified through the subscription session.
-   - A read-only Opus release-plan review produced no verdict within the fixed
-     timebox and was stopped. Do not claim Opus approval and do not restart a
-     review loop without a material new plan or code change.
-
-6. **Durable current-state documentation was reconciled.**
-   - The lifecycle/file/schema plans, API matrix, service catalog, state Atlas,
-     Postgres Atlas, agent wiki, milestone log, and this handoff now distinguish
-     Dynamics Sent proof from recipient inbox delivery.
+5. **Production release completed.**
+   - Vercel Preview was Ready and protected by Vercel SSO.
+   - `SITE_VISIT_LOGISTICS_SCHEMA_READY=on` is verified as non-sensitive in
+     Preview and Production.
+   - Commit `ffaa293b` fast-forwarded `main`; Production deployment
+     `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready on the branded aliases.
+   - Production `/api/auth/status` returned `{"enabled":true}`; both new routes
+     redirected unauthenticated callers to sign-in; the bounded error-log scan
+     was clean.
+   - No Production Site Visit row or calendar/link distribution was created.
 
 ## Primary Next Step
 
-1. **Map Site Visit logistics to live Dataverse and SharePoint facts.**
-   - Start read-only from `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`,
-     `docs/APPLICATION_STATE_ATLAS.md`, and the relevant Atlas entity pages.
-   - Inventory the desired logistics facts, then identify existing entities,
-     fields, relationships, files, and current consumers before proposing any
-     schema or route.
-   - Label live facts with their probe/source. Propose only genuinely missing
-     fields and keep applicant uploads as a separate security-reviewed slice.
-   - Use `/contract-reconcile` for the plan. Obtain one bounded Claude Opus plan
-     review before implementation; stop after material findings are resolved.
+1. **Run one signed-in business proof when the owner supplies real event
+   details.**
+   - Use Request `1002379` only after re-reading its current Pre-Site state.
+   - Obtain actual local date, start/end time, IANA zone, format,
+     location/link, organizer, attendee roles, and any selected governed
+     material links. Do not infer or fabricate any of them.
+   - Save once, independently read back the Activity/parties/UTC+zone fields,
+     refresh and verify the UI round trip, then prepare an exact preview.
+   - Before sending, show the final To/Cc, subject/body, links, and calendar
+     facts. A calendar send is a new external communication and requires the
+     user's explicit confirmation at the send step. The previously confirmed
+     base PDF operation must not be reused or repeated.
 
 ## Verified Open
 
-1. **Recipient inbox confirmation.**
-   - Dynamics Sent proves transport acceptance/status, not mailbox delivery.
-     Record a user-reported receipt if supplied; do not infer it.
-
-2. **Final-subject behavior.**
-   - Dynamics appended its CRM tracking token after acceptance. Treat this as a
-     known external transformation. Any requirement for byte-exact final subject
-     text needs an owner decision before code or tenant-setting changes.
-
-3. **AkoyaGo publication projection.**
-   - Complete signed-in discovery before proposing publication fields, paths,
-     relationships, filenames, or Power Automate behavior.
-
-## Verify Before Acting
-
-1. Do not repeat the `1002379` send; its exact operation is complete.
-2. Do not delete or supersede the retained snapshots, ledger row, Dynamics
-   activity, or attachment. They are Production audit evidence.
-3. Re-read live source state before any new lifecycle or file mutation.
-4. Final Writeup creation remains a later, separately approval-gated transaction.
-
-## Standing Organic Observation
-
-1. Continue real Dynamics Explorer and Stage II observation under
-   `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`,
-   `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`, and
-   `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`.
-2. After 2026-09-02, re-probe the live environment and replacement deployment
-   before deciding whether to retain or remove the Stage II rollout flag.
-
-## Parked
-
-1. Site Visit governed supporting-file dossier and applicant upload security.
-2. AkoyaGo publication projection, pending signed-in discovery.
-3. Final Writeup copy transaction, until logistics and publication contracts
-   are established.
-4. `NEXTAUTH_SECRET` rotation, until a coordinated session-invalidation window.
+1. Signed-in Production recipient-directory read and logistics GET/PATCH.
+2. Production calendar/material preview and one controlled send/readback.
+3. Population of `expertise_roster.preferred_email` for Board/Consultant rows
+   that use external addresses.
+4. Recipient inbox confirmation for the earlier PDF-only send; Dynamics Sent is
+   transport acceptance, not inbox proof.
+5. AkoyaGo publication projection, supporting-file upload dossier, and Final
+   Writeup copy remain separate later slices.
 
 ## Do Not Reopen Without a New Decision
 
-1. Automatic email on Site Visit promotion; distribution remains explicit.
-2. Identity-confidence/directory gating for known staff/consultant recipients.
-3. Editing a preserved Review row in place; correction uses an audited successor.
-4. Broad Opus/Codex review loops without material new plan or code.
-5. Treating Dynamics Sent or Pending Send as recipient inbox proof.
+1. Formal `METHOD:REQUEST` scheduling, RSVP, update, or cancellation semantics.
+2. A parallel Site Visit status field, second orchestration ledger, or separate
+   Site Visit Writeup.
+3. Direct ActivityParty writes or caller-selected upsert identities.
+4. Automatic email when Site Visit promotion/date changes.
+5. Broad Opus/Codex review loops without a material new plan or code change.
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Lifecycle sequence and next logistics slice |
-| `docs/APPLICATION_STATE_ATLAS.md` | Cross-system ownership and adapter map |
-| `docs/atlas/postgres-infra-tables.md` | Live distribution ledger proof |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Governed file and snapshot contract |
-| `docs/API_ROUTE_SECURITY_MATRIX.md` | Route authorization and live-proof status |
+| `docs/atlas/dataverse-wmkf-sitevisit.md` | Live Site Visit source/persistence/consumer contract |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Cross-tab lifecycle and next slices |
+| `docs/atlas/postgres-infra-tables.md` | Migration 035 ledger/roster state |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Auth and data-boundary status |
+| `lib/services/site-visit/logistics-service.js` | Save/read invariants |
+| `lib/services/pre-site-visit/distribution-service.js` | Exact calendar/link preview and send |
 
-## Testing
+## Release Verification
 
 ```bash
-rtk npm run check:api-routes
+rtk npm test -- --runInBand tests/unit/calendar-invite.test.js tests/unit/pre-site-distribution-schema-parity.test.js tests/unit/pre-site-distribution-service.test.js tests/unit/site-visit-adapter.test.js tests/unit/site-visit-logistics-panel.test.js tests/unit/site-visit-logistics-service.test.js tests/unit/site-visit-tab.test.js tests/unit/zoned-date-time.test.js
+rtk npm run check:types
 rtk npm run check:api-routes:self-test
-rtk npm run check:atlas
+rtk npm run check:api-routes
+rtk npm run check:route-service-boundary:self-test
+rtk npm run check:route-service-boundary
 rtk npm run check:atlas:self-test
-rtk npm run check:agent-wiki
+rtk npm run check:atlas
 rtk npm run check:agent-wiki:self-test
+rtk npm run check:agent-wiki
 rtk npm run check:memory-drift:no-write
 rtk npm run check:agent-invariants
 ```
