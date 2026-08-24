@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -344,21 +344,21 @@ document inventory, and individual implementation plans do not establish priorit
   Online v3 proof remain open. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
-- Frozen Pre-Site distribution (**owner-decided/source/test verified and
-  Production-deployed 2026-08-23; migration live and empty; full distribution
-  path not live-proved**): the send is explicit and
+- Frozen Pre-Site distribution (**owner-decided and Production-proved
+  2026-08-24 on Request `1002379`**): the send is explicit and
   informational, never a handoff side effect. It first retains an exact Word
   snapshot, optionally derives PDF from that immutable item, and lets staff
   attach DOCX, PDF, or both. Recipients are known staff/consultants entered by
   staff, so syntax/dedupe/To-Cc conflict checks apply without a separate
   identity-confidence/directory gate. Postgres migration 034 supplies the
   exact-preview/recovery ledger; granular Dynamics activity/attachment/send-
-  intent state and status readback prevent duplicate retry. No Production
-  snapshot, attempt row, activity, or send has yet proved this source path.
-  Production read-only metadata and sandbox raw-recipient transport/repeat
-  probes passed. Merge `76a93a41` is Ready in deployment
-  `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; authenticated Production lifecycle reads
-  passed without writes, while the Draft request kept panel/history unexercised.
+  intent state and status readback prevent duplicate retry. PDF-only operation
+  `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb` retained exact Ready/Board Ready DOCX
+  and PDF rows, persisted one `sent` ledger row, and produced a Dynamics Sent
+  activity with actor attribution and one hash-matching attachment to
+  `jgallivan@wmkeck.org`. Workbench history surfaced the receipt and a bounded
+  Production error-log scan was clean. Dynamics appended its CRM tracking token
+  after preview acceptance; inbox delivery remains unverified.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and

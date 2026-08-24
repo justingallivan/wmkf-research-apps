@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -256,18 +256,20 @@ rather than Site Visit material categories. “Create Final Writeup” copies th
 exact current Pre-Site row and SharePoint version/hash at action time into a
 new Final row/file; it does not rename or overwrite the Pre-Site document.
 
-Staff continue to edit through the canonical Word link. **[PRODUCTION-DEPLOYED
-2026-08-23 in merge `76a93a41` / Ready deployment
-`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; migration live and
-empty; full distribution path not live-proved]** informational email
+Staff continue to edit through the canonical Word link. **[PRODUCTION-PROVED
+2026-08-24 on Request `1002379`, PDF-only operation
+`85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`]** informational email
 always retains an exact Word snapshot and lets staff attach that DOCX, a PDF
 derived from the retained DOCX, or both. Recipients are known staff members or
 consultants entered explicitly by staff; syntax/deduplication/To-Cc conflict
 checks apply, but no identity-confidence or directory-membership gate does. An
-external document-sharing portal is not required for this use case. Production
-read-only metadata and sandbox raw-recipient transport/repeat probes passed.
-Authenticated Production lifecycle reads passed without writes; the audited
-request is Draft, so the panel/history path was not exercised.
+external document-sharing portal is not required for this use case. The live
+path retained Ready/Board Ready DOCX and PDF rows, sent the exact selected PDF
+to `jgallivan@wmkeck.org`, persisted one `sent` ledger row, and produced a
+Dynamics Sent activity with actor attribution and one hash-matching attachment.
+Workbench history surfaced the receipt and a bounded Production error-log scan
+was clean. Dynamics appended its CRM tracking token to the persisted subject
+after acceptance; inbox delivery is not yet independently verified.
 
 The Pre-Site document is informational and normally does not need a Reviewed
 marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement

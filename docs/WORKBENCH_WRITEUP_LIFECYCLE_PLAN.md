@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -409,8 +409,7 @@ non-superseded lifecycle.
    pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, standard actor/time, and a
    superuser-only route.
-6. **Selected, source/test verified, and Production-deployed 2026-08-23;
-   full distribution path not live-proved:** Postgres
+6. **Selected and Production-proved 2026-08-24 on Request `1002379`:** Postgres
    `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request
    Document rows, and Dynamics owns the email activity.
@@ -426,14 +425,19 @@ hash. If staff selects PDF or both, Graph converts that retained immutable Word
 item and a second Request Document row links to the Word snapshot. A current
 writeup pointer always targets the editable Word workspace, never a snapshot.
 
-**[OWNER DIRECTION 2026-08-23; PRODUCTION-DEPLOYED IN MERGE `76a93a41` /
-READY DEPLOYMENT `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED;
-MIGRATION LIVE AND EMPTY; FULL DISTRIBUTION PATH NOT LIVE-PROVED.]**
+**[OWNER DIRECTION 2026-08-23; PRODUCTION-PROVED 2026-08-24.]**
 Distribution is informational. Staff can attach the retained Word DOCX, the
 derived PDF, or both; recipients are not asked to edit the live workspace, and
 promotion never sends automatically. Migration
 `034_pre_site_distribution_attempts.sql` was applied and schema-read-back on
-2026-08-23; the live coordination table remains empty.
+2026-08-23. Request `1002379`, PDF-only operation
+`85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`, retained Ready/Board Ready DOCX and
+PDF rows, persisted one `sent` ledger row, and produced Dynamics activity
+`33ce6346-d89f-f111-b8db-6045bd07a06d` with Sent status, actor attribution,
+and one hash-matching PDF attachment to `jgallivan@wmkeck.org`. Workbench
+history surfaced the receipt and a bounded Production error-log scan was clean.
+Dynamics appended its CRM tracking token after preview acceptance; inbox
+delivery remains unverified.
 
 The minimum staff flow is `Create/Reuse Snapshot → Compose → Preview → Explicit
 Send → History`:
@@ -646,18 +650,17 @@ silently extend its paths or names to writeup publications.
    Dataverse/Graph readback proved pointer, lifecycle, audit, cardinality, and
    byte coherence. This proof now precedes Final creation so an accidental
    handoff cannot become an unexplained Final lineage source.
-7. **Frozen Word/PDF informational email — Production-deployed 2026-08-23.** The
+7. **Frozen Word/PDF informational email — Production-proved 2026-08-24.** The
    DOCX/PDF/both snapshot, exact preview, explicit send, resume-safe retry, and
-   history path is implemented; migration 034 is live, schema-read-back, and
-   empty. Production read-only metadata confirmed the subject/status/tenant
-   contracts, and sandbox probes proved raw `addressused`, exact
-   description/address/correlation round-trip, transport acceptance, and
-   repeated `SendEmail` behavior. Merge `76a93a41` is Ready in Production
-   deployment `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; authenticated dashboard,
-   Workbench, Request `1002379`, lifecycle, and guarded-reopen reads passed
-   without writes. That request is Draft, so the panel/history path was not
-   exercised, and the ledger remains empty. Full prepare/history/send proof and
-   any Production send remain separately approval-gated.
+   history path is implemented. After explicit owner approval, Request
+   `1002379` operation `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb` retained exact
+   Word/PDF snapshots, previewed and sent only the selected PDF, and exposed the
+   resulting Dynamics receipt in history. Independent Postgres, Dataverse, and
+   Graph readbacks proved one `sent` row, a Sent activity, actor attribution,
+   and exactly one 133,265-byte attachment matching SHA-256
+   `574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
+   Dynamics appended its CRM tracking token after transport acceptance. The
+   proof stops at Dynamics Sent; recipient inbox delivery remains unverified.
 8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload

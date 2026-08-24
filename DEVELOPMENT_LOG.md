@@ -10,17 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
-## August 2026 — Frozen Pre-Site distribution reached Production (Session 457)
+## August 2026 — Frozen Pre-Site distribution reached Production and passed its first live send (Sessions 457–458)
 
 **Milestone:** Exact DOCX/PDF/both snapshot preview, recovery-safe Dynamics
-distribution, and history routes are now Production-deployed.
-**Sessions:** 454–457 (implementation, bounded Opus plan/code review, migration,
-metadata/sandbox transport probes, Preview auth rehearsal, and promotion).
-**Ship state:** Migration 034 is live and empty; merge `76a93a41` is Ready in
-deployment `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`. Signed-in Production lifecycle
-reads passed without writes; the audited Draft request kept the distribution
-panel/history route unexercised. No Production snapshot, attempt, activity, or
-email was created, so full distribution proof remains separately gated.
+distribution, and history routes are Production-deployed and live-proved.
+**Sessions:** 454–458 (implementation, bounded Opus plan/code review, migration,
+metadata/sandbox transport probes, Preview auth rehearsal, promotion, and first
+approved Production send).
+**Ship state:** Migration 034 is live with one `sent` proof row. Request
+`1002379` operation `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb` retained exact
+DOCX/PDF snapshots and sent the selected PDF to `jgallivan@wmkeck.org`.
+Dynamics activity `33ce6346-d89f-f111-b8db-6045bd07a06d` read back Sent with
+actor attribution and one hash-matching attachment; Workbench history was
+visible and the bounded Production error-log scan was clean. Inbox delivery is
+not independently verified.
 **Why it matters:** staff now have the reviewed, durable exact-materials sharing
 path in Production without coupling send to lifecycle promotion or weakening
 guarded-reopen evidence.

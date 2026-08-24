@@ -3,10 +3,10 @@ title: Pre-Site Visit Dataverse Schema Design
 domain: dataverse
 kind: spec
 status: active
-summary: "Production-live Wave 19, Site Visit handoff, and Production-proved Wave 20 guarded reopen with exact retry reuse."
+summary: "Production-live Wave 19, Site Visit handoff/correction, and Production-proved frozen distribution."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -279,9 +279,8 @@ fail-closed lifecycle behavior. Snapshot Ready finalization uses stable-ID
 Graph native publication version/eTag readback, and PDF conversion fences the
 retained Word publication identity before and after conversion.
 
-**[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
-`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; FULL DISTRIBUTION
-PATH NOT LIVE-PROVED.]** Postgres table
+**[PRODUCTION-PROVED 2026-08-24 on Request `1002379`, PDF-only operation
+`85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`.]** Postgres table
 `pre_site_distribution_attempts` stores the selected attachment mode, exact
 preview and selected file hashes, recipients/content/actor, granular send
 state, Dynamics activity ID/status, leases, and bounded failure evidence. It
@@ -289,12 +288,13 @@ coordinates recovery only; SharePoint and Request Document rows remain file
 authority, and Dynamics remains email-activity authority. A non-sent attempt
 requires literal Dynamics impersonation, revalidates the current source under
 its lease, persists a created/recovered activity ID before exact assertions,
-and renews the lease immediately before transport.
-The live table is schema-read-back and empty. Production metadata and sandbox
-raw-recipient transport/repeat probes passed. Authenticated Production lifecycle
-reads passed without writes; the audited request is currently Draft, so the
-panel/history path was not exercised. No Production distribution write or send
-has occurred.
+and renews the lease immediately before transport. The live path retained
+Ready/Board Ready DOCX and PDF Request Document rows, persisted one `sent`
+ledger row, and produced a Dynamics Sent activity with actor attribution and
+exactly one selected PDF attachment matching the retained hash. Workbench
+history showed the transport receipt and a bounded Production error-log scan
+was clean. Dynamics appended its CRM tracking token to the persisted subject
+after transport acceptance; inbox delivery is not independently verified.
 
 ## Structured snapshot contracts
 

@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -455,9 +455,7 @@ snapshot, a PDF converted from that retained Word snapshot, or both. An
 anonymous or guest SharePoint document link is not required for this minimum
 contract.
 
-**[OWNER DIRECTION 2026-08-23; PRODUCTION-DEPLOYED IN MERGE `76a93a41` /
-READY DEPLOYMENT `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED;
-FULL DISTRIBUTION PATH NOT LIVE-PROVED.]**
+**[OWNER DIRECTION 2026-08-23; PRODUCTION-PROVED 2026-08-24.]**
 Promotion does not send email. Staff explicitly creates or reuses the retained
 snapshot set, selects Word, PDF, or both, enters To/CC recipients, previews the
 editable subject/body plus exact attachments, and confirms that preview before
@@ -468,13 +466,22 @@ identity-confidence or directory-membership gate. Any invalid recipient rejects
 the whole operation before a send.
 
 Migration `034_pre_site_distribution_attempts.sql` added the live, schema-read-
-back Postgres coordination ledger; it remains empty. SharePoint and
+back Postgres coordination ledger. Production Request `1002379`, operation
+`85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`, proved the PDF-only path from a
+Review-state source: retained DOCX and PDF Request Document rows are Ready and
+Board Ready, the ledger is `sent`, and Dynamics activity
+`33ce6346-d89f-f111-b8db-6045bd07a06d` reached Sent with exactly one PDF
+attachment whose SHA-256 is
+`574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
+The activity sender/recipient was `jgallivan@wmkeck.org`, its `createdBy`
+matched the authenticated actor, the Workbench history row was visible, and a
+bounded Production error-log scan was clean. Dynamics appended its
+`CRM:0153199` tracking token to the persisted subject after transport
+acceptance; preview exactness remains the pre-transport contract. Inbox
+delivery remains unverified. SharePoint and
 `wmkf_requestdocument` own retained file identities; Postgres owns exact
 preview/send recovery; Dynamics owns the email activity. Production metadata
-and sandbox raw-recipient transport/repeat probes passed. Authenticated
-Production lifecycle reads passed without writes; Request `1002379` is currently
-Draft after guarded reopen, so the panel/history path was not exercised. No
-Production row, snapshot, activity, or email has been created.
+and sandbox raw-recipient transport/repeat probes also passed.
 
 One durable distribution attempt retains the exact source Word, retained Word,
 and selected PDF identities/versions/hashes, recipient set,

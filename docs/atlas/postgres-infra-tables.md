@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-08-23. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-08-24. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -163,14 +163,15 @@ mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
 
-### `pre_site_distribution_attempts` — LIVE; EMPTY; RUNTIME PRODUCTION-DEPLOYED
+### `pre_site_distribution_attempts` — LIVE; ONE SENT PRODUCTION PROOF
 
 **Source of truth:** Postgres exact-preview and cross-system recovery ledger.
 Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
-setup. **[VERIFIED LIVE 2026-08-23 via canonical migration plus schema/tracker
-readback]** migration 034 was applied at `2026-08-23T23:39:34.686Z`; the table
+setup. **[VERIFIED LIVE 2026-08-24 via canonical migration, schema/tracker
+readback, and the first approved send]** migration 034 was applied at
+`2026-08-23T23:39:34.686Z`; the table
 has 55 columns, eight named CHECK constraints plus its primary key, four indexes
-including the primary-key index, zero rows, and no pending manifest migration.
+including the primary-key index, one `sent` row, and no pending manifest migration.
 SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
@@ -191,16 +192,17 @@ request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and
 `lib/services/pre-site-visit/distribution-service.js`.
 
-**[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
-`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`.]** An authenticated Production smoke loaded
-the dashboard, Workbench, Request `1002379`, Pre-Site/Site Visit lifecycle state,
-and guarded-reopen history without a write. That request is currently Draft after
-guarded reopen, so the distribution panel and its history route were not
-exercised. Production email metadata and the tenant setting were read-only
-probed, and a controlled sandbox raw-`addressused` send/readback plus repeated
-`SendEmail` check passed at Dynamics transport-acceptance level. Post-deploy
-readback still found zero Production distribution rows; no Production snapshot,
-activity, or email was created.
+**[PRODUCTION-PROVED 2026-08-24.]** Request `1002379`, PDF-only operation
+`85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`, moved through `prepared` to `sent` in
+one attempt. It references retained Ready/Board Ready DOCX and PDF rows; the
+selected PDF is 133,265 bytes with SHA-256
+`574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
+Dynamics activity `33ce6346-d89f-f111-b8db-6045bd07a06d` read back Sent with
+sender/To `jgallivan@wmkeck.org`, `createdBy` matching the authenticated actor,
+and exactly one matching attachment. Workbench history showed the transport
+receipt and a bounded Production error-log scan was clean. Dynamics appended
+its CRM tracking token to the final stored subject after transport acceptance;
+inbox delivery is not independently verified.
 
 ## Portal upload staging
 
