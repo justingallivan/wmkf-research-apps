@@ -279,7 +279,8 @@ fail-closed lifecycle behavior. Snapshot Ready finalization uses stable-ID
 Graph native publication version/eTag readback, and PDF conversion fences the
 retained Word publication identity before and after conversion.
 
-**[SOURCE-IMPLEMENTED 2026-08-23; NOT DEPLOYED/LIVE-PROVED.]** Postgres table
+**[SOURCE/TEST VERIFIED; MIGRATION LIVE; READY BRANCH PREVIEW 2026-08-23; NOT
+PRODUCTION-DEPLOYED.]** Postgres table
 `pre_site_distribution_attempts` stores the selected attachment mode, exact
 preview and selected file hashes, recipients/content/actor, granular send
 state, Dynamics activity ID/status, leases, and bounded failure evidence. It
@@ -288,6 +289,10 @@ authority, and Dynamics remains email-activity authority. A non-sent attempt
 requires literal Dynamics impersonation, revalidates the current source under
 its lease, persists a created/recovered activity ID before exact assertions,
 and renews the lease immediately before transport.
+The live table is schema-read-back and empty. Production metadata and sandbox
+raw-recipient transport/repeat probes passed; authenticated Preview feature
+proof is blocked by Azure callback `AADSTS50011`, and no Production
+distribution write or send has occurred.
 
 ## Structured snapshot contracts
 

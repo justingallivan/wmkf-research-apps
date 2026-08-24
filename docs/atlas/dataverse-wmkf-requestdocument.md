@@ -188,15 +188,19 @@ its exact operation retry, but a later distinct operation records any resolvable
 retained copy as cleanup work. Actor/time is attributed only to reason-bearing
 reopen events, never to later generated descendants that inherit only the cycle.
 
-**[VERIFIED 2026-08-23 via repository source/tests; NOT DEPLOYED OR
-LIVE-PROVED.]** Frozen informational distribution now creates or reuses one
+**[VERIFIED 2026-08-23 via repository source/tests; DEPLOYED TO READY BRANCH
+PREVIEW; NOT PRODUCTION-DEPLOYED.]** Migration 034 is live and empty;
+authenticated Preview proof is blocked by Azure callback `AADSTS50011`.
+Frozen informational distribution creates or reuses one
 retained DOCX snapshot row linked to the exact editable Pre-Site row/version/
 hash. PDF or both mode adds a second row derived from the retained DOCX; the
 outgoing Dynamics email may attach DOCX, PDF, or both. Snapshot rows use the
 existing `Pre Site Visit` artifact type, `Board Ready` lifecycle, representation-
 specific producer/template/content type, and stable Graph identities. They do
-not become the Request's current Pre-Site pointer. No new Production Request
-Document row was created by this source work.
+not become the Request's current Pre-Site pointer. Production read-only email
+metadata and sandbox raw-recipient transport/repeat probes passed, but the full
+Workbench path remains unexercised outside tests. No new Production Request
+Document row was created by this work.
 
 ## Ownership
 

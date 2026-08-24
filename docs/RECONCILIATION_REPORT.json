@@ -1,7 +1,7 @@
 {
-  "generated": "2026-08-23T21:27:16.071Z",
+  "generated": "2026-08-24T00:06:32.547Z",
   "summary": {
-    "live_drift_findings": 6,
+    "live_drift_findings": 5,
     "probe_errors": 0
   },
   "bucket_meta": {
@@ -72,14 +72,7 @@
       }
     ],
     "doc_label_collision": [],
-    "postgres_table_mismatch": [
-      {
-        "table": "pre_site_distribution_attempts",
-        "in_schema_as_code": true,
-        "deployed": false,
-        "declared_in": "setup_database+migrations"
-      }
-    ]
+    "postgres_table_mismatch": []
   },
   "historical_claim_audit": {
     "source_file": "docs/AUDIT_S154_MEMORY_V2.md",

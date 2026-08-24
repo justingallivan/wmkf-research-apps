@@ -163,12 +163,16 @@ mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
 
-### `pre_site_distribution_attempts` — SOURCE-DECLARED; NOT APPLIED/LIVE-PROBED
+### `pre_site_distribution_attempts` — LIVE; EMPTY; RUNTIME NOT PRODUCTION-PROVED
 
 **Source of truth:** Postgres exact-preview and cross-system recovery ledger.
 Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
-setup. SharePoint plus `wmkf_requestdocument` remain retained-file authority,
-and Dynamics remains email-activity/transport authority.
+setup. **[VERIFIED LIVE 2026-08-23 via canonical migration plus schema/tracker
+readback]** migration 034 was applied at `2026-08-23T23:39:34.686Z`; the table
+has 55 columns, eight named CHECK constraints plus its primary key, four indexes
+including the primary-key index, zero rows, and no pending manifest migration.
+SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
+Dynamics remains email-activity/transport authority.
 
 One client operation UUID binds one Request, exact editable source Word
 identity/version/governed hash/raw byte hash, attachment mode (`docx`, `pdf`, or
@@ -187,9 +191,13 @@ request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and
 `lib/services/pre-site-visit/distribution-service.js`.
 
-**[VERIFIED IN SOURCE/TESTS 2026-08-23.]** Migration apply, Production schema
-readback, authenticated UI smoke, and any controlled send remain pending. No
-Production table row or email was created during implementation.
+**[VERIFIED IN SOURCE/TESTS AND LIVE SCHEMA 2026-08-23.]** The exact feature
+commit is Ready on a branch Preview, but Azure rejects that Preview callback
+with `AADSTS50011`, so authenticated feature/UI proof remains open. Production
+email metadata and the tenant setting were read-only probed, and a controlled
+sandbox raw-`addressused` send/readback plus repeated `SendEmail` check passed
+at Dynamics transport-acceptance level. No Production distribution row,
+snapshot, activity, or email was created.
 
 ## Portal upload staging
 

@@ -211,14 +211,19 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.
 - Treat any Dataverse/Power Automate/Azure claim as external-platform state; verify before asserting.
 - **Frozen Pre-Site email uses granular Dynamics steps, not the composed helper
-  (source-built 2026-08-23; not live-proved).** `createEmailActivity` accepts an
+  (source/test verified; Ready branch Preview; not Production-deployed).**
+  Migration 034 is live and empty. Production read-only metadata confirmed the
+  email fields/statuses and unresolved-party tenant setting; a sandbox
+  raw-`addressused` send/readback plus repeated `SendEmail` check reached
+  transport acceptance. Authenticated Preview feature proof remains blocked by
+  Azure callback `AADSTS50011`. `createEmailActivity` accepts an
   optional bounded correlation key in `email.subcategory`; the distribution
   service persists the returned activity ID, reconciles each deterministic
   filename, records `send_requested` before `SendEmail`, and queries email
   status before retrying an ambiguous response. To/Cc are known staff/
   consultant addresses carried as `addressused`; staff entry is authoritative,
   with syntax/dedupe/To-Cc conflict validation rather than identity scoring.
-  Migration 034 must precede runtime deployment.
+  No Production distribution row, snapshot, activity, or email has been created.
 - **`wmkf_potentialreviewers.wmkf_name` whitespace is stored, not display-only; the adapter does NOT trim it.** [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:148` (create) and `:284` (update)] both write `wmkf_name = name` raw; only `splitName` (`:35`) trims the derived `wmkf_firstname`/`wmkf_lastname`. No central trim, so each caller's whitespace hygiene leaks to storage. [VERIFIED via Explorer length probe 2026-06-30] a manual-add row stored `wmkf_name = " Test 3 Reviewer "` (leading+trailing pad, len 17) while `wmkf_firstname`="Test"(4)/`wmkf_lastname`="3 Reviewer"(10) were clean; a 14-row sample showed non-uniform `nameLen−(firstLen+lastLen)` deltas (0,1,2,3) incl. double internal spaces and trailing spaces baked into `wmkf_firstname`. [VERIFIED via attribute-metadata probe 2026-06-30] `wmkf_name` is a plain WRITABLE field, NOT computed: `SourceType=0` (0=simple, 1=calculated, 2=rollup), `IsValidForCreate=true`, `IsValidForUpdate=true`, `FormulaDefinition=""`. So writes stick — the padding came from write paths, not a Dynamics recompute. [VERIFIED via grep] the potential-reviewer adapter is the ONLY writer of this field (discovery/save → `upsertByEmail`; no direct `wmkf_name` write to this entity elsewhere), and a full-table dry-run found 4368/4368 rows padded — i.e. the historical write path systematically stored `" first last "` (leading+trailing, plus a double space where a middle slot was empty). NOT re-verified: whether a Power Automate FLOW re-pads on write (metadata can't see flows; the write-stick test was deferred). Render-time defense exists ([VERIFIED] `ContactParser.normalizeDisplayName`, commit 3a359cc5, strips it in emails/UI). [VERIFIED — implemented] the adapter now normalizes `wmkf_name` on every write via `cleanName()` (= `normalizeDisplayName`) in `create`/`upsertByEmail`/`update` (`potential-reviewer.js`), so no NEW padding is stored. CAVEAT: `update`'s no-op guard (`fieldsEqual`, `:331`, trim+lowercase compare) treats a padded-vs-clean name as equal and SKIPS the write, so `update` does NOT self-heal already-padded rows — existing rows need a one-time cleanup that force-writes `wmkf_name` (bypassing the guard), not a plain `update()`.
 
 ## Standard Probe

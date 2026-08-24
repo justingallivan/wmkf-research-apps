@@ -344,8 +344,9 @@ document inventory, and individual implementation plans do not establish priorit
   Online v3 proof remain open. The older `phase-ii.summarize` row still drives no
   route, while the legacy retained PDF route still uses
   `createSummarizationPrompt()`.
-- Frozen Pre-Site distribution (**owner-decided/source-built 2026-08-23;
-  migration/deployment/live proof pending**): the send is explicit and
+- Frozen Pre-Site distribution (**owner-decided/source/test verified 2026-08-23;
+  migration live; Ready branch Preview; Production deployment/full feature
+  proof pending**): the send is explicit and
   informational, never a handoff side effect. It first retains an exact Word
   snapshot, optionally derives PDF from that immutable item, and lets staff
   attach DOCX, PDF, or both. Recipients are known staff/consultants entered by
@@ -354,6 +355,9 @@ document inventory, and individual implementation plans do not establish priorit
   exact-preview/recovery ledger; granular Dynamics activity/attachment/send-
   intent state and status readback prevent duplicate retry. No Production
   snapshot, attempt row, activity, or send has yet proved this source path.
+  Production read-only metadata and sandbox raw-recipient transport/repeat
+  probes passed; authenticated Preview proof is blocked by Azure callback
+  `AADSTS50011`.
 - Site Visit direction (owner-decided 2026-07-28): the tab is a dossier, not a
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and

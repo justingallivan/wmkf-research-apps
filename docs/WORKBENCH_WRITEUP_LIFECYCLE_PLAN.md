@@ -409,8 +409,9 @@ non-superseded lifecycle.
    pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, standard actor/time, and a
    superuser-only route.
-6. **Selected and source-built 2026-08-23; migration/deployment/live proof
-   pending:** Postgres `pre_site_distribution_attempts` is the exact-preview and
+6. **Selected and source/test verified 2026-08-23; migration live; Ready branch
+   Preview; Production deployment/full feature proof pending:** Postgres
+   `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request
    Document rows, and Dynamics owns the email activity.
 7. Complete the AkoyaGo publication-projection discovery below before proposing
@@ -425,11 +426,13 @@ hash. If staff selects PDF or both, Graph converts that retained immutable Word
 item and a second Request Document row links to the Word snapshot. A current
 writeup pointer always targets the editable Word workspace, never a snapshot.
 
-**[OWNER DIRECTION 2026-08-23; SOURCE-IMPLEMENTED, NOT DEPLOYED OR LIVE-PROVED.]**
+**[OWNER DIRECTION 2026-08-23; SOURCE/TEST VERIFIED; MIGRATION LIVE; READY
+BRANCH PREVIEW; NOT PRODUCTION-DEPLOYED.]**
 Distribution is informational. Staff can attach the retained Word DOCX, the
 derived PDF, or both; recipients are not asked to edit the live workspace, and
 promotion never sends automatically. Migration
-`034_pre_site_distribution_attempts.sql` is a deployment prerequisite.
+`034_pre_site_distribution_attempts.sql` was applied and schema-read-back on
+2026-08-23; the live coordination table remains empty.
 
 The minimum staff flow is `Create/Reuse Snapshot → Compose → Preview → Explicit
 Send → History`:
@@ -642,16 +645,17 @@ silently extend its paths or names to writeup publications.
    Dataverse/Graph readback proved pointer, lifecycle, audit, cardinality, and
    byte coherence. This proof now precedes Final creation so an accidental
    handoff cannot become an unexplained Final lineage source.
-7. **Frozen Word/PDF informational email — source-built 2026-08-23.** The
+7. **Frozen Word/PDF informational email — branch-Preview deployed 2026-08-23.** The
    DOCX/PDF/both snapshot, exact preview, explicit send, resume-safe retry, and
-   history path is implemented. Apply Postgres migration 034 before deployment.
-   In non-production, first record go/no-go evidence that raw `addressused`
-   To/Cc parties resolve and send under the tenant's unresolved-recipient
-   policy, confirm the target `email.subject` maximum, and prove exact
-   description/address/correlation round-trip plus status codes `{3,6,7}` and
-   repeated `SendEmail` behavior. Then run authenticated read-only UI
-   verification and one separately approved controlled send/readback before
-   claiming Production proof.
+   history path is implemented; migration 034 is live, schema-read-back, and
+   empty. Production read-only metadata confirmed the subject/status/tenant
+   contracts, and sandbox probes proved raw `addressused`, exact
+   description/address/correlation round-trip, transport acceptance, and
+   repeated `SendEmail` behavior. The exact feature commit is Ready on branch
+   Preview, but Azure rejects that callback with `AADSTS50011`. Register an
+   approved durable Preview callback or deliberately promote through the
+   governed Production path, then run authenticated full-feature verification.
+   Any Production send remains separately approval-gated.
 8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload
