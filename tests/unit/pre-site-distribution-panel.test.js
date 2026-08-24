@@ -64,6 +64,30 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
   expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
 });
 
+test('explains calendar and material-link choices in plain language', async () => {
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      materials={[{
+        artifactId: '44444444-4444-4444-8444-444444444444',
+        filename: 'Applicant Slides.pdf',
+        artifactTypeLabel: 'Applicant Slides',
+      }]}
+    />,
+  );
+
+  expect(await screen.findByRole('group', { name: 'Document attachment' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Calendar and material links' })).toBeInTheDocument();
+  expect(screen.getByLabelText(/Attach an add-to-calendar file \(.ics\)/i)).toBeDisabled();
+  expect(screen.getByText(/does not request an RSVP.*later changes will not update it automatically/i))
+    .toBeInTheDocument();
+  expect(screen.getByText('Complete and save Visit logistics above to include the calendar.'))
+    .toBeInTheDocument();
+  expect(screen.getByText('Include links to materials')).toBeInTheDocument();
+});
+
 test('binds the chosen mode into prepare and requires exact-preview confirmation before send', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

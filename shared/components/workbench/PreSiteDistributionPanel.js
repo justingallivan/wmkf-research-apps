@@ -208,7 +208,7 @@ export default function PreSiteDistributionPanel({
         )}
 
         <fieldset className="mt-4">
-          <legend className="text-sm font-medium text-gray-800">Attach</legend>
+          <legend className="text-sm font-medium text-gray-800">Document attachment</legend>
           <div className="mt-2 flex flex-wrap gap-4">
             {[
               ['docx', 'Word document'],
@@ -231,7 +231,7 @@ export default function PreSiteDistributionPanel({
         </fieldset>
 
         <fieldset className="mt-4">
-          <legend className="text-sm font-medium text-gray-800">Calendar and links</legend>
+          <legend className="text-sm font-medium text-gray-800">Calendar and material links</legend>
           <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -241,16 +241,16 @@ export default function PreSiteDistributionPanel({
               className="mt-0.5"
             />
             <span>
-              Attach the saved Site Visit as an informational add-to-calendar event.
-              It does not request an RSVP or provide reliable update/cancellation handling.
+              Attach an add-to-calendar file (.ics). Recipients can add the event to their calendars.
+              It does not request an RSVP, and later changes will not update it automatically.
             </span>
           </label>
           {!siteVisit?.activityId && (
-            <p className="mt-1 text-xs text-amber-700">Save Visit logistics above before adding the calendar.</p>
+            <p className="mt-1 text-xs text-amber-700">Complete and save Visit logistics above to include the calendar.</p>
           )}
           {materials.length > 0 && (
             <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium text-gray-800">Link to governed materials</p>
+              <p className="text-sm font-medium text-gray-800">Include links to materials</p>
               {materials.map((material) => (
                 <label key={material.artifactId} className="flex items-start gap-2 text-sm text-gray-700">
                   <input
