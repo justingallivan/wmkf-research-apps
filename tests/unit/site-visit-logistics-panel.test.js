@@ -8,6 +8,7 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const SETUP_FETCH = global.fetch;
 const visit = {
   activityId: '22222222-2222-4222-8222-222222222222',
   etag: 'W/"2"',
@@ -50,7 +51,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete global.fetch;
+  global.fetch = SETUP_FETCH;
 });
 
 test('loads the saved activity and PATCHes stable recipient references with its ETag', async () => {
@@ -88,4 +89,30 @@ test('loads the saved activity and PATCHes stable recipient references with its 
     organizer: { kind: 'staff', profileId: 7 },
     requiredAttendees: [{ kind: 'roster', rosterId: 12 }],
   });
+});
+
+test('defaults an empty end from a new start and uses 15-minute time increments', async () => {
+  global.fetch = jest.fn()
+    .mockImplementationOnce(() => response({ success: true, siteVisit: null, materials: [] }))
+    .mockImplementationOnce(() => response({ success: true, staff: [], external: [] }));
+
+  render(
+    <SiteVisitLogisticsPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+    />,
+  );
+
+  const starts = await screen.findByLabelText('Starts');
+  const ends = screen.getByLabelText('Ends');
+  expect(starts).toHaveAttribute('step', '900');
+  expect(ends).toHaveAttribute('step', '900');
+
+  fireEvent.change(starts, { target: { value: '2026-09-15T09:15' } });
+  expect(ends).toHaveValue('2026-09-15T10:15');
+
+  fireEvent.change(ends, { target: { value: '2026-09-15T11:45' } });
+  fireEvent.change(starts, { target: { value: '2026-09-15T08:30' } });
+  expect(ends).toHaveValue('2026-09-15T11:45');
+  expect(screen.getByText(/same local time happens twice/i)).toBeInTheDocument();
 });

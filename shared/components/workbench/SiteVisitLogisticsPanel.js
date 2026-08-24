@@ -50,6 +50,20 @@ function selectedValues(event) {
   return Array.from(event.target.selectedOptions, (option) => option.value);
 }
 
+function defaultEndLocal(startLocal) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(startLocal);
+  if (!match) return startLocal;
+  const [, year, month, day, hour, minute] = match;
+  const value = new Date(Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute) + 60,
+  ));
+  return value.toISOString().slice(0, 16);
+}
+
 export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onContext }) {
   const [form, setForm] = useState(() => defaultForm(requestNumber));
   const [directory, setDirectory] = useState({ staff: [], external: [] });
@@ -136,6 +150,16 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
     setError(null);
   };
 
+  const editStart = (startLocal) => {
+    setForm((current) => ({
+      ...current,
+      startLocal,
+      endLocal: current.endLocal || defaultEndLocal(startLocal),
+    }));
+    setSaved(false);
+    setError(null);
+  };
+
   const save = async (event) => {
     event.preventDefault();
     if (saving) return;
@@ -209,11 +233,11 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="site-visit-start" className="block text-sm font-medium text-gray-800">Starts</label>
-              <input id="site-visit-start" type="datetime-local" value={form.startLocal} required onChange={(event) => edit({ startLocal: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input id="site-visit-start" type="datetime-local" step={900} value={form.startLocal} required onChange={(event) => editStart(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
             <div>
               <label htmlFor="site-visit-end" className="block text-sm font-medium text-gray-800">Ends</label>
-              <input id="site-visit-end" type="datetime-local" value={form.endLocal} required onChange={(event) => edit({ endLocal: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <input id="site-visit-end" type="datetime-local" step={900} value={form.endLocal} required onChange={(event) => edit({ endLocal: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -222,12 +246,15 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
               <input id="site-visit-zone" value={form.timeZone} maxLength={100} required onChange={(event) => edit({ timeZone: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
             <div>
-              <label htmlFor="site-visit-overlap" className="block text-sm font-medium text-gray-800">Repeated clock time</label>
-              <select id="site-visit-overlap" value={form.disambiguation} onChange={(event) => edit({ disambiguation: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="reject">Ask me to choose</option>
-                <option value="earlier">Earlier occurrence</option>
-                <option value="later">Later occurrence</option>
+              <label htmlFor="site-visit-overlap" className="block text-sm font-medium text-gray-800">Daylight saving time overlap</label>
+              <select id="site-visit-overlap" aria-describedby="site-visit-overlap-help" value={form.disambiguation} onChange={(event) => edit({ disambiguation: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="reject">Ask only if this time occurs twice</option>
+                <option value="earlier">First occurrence (before clocks change)</option>
+                <option value="later">Second occurrence (after clocks change)</option>
               </select>
+              <p id="site-visit-overlap-help" className="mt-1 text-xs text-gray-500">
+                Only relevant when clocks fall back and the same local time happens twice.
+              </p>
             </div>
             <div>
               <label htmlFor="site-visit-format" className="block text-sm font-medium text-gray-800">Format</label>
