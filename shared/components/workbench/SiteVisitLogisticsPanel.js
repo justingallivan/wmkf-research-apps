@@ -15,10 +15,12 @@ function defaultForm(requestNumber) {
     etag: null,
     subject: `Site Visit${requestNumber ? ` — ${requestNumber}` : ''}`,
     description: '',
-    startLocal: '',
-    endLocal: '',
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago',
-    disambiguation: 'reject',
+    disambiguation: 'earlier',
     format: SITE_VISIT_FORMAT.IN_PERSON,
     locationOrLink: '',
     organizer: '',
@@ -29,15 +31,19 @@ function defaultForm(requestNumber) {
 
 function formFromVisit(visit, requestNumber) {
   if (!visit) return defaultForm(requestNumber);
+  const start = splitLocal(visit.startLocal);
+  const end = splitLocal(visit.endLocal);
   return {
     activityId: visit.activityId,
     etag: visit.etag,
     subject: visit.subject || '',
     description: visit.description || '',
-    startLocal: visit.startLocal || '',
-    endLocal: visit.endLocal || '',
+    startDate: start.date,
+    startTime: start.time,
+    endDate: end.date,
+    endTime: end.time,
     timeZone: visit.timeZone || 'America/Chicago',
-    disambiguation: 'reject',
+    disambiguation: 'earlier',
     format: visit.format,
     locationOrLink: visit.locationOrLink || '',
     organizer: refKey(visit.organizer),
@@ -48,6 +54,15 @@ function formFromVisit(visit, requestNumber) {
 
 function selectedValues(event) {
   return Array.from(event.target.selectedOptions, (option) => option.value);
+}
+
+function splitLocal(localDateTime) {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(localDateTime || '');
+  return match ? { date: match[1], time: match[2] } : { date: '', time: '' };
+}
+
+function joinLocal(date, time) {
+  return date && time ? `${date}T${time}` : '';
 }
 
 function defaultEndLocal(startLocal) {
@@ -74,6 +89,7 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
   const sequence = useRef(0);
+  const endTouched = useRef({ date: false, time: false });
 
   const entries = useMemo(() => {
     const rows = [
@@ -129,6 +145,10 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
       setDirectory(nextDirectory);
       setManualRecipients(nextManual);
       setMaterials(nextMaterials);
+      endTouched.current = {
+        date: Boolean(logisticsBody.siteVisit?.endLocal),
+        time: Boolean(logisticsBody.siteVisit?.endLocal),
+      };
       setForm(formFromVisit(logisticsBody.siteVisit, requestNumber));
       emitContext(logisticsBody.siteVisit || null, nextMaterials, nextDirectory);
     }).catch((loadError) => {
@@ -150,14 +170,27 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
     setError(null);
   };
 
-  const editStart = (startLocal) => {
-    setForm((current) => ({
-      ...current,
-      startLocal,
-      endLocal: current.endLocal || defaultEndLocal(startLocal),
-    }));
+  const editStartPart = (part, value) => {
+    setForm((current) => {
+      const next = { ...current, [part]: value };
+      const startLocal = joinLocal(next.startDate, next.startTime);
+      if (startLocal) {
+        const defaultEnd = splitLocal(defaultEndLocal(startLocal));
+        if (!endTouched.current.date) next.endDate = defaultEnd.date;
+        if (!endTouched.current.time) next.endTime = defaultEnd.time;
+      } else if (part === 'startDate' && !endTouched.current.date) {
+        next.endDate = value;
+      }
+      return next;
+    });
     setSaved(false);
     setError(null);
+  };
+
+  const editEndPart = (part, value) => {
+    const touchKey = part === 'endDate' ? 'date' : 'time';
+    endTouched.current = { ...endTouched.current, [touchKey]: true };
+    edit({ [part]: value });
   };
 
   const save = async (event) => {
@@ -183,8 +216,8 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
           etag: form.etag,
           subject: form.subject,
           description: form.description,
-          startLocal: form.startLocal,
-          endLocal: form.endLocal,
+          startLocal: joinLocal(form.startDate, form.startTime),
+          endLocal: joinLocal(form.endDate, form.endTime),
           timeZone: form.timeZone,
           disambiguation: form.disambiguation,
           format: Number(form.format),
@@ -230,31 +263,28 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
             <label htmlFor="site-visit-subject" className="block text-sm font-medium text-gray-800">Subject</label>
             <input id="site-visit-subject" value={form.subject} maxLength={400} required onChange={(event) => edit({ subject: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-4">
             <div>
-              <label htmlFor="site-visit-start" className="block text-sm font-medium text-gray-800">Starts</label>
-              <input id="site-visit-start" type="datetime-local" step={900} value={form.startLocal} required onChange={(event) => editStart(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <label htmlFor="site-visit-start-date" className="block text-sm font-medium text-gray-800">Start date</label>
+              <input id="site-visit-start-date" type="date" value={form.startDate} required onChange={(event) => editStartPart('startDate', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
             <div>
-              <label htmlFor="site-visit-end" className="block text-sm font-medium text-gray-800">Ends</label>
-              <input id="site-visit-end" type="datetime-local" step={900} value={form.endLocal} required onChange={(event) => edit({ endLocal: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <label htmlFor="site-visit-start-time" className="block text-sm font-medium text-gray-800">Start time</label>
+              <input id="site-visit-start-time" type="time" step={900} value={form.startTime} required onChange={(event) => editStartPart('startTime', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label htmlFor="site-visit-end-date" className="block text-sm font-medium text-gray-800">End date</label>
+              <input id="site-visit-end-date" type="date" value={form.endDate} required onChange={(event) => editEndPart('endDate', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label htmlFor="site-visit-end-time" className="block text-sm font-medium text-gray-800">End time</label>
+              <input id="site-visit-end-time" type="time" step={900} value={form.endTime} required onChange={(event) => editEndPart('endTime', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="site-visit-zone" className="block text-sm font-medium text-gray-800">IANA time zone</label>
               <input id="site-visit-zone" value={form.timeZone} maxLength={100} required onChange={(event) => edit({ timeZone: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label htmlFor="site-visit-overlap" className="block text-sm font-medium text-gray-800">Daylight saving time overlap</label>
-              <select id="site-visit-overlap" aria-describedby="site-visit-overlap-help" value={form.disambiguation} onChange={(event) => edit({ disambiguation: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option value="reject">Ask only if this time occurs twice</option>
-                <option value="earlier">First occurrence (before clocks change)</option>
-                <option value="later">Second occurrence (after clocks change)</option>
-              </select>
-              <p id="site-visit-overlap-help" className="mt-1 text-xs text-gray-500">
-                Only relevant when clocks fall back and the same local time happens twice.
-              </p>
             </div>
             <div>
               <label htmlFor="site-visit-format" className="block text-sm font-medium text-gray-800">Format</label>

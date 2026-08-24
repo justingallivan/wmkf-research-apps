@@ -65,6 +65,10 @@ test('loads the saved activity and PATCHes stable recipient references with its 
   );
 
   expect(await screen.findByDisplayValue('Conference room / Teams')).toBeInTheDocument();
+  expect(screen.getByLabelText('Start date')).toHaveValue('2026-09-15');
+  expect(screen.getByLabelText('Start time')).toHaveValue('09:00');
+  expect(screen.getByLabelText('End date')).toHaveValue('2026-09-15');
+  expect(screen.getByLabelText('End time')).toHaveValue('11:00');
   await waitFor(() => expect(onContext).toHaveBeenCalledWith(expect.objectContaining({
     siteVisit: visit,
     suggestedTo: ['board@example.org'],
@@ -86,12 +90,15 @@ test('loads the saved activity and PATCHes stable recipient references with its 
     activityId: visit.activityId,
     etag: 'W/"2"',
     locationOrLink: 'New location',
+    startLocal: '2026-09-15T09:00',
+    endLocal: '2026-09-15T11:00',
+    disambiguation: 'earlier',
     organizer: { kind: 'staff', profileId: 7 },
     requiredAttendees: [{ kind: 'roster', rosterId: 12 }],
   });
 });
 
-test('defaults an empty end from a new start and uses 15-minute time increments', async () => {
+test('uses separate date and time controls and preserves an end time chosen by the user', async () => {
   global.fetch = jest.fn()
     .mockImplementationOnce(() => response({ success: true, siteVisit: null, materials: [] }))
     .mockImplementationOnce(() => response({ success: true, staff: [], external: [] }));
@@ -103,16 +110,42 @@ test('defaults an empty end from a new start and uses 15-minute time increments'
     />,
   );
 
-  const starts = await screen.findByLabelText('Starts');
-  const ends = screen.getByLabelText('Ends');
-  expect(starts).toHaveAttribute('step', '900');
-  expect(ends).toHaveAttribute('step', '900');
+  const startDate = await screen.findByLabelText('Start date');
+  const startTime = screen.getByLabelText('Start time');
+  const endDate = screen.getByLabelText('End date');
+  const endTime = screen.getByLabelText('End time');
+  expect(startDate).toHaveAttribute('type', 'date');
+  expect(endDate).toHaveAttribute('type', 'date');
+  expect(startTime).toHaveAttribute('type', 'time');
+  expect(endTime).toHaveAttribute('type', 'time');
+  expect(startTime).toHaveAttribute('step', '900');
+  expect(endTime).toHaveAttribute('step', '900');
 
-  fireEvent.change(starts, { target: { value: '2026-09-15T09:15' } });
-  expect(ends).toHaveValue('2026-09-15T10:15');
+  fireEvent.change(startDate, { target: { value: '2026-09-15' } });
+  expect(endDate).toHaveValue('2026-09-15');
+  fireEvent.change(startTime, { target: { value: '09:15' } });
+  expect(endTime).toHaveValue('10:15');
 
-  fireEvent.change(ends, { target: { value: '2026-09-15T11:45' } });
-  fireEvent.change(starts, { target: { value: '2026-09-15T08:30' } });
-  expect(ends).toHaveValue('2026-09-15T11:45');
-  expect(screen.getByText(/same local time happens twice/i)).toBeInTheDocument();
+  fireEvent.change(endTime, { target: { value: '11:45' } });
+  fireEvent.change(startTime, { target: { value: '08:30' } });
+  expect(endTime).toHaveValue('11:45');
+  expect(screen.queryByLabelText(/Daylight saving time overlap/i)).not.toBeInTheDocument();
+});
+
+test('rolls an untouched default end into the next date', async () => {
+  global.fetch = jest.fn()
+    .mockImplementationOnce(() => response({ success: true, siteVisit: null, materials: [] }))
+    .mockImplementationOnce(() => response({ success: true, staff: [], external: [] }));
+
+  render(
+    <SiteVisitLogisticsPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+    />,
+  );
+
+  fireEvent.change(await screen.findByLabelText('Start time'), { target: { value: '23:30' } });
+  fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-15' } });
+  expect(screen.getByLabelText('End date')).toHaveValue('2026-09-16');
+  expect(screen.getByLabelText('End time')).toHaveValue('00:30');
 });
