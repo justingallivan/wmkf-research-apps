@@ -6,7 +6,7 @@ status: canonical
 summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-17
+last_verified: 2026-08-23
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -256,11 +256,16 @@ rather than Site Visit material categories. “Create Final Writeup” copies th
 exact current Pre-Site row and SharePoint version/hash at action time into a
 new Final row/file; it does not rename or overwrite the Pre-Site document.
 
-Internal staff receive the canonical Word link. When a Board member or
-consultant without staff access joins a visit, the minimum external
-distribution path is a PDF attachment representing an exact frozen Pre-Site
-version. Staff send that attachment through the ordinary approved email path;
-an external document-sharing portal is not required for this use case.
+Staff continue to edit through the canonical Word link. **[SOURCE/TEST VERIFIED
+2026-08-23; migration live; Ready branch Preview; Production deployment/full
+feature proof pending]** informational email
+always retains an exact Word snapshot and lets staff attach that DOCX, a PDF
+derived from the retained DOCX, or both. Recipients are known staff members or
+consultants entered explicitly by staff; syntax/deduplication/To-Cc conflict
+checks apply, but no identity-confidence or directory-membership gate does. An
+external document-sharing portal is not required for this use case. Production
+read-only metadata and sandbox raw-recipient transport/repeat probes passed;
+authenticated Preview proof is blocked by Azure callback `AADSTS50011`.
 
 The Pre-Site document is informational and normally does not need a Reviewed
 marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement
@@ -985,7 +990,8 @@ Owner-decided:
    Pre-Site row/version/hash at action time and no separate Site Visit Writeup;
 8. the Site Visit tab as a dossier for metadata and supporting files plus a
    link to the same Pre-Site Word workspace, where staff enter observations;
-9. PDF attachment as the sufficient external Pre-Site distribution path;
+9. explicit frozen DOCX, PDF, or both attachments as the sufficient
+   informational Pre-Site distribution path;
 10. a narrow request-scoped Site Visit Materials Upload link that does not
     reopen the general applicant-intake product; and
 11. transcription-platform summary reuse before any deliberate suite LLM

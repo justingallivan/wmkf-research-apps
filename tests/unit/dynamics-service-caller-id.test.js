@@ -162,6 +162,29 @@ describe('MSCRMCallerID — composed helpers', () => {
     }));
   }));
 
+  test('createEmailActivity persists the bounded distribution correlation key', ctx(async () => {
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }));
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ value: [{ systemuserid: 'user-1' }] }) }));
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ activityid: 'mail-1' }) }));
+
+    const correlationKey = `wmkf-pre-site-distribution:${'a'.repeat(80)}`;
+    await DynamicsService.createEmailActivity({
+      subject: 'Frozen materials',
+      body: '<p>Attached.</p>',
+      from: 'sender@example.com',
+      to: ['staff@example.com'],
+      correlationKey,
+      actingUserSystemId: ACTING_GUID,
+    });
+
+    const calls = nonTokenCalls();
+    const body = JSON.parse(calls[1][1].body);
+    expect(body.subcategory).toBe(correlationKey.slice(0, 100));
+  }));
+
   test('updateIfEmpty: when the field is empty, the PATCH carries the header', async () => {
     // Token, then GET (empty field), then PATCH
     fetch.mockImplementationOnce((url) =>

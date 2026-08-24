@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
+import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -370,6 +371,15 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
           )}
         </div>
       </Card>
+
+      {active && ready && (
+        <PreSiteDistributionPanel
+          key={requestId}
+          requestId={requestId}
+          requestNumber={requestNumber}
+          sourceArtifact={ready}
+        />
+      )}
 
       {reopenHistory.length > 0 && (
         <Card hover={false}>

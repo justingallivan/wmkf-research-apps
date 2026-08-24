@@ -8,6 +8,7 @@ import {
   SECTION_FIELDS,
 } from '../../lib/services/pre-site-visit/artifact-service.js';
 import {
+  PRE_SITE_DISTRIBUTION_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
@@ -242,9 +243,14 @@ test('a regenerated descendant carries the cycle without claiming its generator 
   });
 });
 
-function createHarness({ mutatePersistedDraft = false, currentPointerRow = null } = {}) {
+function createHarness({
+  mutatePersistedDraft = false,
+  currentPointerRow = null,
+  additionalRows = [],
+} = {}) {
   let row = null;
   const prior = currentPointerRow ? { ...currentPointerRow } : null;
+  const extraRows = additionalRows.map((candidate) => ({ ...candidate }));
   const request = {
     akoya_requestid: REQUEST_ID,
     _wmkf_currentpresitevisit_value: prior?.wmkf_requestdocumentid || null,
@@ -300,6 +306,7 @@ function createHarness({ mutatePersistedDraft = false, currentPointerRow = null 
       records: [
         ...(row ? [{ ...row }] : []),
         ...(prior ? [{ ...prior }] : []),
+        ...extraRows.map((candidate) => ({ ...candidate })),
       ],
     })),
     createDocument: jest.fn().mockImplementation(async (payload) => {
@@ -327,7 +334,11 @@ function createHarness({ mutatePersistedDraft = false, currentPointerRow = null 
     commitChangeset: jest.fn().mockImplementation(async (operations) => {
       for (const operation of operations) {
         if (operation.entitySet === 'wmkf_requestdocuments') {
-          applyDocumentPatch(row, operation.body);
+          const target = [row, prior, ...extraRows].find((candidate) => (
+            candidate?.wmkf_requestdocumentid === operation.key
+          ));
+          if (!target) throw new Error(`document row ${operation.key} not found`);
+          applyDocumentPatch(target, operation.body);
         } else if (operation.entitySet === 'akoya_requests') {
           request._wmkf_currentpresitevisit_value = operation.body[
             'wmkf_CurrentPreSiteVisit@odata.bind'
@@ -365,6 +376,7 @@ function createHarness({ mutatePersistedDraft = false, currentPointerRow = null 
     get request() { return request; },
     get uploaded() { return uploaded; },
     get currentPointerRow() { return prior; },
+    get additionalRows() { return extraRows; },
   };
 }
 
@@ -673,6 +685,57 @@ test('read-only status exposes an in-progress replacement alongside the current 
   });
   expect(harness.dependencies.runProposalCore).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.uploadFile).toHaveBeenCalledTimes(1);
+});
+
+test('read-only status excludes a newer frozen distribution snapshot from pending work', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const current = { ...harness.row };
+  const snapshot = {
+    ...current,
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`,
+    createdon: new Date(Date.parse(current.createdon) + 60_000).toISOString(),
+  };
+  harness.dependencies.findByRequest.mockResolvedValueOnce({ records: [snapshot, current] });
+
+  const status = await getPreSiteVisitArtifactStatus(
+    { requestId: REQUEST_ID },
+    harness.dependencies,
+  );
+
+  expect(status.currentArtifact.artifactId).toBe(ARTIFACT_ID);
+  expect(status.pendingArtifact).toBeNull();
+});
+
+test('activation ignores and preserves a Ready frozen distribution Word snapshot', async () => {
+  const snapshotId = '66666666-6666-4666-8666-666666666666';
+  const harness = createHarness({
+    additionalRows: [{
+      wmkf_requestdocumentid: snapshotId,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+      wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+      wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`,
+      _etag: 'snapshot-row-1',
+      createdon: '2026-08-17T11:00:00Z',
+      modifiedon: '2026-08-17T11:00:00Z',
+    }],
+  });
+
+  const result = await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  expect(result.artifact.artifactId).toBe(ARTIFACT_ID);
+  expect(harness.additionalRows[0].wmkf_lifecyclestate)
+    .toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY);
+  const documentOperations = harness.dependencies.commitChangeset.mock.calls
+    .flatMap(([operations]) => operations)
+    .filter((operation) => operation.entitySet === 'wmkf_requestdocuments');
+  expect(documentOperations.some((operation) => operation.key === snapshotId)).toBe(false);
 });
 
 test('read-only status ignores an older failed attempt after a newer Ready draft', async () => {

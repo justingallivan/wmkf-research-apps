@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-22T15:59:39.226Z",
+  "generated": "2026-08-24T00:06:32.547Z",
   "summary": {
     "live_drift_findings": 5,
     "probe_errors": 0
@@ -43,31 +43,31 @@
       {
         "entity": "wmkf_app_reviewer_suggestion",
         "atlas_claim": 793,
-        "live_count": 807,
+        "live_count": 808,
         "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
       },
       {
         "entity": "wmkf_appreviewersuggestion",
         "atlas_claim": 793,
-        "live_count": 807,
+        "live_count": 808,
         "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
       },
       {
         "entity": "wmkf_appreviewersuggestions",
         "atlas_claim": 793,
-        "live_count": 807,
+        "live_count": 808,
         "source_file": "docs/atlas/dataverse-wmkf-appreviewersuggestion.md"
       },
       {
         "entity": "wmkf_potentialreviewers",
         "atlas_claim": 4474,
-        "live_count": 4488,
+        "live_count": 4489,
         "source_file": "docs/atlas/dataverse-wmkf-potentialreviewers.md"
       },
       {
         "entity": "wmkf_potentialreviewerses",
         "atlas_claim": 4474,
-        "live_count": 4488,
+        "live_count": 4489,
         "source_file": "docs/atlas/dataverse-wmkf-potentialreviewers.md"
       }
     ],

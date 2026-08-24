@@ -10,6 +10,25 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Frozen Pre-Site distribution architecture became source-built (Session 454)
+
+**Milestone:** Workbench can prepare an exact retained Pre-Site Word snapshot,
+derive PDF from that immutable item, and send DOCX, PDF, or both through one
+confirmed, recovery-safe Dynamics email activity.
+**Sessions:** 454 (implementation, focused verification, and independent Claude
+Fable review).
+**Ship state:** Architecture and first implementation are committed on
+`codex/frozen-pdf-distribution`; independent review found nine confirmed
+hardening items that block promotion. Migration 034, deployment, authenticated
+smoke, and any controlled send remain pending. No Production snapshot, attempt,
+activity, or email was created.
+**Why it matters:** staff can share exactly what they reviewed while retries
+resume each durable file/activity/attachment/send-intent step without duplicate
+email, while retained snapshots preserve what earlier recipients saw across a
+guarded reopen. Review closure is required before relying on that contract.
+**Pointers:** `lib/services/pre-site-visit/distribution-service.js`;
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; commit `8a240e77`.
+
 ## August 2026 — Guarded Pre-Site reopen passed durable Production proof (Session 454)
 
 **Milestone:** The superuser correction path now has end-to-end Production

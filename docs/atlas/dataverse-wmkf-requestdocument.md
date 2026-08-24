@@ -6,13 +6,15 @@ status: active
 summary: Governed request-artifact registry; core flow, native version restore, and first-stage recovery pass while administrative controls remain.
 canonical: false
 owner: product-engineering
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
+  - lib/services/pre-site-visit/distribution-service.js
+  - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
 ---
@@ -186,6 +188,20 @@ its exact operation retry, but a later distinct operation records any resolvable
 retained copy as cleanup work. Actor/time is attributed only to reason-bearing
 reopen events, never to later generated descendants that inherit only the cycle.
 
+**[VERIFIED 2026-08-23 via repository source/tests; DEPLOYED TO READY BRANCH
+PREVIEW; NOT PRODUCTION-DEPLOYED.]** Migration 034 is live and empty;
+authenticated Preview proof is blocked by Azure callback `AADSTS50011`.
+Frozen informational distribution creates or reuses one
+retained DOCX snapshot row linked to the exact editable Pre-Site row/version/
+hash. PDF or both mode adds a second row derived from the retained DOCX; the
+outgoing Dynamics email may attach DOCX, PDF, or both. Snapshot rows use the
+existing `Pre Site Visit` artifact type, `Board Ready` lifecycle, representation-
+specific producer/template/content type, and stable Graph identities. They do
+not become the Request's current Pre-Site pointer. Production read-only email
+metadata and sandbox raw-recipient transport/repeat probes passed, but the full
+Workbench path remains unexercised outside tests. No new Production Request
+Document row was created by this work.
+
 ## Ownership
 
 - SharePoint owns editable Word bytes and native version history.
@@ -206,6 +222,14 @@ reopen events, never to later generated descendants that inherit only the cycle.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
+- Frozen distribution snapshot rows own durable file lineage only. Postgres
+  `pre_site_distribution_attempts` owns exact preview/send orchestration, while
+  Dynamics owns the email activity and transport status. A DOCX snapshot uses
+  the governed `gdc1:` content hash; a PDF row uses raw SHA-256 bytes in the
+  same generic `wmkf_contenthash` field. The exact distribution producer
+  namespace is excluded from editable Pre-Site status, activation cardinality,
+  supersession, and guarded-reopen downstream/competing-generation checks;
+  missing or lookalike producers retain ordinary fail-closed lifecycle behavior.
 - **[PRODUCTION-PROVED 2026-08-21]** the Site Visit transition
   resolves that current pointer, requires Ready/Draft Word state and a matching
   expected artifact id, verifies one stable SharePoint publication version
@@ -247,8 +271,10 @@ reopen events, never to later generated descendants that inherit only the cycle.
 - The governed prompt remains admin-configured through
   `pre-site-visit.proposal-core.generate`; `wmkf_ai_run` remains the execution
   audit rather than the editable business record.
-- A PDF distribution copy is a second Request Document row linked through
-  `wmkf_SourceDocument` to the exact Word row and source version/hash.
+- Informational distribution retains a Word snapshot row linked through
+  `wmkf_SourceDocument` to the exact editable Word row/version/hash. PDF
+  selection adds a second row linked to that retained DOCX, and the exact email
+  may attach DOCX, PDF, or both.
 - SharePoint Word becomes authoritative for staff prose once the row is Ready;
   no automatic Word-to-Dataverse section synchronization is claimed.
 - The Site Visit tab reuses that stable Word item for staff observations while

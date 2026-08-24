@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema):** 2026-05-07. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-08-23. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -162,6 +162,42 @@ content source of truth. PR #98 corrected the automatic Executor run-source
 mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
+
+### `pre_site_distribution_attempts` — LIVE; EMPTY; RUNTIME NOT PRODUCTION-PROVED
+
+**Source of truth:** Postgres exact-preview and cross-system recovery ledger.
+Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
+setup. **[VERIFIED LIVE 2026-08-23 via canonical migration plus schema/tracker
+readback]** migration 034 was applied at `2026-08-23T23:39:34.686Z`; the table
+has 55 columns, eight named CHECK constraints plus its primary key, four indexes
+including the primary-key index, zero rows, and no pending manifest migration.
+SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
+Dynamics remains email-activity/transport authority.
+
+One client operation UUID binds one Request, exact editable source Word
+identity/version/governed hash/raw byte hash, attachment mode (`docx`, `pdf`, or
+`both`), exact retained Word/PDF identities and byte hashes, normalized To/Cc,
+subject/body/template/sender/actor, preview hash, Dynamics activity/status, and
+bounded error evidence. Attachment bytes are never stored. States are
+`preparing`, `prepared`, `activity_created`, `attachments_added`,
+`send_requested`, and `sent`; per-kind attachment timestamps plus a lease fence
+allow recovery between Word and PDF or after an ambiguous SendEmail response.
+The Dynamics activity ID becomes durable before exact activity assertions, and
+the same fenced lease is renewed immediately before transport; a lost renewal
+cannot call `SendEmail`. Send also rejects when the current Pre-Site pointer or
+native source version no longer matches the prepared attempt.
+`sent_at` means Dynamics accepted or status readback proved the transport
+request, not inbox delivery. Read/write paths:
+`lib/services/pre-site-visit/distribution-store.js` and
+`lib/services/pre-site-visit/distribution-service.js`.
+
+**[VERIFIED IN SOURCE/TESTS AND LIVE SCHEMA 2026-08-23.]** The exact feature
+commit is Ready on a branch Preview, but Azure rejects that Preview callback
+with `AADSTS50011`, so authenticated feature/UI proof remains open. Production
+email metadata and the tenant setting were read-only probed, and a controlled
+sandbox raw-`addressused` send/readback plus repeated `SendEmail` check passed
+at Dynamics transport-acceptance level. No Production distribution row,
+snapshot, activity, or email was created.
 
 ## Portal upload staging
 

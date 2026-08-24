@@ -3,6 +3,7 @@ import {
   reopenPreSiteVisit,
 } from '../../lib/services/pre-site-visit/reopen-service.js';
 import {
+  PRE_SITE_DISTRIBUTION_CONTRACT,
   PRE_SITE_REOPEN_REASON,
   PRE_SITE_VISIT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -343,6 +344,35 @@ test('a competing Pre-Site generation blocks reopen before file access or mutati
   expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
   expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
   expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('retained and in-flight frozen distribution snapshots do not block guarded reopen', async () => {
+  const harness = createHarness();
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx`,
+  }));
+  harness.rows.push(sourceRow({
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    _wmkf_sourcedocument_value: SOURCE_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_generationkey: 'distribution-generation-key',
+    wmkf_claimtoken: 'distribution-claim',
+    wmkf_producer: `${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-pdf`,
+    modifiedon: '2026-08-22T11:59:00Z',
+  }));
+
+  const result = await reopenPreSiteVisit(
+    input(),
+    { actingUserSystemId: ACTOR_ID },
+    harness.dependencies,
+  );
+
+  expect(result).toMatchObject({ reused: false, artifact: { artifactId: SUCCESSOR_ID } });
 });
 
 test('an expired competing reopen is failed with durable cleanup identity before a new operation proceeds', async () => {
