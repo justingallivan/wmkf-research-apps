@@ -256,16 +256,18 @@ rather than Site Visit material categories. “Create Final Writeup” copies th
 exact current Pre-Site row and SharePoint version/hash at action time into a
 new Final row/file; it does not rename or overwrite the Pre-Site document.
 
-Staff continue to edit through the canonical Word link. **[SOURCE/TEST VERIFIED
-2026-08-23; migration live; Ready branch Preview; Production deployment/full
-feature proof pending]** informational email
+Staff continue to edit through the canonical Word link. **[PRODUCTION-DEPLOYED
+2026-08-23 in merge `76a93a41` / Ready deployment
+`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; migration live and
+empty; full distribution path not live-proved]** informational email
 always retains an exact Word snapshot and lets staff attach that DOCX, a PDF
 derived from the retained DOCX, or both. Recipients are known staff members or
 consultants entered explicitly by staff; syntax/deduplication/To-Cc conflict
 checks apply, but no identity-confidence or directory-membership gate does. An
 external document-sharing portal is not required for this use case. Production
-read-only metadata and sandbox raw-recipient transport/repeat probes passed;
-authenticated Preview proof is blocked by Azure callback `AADSTS50011`.
+read-only metadata and sandbox raw-recipient transport/repeat probes passed.
+Authenticated Production lifecycle reads passed without writes; the audited
+request is Draft, so the panel/history path was not exercised.
 
 The Pre-Site document is informational and normally does not need a Reviewed
 marker. The Final Writeup may expose a soft, optional Reviewed acknowledgement

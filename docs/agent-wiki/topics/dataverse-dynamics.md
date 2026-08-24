@@ -211,12 +211,15 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Do not rebuild Explorer behavior when the Power Tools surface should be reused.
 - Treat any Dataverse/Power Automate/Azure claim as external-platform state; verify before asserting.
 - **Frozen Pre-Site email uses granular Dynamics steps, not the composed helper
-  (source/test verified; Ready branch Preview; not Production-deployed).**
+  (Production-deployed 2026-08-23; source/test verified; full distribution path
+  not live-proved).** Merge `76a93a41` is Ready in deployment
+  `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`.
   Migration 034 is live and empty. Production read-only metadata confirmed the
   email fields/statuses and unresolved-party tenant setting; a sandbox
   raw-`addressused` send/readback plus repeated `SendEmail` check reached
-  transport acceptance. Authenticated Preview feature proof remains blocked by
-  Azure callback `AADSTS50011`. `createEmailActivity` accepts an
+  transport acceptance. Authenticated Production lifecycle reads passed without
+  writes; the audited request is Draft, so panel/history was not exercised.
+  `createEmailActivity` accepts an
   optional bounded correlation key in `email.subcategory`; the distribution
   service persists the returned activity ID, reconciles each deterministic
   filename, records `send_requested` before `SendEmail`, and queries email

@@ -455,8 +455,9 @@ snapshot, a PDF converted from that retained Word snapshot, or both. An
 anonymous or guest SharePoint document link is not required for this minimum
 contract.
 
-**[OWNER DIRECTION 2026-08-23; SOURCE/TEST VERIFIED; MIGRATION LIVE; READY
-BRANCH PREVIEW; NOT PRODUCTION-DEPLOYED.]**
+**[OWNER DIRECTION 2026-08-23; PRODUCTION-DEPLOYED IN MERGE `76a93a41` /
+READY DEPLOYMENT `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED;
+FULL DISTRIBUTION PATH NOT LIVE-PROVED.]**
 Promotion does not send email. Staff explicitly creates or reuses the retained
 snapshot set, selects Word, PDF, or both, enters To/CC recipients, previews the
 editable subject/body plus exact attachments, and confirms that preview before
@@ -470,9 +471,10 @@ Migration `034_pre_site_distribution_attempts.sql` added the live, schema-read-
 back Postgres coordination ledger; it remains empty. SharePoint and
 `wmkf_requestdocument` own retained file identities; Postgres owns exact
 preview/send recovery; Dynamics owns the email activity. Production metadata
-and sandbox raw-recipient transport/repeat probes passed. Authenticated Preview
-feature proof is blocked by Azure callback `AADSTS50011`. No Production row,
-snapshot, activity, or email has been created.
+and sandbox raw-recipient transport/repeat probes passed. Authenticated
+Production lifecycle reads passed without writes; Request `1002379` is currently
+Draft after guarded reopen, so the panel/history path was not exercised. No
+Production row, snapshot, activity, or email has been created.
 
 One durable distribution attempt retains the exact source Word, retained Word,
 and selected PDF identities/versions/hashes, recipient set,

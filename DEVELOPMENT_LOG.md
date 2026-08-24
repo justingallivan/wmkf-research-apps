@@ -10,6 +10,23 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Frozen Pre-Site distribution reached Production (Session 457)
+
+**Milestone:** Exact DOCX/PDF/both snapshot preview, recovery-safe Dynamics
+distribution, and history routes are now Production-deployed.
+**Sessions:** 454–457 (implementation, bounded Opus plan/code review, migration,
+metadata/sandbox transport probes, Preview auth rehearsal, and promotion).
+**Ship state:** Migration 034 is live and empty; merge `76a93a41` is Ready in
+deployment `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`. Signed-in Production lifecycle
+reads passed without writes; the audited Draft request kept the distribution
+panel/history route unexercised. No Production snapshot, attempt, activity, or
+email was created, so full distribution proof remains separately gated.
+**Why it matters:** staff now have the reviewed, durable exact-materials sharing
+path in Production without coupling send to lifecycle promotion or weakening
+guarded-reopen evidence.
+**Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`;
+`docs/atlas/postgres-infra-tables.md`; merge `76a93a41`.
+
 ## August 2026 — Frozen Pre-Site distribution architecture became source-built (Session 454)
 
 **Milestone:** Workbench can prepare an exact retained Pre-Site Word snapshot,

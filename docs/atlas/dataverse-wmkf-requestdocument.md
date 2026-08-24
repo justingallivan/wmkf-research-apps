@@ -188,9 +188,11 @@ its exact operation retry, but a later distinct operation records any resolvable
 retained copy as cleanup work. Actor/time is attributed only to reason-bearing
 reopen events, never to later generated descendants that inherit only the cycle.
 
-**[VERIFIED 2026-08-23 via repository source/tests; DEPLOYED TO READY BRANCH
-PREVIEW; NOT PRODUCTION-DEPLOYED.]** Migration 034 is live and empty;
-authenticated Preview proof is blocked by Azure callback `AADSTS50011`.
+**[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
+`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; FULL DISTRIBUTION
+PATH NOT LIVE-PROVED.]** Migration 034 is live and empty. An authenticated
+Production smoke loaded Request `1002379` lifecycle state without a write; its
+current Draft state correctly kept the distribution panel unavailable.
 Frozen informational distribution creates or reuses one
 retained DOCX snapshot row linked to the exact editable Pre-Site row/version/
 hash. PDF or both mode adds a second row derived from the retained DOCX; the
@@ -199,8 +201,8 @@ existing `Pre Site Visit` artifact type, `Board Ready` lifecycle, representation
 specific producer/template/content type, and stable Graph identities. They do
 not become the Request's current Pre-Site pointer. Production read-only email
 metadata and sandbox raw-recipient transport/repeat probes passed, but the full
-Workbench path remains unexercised outside tests. No new Production Request
-Document row was created by this work.
+Workbench prepare/history/send path remains unexercised outside tests. No new
+Production Request Document row was created by this release smoke.
 
 ## Ownership
 

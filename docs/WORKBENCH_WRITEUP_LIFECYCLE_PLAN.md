@@ -409,8 +409,8 @@ non-superseded lifecycle.
    pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, standard actor/time, and a
    superuser-only route.
-6. **Selected and source/test verified 2026-08-23; migration live; Ready branch
-   Preview; Production deployment/full feature proof pending:** Postgres
+6. **Selected, source/test verified, and Production-deployed 2026-08-23;
+   full distribution path not live-proved:** Postgres
    `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request
    Document rows, and Dynamics owns the email activity.
@@ -426,8 +426,9 @@ hash. If staff selects PDF or both, Graph converts that retained immutable Word
 item and a second Request Document row links to the Word snapshot. A current
 writeup pointer always targets the editable Word workspace, never a snapshot.
 
-**[OWNER DIRECTION 2026-08-23; SOURCE/TEST VERIFIED; MIGRATION LIVE; READY
-BRANCH PREVIEW; NOT PRODUCTION-DEPLOYED.]**
+**[OWNER DIRECTION 2026-08-23; PRODUCTION-DEPLOYED IN MERGE `76a93a41` /
+READY DEPLOYMENT `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED;
+MIGRATION LIVE AND EMPTY; FULL DISTRIBUTION PATH NOT LIVE-PROVED.]**
 Distribution is informational. Staff can attach the retained Word DOCX, the
 derived PDF, or both; recipients are not asked to edit the live workspace, and
 promotion never sends automatically. Migration
@@ -645,17 +646,18 @@ silently extend its paths or names to writeup publications.
    Dataverse/Graph readback proved pointer, lifecycle, audit, cardinality, and
    byte coherence. This proof now precedes Final creation so an accidental
    handoff cannot become an unexplained Final lineage source.
-7. **Frozen Word/PDF informational email — branch-Preview deployed 2026-08-23.** The
+7. **Frozen Word/PDF informational email — Production-deployed 2026-08-23.** The
    DOCX/PDF/both snapshot, exact preview, explicit send, resume-safe retry, and
    history path is implemented; migration 034 is live, schema-read-back, and
    empty. Production read-only metadata confirmed the subject/status/tenant
    contracts, and sandbox probes proved raw `addressused`, exact
    description/address/correlation round-trip, transport acceptance, and
-   repeated `SendEmail` behavior. The exact feature commit is Ready on branch
-   Preview, but Azure rejects that callback with `AADSTS50011`. Register an
-   approved durable Preview callback or deliberately promote through the
-   governed Production path, then run authenticated full-feature verification.
-   Any Production send remains separately approval-gated.
+   repeated `SendEmail` behavior. Merge `76a93a41` is Ready in Production
+   deployment `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; authenticated dashboard,
+   Workbench, Request `1002379`, lifecycle, and guarded-reopen reads passed
+   without writes. That request is Draft, so the panel/history path was not
+   exercised, and the ledger remains empty. Full prepare/history/send proof and
+   any Production send remain separately approval-gated.
 8. **Site Visit logistics design.** Inventory and map every desired logistics
    fact before proposing or applying any further schema.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload

@@ -14,8 +14,11 @@ an authenticated preview.
 Do:
 - Treat push-to-`main` auto-deploy as the owner-confirmed production path.
 - Monitor a known deployment with `vercel inspect`; use localhost by default for
-  auth-gated smoke, or temporarily register the exact stable branch-alias callback
-  and attest that alias to the immutable Preview deployment and commit.
+  auth-gated smoke. For this project, first inspect the already registered
+  `wmkfresearchapps-preview.vercel.app` callback/alias; temporarily repoint that
+  stable alias to an attested immutable Preview deployment, then restore and
+  verify its prior target after the smoke. Add an Entra callback only when no
+  already registered stable alias can serve the exact deployment.
 
 Do not:
 - Run `vercel --prod` merely to duplicate a `main` push.
@@ -52,5 +55,15 @@ removed after the smoke. Do not infer wildcard support or assume a different bra
 alias is registered. Re-attest the exact immutable deployment ID, commit, Preview
 class, and alias ownership for every run, and roll back temporary auth/environment
 configuration afterward.
+
+**VERIFIED 2026-08-23:** the Entra app already contained
+`https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad`.
+Deployment `dpl_4AKs6sf5UcRMUn9f6Vy2AKkmDjuZ` authenticated successfully after
+that stable alias was temporarily moved from recorded target
+`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9`; the dashboard loaded all 12 apps. Workbench
+production reads then failed closed because Preview omitted
+`DATAVERSE_ALLOW_PROD_READS`, as the interlock requires. The alias was restored
+and re-inspected at its exact prior deployment. No Entra URI or application data
+was changed.
 
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].

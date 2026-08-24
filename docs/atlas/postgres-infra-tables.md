@@ -163,7 +163,7 @@ mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
 
-### `pre_site_distribution_attempts` — LIVE; EMPTY; RUNTIME NOT PRODUCTION-PROVED
+### `pre_site_distribution_attempts` — LIVE; EMPTY; RUNTIME PRODUCTION-DEPLOYED
 
 **Source of truth:** Postgres exact-preview and cross-system recovery ledger.
 Migration `034_pre_site_distribution_attempts.sql`; mirrored in the fresh-install
@@ -191,13 +191,16 @@ request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and
 `lib/services/pre-site-visit/distribution-service.js`.
 
-**[VERIFIED IN SOURCE/TESTS AND LIVE SCHEMA 2026-08-23.]** The exact feature
-commit is Ready on a branch Preview, but Azure rejects that Preview callback
-with `AADSTS50011`, so authenticated feature/UI proof remains open. Production
-email metadata and the tenant setting were read-only probed, and a controlled
-sandbox raw-`addressused` send/readback plus repeated `SendEmail` check passed
-at Dynamics transport-acceptance level. No Production distribution row,
-snapshot, activity, or email was created.
+**[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
+`dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`.]** An authenticated Production smoke loaded
+the dashboard, Workbench, Request `1002379`, Pre-Site/Site Visit lifecycle state,
+and guarded-reopen history without a write. That request is currently Draft after
+guarded reopen, so the distribution panel and its history route were not
+exercised. Production email metadata and the tenant setting were read-only
+probed, and a controlled sandbox raw-`addressused` send/readback plus repeated
+`SendEmail` check passed at Dynamics transport-acceptance level. Post-deploy
+readback still found zero Production distribution rows; no Production snapshot,
+activity, or email was created.
 
 ## Portal upload staging
 
