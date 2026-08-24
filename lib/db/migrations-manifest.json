@@ -32,6 +32,7 @@
     "031_portal_upload_staging.sql",
     "032_api_usage_stop_reason.sql",
     "033_dynamics_explorer_request_telemetry.sql",
-    "034_pre_site_distribution_attempts.sql"
+    "034_pre_site_distribution_attempts.sql",
+    "035_site_visit_logistics.sql"
   ]
 }

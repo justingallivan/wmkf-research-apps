@@ -23,6 +23,17 @@
 import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
 
+function normalizePreferredEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!email) return null;
+  if (email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const error = new Error('preferred_email must be a valid email address');
+    error.status = 400;
+    throw error;
+  }
+  return email;
+}
+
 export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'expertise-finder');
   if (!access) return;
@@ -133,7 +144,7 @@ async function handleGet(req, res) {
 async function handleCreate(req, res, access) {
   try {
     const {
-      name, role_type, role, affiliation, orcid,
+      name, preferred_email, role_type, role, affiliation, orcid,
       primary_fields, keywords, subfields_specialties,
       methods_techniques, distinctions, expertise,
       keck_affiliation, keck_affiliation_details,
@@ -150,13 +161,13 @@ async function handleCreate(req, res, access) {
 
     const result = await sql`
       INSERT INTO expertise_roster (
-        name, role_type, role, affiliation, orcid,
+        name, preferred_email, role_type, role, affiliation, orcid,
         primary_fields, keywords, subfields_specialties,
         methods_techniques, distinctions, expertise,
         keck_affiliation, keck_affiliation_details,
         created_by, updated_by
       ) VALUES (
-        ${name}, ${role_type}, ${role || null}, ${affiliation || null}, ${orcid || 'N/A'},
+        ${name}, ${normalizePreferredEmail(preferred_email)}, ${role_type}, ${role || null}, ${affiliation || null}, ${orcid || 'N/A'},
         ${primary_fields || null}, ${keywords || null}, ${subfields_specialties || null},
         ${methods_techniques || null}, ${distinctions || null}, ${expertise || null},
         ${keck_affiliation || null}, ${keck_affiliation_details || null},
@@ -168,7 +179,9 @@ async function handleCreate(req, res, access) {
     return res.status(201).json({ success: true, member: result.rows[0] });
   } catch (error) {
     console.error('Roster CREATE error:', error);
-    return res.status(500).json({ error: 'Failed to create roster member' });
+    return res.status(error.status || 500).json({
+      error: error.status === 400 ? error.message : 'Failed to create roster member',
+    });
   }
 }
 
@@ -188,7 +201,7 @@ async function handlePatch(req, res, access) {
 
     // Build dynamic update
     const allowedFields = [
-      'name', 'role_type', 'role', 'affiliation', 'orcid',
+      'name', 'preferred_email', 'role_type', 'role', 'affiliation', 'orcid',
       'primary_fields', 'keywords', 'subfields_specialties',
       'methods_techniques', 'distinctions', 'expertise',
       'keck_affiliation', 'keck_affiliation_details', 'is_active',
@@ -199,7 +212,9 @@ async function handlePatch(req, res, access) {
 
     for (const field of allowedFields) {
       if (field in updates) {
-        params.push(updates[field]);
+        params.push(field === 'preferred_email'
+          ? normalizePreferredEmail(updates[field])
+          : updates[field]);
         setClauses.push(`${field} = $${params.length}`);
       }
     }
@@ -235,7 +250,9 @@ async function handlePatch(req, res, access) {
     return res.status(200).json({ success: true, member: result.rows[0] });
   } catch (error) {
     console.error('Roster PATCH error:', error);
-    return res.status(500).json({ error: 'Failed to update roster member' });
+    return res.status(error.status || 500).json({
+      error: error.status === 400 ? error.message : 'Failed to update roster member',
+    });
   }
 }
 

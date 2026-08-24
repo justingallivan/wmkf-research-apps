@@ -752,6 +752,15 @@ const v40Statements = [
     draft_hash CHAR(64) NOT NULL,
     preview_hash CHAR(64),
     template_version TEXT NOT NULL,
+    calendar_enabled BOOLEAN NOT NULL DEFAULT false,
+    site_visit_id UUID,
+    site_visit_etag TEXT,
+    site_visit_snapshot JSONB,
+    material_links JSONB NOT NULL DEFAULT '[]'::jsonb,
+    calendar_filename TEXT,
+    calendar_content_type TEXT,
+    calendar_byte_hash CHAR(64),
+    calendar_size BIGINT,
     docx_snapshot_document_id UUID,
     docx_drive_id TEXT,
     docx_item_id TEXT,
@@ -779,6 +788,7 @@ const v40Statements = [
       CHECK (state IN ('preparing', 'prepared', 'activity_created', 'attachments_added', 'send_requested', 'sent')),
     docx_attached_at TIMESTAMPTZ,
     pdf_attached_at TIMESTAMPTZ,
+    calendar_attached_at TIMESTAMPTZ,
     send_requested_at TIMESTAMPTZ,
     sent_at TIMESTAMPTZ,
     attempt_count INTEGER NOT NULL DEFAULT 0
@@ -799,7 +809,30 @@ const v40Statements = [
       AND (preview_hash IS NULL OR preview_hash ~ '^[0-9a-f]{64}$')
       AND (source_byte_hash IS NULL OR source_byte_hash ~ '^[0-9a-f]{64}$')
       AND (docx_byte_hash IS NULL OR docx_byte_hash ~ '^[0-9a-f]{64}$')
-      AND (pdf_byte_hash IS NULL OR pdf_byte_hash ~ '^[0-9a-f]{64}$')),
+      AND (pdf_byte_hash IS NULL OR pdf_byte_hash ~ '^[0-9a-f]{64}$')
+      AND (calendar_byte_hash IS NULL OR calendar_byte_hash ~ '^[0-9a-f]{64}$')),
+    CONSTRAINT pre_site_distribution_material_links_shape
+      CHECK (jsonb_typeof(material_links) = 'array'),
+    CONSTRAINT pre_site_distribution_calendar_shape
+      CHECK ((calendar_enabled = false
+        AND site_visit_id IS NULL
+        AND site_visit_etag IS NULL
+        AND site_visit_snapshot IS NULL
+        AND calendar_filename IS NULL
+        AND calendar_content_type IS NULL
+        AND calendar_byte_hash IS NULL
+        AND calendar_size IS NULL
+        AND calendar_attached_at IS NULL)
+      OR (calendar_enabled = true
+        AND site_visit_id IS NOT NULL
+        AND site_visit_etag IS NOT NULL
+        AND jsonb_typeof(site_visit_snapshot) = 'object'
+        AND calendar_filename IS NOT NULL
+        AND calendar_content_type IS NOT NULL
+        AND calendar_byte_hash IS NOT NULL
+        AND calendar_size > 0
+        AND (state IN ('preparing', 'prepared', 'activity_created')
+          OR calendar_attached_at IS NOT NULL))),
     CONSTRAINT pre_site_distribution_prepared_shape
       CHECK (state = 'preparing' OR (
       source_drive_id IS NOT NULL
@@ -841,6 +874,9 @@ const v40Statements = [
   `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_recovery
      ON pre_site_distribution_attempts (state, locked_until, updated_at)
      WHERE state <> 'sent'`,
+  `CREATE INDEX IF NOT EXISTS idx_pre_site_distribution_site_visit
+     ON pre_site_distribution_attempts (site_visit_id, created_at DESC)
+     WHERE site_visit_id IS NOT NULL`,
 ];
 
 // V32: model pricing audit history (S181).
@@ -978,6 +1014,7 @@ const v25Statements = [
   `CREATE TABLE IF NOT EXISTS expertise_roster (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    preferred_email VARCHAR(320),
     role_type VARCHAR(50) NOT NULL,
     role VARCHAR(255),
     affiliation VARCHAR(500),

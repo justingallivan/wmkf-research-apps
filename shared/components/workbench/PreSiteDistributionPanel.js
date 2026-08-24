@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 
 const DEFAULT_BODY = 'Please find the frozen Pre-Site Visit materials attached.';
+const EMPTY_LIST = Object.freeze([]);
 
 function newOperationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -34,13 +35,24 @@ function stateLabel(attempt) {
   return 'Sending';
 }
 
-export default function PreSiteDistributionPanel({ requestId, requestNumber, sourceArtifact }) {
+export default function PreSiteDistributionPanel({
+  requestId,
+  requestNumber,
+  sourceArtifact,
+  siteVisit = null,
+  materials = EMPTY_LIST,
+  suggestedTo = EMPTY_LIST,
+  suggestedCc = EMPTY_LIST,
+}) {
   const [form, setForm] = useState({
     attachmentMode: 'pdf',
     to: '',
     cc: '',
     subject: `Pre-Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
     bodyText: DEFAULT_BODY,
+    includeCalendar: false,
+    siteVisitId: null,
+    selectedMaterialIds: [],
   });
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -82,6 +94,19 @@ export default function PreSiteDistributionPanel({ requestId, requestNumber, sou
       if (controllerRef.current === controller) controllerRef.current = null;
     };
   }, [requestId, loadHistory]);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      to: current.to.trim() ? current.to : suggestedTo.join(', '),
+      cc: current.cc.trim() ? current.cc : suggestedCc.join(', '),
+      siteVisitId: siteVisit?.activityId || null,
+      includeCalendar: siteVisit?.activityId ? current.includeCalendar : false,
+      selectedMaterialIds: current.selectedMaterialIds.filter((id) => (
+        materials.some((material) => material.artifactId === id)
+      )),
+    }));
+  }, [materials, siteVisit?.activityId, suggestedCc, suggestedTo]);
 
   const edit = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -205,6 +230,47 @@ export default function PreSiteDistributionPanel({ requestId, requestNumber, sou
           </div>
         </fieldset>
 
+        <fieldset className="mt-4">
+          <legend className="text-sm font-medium text-gray-800">Calendar and links</legend>
+          <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.includeCalendar}
+              onChange={(event) => edit({ includeCalendar: event.target.checked })}
+              disabled={preparing || sending || !siteVisit?.activityId}
+              className="mt-0.5"
+            />
+            <span>
+              Attach the saved Site Visit as an informational add-to-calendar event.
+              It does not request an RSVP or provide reliable update/cancellation handling.
+            </span>
+          </label>
+          {!siteVisit?.activityId && (
+            <p className="mt-1 text-xs text-amber-700">Save Visit logistics above before adding the calendar.</p>
+          )}
+          {materials.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium text-gray-800">Link to governed materials</p>
+              {materials.map((material) => (
+                <label key={material.artifactId} className="flex items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.selectedMaterialIds.includes(material.artifactId)}
+                    onChange={(event) => edit({
+                      selectedMaterialIds: event.target.checked
+                        ? [...form.selectedMaterialIds, material.artifactId]
+                        : form.selectedMaterialIds.filter((id) => id !== material.artifactId),
+                    })}
+                    disabled={preparing || sending}
+                    className="mt-0.5"
+                  />
+                  <span>{material.filename} <span className="text-gray-500">— {material.artifactTypeLabel}</span></span>
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
+
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <label htmlFor="distribution-to" className="block text-sm font-medium text-gray-800">To</label>
@@ -277,18 +343,36 @@ export default function PreSiteDistributionPanel({ requestId, requestNumber, sou
                 <dt className="font-medium">Attachments:</dt>
                 <dd className="mt-1 flex flex-wrap gap-2">
                   {preview.attachments.map((file) => (
-                    <a
-                      key={file.kind}
-                      href={downloadUrl(file.webUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded border border-blue-300 bg-white px-3 py-1 font-medium text-blue-900 underline"
-                    >
-                      {file.filename} ({Math.max(1, Math.round(file.size / 1024))} KB)
-                    </a>
+                    file.webUrl ? (
+                      <a
+                        key={file.kind}
+                        href={downloadUrl(file.webUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded border border-blue-300 bg-white px-3 py-1 font-medium text-blue-900 underline"
+                      >
+                        {file.filename} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                      </a>
+                    ) : (
+                      <span key={file.kind} className="rounded border border-blue-300 bg-white px-3 py-1 font-medium text-blue-900">
+                        {file.filename} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                      </span>
+                    )
                   ))}
                 </dd>
               </div>
+              {preview.materialLinks?.length > 0 && (
+                <div>
+                  <dt className="font-medium">Material links:</dt>
+                  <dd className="mt-1">
+                    <ul className="list-disc pl-5">
+                      {preview.materialLinks.map((material) => (
+                        <li key={material.artifactId}>{material.filename} — {material.artifactTypeLabel}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              )}
             </dl>
             {preview.transportAccepted ? (
               <p className="mt-4 text-sm font-medium text-green-800">
@@ -304,7 +388,7 @@ export default function PreSiteDistributionPanel({ requestId, requestNumber, sou
                     disabled={sending}
                     className="mt-0.5"
                   />
-                  I confirmed the exact recipients, message, and frozen attachment{preview.attachments.length === 1 ? '' : 's'} shown above.
+                  I confirmed the exact recipients, message, material links, and attachment{preview.attachments.length === 1 ? '' : 's'} shown above.
                 </label>
                 <button
                   type="button"
@@ -343,6 +427,7 @@ export default function PreSiteDistributionPanel({ requestId, requestNumber, sou
                 <p className="mt-2 text-xs text-gray-500">
                   {new Date(attempt.createdAt).toLocaleString()}
                   {attempt.attachments.length > 0 ? ` · ${attempt.attachments.map((file) => file.kind.toUpperCase()).join(' + ')}` : ''}
+                  {attempt.materialLinks?.length > 0 ? ` · ${attempt.materialLinks.length} material link${attempt.materialLinks.length === 1 ? '' : 's'}` : ''}
                   {attempt.dynamicsEmailId ? ` · Dynamics ${attempt.dynamicsEmailId}` : ''}
                 </p>
                 {attempt.sourceFreshness === 'changed' && (

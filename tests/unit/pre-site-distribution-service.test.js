@@ -122,6 +122,15 @@ function createPrepareHarness({
         acting_user_system_id: input.actingUserSystemId,
         draft_hash: input.draftHash,
         template_version: input.templateVersion,
+        calendar_enabled: input.calendarEnabled,
+        site_visit_id: input.siteVisitId,
+        site_visit_etag: input.siteVisitEtag,
+        site_visit_snapshot: input.siteVisitSnapshot,
+        material_links: input.materialLinks,
+        calendar_filename: input.calendar?.filename || null,
+        calendar_content_type: input.calendar?.contentType || null,
+        calendar_byte_hash: input.calendar?.byteHash || null,
+        calendar_size: input.calendar?.size || null,
         state: 'preparing',
       };
       return attempt;
@@ -221,6 +230,10 @@ function createPrepareHarness({
         pdf_content_type: prepared.pdf?.contentType || null,
         pdf_byte_hash: prepared.pdf?.byteHash || null,
         pdf_size: prepared.pdf?.size || null,
+        calendar_filename: prepared.calendar?.filename || null,
+        calendar_content_type: prepared.calendar?.contentType || null,
+        calendar_byte_hash: prepared.calendar?.byteHash || null,
+        calendar_size: prepared.calendar?.size || null,
       };
       return attempt;
     }),
@@ -278,6 +291,133 @@ test('prepare accepts the settled stable-ID eTag when the upload response eTag i
 
   expect(result.attempt.attachments[0].versionId).toBe('1.0');
   expect(harness.snapshots[0].wmkf_sharepointetag).toBe('word-etag');
+});
+
+test('prepare binds server-resolved material links and one informational calendar to the preview', async () => {
+  const harness = createPrepareHarness();
+  const materialId = '99999999-9999-4999-8999-999999999999';
+  const sourceResult = await harness.dependencies.findDocumentsByRequest();
+  const material = {
+    wmkf_requestdocumentid: materialId,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_filename: 'Applicant <Slides>.pdf',
+    wmkf_sharepointweburl: 'https://sharepoint.test/slides?a=1&b=2',
+    wmkf_sharepointdriveid: 'materials-drive',
+    wmkf_sharepointitemid: 'slides-item',
+    wmkf_sharepointversionid: '3.0',
+  };
+  harness.dependencies.findDocumentsByRequest.mockResolvedValue({
+    records: [...sourceResult.records, material],
+  });
+  harness.dependencies.schemaReady = jest.fn(() => true);
+  harness.dependencies.getSiteVisitById = jest.fn(async () => ({
+    activityid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    _etag: 'W/"7"',
+    _regardingobjectid_value: REQUEST_ID,
+    statecode: 0,
+    subject: 'Site Visit',
+    description: 'Discussion',
+    scheduledstart: '2026-09-15T14:00:00Z',
+    scheduledend: '2026-09-15T16:00:00Z',
+    wmkf_ianatimezone: 'America/Chicago',
+    wmkf_visitformat: 100000002,
+    wmkf_locationorlink: 'Conference room / Teams',
+    wmkf_attendeerefsjson: JSON.stringify({
+      version: 1,
+      organizer: { kind: 'staff', profileId: 7 },
+      requiredAttendees: [],
+      optionalAttendees: [],
+    }),
+    modifiedon: '2026-08-24T12:34:56Z',
+    wmkf_SiteVisit_activity_parties: [{
+      participationtypemask: 7,
+      addressused: 'organizer@wmkeck.org',
+    }],
+  }));
+
+  const result = await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'docx',
+    includeCalendar: true,
+    siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    selectedMaterialIds: [materialId],
+  }), harness.dependencies);
+
+  expect(result.attempt.attachments.map((attachment) => attachment.kind))
+    .toEqual(['docx', 'calendar']);
+  expect(result.attempt.materialLinks).toEqual([expect.objectContaining({ artifactId: materialId })]);
+  expect(result.attempt.calendarEnabled).toBe(true);
+  expect(result.attempt.bodyText).toBe('Attached.');
+  const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(persisted.bodyHtml).toContain('Applicant &lt;Slides&gt;.pdf');
+  expect(persisted.bodyHtml).toContain('a=1&amp;b=2');
+  expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
+  expect(persisted.calendar.content.toString('utf8')).not.toContain('ATTENDEE');
+});
+
+test('calendar and material selections participate in the draft identity', async () => {
+  const base = createPrepareHarness();
+  await preparePreSiteDistribution(prepareInput({ attachmentMode: 'docx' }), base.dependencies);
+  const baseHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+  const materialId = '99999999-9999-4999-8999-999999999999';
+  const material = createPrepareHarness();
+  const materialSource = await material.dependencies.findDocumentsByRequest();
+  material.dependencies.findDocumentsByRequest.mockResolvedValue({
+    records: [
+      ...materialSource.records,
+      {
+        wmkf_requestdocumentid: materialId,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+        wmkf_filename: 'Applicant Slides.pdf',
+        wmkf_sharepointweburl: 'https://sharepoint.test/slides',
+        wmkf_sharepointdriveid: 'materials-drive',
+        wmkf_sharepointitemid: 'slides-item',
+        wmkf_sharepointversionid: '3.0',
+      },
+    ],
+  });
+  await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'docx',
+    selectedMaterialIds: [materialId],
+  }), material.dependencies);
+  const materialHash = material.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+  expect(materialHash).not.toBe(baseHash);
+
+  const extended = createPrepareHarness();
+  extended.dependencies.schemaReady = jest.fn(() => true);
+  extended.dependencies.getSiteVisitById = jest.fn(async () => ({
+    activityid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    _etag: 'W/"7"',
+    _regardingobjectid_value: REQUEST_ID,
+    statecode: 0,
+    subject: 'Site Visit',
+    scheduledstart: '2026-09-15T14:00:00Z',
+    scheduledend: '2026-09-15T16:00:00Z',
+    wmkf_attendeerefsjson: JSON.stringify({
+      version: 1,
+      organizer: { kind: 'staff', profileId: 7 },
+      requiredAttendees: [],
+      optionalAttendees: [],
+    }),
+    modifiedon: '2026-08-24T12:34:56Z',
+    wmkf_SiteVisit_activity_parties: [{
+      participationtypemask: 7,
+      addressused: 'organizer@wmkeck.org',
+    }],
+  }));
+  await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'docx',
+    includeCalendar: true,
+    siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  }), extended.dependencies);
+  const extendedHash = extended.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+  expect(extendedHash).not.toBe(baseHash);
 });
 
 test('byte-identical Ready snapshot metadata drift refreshes the registry and remains reusable', async () => {

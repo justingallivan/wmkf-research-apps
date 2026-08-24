@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
+import SiteVisitLogisticsPanel from './SiteVisitLogisticsPanel';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../config/requestDocument';
+
+const EMPTY_LIST = Object.freeze([]);
 
 async function readStatus(requestId, signal) {
   const response = await fetch(
@@ -54,6 +57,7 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
   const [reopeningRequestId, setReopeningRequestId] = useState(null);
   const [reopenForm, setReopenForm] = useState(null);
   const [reopenError, setReopenError] = useState(null);
+  const [logisticsContext, setLogisticsContext] = useState(null);
   const sequence = useRef(0);
   const activeController = useRef(null);
 
@@ -64,6 +68,7 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
     activeController.current = controller;
     setReopenForm(null);
     setReopenError(null);
+    setLogisticsContext(null);
     if (!requestId) return () => controller.abort();
 
     const id = requestId;
@@ -373,11 +378,24 @@ export default function SiteVisitTab({ requestId, requestNumber = '', isSuperuse
       </Card>
 
       {active && ready && (
+        <SiteVisitLogisticsPanel
+          key={`logistics-${requestId}`}
+          requestId={requestId}
+          requestNumber={requestNumber}
+          onContext={setLogisticsContext}
+        />
+      )}
+
+      {active && ready && (
         <PreSiteDistributionPanel
-          key={requestId}
+          key={`distribution-${requestId}`}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={ready}
+          siteVisit={logisticsContext?.siteVisit || null}
+          materials={logisticsContext?.materials || EMPTY_LIST}
+          suggestedTo={logisticsContext?.suggestedTo || EMPTY_LIST}
+          suggestedCc={logisticsContext?.suggestedCc || EMPTY_LIST}
         />
       )}
 

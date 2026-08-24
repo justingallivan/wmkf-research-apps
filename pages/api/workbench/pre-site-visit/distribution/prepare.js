@@ -11,7 +11,8 @@ export const config = {
 
 const ALLOWED = new Set([
   'requestId', 'expectedArtifactId', 'operationId', 'attachmentMode',
-  'to', 'cc', 'subject', 'bodyText',
+  'to', 'cc', 'subject', 'bodyText', 'includeCalendar', 'siteVisitId',
+  'selectedMaterialIds',
 ]);
 
 function sendError(res, error) {

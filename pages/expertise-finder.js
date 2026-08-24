@@ -420,6 +420,9 @@ function RosterTab() {
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900 truncate">{member.name}</p>
                     <p className="text-sm text-gray-500 truncate">{member.role}{member.affiliation ? `, ${member.affiliation}` : ''}</p>
+                    {member.preferred_email && (
+                      <p className="text-xs text-gray-500 truncate">{member.preferred_email}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -449,6 +452,19 @@ function RosterTab() {
                     <div className="pt-4 space-y-3">
                       {member.primary_fields && (
                         <DetailRow label="Primary Fields" value={member.primary_fields} />
+                      )}
+                      {member.preferred_email && (
+                        <div>
+                          <span className="text-xs font-medium text-gray-500 uppercase">Preferred Email</span>
+                          <p className="text-sm">
+                            <a
+                              href={`mailto:${member.preferred_email}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {member.preferred_email}
+                            </a>
+                          </p>
+                        </div>
                       )}
                       {member.keywords && (
                         <div>
@@ -522,7 +538,7 @@ function DetailRow({ label, value, isLink }) {
 
 function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTypes, isEdit }) {
   const [form, setForm] = useState(initialData || {
-    name: '', role_type: 'Consultant', role: '', affiliation: '', orcid: '',
+    name: '', preferred_email: '', role_type: 'Consultant', role: '', affiliation: '', orcid: '',
     primary_fields: '', keywords: '', subfields_specialties: '',
     methods_techniques: '', distinctions: '', expertise: '',
     keck_affiliation: '', keck_affiliation_details: '',
@@ -547,6 +563,16 @@ function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTyp
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
           <input type="text" required value={form.name} onChange={(e) => updateField('name', e.target.value)} className={fieldClass} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Email</label>
+          <input
+            type="email"
+            value={form.preferred_email || ''}
+            onChange={(e) => updateField('preferred_email', e.target.value)}
+            className={fieldClass}
+            placeholder="Preferred Site Visit correspondence address"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Role Type *</label>

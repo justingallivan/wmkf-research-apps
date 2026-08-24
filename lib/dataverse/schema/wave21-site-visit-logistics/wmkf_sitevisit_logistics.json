@@ -1,0 +1,40 @@
+{
+  "name": "wmkf_sitevisit-logistics",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_sitevisit",
+  "_comment": "Additive Site Visit fields needed for round-trip format, IANA timezone, physical/virtual location, and immutable recipient reference identity. Runtime must not select them until the target passes exact preflight and this wave is explicitly applied.",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_VisitFormat",
+      "displayName": "Visit Format",
+      "description": "How the Site Visit will occur.",
+      "options": [
+        { "value": 100000000, "label": "In person" },
+        { "value": 100000001, "label": "Virtual" },
+        { "value": 100000002, "label": "Hybrid" }
+      ]
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IanaTimeZone",
+      "displayName": "IANA Time Zone",
+      "description": "IANA time-zone identifier used to interpret and round-trip the entered local Site Visit time.",
+      "maxLength": 100
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_LocationOrLink",
+      "displayName": "Location or Meeting Link",
+      "description": "Physical location, virtual meeting URL, or hybrid attendance instructions.",
+      "maxLength": 2000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AttendeeRefsJson",
+      "displayName": "Attendee References (JSON)",
+      "description": "Server-owned versioned identity map for Site Visit organizer and attendee ActivityParty rows. Roster entries are keyed by immutable expertise_roster IDs; resolved names and addresses remain on ActivityParty.",
+      "maxLength": 32000
+    }
+  ]
+}

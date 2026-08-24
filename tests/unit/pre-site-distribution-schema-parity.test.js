@@ -7,6 +7,10 @@ const migration = fs.readFileSync(
   'utf8',
 );
 const setup = fs.readFileSync(path.join(ROOT, 'scripts/setup-database.js'), 'utf8');
+const logisticsMigration = fs.readFileSync(
+  path.join(ROOT, 'lib/db/migrations/035_site_visit_logistics.sql'),
+  'utf8',
+);
 
 const CONSTRAINT_NAMES = [
   'pre_site_distribution_mode_check',
@@ -36,4 +40,28 @@ test('migration 034 reconciles the legacy anonymous fresh-install constraint nam
     expect(migration).toContain(name);
   }
   expect(migration).toContain('RENAME CONSTRAINT');
+});
+
+test('migration 035 and fresh install declare the same calendar/link extension constraints', () => {
+  for (const name of [
+    'pre_site_distribution_hash_shape',
+    'pre_site_distribution_material_links_shape',
+    'pre_site_distribution_calendar_shape',
+  ]) {
+    expect(logisticsMigration).toContain(`CONSTRAINT ${name}`);
+    expect(setup).toContain(`CONSTRAINT ${name}`);
+  }
+  for (const column of [
+    'preferred_email',
+    'calendar_enabled',
+    'site_visit_id',
+    'site_visit_etag',
+    'site_visit_snapshot',
+    'material_links',
+    'calendar_byte_hash',
+    'calendar_attached_at',
+  ]) {
+    expect(logisticsMigration).toContain(column);
+    expect(setup).toContain(column);
+  }
 });

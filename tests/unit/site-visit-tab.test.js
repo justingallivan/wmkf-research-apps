@@ -13,6 +13,10 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => ({
   __esModule: true,
   default: () => <div>Frozen distribution panel</div>,
 }));
+jest.mock('../../shared/components/workbench/SiteVisitLogisticsPanel', () => ({
+  __esModule: true,
+  default: () => <div>Site Visit logistics panel</div>,
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_REQUEST_ID = '33333333-3333-4333-8333-333333333333';

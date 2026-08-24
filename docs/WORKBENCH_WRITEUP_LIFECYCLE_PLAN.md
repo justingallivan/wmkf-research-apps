@@ -316,12 +316,125 @@ on the cycle field remaining visible.
 ### Logistics
 
 The desired logistics are date, time/time zone, format, location/link, lead PD,
-WMKF staff, applicant participants, and Board/consultant participants. The only
-currently confirmed relevant Request fields are `akoya_sitevisitdate` and
-`akoya_sitevisitnotes`. A separate schema-design slice must map the remaining
-facts to existing relationships/fields or propose the smallest additive
-Dataverse shape. No separate Scheduled/Completed/Cancelled status is required
-without a consuming workflow.
+WMKF staff, applicant participants, and Board/consultant participants.
+
+**[VERIFIED 2026-08-24 via Production metadata and
+`scripts/probe-site-visit-logistics-capabilities.mjs`; sandbox target
+`orgd9e66399.crm.dynamics.com` re-probe.]** The existing `wmkf_sitevisit`
+custom Activity is the bounded persistence surface: it exists in Production and
+sandbox, has the Request `regardingobjectid` relationship, standard
+`scheduledstart` / `scheduledend`, `subject`, `description`, `organizer`,
+`requiredattendees`, and `optionalattendees` fields, and has zero rows in both
+targets. The sandbox app user can read the entity and is assigned System
+Administrator/System Customizer. The entity has no custom attributes and no
+native `location` field. The sandbox still lacks `wmkf_requestdocument`, so it
+can prove Activity/calendar transport but not the full governed material-link
+projection.
+
+**[OWNER DIRECTION 2026-08-24; OPUS PLAN REVIEW `READY WITH NAMED CHANGES`;
+SOURCE-BUILT; LIVE PROMOTION PENDING.]** The first logistics slice uses the custom Activity rather
+than standard `appointment`, because the custom entity and Request relationship
+already express the intended domain. It adds only four structured Dataverse
+fields needed for round-trip editing:
+
+| Field | Shape | Purpose |
+|---|---|---|
+| `wmkf_VisitFormat` | local Choice: In person / Virtual / Hybrid | Explicit visit format |
+| `wmkf_IanaTimeZone` | String, 100 | Stable IANA zone used to interpret and re-render local wall time |
+| `wmkf_LocationOrLink` | String, 2000 | Physical location, meeting URL, or hybrid instructions |
+| `wmkf_AttendeeRefsJson` | Memo, 32000 | Server-owned versioned map from ActivityParty rows to immutable staff/profile, roster, or manual recipient references |
+
+`description` remains the staff-authored visit/email note; it is not overloaded
+with a machine JSON envelope. `scheduledstart` and `scheduledend` store the UTC
+instants derived from validated local date/time plus the persisted IANA zone.
+The server rejects nonexistent DST wall times and requires explicit
+disambiguation for repeated wall times. Standard Activity state/status remains
+the lifecycle authority; no parallel Scheduled/Completed/Cancelled enum is
+added.
+
+The UI contract allows zero or one open Site Visit Activity per Request. GET
+returns none or the single open row plus its ETag. If multiple open rows exist,
+the route fails closed for reconciliation rather than selecting one. First save
+creates. Later saves with unchanged attendee identity use entity `PATCH` with
+`If-Match`. Dataverse rejects direct ActivityParty create/update/delete, so an
+attendee-role change uses a sandbox-proved atomic changeset: ETag-fenced delete
+plus nested-party create of the same Activity GUID. This is a deliberate
+same-ID replacement, not upsert or stale-write fallback; a rejected operation
+commits neither half. Completed or cancelled rows are history and are never
+edited by this panel. **[VERIFIED 2026-08-24 in tracked sandbox
+`orgd9e66399.crm.dynamics.com`]** nested organizer create and atomic same-ID
+replacement passed, direct ActivityParty create failed with expected Dataverse
+code `0x80040800`, and the exact sentinel was deleted/read back absent.
+
+Recipient suggestions have two authoritative sources:
+
+- WMKF staff: active `user_profiles` reconciled to enabled Dataverse
+  `systemusers`; the stable system-user ID is retained for ActivityParty binding.
+- Board and consultants: active `expertise_roster` rows. A nullable normalized
+  preferred email is added directly to this existing roster table and managed
+  with the existing roster editor. The immutable roster primary key remains the
+  identity; names are display text, never a join key.
+
+Staff may type an additional address for one send, but manual values are shown
+in exact preview and are not silently persisted into either directory. The
+server normalizes and deduplicates all addresses and rejects a To/CC or
+required/optional conflict as an all-or-nothing validation failure.
+
+The first calendar attachment is deliberately informational
+`METHOD:PUBLISH`, matching the already-deployed review-due attachment contract:
+it offers Add to Calendar but does not request RSVP and does not claim reliable
+update/cancel behavior. A changed date, location, or attendee set requires a
+new explicit preview and email. Formal `METHOD:REQUEST` scheduling is a later
+slice that must implement incremented `SEQUENCE`, cancellations to every
+affected removed attendee, and whole-event cancellation before it can claim
+meeting-update semantics. The attachment still uses a stable UID derived from
+the Site Visit Activity ID to reduce accidental duplicates where a client
+honors PUBLISH identity, but the application does not rely on that client
+behavior.
+
+Selected material links come only from the governed Request Document adapter
+and the current stable SharePoint identities already rendered by Workbench.
+The email contains links; it does not attach, copy, rename, or publish the live
+Word workspace. Exact preview freezes each selected artifact ID, Graph
+site/drive/item/version identity, web URL, and display label. Retry uses that
+snapshot and never silently substitutes a newer link or version.
+
+Send remains separate from Activity save. The existing Postgres
+`pre_site_distribution_attempts` ledger is extended rather than creating a
+second orchestration table: it records the exact Site Visit snapshot,
+material-link snapshot, calendar byte hash, authenticated actor/sender, Dynamics
+email ID, and calendar-attachment step alongside the already-proven frozen
+DOCX/PDF snapshot. Exact retry resumes the same Dynamics email activity; a
+changed schedule, recipients, note, or material selection requires a new
+preview and operation. Transport acceptance is not inbox-delivery proof.
+
+#### Implementation invariants
+
+| Invariant | Likely surfaces | Verification |
+|---|---|---|
+| Schedule round-trips without losing the entered zone or DST meaning | Wave 21 Site Visit fields; adapter/service; UI | exact metadata preflight; ambiguous/nonexistent DST tests; UTC/local round-trip tests |
+| A stale save cannot create or overwrite another Site Visit | route; service; Dataverse adapter | GUID + same-Request check; ETag-fenced `PATCH` or atomic same-ID replacement; 404/412 and wrong-ID tests; reversible sandbox proof |
+| Multiple open Site Visits fail closed | adapter/service/route/UI | two-row fixture returns reconciliation error and no write |
+| Suggested recipients retain stable authority | `user_profiles`/`systemusers`; `expertise_roster.id` + preferred email | disabled/unreconciled staff excluded; roster rename preserves email mapping |
+| Exact preview binds every recipient, event field, link identity, and calendar bytes | preview service; Postgres ledger | any changed input changes preview hash and disables prior confirmation |
+| Partial email failure resumes one Dynamics activity | extended distribution store/service; email adapter | activity-created and calendar-attachment failure tests; exact retry returns same email ID |
+| PUBLISH is never presented as RSVP/update/cancel scheduling | calendar builder; UI copy; docs | ICS contract tests and component copy assertions |
+| Sandbox proof cannot contact external recipients | smoke script/runbook | internal-recipient allowlist and explicit target assertion before every send |
+
+The bounded route surface is one authenticated logistics GET/PATCH endpoint and
+one read-only recipient-directory endpoint. The existing frozen-distribution
+prepare/send/history routes gain the calendar and material-link contract; they
+retain the proven confirmation and recovery pattern. Every route establishes
+`withDalContext`, resolves the Request independently, and never accepts actor or
+sender identity from the request body.
+
+Sandbox proof covers Site Visit create/read/PATCH and same-ID replacement, ActivityParty behavior,
+internal-recipient calendar attachment transport, exact retry, and exact-ID
+cleanup of disposable rows. Because sandbox lacks `wmkf_requestdocument`,
+material-link selection is first covered by adapter/service tests. A later
+Production sentinel is restricted to an internal WMKF recipient and a
+disposable Site Visit Activity; its runbook must name exact cleanup/closure and
+independent readback before execution.
 
 ### Supporting-file registry and paths
 
