@@ -29,6 +29,13 @@ export const SITE_VISIT_LIMITS = Object.freeze({
   attendeesPerRole: 100,
 });
 
+const SITE_VISIT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizeSiteVisitEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return email && email.length <= 320 && SITE_VISIT_EMAIL_RE.test(email) ? email : null;
+}
+
 export function isSiteVisitFormat(value) {
   return Object.values(SITE_VISIT_FORMAT).includes(Number(value));
 }

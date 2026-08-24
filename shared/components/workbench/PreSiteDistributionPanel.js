@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 
-const DEFAULT_BODY = 'Please find the frozen Pre-Site Visit materials attached.';
+const DEFAULT_BODY = 'Please find the Pre-Site Visit materials attached.';
 const EMPTY_LIST = Object.freeze([]);
+const STALE_PREVIEW_CODES = new Set([
+  'distribution_stale_source',
+  'distribution_material_stale',
+  'distribution_site_visit_stale',
+  'distribution_preview_changed',
+]);
 
 function newOperationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -59,6 +65,7 @@ export default function PreSiteDistributionPanel({
   const [history, setHistory] = useState([]);
   const [historyError, setHistoryError] = useState(null);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
   const sequence = useRef(0);
@@ -70,7 +77,7 @@ export default function PreSiteDistributionPanel({
       { signal },
     );
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || 'Distribution history could not be loaded.');
+    if (!response.ok) throw new Error(body.error || 'Email history could not be loaded.');
     if (sequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setHistoryError(null);
@@ -113,6 +120,7 @@ export default function PreSiteDistributionPanel({
     setPreview(null);
     setConfirmed(false);
     setError(null);
+    setNotice(null);
   };
 
   const prepare = async () => {
@@ -124,6 +132,7 @@ export default function PreSiteDistributionPanel({
     controllerRef.current = controller;
     setPreparing(true);
     setError(null);
+    setNotice(null);
     setConfirmed(false);
     try {
       const response = await fetch('/api/workbench/pre-site-visit/distribution/prepare', {
@@ -155,7 +164,7 @@ export default function PreSiteDistributionPanel({
   };
 
   const send = async () => {
-    if (!preview?.operationId || !preview.previewHash || !confirmed || sending) return;
+    if (!preview?.operationId || !preview.previewHash || !confirmed || notice || preparing || sending) return;
     const id = requestId;
     const currentSequence = ++sequence.current;
     controllerRef.current?.abort();
@@ -176,10 +185,19 @@ export default function PreSiteDistributionPanel({
       });
       const body = await response.json().catch(() => ({}));
       if (body.inProgress) throw new Error(body.error || 'This exact send is already in progress.');
+      if (!response.ok && STALE_PREVIEW_CODES.has(body.code)) {
+        if (sequence.current === currentSequence && id === requestId) {
+          setPreview(null);
+          setConfirmed(false);
+          setNotice('This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || `Send failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || preview);
       setConfirmed(false);
+      setNotice(null);
       await loadHistory(id, controller.signal, currentSequence);
     } catch (sendError) {
       if (sendError?.name !== 'AbortError'
@@ -196,9 +214,9 @@ export default function PreSiteDistributionPanel({
   return (
     <>
       <Card hover={false}>
-        <h3 className="text-base font-semibold text-gray-900">Send frozen materials</h3>
+        <h3 className="text-base font-semibold text-gray-900">Send visit materials</h3>
         <p className="mt-1 text-sm text-gray-600">
-          Create an exact retained snapshot, confirm the recipients and email, then send through Dynamics.
+          Create a fixed preview, review the recipients and attachments, then send through Dynamics.
         </p>
 
         {error && (
@@ -324,17 +342,22 @@ export default function PreSiteDistributionPanel({
           disabled={preparing || sending || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
           className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {preparing ? 'Freezing files…' : preview ? 'Prepare new preview' : 'Freeze and preview'}
+          {preparing ? 'Creating preview…' : preview ? 'Create new preview' : 'Create preview'}
         </button>
+        {notice && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
+            {notice}
+          </div>
+        )}
 
         {preview && (
           <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h4 className="font-semibold text-gray-900">Exact send preview</h4>
+            <h4 className="font-semibold text-gray-900">Email preview</h4>
             <dl className="mt-3 space-y-2 text-sm text-gray-700">
               <div><dt className="inline font-medium">To:</dt> <dd className="inline">{preview.to.join(', ')}</dd></div>
               {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
-              <div><dt className="inline font-medium">Frozen source:</dt> <dd className="inline">Word version {preview.sourceVersionId}</dd></div>
+              <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
               <div>
                 <dt className="font-medium">Message:</dt>
                 <dd className="mt-1 whitespace-pre-wrap rounded border border-blue-100 bg-white p-3">{preview.bodyText}</dd>
@@ -385,18 +408,18 @@ export default function PreSiteDistributionPanel({
                     type="checkbox"
                     checked={confirmed}
                     onChange={(event) => setConfirmed(event.target.checked)}
-                    disabled={sending}
+                    disabled={preparing || sending}
                     className="mt-0.5"
                   />
-                  I confirmed the exact recipients, message, material links, and attachment{preview.attachments.length === 1 ? '' : 's'} shown above.
+                  I reviewed the recipients, message, material links, and attachment{preview.attachments.length === 1 ? '' : 's'} shown above.
                 </label>
                 <button
                   type="button"
                   onClick={send}
-                  disabled={!confirmed || sending}
+                  disabled={!confirmed || preparing || sending}
                   className="mt-3 rounded-lg bg-blue-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {sending ? 'Sending…' : 'Send exact preview'}
+                  {sending ? 'Sending…' : 'Send email'}
                 </button>
               </>
             )}
@@ -405,10 +428,10 @@ export default function PreSiteDistributionPanel({
       </Card>
 
       <Card hover={false}>
-        <h3 className="text-base font-semibold text-gray-900">Distribution history</h3>
+        <h3 className="text-base font-semibold text-gray-900">Email history</h3>
         {historyError && <p className="mt-2 text-sm text-red-700">{historyError}</p>}
         {!historyError && history.length === 0 && (
-          <p className="mt-2 text-sm text-gray-600">No frozen distributions have been prepared for this request.</p>
+          <p className="mt-2 text-sm text-gray-600">No email previews have been created for this request.</p>
         )}
         {history.length > 0 && (
           <ul className="mt-3 space-y-3">

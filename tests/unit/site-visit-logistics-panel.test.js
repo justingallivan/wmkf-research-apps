@@ -69,6 +69,7 @@ test('loads the saved activity and PATCHes stable recipient references with its 
   expect(screen.getByLabelText('Start time')).toHaveValue('09:00');
   expect(screen.getByLabelText('End date')).toHaveValue('2026-09-15');
   expect(screen.getByLabelText('End time')).toHaveValue('11:00');
+  expect(screen.getByLabelText('Attendee role for Board Member (board@example.org)')).toHaveValue('required');
   await waitFor(() => expect(onContext).toHaveBeenCalledWith(expect.objectContaining({
     siteVisit: visit,
     suggestedTo: ['board@example.org'],
@@ -148,4 +149,80 @@ test('rolls an untouched default end into the next date', async () => {
   fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-15' } });
   expect(screen.getByLabelText('End date')).toHaveValue('2026-09-16');
   expect(screen.getByLabelText('End time')).toHaveValue('00:30');
+});
+
+test('uses one attendee role per email and excludes the organizer automatically', async () => {
+  global.fetch = jest.fn()
+    .mockImplementationOnce(() => response({ success: true, siteVisit: null, materials: [] }))
+    .mockImplementationOnce(() => response({
+      success: true,
+      staff: [{ kind: 'staff', profileId: 7, name: 'Justin Staff', email: 'jgallivan@wmkeck.org' }],
+      external: [
+        { kind: 'roster', rosterId: 12, name: 'Justin Board', email: 'JGALLIVAN@wmkeck.org', roleType: 'Board' },
+        { kind: 'roster', rosterId: 13, name: 'Consultant One', email: 'consultant@example.org', roleType: 'Consultant' },
+      ],
+    }));
+
+  render(
+    <SiteVisitLogisticsPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+    />,
+  );
+
+  const organizer = await screen.findByLabelText('Organizer');
+  fireEvent.change(organizer, { target: { value: 'staff:7' } });
+  expect(screen.queryByLabelText('Justin Board')).not.toBeInTheDocument();
+
+  const consultantRole = screen.getByLabelText('Attendee role for Consultant One (consultant@example.org)');
+  fireEvent.change(consultantRole, { target: { value: 'required' } });
+  expect(consultantRole).toHaveValue('required');
+  fireEvent.change(consultantRole, { target: { value: 'optional' } });
+  expect(consultantRole).toHaveValue('optional');
+});
+
+test('round-trips a saved no-email attendee and still allows removing it', async () => {
+  const noEmailVisit = {
+    ...visit,
+    requiredAttendees: [{ kind: 'roster', rosterId: 99 }],
+  };
+  global.fetch = jest.fn()
+    .mockImplementationOnce(() => response({ success: true, siteVisit: noEmailVisit, materials: [] }))
+    .mockImplementationOnce(() => response({
+      success: true,
+      staff: [{ kind: 'staff', profileId: 7, name: 'Organizer', email: 'organizer@wmkeck.org' }],
+      external: [{ kind: 'roster', rosterId: 99, name: 'No Email Board', email: null, roleType: 'Board' }],
+    }));
+
+  render(
+    <SiteVisitLogisticsPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+    />,
+  );
+
+  const role = await screen.findByLabelText('Attendee role for No Email Board (email needed)');
+  expect(role).toBeEnabled();
+  expect(role).toHaveValue('required');
+  expect(screen.getByText(/can be completed in Expertise Finder/i)).toBeInTheDocument();
+
+  global.fetch.mockImplementationOnce(() => response({
+    success: true,
+    siteVisit: { ...noEmailVisit, etag: 'W/"3"' },
+  }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update logistics' }));
+  await screen.findByText('Saved');
+  let patchCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(JSON.parse(patchCalls[0][1].body).requiredAttendees)
+    .toEqual([{ kind: 'roster', rosterId: 99 }]);
+
+  fireEvent.change(role, { target: { value: '' } });
+  global.fetch.mockImplementationOnce(() => response({
+    success: true,
+    siteVisit: { ...noEmailVisit, etag: 'W/"4"', requiredAttendees: [] },
+  }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update logistics' }));
+  await screen.findByText('Saved');
+  patchCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(JSON.parse(patchCalls[1][1].body).requiredAttendees).toEqual([]);
 });

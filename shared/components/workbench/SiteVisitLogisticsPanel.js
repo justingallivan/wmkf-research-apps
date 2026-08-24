@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '../Layout';
-import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL } from '../../config/siteVisit';
+import {
+  normalizeSiteVisitEmail,
+  SITE_VISIT_FORMAT,
+  SITE_VISIT_FORMAT_LABEL,
+} from '../../config/siteVisit';
 
 function refKey(ref) {
   if (ref?.kind === 'staff') return `staff:${ref.profileId}`;
@@ -52,10 +56,6 @@ function formFromVisit(visit, requestNumber) {
   };
 }
 
-function selectedValues(event) {
-  return Array.from(event.target.selectedOptions, (option) => option.value);
-}
-
 function splitLocal(localDateTime) {
   const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(localDateTime || '');
   return match ? { date: match[1], time: match[2] } : { date: '', time: '' };
@@ -100,6 +100,13 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
     return rows;
   }, [directory, manualRecipients]);
   const byKey = useMemo(() => new Map(entries.map((row) => [row.key, row])), [entries]);
+  const emailForKey = (key) => normalizeSiteVisitEmail(byKey.get(key)?.email);
+  const organizerEmail = emailForKey(form.organizer);
+  const attendeeEntries = organizerEmail
+    ? entries.filter((row) => (
+      normalizeSiteVisitEmail(row.email) !== organizerEmail || row.key === form.organizer
+    ))
+    : entries;
 
   const emitContext = (visit, nextMaterials = materials, nextDirectory = directory) => {
     const lookup = new Map([
@@ -165,9 +172,51 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
   }, [requestId]);
 
   const edit = (patch) => {
-    setForm((current) => ({ ...current, ...patch }));
+    setForm((current) => ({
+      ...current,
+      ...(typeof patch === 'function' ? patch(current) : patch),
+    }));
     setSaved(false);
     setError(null);
+  };
+
+  const withoutEmail = (keys, email) => {
+    if (!email) return keys;
+    return keys.filter((key) => emailForKey(key) !== email);
+  };
+
+  const editOrganizer = (organizer) => {
+    const email = emailForKey(organizer);
+    edit((current) => ({
+      organizer,
+      requiredAttendees: withoutEmail(current.requiredAttendees, email),
+      optionalAttendees: withoutEmail(current.optionalAttendees, email),
+    }));
+  };
+
+  const editAttendeeRole = (key, role) => {
+    if (!['', 'required', 'optional'].includes(role)) return;
+    const email = emailForKey(key);
+    if (!email) {
+      if (role !== '') return;
+      edit((current) => ({
+        requiredAttendees: current.requiredAttendees.filter((candidate) => candidate !== key),
+        optionalAttendees: current.optionalAttendees.filter((candidate) => candidate !== key),
+      }));
+      return;
+    }
+    edit((current) => {
+      const requiredAttendees = withoutEmail(current.requiredAttendees, email);
+      const optionalAttendees = withoutEmail(current.optionalAttendees, email);
+      return {
+        requiredAttendees: role === 'required'
+          ? [...requiredAttendees, key]
+          : requiredAttendees,
+        optionalAttendees: role === 'optional'
+          ? [...optionalAttendees, key]
+          : optionalAttendees,
+      };
+    });
   };
 
   const editStartPart = (part, value) => {
@@ -243,17 +292,11 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
     }
   };
 
-  const attendeeOptions = (selected) => entries.map((row) => (
-    <option key={row.key} value={row.key} disabled={!row.email && !selected.includes(row.key)}>
-      {row.name} — {row.group}{row.email ? ` (${row.email})` : ' (email needed)'}
-    </option>
-  ));
-
   return (
     <Card hover={false}>
       <h3 className="text-base font-semibold text-gray-900">Visit logistics</h3>
       <p className="mt-1 text-sm text-gray-600">
-        Save the date, format, location, organizer, and attendee list on the Request&apos;s Site Visit activity.
+        Set the visit details and choose who should attend.
       </p>
       {loading && <p className="mt-4 text-sm text-gray-600">Loading logistics and recipients…</p>}
       {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</div>}
@@ -283,7 +326,7 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label htmlFor="site-visit-zone" className="block text-sm font-medium text-gray-800">IANA time zone</label>
+              <label htmlFor="site-visit-zone" className="block text-sm font-medium text-gray-800">Time zone</label>
               <input id="site-visit-zone" value={form.timeZone} maxLength={100} required onChange={(event) => edit({ timeZone: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
             </div>
             <div>
@@ -299,22 +342,49 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
           </div>
           <div>
             <label htmlFor="site-visit-organizer" className="block text-sm font-medium text-gray-800">Organizer</label>
-            <select id="site-visit-organizer" value={form.organizer} required onChange={(event) => edit({ organizer: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <select id="site-visit-organizer" value={form.organizer} required onChange={(event) => editOrganizer(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
               <option value="">Select WMKF staff</option>
               {directory.staff.map((row) => <option key={refKey(row)} value={refKey(row)}>{row.name} ({row.email})</option>)}
             </select>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label htmlFor="site-visit-required" className="block text-sm font-medium text-gray-800">Required attendees</label>
-              <select id="site-visit-required" multiple size={Math.min(8, Math.max(4, entries.length))} value={form.requiredAttendees} onChange={(event) => edit({ requiredAttendees: selectedValues(event) })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">{attendeeOptions(form.requiredAttendees)}</select>
+          <fieldset>
+            <legend className="text-sm font-medium text-gray-800">Attendees</legend>
+            <div className="mt-1 max-h-72 divide-y divide-gray-200 overflow-y-auto rounded-lg border border-gray-300">
+              {attendeeEntries.map((row) => {
+                const email = normalizeSiteVisitEmail(row.email);
+                const isOrganizer = Boolean(email && organizerEmail && email === organizerEmail);
+                const role = form.requiredAttendees.includes(row.key)
+                  ? 'required'
+                  : form.optionalAttendees.includes(row.key) ? 'optional' : '';
+                const inputId = `site-visit-attendee-role-${row.key}`;
+                return (
+                  <div key={row.key} className="flex items-center justify-between gap-4 px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <label htmlFor={isOrganizer ? undefined : inputId} className="block truncate font-medium text-gray-800">{row.name}</label>
+                      <p className="truncate text-xs text-gray-500">{row.group}{email ? ` — ${email}` : ' — email needed'}</p>
+                    </div>
+                    {isOrganizer ? (
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800">Organizer</span>
+                    ) : (
+                      <select
+                        id={inputId}
+                        aria-label={`Attendee role for ${row.name}${email ? ` (${email})` : ' (email needed)'}`}
+                        value={role}
+                        disabled={!email && !role}
+                        onChange={(event) => editAttendeeRole(row.key, event.target.value)}
+                        className="shrink-0 rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100 disabled:text-gray-500"
+                      >
+                        <option value="">Not attending</option>
+                        <option value="required" disabled={!email}>Required</option>
+                        <option value="optional" disabled={!email}>Optional</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div>
-              <label htmlFor="site-visit-optional" className="block text-sm font-medium text-gray-800">Optional attendees</label>
-              <select id="site-visit-optional" multiple size={Math.min(8, Math.max(4, entries.length))} value={form.optionalAttendees} onChange={(event) => edit({ optionalAttendees: selectedValues(event) })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">{attendeeOptions(form.optionalAttendees)}</select>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500">Use Command/Ctrl-click to choose more than one attendee. Board/Consultant entries without an email can be completed in Expertise Finder.</p>
+            <p className="mt-1 text-xs text-gray-500">Choose one role for each attendee. Board/Consultant entries without an email can be completed in Expertise Finder.</p>
+          </fieldset>
           <div>
             <label htmlFor="site-visit-description" className="block text-sm font-medium text-gray-800">Notes for the calendar event</label>
             <textarea id="site-visit-description" rows={4} value={form.description} maxLength={2000} onChange={(event) => edit({ description: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

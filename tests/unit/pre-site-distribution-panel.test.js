@@ -60,6 +60,7 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
     />,
   );
   expect(await screen.findByLabelText('Word document')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Send visit materials' })).toBeInTheDocument();
   expect(screen.getByLabelText('PDF')).toBeChecked();
   expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
 });
@@ -107,13 +108,13 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  await screen.findByText(/No frozen distributions/);
+  await screen.findByText(/No email previews/);
   fireEvent.click(screen.getByLabelText('Word and PDF'));
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'consultant@example.org' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Freeze and preview' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
-  expect(await screen.findByText('Exact send preview')).toBeInTheDocument();
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
   const prepareCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/prepare'));
   expect(JSON.parse(prepareCall[1].body)).toMatchObject({
     requestId: REQUEST_ID,
@@ -124,9 +125,10 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
   });
   expect(screen.getByText(/PreSite_1002379.docx/)).toBeInTheDocument();
   expect(screen.getByText(/PreSite_1002379.pdf/)).toBeInTheDocument();
-  const send = screen.getByRole('button', { name: 'Send exact preview' });
+  expect(screen.getByText(/later edits are not included/i)).toBeInTheDocument();
+  const send = screen.getByRole('button', { name: 'Send email' });
   expect(send).toBeDisabled();
-  fireEvent.click(screen.getByLabelText(/I confirmed the exact recipients/));
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(send);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -154,12 +156,12 @@ test('changing attachment selection invalidates a prepared preview', async () =>
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  await screen.findByText(/No frozen distributions/);
+  await screen.findByText(/No email previews/);
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Freeze and preview' }));
-  expect(await screen.findByText('Exact send preview')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
   fireEvent.click(screen.getByLabelText('Word document'));
-  expect(screen.queryByText('Exact send preview')).not.toBeInTheDocument();
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
 test('surfaces an in-progress prepare response instead of accepting it as a preview', async () => {
@@ -176,10 +178,73 @@ test('surfaces an in-progress prepare response instead of accepting it as a prev
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  await screen.findByText(/No frozen distributions/);
+  await screen.findByText(/No email previews/);
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Freeze and preview' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/already being prepared/i);
-  expect(screen.queryByText('Exact send preview')).not.toBeInTheDocument();
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('turns a stale material response into a recoverable notice and requires a fresh confirmation', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }))
+    .mockResolvedValueOnce(response({
+      error: 'A linked Site Visit material changed after preview. Prepare a new exact preview.',
+      code: 'distribution_material_stale',
+    }, 409))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByText('Email preview');
+  const confirmation = screen.getByLabelText(/I reviewed the recipients/);
+  fireEvent.click(confirmation);
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+
+  const notice = await screen.findByRole('status');
+  expect(notice).toHaveTextContent(/preview is out of date.*Create a new preview/i);
+  expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+});
+
+test('keeps non-stale send failures as errors', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }))
+    .mockResolvedValueOnce(response({
+      error: 'The persisted Dynamics email activity could not be found.',
+      code: 'distribution_email_missing',
+    }, 409));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByText('Email preview');
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
