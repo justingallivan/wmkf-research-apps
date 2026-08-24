@@ -1,125 +1,131 @@
-# Session 456 Prompt: Release Frozen Pre-Site Distribution Safely
+# Session 457 Prompt: Choose the Frozen Distribution Release Path
 
-## Session 455 Summary
+## Session 456 Summary
 
-Session 455 closed the material plan and code review findings for frozen Pre-Site
-distribution on `codex/frozen-pdf-distribution`. The branch remains isolated from
-`main`. No migration was applied, deployment was promoted, Dynamics activity was
-created, or email was sent.
+Session 456 completed every safe primary release step for frozen Pre-Site
+distribution on `codex/frozen-pdf-distribution`. Migration 034 is live and
+schema-read-back, the exact feature commit is Ready on a Vercel branch Preview,
+and Dynamics metadata plus controlled sandbox transport proofs passed. The
+remaining full-feature verification is blocked by an Azure redirect URI decision;
+the feature is not deployed to Production and no Production distribution write
+or email occurred.
 
 ### What Was Completed
 
-1. **The lifecycle now recognizes retained distribution snapshots exactly.**
-   - `[SOURCE-VERIFIED]` `request-workbench-distribution-docx` and
-     `request-workbench-distribution-pdf` are the only classified distribution
-     producers; missing and lookalike values fail closed.
-   - Retained DOCX/PDF rows no longer block guarded reopen, appear as editable
-     drafts, get superseded by draft activation, or create false activation
-     conflicts. Other descendants and competing generations still block.
-   - A stale prepared send cannot cross a guarded reopen: the source pointer and
-     native version are checked under the send lease and again immediately before
-     transport.
+1. **Migration 034 is live and exact.**
+   - `[VERIFIED via canonical apply + live readback]` Migration
+     `034_pre_site_distribution_attempts.sql` was applied at
+     `2026-08-23T23:39:34.686Z` with `scripts/apply-migrations.js`.
+   - `schema_migrations` contains 034; the table has 55 columns, eight named
+     CHECK constraints plus its primary key, four indexes including the PK
+     index, zero rows, and no pending manifest migration.
+   - The canonical reconciliation probe now reports zero Postgres table
+     mismatches and zero probe errors.
 
-2. **Dynamics send and recovery contracts now fail closed.**
-   - Exact sent receipts remain read-only and retryable when impersonation is off;
-     every non-sent attempt requires literal
-     `DYNAMICS_IMPERSONATION_ENABLED=true` before acquiring a lease or writing.
-   - A recovered or newly created activity ID is fenced into Postgres before exact
-     content assertions. Correlation ambiguity and recovery errors are preserved
-     instead of being swallowed.
-   - The send lease is renewed immediately before `SendEmail`; losing it blocks
-     transport.
+2. **The exact feature branch is deployed to Preview.**
+   - Vercel Preview `dpl_Gbt5Dacch3GgDKDTSCpHAZKZACSJ` is Ready at commit
+     `68eeec11774bd44762b654695759f58a10434b35` on
+     `codex/frozen-pdf-distribution`.
+   - The Preview environment has `DATAVERSE_TARGET_INTERLOCK=on`, targets the
+     registered Production Dynamics hostname, and omits the impersonation and
+     Production-read enablement flags. No environment value was changed.
+   - Authenticated Preview testing is blocked by Azure `AADSTS50011`: the
+     deployment callback URI is not registered for the Entra app. Production
+     sign-in was independently confirmed with the existing browser session; the
+     new feature is not on Production.
 
-3. **Graph snapshot identity and reuse are stable.**
-   - `[SOURCE-VERIFIED]` Metadata read by stable drive/item ID is authoritative;
-     provisional upload/path tags are not treated as native publication versions.
-   - PDF conversion proves the retained Word native version/eTag before and after
-     conversion.
-   - Ready reuse requires a stable metadata window plus exact size, byte, and hash
-     proof. Byte-identical metadata drift refreshes the registry row with an
-     eTag-conditional update; content drift fails closed.
+3. **Dynamics release contracts are live-probed.**
+   - A new read-only probe,
+     `scripts/probe-dynamics-email-distribution-contract.mjs`, fail-closes on
+     target hostname and requires explicit Production-read confirmation.
+   - Production and sandbox metadata agree: email subject max length 800,
+     description max length 1,073,741,823, states Open/Completed/Canceled, and
+     statuses Draft/Completed/Sent/Received/Canceled/Pending Send/Sending/Failed.
+   - Both organizations report unresolved email recipients allowed.
 
-4. **Fresh-install and existing-database schemas are reconciled in source.**
-   - Setup and migration 034 use the same eight named CHECK constraints.
-   - Migration 034 reconciles known anonymous legacy constraints before adding
-     any missing canonical constraints.
-   - `[NOT LIVE]` Migration 034 remains source-declared but unapplied; the expected
-     source/live difference is recorded in `docs/RECONCILIATION_REPORT.json`.
+4. **A controlled sandbox transport/readback passed.**
+   - A raw `addressused` recipient was accepted; exact body and From/To data
+     round-tripped; Dynamics accepted `SendEmail` and reported `Pending Send`.
+   - Repeating `SendEmail` on the same activity returned another accepted 2xx
+     without creating a replacement activity. This supports the runtime guard
+     that treats Pending Send as transport-accepted; it does not prove inbox
+     delivery.
+   - A separate adapter-created draft proved exact subject/body/correlation/
+     From/To round-trip and was deleted after readback. No Production Dynamics
+     write was made.
 
-5. **Claude Opus review was bounded and resolved once.**
-   - The plan review found four material gaps: stale sends after reopen, lease
-     expiry at transport, swallowed recovery ambiguity, and legacy constraint
-     reconciliation. All four were incorporated before implementation.
-   - The code review found two material Graph issues: byte-identical Ready rows
-     could dead-end after metadata drift, and provisional upload tags could cause
-     a false first-prepare conflict. Both were corrected in one pass.
-   - No additional review loop was started; nits and speculative tail-chasing were
-     intentionally excluded.
+5. **Durable state is reconciled.**
+   - The API matrix, Atlas, Request Document model, lifecycle plan, service
+     catalog, agent wiki, and near-term plan now distinguish: migration live and
+     empty; branch Preview Ready; authenticated Preview callback-blocked; not
+     Production-deployed.
+   - Historical Session 455 text in `DEVELOPMENT_LOG.md` remains historical.
+     No new milestone entry was required because no Production capability or
+     cutover shipped.
 
-6. **The corrected implementation passed scoped verification.**
-   - Seventeen focused suites passed 207/207 tests.
-   - Five targeted mutation checks each proved its lifecycle exclusion fixture
-     failed when the corresponding exclusion was removed.
-   - Migration, API-route, Atlas, enum, TypeScript, documentation, build-claim,
-     Dataverse boundary, lifecycle authorization, service-boundary, agent,
-     instruction, and memory gates passed with their required self-tests.
-   - `npm run build -- --webpack` passed with only existing dependency and
-     `localStorage` warnings.
+6. **Review and verification remained bounded.**
+   - The primary plan and implementation retain the completed Claude Opus plan
+     review and one code-review correction pass from Session 455.
+   - One bounded Opus review attempt for the new read-only probe completed but
+     the host CLI returned no review text; output recovery was stopped rather
+     than tail-chased. Do not claim that probe received Opus review.
+   - Migration, API matrix, Atlas, wiki, fact, canonical-pointer, symbol,
+     build-claim, docs-catalog, memory-drift, and script syntax checks passed,
+     including required self-tests.
 
 ### Commits
 
-- `0167a8b3` — fix(pre-site): harden frozen distribution contracts
+- `8cae7c5` — chore(pre-site): record release preflight evidence
+- `68eeec11` — docs: document Session 455 and create Session 456 prompt
 - `acad76c4` — fix(pre-site): reconcile settled snapshot metadata
+- `0167a8b3` — fix(pre-site): harden frozen distribution contracts
+- `8a240e77` — feat(workbench): add frozen pre-site distribution
 
-## Primary Next Steps
+## Next Items
 
-### Owner Authorization Required
+### Owner Decision Needed
 
-1. **Apply and read back migration 034 in the intended database.**
-   - Reconfirm the target and current live shape first.
-   - Apply only with `node scripts/apply-migrations.js`; never use
-     `scripts/setup-database.js` on an existing database.
-   - Read back `schema_migrations`, all columns, eight named CHECK constraints,
-     unique constraints, and indexes before treating the ledger as live.
+1. **Choose the authenticated release-test path.**
+   Evidence: the exact branch Preview is Ready, but Microsoft returns
+   `AADSTS50011` for its deployment-specific callback.
+   - Register an approved stable Preview callback/alias in the Entra app, or
+   - explicitly authorize governed promotion through `main`/Production under
+     `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
+   Do not silently change Azure registration or promote this Tier 2 runtime work.
 
-2. **Deploy the feature branch through the governed release path.**
-   - Follow `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`; do not merge
-     runtime work directly into `main` merely to obtain a test deployment.
-   - Confirm the deployment has the literal impersonation and Dataverse interlock
-     settings before any write-path exercise.
+2. **Separately authorize any Production distribution send.**
+   Evidence: only metadata was read from Production; the only transport exercise
+   was in sandbox. A Production prepare creates Postgres/SharePoint/Request
+   Document state, and send additionally creates a Dynamics activity and email.
 
-3. **Approve a controlled non-production Dynamics preflight and recipient.**
-   Verify before any Production send:
-   - the tenant's `email.subject` maximum length;
-   - raw `addressused` unresolved-recipient behavior;
-   - description, address, and correlation round-trip fidelity;
-   - status-code meanings `{3,6,7}`;
-   - repeated `SendEmail` behavior for the same activity.
+### Verified Open
 
-4. **After migration and deployment, run authenticated read-only UI verification.**
-   Confirm compose, frozen preview, DOCX/PDF selection, history, and guarded reopen
-   behavior without sending.
+1. **Run authenticated full-feature verification after the callback/release
+   decision.**
+   Evidence: source/tests pass, migration is live, and branch Preview is Ready;
+   only authentication blocks the UI path. Verify compose, DOCX/PDF/both frozen
+   preview, history, source-drift/reopen behavior, and exact receipt semantics.
+   Treat prepare as a durable write, not a read-only smoke.
 
-5. **Perform one separately approved controlled non-production send/readback.**
-   Use an explicitly approved recipient and exact artifact selection. Production
-   proof remains a separate authorization boundary.
+2. **Confirm the intended runtime flags before a non-sent feature exercise.**
+   Evidence: `distribution-service.js` requires literal
+   `DYNAMICS_IMPERSONATION_ENABLED=true` for every non-sent attempt, while the
+   target interlock and DAL enforcement must remain on. Never add
+   `DATAVERSE_ALLOW_PROD_READS` to an agent environment.
 
 ### Standing Organic Observation
 
-1. Continue accumulating real Dynamics Explorer and Stage II outcomes under
+1. Continue real Dynamics Explorer and Stage II observation under
    `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`,
    `docs/DYNAMICS_EXPLORER_PHASE_B_TELEMETRY_PLAN.md`, and
    `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`. Do not manufacture
    staff traffic or shared-roster evidence.
-2. Explorer campaign Phases C-D remain blocked on 10-20 real Southern California
-   questions and owner answers about population-served and `_socal` program-area
-   usage.
-3. After 2026-09-02, re-probe the live environment and replacement deployment
+2. After 2026-09-02, re-probe the live environment and replacement deployment
    before deciding whether to retain or remove the Stage II rollout flag.
 
 ### Parked
 
-1. Site Visit logistics and its governed supporting-file dossier, pending live
+1. Site Visit logistics and governed supporting-file dossier, pending live
    Dataverse fact mapping.
 2. AkoyaGo publication projection, pending signed-in AkoyaGo, historical
    path/filename, Power Automate, and non-governed SharePoint discovery.
@@ -129,57 +135,46 @@ created, or email was sent.
 
 ### Do Not Reopen Without a New Decision
 
-1. Automatic email on Site Visit promotion; the owner chose explicit preview and
-   send of DOCX, PDF, or both.
-2. Identity-confidence or directory-membership gating for known
-   staff/consultant recipients.
-3. Editing a preserved Review row in place; correction uses an audited Draft
-   successor while earlier distribution snapshots remain retained.
-4. Allowing an unsent preview prepared against an earlier source version to send
-   after guarded reopen.
-5. Repeating plan or code review without a new material change or finding.
-6. Treating an AkoyaGo-visible publication as a second editable source of truth.
+1. Automatic email on Site Visit promotion; distribution remains explicit.
+2. Identity-confidence/directory gating for known staff/consultant recipients.
+3. Editing a preserved Review row in place; correction uses an audited successor.
+4. Sending a preview after its source pointer/version changes.
+5. Repeating broad plan/code review without a new material change or finding.
+6. Treating Dynamics Pending Send as proof of inbox delivery.
 
 ## Operational Gotchas
 
-1. Only the exact producer names ending in `-docx` and `-pdf` are distribution
-   snapshots; broader prefix matching would weaken lifecycle blockers.
-2. An exact sent retry may read its receipt with impersonation disabled. Any
-   non-sent path must reject unless the flag is literally `true`.
-3. Stable-ID Graph metadata owns native version/eTag. Ready-row metadata may be
-   refreshed only after stable-window and exact byte/hash proof.
-4. `docs/RECONCILIATION_REPORT.json` should continue to show migration 034 as
-   source-declared/live-absent until the authorized migration and readback finish.
-5. Production Dataverse reads are owner-run. Never set
-   `DATAVERSE_ALLOW_PROD_READS` in an agent session.
+1. Existing databases use `scripts/apply-migrations.js`; never run
+   `scripts/setup-database.js` against this populated database.
+2. Migration 034 is already live and empty. Do not carry forward “apply 034.”
+3. Preview authentication—not build readiness—is the current blocker.
+4. The sandbox test activity may remain Pending Send because sandbox outbound
+   delivery is not guaranteed; its evidence is transport acceptance/readback.
+5. Production environment values were not exported. Verify exact non-sensitive
+   flags through the approved Vercel path before promotion.
 6. Request `1002379` remains an audited guarded-reopen successor. Do not
-   regenerate or start another Site Visit handoff without exact durable-write
-   approval.
+   regenerate, distribute, or hand it off without exact durable-write approval.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `shared/config/requestDocument.js` | Exact shared distribution contract and classifier |
+| `scripts/probe-dynamics-email-distribution-contract.mjs` | Read-only email metadata/status/tenant-setting release probe |
+| `lib/db/migrations/034_pre_site_distribution_attempts.sql` | Live existing-database distribution ledger migration |
 | `lib/services/pre-site-visit/distribution-service.js` | Frozen source/snapshot, preview, Dynamics recovery, and send coordinator |
 | `lib/services/pre-site-visit/distribution-store.js` | Attempt ledger, send lease, and fenced receipts |
-| `lib/db/migrations/034_pre_site_distribution_attempts.sql` | Existing-database ledger migration; not applied |
-| `scripts/setup-database.js` | Fresh-install mirror with canonical named constraints |
-| `lib/services/pre-site-visit/artifact-service.js` | Editable lifecycle projection and activation |
-| `lib/services/pre-site-visit/reopen-service.js` | Guarded reopen descendant checks |
-| `lib/services/graph-service.js` | Stable metadata, version, and byte retrieval |
-| `lib/dataverse/adapters/email-activity.js` | Dynamics email activity and attachment adapter |
-| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Canonical lifecycle and release contract |
+| `lib/dataverse/adapters/email-activity.js` | Granular Dynamics email activity/attachment/status transport |
+| `docs/atlas/postgres-infra-tables.md` | Live ledger ownership and readback state |
+| `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` | Canonical lifecycle/release contract |
 
 ## Testing
 
 ```bash
-rtk npx jest --runInBand tests/unit/pre-site-distribution-service.test.js tests/unit/pre-site-distribution-panel.test.js tests/unit/request-document-distribution.test.js tests/unit/pre-site-visit-artifact-service.test.js tests/unit/pre-site-visit-reopen-service.test.js tests/unit/email-activity-adapter.test.js tests/unit/graph-service-versions.test.js tests/unit/dynamics-service-caller-id.test.js
+rtk node --check scripts/probe-dynamics-email-distribution-contract.mjs
 rtk npm run check:migrations-manifest
-rtk npm run check:types
-rtk npm run check:api-routes
-rtk npm run check:atlas
-rtk npm run check:dataverse-access-layer
+rtk npm run check:api-routes && rtk npm run check:api-routes:self-test
+rtk npm run check:atlas && rtk npm run check:atlas:self-test
+rtk npm run check:agent-wiki && rtk npm run check:agent-wiki:self-test
+rtk npm run check:memory-drift:no-write
 rtk npm run check:agent-invariants
-rtk npm run build -- --webpack
 ```
