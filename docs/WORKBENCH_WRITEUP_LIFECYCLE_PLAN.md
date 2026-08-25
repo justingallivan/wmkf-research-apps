@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -25,7 +25,7 @@ related:
 
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
-2026-08-23; SITE VISIT LOGISTICS PRODUCTION-DEPLOYED 2026-08-24; FINAL
+2026-08-23; SITE VISIT LOGISTICS/CALENDAR PRODUCTION-PROVED 2026-08-25; FINAL
 PLANNED.]** The three Workbench
 tabs form one document lifecycle, not three independent data-entry systems:
 
@@ -333,7 +333,7 @@ can prove Activity/calendar transport but not the full governed material-link
 projection.
 
 **[OWNER DIRECTION 2026-08-24; OPUS PLAN AND CODE REVIEWS `READY WITH NAMED
-CHANGES`; PRODUCTION-DEPLOYED; SIGNED-IN SAVE/SEND PROOF OPEN.]** The first
+CHANGES`; PRODUCTION-PROVED 2026-08-25.]** The first
 logistics slice uses the custom Activity rather
 than standard `appointment`, because the custom entity and Request relationship
 already express the intended domain. It adds only four structured Dataverse
@@ -349,10 +349,10 @@ fields needed for round-trip editing:
 `description` remains the staff-authored visit/email note; it is not overloaded
 with a machine JSON envelope. `scheduledstart` and `scheduledend` store the UTC
 instants derived from validated local date/time plus the persisted IANA zone.
-The server rejects nonexistent DST wall times and requires explicit
-disambiguation for repeated wall times. Standard Activity state/status remains
-the lifecycle authority; no parallel Scheduled/Completed/Cancelled enum is
-added.
+The server rejects nonexistent DST wall times. The simplified UI hides the
+daylight-saving panel and consistently chooses the earlier occurrence for a
+repeated wall time. Standard Activity state/status remains the lifecycle
+authority; no parallel Scheduled/Completed/Cancelled enum is added.
 
 The UI contract allows zero or one open Site Visit Activity per Request. GET
 returns none or the single open row plus its ETag. If multiple open rows exist,
@@ -564,6 +564,16 @@ and one hash-matching PDF attachment to `jgallivan@wmkeck.org`. Workbench
 history surfaced the receipt and a bounded Production error-log scan was clean.
 Dynamics appended its CRM tracking token after preview acceptance; inbox
 delivery remains unverified.
+
+**[CALENDAR/MATERIAL EXTENSION PRODUCTION-PROVED 2026-08-25.]** Signed-in
+Request `1002379` operation `f497643a-2e9e-4032-a323-1e40874d16f1` bound the
+saved Site Visit, one governed material, exact compose state, and deterministic
+calendar bytes, then reached `sent` with no final error. The organizer was
+included in the authoritative `To` set. Independent Dataverse readback
+confirmed one active request-bound Site Visit with persisted logistics fields
+and five ActivityParty rows. This closes the Production save/send proof but,
+like the base proof, stops at Dynamics transport acceptance rather than
+independent inbox/calendar-client delivery.
 
 The minimum staff flow is `Create/Reuse Snapshot → Compose → Preview → Explicit
 Send → History`:
@@ -787,16 +797,19 @@ silently extend its paths or names to writeup publications.
    `574ac7b833801866c370a8056b7197933addfe3ea5dd535dcf4d29803c18f0c9`.
    Dynamics appended its CRM tracking token after transport acceptance. The
    proof stops at Dynamics Sent; recipient inbox delivery remains unverified.
-8. **Site Visit logistics and calendar extension — Production-deployed
-   2026-08-24; signed-in business proof open.** Wave 21 is exact in sandbox and
-   Production, migration 035 is applied/read back, the readiness flag is
-   literal `on` in Preview/Production, and deployment
-   `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready. Reversible sandbox proof covers
-   nested ActivityParty create, ETag-fenced field edits, atomic same-ID party
-   replacement, and exact sentinel cleanup. Production HTTP smoke proved the
-   auth boundary and error logs were clean. No Production Site Visit row or
-   calendar/link distribution was created, because no actual event details
-   were supplied.
+8. **Site Visit logistics and calendar extension — Production-proved
+   2026-08-25.** Wave 21 is exact in sandbox and Production, migration 035 is
+   applied/read back, and the readiness flag is literal `on` in
+   Preview/Production. Reversible sandbox proof covers nested ActivityParty
+   create, ETag-fenced field edits, atomic same-ID party replacement, and exact
+   sentinel cleanup. Signed-in Request `1002379` created and round-tripped one
+   active Site Visit with five parties. Operation
+   `f497643a-2e9e-4032-a323-1e40874d16f1` then sent one governed material plus
+   the informational calendar through Dynamics with no final error. Subsequent
+   Production UX fixes split date/time controls, hide the daylight-saving
+   panel, enforce organizer delivery, correct false JSONB material-staleness,
+   and provide a time-zone dropdown that defaults new visits to US Pacific;
+   deployment `dpl_28bcFzCpxbwSVf8z5apvNrt1apDV` is Ready.
 9. **Site Visit dossier.** Implement governed supporting-file listing/upload
    paths and logistics around the now-built Word-workspace handoff. Keep
    applicant upload work as its own security-reviewed slice.

@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-08-24. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-08-25. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -168,17 +168,17 @@ mapping and PR #99 closed vanished-input cancellation. Final deployment
 `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` is Ready; a post-deploy authenticated drain
 returned zero eligible/enqueued/claimed/failed.
 
-### `pre_site_distribution_attempts` — LIVE; ONE SENT PRODUCTION PROOF
+### `pre_site_distribution_attempts` — LIVE; CALENDAR/MATERIAL PRODUCTION-PROVED
 
 **Source of truth:** Postgres exact-preview and cross-system recovery ledger.
 Migrations `034_pre_site_distribution_attempts.sql` and
 `035_site_visit_logistics.sql`; mirrored in the fresh-install setup.
-**[VERIFIED LIVE 2026-08-24 via canonical migrations, schema/tracker readback,
-and the first approved base send]** migration 034 was applied at
+**[VERIFIED LIVE 2026-08-25 via canonical migrations, schema/tracker readback,
+and approved base plus calendar/material sends]** migration 034 was applied at
 `2026-08-23T23:39:34.686Z`; migration 035 was applied at
 `2026-08-24T20:23:13.965Z`. The table has 66 columns, including the 11 additive
-calendar/Site Visit/material-link fields, one `sent` base-proof row, zero
-calendar attempts, and no pending manifest migration. The migration-035
+calendar/Site Visit/material-link fields, sent base and calendar/material proof
+rows, and no pending manifest migration. The migration-035
 calendar/hash/material constraints and columns read back exact.
 SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
@@ -218,6 +218,16 @@ and exactly one matching attachment. Workbench history showed the transport
 receipt and a bounded Production error-log scan was clean. Dynamics appended
 its CRM tracking token to the final stored subject after transport acceptance;
 inbox delivery is not independently verified.
+
+**[PRODUCTION-PROVED 2026-08-25.]** Request `1002379` operation
+`f497643a-2e9e-4032-a323-1e40874d16f1` reached `sent` with
+`calendar_enabled=true`, `material_count=1`, saved Site Visit
+`11b41d73-02a0-f111-b8dc-6045bd018a07`, no final error, and
+`sent_at=2026-08-25T15:51:00.440Z`. Earlier `prepared` attempts with
+`distribution_material_stale` remain diagnostic evidence of the JSONB
+object-key-order defect fixed in commit `f5b7efc2`; they are not additional
+sends. This receipt proves Dynamics transport acceptance, not independent
+inbox/calendar-client delivery.
 
 ## Portal upload staging
 

@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -34,9 +34,11 @@ Wave 21 is exact in sandbox and Production and adds only:
 | `wmkf_attendeerefsjson` | Memo(32000) | Server-owned versioned map from ActivityParty rows to immutable recipient references |
 
 The non-sensitive readiness flag is literal `on` in Vercel Preview and
-Production. Production deployment `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready.
-No Production Site Visit row was created during release; signed-in save proof
-remains open until real event details are available.
+Production. **[VERIFIED LIVE 2026-08-25.]** Request `1002379` now has one active
+Production Site Visit, `11b41d73-02a0-f111-b8dc-6045bd018a07`. Read-only
+adapter readback confirmed its Request binding, active state, `America/Chicago`
+zone, populated format/location/reference-map fields, five ActivityParty rows,
+and ETag `W/"95328121"`.
 
 ## Producer and persistence contract
 
@@ -56,8 +58,11 @@ fallback.
 
 ## Consumers
 
-- `SiteVisitLogisticsPanel` renders and saves local date/time, IANA zone, DST
-  choice, format, location/link, organizer, attendees, and notes.
+- `SiteVisitLogisticsPanel` renders and saves separate local date/time controls,
+  a curated IANA-zone dropdown (US Pacific for a new visit), format,
+  location/link, organizer, attendees, and notes. The daylight-saving panel is
+  hidden; the UI consistently selects the earlier occurrence of a repeated
+  wall time while the server still rejects nonexistent local times.
 - `recipient-directory-service.js` joins active WMKF profiles to enabled
   `systemusers` and reads Board/Consultant suggestions by immutable
   `expertise_roster.id` plus maintained `preferred_email`.
@@ -77,6 +82,8 @@ fallback.
 - Focused tests cover DST ambiguity/nonexistence, one-active-row enforcement,
   ETag behavior, exact identity mapping, adapter changeset shape, and calendar/
   material preview identity.
-- Production deployment/auth-boundary and error-log smokes passed. A signed-in
-  Production directory read, logistics save, and calendar/link send are not yet
-  live-proved.
+- **[PRODUCTION-PROVED 2026-08-25.]** The signed-in directory/logistics flow
+  created and round-tripped the Request `1002379` row above. Calendar/material
+  operation `f497643a-2e9e-4032-a323-1e40874d16f1` reached `sent` with this Site
+  Visit ID, one governed material, and no final error. `sent` proves Dynamics
+  transport acceptance, not independent inbox or calendar-client delivery.

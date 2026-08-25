@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -363,16 +363,22 @@ document inventory, and individual implementation plans do not establish priorit
   fourth writeup. Its logistics are date, time/time zone, format,
   location/link, lead PD, WMKF staff, applicant participants, and
   Board/consultant participants; no separate visit-status field is needed.
-  **[PRODUCTION-DEPLOYED 2026-08-24; SIGNED-IN BUSINESS PROOF OPEN]** the
+  **[PRODUCTION-PROVED 2026-08-25]** the
   existing `wmkf_sitevisit` Activity now owns that schedule, IANA zone,
   format, location/link, organizer/attendee parties, and server-owned recipient
   reference map. Wave 21 is exact in sandbox and Production; migration 035
   extends the existing distribution ledger and roster email mapping; the
-  readiness flag is literal `on` in Preview/Production; deployment
-  `dpl_A3PED8cA22G88dAKL4jafBAro5tn` is Ready. Calendar attachment semantics
-  are informational `METHOD:PUBLISH`, not RSVP/update/cancellation scheduling.
-  Reversible sandbox write/cleanup proof passed; no Production Site Visit row
-  or calendar/link send was created during release.
+  readiness flag is literal `on` in Preview/Production. Reversible sandbox
+  write/cleanup proof passed. Signed-in Request `1002379` created and
+  round-tripped one active Site Visit with five ActivityParty rows; calendar/
+  material operation `f497643a-2e9e-4032-a323-1e40874d16f1` reached `sent` with
+  the saved visit, one governed material, and no final error. Calendar semantics
+  remain informational `METHOD:PUBLISH`, not RSVP/update/cancellation
+  scheduling; `sent` proves Dynamics transport acceptance rather than
+  independent inbox/calendar-client delivery. Production UX follow-ups split
+  date/time controls, hide the daylight-saving panel, force the organizer into
+  `To`, fix false JSONB material-staleness, and add a time-zone dropdown that
+  defaults new visits to US Pacific.
   Its file categories are applicant slides, other applicant materials,
   recording, transcript, and transcript summary. Staff observations are direct
   edits in the existing Pre-Site Word workspace; do not add a separate

@@ -10,27 +10,29 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
-## August 2026 — Site Visit logistics and informational calendar distribution reached Production (Session 459)
+## August 2026 — Site Visit logistics and informational calendar distribution reached Production (Sessions 459–460)
 
 **Milestone:** Workbench now manages request-bound Site Visit schedule,
 time zone, format, location/link, organizer/attendees, governed material links,
 and an optional informational calendar attachment.
-**Sessions:** 459 (live schema mapping, bounded Opus plan/code reviews,
-implementation, migration/schema apply, reversible sandbox proof, Preview, and
-Production promotion).
+**Sessions:** 459–460 (live schema mapping, bounded Opus plan/code reviews,
+implementation, migration/schema apply, reversible sandbox proof, Production
+promotion, signed-in business proof, and owner-guided UX correction).
 **Ship state:** Wave 21 is exact in sandbox and Production; migration 035 is
 applied/read back; Preview/Production readiness is literal `on`; main commit
-`ffaa293b` is Ready in Production deployment
-`dpl_A3PED8cA22G88dAKL4jafBAro5tn`. The sandbox proved nested ActivityParty
-create and atomic same-ID replacement with exact cleanup. Production auth and
-error-log smokes passed; no Production Site Visit row or calendar send was
-created without real event details.
+`ffaa293b` reached Production and subsequent UX/freshness fixes through
+`f8037230` are Ready in deployment `dpl_28bcFzCpxbwSVf8z5apvNrt1apDV`. The
+sandbox proved nested ActivityParty create and atomic same-ID replacement with
+exact cleanup. Signed-in Request `1002379` then created/read back one active Site
+Visit with five parties; operation `f497643a-2e9e-4032-a323-1e40874d16f1`
+reached `sent` with a calendar and one governed material. Dynamics transport
+acceptance is proved; independent inbox/calendar-client delivery is not.
 **Why it matters:** staff can populate recipients from reconciled WMKF staff and
 Board/Consultant roster identities, enter the event once, link governed
 materials, and send an exact-preview `METHOD:PUBLISH` attachment without
 claiming RSVP or update/cancel semantics.
 **Pointers:** `docs/atlas/dataverse-wmkf-sitevisit.md`;
-`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; commit `ffaa293b`.
+`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; commits `ffaa293b`–`f8037230`.
 
 ## August 2026 — Frozen Pre-Site distribution reached Production and passed its first live send (Sessions 457–458)
 
