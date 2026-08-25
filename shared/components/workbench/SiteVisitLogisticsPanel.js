@@ -6,6 +6,17 @@ import {
   SITE_VISIT_FORMAT_LABEL,
 } from '../../config/siteVisit';
 
+const DEFAULT_SITE_VISIT_TIME_ZONE = 'America/Los_Angeles';
+const SITE_VISIT_TIME_ZONE_OPTIONS = Object.freeze([
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Phoenix', label: 'Arizona Time (no daylight saving)' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (no daylight saving)' },
+]);
+
 function refKey(ref) {
   if (ref?.kind === 'staff') return `staff:${ref.profileId}`;
   if (ref?.kind === 'roster') return `roster:${ref.rosterId}`;
@@ -23,7 +34,7 @@ function defaultForm(requestNumber) {
     startTime: '',
     endDate: '',
     endTime: '',
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago',
+    timeZone: DEFAULT_SITE_VISIT_TIME_ZONE,
     disambiguation: 'earlier',
     format: SITE_VISIT_FORMAT.IN_PERSON,
     locationOrLink: '',
@@ -46,7 +57,7 @@ function formFromVisit(visit, requestNumber) {
     startTime: start.time,
     endDate: end.date,
     endTime: end.time,
-    timeZone: visit.timeZone || 'America/Chicago',
+    timeZone: visit.timeZone || DEFAULT_SITE_VISIT_TIME_ZONE,
     disambiguation: 'earlier',
     format: visit.format,
     locationOrLink: visit.locationOrLink || '',
@@ -102,6 +113,9 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
   const byKey = useMemo(() => new Map(entries.map((row) => [row.key, row])), [entries]);
   const emailForKey = (key) => normalizeSiteVisitEmail(byKey.get(key)?.email);
   const organizerEmail = emailForKey(form.organizer);
+  const timeZoneOptions = SITE_VISIT_TIME_ZONE_OPTIONS.some(({ value }) => value === form.timeZone)
+    ? SITE_VISIT_TIME_ZONE_OPTIONS
+    : [{ value: form.timeZone, label: `${form.timeZone} (saved)` }, ...SITE_VISIT_TIME_ZONE_OPTIONS];
   const attendeeEntries = organizerEmail
     ? entries.filter((row) => (
       normalizeSiteVisitEmail(row.email) !== organizerEmail || row.key === form.organizer
@@ -327,7 +341,9 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label htmlFor="site-visit-zone" className="block text-sm font-medium text-gray-800">Time zone</label>
-              <input id="site-visit-zone" value={form.timeZone} maxLength={100} required onChange={(event) => edit({ timeZone: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <select id="site-visit-zone" value={form.timeZone} required onChange={(event) => edit({ timeZone: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                {timeZoneOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+              </select>
             </div>
             <div>
               <label htmlFor="site-visit-format" className="block text-sm font-medium text-gray-800">Format</label>

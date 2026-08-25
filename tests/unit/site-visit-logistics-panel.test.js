@@ -69,6 +69,7 @@ test('loads the saved activity and PATCHes stable recipient references with its 
   expect(screen.getByLabelText('Start time')).toHaveValue('09:00');
   expect(screen.getByLabelText('End date')).toHaveValue('2026-09-15');
   expect(screen.getByLabelText('End time')).toHaveValue('11:00');
+  expect(screen.getByLabelText('Time zone')).toHaveValue('America/Chicago');
   expect(screen.getByLabelText('Attendee role for Board Member (board@example.org)')).toHaveValue('required');
   await waitFor(() => expect(onContext).toHaveBeenCalledWith(expect.objectContaining({
     siteVisit: visit,
@@ -93,6 +94,7 @@ test('loads the saved activity and PATCHes stable recipient references with its 
     locationOrLink: 'New location',
     startLocal: '2026-09-15T09:00',
     endLocal: '2026-09-15T11:00',
+    timeZone: 'America/Chicago',
     disambiguation: 'earlier',
     organizer: { kind: 'staff', profileId: 7 },
     requiredAttendees: [{ kind: 'roster', rosterId: 12 }],
@@ -121,6 +123,18 @@ test('uses separate date and time controls and preserves an end time chosen by t
   expect(endTime).toHaveAttribute('type', 'time');
   expect(startTime).toHaveAttribute('step', '900');
   expect(endTime).toHaveAttribute('step', '900');
+  const timeZone = screen.getByLabelText('Time zone');
+  expect(timeZone.tagName).toBe('SELECT');
+  expect(timeZone).toHaveValue('America/Los_Angeles');
+  expect([...timeZone.options].map((option) => option.value)).toEqual([
+    'America/Los_Angeles',
+    'America/Denver',
+    'America/Phoenix',
+    'America/Chicago',
+    'America/New_York',
+    'America/Anchorage',
+    'Pacific/Honolulu',
+  ]);
 
   fireEvent.change(startDate, { target: { value: '2026-09-15' } });
   expect(endDate).toHaveValue('2026-09-15');
@@ -131,6 +145,27 @@ test('uses separate date and time controls and preserves an end time chosen by t
   fireEvent.change(startTime, { target: { value: '08:30' } });
   expect(endTime).toHaveValue('11:45');
   expect(screen.queryByLabelText(/Daylight saving time overlap/i)).not.toBeInTheDocument();
+});
+
+test('preserves a saved timezone that is not in the curated dropdown', async () => {
+  global.fetch = jest.fn()
+    .mockImplementationOnce(() => response({
+      success: true,
+      siteVisit: { ...visit, timeZone: 'America/Boise' },
+      materials: [],
+    }))
+    .mockImplementationOnce(() => response({ success: true, staff: [], external: [] }));
+
+  render(
+    <SiteVisitLogisticsPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+    />,
+  );
+
+  const timeZone = await screen.findByLabelText('Time zone');
+  expect(timeZone).toHaveValue('America/Boise');
+  expect(screen.getByRole('option', { name: 'America/Boise (saved)' })).toBeInTheDocument();
 });
 
 test('rolls an untouched default end into the next date', async () => {
