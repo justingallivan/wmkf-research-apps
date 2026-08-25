@@ -176,7 +176,7 @@ The high-leverage services for data-layer work — full source remains authorita
 
 ## Endpoint inventory
 
-For per-endpoint persistence info, see **`docs/API_ROUTE_SECURITY_MATRIX.md`**. The matrix has a registered structural check and is the canonical endpoint list; that check is run manually and by selected hooks/session workflows, but is not presently part of `.github/workflows/test.yml`. The Atlas defers to it rather than duplicating a count or route table. ~~**Atlas v1 gap:** the matrix doesn't yet annotate "writes Postgres `<table>` / Dataverse `<entity>`."~~ **Closed S141 (2026-05-08):** the matrix has a Persistence column for every registered route (PG = Postgres, DV = Dataverse). The current code-derived route-file count is [149](CANONICAL_COUNTS.md#api-route-file-count).
+For per-endpoint persistence info, see **`docs/API_ROUTE_SECURITY_MATRIX.md`**. The matrix has a registered structural check and is the canonical endpoint list; that check is run manually and by selected hooks/session workflows, but is not presently part of `.github/workflows/test.yml`. The Atlas defers to it rather than duplicating a count or route table. ~~**Atlas v1 gap:** the matrix doesn't yet annotate "writes Postgres `<table>` / Dataverse `<entity>`."~~ **Closed S141 (2026-05-08):** the matrix has a Persistence column for every registered route (PG = Postgres, DV = Dataverse). The current code-derived route-file count is [171](CANONICAL_COUNTS.md#api-route-file-count).
 
 For the reviewer-finder + review-manager subset, the per-entity pages above already enumerate read/write endpoints.
 
