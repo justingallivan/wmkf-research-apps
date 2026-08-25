@@ -8,6 +8,7 @@ import {
 } from '../../lib/services/pre-site-visit/distribution-service';
 import {
   PRE_SITE_VISIT_CONTRACT,
+  REQUEST_DOCUMENT_ARTIFACT_LABEL,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
@@ -595,11 +596,41 @@ test('history marks a retained distribution changed when the working Word versio
   expect(result.attempts[0].sourceFreshness).toBe('changed');
 });
 
-test('send persists one activity and both attachment steps before transport acceptance', async () => {
-  let row = attemptFixture();
+test('send accepts an unchanged linked material after PostgreSQL JSONB reorders its object keys', async () => {
+  const materialId = '99999999-9999-4999-8999-999999999999';
+  const materialType = REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES;
+  let row = attemptFixture({
+    material_links: [{
+      itemId: 'slides-item',
+      webUrl: 'https://sharepoint.test/slides',
+      driveId: 'materials-drive',
+      filename: 'Applicant Slides.pdf',
+      versionId: '3.0',
+      artifactId: materialId,
+      artifactType: materialType,
+      artifactTypeLabel: REQUEST_DOCUMENT_ARTIFACT_LABEL[materialType],
+    }],
+  });
   const calls = [];
+  const sourceDependencies = currentSourceDependencies(row);
+  const sourceRecords = (await sourceDependencies.findDocumentsByRequest()).records;
   const dependencies = {
-    ...currentSourceDependencies(row),
+    ...sourceDependencies,
+    findDocumentsByRequest: jest.fn(async () => ({ records: [
+      ...sourceRecords,
+      {
+        wmkf_requestdocumentid: materialId,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_artifacttype: materialType,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+        wmkf_filename: 'Applicant Slides.pdf',
+        wmkf_sharepointweburl: 'https://sharepoint.test/slides',
+        wmkf_sharepointdriveid: 'materials-drive',
+        wmkf_sharepointitemid: 'slides-item',
+        wmkf_sharepointversionid: '3.0',
+      },
+    ] })),
     getAttempt: jest.fn(async () => row),
     claimSend: jest.fn(async () => {
       row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777', attempt_count: 1 };
@@ -665,6 +696,61 @@ test('send persists one activity and both attachment steps before transport acce
   ]);
   expect(dependencies.createEmailActivity).toHaveBeenCalledTimes(1);
   expect(dependencies.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+test('send rejects a real linked-material version change before creating a Dynamics activity', async () => {
+  const materialId = '99999999-9999-4999-8999-999999999999';
+  const materialType = REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES;
+  let row = attemptFixture({
+    material_links: [{
+      itemId: 'slides-item',
+      webUrl: 'https://sharepoint.test/slides',
+      driveId: 'materials-drive',
+      filename: 'Applicant Slides.pdf',
+      versionId: '3.0',
+      artifactId: materialId,
+      artifactType: materialType,
+      artifactTypeLabel: REQUEST_DOCUMENT_ARTIFACT_LABEL[materialType],
+    }],
+  });
+  const sourceDependencies = currentSourceDependencies(row);
+  const sourceRecords = (await sourceDependencies.findDocumentsByRequest()).records;
+  const dependencies = {
+    ...sourceDependencies,
+    findDocumentsByRequest: jest.fn(async () => ({ records: [
+      ...sourceRecords,
+      {
+        wmkf_requestdocumentid: materialId,
+        _wmkf_request_value: REQUEST_ID,
+        wmkf_artifacttype: materialType,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+        wmkf_filename: 'Applicant Slides.pdf',
+        wmkf_sharepointweburl: 'https://sharepoint.test/slides',
+        wmkf_sharepointdriveid: 'materials-drive',
+        wmkf_sharepointitemid: 'slides-item',
+        wmkf_sharepointversionid: '4.0',
+      },
+    ] })),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+
+  await expect(sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies)).rejects.toMatchObject({ code: 'distribution_material_stale' });
+  expect(dependencies.findEmailByCorrelation).not.toHaveBeenCalled();
+  expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
 });
 
 test('an exact sent retry returns its receipt without another Dynamics write', async () => {
