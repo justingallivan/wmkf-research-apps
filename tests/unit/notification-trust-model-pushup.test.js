@@ -533,6 +533,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   DynamicsService.clearCaches();
   mockDynamicsFetch();
+  mockSql.mockResolvedValue({ rows: [] });
 
   mockDrainReviewerAcceptanceJobs.mockReset();
   mockWriteReviewFiles.mockReset();

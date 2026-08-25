@@ -229,6 +229,46 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
+### `scheduled_email_messages` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+
+**Source of truth:** Postgres coordination and audit ledger for personalized
+scheduled email; Dataverse remains workflow authority and Dynamics remains
+email-activity/transport authority. Migration
+`036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
+**[VERIFIED IN SOURCE + FOCUSED TESTS 2026-08-25; NOT LIVE-PROBED]** no claim is
+made that the table exists in Preview or Production.
+
+The first allowlisted workflow is `grantee_abstract_reminder`. One source
+deliverable can own one row. The row freezes the exact server-derived PD,
+recipients, subject/body/signature, established day-12 send time, and optional
+earlier review time. It records optimistic versions and PD edit/approve/stop
+attribution; internal notification identity/lease/error; recipient Dynamics
+activity identity, send intent, acceptance receipt, retry lease/error; and the
+final Dataverse repair timestamp. Preview uses a visibly non-live placeholder;
+the grantee token is minted only for a real send.
+
+Read/write paths: `lib/services/scheduled-email-store.js`,
+`lib/services/scheduled-email-service.js`,
+`lib/services/cron/grantee-deliverable-reminders-service.js`, and the
+profile-owned `/api/scheduled-emails` routes. Recipients/sender/source/schedule
+are never client-editable; PATCH actions can edit bounded subject/body, approve,
+stop, or send now under exact PD ownership and a version fence. A due send
+freshly rechecks that the deliverable is still Invited, persists/reconciles one
+correlation-keyed Dynamics activity, records transport acceptance, and only
+then finalizes `wmkf_granteedeliverable`. A separate pass repairs sent but
+unfinalized rows without re-sending.
+
+**Retention:** daily maintenance defaults to 365 days and deletes only rows
+that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
+failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
+erase recoverable work. The Dataverse setting
+`retention:scheduled_email_messages_days` may supply a positive override.
+
+**Open rollout decision:** a PD with no saved `email_automation` preference
+currently stays on the historical day-12 automatic path. Migration application
+and production enablement should not proceed until the owner chooses the
+eventual default and rollout/migration policy.
+
 ## Portal upload staging
 
 ### `portal_upload_staging` (migration 031)

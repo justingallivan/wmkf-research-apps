@@ -32,12 +32,34 @@ jest.mock('../../lib/services/email-signature', () => ({
     email: 'assigned.pd@wmkeck.org',
   })),
 }));
+jest.mock('../../lib/services/email-automation-preferences', () => ({
+  getEmailAutomationPreferenceForSystemUser: jest.fn(async () => null),
+}));
+jest.mock('../../lib/services/scheduled-email-store', () => ({
+  createOrGetScheduledEmail: jest.fn(),
+  listScheduledEmailsNeedingNotification: jest.fn(async () => []),
+  listDueScheduledEmails: jest.fn(async () => []),
+  listUnfinalizedScheduledEmails: jest.fn(async () => []),
+}));
+jest.mock('../../lib/services/scheduled-email-service', () => ({
+  scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
+  notifyScheduledEmailReview: jest.fn(),
+  deliverScheduledEmail: jest.fn(),
+  finalizeScheduledEmail: jest.fn(),
+}));
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { getSettingStrict } from '../../lib/services/settings-service';
 import NotificationService from '../../lib/services/notification-service';
 import { resolveSignatureForRequest } from '../../lib/services/email-signature';
+import { getEmailAutomationPreferenceForSystemUser } from '../../lib/services/email-automation-preferences';
+import * as scheduledEmailStore from '../../lib/services/scheduled-email-store';
+import {
+  deliverScheduledEmail,
+  finalizeScheduledEmail,
+  notifyScheduledEmailReview,
+} from '../../lib/services/scheduled-email-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 import handler from '../../pages/api/cron/grantee-deliverable-reminders';
 
@@ -103,6 +125,14 @@ beforeEach(() => {
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
   resolveSignatureForRequest.mockClear();
+  getEmailAutomationPreferenceForSystemUser.mockClear().mockResolvedValue(null);
+  scheduledEmailStore.createOrGetScheduledEmail.mockReset().mockResolvedValue({ id: 'scheduled-1' });
+  scheduledEmailStore.listScheduledEmailsNeedingNotification.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listDueScheduledEmails.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listUnfinalizedScheduledEmails.mockReset().mockResolvedValue([]);
+  notifyScheduledEmailReview.mockReset();
+  deliverScheduledEmail.mockReset();
+  finalizeScheduledEmail.mockReset();
   DynamicsService.getRecord.mockReset().mockImplementation((entitySet, id) => {
     if (entitySet === 'akoya_requests') return Promise.resolve(requestRow(id.slice(1)));
     if (entitySet === 'contacts') return Promise.resolve(contactRow(id));
@@ -116,15 +146,24 @@ afterEach(() => {
   Date.now.mockRestore();
 });
 
-test('selection window includes day 12 and excludes day 11 by using inviteddate <= now-12d', async () => {
+test('selection scans all Invited rows so per-PD review windows can be calculated', async () => {
   const res = mockRes();
   await handler(req(), res);
   expect(res.statusCode).toBe(200);
   const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
   expect(filter).toContain(`wmkf_deliverablestatus eq ${GRANTEE_DELIVERABLE_STATUS.INVITED}`);
   expect(filter).toContain('wmkf_inviteddate ne null');
-  expect(filter).toContain('wmkf_inviteddate le 2026-06-08T00:00:00.000Z');
-  expect(filter).not.toContain('2026-06-09T00:00:00.000Z');
+  expect(filter).not.toContain('wmkf_inviteddate le');
+});
+
+test('unconfigured rollout compatibility still excludes a day-11 reminder', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({
+    records: [deliv(1, '2026-06-09T00:00:00.000Z')], totalCount: 1, capped: false,
+  });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.body.reminded).toBe(0);
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });
 
 test('claims before sending and sends with noFallback as the PD', async () => {
@@ -154,6 +193,9 @@ test('claims before sending and sends with noFallback as the PD', async () => {
   });
   expect(resolveSignatureForRequest).toHaveBeenCalledWith('r1');
   expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain('Assigned PD');
+  expect(DynamicsService.createAndSendEmail.mock.calls[0][0].body).toContain(
+    'This automated reminder was sent by the W. M. Keck Foundation on behalf of PD pd1.',
+  );
 });
 
 test('default read is applied to grantee reminder subject and body', async () => {
@@ -177,6 +219,35 @@ test('default read is applied to grantee reminder subject and body', async () =>
   expect(email.body).toContain('Hello Professor pi1');
   expect(email.body).toContain('Award Award 1 is due by COB June 22, 2026.');
   expect(email.body).toContain('Assigned PD');
+});
+
+test('a review-mode PD gets a durable draft three days before the established send without an early recipient email', async () => {
+  getEmailAutomationPreferenceForSystemUser.mockResolvedValue({ mode: 'review', leadDays: 3 });
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+
+  expect(res.body.scheduled).toBe(1);
+  expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+    workflowType: 'grantee_abstract_reminder',
+    sourceRecordId: 'd1',
+    pdSystemUserId: 'pd1',
+    reviewLeadDays: 3,
+    scheduledSendAt: '2026-06-20T00:00:00.000Z',
+    reviewAvailableAt: '2026-06-17T00:00:00.000Z',
+  }));
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('a preference read failure never falls through to the legacy automatic send', async () => {
+  getEmailAutomationPreferenceForSystemUser.mockRejectedValue(new Error('Dataverse preference read failed'));
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.body.preferenceFailed).toBe(1);
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
 });
 
 test('blank grantee reminder default skips before claim and alerts admins', async () => {
@@ -221,6 +292,21 @@ test('unavailable grantee reminder default skips before claim and alerts admins'
   }));
   expect(NotificationService.notify.mock.invocationCallOrder[0])
     .toBeLessThan(DynamicsService.queryAllRecords.mock.invocationCallOrder[0]);
+});
+
+test('a frozen due message still sends when the current shared defaults are unavailable', async () => {
+  getSettingStrict.mockRejectedValue(new Error('Dynamics settings unavailable'));
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+  scheduledEmailStore.listDueScheduledEmails.mockResolvedValue([{ id: 'scheduled-due-1' }]);
+  deliverScheduledEmail.mockResolvedValue({ sent: true });
+
+  const res = mockRes();
+  await handler(req(), res);
+
+  expect(res.body.skippedMisconfigured).toBe(1);
+  expect(res.body.reminded).toBe(1);
+  expect(deliverScheduledEmail).toHaveBeenCalledWith('scheduled-due-1');
+  expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
 });
 
 test('send failure after claim is reported and not finalized, preventing next-run double-send', async () => {
@@ -326,6 +412,12 @@ test('200 summary envelope pinned exactly', async () => {
     skippedMisconfigured: 0,
     claimFailed: 0,
     sendFailed: 0,
+    scheduled: 0,
+    notified: 0,
+    notificationFailed: 0,
+    stoppedNoLongerEligible: 0,
+    preferenceFailed: 0,
+    finalizeFailed: 0,
     capped: false,
     deferred: 0,
     failures: [],

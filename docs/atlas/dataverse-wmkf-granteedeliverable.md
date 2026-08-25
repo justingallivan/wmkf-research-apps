@@ -45,7 +45,7 @@ Data:
 - `pages/api/workbench/grantee-deliverables/awardees.js` — per-awardee status label.
 - `pages/api/workbench/grantee-deliverables/abstract.js` (GET) — staff Awardee-tab read of `wmkf_imagecaption`, `wmkf_imagefileref`, and `wmkf_waiverackedat` alongside status. Returns exact caption Markdown plus response-only sanitized `captionHtml` for formatted display and the shared replacement editor. The image ref is exposed to STAFF only, and only as a link when it is an absolute http(s) URL (the writer's fallback is a relative library path). `wmkf_waiverackedat` is surfaced as the de-facto submission time and labeled as the waiver acknowledgment, since no submitted-date field exists. Added 2026-07-29. Also returns (2026-08-10, S412) the server-computed `canReplace` capability flag and the package row's `deliverableEtag`, which the staff replace path sends back as its If-Match — the flag exists so the client never re-derives the status rule.
 - `lib/services/grantee-document-assembly.js` — reads image ref/caption for staff website/cycle export and image presence for previews.
-- `pages/api/cron/grantee-deliverable-reminders.js` — paged query of Invited packages where `wmkf_inviteddate` is 12+ days old; no `$expand`.
+- `pages/api/cron/grantee-deliverable-reminders.js` — paged query of all Invited packages with an invite date; no `$expand`. **[SOURCE-BUILT 2026-08-25; migration 036 not applied]** configured PDs are evaluated at their earlier review time or the established day-12 send time, while no-preference PDs retain the historical day-12 path during rollout.
 
 ## Write Paths
 
@@ -56,7 +56,7 @@ Data:
 - `pages/api/workbench/grantee-deliverables/send-invite.js` — ensures package row; on first Drafted→Invited flip stamps `wmkf_inviteddate=now`; re-sends leave status/date unchanged.
 - `lib/services/grantee-upload.js` — after validating/uploading image, commits the package row (`wmkf_imagecaption`, `wmkf_imagefileref`, status→Submitted, `wmkf_WaiverPolicyVersion` bind + `wmkf_waiverackedat` + `wmkf_waiverbodyhash`) AND the `akoya_request` approved-abstract PATCH in ONE atomic Dataverse changeset (per-op If-Match). SharePoint upload is outside the changeset; a non-412 failure re-reads before deleting the upload. **Reached only from the external grantee portal's submit route** — it requires an acknowledged waiver version and fails closed without one, so staff paths cannot use it.
 - `lib/services/workbench/grantee-deliverables/replace-submission-service.js` — **second writer of `wmkf_imagecaption` / `wmkf_imagefileref`** (2026-08-10, S412), for STAFF replacing what the grantee returned after a revision agreed off-portal by email. Status-gated to Submitted / Staff Review from a fresh server read (Revision Requested deliberately refused — the grantee holds the pen there); the etag If-Match closes the window between that status read and the write (a status change bumps the etag → 412 → 409). Writes through `patchDeliverable`, whose field whitelist structurally prevents touching the waiver fields: the grantee's original consent **stands** and is never re-recorded. **Never** writes `wmkf_deliverablestatus`; never touches the `akoya_request` row. SharePoint upload is outside the Dataverse write and uses the SAME server-controlled filename pattern as the portal writer (the image proxy's allowlist and the prior-image prune both key on it); a failed PATCH removes the new upload, except where a re-read shows the ref DID commit (response drop), which returns success. A committed image replacement prunes the prior file best-effort, so the grantee's original leaves the folder and survives only in SharePoint's recycle bin.
-- `pages/api/cron/grantee-deliverable-reminders.js` — durable pre-send claim moves status to Reminder Sent before sending; finalize stamps `wmkf_remindeddate`.
+- `pages/api/cron/grantee-deliverable-reminders.js` — **[SOURCE-BUILT 2026-08-25; not live]** configured PDs use Postgres `scheduled_email_messages`: the cron leaves this Dataverse row Invited during review, sends through a persisted/recoverable Dynamics activity at the day-12 time, then writes Reminder Sent + `wmkf_remindeddate` only after transport acceptance. A sent-but-unfinalized repair pass retries only this Dataverse write. No-preference PDs retain the historical pre-send claim path until the rollout default is decided.
 
 ## Cross-System
 
@@ -75,7 +75,9 @@ Straight cutover, no backfill. The old flat request fields `wmkf_granteedelivera
 - **Schema and write privilege are live.** S271 applied the production schema and verified full service-principal CRUD with `scripts/smoke-grantee-deliverable-write.mjs`; the 2026-08-12 memory-drift live count probe found 14 durable rows.
 - **External paths are fail-closed.** `getDeliverableForRequest()` never creates; missing row means not editable.
 - **No silent impersonation fallback for reminders.** The cron passes `noFallback:true` and reports send failures rather than sending from the service principal.
-- **A claim without a final timestamp is ambiguous by design.** `Reminder Sent`
-  with null `wmkf_remindeddate` can mean the pre-send claim succeeded but delivery or
-  finalization failed. Investigate the email activity and logs; do not blindly
-  reset/retry.
+- **A legacy claim without a final timestamp is ambiguous by design.** For a
+  no-preference PD on the rollout compatibility path, `Reminder Sent` with null
+  `wmkf_remindeddate` can still mean the pre-send claim succeeded but delivery
+  or finalization failed. Investigate the email activity and logs; do not
+  blindly reset/retry. Configured scheduled rows instead preserve the Dynamics
+  identity/send receipt in Postgres and repair finalization without re-sending.

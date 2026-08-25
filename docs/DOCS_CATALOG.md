@@ -133,6 +133,7 @@ related:
 |---|---|---|---|---|---|
 | [EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md](EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md) | plan | historical |  | Historical record of the completed July 2026 mustache-token migration; current template behavior lives in the resolver source and seed defaults. | 2026-07-02 |
 | [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source. | 2026-07-02 |
+| [SCHEDULED_PERSONALIZED_EMAIL_P0.md](SCHEDULED_PERSONALIZED_EMAIL_P0.md) | plan | active |  | Source-built P0 for per-PD review preferences, durable drafts, personalized automation disclosure, and recoverable send/finalization. | 2026-08-25 |
 | [TODO_EMAIL_NOTIFICATIONS.md](TODO_EMAIL_NOTIFICATIONS.md) | plan | draft |  | System-alert emails are wired to the Dynamics email transport (DynamicsService.createAndSendEmail). When NOTIFICATION_EMAIL_FROM is set, the... | 2026-07-02 |
 | [UNIFIED_EMAIL_SIGNATURE_PLAN.md](UNIFIED_EMAIL_SIGNATURE_PLAN.md) | plan | historical |  | Historical Phase-1 plan for the unified per-user email signature, now implemented. | 2026-07-02 |
 

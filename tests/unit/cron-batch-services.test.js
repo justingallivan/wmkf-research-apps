@@ -50,7 +50,23 @@ jest.mock('../../lib/external/grantee-token-lifecycle', () => ({
   mintForRequest: jest.fn(async () => ({ url: 'https://x/grantee/t' })),
 }));
 jest.mock('../../lib/external/grantee-invite-email', () => ({
+  buildGranteeReminderDraftBodyText: jest.fn(() => 'draft'),
   renderGranteeReminderHtml: jest.fn(() => '<p>html</p>'),
+}));
+jest.mock('../../lib/services/email-automation-preferences', () => ({
+  getEmailAutomationPreferenceForSystemUser: jest.fn(async () => null),
+}));
+jest.mock('../../lib/services/scheduled-email-store', () => ({
+  createOrGetScheduledEmail: jest.fn(),
+  listScheduledEmailsNeedingNotification: jest.fn(async () => []),
+  listDueScheduledEmails: jest.fn(async () => []),
+  listUnfinalizedScheduledEmails: jest.fn(async () => []),
+}));
+jest.mock('../../lib/services/scheduled-email-service', () => ({
+  scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
+  notifyScheduledEmailReview: jest.fn(),
+  deliverScheduledEmail: jest.fn(),
+  finalizeScheduledEmail: jest.fn(),
 }));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
@@ -131,7 +147,7 @@ describe('runGranteeDeliverableReminders', () => {
     expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  it('misconfigured email defaults short-circuit into the summary before any claim', async () => {
+  it('misconfigured email defaults skip new source rows before any legacy claim', async () => {
     readRequiredEmailDefaults.mockResolvedValueOnce({
       ok: false,
       failures: [{ key: 'email.grantee_reminder.subject', reason: 'blank' }],

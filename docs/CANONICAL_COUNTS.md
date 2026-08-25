@@ -38,7 +38,7 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## api-route-file-count
 
-- **Live value:** 171
+- **Live value:** 174
 - **Description:** pages/api route files (matches check:api-routes walker)
 - **Derive:** `pages/api/**/*.js` → count of route files (same predicate `scripts/check-api-route-security-matrix.js` uses)
 

@@ -35,6 +35,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
       health_history_days: 30, alert_days: 90, intake_audit_days: 730,
       bill_webhook_events_days: 7, maintenance_runs_days: 90,
       reviewer_identity_shadow_log_days: 90,
+      scheduled_email_messages_days: 365,
     })),
     cleanupUsageLog: jest.fn(async () => 0),
     cleanupQueryLog: jest.fn(async () => 0),
@@ -52,6 +53,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     cleanupBlobs: jest.fn(async () => ({ deleted: 0, skipped: 0, errors: 0, details: [] })),
     cleanupIntakePrivateBlobs: jest.fn(async () => ({ deleted: 0 })),
     cleanupPortalUploadStaging: jest.fn(async () => ({ deleted: 0, errors: 0, pruned: 0 })),
+    cleanupScheduledEmailMessages: jest.fn(async () => 0),
   },
 }));
 
@@ -180,6 +182,16 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(res.body.ok).toBe(true);
     expect(res.body.results.portalUploadStaging).toEqual({ deleted: 3, errors: 0, pruned: 2 });
     expect(res.body.totalDeleted).toBe(3);
+  });
+
+  it('prunes only terminal scheduled-email rows at the configured retention horizon', async () => {
+    MaintenanceService.cleanupScheduledEmailMessages.mockResolvedValueOnce(4);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(MaintenanceService.cleanupScheduledEmailMessages).toHaveBeenCalledWith(365);
+    expect(res.body.results.scheduledEmailMessages).toBe(4);
+    expect(res.body.totalDeleted).toBe(4);
   });
 
   it('a thrown review-draft GC is caught, surfaced in failedSubtasks, and marks the run failed', async () => {

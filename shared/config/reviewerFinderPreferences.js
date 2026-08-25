@@ -50,6 +50,13 @@ export const PREFERENCE_KEYS = {
   // the generic /api/user-preferences endpoint (not reserved); "Reset to default"
   // DELETEs the key.
   GRANTEE_INVITE_BODY: 'grantee_invite_body',
+  // Explicit per-PD choice for automatic outbound email handling:
+  //   { mode: 'automatic' }
+  //   { mode: 'review', leadDays: 1..14 }
+  // Absent means the PD has not made a rollout choice yet. Writes use the
+  // dedicated /api/email-automation-preferences route so mode/day validation
+  // cannot be bypassed through the generic preference endpoint.
+  EMAIL_AUTOMATION: 'email_automation',
 };
 
 /**
