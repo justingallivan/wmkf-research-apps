@@ -64,7 +64,10 @@ changes production configuration, or deploys the feature.
 
 ## Recovery and residual risk
 
-- The message is stopped if the source deliverable is no longer Invited.
+- The message is stopped only when a successful eligibility read shows the
+  source deliverable is no longer Invited, or the deliverable is confirmed
+  deleted (404). Any other eligibility read failure marks the row failed and
+  retryable; a transient Dataverse error cannot permanently stop a message.
 - A Dynamics activity ID is persisted before transport; ambiguous creation is
   recovered by a deterministic correlation key. Multiple matches fail closed.
 - Dynamics transport acceptance is recorded before Dataverse is finalized.
@@ -76,6 +79,12 @@ changes production configuration, or deploys the feature.
   those two systems one transaction.
 - This first slice sends the initial advance-review notification. A separate
   follow-up notification near the send time is not implemented in P0.
+- No minimum review window is guaranteed. If a row is first created after its
+  scheduled send time has already passed (a cron outage longer than the lead
+  window, or a preference saved late), the same cron run creates and sends it
+  with no review notification, because notification claiming requires the send
+  time to still be in the future. Any change here intersects the owner
+  decision that lead days never move the established send date.
 
 ## Mode-A sweep report (2026-08-25)
 

@@ -115,6 +115,31 @@ test('a source that is no longer Invited is stopped before token mint or email c
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
+test('a transient eligibility read failure keeps the row retryable instead of stopping it', async () => {
+  const deps = dependencies();
+  const transient = Object.assign(new Error('dataverse failed (503)'), { status: 503 });
+  deps.getDeliverable.mockRejectedValue(transient);
+
+  await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toThrow('dataverse failed (503)');
+  expect(deps.cancelForSource).not.toHaveBeenCalled();
+  expect(deps.recordFailure).toHaveBeenCalled();
+  expect(deps.mintForRequest).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('a confirmed-deleted source (404) is stopped, not retried', async () => {
+  const deps = dependencies();
+  const gone = Object.assign(new Error('dataverse failed (404)'), { status: 404 });
+  deps.getDeliverable.mockRejectedValue(gone);
+  deps.cancelForSource.mockResolvedValue({ ...message(), status: 'stopped', stopped_at: '2026-08-25T00:00:00Z' });
+
+  const result = await deliverScheduledEmail(message().id, {}, deps);
+  expect(result.stopped).toBe(true);
+  expect(deps.recordFailure).not.toHaveBeenCalled();
+  expect(deps.mintForRequest).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
 test('an accepted correlated Dynamics activity is reconciled without minting or sending again', async () => {
   const base = message({ dynamics_email_id: null });
   const deps = dependencies(base);
