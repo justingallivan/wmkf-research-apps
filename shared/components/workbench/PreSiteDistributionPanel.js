@@ -260,7 +260,8 @@ export default function PreSiteDistributionPanel({
             />
             <span>
               Attach an add-to-calendar file (.ics). Recipients can add the event to their calendars.
-              It does not request an RSVP, and later changes will not update it automatically.
+              The saved organizer is included in To automatically. It does not request an RSVP,
+              and later changes will not update it automatically.
             </span>
           </label>
           {!siteVisit?.activityId && (

@@ -63,7 +63,9 @@ fallback.
   `expertise_roster.id` plus maintained `preferred_email`.
 - `pre-site-visit/distribution-service.js` can bind the Activity ID/ETag and a
   bounded event snapshot into an informational `METHOD:PUBLISH` calendar
-  attachment. It rechecks the ETag before transport.
+  attachment. For a calendar-enabled preview it requires the ActivityParty
+  organizer email, forces that address into the exact persisted `To` set, and
+  removes it from `Cc` before hashing. It rechecks the ETag before transport.
 
 ## Verification and limits
 
@@ -78,4 +80,3 @@ fallback.
 - Production deployment/auth-boundary and error-log smokes passed. A signed-in
   Production directory read, logistics save, and calendar/link send are not yet
   live-proved.
-

@@ -351,10 +351,50 @@ test('prepare binds server-resolved material links and one informational calenda
   expect(result.attempt.calendarEnabled).toBe(true);
   expect(result.attempt.bodyText).toBe('Attached.');
   const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
+  expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
   expect(persisted.bodyHtml).toContain('Applicant &lt;Slides&gt;.pdf');
   expect(persisted.bodyHtml).toContain('a=1&amp;b=2');
   expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
+  expect(persisted.calendar.content.toString('utf8'))
+    .toContain('ORGANIZER:mailto:organizer@wmkeck.org');
   expect(persisted.calendar.content.toString('utf8')).not.toContain('ATTENDEE');
+});
+
+test('calendar organizer is moved from Cc to To before preview persistence', async () => {
+  const harness = createPrepareHarness();
+  harness.dependencies.schemaReady = jest.fn(() => true);
+  harness.dependencies.getSiteVisitById = jest.fn(async () => ({
+    activityid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    _etag: 'W/"7"',
+    _regardingobjectid_value: REQUEST_ID,
+    statecode: 0,
+    subject: 'Site Visit',
+    scheduledstart: '2026-09-15T14:00:00Z',
+    scheduledend: '2026-09-15T16:00:00Z',
+    wmkf_attendeerefsjson: JSON.stringify({
+      version: 1,
+      organizer: { kind: 'staff', profileId: 7 },
+      requiredAttendees: [],
+      optionalAttendees: [],
+    }),
+    modifiedon: '2026-08-24T12:34:56Z',
+    wmkf_SiteVisit_activity_parties: [{
+      participationtypemask: 7,
+      addressused: 'ORGANIZER@wmkeck.org',
+    }],
+  }));
+
+  await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'docx',
+    cc: 'organizer@wmkeck.org, consultant@example.org',
+    includeCalendar: true,
+    siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  }), harness.dependencies);
+
+  const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
+  expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
 });
 
 test('calendar and material selections participate in the draft identity', async () => {

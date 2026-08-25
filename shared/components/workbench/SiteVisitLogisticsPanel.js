@@ -113,13 +113,13 @@ export default function SiteVisitLogisticsPanel({ requestId, requestNumber, onCo
       ...nextDirectory.staff.map((row) => [refKey(row), row]),
       ...nextDirectory.external.map((row) => [refKey(row), row]),
     ]);
-    const emails = (refs) => (refs || []).map((ref) => (
+    const emails = (refs) => (refs || []).filter(Boolean).map((ref) => (
       ref.kind === 'manual' ? ref : lookup.get(refKey(ref))
     )).filter((row) => row?.email).map((row) => row.email);
     onContext?.({
       siteVisit: visit,
       materials: nextMaterials,
-      suggestedTo: visit ? emails(visit.requiredAttendees) : [],
+      suggestedTo: visit ? emails([visit.organizer, ...visit.requiredAttendees]) : [],
       suggestedCc: visit ? emails(visit.optionalAttendees) : [],
     });
   };

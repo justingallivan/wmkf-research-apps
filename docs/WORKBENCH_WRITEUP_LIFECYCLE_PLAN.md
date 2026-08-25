@@ -382,6 +382,13 @@ in exact preview and are not silently persisted into either directory. The
 server normalizes and deduplicates all addresses and rejects a To/CC or
 required/optional conflict as an all-or-nothing validation failure.
 
+**[VERIFIED IN SOURCE 2026-08-24.]** For every calendar-enabled preview, the
+server-resolved Site Visit organizer is a mandatory `To` recipient. Preparation
+adds that address exactly once, removes the same address from `Cc`, and uses the
+resulting recipient set in both preview hashes and the durable distribution
+attempt. The UI suggests the organizer up front, but the prepare service is the
+authoritative enforcement point.
+
 The first calendar attachment is deliberately informational
 `METHOD:PUBLISH`, matching the already-deployed review-due attachment contract:
 it offers Add to Calendar but does not request RSVP and does not claim reliable
@@ -418,6 +425,7 @@ preview and operation. Transport acceptance is not inbox-delivery proof.
 | A stale save cannot create or overwrite another Site Visit | route; service; Dataverse adapter | GUID + same-Request check; ETag-fenced `PATCH` or atomic same-ID replacement; 404/412 and wrong-ID tests; reversible sandbox proof |
 | Multiple open Site Visits fail closed | adapter/service/route/UI | two-row fixture returns reconciliation error and no write |
 | Suggested recipients retain stable authority | `user_profiles`/`systemusers`; `expertise_roster.id` + preferred email | disabled/unreconciled staff excluded; roster rename preserves email mapping |
+| A calendar-enabled send always includes the saved organizer | Site Visit ActivityParty snapshot; preview service; Postgres ledger | omitted organizer is inserted into `To`; a matching `Cc` entry moves to `To`; hashes and persisted recipients use the enforced set |
 | Exact preview binds every recipient, event field, link identity, and calendar bytes | preview service; Postgres ledger | any changed input changes preview hash and disables prior confirmation |
 | Partial email failure resumes one Dynamics activity | extended distribution store/service; email adapter | activity-created and calendar-attachment failure tests; exact retry returns same email ID |
 | PUBLISH is never presented as RSVP/update/cancel scheduling | calendar builder; UI copy; docs | ICS contract tests and component copy assertions |
@@ -825,6 +833,9 @@ strategy; this plan itself performs no deployment.
 - An informational send attaches the exact frozen Word DOCX, PDF, or both
   approved in preview, persists stepwise attempt state, and resumes without a
   duplicate email activity after attachment, send, or response failure.
+- A calendar-enabled informational send includes the server-resolved Site Visit
+  organizer in the exact `To` recipients and attaches the same frozen `.ics`
+  shown in preview.
 - Every Site Visit supporting file appears in the correct governed category and
   has one registry row with stable Graph identity.
 - Creating Final copies the exact latest/selected Site Visit-stage Pre-Site Word

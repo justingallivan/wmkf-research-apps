@@ -72,7 +72,7 @@ test('loads the saved activity and PATCHes stable recipient references with its 
   expect(screen.getByLabelText('Attendee role for Board Member (board@example.org)')).toHaveValue('required');
   await waitFor(() => expect(onContext).toHaveBeenCalledWith(expect.objectContaining({
     siteVisit: visit,
-    suggestedTo: ['board@example.org'],
+    suggestedTo: ['organizer@wmkeck.org', 'board@example.org'],
   })));
 
   global.fetch.mockImplementationOnce(() => response({

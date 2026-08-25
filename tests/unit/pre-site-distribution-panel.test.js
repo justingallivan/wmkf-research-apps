@@ -82,7 +82,7 @@ test('explains calendar and material-link choices in plain language', async () =
   expect(await screen.findByRole('group', { name: 'Document attachment' })).toBeInTheDocument();
   expect(screen.getByRole('group', { name: 'Calendar and material links' })).toBeInTheDocument();
   expect(screen.getByLabelText(/Attach an add-to-calendar file \(.ics\)/i)).toBeDisabled();
-  expect(screen.getByText(/does not request an RSVP.*later changes will not update it automatically/i))
+  expect(screen.getByText(/saved organizer is included in To automatically.*does not request an RSVP/i))
     .toBeInTheDocument();
   expect(screen.getByText('Complete and save Visit logistics above to include the calendar.'))
     .toBeInTheDocument();
