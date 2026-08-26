@@ -323,9 +323,11 @@ route accepts only a valid cron secret, and the service implements the day-12
 send/day-14 deadline. **[SOURCE-BUILT 2026-08-25; NOT DEPLOYED]** the P0
 personalized scheduling extension adds Dataverse `email_automation` preference
 validation, migration 036's `scheduled_email_messages` ledger, the PD review
-inbox, and recoverable Dynamics transport/finalization. The no-preference
-rollout default remains an owner decision, so this source retains the deployed
-legacy automatic behavior for those PDs rather than silently assigning a mode.
+inbox, and recoverable Dynamics transport/finalization. The as-built source retains the deployed
+legacy automatic behavior for no-preference PDs rather than silently assigning
+a mode; the rollout question was resolved 2026-08-26 by the superseding
+`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` (automatic-by-default with
+per-(PD, contact) VIP review flags; onboarding as a rollout precondition).
 
 A dated 2026-07-27 production probe found three `wmkf_granteedeliverable` rows,
 all in `Drafted`: zero day-12-eligible rows, zero past-day-14 rows, zero claimed
