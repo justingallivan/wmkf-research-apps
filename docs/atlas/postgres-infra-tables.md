@@ -229,14 +229,13 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
-### `scheduled_email_messages` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 
 **Source of truth:** Postgres coordination and audit ledger for personalized
 scheduled email; Dataverse remains workflow authority and Dynamics remains
 email-activity/transport authority. Migration
 `036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
-**[VERIFIED IN SOURCE + FOCUSED TESTS 2026-08-25; NOT LIVE-PROBED]** no claim is
-made that the table exists in Preview or Production.
+**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the branch code that writes it is not yet deployed, so the table is empty in production.]**
 
 The first allowlisted workflow is `grantee_abstract_reminder`. One source
 deliverable can own one row, created on the cron's first sight of an Invited
@@ -287,7 +286,7 @@ as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
 
-### `scheduled_email_vip_flags` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, contact) VIP review flags
 (`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
@@ -298,9 +297,9 @@ Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
 reminders cron to freeze `approval_required` at ledger-row creation; any
 flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
-`codex/scheduled-email-review-p0`; NOT LIVE-PROBED.]**
+`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
 
-### `scheduled_email_digest_runs` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
 2026-08-26 after the branch adversarial review. The primary key
@@ -317,7 +316,7 @@ consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
 unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
 materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
-tests/unit/scheduled-email-service.test.js; NOT LIVE-PROBED.]**
+tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
 
 ## Portal upload staging
 

@@ -20,8 +20,10 @@ related:
 **OWNER-SETTLED DESIGN 2026-08-26; SOURCE-BUILT SAME DAY on branch
 `codex/scheduled-email-review-p0` (commit `417774f`); adversarially reviewed
 and all three findings fixed same day (digest run ledger + PD handoff
-rebuild — see "Adversarial review outcome" below); NOT DEPLOYED, migration
-036 not applied.** One scope note against Decision 5: the Reviewers/Invite
+rebuild — see "Adversarial review outcome" below); migration 036 APPLIED
+to the shared Neon database 2026-08-26 [VERIFIED via read-only probe:
+tracker row 036_scheduled_email_messages.sql + all three tables exist];
+code NOT DEPLOYED (branch unmerged — merge is the enablement).** One scope note against Decision 5: the Reviewers/Invite
 Reviewers panel toggle is deferred to the reviewer-workflow slice — reviewer
 rows key on `wmkf_potentialreviewers`, the flag store keys on contact, and no
 ledger workflow reads reviewer flags yet, so a toggle there would write state
