@@ -23,7 +23,9 @@ and all three findings fixed same day (digest run ledger + PD handoff
 rebuild — see "Adversarial review outcome" below); migration 036 APPLIED
 to the shared Neon database 2026-08-26 [VERIFIED via read-only probe:
 tracker row 036_scheduled_email_messages.sql + all three tables exist];
-code NOT DEPLOYED (branch unmerged — merge is the enablement).** One scope note against Decision 5: the Reviewers/Invite
+MERGED TO MAIN 2026-08-26 22:00 UTC (merge `4a743d63`, auto-deploy in
+flight at write time) — first new-code cron tick 08:00 UTC 2026-08-27; PD
+onboarding must complete inside that window per the rollout checklist.** One scope note against Decision 5: the Reviewers/Invite
 Reviewers panel toggle is deferred to the reviewer-workflow slice — reviewer
 rows key on `wmkf_potentialreviewers`, the flag store keys on contact, and no
 ledger workflow reads reviewer flags yet, so a toggle there would write state
@@ -166,6 +168,30 @@ confirmed findings; the fixes are source-built on the branch:
 
 **Retention decision:** `scheduled_email_digest_runs` is deliberately
 unbounded (≤6 PDs × ≤366 rows/PD/year); revisit only if PD count grows.
+
+## Broader effort: reviewer email slices (owner direction, 2026-08-26)
+
+The abstract reminder is deliberately the small pilot (1 To + 1 Cc, funded
+grants only). The owner's stated volume reality: the vast majority of
+outbound mail is reviewer solicitation and follow-up, and PDs differ in how
+they want each handled. Owner decisions recorded so far for the next slices:
+
+1. **The abstract flow merges and ships first** (done 2026-08-26, merge
+   `4a743d63`); reviewer workflows follow as separate, more careful slices —
+   the Foundation is mid-reviewer-cycle, so timing and blast radius matter.
+2. **Reviewer invitations: VIP checkbox → editable preview.** A VIP-checked
+   candidate brings up the editable preview window (like the current
+   render-emails flow) before their invitation sends; non-VIP candidates
+   batch-send without per-message click-through ("for people we don't know,
+   there's generally no reason to click through and send multiple emails one
+   at a time").
+3. **Per-PD, per-email-type preferences** are the working direction (the
+   single `{ reviewAll }` override generalizes), with the digest remaining
+   the single interface.
+
+Detailed planning for these slices has not started; the full outbound-email
+inventory (18 types; triggers, sender identities, controls, notice and
+noFallback coverage) was compiled 2026-08-26 and should seed that plan.
 
 ## Rollout checklist (procedural guarantees)
 
