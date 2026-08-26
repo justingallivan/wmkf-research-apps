@@ -50,7 +50,7 @@ implementation pass.
 
 | Claim | Producer / entry | Persistence / authority | Consumer | Evidence | Status |
 |---|---|---|---|---|---|
-| PD preference is explicit and validated | Profile Settings → `/api/email-automation-preferences` | Dataverse `wmkf_appuserpreferences.email_automation` | Grantee reminder cron | source + route/preference tests | VERIFIED IN SOURCE |
+| PD preference is explicit and validated | Profile Settings → `/api/email-automation-preferences` | Dataverse `wmkf_appuserpreferences.email_automation` | Grantee reminder cron | source + route/preference tests | [STALE-ACCEPTED: lib/services/email-automation-preferences.js — dated 2026-08-25 record; the rebuild removed the Profile Settings card and redefined the value to `{ reviewAll }`, set from `/scheduled-emails` per the superseding plan doc] |
 | Review lead does not move recipient send | cron schedule calculation | first 08:00 UTC cron tick after full day-12 eligibility; `scheduled_send_at` + `review_available_at` | notification/send processors | shared config + service/cron tests | VERIFIED IN SOURCE |
 | Exact draft/actions survive cron retries | cron creates row; PD PATCH actions | Postgres `scheduled_email_messages` | PD inbox + due-send worker | migration/setup parity + route/service tests | VERIFIED IN SOURCE; NOT LIVE |
 | Browser cannot redirect a send | owned route accepts bounded action fields only | server-owned row recipients/sender/source | Dynamics email creation | route tests + API security matrix | VERIFIED IN SOURCE |
