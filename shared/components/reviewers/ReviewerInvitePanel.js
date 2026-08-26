@@ -222,6 +222,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // collapse to a batch summary. Stored against the request's lead PD
   // (resolved server-side); any staff member here may curate them.
   const [vipIds, setVipIds] = useState(() => new Set()); // potentialReviewerId Set
+  const [vipLoaded, setVipLoaded] = useState(false); // false until the GET succeeds
   const [vipSavingId, setVipSavingId] = useState(null);
   const exportingRef = useRef(false);
   const repairTargetRef = useRef(null);
@@ -238,7 +239,12 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
         if (!resp.ok) return;
         const data = await resp.json();
         setVipIds(new Set(data.flaggedPotentialReviewerIds || []));
-      } catch { /* flags are a routing aid; the modal defaults to full cards */ }
+        setVipLoaded(true);
+      } catch {
+        // Fail CLOSED: vipLoaded stays false, so the modal opens with
+        // vipUnknown and renders every draft as a full card (pre-slice
+        // behavior). A flag-read failure must never collapse a VIP's draft.
+      }
     })();
     return () => controller.abort();
   }, [requestId]);
@@ -436,6 +442,10 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
         vip: Boolean(c.potentialReviewerId && vipIds.has(c.potentialReviewerId)),
       })),
       allowResend,
+      // Fail closed: until the flags GET has succeeded, VIP membership is
+      // unknown — the modal must render every draft as a full card rather
+      // than collapse someone whose flag we simply failed to read.
+      vipUnknown: !vipLoaded,
     });
   };
 
@@ -808,6 +818,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
           candidates={modal.candidates}
           settings={settings}
           allowResend={modal.allowResend}
+          vipUnknown={modal.vipUnknown}
           onClose={() => setModal(null)}
           onSent={afterSent}
         />

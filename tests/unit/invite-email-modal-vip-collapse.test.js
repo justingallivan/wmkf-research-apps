@@ -111,6 +111,26 @@ test('a single-candidate open renders a full card regardless of VIP state', asyn
   expect(screen.queryByText(/standard invitation.* ready/)).toBeNull();
 });
 
+test('vipUnknown (flags failed to load) renders EVERY draft full — a read failure must not collapse a VIP', async () => {
+  mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
+  // Simulate the panel's fail-closed path: flags GET failed, so every
+  // candidate arrives vip:false but vipUnknown is set.
+  const unknownCandidates = CANDIDATES.map((c) => ({ ...c, vip: false }));
+  render(
+    <InviteEmailModal
+      requestId="req-1"
+      candidates={unknownCandidates}
+      vipUnknown
+      onClose={() => {}}
+      onSent={() => {}}
+    />,
+  );
+  await waitFor(() => expect(screen.getByDisplayValue('Invitation for VIP Person')).toBeTruthy());
+  expect(screen.getByDisplayValue('Invitation for Standard One')).toBeTruthy();
+  expect(screen.getByDisplayValue('Invitation for Standard Two')).toBeTruthy();
+  expect(screen.queryByText(/standard invitations? ready/)).toBeNull();
+});
+
 test('collapsed drafts are still included in the send payload unchanged', async () => {
   mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
   readSseStream.mockImplementation(async (_response, onEvent) => {

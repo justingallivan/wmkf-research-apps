@@ -13,7 +13,9 @@ import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvit
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
-jest.mock('../../shared/components/reviewers/InviteEmailModal', () => function InviteEmailModal() {
+const mockModalProps = [];
+jest.mock('../../shared/components/reviewers/InviteEmailModal', () => function InviteEmailModal(props) {
+  mockModalProps.push(props);
   return null;
 });
 jest.mock('../../shared/components/reviewers/CandidateEditModal', () => function CandidateEditModal() {
@@ -46,6 +48,7 @@ const withoutPerson = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockModalProps.length = 0;
   global.fetch = jest.fn(async (url) => {
     if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
       return { ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }) };
@@ -73,6 +76,39 @@ test('flags load for the request on mount; toggle PUTs the person id and flips v
     });
   });
   await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+});
+
+test('a FAILED flags load opens the modal fail-closed: vipUnknown is true', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      throw new Error('network down');
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole('checkbox', { name: /select dr\. keyed person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Send invitation/ }));
+  await waitFor(() => expect(mockModalProps.length).toBeGreaterThan(0));
+  expect(mockModalProps[mockModalProps.length - 1].vipUnknown).toBe(true);
+});
+
+test('a successful flags load opens the modal with vipUnknown false and the vip bit set', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return { ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [PR1] }) };
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  const toggle = await screen.findByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+  fireEvent.click(screen.getByRole('checkbox', { name: /select dr\. keyed person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Send invitation/ }));
+  await waitFor(() => expect(mockModalProps.length).toBeGreaterThan(0));
+  const props = mockModalProps[mockModalProps.length - 1];
+  expect(props.vipUnknown).toBe(false);
+  expect(props.candidates[0].vip).toBe(true);
 });
 
 test('a row without a potentialReviewerId renders no VIP toggle', async () => {

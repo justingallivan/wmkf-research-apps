@@ -210,7 +210,7 @@ export function applySubjectTiming(subject, timing) {
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
 
-export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
+export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
@@ -450,7 +450,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     (candidates || []).map((c) => [c.suggestionId, c.vip === true]),
   );
   const requiresFullCard = (d) =>
-    candidates.length <= 1
+    vipUnknown // fail closed: flags never loaded → treat everyone as needing eyes
+    || candidates.length <= 1
     || Boolean(d.skipped)
     || d.emailConfidence?.action === 'quick_check'
     || vipBySuggestionId.get(d.suggestionId) === true
