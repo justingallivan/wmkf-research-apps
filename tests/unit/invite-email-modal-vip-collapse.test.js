@@ -22,7 +22,8 @@ function draft(id, name, extra = {}) {
     candidateName: name,
     candidateEmail: `${id.toLowerCase()}@example.org`,
     subject: `Invitation for ${name}`,
-    body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value',
+    body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/send_time_token.pending_authority.not_live',
+    externalLinkExpected: true,
     ...extra,
   };
 }
@@ -147,6 +148,37 @@ test('a draft that would fail the send-time body-integrity gate renders FULL —
   expect(screen.getByDisplayValue('Invitation for Standard Two')).toBeTruthy();
   // …so nothing is left to collapse.
   expect(screen.queryByText(/standard invitations? ready/)).toBeNull();
+});
+
+test('a LINKLESS draft renders FULL even when the template expected no link — the send gate withholds every linkless invitation', async () => {
+  mockRender([
+    draft('S1', 'VIP Person'),
+    draft('S2', 'Standard One', { body: 'No reviewer link anywhere.', externalLinkExpected: false }),
+    draft('S3', 'Standard Two'),
+  ]);
+  render(
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} onClose={() => {}} onSent={() => {}} />,
+  );
+  await waitFor(() => expect(screen.getByDisplayValue('Invitation for Standard One')).toBeTruthy());
+  expect(screen.queryByDisplayValue('Invitation for Standard Two')).toBeNull();
+  expect(screen.getByText('1 standard invitation ready')).toBeTruthy();
+});
+
+test('a hardcoded malformed reviewer path renders FULL even when externalLinkExpected is false', async () => {
+  mockRender([
+    draft('S1', 'VIP Person'),
+    draft('S2', 'Standard One', {
+      body: 'Hardcoded link: https://reviews.wmkeck.org/external/review/token.value',
+      externalLinkExpected: false,
+    }),
+    draft('S3', 'Standard Two'),
+  ]);
+  render(
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} onClose={() => {}} onSent={() => {}} />,
+  );
+  await waitFor(() => expect(screen.getByDisplayValue('Invitation for Standard One')).toBeTruthy());
+  expect(screen.queryByDisplayValue('Invitation for Standard Two')).toBeNull();
+  expect(screen.getByText('1 standard invitation ready')).toBeTruthy();
 });
 
 test('collapsed drafts are still included in the send payload unchanged', async () => {

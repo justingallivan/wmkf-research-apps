@@ -16,6 +16,7 @@ import {
   loadAdminTemplateDefaults,
   saveEmailTemplates,
 } from './email-template-store';
+import { validateInvitationTemplateForSave } from '../../../lib/utils/invitation-link-validator';
 
 const PLACEHOLDER_HINT = '{{greeting}} {{proposalTitle}} {{piInstitution}} {{externalLink}} {{reviewDueDate}} {{signature}}';
 const INVITATION_TIMING_HINT = '{{respondBy}} {{proposalDelivery}} {{reviewDue}}';
@@ -45,7 +46,13 @@ export default function EmailTemplatesModal({ onClose }) {
     setTemplates((prev) => ({ ...prev, [active]: { ...(adminDefaults?.[active] || { subject: '', body: '' }) } }));
 
   const handleSave = async () => {
-    setStatus('saving'); setError(null);
+    setError(null);
+    if (!validateInvitationTemplateForSave(templates?.invitation).valid) {
+      setStatus('error');
+      setError('Invitation templates must include {{externalLink}} in the subject or body.');
+      return;
+    }
+    setStatus('saving');
     const ok = await saveEmailTemplates(templates);
     if (ok) { setStatus('saved'); setTimeout(() => setStatus('ready'), 1500); }
     else { setStatus('error'); setError('Failed to save templates. Please try again.'); }

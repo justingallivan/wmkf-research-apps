@@ -192,13 +192,24 @@ they want each handled. Owner decisions recorded so far for the next slices:
    `wmkf_potentialreviewersid` since candidates lack contacts
    pre-acceptance); non-VIP drafts collapse to an expandable summary inside
    the modal (skipped/quick-check/edited/single-candidate drafts always
-   render full). Codex adversarial review (2026-08-26) drove two hardening
-   fixes on the branch: star toggles stay disabled until the initial flags
-   GET resolves (a slow load can no longer clobber a just-completed toggle
-   with its pre-PUT snapshot), and the collapse classifier mirrors the
-   send-time invitation body-integrity gate (missing secure link /
-   unresolved `{{token}}` drafts always render full; the server gate in
-   `send-emails-service.js` stays authoritative). Accepted residual: a
+   render full). Two rounds of Codex adversarial review (2026-08-26) drove
+   three fail-safe hardening fixes on the branch: VIP changes update the
+   modal's snapshot optimistically and roll back on a failed PUT while every
+   star is visibly disabled during the save; failed or timed-out flag loads
+   remain fail-closed with an inline Retry path; and the dependency-free
+   `lib/utils/invitation-link-validator.js` now owns the invitation-link
+   contract across modal collapse, send withholding, and invitation-template
+   save validation. A draft is collapsible/sendable only when it carries
+   exactly one DISTINCT three-base64url-segment `/external/review/` token
+   (repeated identical copies of the same link remain a tolerated input —
+   button + plain-text fallback — and substitution replaces every copy),
+   `externalLinkExpected` is true, and no unresolved `{{token}}` remains;
+   trailing prose punctuation after the token is fine, but a fourth token
+   segment or any malformed/unexpected reviewer path stays full and is
+   withheld as `invalid_secure_link`, a linkless invitation is withheld as
+   `missing_secure_link` regardless of expectation, and invitation-template
+   saves require the literal `{{externalLink}}` placeholder
+   [RECHECKED after lib/utils/invitation-link-validator.js change: identical-duplicate tolerance and prose-punctuation boundary restored in Claude's review pass, same day]. Accepted residual: a
    mid-session lead-PD reassignment on the same request leaves the loaded
    flag snapshot keyed to the old PD until the panel remounts — writes and
    sends always resolve the current PD server-side, so the worst case is a

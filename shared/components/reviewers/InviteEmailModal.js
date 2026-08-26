@@ -31,6 +31,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
+import {
+  classifyInvitationLinks,
+  INVALID_SECURE_LINK_SKIP_REASON,
+} from '../../../lib/utils/invitation-link-validator';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
@@ -61,6 +65,7 @@ function addDaysToTodayYmd(days, today = new Date()) {
 // reason string for anything not called out here.
 function skipReasonLabel(reason) {
   if (reason === 'missing_secure_link') return 'missing secure link';
+  if (reason === INVALID_SECURE_LINK_SKIP_REASON) return 'invalid secure invitation link; restore {{externalLink}} in the invitation template';
   if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
   if (reason === 'email_research_only') return 'address is research-only, not invite-ready';
   if (reason === 'address_conflict_pending') return 'stored and newly found addresses conflict';
@@ -449,14 +454,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const vipBySuggestionId = new Map(
     (candidates || []).map((c) => [c.suggestionId, c.vip === true]),
   );
-  // Client mirror of the send-time invitation body-integrity gate
-  // (send-emails-service): a draft whose secure link failed to mint or that
-  // still carries an unresolved {{token}} would be withheld at send time —
-  // it must render FULL with the defect visible, never collapse as "ready".
-  // Routing aid only; the server gate stays authoritative.
-  const failsBodyIntegrity = (d) =>
-    !/\/external\/review\/[A-Za-z0-9._~-]+/.test(d.body || '')
-    || /\{\{[^}]+\}\}/.test(`${d.subject || ''}\n${d.body || ''}`);
+  // Shared mirror of the server-authoritative invitation-link contract. Any
+  // invalid classification renders FULL with the defect visible, never as a
+  // collapsed "ready" draft. The extra zero-occurrence check mirrors the send
+  // gate's stricter invitation rule: an invitation with NO reviewer link is
+  // withheld at send time even when the template never asked for one
+  // (externalLinkExpected false), so it must not collapse as "ready" here.
+  const failsBodyIntegrity = (d) => {
+    const linkState = classifyInvitationLinks({
+      subject: d.subject,
+      body: d.body,
+      externalLinkExpected: d.externalLinkExpected,
+    });
+    return !linkState.valid || linkState.occurrenceCount === 0;
+  };
   const requiresFullCard = (d) =>
     vipUnknown // fail closed: flags never loaded → treat everyone as needing eyes
     || candidates.length <= 1

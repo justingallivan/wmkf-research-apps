@@ -19,7 +19,8 @@ const draft = {
   candidateName: 'Dr. Test Reviewer',
   candidateEmail: 'reviewer@example.org',
   subject: 'Invitation',
-  body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/token.value',
+  body: 'Please use your secure personal link:\nhttps://reviews.wmkeck.org/external/review/send_time_token.pending_authority.not_live',
+  externalLinkExpected: true,
 };
 
 function mockJson(data, ok = true) {
@@ -51,7 +52,7 @@ beforeEach(() => {
             candidateName: 'Dr. Test Reviewer',
             to: 'reviewer@example.org',
             subject: 'Invitation',
-            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/token.value?action=accept">Yes, I Can Review</a></td></tr></table>',
+            htmlBody: '<table><tr><td><a href="https://reviews.wmkeck.org/external/review/send_time_token.pending_authority.not_live?action=accept">Yes, I Can Review</a></td></tr></table>',
           },
         }],
         failed: [],

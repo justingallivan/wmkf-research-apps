@@ -7,8 +7,8 @@
  * no toggle at all.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import ReviewerInvitePanel from '../../shared/components/reviewers/ReviewerInvitePanel';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import ReviewerInvitePanel, { VIP_FLAGS_LOAD_TIMEOUT_MS } from '../../shared/components/reviewers/ReviewerInvitePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -26,6 +26,7 @@ jest.mock('../../shared/components/reviewers/ReleaseEmailModal', () => function 
 });
 
 const PR1 = '22222222-2222-4222-8222-222222222222';
+const PR2 = '33333333-3333-4333-8333-333333333333';
 
 const withPerson = {
   suggestionId: 'S-1',
@@ -41,6 +42,15 @@ const withoutPerson = {
   potentialReviewerId: null,
   name: 'Unkeyed Row',
   email: 'unkeyed@example.edu',
+  invited: false,
+  accepted: false,
+  declined: false,
+};
+const secondPerson = {
+  suggestionId: 'S-3',
+  potentialReviewerId: PR2,
+  name: 'Dr. Second Person',
+  email: 'second@example.edu',
   invited: false,
   accepted: false,
   declined: false,
@@ -103,19 +113,116 @@ test('toggles are DISABLED until the initial flags GET resolves — a slow load 
   await waitFor(() => expect(toggle).not.toBeDisabled());
 });
 
-test('a FAILED flags load opens the modal fail-closed: vipUnknown is true', async () => {
+test('a pending VIP PUT is optimistic for the modal snapshot and disables every star toggle', async () => {
+  let resolvePut;
+  global.fetch = jest.fn((url, options) => {
+    if (options?.method === 'PUT') {
+      return new Promise((resolve) => { resolvePut = resolve; });
+    }
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }),
+      });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson, secondPerson]} onRefresh={() => {}} />);
+  const firstToggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  const secondToggle = screen.getByRole('button', { name: /toggle vip review for dr\. second person/i });
+  await waitFor(() => expect(firstToggle).not.toBeDisabled());
+
+  fireEvent.click(firstToggle);
+  expect(firstToggle).toHaveAttribute('aria-pressed', 'true');
+  expect(firstToggle).toBeDisabled();
+  expect(secondToggle).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('checkbox', { name: /select dr\. keyed person/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Send invitation/ }));
+  await waitFor(() => expect(mockModalProps.length).toBeGreaterThan(0));
+  expect(mockModalProps[mockModalProps.length - 1].candidates[0].vip).toBe(true);
+  expect(mockModalProps[mockModalProps.length - 1].vipUnknown).toBe(true);
+
+  resolvePut({ ok: true, status: 200, json: async () => ({}) });
+  await waitFor(() => expect(firstToggle).not.toBeDisabled());
+});
+
+test('a failed VIP PUT rolls the optimistic star state back', async () => {
+  let resolvePut;
+  jest.spyOn(window, 'alert').mockImplementation(() => {});
+  global.fetch = jest.fn((url, options) => {
+    if (options?.method === 'PUT') {
+      return new Promise((resolve) => { resolvePut = resolve; });
+    }
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }),
+      });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  const toggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+  resolvePut({ ok: false, status: 500, json: async () => ({ error: 'save failed' }) });
+  await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+  expect(window.alert).toHaveBeenCalledWith('Could not update the VIP flag: save failed');
+});
+
+test('a failed flags load is explained and stays fail-closed until Retry succeeds', async () => {
+  let getAttempts = 0;
   global.fetch = jest.fn(async (url) => {
     if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
-      throw new Error('network down');
+      getAttempts += 1;
+      if (getAttempts === 1) throw new Error('network down');
+      return { ok: true, status: 200, json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }) };
     }
     throw new Error(`Unexpected fetch: ${url}`);
   });
   render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
-  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  expect(await screen.findByText(/VIP flags unavailable/)).toBeTruthy();
+  const toggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  expect(toggle).toBeDisabled();
   fireEvent.click(screen.getByRole('checkbox', { name: /select dr\. keyed person/i }));
   fireEvent.click(screen.getByRole('button', { name: /^Send invitation/ }));
   await waitFor(() => expect(mockModalProps.length).toBeGreaterThan(0));
   expect(mockModalProps[mockModalProps.length - 1].vipUnknown).toBe(true);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  await waitFor(() => expect(toggle).not.toBeDisabled());
+  expect(screen.queryByText(/VIP flags unavailable/)).toBeNull();
+
+  const priorModalCount = mockModalProps.length;
+  act(() => { mockModalProps[mockModalProps.length - 1].onClose(); });
+  fireEvent.click(screen.getByRole('button', { name: /^Send invitation/ }));
+  await waitFor(() => expect(mockModalProps.length).toBeGreaterThan(priorModalCount));
+  expect(mockModalProps[mockModalProps.length - 1].vipUnknown).toBe(false);
+});
+
+test('a hung flags GET aborts at the timeout and exposes Retry', async () => {
+  jest.useFakeTimers();
+  try {
+    global.fetch = jest.fn((_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }));
+    render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+    await act(async () => {
+      jest.advanceTimersByTime(VIP_FLAGS_LOAD_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+    expect(screen.getByText(/VIP flags unavailable/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i })).toBeDisabled();
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test('a successful flags load opens the modal with vipUnknown false and the vip bit set', async () => {
