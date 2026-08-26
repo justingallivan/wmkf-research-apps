@@ -10,6 +10,7 @@
 - Live-state ownership Atlas: ../docs/APPLICATION_STATE_ATLAS.md
 - Ground-truth rules: ../CLAUDE.md
 - Memory hygiene / router edits: ../docs/MEMORY_HYGIENE_RUNBOOK.md; ../.claude/rules/durable-docs.md; project-memory-router-trap-prevention.md
+- Stop-hook staleness acks: reference-staleness-ack-markers-single-line.md
 
 ## Always-Read Guardrails
 - Carryover / destructive work: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md
