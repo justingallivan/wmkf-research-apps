@@ -269,4 +269,11 @@ test('the store claim and due-list SQL both refuse unapproved approval_required 
   expect(dueSection).toMatch(/approval_required = false OR approved_at IS NOT NULL/);
   // force (the PD's version-fenced send-now) must be the only bypass.
   expect(claimSection).toContain('${force}::boolean = true\n            OR approval_required = false');
+  // Editing a draft must clear approval: an edited approval-required draft
+  // re-enters approval-pending instead of sending the unreviewed edit.
+  const editSection = store.slice(
+    store.indexOf('updateScheduledEmailDraft'),
+    store.indexOf('approveScheduledEmail'),
+  );
+  expect(editSection).toContain('approved_at = NULL');
 });
