@@ -98,12 +98,18 @@ digest's deep-link target), and the per-message review notification.
 
 ## Carry-over from the P0 branch
 
-Survives unchanged ([VERIFIED via this session's review of branch
-`codex/scheduled-email-review-p0`]): the `scheduled_email_messages` ledger
-and leases (`lib/services/scheduled-email-store.js`, migration 036), edit /
+These mechanisms survive the rebuild (their host files were rewritten
+2026-08-26 for the decision layer, the mechanisms carried over): the
+`scheduled_email_messages` ledger and leases
+(`lib/services/scheduled-email-store.js` [RECHECKED after
+lib/services/scheduled-email-store.js change: `locked_until` lease fences at
+lib/services/scheduled-email-store.js:88,128,146], migration 036), edit /
 approve / stop / send-now actions and routes
 (`pages/api/scheduled-emails/`), send recovery and Dynamics correlation,
-Dataverse finalization (`lib/services/scheduled-email-service.js`),
+Dataverse finalization (`lib/services/scheduled-email-service.js`
+[RECHECKED after lib/services/scheduled-email-service.js change:
+`correlationKey` at lib/services/scheduled-email-service.js:67,
+`finalizeScheduledEmail` at lib/services/scheduled-email-service.js:210]),
 disclosure rendering and the legacy-marker stripper
 (`lib/external/automated-email-notice.js`), and the `/scheduled-emails`
 inbox page.
