@@ -18,7 +18,13 @@ related:
 
 ## Status
 
-**SOURCE-BUILT AND FOCUSED-TESTED 2026-08-25; NOT DEPLOYED.** Migration 036
+**SOURCE-BUILT AND FOCUSED-TESTED 2026-08-25; NOT DEPLOYED. DECISION LAYER
+SUPERSEDED 2026-08-26** by `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`: the
+owner replaced per-PD automatic/review modes, per-message notifications, the
+Profile Settings card, and the global nav item with automatic-by-default
+sends, per-(PD, contact) VIP review flags, and a daily digest. This document
+remains the implementation record for the durable ledger, review actions,
+send recovery, and disclosure rendering, which carry over. Migration 036
 has not been applied or live-probed. The first workflow is the automatic
 grantee abstract reminder. No external/third-party review was requested for
 this implementation pass.
