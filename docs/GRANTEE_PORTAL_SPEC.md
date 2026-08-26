@@ -121,12 +121,20 @@ Per grantee, exactly:
    and the waiver acknowledgment time. Staff can correct the approved abstract and, in Submitted / Staff
    Review, replace the image or caption through the package's separate ETag-conditional path. The GET
    returns response-only sanitized HTML for both Markdown-backed editors/displays; no HTML is persisted.
-8. **Cadence:** a daily cron selects packages still in `Invited` whose first
-   `wmkf_inviteddate` is at least 12 days old. It sends one reminder from the
-   assigned Program Director to the PI, Cc'ing the liaison, with a day-14 COB
-   deadline. The service conditionally claims the package as `Reminder Sent`
-   before email delivery so the next run cannot select it again; after a
-   successful send it stamps `wmkf_remindeddate`.
+8. **Cadence:** the established recipient send remains day 12 after the first
+   `wmkf_inviteddate`, with a day-14 COB response deadline. **[SOURCE-BUILT
+   2026-08-25; migration 036 not applied]** an assigned PD may explicitly choose
+   automatic send or an earlier 1–14 day review window. The lead days move only
+   the internal notification/review time; silence preserves the day-12 send.
+   Configured PDs receive an exact frozen draft in `/scheduled-emails`, may edit
+   subject/body, approve, stop, or send now, and are told that inaction will send
+   as shown. Recipients and sender remain server-owned. The recipient email begins
+   with a personalized automated/on-behalf/reply-routing notice; the secure portal
+   token is minted only at real send. Postgres stores the Dynamics activity/send
+   receipt, then the service stamps Reminder Sent + `wmkf_remindeddate`; a separate
+   pass repairs that final Dataverse write without re-sending. A PD with no saved
+   preference stays on the existing claim-before-send automatic path until the
+   owner selects the rollout default.
 
 ## Reuse — shared primitives vs parallel grantee variant
 
@@ -309,11 +317,18 @@ validation, and waiver evidence are closed by the as-built contract above:
   server-side; and
 - field/schema literals are recorded in the two canonical Atlas pages.
 
-The reminder policy is implemented, deployed, and no longer an open product
-decision. The deployed Vercel configuration registers
+The original reminder policy is implemented and deployed. The deployed Vercel configuration registers
 `/api/cron/grantee-deliverable-reminders` at `0 8 * * *` (08:00 UTC). The
 route accepts only a valid cron secret, and the service implements the day-12
-selection/day-14 deadline and once-only claim described above.
+send/day-14 deadline. **[SOURCE-BUILT 2026-08-26; NOT DEPLOYED]** the
+personalized scheduling extension (VIP/digest decision layer per
+`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`) adds migration 036's
+`scheduled_email_messages` ledger and `scheduled_email_vip_flags` table, the
+PD inbox at `/scheduled-emails`, per-(PD, contact) VIP review flags with
+Awardee-tab/inbox toggles, the `email_automation` review-all override, the
+per-PD daily digest, and recoverable Dynamics transport/finalization. Every
+Invited deliverable gets a ledger row on first sight; the legacy direct
+claim-before-send path is deleted.
 
 A dated 2026-07-27 production probe found three `wmkf_granteedeliverable` rows,
 all in `Drafted`: zero day-12-eligible rows, zero past-day-14 rows, zero claimed

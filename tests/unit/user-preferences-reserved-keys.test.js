@@ -24,6 +24,7 @@ import { DatabaseService } from '../../lib/services/database-service';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 
 const RESERVED = PREFERENCE_KEYS.PROMPT_OVERRIDES;
+const EMAIL_AUTOMATION_RESERVED = PREFERENCE_KEYS.EMAIL_AUTOMATION;
 
 function mockRes() {
   return {
@@ -67,5 +68,15 @@ describe('reserved-key guard', () => {
     await handler({ method: 'POST', body: { key: 'reviewer_finder_sender_info', value: 'x' } }, res);
     expect(res.statusCode).toBe(200);
     expect(DatabaseService.setUserPreference).toHaveBeenCalled();
+  });
+
+  it('blocks automatic-email preference writes through the unvalidated generic route', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'POST',
+      body: { key: EMAIL_AUTOMATION_RESERVED, value: '{"mode":"automatic"}' },
+    }, res);
+    expect(res.statusCode).toBe(403);
+    expect(DatabaseService.setUserPreference).not.toHaveBeenCalled();
   });
 });

@@ -175,6 +175,7 @@ describe('happy-path envelope (full pin)', () => {
           code: null,
           addressTrustVerified: false,
           addressConflictPending: false,
+          addressChoice: null,
           potentialReviewerId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
           name: null,
           affiliation: null,

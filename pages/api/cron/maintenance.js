@@ -218,6 +218,17 @@ export default async function handler(req, res) {
       results.portalUploadStaging = { error: error.message };
     }
 
+    // 7.7. Personalized scheduled-email audit/recovery ledger. Delete only
+    // fully finalized sends and explicit stops; unresolved work is retained.
+    try {
+      results.scheduledEmailMessages = await MaintenanceService.cleanupScheduledEmailMessages(
+        config.scheduled_email_messages_days,
+      );
+      totalDeleted += results.scheduledEmailMessages;
+    } catch (error) {
+      results.scheduledEmailMessages = { error: error.message };
+    }
+
     // 8. Dynamics feedback cleanup (20 days after first admin ACK).
     // Owner decision 2026-08-08: reviewed_at is the retention clock; rows
     // without an ACK remain ineligible regardless of status or creation age.

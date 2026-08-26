@@ -17,7 +17,19 @@ related:
 
 ## Status
 
-**OWNER-SETTLED DESIGN 2026-08-26; NOT BUILT.** This document supersedes the
+**OWNER-SETTLED DESIGN 2026-08-26; SOURCE-BUILT SAME DAY on branch
+`codex/scheduled-email-review-p0` (commit `417774f`); adversarially reviewed
+and all three findings fixed same day (digest run ledger + PD handoff
+rebuild — see "Adversarial review outcome" below); migration 036 APPLIED
+to the shared Neon database 2026-08-26 [VERIFIED via read-only probe:
+tracker row 036_scheduled_email_messages.sql + all three tables exist];
+code NOT DEPLOYED (branch unmerged — merge is the enablement).** One scope note against Decision 5: the Reviewers/Invite
+Reviewers panel toggle is deferred to the reviewer-workflow slice — reviewer
+rows key on `wmkf_potentialreviewers`, the flag store keys on contact, and no
+ledger workflow reads reviewer flags yet, so a toggle there would write state
+nothing consumes. The built toggles are the Awardee tab and the
+`/scheduled-emails` inbox; the principle stands and the reviewer placement
+activates with its workflow. This document supersedes the
 decision layer of `docs/SCHEDULED_PERSONALIZED_EMAIL_P0.md` (per-PD
 automatic/review modes, per-message notifications, Profile Settings card,
 global nav item). The P0 document remains the implementation record for the
@@ -32,8 +44,9 @@ which carry over under this design.
 2. **Sends remain personalized.** Mail goes out from the assigned PD's own
    address, so external replies reach that human directly; every automated
    message carries the disclosure that it was sent automatically on the PD's
-   behalf and where replies go. (Both built in P0 — [VERIFIED via
-   lib/services/scheduled-email-service.js `from: message.pd_email`;
+   behalf and where replies go. (Both built in P0 — [RECHECKED after
+   lib/services/scheduled-email-service.js change:
+   `from: message.pd_email` at lib/services/scheduled-email-service.js:268;
    lib/external/automated-email-notice.js `buildAutomatedEmailNotice`].)
 3. **Review is triggered by the recipient, not the sender.** A VIP flag
    marks recipients whose mail waits for explicit PD approval before
@@ -89,22 +102,70 @@ digest's deep-link target), and the per-message review notification.
 
 ## Carry-over from the P0 branch
 
-Survives unchanged ([VERIFIED via this session's review of branch
-`codex/scheduled-email-review-p0`]): the `scheduled_email_messages` ledger
-and leases (`lib/services/scheduled-email-store.js`, migration 036), edit /
+These mechanisms survive the rebuild (their host files were rewritten
+2026-08-26 for the decision layer, the mechanisms carried over): the
+`scheduled_email_messages` ledger and leases
+(`lib/services/scheduled-email-store.js`
+[RECHECKED after lib/services/scheduled-email-store.js change: `locked_until` lease fences at lines 88, 128, 146],
+migration 036), edit /
 approve / stop / send-now actions and routes
 (`pages/api/scheduled-emails/`), send recovery and Dynamics correlation,
-Dataverse finalization (`lib/services/scheduled-email-service.js`),
+Dataverse finalization (`lib/services/scheduled-email-service.js`
+[RECHECKED after lib/services/scheduled-email-service.js change:
+`correlationKey` at lib/services/scheduled-email-service.js:71,
+`finalizeScheduledEmail` at lib/services/scheduled-email-service.js:214]),
 disclosure rendering and the legacy-marker stripper
 (`lib/external/automated-email-notice.js`), and the `/scheduled-emails`
 inbox page.
 
-Rebuilt or new ([PLANNED]): the preference layer (per-PD mode becomes the
-"review everything" override; VIP flag store per (PD, contact) with an
-indexed is-flagged lookup for the cron), a fail-closed due-send guard (a
-VIP-bound or override-covered draft must never send unapproved), the digest
-builder (replacing `notifyScheduledEmailReview`), and the in-context flag
-toggles.
+Rebuilt or new ([BUILT 2026-08-26 on the branch]): the preference layer
+(per-PD mode became the `{ reviewAll }` override; `scheduled_email_vip_flags`
+per (PD, contact) with the indexed `filterVipFlaggedContacts` lookup), the
+fail-closed due-send guard (the store claim refuses an unapproved
+approval-required row; PD send-now is the only bypass), the digest builder
+(replacing the removed `notifyScheduledEmailReview` and its notification
+columns), and the in-context flag toggles (Awardee tab + inbox; Reviewers
+panel deferred per Status).
+
+## Adversarial review outcome (2026-08-26, Codex; all three findings fixed same day)
+
+An owner-invoked Codex adversarial review of the branch returned three
+confirmed findings; the fixes are source-built on the branch:
+
+1. **Digest retries could receipt FYIs the digest never contained** (high).
+   Fixed by the `scheduled_email_digest_runs` ledger: `fyi_message_ids`
+   freezes the rendered membership at first claim, and every stamp path
+   stamps at most that membership — a row sent after today's digest stays
+   unreceipted and appears tomorrow. Accepted direction of error: a mid-run
+   crash can repeat an FYI once; it can never drop one.
+   [RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest stamps parseRecipients(run.fyi_message_ids), never group.sentFyi]
+2. **PD handoff left the former PD's mailbox and posture on unsent rows**
+   (high; live concern — PD rotations planned). Fixed: the cron rebuilds an
+   unsent row in place under the request's current PD (mailbox, name,
+   signature, recipients, and the CURRENT PD's own review-all/VIP posture).
+   **Deliberate product behavior:** the former PD's edits and any prior
+   approval are discarded — a handed-off, previously-approved VIP draft
+   re-enters the new PD's posture, which may be automatic. Reassignment
+   mid-run (after the drift check, before that run's send) and rows deferred
+   by a capped scan self-heal next run.
+   **Transport-state residual (re-review 2026-08-26, fixed via Codex
+   rescue):** a row whose Dynamics activity already exists (created, send
+   failed) is NOT rebuilt — the deliver path prefers the retained activity
+   and the correlation backstop is generation-blind, so a rebuild would send
+   the former PD's frozen content under the new PD's name. Such a row
+   deliberately stays under the former PD until its retry resolves (honest
+   attribution; same mail as a handoff one day later), and the cron reports
+   `pd handoff deferred` in the summary failures list. The full
+   cancel-and-regenerate path (generation-keyed correlation + a Dynamics
+   cancel op the adapter does not have) is deliberately not built.
+   [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail SQL guard — different PD + unsent + no transport state + unleased only]
+3. **Digest creation was not concurrency-safe** (medium). Fixed by the same
+   run ledger: the (PD, day) primary key plus lease is claimed before any
+   Dynamics work; a losing invocation skips without sending or stamping. The
+   Dynamics correlation key remains the crash backstop.
+
+**Retention decision:** `scheduled_email_digest_runs` is deliberately
+unbounded (≤6 PDs × ≤366 rows/PD/year); revisit only if PD count grows.
 
 ## Rollout checklist (procedural guarantees)
 
@@ -113,10 +174,22 @@ toggles.
 2. Apply the schema migration(s) for the VIP flag store; probe live.
 3. First digest cycle observed with a test PD before real recipients.
 
-## Open implementation questions (not owner decisions)
+## Implementation questions (resolved 2026-08-26 at build time)
 
-- VIP flag storage shape: small Postgres table alongside the ledger vs.
-  Dataverse rows per pair. Needs a cheap indexed "is contact C flagged by
-  PD P" lookup from the cron send path.
-- Whether the digest is generated by the existing daily reminders cron or a
-  separate cron entry.
+- VIP flag storage: Postgres `scheduled_email_vip_flags` in migration 036
+  alongside the ledger, primary key (pd_systemuser_id, contact_id) — the
+  cron's indexed is-flagged lookup is `filterVipFlaggedContacts` in
+  `lib/services/scheduled-email-store.js`
+  [RECHECKED after lib/services/scheduled-email-store.js change: exported at line 468].
+- The digest is generated by the existing daily reminders cron
+  (`lib/services/cron/grantee-deliverable-reminders-service.js`), one digest
+  per PD per UTC day, claimed through the `scheduled_email_digest_runs`
+  ledger (lease + frozen FYI membership; the Dynamics correlation key is the
+  crash backstop); sent-FYI rows are receipted via `digest_fyi_at` from the
+  run's frozen membership only.
+  [RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: digest loop unchanged, drift rebuild added before it 2026-08-26]
+- The review-all override (Decision 6) is set from a toggle on the
+  `/scheduled-emails` inbox page through the authenticated
+  `/api/email-automation-preferences` route, value shape
+  `{ reviewAll: boolean }` (redefined freely — no old-shape values were ever
+  deployed).

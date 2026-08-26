@@ -2,7 +2,7 @@
 title: "P0: Personalized scheduled email review"
 domain: email
 kind: plan
-status: active
+status: superseded
 summary: "Source-built P0 for per-PD review preferences, durable drafts, personalized automation disclosure, and recoverable send/finalization."
 canonical: false
 cataloged: 2026-08-25
@@ -18,16 +18,19 @@ related:
 
 ## Status
 
-**SOURCE-BUILT AND FOCUSED-TESTED 2026-08-25; NOT DEPLOYED. DECISION LAYER
-SUPERSEDED 2026-08-26** by `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`: the
-owner replaced per-PD automatic/review modes, per-message notifications, the
-Profile Settings card, and the global nav item with automatic-by-default
-sends, per-(PD, contact) VIP review flags, and a daily digest. This document
-remains the implementation record for the durable ledger, review actions,
-send recovery, and disclosure rendering, which carry over. Migration 036
-has not been applied or live-probed. The first workflow is the automatic
-grantee abstract reminder. No external/third-party review was requested for
-this implementation pass.
+**HISTORICAL IMPLEMENTATION RECORD (2026-08-25 build). DECISION LAYER
+SUPERSEDED AND REBUILT 2026-08-26** per
+`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` (branch commit `417774f`): per-PD
+automatic/review modes, review-lead windows, per-message notifications, the
+Profile Settings card, and the global nav item are removed; automatic
+labeled sends, per-(PD, contact) VIP flags, the review-all override, and the
+daily digest replace them. The ledger, review actions, send recovery, and
+disclosure rendering described below carry over into the rebuilt shape (the
+plan doc is authoritative for current behavior; matrix rows below describing
+review windows/notifications are the dated 2026-08-25 record). Migration 036
+has not been applied or live-probed. The first workflow is the grantee
+abstract reminder. No external/third-party review was requested for either
+implementation pass.
 
 ## Owner decisions implemented
 
@@ -47,7 +50,7 @@ this implementation pass.
 
 | Claim | Producer / entry | Persistence / authority | Consumer | Evidence | Status |
 |---|---|---|---|---|---|
-| PD preference is explicit and validated | Profile Settings → `/api/email-automation-preferences` | Dataverse `wmkf_appuserpreferences.email_automation` | Grantee reminder cron | source + route/preference tests | VERIFIED IN SOURCE |
+| PD preference is explicit and validated | Profile Settings → `/api/email-automation-preferences` | Dataverse `wmkf_appuserpreferences.email_automation` | Grantee reminder cron | source + route/preference tests | [STALE-ACCEPTED: lib/services/email-automation-preferences.js — dated 2026-08-25 record; the rebuild removed the Profile Settings card and redefined the value to `{ reviewAll }`, set from `/scheduled-emails` per the superseding plan doc] |
 | Review lead does not move recipient send | cron schedule calculation | first 08:00 UTC cron tick after full day-12 eligibility; `scheduled_send_at` + `review_available_at` | notification/send processors | shared config + service/cron tests | VERIFIED IN SOURCE |
 | Exact draft/actions survive cron retries | cron creates row; PD PATCH actions | Postgres `scheduled_email_messages` | PD inbox + due-send worker | migration/setup parity + route/service tests | VERIFIED IN SOURCE; NOT LIVE |
 | Browser cannot redirect a send | owned route accepts bounded action fields only | server-owned row recipients/sender/source | Dynamics email creation | route tests + API security matrix | VERIFIED IN SOURCE |

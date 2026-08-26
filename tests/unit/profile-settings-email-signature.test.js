@@ -10,6 +10,7 @@ import { GRANTEE_INVITE_SEED_BODY } from '../../lib/seed/email-defaults/grantee-
 
 const setPreference = jest.fn();
 const deletePreference = jest.fn();
+const refreshPreferences = jest.fn();
 
 jest.mock('../../shared/components/Layout', () => {
   const Layout = ({ children }) => <div>{children}</div>;
@@ -33,6 +34,7 @@ jest.mock('../../shared/context/ProfileContext', () => ({
     },
     setPreference,
     deletePreference,
+    refreshPreferences,
     updateProfile: jest.fn(),
     archiveProfile: jest.fn(),
     selectProfile: jest.fn(),
@@ -42,6 +44,7 @@ jest.mock('../../shared/context/ProfileContext', () => ({
 beforeEach(() => {
   setPreference.mockReset().mockResolvedValue(true);
   deletePreference.mockReset().mockResolvedValue(true);
+  refreshPreferences.mockReset().mockResolvedValue(true);
   global.fetch = jest.fn(async (url) => {
     if (String(url).includes('/api/email-defaults/grantee-invite')) {
       return {
@@ -52,6 +55,12 @@ beforeEach(() => {
           configured: true,
           unavailable: false,
         }),
+      };
+    }
+    if (String(url).includes('/api/email-automation-preferences')) {
+      return {
+        ok: true,
+        json: async () => ({ configured: true, preference: { mode: 'review', leadDays: 3 } }),
       };
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -90,4 +99,10 @@ test('loads and resets the Request Abstract email body from the admin default en
 
   await waitFor(() => expect(deletePreference).toHaveBeenCalledWith(PREFERENCE_KEYS.GRANTEE_INVITE_BODY));
   expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY);
+});
+
+test('the automation preference card stays out of Profile Settings (it lives on /scheduled-emails)', () => {
+  render(<ProfileSettings />);
+  expect(screen.queryByText(/automatic email review/i)).toBeNull();
+  expect(screen.queryByRole('button', { name: /save automatic email setting/i })).toBeNull();
 });

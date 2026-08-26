@@ -229,6 +229,95 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
+### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+
+**Source of truth:** Postgres coordination and audit ledger for personalized
+scheduled email; Dataverse remains workflow authority and Dynamics remains
+email-activity/transport authority. Migration
+`036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
+**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the branch code that writes it is not yet deployed, so the table is empty in production.]**
+
+The first allowlisted workflow is `grantee_abstract_reminder`. One source
+deliverable can own one row, created on the cron's first sight of an Invited
+deliverable. The row freezes the exact server-derived PD, recipients,
+recipient contact GUIDs, subject/body/signature, established day-12 send
+time, and `approval_required` (computed once at creation from the PD's
+review-all override plus VIP flags). It records optimistic versions and PD
+edit/approve/stop attribution; the digest FYI receipt (`digest_fyi_at`);
+recipient Dynamics activity identity, send intent, acceptance receipt, retry
+lease/error; and the final Dataverse repair timestamp. Preview uses a visibly
+non-live placeholder; the grantee token is minted only for a real send.
+**[VERIFIED 2026-08-26 via migration 036, scheduled-email-store.js, and the
+scheduled-email suites on branch `codex/scheduled-email-review-p0`.]**
+
+Read/write paths: `lib/services/scheduled-email-store.js`,
+`lib/services/scheduled-email-service.js`,
+`lib/services/cron/grantee-deliverable-reminders-service.js`, and the
+profile-owned `/api/scheduled-emails` routes. Recipients/sender/source/schedule
+are never client-editable; PATCH actions can edit bounded subject/body (which
+clears any prior approval), approve, stop, or send now under exact PD
+ownership and a version fence. The store's due-send claim refuses an
+`approval_required` row without `approved_at`; the PD's version-fenced
+send-now is the only bypass. A due send freshly rechecks that the deliverable
+is still Invited, persists/reconciles one correlation-keyed Dynamics
+activity, records transport acceptance, and only then finalizes
+`wmkf_granteedeliverable`. A separate pass repairs sent but unfinalized rows
+without re-sending. The per-PD daily digest is the only notification surface;
+its concurrency claim and FYI membership live in
+`scheduled_email_digest_runs` (below). PD handoff: when the request's lead PD
+no longer matches an unsent row, the cron rebuilds the row in place under the
+current PD (mailbox, name, signature, recipients, and the current PD's own
+review posture); the former PD's edits/approval are deliberately cleared, and
+the SQL guard (`reassignScheduledEmail`) fires only for unsent, unleased rows
+owned by a different PD. [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail + claimDigestRun added 2026-08-26]
+[RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest rewritten onto the run ledger 2026-08-26]
+[RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: drift rebuild + reassigned counter added 2026-08-26]
+
+**Retention:** daily maintenance defaults to 365 days and deletes only rows
+that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
+failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
+erase recoverable work. The Dataverse setting
+`retention:scheduled_email_messages_days` may supply a positive override.
+
+**Decision layer:** the 2026-08-26 owner design
+(`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`) is now the built shape on this
+branch: automatic-by-default sends, per-(PD, contact) VIP review flags, digest
+as single interface, and PD onboarding as a rollout precondition (no
+unconfigured runtime state; the legacy direct claim-before-send path is
+deleted).
+
+### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+
+**Source of truth:** Postgres. Per-(PD, contact) VIP review flags
+(`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
+Deliberately per-PD, never global — the flag does not transfer on request
+handoff. Written/read via `lib/services/scheduled-email-store.js` from the
+profile-owned `/api/scheduled-emails/vip-flags` route (toggles render on the
+Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
+reminders cron to freeze `approval_required` at ledger-row creation; any
+flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
+2026-08-26 via migration 036 and scheduled-email-store.js on branch
+`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+
+### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+
+**Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
+2026-08-26 after the branch adversarial review. The primary key
+(`pd_systemuser_id`, `digest_day`) plus a `locked_until` lease is the
+one-digest-per-PD/day concurrency claim; `fyi_message_ids` freezes the exact
+sent-FYI membership rendered into that digest at first claim (never rewritten
+on re-claim); `activity_id` is persisted before transport; `accepted_at` and
+`fyi_stamped_at` are idempotent receipts. Recovery stamps `digest_fyi_at` on
+exactly the frozen membership, so a message sent after the digest stays
+unreceipted and appears in the next day's digest — a duplicate FYI is
+possible after a mid-run crash, a dropped FYI is not. Written/read only by
+`lib/services/scheduled-email-store.js` (claim/record/mark helpers) and
+consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
+unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
+materially. **[VERIFIED 2026-08-26 via migration 036,
+scheduled-email-store.js, and the digest tests in
+tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+
 ## Portal upload staging
 
 ### `portal_upload_staging` (migration 031)

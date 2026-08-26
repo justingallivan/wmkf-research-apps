@@ -159,6 +159,11 @@ export default function AwardeeTab({ requestId, context }) {
   // shape without pulling in its batch/per-candidate machinery.
   const [sendStep, setSendStep] = useState(null);
   const [recipients, setRecipients] = useState(null);
+  // The signed-in PD's own per-contact VIP review flags ("flag them where you
+  // see them"): flagged recipients make future automated mail wait for that
+  // PD's approval. Null until loaded so the toggles don't flash unchecked.
+  const [vipContactIds, setVipContactIds] = useState(null);
+  const [savingVipContactId, setSavingVipContactId] = useState(null);
   const [toEmail, setToEmail] = useState('');
   const [ccEmail, setCcEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -263,6 +268,36 @@ export default function AwardeeTab({ requestId, context }) {
       }
     } catch { /* recipients are optional context; staff can still type them */ }
   }, [requestId]);
+
+  const loadVipFlags = useCallback(async () => {
+    try {
+      const res = await fetch('/api/scheduled-emails/vip-flags');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setVipContactIds(new Set((data.flags || []).map((flag) => flag.contactId)));
+    } catch { /* flags are an optional affordance; the tab still works */ }
+  }, []);
+
+  const toggleVipFlag = useCallback(async (contactId, flagged) => {
+    setSavingVipContactId(contactId);
+    try {
+      const res = await fetch('/api/scheduled-emails/vip-flags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, flagged }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setVipContactIds((current) => {
+          const next = new Set(current || []);
+          if (data.flagged) next.add(data.contactId);
+          else next.delete(data.contactId);
+          return next;
+        });
+      }
+    } finally {
+      setSavingVipContactId(null);
+    }
+  }, []);
 
   // Load the EFFECTIVE abstract (approved once the grantee has submitted, else the
   // draft) so the PD can review/edit whatever will publish — including a
@@ -381,6 +416,7 @@ export default function AwardeeTab({ requestId, context }) {
     loadEmailDefaults();
   }, [loadEmailDefaults, currentProfile?.id]);
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
+  useEffect(() => { loadVipFlags(); }, [loadVipFlags]);
   useEffect(() => { loadAbstract(); }, [loadAbstract]);
 
   // Identity reset (the un-latch): when the producing identity changes — the request
@@ -1139,10 +1175,34 @@ export default function AwardeeTab({ requestId, context }) {
           <input aria-label="To email" value={toEmail} onChange={(e) => setToEmail(e.target.value)} className="w-full border rounded p-1" />
           {recipients?.pi?.name && <span className="text-xs text-gray-500"> {recipients.pi.name}</span>}
         </label>
+        {vipContactIds !== null && recipients?.pi?.contactId && (
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={vipContactIds.has(recipients.pi.contactId)}
+              disabled={savingVipContactId === recipients.pi.contactId}
+              onChange={(e) => toggleVipFlag(recipients.pi.contactId, e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300"
+            />
+            Always review automated emails to {recipients.pi.name || 'this PI'} before sending (future messages only)
+          </label>
+        )}
         <label className="block text-sm">Cc (liaison)
           <input aria-label="Cc email" value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} className="w-full border rounded p-1" />
           {recipients?.liaison?.name && <span className="text-xs text-gray-500"> {recipients.liaison.name}</span>}
         </label>
+        {vipContactIds !== null && recipients?.liaison?.contactId && (
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={vipContactIds.has(recipients.liaison.contactId)}
+              disabled={savingVipContactId === recipients.liaison.contactId}
+              onChange={(e) => toggleVipFlag(recipients.liaison.contactId, e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300"
+            />
+            Always review automated emails to {recipients.liaison.name || 'this liaison'} before sending (future messages only)
+          </label>
+        )}
         <label className="block text-sm">Subject
           <input aria-label="Subject" value={subject} onChange={handleSubjectChange} className="w-full border rounded p-1" />
         </label>

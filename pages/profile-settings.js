@@ -4,7 +4,10 @@
  * Self-service surface for the staff user's own linked profile. Each Entra
  * account links to exactly one profile via /api/auth/link-profile during
  * first-login; this page exposes display-name, avatar color, and archive on
- * that profile. Profile creation is intentionally not exposed here.
+ * that profile plus its user-owned email signature and template preferences.
+ * The scheduled-email review posture (review-all override, VIP flags) lives
+ * on /scheduled-emails, not here. Profile creation is intentionally not
+ * exposed here.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -299,7 +302,7 @@ export default function ProfileSettings() {
       <div className="py-8 space-y-8">
         {/* Error Display */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {error}
           </div>
         )}

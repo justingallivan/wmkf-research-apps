@@ -19,7 +19,10 @@ import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
 // enforces the `reviewers` app grant and validates the body (S222). Blocking it
 // here keeps the gated endpoint the sole write path even though this endpoint is
 // only auth-gated (any signed-in profile).
-const RESERVED_WRITE_KEYS = new Set([PREFERENCE_KEYS.PROMPT_OVERRIDES]);
+const RESERVED_WRITE_KEYS = new Set([
+  PREFERENCE_KEYS.PROMPT_OVERRIDES,
+  PREFERENCE_KEYS.EMAIL_AUTOMATION,
+]);
 
 export default async function handler(req, res) {
   // Require authentication and extract profile ID from session

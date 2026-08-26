@@ -879,6 +879,101 @@ const v40Statements = [
      WHERE site_visit_id IS NOT NULL`,
 ];
 
+// V41: approval and send-recovery ledger for personalized automated email,
+// plus per-PD VIP recipient flags (docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md).
+// Existing databases use migration 036_scheduled_email_messages.sql.
+const v41Statements = [
+  `CREATE TABLE IF NOT EXISTS scheduled_email_messages (
+    id UUID PRIMARY KEY,
+    workflow_type TEXT NOT NULL CONSTRAINT scheduled_email_workflow_check
+      CHECK (workflow_type IN ('grantee_abstract_reminder')),
+    source_record_id UUID NOT NULL,
+    request_id UUID NOT NULL,
+    deliverable_id UUID NOT NULL,
+    pd_systemuser_id UUID NOT NULL,
+    pd_name TEXT NOT NULL,
+    pd_email TEXT NOT NULL,
+    to_recipients JSONB NOT NULL,
+    cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+    recipient_name TEXT NOT NULL,
+    recipient_contact_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    subject TEXT NOT NULL,
+    body_text TEXT NOT NULL,
+    signature_text TEXT NOT NULL,
+    scheduled_send_at TIMESTAMPTZ NOT NULL,
+    approval_required BOOLEAN NOT NULL DEFAULT false,
+    status TEXT NOT NULL DEFAULT 'scheduled' CONSTRAINT scheduled_email_status_check
+      CHECK (status IN ('scheduled', 'sending', 'sent', 'stopped', 'failed')),
+    version INTEGER NOT NULL DEFAULT 1 CONSTRAINT scheduled_email_version_check CHECK (version >= 1),
+    reviewed_at TIMESTAMPTZ,
+    approved_at TIMESTAMPTZ,
+    edited_at TIMESTAMPTZ,
+    stopped_at TIMESTAMPTZ,
+    actioned_by_profile_id BIGINT,
+    digest_fyi_at TIMESTAMPTZ,
+    dynamics_email_id UUID,
+    dynamics_statecode INTEGER,
+    dynamics_statuscode INTEGER,
+    dynamics_senton TIMESTAMPTZ,
+    send_requested_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
+    finalized_at TIMESTAMPTZ,
+    attempt_count INTEGER NOT NULL DEFAULT 0 CONSTRAINT scheduled_email_attempt_count_check CHECK (attempt_count >= 0),
+    lease_token UUID,
+    locked_until TIMESTAMPTZ,
+    last_error_code TEXT,
+    last_error_message TEXT,
+    last_failed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT scheduled_email_recipient_shape CHECK (
+      jsonb_typeof(to_recipients) = 'array' AND jsonb_array_length(to_recipients) > 0
+      AND jsonb_typeof(cc_recipients) = 'array'
+      AND jsonb_typeof(recipient_contact_ids) = 'array'),
+    CONSTRAINT scheduled_email_lease_shape CHECK (
+      (lease_token IS NULL AND locked_until IS NULL)
+      OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)),
+    CONSTRAINT scheduled_email_sent_shape CHECK (
+      (status = 'sent' AND dynamics_email_id IS NOT NULL
+        AND send_requested_at IS NOT NULL AND sent_at IS NOT NULL)
+      OR status <> 'sent'),
+    CONSTRAINT scheduled_email_stopped_shape CHECK (
+      (status = 'stopped' AND stopped_at IS NOT NULL) OR status <> 'stopped'),
+    CONSTRAINT scheduled_email_source_unique UNIQUE (workflow_type, source_record_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_scheduled_email_pd_history
+     ON scheduled_email_messages (pd_systemuser_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_scheduled_email_due_send
+     ON scheduled_email_messages (scheduled_send_at, locked_until)
+     WHERE status IN ('scheduled', 'failed', 'sending')`,
+  `CREATE INDEX IF NOT EXISTS idx_scheduled_email_finalize
+     ON scheduled_email_messages (sent_at, finalized_at)
+     WHERE status = 'sent' AND finalized_at IS NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_scheduled_email_digest_fyi
+     ON scheduled_email_messages (pd_systemuser_id, sent_at)
+     WHERE status = 'sent' AND digest_fyi_at IS NULL`,
+  `CREATE TABLE IF NOT EXISTS scheduled_email_vip_flags (
+    pd_systemuser_id UUID NOT NULL,
+    contact_id UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (pd_systemuser_id, contact_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs (
+    pd_systemuser_id UUID NOT NULL,
+    digest_day DATE NOT NULL,
+    fyi_message_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    activity_id UUID,
+    accepted_at TIMESTAMPTZ,
+    fyi_stamped_at TIMESTAMPTZ,
+    locked_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (pd_systemuser_id, digest_day),
+    CONSTRAINT scheduled_email_digest_membership_shape
+      CHECK (jsonb_typeof(fyi_message_ids) = 'array')
+  )`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1622,6 +1717,24 @@ async function runMigration() {
       }
     }
 
+    // Run V41 table creation (scheduled personalized email review ledger)
+    console.log(`\nApplying v41 schema updates - Scheduled email messages (${v41Statements.length} statements)...`);
+    for (let i = 0; i < v41Statements.length; i++) {
+      const statement = v41Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v41-${i + 1}/${v41Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v41-${i + 1}/${v41Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v41-${i + 1}/${v41Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1682,6 +1795,8 @@ async function runMigration() {
     console.log('  • portal_upload_staging (actor-bound private Blob staging + finalize idempotency)');
     console.log('\nV40 new table (Frozen Pre-Site distribution):');
     console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
+    console.log('\nV41 new table (Scheduled personalized email review):');
+    console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
     console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
 
   } catch (error) {

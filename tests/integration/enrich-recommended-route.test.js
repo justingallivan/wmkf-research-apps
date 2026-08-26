@@ -411,6 +411,7 @@ describe('happy path (progress ordering + full card payload)', () => {
         code: null,
         addressTrustVerified: false,
         addressConflictPending: false,
+        addressChoice: null,
         potentialReviewerId: PR,
         name: null,
         affiliation: 'Rec University',
