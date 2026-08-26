@@ -4,8 +4,10 @@
  * Self-service surface for the staff user's own linked profile. Each Entra
  * account links to exactly one profile via /api/auth/link-profile during
  * first-login; this page exposes display-name, avatar color, and archive on
- * that profile plus its user-owned email signature, template, and automatic
- * email review preferences. Profile creation is intentionally not exposed here.
+ * that profile plus its user-owned email signature and template preferences.
+ * The scheduled-email review posture (review-all override, VIP flags) lives
+ * on /scheduled-emails, not here. Profile creation is intentionally not
+ * exposed here.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -16,13 +18,6 @@ import {
   readEmailSignaturePreference,
   serializeEmailSignaturePreference,
 } from '../shared/config/reviewerFinderPreferences';
-import {
-  EMAIL_AUTOMATION_MODE,
-  MAX_REVIEW_LEAD_DAYS,
-  MIN_REVIEW_LEAD_DAYS,
-  SUGGESTED_REVIEW_LEAD_DAYS,
-  normalizeEmailAutomationPreference,
-} from '../shared/config/emailAutomation';
 import EmailTemplatesModal from '../shared/components/reviewers/EmailTemplatesModal';
 import { TEMPLATE_TYPE_LABELS, TEMPLATE_TYPES } from '../shared/components/reviewers/email-template-store';
 
@@ -51,7 +46,6 @@ export default function ProfileSettings() {
     preferences,
     setPreference,
     deletePreference,
-    refreshPreferences,
     status,
   } = useProfile();
 
@@ -85,18 +79,6 @@ export default function ProfileSettings() {
   const loadedInviteBodySourceRef = useRef('');
   const inviteBodyDirtyRef = useRef(false);
   const inviteBodyPreference = preferences?.[PREFERENCE_KEYS.GRANTEE_INVITE_BODY] || '';
-
-  // Explicit automatic-email choice. Absence is intentionally distinct from
-  // either mode so rollout never silently chooses on a PD's behalf.
-  const automationPreferenceRaw = preferences?.[PREFERENCE_KEYS.EMAIL_AUTOMATION] || '';
-  const [automationForm, setAutomationForm] = useState({
-    mode: EMAIL_AUTOMATION_MODE.REVIEW,
-    leadDays: SUGGESTED_REVIEW_LEAD_DAYS,
-  });
-  const [automationConfigured, setAutomationConfigured] = useState(false);
-  const [isSavingAutomation, setIsSavingAutomation] = useState(false);
-  const [automationStatus, setAutomationStatus] = useState(null);
-  const loadedAutomationSourceRef = useRef('');
 
   // Reviewer email templates (the 6-type set sent from Workbench → Reviewers).
   // Edited in the shared EmailTemplatesModal, which loads/saves via the same
@@ -182,20 +164,6 @@ export default function ProfileSettings() {
       });
     return () => { cancelled = true; };
   }, [status, currentProfile?.id]);
-
-  useEffect(() => {
-    if (status !== 'ready') return;
-    const sourceKey = `${currentProfile?.id || ''}::${automationPreferenceRaw}`;
-    if (sourceKey === loadedAutomationSourceRef.current) return;
-    const parsed = normalizeEmailAutomationPreference(automationPreferenceRaw);
-    setAutomationConfigured(parsed !== null);
-    setAutomationForm(parsed || {
-      mode: EMAIL_AUTOMATION_MODE.REVIEW,
-      leadDays: SUGGESTED_REVIEW_LEAD_DAYS,
-    });
-    setAutomationStatus(null);
-    loadedAutomationSourceRef.current = sourceKey;
-  }, [status, currentProfile?.id, automationPreferenceRaw]);
 
   // Reset form when closing
   const resetForm = () => {
@@ -310,32 +278,6 @@ export default function ProfileSettings() {
     }
   };
 
-  const handleSaveAutomation = async (e) => {
-    e.preventDefault();
-    if (!currentProfile) return;
-    setIsSavingAutomation(true);
-    setError(null);
-    setAutomationStatus(null);
-    try {
-      const response = await fetch('/api/email-automation-preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(automationForm),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Failed to save email automation preference.');
-      setAutomationConfigured(true);
-      setAutomationForm(data.preference);
-      setAutomationStatus('saved');
-      await refreshPreferences(currentProfile.id);
-    } catch (err) {
-      setAutomationStatus('error');
-      setError(err.message || 'Failed to save email automation preference.');
-    } finally {
-      setIsSavingAutomation(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <Layout title="Profile Settings" maxWidth="4xl">
@@ -389,108 +331,6 @@ export default function ProfileSettings() {
                 </div>
               </div>
             </div>
-          </Card>
-        )}
-
-        {currentProfile && (
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Automatic Email Review</h2>
-              {automationStatus === 'saved' && (
-                <span className="text-sm text-green-700">Saved</span>
-              )}
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Choose how scheduled automated messages sent on your behalf are handled.
-              This setting initially applies to Request Abstract reminders.
-            </p>
-            {!automationConfigured && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                No choice has been saved yet. Select an option below to join the new scheduled-email flow.
-              </div>
-            )}
-            <form onSubmit={handleSaveAutomation} className="space-y-4">
-              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
-                <input
-                  id="email-automation-automatic"
-                  type="radio"
-                  name="emailAutomationMode"
-                  value={EMAIL_AUTOMATION_MODE.AUTOMATIC}
-                  checked={automationForm.mode === EMAIL_AUTOMATION_MODE.AUTOMATIC}
-                  onChange={() => {
-                    setAutomationForm({ mode: EMAIL_AUTOMATION_MODE.AUTOMATIC });
-                    setAutomationStatus(null);
-                  }}
-                  className="mt-1 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <label htmlFor="email-automation-automatic">
-                  <span className="block text-sm font-medium text-gray-900">Send automatically</span>
-                  <span className="block text-sm text-gray-600">
-                    Messages send at their normal scheduled time without an advance review prompt.
-                  </span>
-                </label>
-              </div>
-              <div className="flex items-start gap-3 rounded-lg border border-gray-200 p-4">
-                <input
-                  id="email-automation-review"
-                  type="radio"
-                  name="emailAutomationMode"
-                  value={EMAIL_AUTOMATION_MODE.REVIEW}
-                  checked={automationForm.mode === EMAIL_AUTOMATION_MODE.REVIEW}
-                  onChange={() => {
-                    setAutomationForm((prev) => ({
-                      mode: EMAIL_AUTOMATION_MODE.REVIEW,
-                      leadDays: prev.leadDays || SUGGESTED_REVIEW_LEAD_DAYS,
-                    }));
-                    setAutomationStatus(null);
-                  }}
-                  className="mt-1 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <div className="flex-1">
-                  <label htmlFor="email-automation-review">
-                    <span className="block text-sm font-medium text-gray-900">Notify me before automatic sending</span>
-                    <span className="block text-sm text-gray-600">
-                      You may edit, approve, send early, or stop a message. If you do nothing, it still sends at its normal time.
-                    </span>
-                  </label>
-                  {automationForm.mode === EMAIL_AUTOMATION_MODE.REVIEW && (
-                    <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-                      Notify me
-                      <input
-                        aria-label="Calendar days before the scheduled send"
-                        type="number"
-                        min={MIN_REVIEW_LEAD_DAYS}
-                        max={MAX_REVIEW_LEAD_DAYS}
-                        value={automationForm.leadDays}
-                        onChange={(e) => {
-                          setAutomationForm({
-                            mode: EMAIL_AUTOMATION_MODE.REVIEW,
-                            leadDays: Number(e.target.value),
-                          });
-                          setAutomationStatus(null);
-                        }}
-                        className="w-20 rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
-                      />
-                      calendar days before the scheduled send.
-                    </label>
-                  )}
-                </div>
-              </div>
-              {automationStatus === 'error' && (
-                <p className="text-sm text-red-700">Could not save the automatic-email preference.</p>
-              )}
-              <div className="flex justify-end">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  type="submit"
-                  disabled={isSavingAutomation}
-                  loading={isSavingAutomation}
-                >
-                  Save Automatic Email Setting
-                </Button>
-              </div>
-            </form>
           </Card>
         )}
 

@@ -22,10 +22,16 @@ function statusLabel(message) {
   if (message.status === 'sent') return 'Sent';
   if (message.status === 'stopped') return 'Stopped';
   if (message.status === 'sending') return 'Sending';
-  if (message.status === 'failed') return 'Send failed — retry available';
+  const waitingApproval = message.approvalRequired && !message.approvedAt;
+  if (message.status === 'failed') {
+    return waitingApproval
+      ? 'Send failed — waiting for your approval'
+      : 'Send failed — retry available';
+  }
+  if (waitingApproval) return 'Waiting for your approval — will not send';
   if (message.editedAt) return 'Edited and scheduled';
-  if (message.approvedAt) return 'Reviewed and scheduled';
-  return 'Review available — will send automatically';
+  if (message.approvedAt) return 'Approved and scheduled';
+  return 'Scheduled — will send automatically';
 }
 
 export default function ScheduledEmailsPage() {
@@ -38,6 +44,71 @@ export default function ScheduledEmailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // Review posture: the coarse review-all override plus this PD's VIP flags.
+  const [reviewAll, setReviewAll] = useState(null);
+  const [savingReviewAll, setSavingReviewAll] = useState(false);
+  const [vipContactIds, setVipContactIds] = useState(new Set());
+  const [savingVip, setSavingVip] = useState(false);
+
+  useEffect(() => {
+    if (profileStatus !== 'ready' || !currentProfile?.id) return;
+    const controller = new AbortController();
+    Promise.all([
+      fetch('/api/email-automation-preferences', { signal: controller.signal })
+        .then((response) => response.json().catch(() => ({}))),
+      fetch('/api/scheduled-emails/vip-flags', { signal: controller.signal })
+        .then((response) => response.json().catch(() => ({}))),
+    ])
+      .then(([preference, flags]) => {
+        setReviewAll(preference?.preference?.reviewAll === true);
+        setVipContactIds(new Set((flags?.flags || []).map((flag) => flag.contactId)));
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [profileStatus, currentProfile?.id]);
+
+  const saveReviewAll = async (next) => {
+    setSavingReviewAll(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/email-automation-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewAll: next }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not save your review preference.');
+      setReviewAll(data.preference.reviewAll);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingReviewAll(false);
+    }
+  };
+
+  const saveVipFlag = async (contactId, flagged) => {
+    setSavingVip(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/scheduled-emails/vip-flags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, flagged }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not update the review flag.');
+      setVipContactIds((current) => {
+        const next = new Set(current);
+        if (data.flagged) next.add(data.contactId);
+        else next.delete(data.contactId);
+        return next;
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingVip(false);
+    }
+  };
 
   useEffect(() => {
     if (!router.isReady || profileStatus !== 'ready' || !currentProfile?.id) return;
@@ -116,13 +187,32 @@ export default function ScheduledEmailsPage() {
         {error && (
           <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
         )}
+        {reviewAll !== null && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4">
+            <label className="flex items-center gap-3 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={reviewAll}
+                disabled={savingReviewAll}
+                onChange={(event) => saveReviewAll(event.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>
+                <span className="block font-medium text-gray-900">Review every automated email before it sends</span>
+                <span className="block text-gray-600">
+                  Off: only mail to recipients you flag waits for approval. Applies to future messages only.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
         {loading ? (
           <div className="py-12 text-center text-gray-500">Loading scheduled emails…</div>
         ) : messages.length === 0 ? (
           <Card>
             <div className="py-10 text-center">
               <h2 className="text-lg font-medium text-gray-900">No scheduled emails</h2>
-              <p className="mt-2 text-sm text-gray-600">Messages will appear here when they enter your review window.</p>
+              <p className="mt-2 text-sm text-gray-600">Messages appear here as soon as an automated reminder is scheduled for one of your grants.</p>
             </div>
           </Card>
         ) : (
@@ -170,6 +260,21 @@ export default function ScheduledEmailsPage() {
                   <div className="mt-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
                     {selected.automationNotice}
                   </div>
+                  {selected.recipientContactIds?.length > 0 && (
+                    <label className="mt-4 flex items-center gap-3 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={vipContactIds.has(selected.recipientContactIds[0])}
+                        disabled={savingVip}
+                        onChange={(event) => saveVipFlag(selected.recipientContactIds[0], event.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>
+                        Always review emails to {selected.recipientName} before sending.
+                        <span className="text-gray-500"> Applies to future messages only.</span>
+                      </span>
+                    </label>
+                  )}
                 </Card>
 
                 <Card>

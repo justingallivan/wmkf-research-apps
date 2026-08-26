@@ -101,18 +101,8 @@ test('loads and resets the Request Abstract email body from the admin default en
   expect(screen.getByLabelText('Email body')).toHaveValue(GRANTEE_INVITE_SEED_BODY);
 });
 
-test('saves a validated three-day advance-review choice through the dedicated route', async () => {
+test('the automation preference card stays out of Profile Settings (it lives on /scheduled-emails)', () => {
   render(<ProfileSettings />);
-  fireEvent.click(screen.getByLabelText(/notify me before automatic sending/i));
-  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '3' } });
-  fireEvent.click(screen.getByRole('button', { name: /save automatic email setting/i }));
-
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    '/api/email-automation-preferences',
-    expect.objectContaining({
-      method: 'PUT',
-      body: JSON.stringify({ mode: 'review', leadDays: 3 }),
-    }),
-  ));
-  expect(refreshPreferences).toHaveBeenCalledWith(1);
+  expect(screen.queryByText(/automatic email review/i)).toBeNull();
+  expect(screen.queryByRole('button', { name: /save automatic email setting/i })).toBeNull();
 });

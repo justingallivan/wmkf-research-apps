@@ -1,9 +1,11 @@
 /**
  * API: /api/email-automation-preferences
  *
- * Authenticated self-service read/write for the assigned PD's explicit
- * automatic-email choice. The generic preference route reserves this key so
- * its bounded mode/lead-day contract cannot be bypassed.
+ * Authenticated self-service read/write for the PD's review-all override
+ * ({ reviewAll: boolean }): whether every automated email waits for their
+ * approval, or only mail to their VIP-flagged recipients. The generic
+ * preference route reserves this key so the bounded contract cannot be
+ * bypassed.
  */
 
 import { DatabaseService } from '../../lib/services/database-service';
@@ -38,7 +40,7 @@ export default async function handler(req, res) {
     const preference = normalizeEmailAutomationPreference(req.body);
     if (!preference) {
       return res.status(400).json({
-        error: 'Choose automatic sending or a review period from 1 to 14 days.',
+        error: 'Choose whether every automated email should wait for your review.',
       });
     }
 

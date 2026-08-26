@@ -1,9 +1,13 @@
 /** @jest-environment node */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   deliverScheduledEmail,
+  groupDigestRowsByPd,
   renderScheduledEmailPreview,
   scheduledSendAtForInvitation,
+  sendScheduledEmailDigest,
 } from '../../lib/services/scheduled-email-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 
@@ -23,8 +27,8 @@ function message(overrides = {}) {
     body_text: 'Dear Professor Reiter,\n\nPlease review your abstract.\n\nThank you,',
     signature_text: 'Jean Kim\nW. M. Keck Foundation',
     scheduled_send_at: '2026-08-30T08:00:00.000Z',
-    review_available_at: '2026-08-27T08:00:00.000Z',
-    review_lead_days: 3,
+    approval_required: false,
+    recipient_contact_ids: ['11111111-1111-4111-8111-111111111111'],
     status: 'scheduled',
     version: 1,
     lease_token: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -158,4 +162,111 @@ test('an accepted correlated Dynamics activity is reconciled without minting or 
   expect(deps.createEmailActivity).not.toHaveBeenCalled();
   expect(deps.sendEmail).not.toHaveBeenCalled();
   expect(deps.recordSent).toHaveBeenCalled();
+});
+
+/* ------------------------------ digest tests ----------------------------- */
+
+function digestRow(over = {}) {
+  return {
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+    pd_systemuser_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    pd_name: 'Jean Kim',
+    pd_email: 'jean@example.org',
+    recipient_name: 'Professor Reiter',
+    subject: 'Reminder: abstract due',
+    scheduled_send_at: '2026-08-30T08:00:00.000Z',
+    status: 'scheduled',
+    approval_required: false,
+    approved_at: null,
+    ...over,
+  };
+}
+
+test('digest grouping places each row in exactly one section per PD', () => {
+  const rows = [
+    digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', approval_required: true }),
+    digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2' }),
+    digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', approval_required: true, approved_at: '2026-08-25T00:00:00Z' }),
+    digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', status: 'sent' }),
+    digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5', pd_systemuser_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1' }),
+  ];
+  const groups = groupDigestRowsByPd(rows);
+  expect(groups).toHaveLength(2);
+  const jean = groups.find((g) => g.pdSystemUserId === 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+  expect(jean.approvalPending.map((r) => r.id)).toEqual(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1']);
+  // An approved approval_required row is "upcoming", not pending.
+  expect(jean.upcoming.map((r) => r.id)).toEqual([
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3',
+  ]);
+  expect(jean.sentFyi.map((r) => r.id)).toEqual(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
+});
+
+function digestDeps(existing = null) {
+  return {
+    findEmailByCorrelation: jest.fn(async () => (existing ? [existing] : [])),
+    createEmailActivity: jest.fn(async () => 'digest-email-1'),
+    getEmailActivity: jest.fn(async () => ({ activityid: 'digest-email-1', statuscode: 1 })),
+    sendEmail: jest.fn(async () => undefined),
+    markDigestFyi: jest.fn(async (ids) => ids.length),
+  };
+}
+
+test('digest sends once per PD per day, mentions each section, and stamps FYI receipts', async () => {
+  process.env.NEXTAUTH_URL = 'https://apps.example.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
+  const deps = digestDeps();
+  const group = {
+    pdSystemUserId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    pdName: 'Jean Kim',
+    pdEmail: 'jean@example.org',
+    approvalPending: [digestRow({ approval_required: true })],
+    upcoming: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2' })],
+    sentFyi: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', status: 'sent' })],
+  };
+  const outcome = await sendScheduledEmailDigest(group, deps);
+  expect(outcome).toEqual({ sent: true, fyiStamped: 1 });
+  const created = deps.createEmailActivity.mock.calls[0][0];
+  expect(created.to).toBe('jean@example.org');
+  expect(created.correlationKey).toMatch(/^wmkf-scheduled-digest:dddddddd-dddd-4ddd-8ddd-dddddddddddd:\d{4}-\d{2}-\d{2}$/);
+  expect(created.body).toContain('Waiting on your approval');
+  expect(created.body).toContain('Sending soon unless you act');
+  expect(created.body).toContain('Sent on your behalf');
+  expect(deps.sendEmail).toHaveBeenCalledWith('digest-email-1');
+  expect(deps.markDigestFyi).toHaveBeenCalledWith(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
+});
+
+test('a cron retry after an accepted digest skips the send but still stamps FYIs', async () => {
+  process.env.NEXTAUTH_URL = 'https://apps.example.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
+  const deps = digestDeps({ activityid: 'digest-email-1', statuscode: 6 });
+  const group = {
+    pdSystemUserId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    pdName: 'Jean Kim',
+    pdEmail: 'jean@example.org',
+    approvalPending: [],
+    upcoming: [],
+    sentFyi: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', status: 'sent' })],
+  };
+  const outcome = await sendScheduledEmailDigest(group, deps);
+  expect(outcome).toEqual({ sent: true, fyiStamped: 1 });
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+  expect(deps.markDigestFyi).toHaveBeenCalledWith(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
+});
+
+/* --------------------------- approval guard pin -------------------------- */
+
+test('the store claim and due-list SQL both refuse unapproved approval_required rows', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const guard = /approval_required = false\s*\n\s*OR approved_at IS NOT NULL/;
+  const claimSection = store.slice(store.indexOf('claimScheduledEmailSend'));
+  const dueSection = store.slice(store.indexOf('listDueScheduledEmails'), store.indexOf('listUnfinalizedScheduledEmails'));
+  expect(claimSection).toMatch(guard);
+  expect(dueSection).toMatch(/approval_required = false OR approved_at IS NOT NULL/);
+  // force (the PD's version-fenced send-now) must be the only bypass.
+  expect(claimSection).toContain('${force}::boolean = true\n            OR approval_required = false');
 });

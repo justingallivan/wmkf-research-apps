@@ -12,11 +12,8 @@ const CONSTRAINT_NAMES = [
   'scheduled_email_workflow_check',
   'scheduled_email_status_check',
   'scheduled_email_recipient_shape',
-  'scheduled_email_review_days_check',
-  'scheduled_email_review_time_check',
   'scheduled_email_attempt_count_check',
   'scheduled_email_lease_shape',
-  'scheduled_email_notification_lease_shape',
   'scheduled_email_sent_shape',
   'scheduled_email_stopped_shape',
   'scheduled_email_source_unique',
@@ -29,11 +26,12 @@ test('migration 036 and fresh install declare the same scheduled-email constrain
   }
 });
 
-test('migration 036 and fresh install retain the recovery and audit columns', () => {
+test('migration 036 and fresh install retain the approval, recovery, and audit columns', () => {
   for (const column of [
-    'review_available_at',
+    'approval_required',
+    'recipient_contact_ids',
+    'digest_fyi_at',
     'actioned_by_profile_id',
-    'notification_email_id',
     'dynamics_email_id',
     'send_requested_at',
     'finalized_at',
@@ -44,7 +42,29 @@ test('migration 036 and fresh install retain the recovery and audit columns', ()
   }
 });
 
+test('the retired review-window/notification columns stay out of both shapes', () => {
+  for (const column of [
+    'review_available_at',
+    'review_lead_days',
+    'notification_email_id',
+    'notification_lease_token',
+    'notified_at',
+  ]) {
+    expect(migration).not.toContain(column);
+    expect(setup).not.toContain(column);
+  }
+});
+
 test('migration 036 and fresh install keep the same source-level uniqueness contract', () => {
   expect(migration).toContain('CONSTRAINT scheduled_email_source_unique UNIQUE (workflow_type, source_record_id)');
   expect(setup).toContain('CONSTRAINT scheduled_email_source_unique UNIQUE (workflow_type, source_record_id)');
+});
+
+test('migration 036 and fresh install both create the per-PD VIP flag table', () => {
+  const table = 'CREATE TABLE IF NOT EXISTS scheduled_email_vip_flags';
+  const pair = 'PRIMARY KEY (pd_systemuser_id, contact_id)';
+  expect(migration).toContain(table);
+  expect(setup).toContain(table);
+  expect(migration).toContain(pair);
+  expect(setup).toContain(pair);
 });
