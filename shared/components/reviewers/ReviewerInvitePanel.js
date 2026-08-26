@@ -229,6 +229,10 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
 
   useEffect(() => {
     if (!requestId) return undefined;
+    // Toggles stay disabled until this GET succeeds (vipLoaded), so no PUT
+    // can land while the load is in flight — a slow initial GET can never
+    // clobber a just-completed toggle with its pre-PUT snapshot.
+    setVipLoaded(false);
     const controller = new AbortController();
     (async () => {
       try {
@@ -251,7 +255,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
 
   const toggleVip = async (candidate) => {
     const personId = candidate.potentialReviewerId;
-    if (!personId || vipSavingId) return;
+    if (!personId || !vipLoaded || vipSavingId) return;
     const flagged = !vipIds.has(personId);
     setVipSavingId(personId);
     try {
@@ -557,7 +561,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                         <button
                           type="button"
                           onClick={() => toggleVip(c)}
-                          disabled={vipSavingId === c.potentialReviewerId}
+                          disabled={!vipLoaded || vipSavingId === c.potentialReviewerId}
                           className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-medium rounded ${
                             vipIds.has(c.potentialReviewerId)
                               ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'

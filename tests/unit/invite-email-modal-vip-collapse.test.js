@@ -131,6 +131,24 @@ test('vipUnknown (flags failed to load) renders EVERY draft full — a read fail
   expect(screen.queryByText(/standard invitations? ready/)).toBeNull();
 });
 
+test('a draft that would fail the send-time body-integrity gate renders FULL — collapse never hides a missing link or unresolved token', async () => {
+  mockRender([
+    draft('S1', 'VIP Person'),
+    // Missing the secure /external/review/ link → server would withhold it.
+    draft('S2', 'Standard One', { body: 'Please use your secure personal link:\n' }),
+    // Unresolved {{token}} → server would withhold it.
+    draft('S3', 'Standard Two', { body: 'Dear {{candidateName}},\nhttps://reviews.wmkeck.org/external/review/token.value' }),
+  ]);
+  render(
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} onClose={() => {}} onSent={() => {}} />,
+  );
+  // Both defective drafts get full editable cards despite vip:false…
+  await waitFor(() => expect(screen.getByDisplayValue('Invitation for Standard One')).toBeTruthy());
+  expect(screen.getByDisplayValue('Invitation for Standard Two')).toBeTruthy();
+  // …so nothing is left to collapse.
+  expect(screen.queryByText(/standard invitations? ready/)).toBeNull();
+});
+
 test('collapsed drafts are still included in the send payload unchanged', async () => {
   mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
   readSseStream.mockImplementation(async (_response, onEvent) => {

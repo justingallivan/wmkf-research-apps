@@ -449,6 +449,14 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const vipBySuggestionId = new Map(
     (candidates || []).map((c) => [c.suggestionId, c.vip === true]),
   );
+  // Client mirror of the send-time invitation body-integrity gate
+  // (send-emails-service): a draft whose secure link failed to mint or that
+  // still carries an unresolved {{token}} would be withheld at send time —
+  // it must render FULL with the defect visible, never collapse as "ready".
+  // Routing aid only; the server gate stays authoritative.
+  const failsBodyIntegrity = (d) =>
+    !/\/external\/review\/[A-Za-z0-9._~-]+/.test(d.body || '')
+    || /\{\{[^}]+\}\}/.test(`${d.subject || ''}\n${d.body || ''}`);
   const requiresFullCard = (d) =>
     vipUnknown // fail closed: flags never loaded → treat everyone as needing eyes
     || candidates.length <= 1
@@ -456,7 +464,8 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     || d.emailConfidence?.action === 'quick_check'
     || vipBySuggestionId.get(d.suggestionId) === true
     || edits[d.suggestionId] !== undefined
-    || expandedIds.has(d.suggestionId);
+    || expandedIds.has(d.suggestionId)
+    || failsBodyIntegrity(d);
   const fullDrafts = drafts.filter(requiresFullCard);
   const collapsedDrafts = drafts.filter((d) => !requiresFullCard(d));
 

@@ -64,6 +64,7 @@ test('flags load for the request on mount; toggle PUTs the person id and flips v
     expect.anything(),
   ));
   const toggle = screen.getByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  await waitFor(() => expect(toggle).not.toBeDisabled());
   expect(toggle).toHaveAttribute('aria-pressed', 'false');
   fireEvent.click(toggle);
   await waitFor(() => {
@@ -76,6 +77,30 @@ test('flags load for the request on mount; toggle PUTs the person id and flips v
     });
   });
   await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+});
+
+test('toggles are DISABLED until the initial flags GET resolves — a slow load can never be clobbered by a pre-load PUT', async () => {
+  let resolveGet;
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).startsWith('/api/review-manager/reviewer-vip-flags')) {
+      return new Promise((resolve) => {
+        resolveGet = () => resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ pdSystemUserId: 'pd-1', flaggedPotentialReviewerIds: [] }),
+        });
+      });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  render(<ReviewerInvitePanel requestId="REQ-1" candidates={[withPerson]} onRefresh={() => {}} />);
+  const toggle = await screen.findByRole('button', { name: /toggle vip review for dr\. keyed person/i });
+  expect(toggle).toBeDisabled();
+  // A click while the load is pending must not fire a PUT.
+  fireEvent.click(toggle);
+  expect(global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT')).toHaveLength(0);
+  resolveGet();
+  await waitFor(() => expect(toggle).not.toBeDisabled());
 });
 
 test('a FAILED flags load opens the modal fail-closed: vipUnknown is true', async () => {

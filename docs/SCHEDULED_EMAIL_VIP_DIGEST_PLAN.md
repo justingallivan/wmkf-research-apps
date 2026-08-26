@@ -192,7 +192,18 @@ they want each handled. Owner decisions recorded so far for the next slices:
    `wmkf_potentialreviewersid` since candidates lack contacts
    pre-acceptance); non-VIP drafts collapse to an expandable summary inside
    the modal (skipped/quick-check/edited/single-candidate drafts always
-   render full). Migration 037 not applied; branch unmerged.
+   render full). Codex adversarial review (2026-08-26) drove two hardening
+   fixes on the branch: star toggles stay disabled until the initial flags
+   GET resolves (a slow load can no longer clobber a just-completed toggle
+   with its pre-PUT snapshot), and the collapse classifier mirrors the
+   send-time invitation body-integrity gate (missing secure link /
+   unresolved `{{token}}` drafts always render full; the server gate in
+   `send-emails-service.js` stays authoritative). Accepted residual: a
+   mid-session lead-PD reassignment on the same request leaves the loaded
+   flag snapshot keyed to the old PD until the panel remounts — writes and
+   sends always resolve the current PD server-side, so the worst case is a
+   stale collapse decision, not a wrong write. Migration 037 not applied;
+   branch unmerged.
    [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
