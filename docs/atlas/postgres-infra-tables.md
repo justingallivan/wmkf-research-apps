@@ -239,24 +239,32 @@ email-activity/transport authority. Migration
 made that the table exists in Preview or Production.
 
 The first allowlisted workflow is `grantee_abstract_reminder`. One source
-deliverable can own one row. The row freezes the exact server-derived PD,
-recipients, subject/body/signature, established day-12 send time, and optional
-earlier review time. It records optimistic versions and PD edit/approve/stop
-attribution; internal notification identity/lease/error; recipient Dynamics
-activity identity, send intent, acceptance receipt, retry lease/error; and the
-final Dataverse repair timestamp. Preview uses a visibly non-live placeholder;
-the grantee token is minted only for a real send.
+deliverable can own one row, created on the cron's first sight of an Invited
+deliverable. The row freezes the exact server-derived PD, recipients,
+recipient contact GUIDs, subject/body/signature, established day-12 send
+time, and `approval_required` (computed once at creation from the PD's
+review-all override plus VIP flags). It records optimistic versions and PD
+edit/approve/stop attribution; the digest FYI receipt (`digest_fyi_at`);
+recipient Dynamics activity identity, send intent, acceptance receipt, retry
+lease/error; and the final Dataverse repair timestamp. Preview uses a visibly
+non-live placeholder; the grantee token is minted only for a real send.
+**[VERIFIED 2026-08-26 via migration 036, scheduled-email-store.js, and the
+scheduled-email suites on branch `codex/scheduled-email-review-p0`.]**
 
 Read/write paths: `lib/services/scheduled-email-store.js`,
 `lib/services/scheduled-email-service.js`,
 `lib/services/cron/grantee-deliverable-reminders-service.js`, and the
 profile-owned `/api/scheduled-emails` routes. Recipients/sender/source/schedule
-are never client-editable; PATCH actions can edit bounded subject/body, approve,
-stop, or send now under exact PD ownership and a version fence. A due send
-freshly rechecks that the deliverable is still Invited, persists/reconciles one
-correlation-keyed Dynamics activity, records transport acceptance, and only
-then finalizes `wmkf_granteedeliverable`. A separate pass repairs sent but
-unfinalized rows without re-sending.
+are never client-editable; PATCH actions can edit bounded subject/body (which
+clears any prior approval), approve, stop, or send now under exact PD
+ownership and a version fence. The store's due-send claim refuses an
+`approval_required` row without `approved_at`; the PD's version-fenced
+send-now is the only bypass. A due send freshly rechecks that the deliverable
+is still Invited, persists/reconciles one correlation-keyed Dynamics
+activity, records transport acceptance, and only then finalizes
+`wmkf_granteedeliverable`. A separate pass repairs sent but unfinalized rows
+without re-sending. The per-PD daily digest (also correlation-keyed, one per
+PD per UTC day) is the only notification surface.
 
 **Retention:** daily maintenance defaults to 365 days and deletes only rows
 that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
@@ -264,13 +272,25 @@ failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
 erase recoverable work. The Dataverse setting
 `retention:scheduled_email_messages_days` may supply a positive override.
 
-**Rollout decision resolved 2026-08-26:** in the as-built branch code a PD
-with no saved `email_automation` preference stays on the historical day-12
-automatic path. The owner has since settled a superseding decision layer
-(`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`): automatic-by-default sends,
-per-(PD, contact) VIP review flags, and PD onboarding as a rollout
-precondition with no unconfigured runtime state. Migration application and
-production enablement follow that plan, not the per-PD preference rollout.
+**Decision layer:** the 2026-08-26 owner design
+(`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`) is now the built shape on this
+branch: automatic-by-default sends, per-(PD, contact) VIP review flags, digest
+as single interface, and PD onboarding as a rollout precondition (no
+unconfigured runtime state; the legacy direct claim-before-send path is
+deleted).
+
+### `scheduled_email_vip_flags` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+
+**Source of truth:** Postgres. Per-(PD, contact) VIP review flags
+(`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
+Deliberately per-PD, never global — the flag does not transfer on request
+handoff. Written/read via `lib/services/scheduled-email-store.js` from the
+profile-owned `/api/scheduled-emails/vip-flags` route (toggles render on the
+Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
+reminders cron to freeze `approval_required` at ledger-row creation; any
+flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
+2026-08-26 via migration 036 and scheduled-email-store.js on branch
+`codex/scheduled-email-review-p0`; NOT LIVE-PROBED.]**
 
 ## Portal upload staging
 
