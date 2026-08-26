@@ -1196,8 +1196,16 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   established post-loop best-effort lifecycle stamp; thank-you additionally refuses terminal rows.
   Durable per-dispatch deadline evidence is not part of the terminal-status branch and requires a
   separate design around ordered Dynamics email activities or an append-only dispatch entity.
-  **This `missing_secure_link`/`unresolved_placeholder` gate is INVITATION-ONLY and regex-based** (a
-  presence check on the rendered body, run before recipient/attachment resolution). It is layered
+  **This invitation-only gate now runs through the shared
+  `lib/utils/invitation-link-validator.js`** (reviewer-invite-vip branch, 2026-08-26): it keeps the
+  established `missing_secure_link` (linkless body, regardless of `externalLinkExpected`) and
+  `unresolved_placeholder` skip reasons and adds `invalid_secure_link` for a malformed or unexpected
+  hardcoded `/external/review/` path. Repeated IDENTICAL copies of one token stay a tolerated input
+  (dedupe → send; only DISTINCT tokens are `external_link_ambiguous`), and trailing prose
+  punctuation after a token is fine while an extended/four-segment token is rejected. The same
+  validator drives `InviteEmailModal` collapse routing and invitation-template save validation
+  (`{{externalLink}}` required to save; legacy templates still load — this gate protects them). It
+  runs before recipient/attachment resolution and is layered
   UNDER, not replaced by, the ALL-TEMPLATE send-time token-authority gate added in S404 (see above):
   that gate runs later, immediately before dispatch, applies to every templateType whose draft
   carries `externalLinkExpected`, and mints/substitutes the final recipient-bound JWT after
