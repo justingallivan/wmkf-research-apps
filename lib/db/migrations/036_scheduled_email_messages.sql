@@ -104,6 +104,26 @@ CREATE TABLE IF NOT EXISTS scheduled_email_vip_flags (
   PRIMARY KEY (pd_systemuser_id, contact_id)
 );
 
+-- Per-(PD, UTC day) digest run ledger. The PK is the concurrency claim: one
+-- digest per PD per day. fyi_message_ids freezes the exact sent-FYI membership
+-- rendered into that digest — recovery stamps ONLY those ids, so a row sent
+-- after the digest keeps digest_fyi_at NULL and appears in the next day's
+-- digest instead of being silently receipted (adversarial review 2026-08-26).
+CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs (
+  pd_systemuser_id UUID NOT NULL,
+  digest_day DATE NOT NULL,
+  fyi_message_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  activity_id UUID,
+  accepted_at TIMESTAMPTZ,
+  fyi_stamped_at TIMESTAMPTZ,
+  locked_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (pd_systemuser_id, digest_day),
+  CONSTRAINT scheduled_email_digest_membership_shape
+    CHECK (jsonb_typeof(fyi_message_ids) = 'array')
+);
+
 COMMENT ON TABLE scheduled_email_messages IS
   'Approval and cross-system recovery ledger for personalized automated email; Dynamics owns transport and Dataverse owns workflow lifecycle.';
 COMMENT ON COLUMN scheduled_email_messages.approval_required IS

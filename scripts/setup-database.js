@@ -958,6 +958,20 @@ const v41Statements = [
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (pd_systemuser_id, contact_id)
   )`,
+  `CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs (
+    pd_systemuser_id UUID NOT NULL,
+    digest_day DATE NOT NULL,
+    fyi_message_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    activity_id UUID,
+    accepted_at TIMESTAMPTZ,
+    fyi_stamped_at TIMESTAMPTZ,
+    locked_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (pd_systemuser_id, digest_day),
+    CONSTRAINT scheduled_email_digest_membership_shape
+      CHECK (jsonb_typeof(fyi_message_ids) = 'array')
+  )`,
 ];
 
 // V32: model pricing audit history (S181).

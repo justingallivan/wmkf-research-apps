@@ -202,8 +202,12 @@ test('digest grouping places each row in exactly one section per PD', () => {
   expect(jean.sentFyi.map((r) => r.id)).toEqual(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
 });
 
-function digestDeps(existing = null) {
+function digestDeps(claimResult, existing = null) {
   return {
+    claimDigestRun: jest.fn(async () => claimResult),
+    recordDigestRunActivity: jest.fn(async () => undefined),
+    markDigestRunAccepted: jest.fn(async () => undefined),
+    markDigestRunFyiStamped: jest.fn(async () => undefined),
     findEmailByCorrelation: jest.fn(async () => (existing ? [existing] : [])),
     createEmailActivity: jest.fn(async () => 'digest-email-1'),
     getEmailActivity: jest.fn(async () => ({ activityid: 'digest-email-1', statuscode: 1 })),
@@ -212,47 +216,97 @@ function digestDeps(existing = null) {
   };
 }
 
-test('digest sends once per PD per day, mentions each section, and stamps FYI receipts', async () => {
-  process.env.NEXTAUTH_URL = 'https://apps.example.org';
-  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
-  const deps = digestDeps();
-  const group = {
+function digestGroup(sentFyi) {
+  return {
     pdSystemUserId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     pdName: 'Jean Kim',
     pdEmail: 'jean@example.org',
     approvalPending: [digestRow({ approval_required: true })],
     upcoming: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2' })],
-    sentFyi: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', status: 'sent' })],
+    sentFyi,
   };
+}
+
+const FYI_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4';
+const FYI_B = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5';
+
+test('digest claims the run, records the activity before transport, mentions each section, and stamps the run membership', async () => {
+  process.env.NEXTAUTH_URL = 'https://apps.example.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
+  const deps = digestDeps({
+    claimed: true,
+    run: { fyi_message_ids: [FYI_A], activity_id: null, accepted_at: null },
+  });
+  const group = digestGroup([digestRow({ id: FYI_A, status: 'sent' })]);
   const outcome = await sendScheduledEmailDigest(group, deps);
   expect(outcome).toEqual({ sent: true, fyiStamped: 1 });
+  expect(deps.claimDigestRun.mock.calls[0][0].fyiMessageIds).toEqual([FYI_A]);
   const created = deps.createEmailActivity.mock.calls[0][0];
   expect(created.to).toBe('jean@example.org');
   expect(created.correlationKey).toMatch(/^wmkf-scheduled-digest:dddddddd-dddd-4ddd-8ddd-dddddddddddd:\d{4}-\d{2}-\d{2}$/);
   expect(created.body).toContain('Waiting on your approval');
   expect(created.body).toContain('Sending soon unless you act');
   expect(created.body).toContain('Sent on your behalf');
+  // Activity identity persisted BEFORE the transport request.
+  expect(deps.recordDigestRunActivity.mock.invocationCallOrder[0])
+    .toBeLessThan(deps.sendEmail.mock.invocationCallOrder[0]);
   expect(deps.sendEmail).toHaveBeenCalledWith('digest-email-1');
-  expect(deps.markDigestFyi).toHaveBeenCalledWith(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
+  expect(deps.markDigestRunAccepted).toHaveBeenCalled();
+  expect(deps.markDigestFyi).toHaveBeenCalledWith([FYI_A]);
+  expect(deps.markDigestRunFyiStamped).toHaveBeenCalled();
 });
 
-test('a cron retry after an accepted digest skips the send but still stamps FYIs', async () => {
+test('recovery of an accepted run stamps ONLY the frozen membership — a row sent after the digest stays unreceipted', async () => {
   process.env.NEXTAUTH_URL = 'https://apps.example.org';
   process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
-  const deps = digestDeps({ activityid: 'digest-email-1', statuscode: 6 });
-  const group = {
-    pdSystemUserId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-    pdName: 'Jean Kim',
-    pdEmail: 'jean@example.org',
-    approvalPending: [],
-    upcoming: [],
-    sentFyi: [digestRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', status: 'sent' })],
-  };
+  const deps = digestDeps({
+    claimed: false,
+    run: { fyi_message_ids: [FYI_A], activity_id: 'digest-email-1', accepted_at: '2026-08-26T08:00:00Z' },
+  });
+  // The freshly built group ALSO contains FYI_B, sent after the digest went
+  // out. The old (defective) code stamped it; the fix must not.
+  const group = digestGroup([
+    digestRow({ id: FYI_A, status: 'sent' }),
+    digestRow({ id: FYI_B, status: 'sent' }),
+  ]);
+  const outcome = await sendScheduledEmailDigest(group, deps);
+  expect(outcome).toEqual({ sent: false, recovered: true, fyiStamped: 1 });
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+  expect(deps.markDigestFyi).toHaveBeenCalledWith([FYI_A]);
+  expect(deps.markDigestFyi).not.toHaveBeenCalledWith(expect.arrayContaining([FYI_B]));
+});
+
+test('a live concurrent invocation holding the lease is skipped without any Dynamics work or stamping', async () => {
+  process.env.NEXTAUTH_URL = 'https://apps.example.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
+  const deps = digestDeps({
+    claimed: false,
+    run: { fyi_message_ids: [FYI_A], activity_id: null, accepted_at: null },
+  });
+  const outcome = await sendScheduledEmailDigest(digestGroup([digestRow({ id: FYI_A, status: 'sent' })]), deps);
+  expect(outcome).toEqual({ sent: false, skipped: true, fyiStamped: 0 });
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+  expect(deps.markDigestFyi).not.toHaveBeenCalled();
+});
+
+test('a crashed run with a recorded activity resumes: no second create, send completes, frozen membership stamped', async () => {
+  process.env.NEXTAUTH_URL = 'https://apps.example.org';
+  process.env.NOTIFICATION_EMAIL_FROM = 'apps@wmkeck.org';
+  const deps = digestDeps({
+    claimed: true,
+    run: { fyi_message_ids: [FYI_A], activity_id: 'digest-email-1', accepted_at: null },
+  });
+  const group = digestGroup([
+    digestRow({ id: FYI_A, status: 'sent' }),
+    digestRow({ id: FYI_B, status: 'sent' }),
+  ]);
   const outcome = await sendScheduledEmailDigest(group, deps);
   expect(outcome).toEqual({ sent: true, fyiStamped: 1 });
   expect(deps.createEmailActivity).not.toHaveBeenCalled();
-  expect(deps.sendEmail).not.toHaveBeenCalled();
-  expect(deps.markDigestFyi).toHaveBeenCalledWith(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4']);
+  expect(deps.sendEmail).toHaveBeenCalledWith('digest-email-1');
+  expect(deps.markDigestFyi).toHaveBeenCalledWith([FYI_A]);
 });
 
 /* --------------------------- approval guard pin -------------------------- */
@@ -276,4 +330,33 @@ test('the store claim and due-list SQL both refuse unapproved approval_required 
     store.indexOf('approveScheduledEmail'),
   );
   expect(editSection).toContain('approved_at = NULL');
+});
+
+test('the digest-run claim SQL freezes membership and the reassign SQL guards atomically', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  // MEMBERSHIP FREEZE: the ON CONFLICT lease re-claim must never rewrite
+  // fyi_message_ids — an unrecorded activity may already hold the first
+  // render, and recovery stamps at most the first claim's membership.
+  const claimSection = store.slice(
+    store.indexOf('export async function claimDigestRun'),
+    store.indexOf('export async function recordDigestRunActivity'),
+  );
+  const doUpdate = claimSection.slice(claimSection.indexOf('DO UPDATE'), claimSection.indexOf('RETURNING'));
+  expect(doUpdate).not.toContain('fyi_message_ids');
+  expect(doUpdate).toContain('accepted_at IS NULL');
+  expect(doUpdate).toMatch(/locked_until IS NULL\s*\n\s*OR scheduled_email_digest_runs\.locked_until < NOW\(\)/);
+  // PD HANDOFF: the rebuild guard is atomic in SQL — only an unsent,
+  // unleased row owned by a DIFFERENT PD is rebuilt; approval is cleared.
+  const reassignSection = store.slice(
+    store.indexOf('export async function reassignScheduledEmail'),
+    store.indexOf('/* --------------------------- digest run ledger'),
+  );
+  expect(reassignSection).toContain('pd_systemuser_id <> ${input.pdSystemUserId}');
+  expect(reassignSection).toContain("status IN ('scheduled', 'failed')");
+  expect(reassignSection).toContain('(locked_until IS NULL OR locked_until < NOW())');
+  expect(reassignSection).toContain('approved_at = NULL');
+  expect(reassignSection).toContain('version = version + 1');
 });

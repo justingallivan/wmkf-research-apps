@@ -263,8 +263,16 @@ send-now is the only bypass. A due send freshly rechecks that the deliverable
 is still Invited, persists/reconciles one correlation-keyed Dynamics
 activity, records transport acceptance, and only then finalizes
 `wmkf_granteedeliverable`. A separate pass repairs sent but unfinalized rows
-without re-sending. The per-PD daily digest (also correlation-keyed, one per
-PD per UTC day) is the only notification surface.
+without re-sending. The per-PD daily digest is the only notification surface;
+its concurrency claim and FYI membership live in
+`scheduled_email_digest_runs` (below). PD handoff: when the request's lead PD
+no longer matches an unsent row, the cron rebuilds the row in place under the
+current PD (mailbox, name, signature, recipients, and the current PD's own
+review posture); the former PD's edits/approval are deliberately cleared, and
+the SQL guard (`reassignScheduledEmail`) fires only for unsent, unleased rows
+owned by a different PD. [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail + claimDigestRun added 2026-08-26]
+[RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest rewritten onto the run ledger 2026-08-26]
+[RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: drift rebuild + reassigned counter added 2026-08-26]
 
 **Retention:** daily maintenance defaults to 365 days and deletes only rows
 that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
@@ -291,6 +299,25 @@ reminders cron to freeze `approval_required` at ledger-row creation; any
 flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
 `codex/scheduled-email-review-p0`; NOT LIVE-PROBED.]**
+
+### `scheduled_email_digest_runs` — SOURCE-BUILT; MIGRATION 036 NOT APPLIED
+
+**Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
+2026-08-26 after the branch adversarial review. The primary key
+(`pd_systemuser_id`, `digest_day`) plus a `locked_until` lease is the
+one-digest-per-PD/day concurrency claim; `fyi_message_ids` freezes the exact
+sent-FYI membership rendered into that digest at first claim (never rewritten
+on re-claim); `activity_id` is persisted before transport; `accepted_at` and
+`fyi_stamped_at` are idempotent receipts. Recovery stamps `digest_fyi_at` on
+exactly the frozen membership, so a message sent after the digest stays
+unreceipted and appears in the next day's digest — a duplicate FYI is
+possible after a mid-run crash, a dropped FYI is not. Written/read only by
+`lib/services/scheduled-email-store.js` (claim/record/mark helpers) and
+consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
+unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
+materially. **[VERIFIED 2026-08-26 via migration 036,
+scheduled-email-store.js, and the digest tests in
+tests/unit/scheduled-email-service.test.js; NOT LIVE-PROBED.]**
 
 ## Portal upload staging
 

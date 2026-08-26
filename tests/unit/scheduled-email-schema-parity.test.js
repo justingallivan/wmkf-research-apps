@@ -68,3 +68,13 @@ test('migration 036 and fresh install both create the per-PD VIP flag table', ()
   expect(migration).toContain(pair);
   expect(setup).toContain(pair);
 });
+
+test('migration 036 and fresh install both create the digest run ledger with the per-day claim key', () => {
+  const table = 'CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs';
+  const claimKey = 'PRIMARY KEY (pd_systemuser_id, digest_day)';
+  const membershipShape = 'CONSTRAINT scheduled_email_digest_membership_shape';
+  for (const fragment of [table, claimKey, membershipShape, 'fyi_message_ids', 'fyi_stamped_at']) {
+    expect(migration).toContain(fragment);
+    expect(setup).toContain(fragment);
+  }
+});

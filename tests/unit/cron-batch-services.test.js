@@ -59,6 +59,7 @@ jest.mock('../../lib/services/email-automation-preferences', () => ({
 }));
 jest.mock('../../lib/services/scheduled-email-store', () => ({
   createOrGetScheduledEmail: jest.fn(),
+  reassignScheduledEmail: jest.fn(),
   filterVipFlaggedContacts: jest.fn(async () => new Set()),
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
@@ -155,6 +156,40 @@ describe('runGranteeDeliverableReminders', () => {
     expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(
       expect.objectContaining({ approvalRequired: true }),
     );
+  });
+
+  it('PD handoff rebuilds an unsent row under the current PD with the CURRENT PD\'s posture', async () => {
+    const scheduledEmailStore = require('../../lib/services/scheduled-email-store');
+    // Ledger row still owned by the FORMER PD; the request now points at pd1.
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({
+      pd_systemuser_id: 'old-pd', status: 'scheduled',
+    });
+    // pd1 (the current PD) has VIP-flagged the liaison — the rebuilt row must
+    // carry pd1's posture, not the former PD's.
+    scheduledEmailStore.filterVipFlaggedContacts.mockResolvedValue(new Set(['li1']));
+    scheduledEmailStore.reassignScheduledEmail.mockResolvedValue({ pd_systemuser_id: 'pd1' });
+    granteeDeliverableAdapter.queryAllDeliverables.mockResolvedValue({ records: [deliv(1)], totalCount: 1 });
+    const summary = await runGranteeDeliverableReminders();
+    expect(summary.reassigned).toBe(1);
+    expect(scheduledEmailStore.reassignScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      workflowType: 'grantee_abstract_reminder',
+      sourceRecordId: 'd1',
+      pdSystemUserId: 'pd1',
+      pdEmail: 'pd1@wmkeck.org',
+      approvalRequired: true,
+    }));
+    expect(scheduledEmailStore.filterVipFlaggedContacts).toHaveBeenCalledWith('pd1', ['pi1', 'li1']);
+  });
+
+  it('no PD drift means no rebuild call at all', async () => {
+    const scheduledEmailStore = require('../../lib/services/scheduled-email-store');
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({
+      pd_systemuser_id: 'pd1', status: 'scheduled',
+    });
+    granteeDeliverableAdapter.queryAllDeliverables.mockResolvedValue({ records: [deliv(1)], totalCount: 1 });
+    const summary = await runGranteeDeliverableReminders();
+    expect(summary.reassigned).toBe(0);
+    expect(scheduledEmailStore.reassignScheduledEmail).not.toHaveBeenCalled();
   });
 
   it('a review posture read failure fails closed: no ledger row, no send', async () => {

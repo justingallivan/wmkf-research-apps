@@ -38,6 +38,7 @@ jest.mock('../../lib/services/email-automation-preferences', () => ({
 }));
 jest.mock('../../lib/services/scheduled-email-store', () => ({
   createOrGetScheduledEmail: jest.fn(),
+  reassignScheduledEmail: jest.fn(),
   filterVipFlaggedContacts: jest.fn(async () => new Set()),
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
@@ -126,7 +127,10 @@ beforeEach(() => {
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
   resolveSignatureForRequest.mockClear();
   getEmailAutomationPreferenceForSystemUser.mockClear().mockResolvedValue(null);
-  scheduledEmailStore.createOrGetScheduledEmail.mockReset().mockResolvedValue({ id: 'scheduled-1' });
+  // pd_systemuser_id matches the fixtures' current PD (pd1) so the default
+  // path exercises no handoff drift.
+  scheduledEmailStore.createOrGetScheduledEmail.mockReset().mockResolvedValue({ id: 'scheduled-1', pd_systemuser_id: 'pd1', status: 'scheduled' });
+  scheduledEmailStore.reassignScheduledEmail.mockReset();
   scheduledEmailStore.filterVipFlaggedContacts.mockReset().mockResolvedValue(new Set());
   scheduledEmailStore.listScheduledEmailDigestRows.mockReset().mockResolvedValue([]);
   scheduledEmailStore.listDueScheduledEmails.mockReset().mockResolvedValue([]);
@@ -395,6 +399,7 @@ test('200 summary envelope pinned exactly', async () => {
     claimFailed: 0,
     sendFailed: 0,
     scheduled: 1,
+    reassigned: 0,
     digestsSent: 0,
     digestFailed: 0,
     stoppedNoLongerEligible: 0,
