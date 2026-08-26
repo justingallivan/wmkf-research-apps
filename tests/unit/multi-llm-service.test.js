@@ -99,10 +99,12 @@ describe('MultiLLMService Claude capability shaping', () => {
       0.2,
     );
 
+    // 'sonnet' resolves to the current tier head (claude-sonnet-5), whose
+    // capabilities exclude temperature — the resolved model's shaping wins.
     expect(sentBody()).toEqual(expect.objectContaining({
-      model: 'claude-sonnet-4-6',
-      temperature: 0.2,
+      model: 'claude-sonnet-5',
     }));
+    expect(sentBody()).not.toHaveProperty('temperature');
   });
 
   test('surfaces HTTP-200 refusal metadata for Fable responses', async () => {
