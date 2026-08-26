@@ -264,10 +264,13 @@ failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
 erase recoverable work. The Dataverse setting
 `retention:scheduled_email_messages_days` may supply a positive override.
 
-**Open rollout decision:** a PD with no saved `email_automation` preference
-currently stays on the historical day-12 automatic path. Migration application
-and production enablement should not proceed until the owner chooses the
-eventual default and rollout/migration policy.
+**Rollout decision resolved 2026-08-26:** in the as-built branch code a PD
+with no saved `email_automation` preference stays on the historical day-12
+automatic path. The owner has since settled a superseding decision layer
+(`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`): automatic-by-default sends,
+per-(PD, contact) VIP review flags, and PD onboarding as a rollout
+precondition with no unconfigured runtime state. Migration application and
+production enablement follow that plan, not the per-PD preference rollout.
 
 ## Portal upload staging
 

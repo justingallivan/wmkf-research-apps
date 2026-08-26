@@ -56,17 +56,18 @@ this implementation pass.
 | Recipient sees personalized automation disclosure | shared notice renderer | rendered message only | grantee/reviewer automated mail | notice renderer tests | VERIFIED IN SOURCE |
 | Cleanup cannot erase unresolved work | daily maintenance | deletes only finalized `sent` or explicit `stopped` | operational retention | maintenance tests | VERIFIED IN SOURCE; NOT LIVE |
 
-## Rollout boundary and remaining decision
+## Rollout boundary (decision resolved 2026-08-26)
 
-A PD with no saved preference currently retains the historical day-12
-automatic claim-before-send path. This avoids silently choosing either
-automatic or three-day review while profiles are unconfigured, but it is a
-rollout compatibility state rather than the desired final policy.
+As built on this branch, a PD with no saved preference retains the
+historical day-12 automatic claim-before-send path — a rollout
+compatibility state, not final policy.
 
-Before migration 036 is applied and the feature is promoted, the owner must
-choose what existing no-preference PDs inherit and how they are prompted to
-make the explicit decision. No code in this branch applies the migration,
-changes production configuration, or deploys the feature.
+The no-preference question is resolved by the superseding
+`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`: automatic-by-default sends,
+per-(PD, contact) VIP review flags, and PD onboarding as a rollout
+precondition (no unconfigured runtime state). Promotion follows that plan's
+rebuild of this branch's decision layer. No code in this branch applies the
+migration, changes production configuration, or deploys the feature.
 
 ## Recovery and residual risk
 
@@ -106,7 +107,8 @@ changes production configuration, or deploys the feature.
   signature, and route-consolidation plans preserve their dated claim-before-
   send implementation record.
 - **Unknown/owner decision:** final default and rollout for existing
-  no-preference PDs.
+  no-preference PDs — resolved 2026-08-26 by
+  `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` (see Rollout boundary above).
 - **Verdict:** source claims reconciled; live/provisioned claim intentionally
   remains NOT VERIFIED until an approved release applies and probes migration
   036.
