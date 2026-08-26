@@ -228,6 +228,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
+  // VIP routing (owner decision 2026-08-26): drafts for VIP-flagged people
+  // render as full editable cards; the rest collapse to a batch summary with
+  // on-demand expansion. Expansion is view state only — the send payload is
+  // identical either way.
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
   const [abstractEditorOpen, setAbstractEditorOpen] = useState(false);
   const [abstractDraft, setAbstractDraft] = useState('');
@@ -436,6 +441,23 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
+
+  // A draft renders as a FULL card when anything requires human eyes on it:
+  // the person is VIP-flagged, the server skipped it (remediation UI), it
+  // needs a quick-check confirmation, the staffer already edited or expanded
+  // it, or this is a single-candidate open (repair / address-conflict paths).
+  const vipBySuggestionId = new Map(
+    (candidates || []).map((c) => [c.suggestionId, c.vip === true]),
+  );
+  const requiresFullCard = (d) =>
+    candidates.length <= 1
+    || Boolean(d.skipped)
+    || d.emailConfidence?.action === 'quick_check'
+    || vipBySuggestionId.get(d.suggestionId) === true
+    || edits[d.suggestionId] !== undefined
+    || expandedIds.has(d.suggestionId);
+  const fullDrafts = drafts.filter(requiresFullCard);
+  const collapsedDrafts = drafts.filter((d) => !requiresFullCard(d));
 
   // Single-proposal modal — abstract fields agree across all drafts, so the first
   // flagged draft (if any) speaks for the whole batch. flagged.reflowedAbstract
@@ -908,9 +930,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-500">
-                    Review each recipient below. The secure-link position renders as one pair of accept/decline buttons in the sent email.
+                    {collapsedDrafts.length > 0
+                      ? 'VIP and flagged recipients are shown in full below; standard invitations are summarized. The secure-link position renders as one pair of accept/decline buttons in the sent email.'
+                      : 'Review each recipient below. The secure-link position renders as one pair of accept/decline buttons in the sent email.'}
                   </p>
-                  {drafts.map((d) => (
+                  {fullDrafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
@@ -1158,6 +1182,33 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       )}
                     </div>
                   ))}
+                  {collapsedDrafts.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {collapsedDrafts.length} standard invitation{collapsedDrafts.length === 1 ? '' : 's'} ready
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        These send with the template as rendered. Open one to read or edit it.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {collapsedDrafts.map((d) => (
+                          <li key={d.suggestionId} className="flex items-center justify-between gap-2 text-xs text-gray-700">
+                            <span className="truncate">
+                              <span className="font-medium">{d.candidateName || '(unnamed)'}</span>
+                              {' '}<span className="text-gray-500">{d.candidateEmail}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedIds((prev) => new Set(prev).add(d.suggestionId))}
+                              className="text-blue-700 hover:text-blue-900 hover:underline flex-shrink-0"
+                            >
+                              Review
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {quickCheckSendable.length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <p className="text-sm font-medium text-amber-900">Confirm quick-check addresses</p>

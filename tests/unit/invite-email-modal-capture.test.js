@@ -335,7 +335,9 @@ describe('InviteEmailModal capture-mode result display', () => {
       />,
     );
 
-    await screen.findAllByDisplayValue('Invitation');
+    // Non-VIP multi-candidate drafts collapse to the batch summary (VIP
+    // preview slice, 2026-08-26); the send path is unchanged.
+    await screen.findByText('2 standard invitations ready');
     fireEvent.click(await screen.findByRole('button', { name: /send 2 invitations/i }));
 
     await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));

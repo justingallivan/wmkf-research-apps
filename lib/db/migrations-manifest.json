@@ -34,6 +34,7 @@
     "033_dynamics_explorer_request_telemetry.sql",
     "034_pre_site_distribution_attempts.sql",
     "035_site_visit_logistics.sql",
-    "036_scheduled_email_messages.sql"
+    "036_scheduled_email_messages.sql",
+    "037_reviewer_vip_flags.sql"
   ]
 }

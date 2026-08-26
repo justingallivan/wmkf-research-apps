@@ -33,7 +33,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell } from 'lucide-react';
+import { Bell, Star } from 'lucide-react';
 import { Card } from '../Layout';
 import InviteEmailModal from './InviteEmailModal';
 import CandidateEditModal from './CandidateEditModal';
@@ -217,8 +217,59 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
   const [nudgeTarget, setNudgeTarget] = useState(null); // active invited candidate | null
+  // Per-(lead PD, reviewer person) VIP flags: flagged people's invitation
+  // drafts render as full editable previews in the send modal; others
+  // collapse to a batch summary. Stored against the request's lead PD
+  // (resolved server-side); any staff member here may curate them.
+  const [vipIds, setVipIds] = useState(() => new Set()); // potentialReviewerId Set
+  const [vipSavingId, setVipSavingId] = useState(null);
   const exportingRef = useRef(false);
   const repairTargetRef = useRef(null);
+
+  useEffect(() => {
+    if (!requestId) return undefined;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const resp = await fetch(
+          `/api/review-manager/reviewer-vip-flags?requestId=${encodeURIComponent(requestId)}`,
+          { signal: controller.signal },
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        setVipIds(new Set(data.flaggedPotentialReviewerIds || []));
+      } catch { /* flags are a routing aid; the modal defaults to full cards */ }
+    })();
+    return () => controller.abort();
+  }, [requestId]);
+
+  const toggleVip = async (candidate) => {
+    const personId = candidate.potentialReviewerId;
+    if (!personId || vipSavingId) return;
+    const flagged = !vipIds.has(personId);
+    setVipSavingId(personId);
+    try {
+      const resp = await fetch('/api/review-manager/reviewer-vip-flags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, potentialReviewerId: personId, flagged }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        alert(`Could not update the VIP flag: ${data.error || resp.status}`);
+        return;
+      }
+      setVipIds((prev) => {
+        const next = new Set(prev);
+        if (flagged) next.add(personId); else next.delete(personId);
+        return next;
+      });
+    } catch (err) {
+      alert(`Network error updating the VIP flag: ${err.message}`);
+    } finally {
+      setVipSavingId(null);
+    }
+  };
 
   useEffect(() => {
     if (
@@ -375,7 +426,15 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
 
   const openInvite = (rows, allowResend) => {
     setModal({
-      candidates: rows.map((c) => ({ suggestionId: c.suggestionId, name: c.name, email: c.email })),
+      candidates: rows.map((c) => ({
+        suggestionId: c.suggestionId,
+        name: c.name,
+        email: c.email,
+        potentialReviewerId: c.potentialReviewerId || null,
+        // VIP routing: flagged people's drafts render as full editable cards;
+        // the rest collapse to the batch summary in InviteEmailModal.
+        vip: Boolean(c.potentialReviewerId && vipIds.has(c.potentialReviewerId)),
+      })),
       allowResend,
     });
   };
@@ -484,6 +543,30 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                       )}
                     </span>
                     <span className="flex items-center gap-1 flex-shrink-0">
+                      {canManage && c.potentialReviewerId && (
+                        <button
+                          type="button"
+                          onClick={() => toggleVip(c)}
+                          disabled={vipSavingId === c.potentialReviewerId}
+                          className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-medium rounded ${
+                            vipIds.has(c.potentialReviewerId)
+                              ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                              : 'text-gray-400 hover:text-amber-700 hover:bg-amber-50'
+                          }`}
+                          title={vipIds.has(c.potentialReviewerId)
+                            ? `VIP: invitations to ${c.name || 'this reviewer'} open as a full editable preview before sending. Click to clear.`
+                            : `Mark ${c.name || 'this reviewer'} as VIP: their invitations will open as a full editable preview before sending.`}
+                          aria-pressed={vipIds.has(c.potentialReviewerId)}
+                          aria-label={`Toggle VIP review for ${c.name || 'reviewer'}`}
+                        >
+                          <Star
+                            size={13}
+                            aria-hidden="true"
+                            fill={vipIds.has(c.potentialReviewerId) ? 'currentColor' : 'none'}
+                          />
+                          VIP
+                        </button>
+                      )}
                       <StatusChip c={c} />
                       {canManage && c.invited && !c.responseType && !c.declined && !c.accepted && (
                         <button

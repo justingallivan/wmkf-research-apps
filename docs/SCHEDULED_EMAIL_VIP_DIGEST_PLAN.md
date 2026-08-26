@@ -184,7 +184,16 @@ they want each handled. Owner decisions recorded so far for the next slices:
    render-emails flow) before their invitation sends; non-VIP candidates
    batch-send without per-message click-through ("for people we don't know,
    there's generally no reason to click through and send multiple emails one
-   at a time").
+   at a time"). **SOURCE-BUILT 2026-08-26 on branch
+   `feature/reviewer-invite-vip`** with three owner refinements: the preview
+   is synchronous (whoever sends reviews VIP drafts in the modal — no hold,
+   no digest); any review-manager staff may curate flags (stored per the
+   request's lead PD in `scheduled_email_reviewer_vip_flags`, keyed on
+   `wmkf_potentialreviewersid` since candidates lack contacts
+   pre-acceptance); non-VIP drafts collapse to an expandable summary inside
+   the modal (skipped/quick-check/edited/single-candidate drafts always
+   render full). Migration 037 not applied; branch unmerged.
+   [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
    the single interface.

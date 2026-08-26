@@ -974,6 +974,18 @@ const v41Statements = [
   )`,
 ];
 
+// V42: per-(PD, reviewer person) VIP flags for invitation sends. Keys on
+// wmkf_potentialreviewersid — candidates have no CRM contact pre-acceptance
+// (S389), so the person row is the only stable key. Mirrors migration 037.
+const v42Statements = [
+  `CREATE TABLE IF NOT EXISTS scheduled_email_reviewer_vip_flags (
+    pd_systemuser_id UUID NOT NULL,
+    potential_reviewer_id UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (pd_systemuser_id, potential_reviewer_id)
+  )`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1730,6 +1742,24 @@ async function runMigration() {
           console.log(`[v41-${i + 1}/${v41Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v41-${i + 1}/${v41Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V42 table creation (per-PD reviewer-person VIP flags)
+    console.log(`\nApplying v42 schema updates - Reviewer VIP flags (${v42Statements.length} statements)...`);
+    for (let i = 0; i < v42Statements.length; i++) {
+      const statement = v42Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v42-${i + 1}/${v42Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v42-${i + 1}/${v42Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v42-${i + 1}/${v42Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
