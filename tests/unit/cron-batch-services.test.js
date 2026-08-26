@@ -192,6 +192,25 @@ describe('runGranteeDeliverableReminders', () => {
     expect(scheduledEmailStore.reassignScheduledEmail).not.toHaveBeenCalled();
   });
 
+  it('reports a deferred PD handoff when the atomic transport or lease guard refuses the rebuild', async () => {
+    const scheduledEmailStore = require('../../lib/services/scheduled-email-store');
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({
+      id: 'message-1', pd_systemuser_id: 'old-pd', status: 'failed',
+    });
+    scheduledEmailStore.reassignScheduledEmail.mockResolvedValue(null);
+    granteeDeliverableAdapter.queryAllDeliverables.mockResolvedValue({ records: [deliv(1)], totalCount: 1 });
+    const summary = await runGranteeDeliverableReminders();
+    expect(summary.reassigned).toBe(0);
+    expect(summary.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reason: expect.stringMatching(/handoff deferred/) }),
+    ]));
+    expect(scheduledEmailStore.reassignScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      workflowType: 'grantee_abstract_reminder',
+      sourceRecordId: 'd1',
+      pdSystemUserId: 'pd1',
+    }));
+  });
+
   it('a review posture read failure fails closed: no ledger row, no send', async () => {
     const scheduledEmailStore = require('../../lib/services/scheduled-email-store');
     const prefs = require('../../lib/services/email-automation-preferences');

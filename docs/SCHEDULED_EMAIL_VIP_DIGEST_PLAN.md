@@ -146,7 +146,17 @@ confirmed findings; the fixes are source-built on the branch:
    re-enters the new PD's posture, which may be automatic. Reassignment
    mid-run (after the drift check, before that run's send) and rows deferred
    by a capped scan self-heal next run.
-   [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail SQL guard — different PD + unsent + unleased only]
+   **Transport-state residual (re-review 2026-08-26, fixed via Codex
+   rescue):** a row whose Dynamics activity already exists (created, send
+   failed) is NOT rebuilt — the deliver path prefers the retained activity
+   and the correlation backstop is generation-blind, so a rebuild would send
+   the former PD's frozen content under the new PD's name. Such a row
+   deliberately stays under the former PD until its retry resolves (honest
+   attribution; same mail as a handoff one day later), and the cron reports
+   `pd handoff deferred` in the summary failures list. The full
+   cancel-and-regenerate path (generation-keyed correlation + a Dynamics
+   cancel op the adapter does not have) is deliberately not built.
+   [RECHECKED after lib/services/scheduled-email-store.js change: reassignScheduledEmail SQL guard — different PD + unsent + no transport state + unleased only]
 3. **Digest creation was not concurrency-safe** (medium). Fixed by the same
    run ledger: the (PD, day) primary key plus lease is claimed before any
    Dynamics work; a losing invocation skips without sending or stamping. The

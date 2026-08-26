@@ -349,13 +349,16 @@ test('the digest-run claim SQL freezes membership and the reassign SQL guards at
   expect(doUpdate).toContain('accepted_at IS NULL');
   expect(doUpdate).toMatch(/locked_until IS NULL\s*\n\s*OR scheduled_email_digest_runs\.locked_until < NOW\(\)/);
   // PD HANDOFF: the rebuild guard is atomic in SQL — only an unsent,
-  // unleased row owned by a DIFFERENT PD is rebuilt; approval is cleared.
+  // transport-free, unleased row owned by a DIFFERENT PD is rebuilt;
+  // approval is cleared.
   const reassignSection = store.slice(
     store.indexOf('export async function reassignScheduledEmail'),
     store.indexOf('/* --------------------------- digest run ledger'),
   );
   expect(reassignSection).toContain('pd_systemuser_id <> ${input.pdSystemUserId}');
   expect(reassignSection).toContain("status IN ('scheduled', 'failed')");
+  expect(reassignSection).toContain('dynamics_email_id IS NULL');
+  expect(reassignSection).toContain('send_requested_at IS NULL');
   expect(reassignSection).toContain('(locked_until IS NULL OR locked_until < NOW())');
   expect(reassignSection).toContain('approved_at = NULL');
   expect(reassignSection).toContain('version = version + 1');
