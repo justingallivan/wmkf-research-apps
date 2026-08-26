@@ -39,6 +39,26 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 
+- **Post-reviewer-cycle: decide invitation-link strictness deliberately.**
+  **[OWNER-FLAGGED 2026-08-26 — revisit when the current reviewer cycle
+  ends.]** The unified `lib/utils/invitation-link-validator.js`
+  (branch `feature/reviewer-invite-vip`, commit `ff156f3d`) deliberately
+  KEEPS two long-tolerated send inputs that Codex's second-round rescue had
+  tightened away: repeated IDENTICAL copies of the same reviewer JWT dedupe
+  and send (only DISTINCT tokens fail as `external_link_ambiguous`), and
+  trailing prose punctuation directly after a token is accepted (an
+  extended/four-segment token is still rejected). Claude reverted the
+  tightening mid-cycle because no probe could rule out live PD templates
+  relying on those shapes. The open decision: once the cycle ends, either
+  adopt the stricter exactly-one-occurrence contract (Codex's version) or
+  ratify the current tolerance as permanent. The current behavior is pinned
+  by `tests/unit/send-emails-service.test.js` ("S2: repeated identical
+  copies") and `tests/unit/invitation-link-validator.test.js` ("token
+  boundary"); flipping the contract means re-pinning those tests
+  deliberately, plus a re-test of the invite send flow. Owner context: "I
+  worry we will forget about it and have to test everything again in 6
+  months" — this entry is the anti-forgetting mechanism.
+
 - **Historical Workbench discovery:** **[PRODUCTION-LIVE 2026-08-17]** the
   Workbench dashboard now opens an exact active or historical
   request number through the existing authenticated `resolve-request` route;
