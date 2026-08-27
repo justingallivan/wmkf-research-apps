@@ -213,8 +213,9 @@ they want each handled. Owner decisions recorded so far for the next slices:
    mid-session lead-PD reassignment on the same request leaves the loaded
    flag snapshot keyed to the old PD until the panel remounts — writes and
    sends always resolve the current PD server-side, so the worst case is a
-   stale collapse decision, not a wrong write. Migration 037 not applied;
-   branch unmerged.
+   stale collapse decision, not a wrong write. Migration 037 APPLIED to the
+   shared Neon database 2026-08-26 (owner-run apply-migrations; live-probed:
+   tracker row + three columns + 0 rows); branch unmerged.
    [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining

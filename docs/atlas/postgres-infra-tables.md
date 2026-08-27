@@ -318,7 +318,7 @@ materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
 tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
 
-### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 NOT APPLIED
+### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 APPLIED
 
 **Source of truth:** Postgres. Per-(lead PD, reviewer person) VIP flags for
 reviewer invitation sends, added by migration `037_reviewer_vip_flags.sql`
@@ -335,7 +335,9 @@ batch summary. **No ledger workflow reads these flags and no send path is
 gated by them.** **Retention:** deliberately unbounded (≤6 PDs × curated
 handfuls of people). **[VERIFIED 2026-08-26 via migration 037,
 scheduled-email-store.js, and the reviewer-vip-flags route/panel/modal
-suites; NOT APPLIED, NOT LIVE-PROBED.]**
+suites; APPLIED to the shared Neon database 2026-08-26 (owner-run
+apply-migrations); LIVE-PROBED same day: tracker row present, three
+expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
