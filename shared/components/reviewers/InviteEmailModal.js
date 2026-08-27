@@ -958,7 +958,20 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                   {fullDrafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {d.candidateName || '(unnamed)'}
+                          {/* Why this card is full: VIP flag only — quick-check,
+                              skipped, and edited cards carry their own markers.
+                              Suppressed under vipUnknown: the snapshot may hold an
+                              optimistic value whose PUT later rolled back, so the
+                              flag isn't trustworthy enough to assert as a label
+                              (every card is already full in that state). */}
+                          {!vipUnknown && vipBySuggestionId.get(d.suggestionId) === true && (
+                            <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 align-middle">
+                              ★ VIP
+                            </span>
+                          )}
+                        </span>
                         <span className="text-xs text-gray-500">{d.candidateEmail || 'no email'}</span>
                       </div>
                       {!d.skipped && d.emailConfidence?.action === 'quick_check' && (

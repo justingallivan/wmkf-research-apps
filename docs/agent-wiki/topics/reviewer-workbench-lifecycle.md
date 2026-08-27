@@ -1186,7 +1186,11 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   timeout can't leave sent invites unstamped and exposed to a duplicate re-send via the
   `shouldSkipDuplicateInvitation` guard. (2) A send that THROWS goes to a new `unconfirmed[]` bucket
   + `email_unconfirmed` SSE event ("possibly sent — verify before retry"), never `failed[]`, because
-  a thrown SendEmail may still have dispatched. (3) A successful send whose inline stamp fails is
+  a thrown SendEmail may still have dispatched. One exception since S463: invitations send with
+  `noFallback:true`, and `createAndSendEmail` (`lib/services/dynamics/email.js`) tags every throw
+  from before the SendEmail POST (env preflight `impersonation_disabled`, create-activity,
+  attachment stage) with `dispatched: false` — provably never sent — so those take plain `failed[]`
+  instead of poisoning the verify-before-retry set. Only SendEmail-stage throws stay `unconfirmed[]`. (3) A successful send whose inline stamp fails is
   recorded `inviteRecorded:false` on the sent record (surfaced, not a scrolling warning). (4) A
   send-time body-integrity gate skips an invitation whose body lacks a `/external/review/` secure
   link (`missing_secure_link`) or carries an unresolved `{{token}}` (`unresolved_placeholder`) rather

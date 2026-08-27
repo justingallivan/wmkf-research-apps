@@ -259,6 +259,57 @@ describe('MSCRMCallerID — composed helpers', () => {
     expect(calls[2][1].headers.MSCRMCallerID).toBe(ACTING_GUID);
     expect(calls[3][1].headers.MSCRMCallerID).toBe(ACTING_GUID);
   });
+
+  test('a noFallback 403 during email-activity creation rejects tagged dispatched:false (provably unsent)', async () => {
+    // resolveSystemUser succeeds, then the create POST 403s. With noFallback the
+    // 403 is NOT retried without the header; createEmailActivity throws before
+    // any SendEmail POST exists, so the error must carry dispatched:false for
+    // the invitation failed[]-vs-unconfirmed[] routing.
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }),
+    );
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ value: [{ systemuserid: 'user-1' }] }) }),
+    );
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 403, text: () => Promise.resolve('PrincipalPrivilegeDenied'), json: () => Promise.resolve({}) }),
+    );
+
+    await withDynamicsContext({ restrictions: [], requestId: 'test' }, () =>
+      expect(DynamicsService.createAndSendEmail({
+        subject: 's', body: 'b', from: 'sender@example.com', to: 'to@example.com',
+        actingUserSystemId: ACTING_GUID,
+        noFallback: true,
+      })).rejects.toMatchObject({ dispatched: false }),
+    );
+    // Only one write attempt — no silent no-header retry under noFallback.
+    expect(nonTokenCalls()).toHaveLength(2);
+  });
+
+  test('a SendEmail-stage failure stays untagged (may have dispatched)', async () => {
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ access_token: 't', expires_in: 3600 }) }),
+    );
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ value: [{ systemuserid: 'user-1' }] }) }),
+    );
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ activityid: 'mail-1' }) }),
+    );
+    fetch.mockImplementationOnce(() =>
+      Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('gateway lost the response'), json: () => Promise.resolve({}) }),
+    );
+
+    await withDynamicsContext({ restrictions: [], requestId: 'test' }, async () => {
+      const err = await DynamicsService.createAndSendEmail({
+        subject: 's', body: 'b', from: 'sender@example.com', to: 'to@example.com',
+        actingUserSystemId: ACTING_GUID,
+        noFallback: true,
+      }).catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect(err.dispatched).toBeUndefined();
+    });
+  });
 });
 
 describe('MSCRMCallerID — privilege-intersection fallback', () => {

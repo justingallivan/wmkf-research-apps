@@ -410,6 +410,15 @@ describe('sendManualRespondReminder', () => {
     }));
   });
 
+  test('sent copy carries the automation notice like its cron twin (2026-08-26 inventory divergence)', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() }))
+      .resolves.toEqual({ ok: true });
+    const email = createAndSendEmail.mock.calls[0][0];
+    expect(email.body).toContain('This automated reminder was sent by the W. M. Keck Foundation');
+    expect(email.body).toContain('pd@keck.org');
+  });
+
   test('edited body is escaped and receives the server-minted secure link', async () => {
     installReads({ suggestion: pendingInvitation() });
 

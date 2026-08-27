@@ -77,6 +77,7 @@ describe('sendAcceptanceConfirmationEmail — golden path', () => {
       regardingId: 'req-1',
       regardingType: 'akoya_request',
       actingUserSystemId: 'su-1',
+      noFallback: true,
     }));
   });
 

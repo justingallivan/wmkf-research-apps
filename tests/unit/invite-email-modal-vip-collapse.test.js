@@ -87,6 +87,33 @@ test('a quick-check draft renders full even when not VIP (collapse must never hi
   expect(screen.queryByDisplayValue('Invitation for Standard Two')).toBeNull();
 });
 
+test('the ★ VIP badge marks only VIP full cards, not other full cards', async () => {
+  mockRender([
+    draft('S1', 'VIP Person'),
+    draft('S2', 'Standard One', { emailConfidence: { action: 'quick_check', reason: 'generic mailbox' } }),
+    draft('S3', 'Standard Two'),
+  ]);
+  render(
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} onClose={() => {}} onSent={() => {}} />,
+  );
+  await waitFor(() => expect(screen.getByText('1 standard invitation ready')).toBeTruthy());
+  // Two full cards (S1 VIP, S2 quick-check) but exactly one badge, on the VIP card.
+  expect(screen.getAllByText('★ VIP')).toHaveLength(1);
+});
+
+test('no ★ VIP badge under vipUnknown — even for a snapshotted vip:true (an optimistic save may have rolled back)', async () => {
+  mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
+  // S1 arrives vip:true in the snapshot; under vipUnknown that value may be an
+  // optimistic star whose PUT failed and rolled back after the modal opened, so
+  // the badge must not assert it. Every card still renders full (fail closed).
+  render(
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} vipUnknown onClose={() => {}} onSent={() => {}} />,
+  );
+  await waitFor(() => expect(screen.getByDisplayValue('Invitation for Standard Two')).toBeTruthy());
+  expect(screen.getByDisplayValue('Invitation for VIP Person')).toBeTruthy();
+  expect(screen.queryByText('★ VIP')).toBeNull();
+});
+
 test('Review expands a collapsed draft into a full editable card', async () => {
   mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
   render(
