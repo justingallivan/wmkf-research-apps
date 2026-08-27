@@ -10,6 +10,28 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Personalized scheduled email + reviewer invitation VIP preview reached Production (Session 462)
+
+**Milestone:** Automated grantee abstract reminders now send automatically
+per-PD with a VIP-flag review-by-exception layer, digest, and durable Postgres
+ledger; reviewer invitations gained per-candidate VIP stars — flagged people
+open as full editable previews, everyone else batch-sends behind a collapsible
+summary, with one shared invitation-link validator across preview, send
+withholding, and template save.
+**Sessions:** 461–462 (P0 build, owner redesign to VIP/digest, two Codex
+adversarial rounds per slice + rescue with Claude review pass, migrations
+036/037 applied + live-probed, owner-run capture-mode smoke, merges).
+**Ship state:** merges `4a743d63` (decision layer) and `dc46fa18` (reviewer
+slice) live; PD digest onboarding still required before first meaningful
+sends (~2026-09-07); post-cycle link-strictness decision parked in the work
+queue.
+**Why it matters:** first review-by-exception email automation — PDs stop
+click-through-approving routine mail without losing eyes on the recipients
+that matter; the send pipeline itself was left byte-identical mid-cycle.
+**Pointers:** `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`,
+`docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`,
+`lib/utils/invitation-link-validator.js`.
+
 ## August 2026 — Site Visit logistics and informational calendar distribution reached Production (Sessions 459–460)
 
 **Milestone:** Workbench now manages request-bound Site Visit schedule,
