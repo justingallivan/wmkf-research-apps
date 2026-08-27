@@ -39,6 +39,14 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 
+- **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
+  **[OWNER-PARKED 2026-08-27 — merge only after the current reviewer cycle
+  ends.]** Built and held on `feature/reviewer-cron-reminders-ledger`
+  (commits `7c29fac7`..`059e51f9`; two Codex adversarial rounds' highs
+  fixed). Promotion sequence and mid-cycle hazards (reminder outage without
+  migration 038; posture freeze under un-onboarded PDs) are recorded in
+  `SESSION_PROMPT.md` Parked item 2 and
+  `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10.
 - **Post-reviewer-cycle: decide invitation-link strictness deliberately.**
   **[OWNER-FLAGGED 2026-08-26 — revisit when the current reviewer cycle
   ends.]** The unified `lib/utils/invitation-link-validator.js`

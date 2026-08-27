@@ -97,22 +97,14 @@ their full verification loops:
    after invitation does not protect that batch. Onboarding + the tutorial
    refresh (Owner Decision Needed below) should complete before the next
    solicitation.
-2. **VIP badge on full cards (small UX polish, owner-noted during smoke).**
-   Evidence: plan doc smoke paragraph — a full card doesn't show WHY it's
-   full (VIP vs quick-check indistinguishable). Add a "★ VIP" badge to the
-   card header in `InviteEmailModal`. No behavior change.
-3. **Email hygiene items from the outbound inventory.**
-   Evidence: `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` cross-cutting
-   findings — `noFallback` absent on invitation (#1) and acceptance
-   confirmation (#10); automation-notice divergence on the manual respond
-   reminder (#7 vs #5); PD-attributed mail sent by other staff (#1,7,8,11,12).
-4. **Later slices (owner-recorded direction, not yet planned).**
-   Evidence: plan doc "Broader effort" section — cron reviewer
-   reminders/thank-yous through the ledger + digest (note
-   `filterVipFlaggedReviewers` in `scheduled-email-store.js` was built for
-   exactly this and has no callers yet); per-PD per-email-type preference
-   matrix (blocked on the `wmkf_preferencevalue` MaxLength live probe);
-   async PD approval for staff-triggered "sent as me" mail.
+2. **DONE S463: VIP badge + email hygiene items** — built, Codex-reviewed
+   twice (stage-aware dispatch fix), merged to main `7bba2f8f`.
+3. **Later slices (owner-recorded direction, not yet planned).**
+   Evidence: plan doc "Broader effort" section — per-PD per-email-type
+   preference matrix (blocked on the `wmkf_preferencevalue` MaxLength live
+   probe); async PD approval for staff-triggered "sent as me" mail.
+   Thank-yous stay on the direct path (owner decision S463). The cron
+   reviewer-reminders slice itself is BUILT and PARKED (below).
 
 ### Owner Decision Needed
 
@@ -127,6 +119,24 @@ their full verification loops:
    Evidence: `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups entry +
    `project-invitation-link-strictness-open-decision.md`. Re-open trigger:
    the current reviewer cycle ends. Do not tighten or ratify silently.
+2. **Reviewer cron-reminders ledger slice — BUILT, HELD on
+   `feature/reviewer-cron-reminders-ledger` (owner parked it S463 until the
+   review cycle ends).** Commits `7c29fac7`..`059e51f9`: migration 038
+   (UNAPPLIED everywhere — amendable until applied), strategy dispatch,
+   claim ownership (`claim_committed_at`), `send_requested_at` defer
+   boundary, marker-gated expiry exemption, send-time recipient
+   revalidation. Two Codex adversarial rounds' highs all fixed (last round
+   implemented by Codex rescue, Claude-reviewed). Promotion sequence when
+   the cycle ends: (a) owner runs `node scripts/apply-migrations.js` (038),
+   (b) seed PD posture — review-all override on for all PDs is the safe
+   default; posture freezes into rows at first sweep after merge, and
+   revive/reassign are the only runtime recomputes, (c) capture-mode local
+   smoke (`reviewer-invite-capture-mode-not-full-sandbox.md`), (d) merge,
+   (e) PD onboarding + tutorial before the next cycle's invitations.
+   Merging mid-cycle without (a) is a reminder OUTAGE (new cron replaces
+   direct send; inserts fail the 036 CHECK); without (b) the backlog
+   freezes `approval_required=false` under un-onboarded PDs. Accepted
+   residuals are on record in plan-doc items 8–10.
 
 ### Verify Before Acting
 
