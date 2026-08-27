@@ -1,144 +1,117 @@
-# Session 463 Prompt: Post-Ship Follow-Ups for the Scheduled-Email + Reviewer-Invite VIP Work
+# Session 464 Prompt: Quiet-Period Work While the Reviewer Cron-Reminders Slice Is Parked
 
-## Session 462 Summary
+## Session 463 Summary
 
-Session 462 shipped BOTH email-personalization slices to production and closed
-their full verification loops:
+Session 463 finished the small follow-ups, then built and parked the reviewer
+cron-reminders ledger slice:
 
-1. the **VIP/digest scheduled-email decision layer** (abstract reminders) was
-   adversarially reviewed (three findings fixed, including the digest-run
-   ledger and the fail-safe PD-handoff rebuild guard), merged to main
-   (`4a743d63`), migration 036 applied to the shared Neon DB and live-probed;
-2. the **reviewer invitation VIP preview slice** was designed with the owner
-   (synchronous preview; any review-manager staff curate flags stored per the
-   request's lead PD; non-VIP drafts collapse to an expandable in-modal
-   summary), built on `feature/reviewer-invite-vip`, hardened through TWO
-   Codex adversarial rounds plus a Codex rescue with a Claude review pass,
-   migration 037 applied + live-probed, owner-run local smoke PASSED
-   (2026-08-27), and merged to main (`dc46fa18`, production deployment Ready).
+1. **VIP badge + email hygiene items** shipped to production (merge
+   `7bba2f8f`): stage-aware dispatch contract for invitation failure routing
+   (all pre-SendEmail throws tagged `dispatched:false`; only SendEmail-stage
+   throws stay `unconfirmed[]`), `noFallback` on invitation/acceptance sends,
+   automation-notice parity on the manual respond reminder, and the ★ VIP
+   badge (suppressed under `vipUnknown`, per a Codex re-review finding).
+2. **Owner corrections + decisions recorded**: the phantom "day-12 sends
+   begin ~Sept 7" deadline was false (abstract requests went out weeks
+   earlier; ALL abstracts received — nothing queued, nothing sends this
+   cycle); reviewer cron-reminder decisions: both reminder types through the
+   ledger, per-message approval, thank-yous stay direct.
+3. **Reviewer cron-reminders ledger slice BUILT** on
+   `feature/reviewer-cron-reminders-ledger` (pushed to origin), hardened
+   through TWO Codex adversarial rounds; the second round's fixes were
+   implemented via Codex rescue and Claude-reviewed. **Owner parked the
+   branch until the review cycle ends** — see Parked item 2 for the full
+   promotion sequence and mid-cycle hazards.
+4. **Both open read-only probes run (owner-authorized)** — results in
+   "Probe Results" below; the preference-matrix slice is now unblocked.
+5. **PD tutorial deferred (owner decision)** until the reminder slice
+   finishes — one tutorial covering the full final surface.
 
-### What Was Completed
+### What Was Built on the Parked Branch
 
-1. **Reviewer invitation VIP preview (production).**
-   - `scheduled_email_reviewer_vip_flags` (migration 037; keyed on
-     `wmkf_potentialreviewersid` — candidates have no CRM contact
-     pre-acceptance, S389), service + thin route
-     `/api/review-manager/reviewer-vip-flags` (lead PD resolved server-side,
-     never client input), star toggle on the Invite Reviewers roster,
-     full-card vs collapse routing in `InviteEmailModal`.
-   - Always-full safety set: VIP, skipped, quick-check, edited, expanded,
-     single-candidate, invalid-link, and linkless drafts. Send payload
-     unchanged and pinned by test.
-   - Hardening from the reviews: fail-closed `vipUnknown` (load state +
-     pending-save), optimistic star with rollback, all stars disabled during
-     load/save, 10s timeout + inline Retry on flag-load failure.
-2. **Unified invitation-link validation.**
-   - `lib/utils/invitation-link-validator.js` shared by modal collapse,
-     send-time withholding (new `invalid_secure_link` skip reason with UI
-     label), and template-save validation (`{{externalLink}}` required to
-     save; legacy templates still load — the send gate protects them,
-     client + server-side in `pages/api/user-preferences.js`).
-   - Claude review pass reverted two silent tightenings from the rescue:
-     repeated IDENTICAL JWT copies dedupe and send (only DISTINCT tokens are
-     `external_link_ambiguous`) and trailing prose punctuation after a token
-     is accepted; extended/four-segment tokens still rejected. Also closed a
-     modal/server mismatch (linkless + `externalLinkExpected:false` drafts
-     no longer collapse).
-3. **Owner-run local smoke (2026-08-27, PASSED).**
-   - Recipe that worked: `REVIEWER_EMAIL_DELIVERY_MODE=capture npm run dev`,
-     same-day `DATAVERSE_PROD_WRITE_ACK` line (local-only, dies at UTC
-     midnight), and a **local-only throwaway `EXTERNAL_LINK_SECRET`** (the
-     mint fails without it; a throwaway is CORRECT — locally minted tokens
-     must not verify in prod). DevTools "Block request URL" (not Offline)
-     for the fail-closed flag-load check.
-   - Verified live: Retry notice, star round-trip + persistence, VIP +
-     quick-check full while standard collapsed, capture of all three sends
-     including the still-collapsed draft.
-4. **Forget-proofing + docs.**
-   - Post-cycle invitation-link strictness decision mechanized:
-     `docs/CURRENT_WORK_QUEUE.md` (Audit follow-ups) +
-     `.claude-memory/project-invitation-link-strictness-open-decision.md`.
-   - Plan doc, Atlas, security matrix, service catalog, agent wiki
-     (invitation gate section) all reconciled; outbound email inventory
-     (18 types) recorded in `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`.
-   - PD tutorial artifact built ("Email Autopilot for PDs",
-     https://claude.ai/code/artifact/11586fac-9e0f-4784-833c-58bb4d0e118f)
-     but deliberately NOT sent (owner: abstracts just solicited, would fall
-     on deaf ears); needs a scope update now that the reviewer slice landed.
+- Migration `038` (UNAPPLIED everywhere — still amendable): reviewer
+  workflow CHECK values, nullable `deliverable_id` + shape constraint,
+  `claim_committed_at`; mirrored in `scripts/setup-database.js`.
+- Per-workflow strategy dispatch in `scheduled-email-service.js`
+  (`strategyFor`; eligibility verdicts eligible/stop/defer; PD send-now
+  `force` overrides timing only).
+- `reviewer-reminder-eligibility.js` (shared refusal predicates +
+  `loadReminderReviewer`), `reviewer-reminder-workflows.js` (send-time
+  config recompute, marker-without-claim stop, marker-gated expiry
+  exemption, send-time recipient revalidation → stop `recipient_changed`,
+  claim fused with activity creation via one If-Match `mintAndStore`).
+- Store lifecycle helpers: `cancelScheduledEmailBySource`,
+  `deferScheduledEmailSend` (refusal boundary `send_requested_at` — an
+  unsent draft still defers), `reviveStoppedScheduledEmail` (clears claim),
+  `refreshUntouchedScheduledEmail`, `recordScheduledEmailClaim`.
+- Sweeps converted to ledger row creation (create/revive/reassign/refresh);
+  manual nudge cancels its queued copy; the reviewer cron now runs the
+  digest/due/finalize pipeline.
+- 143 tests green across the 5 core slice suites at final state (verified
+  2026-08-27); accepted residuals recorded in
+  `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 8–10.
 
-### Commits (this session, all on main via merges)
+### Commits
 
-- `4a743d63` - Merge: VIP/digest scheduled-email decision layer (abstract)
-- `2ab40bda` - feat: reviewer invitation VIP preview slice
-- `5704ebc5` / `8dc60d40` - fail-closed + race/body-integrity hardening
-- `ff156f3d` - Codex rescue (3 second-round findings) + Claude review pass
-- `22ec7c39` - mechanize post-cycle strictness decision
-- `de6122ea` / `92831a0c` - migration 037 applied; owner smoke recorded
-- `dc46fa18` - Merge feature/reviewer-invite-vip to main (production Ready)
+Main: `7bba2f8f` (merge: hygiene + VIP badge, incl. `1a76e526`/`26e0a899`),
+`72e7ee1d`/`048ac13a` (owner corrections/decisions), `3be6dbd9` (park),
+`29e25dbe` (tutorial deferral), `991209f0` (probe results), plus this
+handoff commit.
+Branch `feature/reviewer-cron-reminders-ledger` (pushed): `7c29fac7` (slice
+build), `17333c78` (discriminating tests + catalog), `f138f0f2`/`4b971473`
+(doc recheck markers), `ab524feb` (claim ownership + defer boundary),
+`059e51f9` (recipient revalidation + marker-gated exemption).
 
 ## Next Items
 
 ### Verified Open
 
-1. **PD onboarding / posture seeding for the abstract-reminder digest —
-   before the NEXT solicitation cycle, no current deadline.**
-   Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist
-   (procedural guarantee: onboard every active PD and seed override/VIP state
-   before meaningful sends). Owner-corrected S463: the abstract requests went
-   out weeks before 2026-08-26 and ALL solicited abstracts have been
-   received, so no deliverable is in Invited status — the cron's filter
-   matches nothing, and any stale ledger row self-cancels at send time via
-   the `sourceStillEligible` recheck (`lib/services/scheduled-email-service.js:239`,
-   `stoppedNoLongerEligible`). Nothing is queued and nothing will send this
-   cycle. The binding sequencing constraint for next cycle:
-   `approval_required` is frozen ONCE at ledger-row creation
-   (`grantee-deliverable-reminders-service.js:270`), so PD posture must be
-   seeded BEFORE the next batch of abstracts is stamped Invited — seeding
-   after invitation does not protect that batch. Onboarding + the tutorial
-   refresh (Parked item 0 below — owner deferred it until the parked
-   reminder slice finishes) should complete before the next solicitation.
-2. **DONE S463: VIP badge + email hygiene items** — built, Codex-reviewed
-   twice (stage-aware dispatch fix), merged to main `7bba2f8f`.
-3. **Later slices (owner-recorded direction, not yet planned).**
-   Evidence: plan doc "Broader effort" section — per-PD per-email-type
-   preference matrix (UNBLOCKED S463: `wmkf_preferencevalue` is
-   Memo/100,000 — probe results below); async PD approval for
-   staff-triggered "sent as me" mail.
-   Thank-yous stay on the direct path (owner decision S463). The cron
-   reviewer-reminders slice itself is BUILT and PARKED (below).
+1. **PD onboarding / posture seeding — before the NEXT solicitation cycle,
+   no current deadline.**
+   Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist;
+   `approval_required` freezes ONCE at ledger-row creation
+   (`grantee-deliverable-reminders-service.js:270`), so posture must exist
+   BEFORE the next batch of abstracts is stamped Invited, and (via the
+   parked slice) before its post-merge first sweep. Nothing is queued this
+   cycle (owner-corrected S463: all abstracts received).
+2. **Preference-matrix slice is now plannable** (UNBLOCKED S463:
+   `wmkf_preferencevalue` is Memo/100,000 — Probe Results below). Also
+   still open from the plan doc "Broader effort": async PD approval for
+   staff-triggered "sent as me" mail. Thank-yous stay direct (owner
+   decision S463).
+
+### Owner Decision Needed
+
+(none — the tutorial decision moved to Parked item 0.)
 
 ### Parked
 
 0. **PD tutorial refresh + distribution — DECIDED S463 (2026-08-27): wait
    until the reviewer cron-reminders build is finished/promoted.**
-   Evidence: artifact exists (link above); owner deferred twice — first for
-   the abstract-only sliver, now until the parked slice below merges, so
-   the tutorial covers the full final surface (abstract digest + reviewer
-   invitations + cron reminders) in one send. Re-open trigger: promotion
-   step (e) of Parked item 2 — the tutorial is part of PD onboarding,
-   which must complete before the next cycle's invitations.
+   Evidence: artifact "Email Autopilot for PDs"
+   (https://claude.ai/code/artifact/11586fac-9e0f-4784-833c-58bb4d0e118f);
+   owner deferred twice — now until the parked slice merges, so one
+   tutorial covers abstract digest + reviewer invitations + cron reminders.
+   Re-open trigger: promotion step (e) of Parked item 2.
 1. **Post-cycle invitation-link strictness (tighten vs ratify).**
    Evidence: `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups entry +
    `project-invitation-link-strictness-open-decision.md`. Re-open trigger:
    the current reviewer cycle ends. Do not tighten or ratify silently.
 2. **Reviewer cron-reminders ledger slice — BUILT, HELD on
    `feature/reviewer-cron-reminders-ledger` (owner parked it S463 until the
-   review cycle ends).** Commits `7c29fac7`..`059e51f9`: migration 038
-   (UNAPPLIED everywhere — amendable until applied), strategy dispatch,
-   claim ownership (`claim_committed_at`), `send_requested_at` defer
-   boundary, marker-gated expiry exemption, send-time recipient
-   revalidation. Two Codex adversarial rounds' highs all fixed (last round
-   implemented by Codex rescue, Claude-reviewed). Promotion sequence when
+   review cycle ends).** Commits `7c29fac7`..`059e51f9`; migration 038
+   UNAPPLIED everywhere (amendable until applied). Promotion sequence when
    the cycle ends: (a) owner runs `node scripts/apply-migrations.js` (038),
    (b) seed PD posture — review-all override on for all PDs is the safe
-   default; posture freezes into rows at first sweep after merge, and
+   default; posture freezes into rows at the first sweep after merge, and
    revive/reassign are the only runtime recomputes, (c) capture-mode local
    smoke (`reviewer-invite-capture-mode-not-full-sandbox.md`), (d) merge,
    (e) PD onboarding + tutorial before the next cycle's invitations.
-   Merging mid-cycle without (a) is a reminder OUTAGE (new cron replaces
-   direct send; inserts fail the 036 CHECK); without (b) the backlog
-   freezes `approval_required=false` under un-onboarded PDs. Accepted
-   residuals are on record in plan-doc items 8–10.
+   Merging mid-cycle without (a) is a reminder OUTAGE (the new cron
+   replaces direct send; inserts fail the 036 CHECK); without (b) the
+   backlog freezes `approval_required=false` under un-onboarded PDs.
+   Accepted residuals: plan-doc items 8–10. Also tracked in
+   `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups.
 
 ### Verify Before Acting
 
@@ -148,13 +121,6 @@ their full verification loops:
    request with the owner and that no real workflow references those rows;
    removal is a prod Dataverse write (works from the deployed app; local
    needs a fresh same-day ack).
-2. **DONE S463 (2026-08-27, owner-authorized read-only probes):**
-   - `wmkf_potentialreviewerses`: 4,526 total rows (4,516 active); only
-     **183** have the `wmkf_contact` lookup set (all 183 on active rows) —
-     ~4% linkage, consistent with contact-on-acceptance-only.
-   - `wmkf_appuserpreference.wmkf_preferencevalue` is a **Memo, MaxLength
-     100,000** — the preference-matrix slice is UNBLOCKED (a per-email-type
-     JSON matrix fits with huge margin).
 
 ### Do Not Reopen Without New Decision
 
@@ -165,27 +131,43 @@ their full verification loops:
 3. **Write-permission asymmetry between flag stores** (contact flags PD-only;
    reviewer flags any review-manager staff). Evidence: owner decision
    2026-08-26, recorded in the route header and plan doc.
+4. **Merging the parked slice mid-cycle.** Evidence: owner decision S463
+   ("Let's park this until after the review cycle"); hazards in Parked
+   item 2. A deliberate mid-cycle promotion is possible with the (a)+(b)
+   sequencing but requires a new owner decision.
+
+## Probe Results (owner-authorized read-only, 2026-08-27)
+
+- `wmkf_potentialreviewerses`: 4,526 total rows (4,516 active); only
+  **183** have the `wmkf_contact` lookup set (all on active rows) — ~4%
+  linkage, consistent with contact-on-acceptance-only.
+- `wmkf_appuserpreference.wmkf_preferencevalue`: **Memo, MaxLength
+  100,000** — a per-email-type JSON preference matrix fits with huge
+  margin (the `email_automation` JSON preference already lives in this
+  column).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/utils/invitation-link-validator.js` | Shared invitation-link contract (modal collapse, send gate, template save) |
-| `lib/services/review-manager/reviewer-vip-flags-service.js` | Per-(lead PD, person) flag service; PD server-side |
-| `pages/api/review-manager/reviewer-vip-flags.js` | Thin GET/PUT shell for the flags |
-| `shared/components/reviewers/ReviewerInvitePanel.js` | Star toggle, optimistic save, fail-closed load + Retry |
-| `shared/components/reviewers/InviteEmailModal.js` | Full-card vs collapse routing (`requiresFullCard`) |
-| `lib/services/scheduled-email-store.js` | Ledger + contact/reviewer flag helpers + digest runs |
-| `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` | Canonical plan/status for both slices |
+| `lib/services/scheduled-email-service.js` | Ledger delivery skeleton + `strategyFor` dispatch (branch adds reviewer strategies) |
+| `lib/services/scheduled-email-store.js` | Ledger SQL + lifecycle helpers (branch adds claim/defer/revive/refresh/cancelBySource) |
+| `lib/services/reviewer-reminder-workflows.js` | (branch) reviewer delivery strategies — the sharp edges live here |
+| `lib/services/reviewer-reminder-eligibility.js` | (branch) shared refusal predicates + reviewer-email resolver |
+| `lib/services/reviewer-reminder-sweep.js` | Reviewer sweeps (branch: ledger row creation instead of direct send) |
+| `lib/db/migrations/038_reviewer_reminder_ledger_workflows.sql` | (branch) UNAPPLIED — apply before merge |
+| `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` | Canonical plan/status; items 7–10 = slice decisions + residuals |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/invitation-link-validator.test.js \
-  tests/unit/invite-email-modal-vip-collapse.test.js \
-  tests/unit/reviewer-invite-panel-vip-toggle.test.js \
-  tests/unit/reviewer-vip-flags-route.test.js \
-  tests/unit/send-emails-service.test.js
-# Local smoke recipe: see Session 462 Summary item 3 (capture mode + same-day
-# DATAVERSE_PROD_WRITE_ACK + throwaway EXTERNAL_LINK_SECRET).
+# Parked-slice suites (run on the branch):
+npx jest tests/unit/reviewer-reminder-workflows.test.js \
+  tests/unit/reviewer-reminder-sweep.test.js \
+  tests/unit/reviewer-manual-reminder.test.js \
+  tests/unit/scheduled-email-service.test.js \
+  tests/unit/scheduled-email-schema-parity.test.js
+# Local smoke recipe (for promotion step (c)): capture mode + same-day
+# DATAVERSE_PROD_WRITE_ACK + throwaway EXTERNAL_LINK_SECRET — see
+# .claude-memory/reviewer-invite-capture-mode-not-full-sandbox.md
 ```
