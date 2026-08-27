@@ -1,171 +1,177 @@
-# Session 464 Prompt: Quiet-Period Work While the Reviewer Cron-Reminders Slice Is Parked
+# Session 465 Prompt: Quiet-Period Work Continues; Preference-Matrix Slice Now Owner-Settled
 
-## Session 463 Summary
+## Session 464 Summary
 
-Session 463 finished the small follow-ups, then built and parked the reviewer
-cron-reminders ledger slice:
+Session 464 (2026-08-27) was quiet-period work while the reviewer
+cron-reminders slice stays parked:
 
-1. **VIP badge + email hygiene items** shipped to production (merge
-   `7bba2f8f`): stage-aware dispatch contract for invitation failure routing
-   (all pre-SendEmail throws tagged `dispatched:false`; only SendEmail-stage
-   throws stay `unconfirmed[]`), `noFallback` on invitation/acceptance sends,
-   automation-notice parity on the manual respond reminder, and the ★ VIP
-   badge (suppressed under `vipUnknown`, per a Codex re-review finding).
-2. **Owner corrections + decisions recorded**: the phantom "day-12 sends
-   begin ~Sept 7" deadline was false (abstract requests went out weeks
-   earlier; ALL abstracts received — nothing queued, nothing sends this
-   cycle); reviewer cron-reminder decisions: both reminder types through the
-   ledger, per-message approval, thank-yous stay direct.
-3. **Reviewer cron-reminders ledger slice BUILT** on
-   `feature/reviewer-cron-reminders-ledger` (pushed to origin), hardened
-   through TWO Codex adversarial rounds; the second round's fixes were
-   implemented via Codex rescue and Claude-reviewed. **Owner parked the
-   branch until the review cycle ends** — see Parked item 2 for the full
-   promotion sequence and mid-cycle hazards.
-4. **Both open read-only probes run (owner-authorized)** — results in
-   "Probe Results" below; the preference-matrix slice is now unblocked.
-5. **PD tutorial deferred (owner decision)** until the reminder slice
-   finishes — one tutorial covering the full final surface.
-
-### What Was Built on the Parked Branch
-
-- Migration `038` (UNAPPLIED everywhere — still amendable): reviewer
-  workflow CHECK values, nullable `deliverable_id` + shape constraint,
-  `claim_committed_at`; mirrored in `scripts/setup-database.js`.
-- Per-workflow strategy dispatch in `scheduled-email-service.js`
-  (`strategyFor`; eligibility verdicts eligible/stop/defer; PD send-now
-  `force` overrides timing only).
-- `reviewer-reminder-eligibility.js` (shared refusal predicates +
-  `loadReminderReviewer`), `reviewer-reminder-workflows.js` (send-time
-  config recompute, marker-without-claim stop, marker-gated expiry
-  exemption, send-time recipient revalidation → stop `recipient_changed`,
-  claim fused with activity creation via one If-Match `mintAndStore`).
-- Store lifecycle helpers: `cancelScheduledEmailBySource`,
-  `deferScheduledEmailSend` (refusal boundary `send_requested_at` — an
-  unsent draft still defers), `reviveStoppedScheduledEmail` (clears claim),
-  `refreshUntouchedScheduledEmail`, `recordScheduledEmailClaim`.
-- Sweeps converted to ledger row creation (create/revive/reassign/refresh);
-  manual nudge cancels its queued copy; the reviewer cron now runs the
-  digest/due/finalize pipeline.
-- 143 tests green across the 5 core slice suites at final state (verified
-  2026-08-27); accepted residuals recorded in
-  `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 8–10.
+1. **Preference-matrix slice planned and owner-settled** (no code).
+   New section "Preference-matrix slice — plan" in
+   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`: additive
+   `{ reviewAll, perType? }` shape (effective posture =
+   `perType[workflowType] ?? reviewAll`), type axis = ledger
+   `workflow_type` CHECK values, shared `effectiveReviewAll` helper, no
+   data migration. Owner decisions: **two-state per type; all three
+   ledgered types in the UI at launch; label wording deferred to build
+   time (ask the owner, do not invent)**. HARD ordering invariant written
+   into the plan: the contract change ships only AFTER the parked
+   cron-reminders branch merges and both `approval_required` sites adopt
+   the helper (the branch's `override?.reviewAll === true` check would
+   silently ignore `perType` — posture weakening).
+2. **Phantom co-PI floor closed by full census** (owner-run read-only
+   probe, new `scripts/probe-placeholder-copi-census.js`): 1,084 slot
+   links + 1,073 junction rows, 1,049 distinct contacts, pagination
+   verified complete. **The phantom contact's 14 links are GONE (0+0 vs
+   recorded 7+7)** — remediated CRM-side outside this repo; by whom is
+   unrecorded (owner did not say this session). Zero other
+   punctuation-placeholder co-PI contacts. Residuals (all CRM-side) in
+   the incident record's 2026-08-27 update. Queue entry rewritten.
+3. **PII containment (owner-directed)**:
+   `outputs/phantom-copi-incident-2026-08-12.md` untracked from the
+   public tree (local file kept; tracked 08-12→08-27 history queued in
+   `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` pending scope);
+   the one real personal email in
+   `outputs/reviewer-workflow-stabilization-fable-assessment.md` redacted
+   in place (file stays tracked; reference graph intact).
+4. **Migration-drift alert noise fixed and DEPLOYED TO PRODUCTION**
+   (Tier 1 branch, merged `dfbe6ef9`, deployment Ready): extra-only
+   drift (tracker ahead of the running build — the normal
+   apply-before-merge window) is now a `migration_drift_ahead` WARNING
+   (system_alert row, no email) under its own autoResolveKey; missing
+   entries stay an error email under `migration-drift`; each direction
+   resolves the other's key. 5 new unit tests
+   (`tests/unit/migration-drift.test.js`). Applying migration 038 ahead
+   of the parked merge will now be silent.
+5. **Dependabot nanoid alert (CVE-2026-67214) verified already fixed**
+   (GitHub alert #65 fixed 2026-08-10; tree holds patched 3.3.18/5.1.16;
+   0 open alerts repo-wide). No change needed.
+6. **Housekeeping**: two over-broad wildcard Bash allow rules removed
+   from `.claude/settings.local.json` (untracked, this machine);
+   throwaway smoke-candidate cleanup handed to the owner (see Do Not
+   Reopen 5).
 
 ### Commits
 
-Main: `7bba2f8f` (merge: hygiene + VIP badge, incl. `1a76e526`/`26e0a899`),
-`72e7ee1d`/`048ac13a` (owner corrections/decisions), `3be6dbd9` (park),
-`29e25dbe` (tutorial deferral), `991209f0` (probe results), plus this
+`118814b7`/`29ef05cb`/`5e3ef026`/`603f51da` (preference-matrix plan +
+owner decisions), `4e31ac64` (smoke-candidate handoff), `7851e913`
+(co-PI census + queue), `7301ff21`/`47d511be` (PII untrack + redaction),
+`24180ccd`+merge `dfbe6ef9` (migration-drift severity split), plus this
 handoff commit.
-Branch `feature/reviewer-cron-reminders-ledger` (pushed): `7c29fac7` (slice
-build), `17333c78` (discriminating tests + catalog), `f138f0f2`/`4b971473`
-(doc recheck markers), `ab524feb` (claim ownership + defer boundary),
-`059e51f9` (recipient revalidation + marker-gated exemption).
 
 ## Next Items
 
 ### Verified Open
 
-1. **PD onboarding / posture seeding — before the NEXT solicitation cycle,
-   no current deadline.**
-   Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist;
-   `approval_required` freezes ONCE at ledger-row creation
-   (`grantee-deliverable-reminders-service.js:270`), so posture must exist
-   BEFORE the next batch of abstracts is stamped Invited, and (via the
-   parked slice) before its post-merge first sweep. Nothing is queued this
-   cycle (owner-corrected S463: all abstracts received).
-2. **Preference-matrix slice is now plannable** (UNBLOCKED S463:
-   `wmkf_preferencevalue` is Memo/100,000 — Probe Results below). Also
-   still open from the plan doc "Broader effort": async PD approval for
-   staff-triggered "sent as me" mail. Thank-yous stay direct (owner
-   decision S463).
+1. **Queue item 2 — writeup-slice signed-in generation smoke** (top
+   commitment in `docs/CURRENT_WORK_QUEUE.md` Current sequence).
+   Evidence: queue row 2; deployment and prompt v4 verified there. Needs
+   explicit owner approval + a browser session: one Ready-with-warning
+   generation, one hard-failure case, then Dataverse
+   envelope/run/item/pointer + no-duplicate-retry verification.
+2. **PD onboarding / posture seeding — before the NEXT solicitation
+   cycle, no current deadline.** Evidence:
+   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist;
+   `approval_required` freezes once at row creation
+   (`grantee-deliverable-reminders-service.js`). If the preference
+   matrix ships first, one onboarding pass seeds both (plan §Rollout).
+3. **Async PD approval for staff-triggered "sent as me" mail** — the
+   remaining unplanned Broader-effort item (inventory #1/#7/#8/#11/#12
+   consent axis). Evidence: plan doc Broader effort;
+   `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` cross-cutting finding.
+   Plannable; forward-compatible with the matrix (a ledgered type joins
+   by gaining a `workflow_type`).
 
 ### Owner Decision Needed
 
-(none — the tutorial decision moved to Parked item 0.)
+1. **Who removed the phantom co-PI links?** (curiosity/record-keeping
+   only). Evidence: census 2026-08-27 found 0+0; no execution recorded
+   in-repo. If the owner knows (them or Connor), add one line to the
+   local incident record.
 
 ### Parked
 
-0. **PD tutorial refresh + distribution — DECIDED S463 (2026-08-27): wait
-   until the reviewer cron-reminders build is finished/promoted.**
-   Evidence: artifact "Email Autopilot for PDs"
-   (https://claude.ai/code/artifact/11586fac-9e0f-4784-833c-58bb4d0e118f);
-   owner deferred twice — now until the parked slice merges, so one
-   tutorial covers abstract digest + reviewer invitations + cron reminders.
-   Re-open trigger: promotion step (e) of Parked item 2.
-1. **Post-cycle invitation-link strictness (tighten vs ratify).**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups entry +
-   `project-invitation-link-strictness-open-decision.md`. Re-open trigger:
-   the current reviewer cycle ends. Do not tighten or ratify silently.
-2. **Reviewer cron-reminders ledger slice — BUILT, HELD on
-   `feature/reviewer-cron-reminders-ledger` (owner parked it S463 until the
-   review cycle ends).** Commits `7c29fac7`..`059e51f9`; migration 038
-   UNAPPLIED everywhere (amendable until applied). Promotion sequence when
-   the cycle ends: (a) owner runs `node scripts/apply-migrations.js` (038),
-   (b) seed PD posture — review-all override on for all PDs is the safe
-   default; posture freezes into rows at the first sweep after merge, and
-   revive/reassign are the only runtime recomputes, (c) capture-mode local
-   smoke (`reviewer-invite-capture-mode-not-full-sandbox.md`), (d) merge,
-   (e) PD onboarding + tutorial before the next cycle's invitations.
-   Merging mid-cycle without (a) is a reminder OUTAGE (the new cron
-   replaces direct send; inserts fail the 036 CHECK); without (b) the
-   backlog freezes `approval_required=false` under un-onboarded PDs.
-   Accepted residuals: plan-doc items 8–10. Also tracked in
-   `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups.
+1. **Reviewer cron-reminders ledger slice — BUILT, HELD on
+   `feature/reviewer-cron-reminders-ledger` until the review cycle
+   ends.** Commits `7c29fac7`..`059e51f9`; migration 038 UNAPPLIED
+   everywhere. Promotion sequence: (a) owner applies 038, (b) seed PD
+   posture (review-all on for all PDs is the safe default), (c)
+   capture-mode local smoke, (d) merge, (e) PD onboarding + tutorial.
+   Mid-cycle merge without (a) = reminder OUTAGE; without (b) = backlog
+   freezes `approval_required=false`. NOTE (S464): the apply→merge
+   window no longer emails drift alerts (warning-only), so don't rely on
+   the alert as a promotion reminder. Details: SESSION_PROMPT history +
+   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10 (branch copy).
+2. **Preference-matrix slice BUILD — owner-settled design, blocked by
+   ordering invariant.** Evidence: plan doc "Preference-matrix slice"
+   section (owner decisions 2026-08-27). Build only after Parked 1
+   merges; both consumers must adopt `effectiveReviewAll` in the same
+   change. Ask the owner for UI label wording at build time.
+3. **PD tutorial refresh + distribution** — wait until the reminder
+   slice is finished/promoted (owner decision S463). Re-open trigger:
+   promotion step (e) of Parked 1. Artifact: "Email Autopilot for PDs"
+   (https://claude.ai/code/artifact/11586fac-9e0f-4784-833c-58bb4d0e118f).
+4. **Post-cycle invitation-link strictness (tighten vs ratify).**
+   Evidence: `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups;
+   `project-invitation-link-strictness-open-decision.md`. Re-open
+   trigger: cycle end. Do not tighten or ratify silently.
+5. **Public git history rewrite** — owner-gated destructive step
+   (`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`); the phantom
+   incident record's 08-12→08-27 revisions and the stabilization
+   assessment's pre-redaction revisions were added to its pending scope
+   S464. Content remains visible in public history until executed.
 
 ### Verify Before Acting
 
-(none — the throwaway smoke-candidate cleanup (Test Homer, Francesco Cisco,
-Justin Test2 on Request `1002788`) is owner-held as of 2026-08-27 S464: the
-owner will remove them personally via the app's "Remove entirely" flow; do
-not track or resurface.)
+1. **Phantom co-PI residuals (CRM-side cleanups)**: the `ab@ab.com`
+   test contact on request `1001931`, the corrupted-email duplicate
+   contact pair, the 1002788 test-byline trio across five requests,
+   and 18/8 cross-store drift rows. Evidence: local
+   `outputs/phantom-copi-incident-2026-08-12.md` §Update 2026-08-27.
+   All are prod Dataverse writes — owner confirmation + preflight
+   re-probe first; Connor's importer fix remains the only recurrence
+   prevention.
 
 ### Do Not Reopen Without New Decision
 
-1. **Blanket per-PD review of all automated mail.** Evidence: plan doc owner
-   decision 10 — a single miss does not reopen blanket review.
-2. **Reviewer flags keyed on contact.** Evidence: S389 + Atlas — candidates
-   have no CRM contact pre-acceptance; person-keying is deliberate.
-3. **Write-permission asymmetry between flag stores** (contact flags PD-only;
-   reviewer flags any review-manager staff). Evidence: owner decision
-   2026-08-26, recorded in the route header and plan doc.
-4. **Merging the parked slice mid-cycle.** Evidence: owner decision S463
-   ("Let's park this until after the review cycle"); hazards in Parked
-   item 2. A deliberate mid-cycle promotion is possible with the (a)+(b)
-   sequencing but requires a new owner decision.
-
-## Probe Results (owner-authorized read-only, 2026-08-27)
-
-- `wmkf_potentialreviewerses`: 4,526 total rows (4,516 active); only
-  **183** have the `wmkf_contact` lookup set (all on active rows) — ~4%
-  linkage, consistent with contact-on-acceptance-only.
-- `wmkf_appuserpreference.wmkf_preferencevalue`: **Memo, MaxLength
-  100,000** — a per-email-type JSON preference matrix fits with huge
-  margin (the `email_automation` JSON preference already lives in this
-  column).
+1. **Blanket per-PD review of all automated mail.** Plan doc owner
+   decision 10.
+2. **Reviewer flags keyed on contact.** S389 + Atlas; person-keying is
+   deliberate.
+3. **Write-permission asymmetry between flag stores.** Owner decision
+   2026-08-26 (route header + plan doc).
+4. **Merging the parked slice mid-cycle.** Owner decision S463; hazards
+   in Parked 1.
+5. **Throwaway smoke-candidate cleanup (Test Homer, Francesco Cisco,
+   Justin Test2 on Request `1002788`)** — owner-held S464: the owner
+   removes them personally via the app's "Remove entirely" flow. Do not
+   track or resurface.
+6. **A third "always auto, even for VIPs" preference level.** Owner
+   decision S464 (plan doc): two-state per type.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/scheduled-email-service.js` | Ledger delivery skeleton + `strategyFor` dispatch (branch adds reviewer strategies) |
-| `lib/services/scheduled-email-store.js` | Ledger SQL + lifecycle helpers (branch adds claim/defer/revive/refresh/cancelBySource) |
-| `lib/services/reviewer-reminder-workflows.js` | (branch) reviewer delivery strategies — the sharp edges live here |
-| `lib/services/reviewer-reminder-eligibility.js` | (branch) shared refusal predicates + reviewer-email resolver |
-| `lib/services/reviewer-reminder-sweep.js` | Reviewer sweeps (branch: ledger row creation instead of direct send) |
-| `lib/db/migrations/038_reviewer_reminder_ledger_workflows.sql` | (branch) UNAPPLIED — apply before merge |
-| `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` | Canonical plan/status; items 7–10 = slice decisions + residuals |
+| `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` | Canonical plan; now includes the owner-settled preference-matrix slice section |
+| `lib/utils/migration-drift.js` | Cold-start drift check; S464 direction split (missing=error email, ahead=warning) |
+| `tests/unit/migration-drift.test.js` | 5 tests pinning the severity/key split |
+| `scripts/probe-placeholder-copi-census.js` | Read-only co-PI census (both stores, paginated, classified) |
+| `outputs/phantom-copi-incident-2026-08-12.md` | LOCAL-ONLY (untracked S464) incident record + census update |
+| `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md` | History rewrite plan; pending scope grew S464 |
+| `lib/services/reviewer-reminder-workflows.js` | (parked branch) reviewer delivery strategies |
+| `lib/db/migrations/038_reviewer_reminder_ledger_workflows.sql` | (parked branch) UNAPPLIED — apply before merge |
 
 ## Testing
 
 ```bash
+# Migration-drift severity split:
+npx jest tests/unit/migration-drift.test.js
 # Parked-slice suites (run on the branch):
 npx jest tests/unit/reviewer-reminder-workflows.test.js \
   tests/unit/reviewer-reminder-sweep.test.js \
   tests/unit/reviewer-manual-reminder.test.js \
   tests/unit/scheduled-email-service.test.js \
   tests/unit/scheduled-email-schema-parity.test.js
-# Local smoke recipe (for promotion step (c)): capture mode + same-day
-# DATAVERSE_PROD_WRITE_ACK + throwaway EXTERNAL_LINK_SECRET — see
-# .claude-memory/reviewer-invite-capture-mode-not-full-sandbox.md
+# Co-PI census (read-only; owner runs it):
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-placeholder-copi-census.js
 ```
