@@ -410,9 +410,10 @@ describe('send-emails-service — invitation body-integrity gate', () => {
 
   test('an invitation impersonation-disabled guard failure lands in failed[] (provably never dispatched), not unconfirmed[]', async () => {
     createAndSendEmail.mockImplementationOnce(async () => {
-      const err = new Error('Dynamics impersonation is disabled; noFallback requested');
-      err.code = 'impersonation_disabled';
-      throw err;
+      throw Object.assign(new Error('Dynamics impersonation is disabled; noFallback requested'), {
+        code: 'impersonation_disabled',
+        dispatched: false,
+      });
     });
     const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
     expect(updateLifecycle).not.toHaveBeenCalled();
@@ -422,6 +423,20 @@ describe('send-emails-service — invitation body-integrity gate', () => {
     expect(r.unconfirmed).toEqual([]);
     expect(r.failed).toHaveLength(1);
     expect(r.failed[0].error).toContain('was not sent');
+  });
+
+  test('any invitation throw tagged dispatched:false (create/attachment stage) lands in failed[] with its own message', async () => {
+    createAndSendEmail.mockImplementationOnce(async () => {
+      throw Object.assign(new Error('Failed to create email activity (403): PrincipalPrivilegeDenied'), {
+        dispatched: false,
+      });
+    });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(names(emitted)).not.toContain('email_unconfirmed');
+    const r = resultOf(emitted);
+    expect(r.unconfirmed).toEqual([]);
+    expect(r.failed).toHaveLength(1);
+    expect(r.failed[0].error).toContain('Failed to create email activity');
   });
 
   test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {

@@ -80,11 +80,13 @@ reflect the 2026-08-26 snapshot and are superseded on these points:
 
 - **#1 reviewer invitation:** now `noFallback: true` (invitations only; the
   shared payload keeps fallback for #2–4, which send as the acting staff
-  member). A pre-dispatch impersonation-guard failure is tagged
-  (`err.code = 'impersonation_disabled'` in `lib/services/dynamics/email.js`)
-  and lands in plain `failed[]` with staff-readable copy — not in the
-  "possibly sent — verify before retry" bucket, which is reserved for throws
-  that may have dispatched.
+  member). `createAndSendEmail` (`lib/services/dynamics/email.js`) tags every
+  throw from before the SendEmail POST — env preflight
+  (`code: 'impersonation_disabled'`), create-activity, and attachment stages —
+  with `dispatched: false`; the invitation catch routes those to plain
+  `failed[]` with staff-readable copy, keeping the "possibly sent — verify
+  before retry" bucket for SendEmail-stage throws that may have dispatched
+  (stage-aware contract added after the S463 Codex adversarial review).
 - **#10 acceptance confirmation:** now `noFallback: true`. Harmless on the
   NOTIFICATION_EMAIL_FROM fallback branch (no acting user there); the drain
   records a throw as a non-fatal failed step, at-most-once.
