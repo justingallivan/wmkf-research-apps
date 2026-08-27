@@ -24,6 +24,7 @@
  */
 
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
+import { validateInvitationTemplateForSave } from '../../../lib/utils/invitation-link-validator';
 
 export const TEMPLATE_TYPES = ['invitation', 'materials', 'followup', 'thankyou'];
 
@@ -120,6 +121,7 @@ export async function loadEmailTemplates() {
  * default). Re-reads the admin default to diff against. Returns true on success.
  */
 export async function saveEmailTemplates(templates) {
+  if (!validateInvitationTemplateForSave(templates?.invitation).valid) return false;
   try {
     const adminDefaults = await loadAdminTemplateDefaults();
     const overrides = toOverrides(templates, adminDefaults);

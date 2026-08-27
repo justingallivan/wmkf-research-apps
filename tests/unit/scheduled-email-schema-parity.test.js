@@ -69,6 +69,21 @@ test('migration 036 and fresh install both create the per-PD VIP flag table', ()
   expect(setup).toContain(pair);
 });
 
+test('migration 037 and fresh install both create the reviewer VIP flag table keyed on the person row', () => {
+  const migration037 = fs.readFileSync(
+    path.join(ROOT, 'lib/db/migrations/037_reviewer_vip_flags.sql'),
+    'utf8',
+  );
+  const table = 'CREATE TABLE IF NOT EXISTS scheduled_email_reviewer_vip_flags';
+  // Person-keyed by design: candidates have no CRM contact pre-acceptance (S389).
+  const key = 'PRIMARY KEY (pd_systemuser_id, potential_reviewer_id)';
+  for (const fragment of [table, key]) {
+    expect(migration037).toContain(fragment);
+    expect(setup).toContain(fragment);
+  }
+  expect(migration037).not.toContain('contact_id');
+});
+
 test('migration 036 and fresh install both create the digest run ledger with the per-day claim key', () => {
   const table = 'CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs';
   const claimKey = 'PRIMARY KEY (pd_systemuser_id, digest_day)';

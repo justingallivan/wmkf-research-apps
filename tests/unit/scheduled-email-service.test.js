@@ -363,3 +363,17 @@ test('the digest-run claim SQL freezes membership and the reassign SQL guards at
   expect(reassignSection).toContain('approved_at = NULL');
   expect(reassignSection).toContain('version = version + 1');
 });
+
+test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function setReviewerVipFlag'),
+    store.indexOf('/** Returns the subset of contactIds'),
+  );
+  expect(section).toContain('scheduled_email_reviewer_vip_flags');
+  expect(section).toContain('potential_reviewer_id');
+  expect(section).not.toContain('contact_id');
+});

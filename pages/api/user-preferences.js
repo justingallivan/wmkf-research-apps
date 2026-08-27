@@ -12,6 +12,8 @@ import { DatabaseService } from '../../lib/services/database-service';
 import { requireAuthWithProfile } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
+import { getSettingStrict } from '../../lib/services/settings-service';
+import { validateInvitationTemplateForSave } from '../../lib/utils/invitation-link-validator';
 
 // Keys that this generic endpoint must NOT write — they have a dedicated,
 // grant-gated + validating write path. PROMPT_OVERRIDES (reviewer-finder prompt
@@ -23,6 +25,42 @@ const RESERVED_WRITE_KEYS = new Set([
   PREFERENCE_KEYS.PROMPT_OVERRIDES,
   PREFERENCE_KEYS.EMAIL_AUTOMATION,
 ]);
+
+const INVITATION_TEMPLATE_SAVE_ERROR = 'Invitation templates must include {{externalLink}} in the subject or body.';
+
+async function validateEmailTemplatesPreference(value) {
+  let parsed;
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    return { ok: false, status: 400, error: 'Reviewer email templates must be valid JSON.' };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { ok: false, status: 400, error: 'Reviewer email templates must be an object.' };
+  }
+
+  const invitation = parsed.invitation && typeof parsed.invitation === 'object'
+    ? parsed.invitation
+    : {};
+  const hasSubject = Object.prototype.hasOwnProperty.call(invitation, 'subject');
+  const hasBody = Object.prototype.hasOwnProperty.call(invitation, 'body');
+  try {
+    const [subjectDefault, bodyDefault] = await Promise.all([
+      hasSubject ? null : getSettingStrict('email.reviewer_invitation.subject'),
+      hasBody ? null : getSettingStrict('email.reviewer_invitation.body'),
+    ]);
+    const resolved = {
+      subject: hasSubject ? invitation.subject : (subjectDefault?.found ? subjectDefault.value : ''),
+      body: hasBody ? invitation.body : (bodyDefault?.found ? bodyDefault.value : ''),
+    };
+    return validateInvitationTemplateForSave(resolved).valid
+      ? { ok: true }
+      : { ok: false, status: 400, error: INVITATION_TEMPLATE_SAVE_ERROR };
+  } catch (error) {
+    console.error('Invitation template validation error:', error);
+    return { ok: false, status: 503, error: 'Invitation template could not be validated. Try again.' };
+  }
+}
 
 export default async function handler(req, res) {
   // Require authentication and extract profile ID from session
@@ -86,6 +124,14 @@ async function handlePost(req, res, profileId) {
     const reservedHit = attemptedKeys.find((k) => RESERVED_WRITE_KEYS.has(k));
     if (reservedHit) {
       return res.status(403).json({ error: `Preference key "${reservedHit}" cannot be written through this endpoint; use its dedicated route.` });
+    }
+
+    const emailTemplatesValue = key === PREFERENCE_KEYS.EMAIL_TEMPLATES
+      ? value
+      : preferences?.[PREFERENCE_KEYS.EMAIL_TEMPLATES];
+    if (emailTemplatesValue !== undefined || key === PREFERENCE_KEYS.EMAIL_TEMPLATES) {
+      const validation = await validateEmailTemplatesPreference(emailTemplatesValue);
+      if (!validation.ok) return res.status(validation.status).json({ error: validation.error });
     }
 
     // Handle single key-value pair

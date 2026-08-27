@@ -318,6 +318,27 @@ materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
 tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
 
+### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 APPLIED
+
+**Source of truth:** Postgres. Per-(lead PD, reviewer person) VIP flags for
+reviewer invitation sends, added by migration `037_reviewer_vip_flags.sql`
+(mirrored in fresh-install v42). **Keyed on `wmkf_potentialreviewersid`, not
+contact** — reviewer candidates deliberately have no CRM contact until an
+identity-bearing acceptance (S389), so the person row is the only stable
+pre-invitation key. Written/read via `lib/services/scheduled-email-store.js`
+reviewer-flag helpers from `/api/review-manager/reviewer-vip-flags` (any
+review-manager/reviewers staff may curate on the lead PD's behalf; the PD
+resolves server-side from the request row). Consumed synchronously by the
+Invite Reviewers send flow — a flagged person's invitation drafts render as
+full editable preview cards in `InviteEmailModal`, others collapse to a
+batch summary. **No ledger workflow reads these flags and no send path is
+gated by them.** **Retention:** deliberately unbounded (≤6 PDs × curated
+handfuls of people). **[VERIFIED 2026-08-26 via migration 037,
+scheduled-email-store.js, and the reviewer-vip-flags route/panel/modal
+suites; APPLIED to the shared Neon database 2026-08-26 (owner-run
+apply-migrations); LIVE-PROBED same day: tracker row present, three
+expected columns, 0 rows — empty until the branch merges.]**
+
 ## Portal upload staging
 
 ### `portal_upload_staging` (migration 031)

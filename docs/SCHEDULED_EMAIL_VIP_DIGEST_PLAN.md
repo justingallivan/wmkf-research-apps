@@ -184,7 +184,48 @@ they want each handled. Owner decisions recorded so far for the next slices:
    render-emails flow) before their invitation sends; non-VIP candidates
    batch-send without per-message click-through ("for people we don't know,
    there's generally no reason to click through and send multiple emails one
-   at a time").
+   at a time"). **SOURCE-BUILT 2026-08-26 on branch
+   `feature/reviewer-invite-vip`** with three owner refinements: the preview
+   is synchronous (whoever sends reviews VIP drafts in the modal — no hold,
+   no digest); any review-manager staff may curate flags (stored per the
+   request's lead PD in `scheduled_email_reviewer_vip_flags`, keyed on
+   `wmkf_potentialreviewersid` since candidates lack contacts
+   pre-acceptance); non-VIP drafts collapse to an expandable summary inside
+   the modal (skipped/quick-check/edited/single-candidate drafts always
+   render full). Two rounds of Codex adversarial review (2026-08-26) drove
+   three fail-safe hardening fixes on the branch: VIP changes update the
+   modal's snapshot optimistically and roll back on a failed PUT while every
+   star is visibly disabled during the save; failed or timed-out flag loads
+   remain fail-closed with an inline Retry path; and the dependency-free
+   `lib/utils/invitation-link-validator.js` now owns the invitation-link
+   contract across modal collapse, send withholding, and invitation-template
+   save validation. A draft is collapsible/sendable only when it carries
+   exactly one DISTINCT three-base64url-segment `/external/review/` token
+   (repeated identical copies of the same link remain a tolerated input —
+   button + plain-text fallback — and substitution replaces every copy),
+   `externalLinkExpected` is true, and no unresolved `{{token}}` remains;
+   trailing prose punctuation after the token is fine, but a fourth token
+   segment or any malformed/unexpected reviewer path stays full and is
+   withheld as `invalid_secure_link`, a linkless invitation is withheld as
+   `missing_secure_link` regardless of expectation, and invitation-template
+   saves require the literal `{{externalLink}}` placeholder
+   [RECHECKED after lib/utils/invitation-link-validator.js change: identical-duplicate tolerance and prose-punctuation boundary restored in Claude's review pass, same day]. Accepted residual: a
+   mid-session lead-PD reassignment on the same request leaves the loaded
+   flag snapshot keyed to the old PD until the panel remounts — writes and
+   sends always resolve the current PD server-side, so the worst case is a
+   stale collapse decision, not a wrong write. Migration 037 APPLIED to the
+   shared Neon database 2026-08-26 (owner-run apply-migrations; live-probed:
+   tracker row + three columns + 0 rows). **Owner-run local smoke PASSED
+   2026-08-27** (capture mode + same-day prod-write ack + local-only
+   `EXTERNAL_LINK_SECRET`, three throwaway candidates): fail-closed Retry
+   notice on a blocked flags GET, star toggle round-trip + persistence
+   across reload, VIP and quick-check drafts full while the standard draft
+   collapsed, and a send that captured all three — including the
+   still-collapsed draft — proving collapse is view-state only. One UX
+   polish noted, not built: the full card doesn't show WHY it's full (a VIP
+   badge on the card header would distinguish VIP from quick-check).
+   Branch unmerged.
+   [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
    the single interface.

@@ -242,7 +242,8 @@ describe('send-emails — reviewer portal HTML links', () => {
       drafts: [{
         suggestionId: SUG_1,
         subject: 'Review request REQ-001',
-        body: 'Please review this proposal. https://reviews.example.org/external/review/tok-1',
+        body: `Please review this proposal. https://reviews.example.org/external/review/${TOKEN_FOR(SUG_1)}`,
+        externalLinkExpected: true,
       }],
       templateType: 'invitation',
     });

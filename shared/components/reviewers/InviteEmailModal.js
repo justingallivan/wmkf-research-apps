@@ -31,6 +31,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { readSseStream } from './sse';
 import { PREFERENCE_KEYS } from '../../config/reviewerFinderPreferences';
 import { loadEmailTemplates, EMPTY_TEMPLATES } from './email-template-store';
+import {
+  classifyInvitationLinks,
+  INVALID_SECURE_LINK_SKIP_REASON,
+} from '../../../lib/utils/invitation-link-validator';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
@@ -61,6 +65,7 @@ function addDaysToTodayYmd(days, today = new Date()) {
 // reason string for anything not called out here.
 function skipReasonLabel(reason) {
   if (reason === 'missing_secure_link') return 'missing secure link';
+  if (reason === INVALID_SECURE_LINK_SKIP_REASON) return 'invalid secure invitation link; restore {{externalLink}} in the invitation template';
   if (reason === 'unresolved_placeholder') return 'unfilled {{field}}';
   if (reason === 'email_research_only') return 'address is research-only, not invite-ready';
   if (reason === 'address_conflict_pending') return 'stored and newly found addresses conflict';
@@ -210,7 +215,7 @@ export function applySubjectTiming(subject, timing) {
 // never strand a durable write.
 export const PREVIEW_RENDER_TIMEOUT_MS = 45000;
 
-export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, onClose, onSent }) {
+export default function InviteEmailModal({ requestId = null, candidates = [], settings = {}, allowResend = false, vipUnknown = false, onClose, onSent }) {
   const [step, setStep] = useState('preview'); // preview | sending | sent | error
   const [rawDrafts, setRawDrafts] = useState([]); // from render-emails, timing tokens still literal
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, body? } user overrides
@@ -228,6 +233,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
   const [rendering, setRendering] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: 'Rendering previews…' });
   const [results, setResults] = useState({ sent: [], failed: [], skipped: [], unconfirmed: [] });
+  // VIP routing (owner decision 2026-08-26): drafts for VIP-flagged people
+  // render as full editable cards; the rest collapse to a batch summary with
+  // on-demand expansion. Expansion is view state only — the send payload is
+  // identical either way.
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const [confirmedLowConfidenceIds, setConfirmedLowConfidenceIds] = useState({});
   const [abstractEditorOpen, setAbstractEditorOpen] = useState(false);
   const [abstractDraft, setAbstractDraft] = useState('');
@@ -436,6 +446,39 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
     body: edits[d.suggestionId]?.body ?? (d.skipped ? d.body : applyTiming(d.body, timing)),
   });
   const drafts = rawDrafts.map(draftView);
+
+  // A draft renders as a FULL card when anything requires human eyes on it:
+  // the person is VIP-flagged, the server skipped it (remediation UI), it
+  // needs a quick-check confirmation, the staffer already edited or expanded
+  // it, or this is a single-candidate open (repair / address-conflict paths).
+  const vipBySuggestionId = new Map(
+    (candidates || []).map((c) => [c.suggestionId, c.vip === true]),
+  );
+  // Shared mirror of the server-authoritative invitation-link contract. Any
+  // invalid classification renders FULL with the defect visible, never as a
+  // collapsed "ready" draft. The extra zero-occurrence check mirrors the send
+  // gate's stricter invitation rule: an invitation with NO reviewer link is
+  // withheld at send time even when the template never asked for one
+  // (externalLinkExpected false), so it must not collapse as "ready" here.
+  const failsBodyIntegrity = (d) => {
+    const linkState = classifyInvitationLinks({
+      subject: d.subject,
+      body: d.body,
+      externalLinkExpected: d.externalLinkExpected,
+    });
+    return !linkState.valid || linkState.occurrenceCount === 0;
+  };
+  const requiresFullCard = (d) =>
+    vipUnknown // fail closed: flags never loaded → treat everyone as needing eyes
+    || candidates.length <= 1
+    || Boolean(d.skipped)
+    || d.emailConfidence?.action === 'quick_check'
+    || vipBySuggestionId.get(d.suggestionId) === true
+    || edits[d.suggestionId] !== undefined
+    || expandedIds.has(d.suggestionId)
+    || failsBodyIntegrity(d);
+  const fullDrafts = drafts.filter(requiresFullCard);
+  const collapsedDrafts = drafts.filter((d) => !requiresFullCard(d));
 
   // Single-proposal modal — abstract fields agree across all drafts, so the first
   // flagged draft (if any) speaks for the whole batch. flagged.reflowedAbstract
@@ -908,9 +951,11 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-500">
-                    Review each recipient below. The secure-link position renders as one pair of accept/decline buttons in the sent email.
+                    {collapsedDrafts.length > 0
+                      ? 'VIP and flagged recipients are shown in full below; standard invitations are summarized. The secure-link position renders as one pair of accept/decline buttons in the sent email.'
+                      : 'Review each recipient below. The secure-link position renders as one pair of accept/decline buttons in the sent email.'}
                   </p>
-                  {drafts.map((d) => (
+                  {fullDrafts.map((d) => (
                     <div key={d.suggestionId} className={`border rounded-lg p-3 ${d.skipped ? 'border-amber-200 bg-amber-50' : 'border-gray-200'}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-900">{d.candidateName || '(unnamed)'}</span>
@@ -1158,6 +1203,33 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                       )}
                     </div>
                   ))}
+                  {collapsedDrafts.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {collapsedDrafts.length} standard invitation{collapsedDrafts.length === 1 ? '' : 's'} ready
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        These send with the template as rendered. Open one to read or edit it.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {collapsedDrafts.map((d) => (
+                          <li key={d.suggestionId} className="flex items-center justify-between gap-2 text-xs text-gray-700">
+                            <span className="truncate">
+                              <span className="font-medium">{d.candidateName || '(unnamed)'}</span>
+                              {' '}<span className="text-gray-500">{d.candidateEmail}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedIds((prev) => new Set(prev).add(d.suggestionId))}
+                              className="text-blue-700 hover:text-blue-900 hover:underline flex-shrink-0"
+                            >
+                              Review
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {quickCheckSendable.length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                       <p className="text-sm font-medium text-amber-900">Confirm quick-check addresses</p>

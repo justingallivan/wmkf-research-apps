@@ -433,6 +433,24 @@ describe('send-emails-service — invitation body-integrity gate', () => {
     expect(r.skipped[0]).toMatchObject({ suggestionId: SUG_OK, reason: 'unresolved_placeholder' });
   });
 
+  test('a malformed hardcoded reviewer path is skipped invalid_secure_link even when the template did not expect a link', async () => {
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'S',
+        body: 'Hardcoded: https://reviews.example.org/external/review/token.value',
+        externalLinkExpected: false,
+      }],
+      templateType: 'invitation',
+    });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'invalid_secure_link',
+    });
+  });
+
   test('the body-integrity gate does not apply to non-invitation templateTypes', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     const emitted = await run({
@@ -579,7 +597,11 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
     expect(resultOf(emitted).sent).toHaveLength(1);
   });
 
-  test('S2: repeated identical copies of the same JWT verify once (dedup)', async () => {
+  test('S2: repeated identical copies of the same JWT verify once (dedup) and send', async () => {
+    // Long-standing tolerated input (button + plain-text fallback, or a PD
+    // duplicating the link line while editing): identical copies dedupe to one
+    // token; only DISTINCT tokens are ambiguous. Send-time substitution
+    // replaces every occurrence.
     const body = `Body: https://reviews.example.org/external/review/${TOKEN} again: https://reviews.example.org/external/review/${TOKEN}`;
     await run({
       drafts: [{ suggestionId: SUG_OK, subject: 'S', body, externalLinkExpected: true }],
@@ -766,6 +788,9 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
   test('send-time substitution changes only JWT path segments in edited subject and body', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
     mintAndStore.mockResolvedValueOnce({ jwt: 'new.jwt.sig' });
+    // Identical copies in subject AND body are a tolerated input (dedup to one
+    // token); substitution must replace every occurrence while preserving
+    // query strings and surrounding prose.
     const subject = `Prefix https://reviews.example.org/external/review/${TOKEN}?action=accept suffix`;
     const body = `Before\nhttps://reviews.example.org/external/review/${TOKEN}?x=1\nAfter`;
 
