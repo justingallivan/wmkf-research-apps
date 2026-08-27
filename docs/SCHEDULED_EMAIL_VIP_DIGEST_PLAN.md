@@ -236,6 +236,37 @@ Detailed planning for these slices has not started; the full outbound-email
 inventory (18 types; triggers, sender identities, controls, notice and
 noFallback coverage) was compiled 2026-08-26 and should seed that plan.
 
+### Reviewer cron-reminders slice — owner decisions (2026-08-27, S463)
+
+Scope and shape settled with the owner; build not started:
+
+1. **Both cron reminder types** (respond-by and review-due,
+   `reviewer-reminder-sweep.js`) route through the ledger + digest decision
+   layer. **Thank-yous stay on the direct send path** — post-submission,
+   low-stakes.
+2. **Per-message approval unit.** The recorded batch-unit decision (Broader
+   effort decision 2 context) applies to solicitation only; each cron
+   reminder has its own deadline, so ledger rows are per reminder.
+3. `approval_required` = PD review-all override OR
+   `filterVipFlaggedReviewers` hit (the helper's first caller). Reviewer VIP
+   flags are curated on the invite roster at invitation time, so posture
+   naturally exists before reminder rows are created — the abstract slice's
+   freeze-at-creation sequencing trap is structurally smaller here, but the
+   freeze-at-creation semantics themselves carry over unchanged.
+4. Send-time eligibility recheck reuses the shared refusal predicates
+   (`respondRefusalReason` / `reviewDueRefusalReason`,
+   `reviewer-manual-reminder.js`); token minting stays at delivery time
+   (expiry windows + revocation), never at row creation.
+5. Requires a migration extending the ledger `workflow_type` CHECK
+   (036 locks it to `grantee_abstract_reminder`) and a reviewer-shaped
+   source reference (suggestion id as `source_record_id`).
+6. Manual "send reminder now" coexists: it stamps the same markers; a queued
+   ledger row must observe a manual send (cancel/reschedule, no double
+   nudge) — design detail for build time.
+7. Timing: ships during the between-cycles quiet period so it governs the
+   NEXT cycle's reminders from first invitation; current-cycle reminders
+   continue on the direct path.
+
 ## Rollout checklist (procedural guarantees)
 
 1. Admin onboards every active PD and seeds their override/VIP state
