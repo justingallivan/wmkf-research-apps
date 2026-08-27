@@ -95,8 +95,8 @@ their full verification loops:
    (`grantee-deliverable-reminders-service.js:270`), so PD posture must be
    seeded BEFORE the next batch of abstracts is stamped Invited — seeding
    after invitation does not protect that batch. Onboarding + the tutorial
-   refresh (Owner Decision Needed below) should complete before the next
-   solicitation.
+   refresh (Parked item 0 below — owner deferred it until the parked
+   reminder slice finishes) should complete before the next solicitation.
 2. **DONE S463: VIP badge + email hygiene items** — built, Codex-reviewed
    twice (stage-aware dispatch fix), merged to main `7bba2f8f`.
 3. **Later slices (owner-recorded direction, not yet planned).**
@@ -106,15 +106,16 @@ their full verification loops:
    Thank-yous stay on the direct path (owner decision S463). The cron
    reviewer-reminders slice itself is BUILT and PARKED (below).
 
-### Owner Decision Needed
-
-1. **PD tutorial send timing + scope refresh.**
-   Evidence: artifact exists (link above); owner deferred sending for the
-   abstract-only sliver. Now that reviewer invitations shipped, refresh the
-   artifact to cover both and ask the owner when to distribute.
-
 ### Parked
 
+0. **PD tutorial refresh + distribution — DECIDED S463 (2026-08-27): wait
+   until the reviewer cron-reminders build is finished/promoted.**
+   Evidence: artifact exists (link above); owner deferred twice — first for
+   the abstract-only sliver, now until the parked slice below merges, so
+   the tutorial covers the full final surface (abstract digest + reviewer
+   invitations + cron reminders) in one send. Re-open trigger: promotion
+   step (e) of Parked item 2 — the tutorial is part of PD onboarding,
+   which must complete before the next cycle's invitations.
 1. **Post-cycle invitation-link strictness (tighten vs ratify).**
    Evidence: `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups entry +
    `project-invitation-link-strictness-open-decision.md`. Re-open trigger:
