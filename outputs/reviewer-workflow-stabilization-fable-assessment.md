@@ -745,7 +745,7 @@ Person rows for that request `[VERIFIED via read-only lookup 2026-08-01]`:
 |---|---|---|---|
 | `ad90a3f5…` | "Christopher Lima" | 2026-04-30 by **akoyaGO Integration** | active — the pre-existing applicant-slot person |
 | `0ae2bbf4…` | `" Chris Lima "` | **2026-08-01 03:06:18 by Justin Gallivan** | **inactive** — the duplicate, repaired then deactivated at 03:09:24 |
-| `8129d6b9…` | `" Kylie Walters "` | 2026-08-01 03:11:46 by Justin Gallivan | active, `kylie.walters@nih.gov`, National Cancer Institute |
+| `8129d6b9…` | `" Kylie Walters "` | 2026-08-01 03:11:46 by Justin Gallivan | active, real `nih.gov` address on file (literal redacted 2026-08-27 — public repo), National Cancer Institute |
 
 **Finding C is now confirmed by a surviving production artifact**, not only by
 testimony: a second Lima person record was minted from the two-line referral,

@@ -173,14 +173,11 @@ repository is frozen.
   (`git rm --cached`; the file remains local-only under the gitignored
   `outputs/`). Its historical blobs across those revisions must join the
   removal set when the final specification is regenerated.
-- Candidate, owner decision pending:
-  `outputs/reviewer-workflow-stabilization-fable-assessment.md` (still
-  tracked — referenced by the memory router and
-  `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`) contains one real
-  personal email address alongside a placeholder example. Options: redact
-  the address in place (keeps the reference graph intact) or untrack like
-  the incident record; either way its prior revisions join the historical
-  scope.
+- `outputs/reviewer-workflow-stabilization-fable-assessment.md` — owner
+  decided 2026-08-27: the one real personal email address was **redacted in
+  place** (the file stays tracked; the reference graph from the memory
+  router and `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md` is intact).
+  Its pre-redaction revisions join the historical removal scope.
 
 ## Options
 
