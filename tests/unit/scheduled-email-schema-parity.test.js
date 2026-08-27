@@ -84,6 +84,30 @@ test('migration 037 and fresh install both create the reviewer VIP flag table ke
   expect(migration037).not.toContain('contact_id');
 });
 
+test('migration 038 and fresh install admit the same reviewer workflow types with the same deliverable shape', () => {
+  const migration038 = fs.readFileSync(
+    path.join(ROOT, 'lib/db/migrations/038_reviewer_reminder_ledger_workflows.sql'),
+    'utf8',
+  );
+  for (const workflow of [
+    "'grantee_abstract_reminder'",
+    "'reviewer_respond_reminder'",
+    "'reviewer_reviewdue_reminder'",
+  ]) {
+    expect(migration038).toContain(workflow);
+    expect(setup).toContain(workflow);
+  }
+  // deliverable_id: NOT NULL only for the grantee workflow, both shapes.
+  const shape = 'CONSTRAINT scheduled_email_deliverable_shape';
+  expect(migration038).toContain(shape);
+  expect(setup).toContain(shape);
+  expect(migration038).toContain('ALTER COLUMN deliverable_id DROP NOT NULL');
+  expect(setup).not.toMatch(/deliverable_id UUID NOT NULL/);
+  // The workflow CHECK values in the fresh install come from 036 + 038; the
+  // 036 file itself stays historical (single workflow) and is superseded.
+  expect(migration).toContain("CHECK (workflow_type IN ('grantee_abstract_reminder'))");
+});
+
 test('migration 036 and fresh install both create the digest run ledger with the per-day claim key', () => {
   const table = 'CREATE TABLE IF NOT EXISTS scheduled_email_digest_runs';
   const claimKey = 'PRIMARY KEY (pd_systemuser_id, digest_day)';

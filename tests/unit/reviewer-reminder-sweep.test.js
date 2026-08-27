@@ -1,6 +1,10 @@
 /**
- * Reviewer reminder sweeps (Phase 3) — eligibility, fire-once claim-before-send,
- * per-request opt-in, and token-liveness gating.
+ * Reviewer reminder sweeps (Phase 3; LEDGER MODE since the reviewer
+ * cron-reminders slice) — eligibility gating, ledger-row creation with frozen
+ * send times, posture freezing (review-all override / reviewer VIP flags),
+ * and row reconciliation (revive / reassign / refresh). Delivery itself is
+ * covered by the scheduled-email-service and reviewer-reminder-workflows
+ * suites; the sweeps must never send or touch Dataverse markers.
  */
 
 const queryAllRecords = jest.fn();
@@ -17,6 +21,22 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 const mintAndStore = jest.fn(async () => ({ url: 'https://reviews.example/external/review/jwt' }));
 jest.mock('../../lib/external/token-lifecycle', () => ({ mintAndStore: (...a) => mintAndStore(...a) }));
+const createOrGetScheduledEmail = jest.fn();
+const reviveStoppedScheduledEmail = jest.fn();
+const reassignScheduledEmail = jest.fn();
+const refreshUntouchedScheduledEmail = jest.fn();
+const filterVipFlaggedReviewers = jest.fn();
+jest.mock('../../lib/services/scheduled-email-store', () => ({
+  createOrGetScheduledEmail: (...a) => createOrGetScheduledEmail(...a),
+  reviveStoppedScheduledEmail: (...a) => reviveStoppedScheduledEmail(...a),
+  reassignScheduledEmail: (...a) => reassignScheduledEmail(...a),
+  refreshUntouchedScheduledEmail: (...a) => refreshUntouchedScheduledEmail(...a),
+  filterVipFlaggedReviewers: (...a) => filterVipFlaggedReviewers(...a),
+}));
+const getEmailAutomationPreferenceForSystemUser = jest.fn();
+jest.mock('../../lib/services/email-automation-preferences', () => ({
+  getEmailAutomationPreferenceForSystemUser: (...a) => getEmailAutomationPreferenceForSystemUser(...a),
+}));
 const getSettingStrict = jest.fn();
 jest.mock('../../lib/services/settings-service', () => ({
   getSettingStrict: (...a) => getSettingStrict(...a),
@@ -128,7 +148,26 @@ beforeEach(() => {
   mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
   createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
   updateRecord.mockResolvedValue(undefined);
+  // Default: creation succeeds — echo the input as a freshly inserted row
+  // (same id ⇒ the sweep counts it as created).
+  createOrGetScheduledEmail.mockImplementation(async (input) => ({
+    ...input,
+    status: 'scheduled',
+    pd_systemuser_id: input.pdSystemUserId,
+  }));
+  reviveStoppedScheduledEmail.mockResolvedValue(null);
+  reassignScheduledEmail.mockResolvedValue(null);
+  refreshUntouchedScheduledEmail.mockResolvedValue(null);
+  filterVipFlaggedReviewers.mockResolvedValue(new Set());
+  getEmailAutomationPreferenceForSystemUser.mockResolvedValue(null);
 });
+
+/** The sweeps must NEVER send or claim — delivery belongs to the due worker. */
+function expectNoDirectSendOrClaim() {
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(updateRecord).not.toHaveBeenCalled();
+}
 
 describe('sweepRespondReminders', () => {
   test('respond query filters to selected, not-revoked reviewers (T2) with null-safe revoked syntax', async () => {
@@ -143,33 +182,28 @@ describe('sweepRespondReminders', () => {
     expect(options.filter).not.toMatch(/wmkf_externaltokenrevoked\s+ne\s+true/);
   });
 
-  test('eligible candidate: claims the marker + token in one ETag-guarded PATCH, then sends', async () => {
+  test('eligible candidate: creates the ledger row (frozen draft, send time, PD identity); never sends or claims', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(1);
-    // Marker + token land in the single mintAndStore PATCH, bound to the query row's
-    // ETag (atomic-write fix): a concurrent revoke/deselect 412s the whole write.
-    expect(mintAndStore).toHaveBeenCalledTimes(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      suggestionId: SUG,
-      ifMatch: 'W/"100"',
-      writeFields: expect.objectContaining({ wmkf_respondremindersentat: expect.any(String) }),
-    }));
-    // No separate marker PATCH any more — the claim rides in the mint.
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    // Claim-before-send ordering: the atomic marker+token write must precede the send,
-    // so a crash mid-op can never send without first claiming.
-    expect(mintAndStore.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
-    // Sent from the PD; respond reminder is the "accept or decline" subject.
-    const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.from).toBe('pd@keck.org');
-    expect(email.to).toBe('rev@example.org');
-    expect(email.subject).toBe(RESPOND_SUBJECT);
-    expect(email.body).toContain('Dear Dr. Reviewer,');
-    expect(email.body).toContain('the proposal “A Proposal”');
-    expect(email.body).toContain('Dr. PD');
+    expect(r.created).toBe(1);
+    expect(r.sent).toBe(0);
+    expectNoDirectSendOrClaim();
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(input.workflowType).toBe('reviewer_respond_reminder');
+    expect(input.sourceRecordId).toBe(SUG);
+    expect(input.requestId).toBe(REQ);
+    expect(input.deliverableId).toBeNull();
+    expect(input.pdSystemUserId).toBe(PD);
+    expect(input.pdEmail).toBe('pd@keck.org');
+    expect(input.toRecipients).toEqual(['rev@example.org']);
+    expect(input.approvalRequired).toBe(false);
+    expect(input.subject).toBe(RESPOND_SUBJECT);
+    // 8d-old invite, offset 7, lead 0 → send time already past (backlog sends next due run).
+    expect(Date.parse(input.scheduledSendAt)).toBeLessThan(Date.now());
+    expect(input.bodyText).toContain('Dear Dr. Reviewer,');
+    expect(input.bodyText).toContain('the proposal “A Proposal”');
+    expect(input.bodyText).toContain('Dr. PD');
   });
 
   test('default read is applied to respond reminder subject and body', async () => {
@@ -184,12 +218,12 @@ describe('sweepRespondReminders', () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(1);
-    const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.subject).toBe('Custom respond subject');
-    expect(email.body).toContain('Hello Dr. Reviewer');
-    expect(email.body).toContain('Review the proposal “A Proposal”.');
-    expect(email.body).toContain('Dr. PD');
+    expect(r.created).toBe(1);
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(input.subject).toBe('Custom respond subject');
+    expect(input.bodyText).toContain('Hello Dr. Reviewer');
+    expect(input.bodyText).toContain('Review the proposal “A Proposal”.');
+    expect(input.bodyText).toContain('Dr. PD');
   });
 
   test('blank respond default skips before claim and alerts admins', async () => {
@@ -233,28 +267,22 @@ describe('sweepRespondReminders', () => {
     }));
   });
 
-  test('missing _etag → fail closed (claimFailed, no claim write, no send)', async () => {
+  test('a query row without an ETag still gets its ledger row (the delivery claim authorizes from a fresh read)', async () => {
     const { _etag, ...noEtag } = respondCandidate();
     queryAllRecords.mockResolvedValue({ records: [noEtag] });
     installReads();
     const r = await sweepRespondReminders();
-    expect(r.claimFailed).toBe(1);
-    expect(r.sent).toBe(0);
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(1);
+    expectNoDirectSendOrClaim();
   });
 
-  test('maxBatch bounds CLAIMS even when sends fail (no mass suppression)', async () => {
-    const rows = Array.from({ length: 5 }, (_, i) => respondCandidate({ wmkf_appreviewersuggestionid: `id-${i}`, _etag: `W/"${i}"` }));
+  test('maxBatch bounds ledger-row upserts per run', async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => respondCandidate({ wmkf_appreviewersuggestionid: `id-${i}` }));
     queryAllRecords.mockResolvedValue({ records: rows });
     installReads();
-    createAndSendEmail.mockRejectedValue(new Error('SMTP down')); // every send fails
     const r = await sweepRespondReminders({ maxBatch: 2 });
-    // Only 2 rows may be claimed despite all sends failing — the rest are deferred.
-    // The claim now rides in the atomic mintAndStore PATCH, so it bounds the claims.
-    expect(mintAndStore).toHaveBeenCalledTimes(2);
-    expect(r.sendFailed).toBe(2);
-    expect(r.sent).toBe(0);
+    expect(createOrGetScheduledEmail).toHaveBeenCalledTimes(2);
+    expect(r.created).toBe(2);
     expect(r.skipped).toBe(3);
   });
 
@@ -262,51 +290,59 @@ describe('sweepRespondReminders', () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads({ reviewerEmail: null });
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(0);
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(0);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expectNoDirectSendOrClaim();
   });
 
   test('disabled per request → skipped, no claim or send', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads({ request: requestConfig({ wmkf_respondreminderenabled: false }) });
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(0);
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(0);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expectNoDirectSendOrClaim();
   });
 
-  test('before the per-reviewer deadline (minus lead) → skipped', async () => {
-    // emailSentAt 1d ago, offset 7, lead 0 → deadline 6d in the future → not yet.
-    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_emailsentat: isoDaysAgo(1) })] });
+  test('a future deadline still creates the row NOW, frozen with its future send time (early visibility)', async () => {
+    // emailSentAt 1d ago, offset 7, lead 0 → send time 6d in the future.
+    const sentAt = isoDaysAgo(1);
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_emailsentat: sentAt })] });
     installReads();
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(0);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(1);
+    expectNoDirectSendOrClaim();
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(Date.parse(input.scheduledSendAt)).toBe(Date.parse(sentAt) + 7 * DAY);
   });
 
   test('expired token → skipped (offer window closed)', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_externaltokenexpires: isoDaysAgo(1) })] });
     installReads();
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(0);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(0);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expectNoDirectSendOrClaim();
   });
 
-  test('lead days bring an otherwise-future deadline into range', async () => {
-    // emailSentAt 1d ago, offset 7 → deadline +6d; lead 7 → fire at deadline-7d = 1d ago → eligible.
-    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_emailsentat: isoDaysAgo(1) })] });
+  test('lead days shift the frozen send time earlier', async () => {
+    // emailSentAt 1d ago, offset 7, lead 7 → send time = emailSentAt (offset − lead = 0).
+    const sentAt = isoDaysAgo(1);
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_emailsentat: sentAt })] });
     installReads({ request: requestConfig({ wmkf_respondreminderleaddays: 7 }) });
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(1);
+    expect(r.created).toBe(1);
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(Date.parse(input.scheduledSendAt)).toBe(Date.parse(sentAt));
   });
 
   test('disabled PD (no sender) → skipped', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads({ pdDisabled: true });
     const r = await sweepRespondReminders();
-    expect(r.sent).toBe(0);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(0);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expectNoDirectSendOrClaim();
   });
 
   test('dryRun: counts eligible but never claims or sends', async () => {
@@ -314,34 +350,67 @@ describe('sweepRespondReminders', () => {
     installReads();
     const r = await sweepRespondReminders({ dryRun: true });
     expect(r.eligible).toBe(1);
-    expect(r.sent).toBe(0);
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(0);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expectNoDirectSendOrClaim();
   });
 
-  test('concurrent revoke/deselect (412 on the atomic marker+token PATCH) → claimFailed, no send, no reactivation', async () => {
-    // Regression for the Codex P1 race: a staff revoke or deselect that lands after
-    // the sweep query but before the write must 412 the atomic mint (which would
-    // otherwise clear wmkf_externaltokenrevoked back to false). Verifies no email is
-    // sent and no marker is stamped.
+  test('an existing stopped never-transported row is revived from current state', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
-    mintAndStore.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+    createOrGetScheduledEmail.mockResolvedValueOnce({ id: 'other-id', status: 'stopped', pd_systemuser_id: PD });
+    reviveStoppedScheduledEmail.mockResolvedValueOnce({ id: 'other-id', status: 'scheduled' });
     const r = await sweepRespondReminders();
-    expect(r.claimFailed).toBe(1);
-    expect(r.sent).toBe(0);
-    expect(createAndSendEmail).not.toHaveBeenCalled();
-    expect(updateRecord).not.toHaveBeenCalled();
+    expect(r.revived).toBe(1);
+    expect(reviveStoppedScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({ sourceRecordId: SUG }));
+    expectNoDirectSendOrClaim();
   });
 
-  test('send fails after a successful atomic claim → at-most-once (sendFailed, marker stays)', async () => {
+  test('an existing unsent row under a different PD is rebuilt via reassign', async () => {
     queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
     installReads();
-    createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+    createOrGetScheduledEmail.mockResolvedValueOnce({ id: 'other-id', status: 'scheduled', pd_systemuser_id: 'former-pd' });
+    reassignScheduledEmail.mockResolvedValueOnce({ id: 'other-id' });
     const r = await sweepRespondReminders();
-    expect(mintAndStore).toHaveBeenCalledTimes(1); // atomic marker+token PATCH landed
-    expect(r.sendFailed).toBe(1);
-    expect(r.sent).toBe(0);
+    expect(r.reassigned).toBe(1);
+    expect(refreshUntouchedScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('an existing same-PD unsent row gets an untouched-draft refresh', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    createOrGetScheduledEmail.mockResolvedValueOnce({ id: 'other-id', status: 'scheduled', pd_systemuser_id: PD });
+    refreshUntouchedScheduledEmail.mockResolvedValueOnce({ id: 'other-id' });
+    const r = await sweepRespondReminders();
+    expect(r.refreshed).toBe(1);
+    expect(reassignScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('a VIP-flagged reviewer freezes approval_required at creation', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    filterVipFlaggedReviewers.mockResolvedValueOnce(new Set([PERSON]));
+    await sweepRespondReminders();
+    expect(filterVipFlaggedReviewers).toHaveBeenCalledWith(PD, [PERSON]);
+    expect(createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({ approvalRequired: true }));
+  });
+
+  test('the review-all override freezes approval_required without consulting VIP flags', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    getEmailAutomationPreferenceForSystemUser.mockResolvedValueOnce({ reviewAll: true });
+    await sweepRespondReminders();
+    expect(createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({ approvalRequired: true }));
+    expect(filterVipFlaggedReviewers).not.toHaveBeenCalled();
+  });
+
+  test('a posture read failure fails closed: no row is created', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate()] });
+    installReads();
+    getEmailAutomationPreferenceForSystemUser.mockRejectedValueOnce(new Error('pg down'));
+    const r = await sweepRespondReminders();
+    expect(r.preferenceFailed).toBe(1);
+    expect(createOrGetScheduledEmail).not.toHaveBeenCalled();
   });
 });
 
@@ -366,28 +435,23 @@ describe('sweepReviewDueReminders', () => {
     };
   }
 
-  test('eligible: claims wmkf_remindersentat (+count) + token in one ETag-guarded PATCH, then sends', async () => {
+  test('eligible: creates the review-due ledger row with the due-date send time; never sends or claims', async () => {
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
     installReads({ request: reviewDueRequest() });
     const r = await sweepReviewDueReminders();
-    expect(r.sent).toBe(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      suggestionId: SUG,
-      ifMatch: 'W/"200"',
-      writeFields: expect.objectContaining({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: 1 }),
-    }));
-    expect(updateRecord).not.toHaveBeenCalled();
-    const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.subject).toBe(REVIEW_DUE_SUBJECT);
-    expect(email.body).toContain('Dear Dr. Reviewer,');
-    expect(email.body).toContain('Your review is due by');
+    expect(r.created).toBe(1);
+    expectNoDirectSendOrClaim();
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(input.workflowType).toBe('reviewer_reviewdue_reminder');
+    expect(input.sourceRecordId).toBe(SUG);
+    expect(input.deliverableId).toBeNull();
+    expect(input.subject).toBe(REVIEW_DUE_SUBJECT);
+    expect(input.bodyText).toContain('Dear Dr. Reviewer,');
+    expect(input.bodyText).toContain('Your review is due by');
   });
 
-  test('per-reviewer override controls eligibility, rendered date, and minted-token expiry', async () => {
+  test('per-reviewer override controls the frozen send time and the rendered date', async () => {
     const override = ymdDaysFromNow(10);
-    const expectedExpiry = new Date(
-      Date.parse(`${override}T23:59:59Z`) + 90 * DAY,
-    );
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate({
       wmkf_reviewduedateoverride: override,
     })] });
@@ -398,20 +462,20 @@ describe('sweepReviewDueReminders', () => {
 
     const r = await sweepReviewDueReminders();
 
-    expect(r.sent).toBe(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      expiresAt: expectedExpiry,
-    }));
-    expect(createAndSendEmail.mock.calls[0][0].body).toContain(
+    expect(r.created).toBe(1);
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(Date.parse(input.scheduledSendAt)).toBe(Date.parse(`${override}T23:59:59Z`) - 40 * DAY);
+    expect(input.bodyText).toContain(
       new Date(`${override}T12:00:00Z`).toLocaleDateString('en-US', {
         month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
       }),
     );
   });
 
-  test('a later per-reviewer override defers a reminder that the request date would send', async () => {
+  test('a later per-reviewer override freezes the LATER send time (row still created early)', async () => {
+    const override = ymdDaysFromNow(30);
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate({
-      wmkf_reviewduedateoverride: ymdDaysFromNow(30),
+      wmkf_reviewduedateoverride: override,
     })] });
     installReads({ request: reviewDueRequest({
       wmkf_reviewduedate: ymdDaysFromNow(10),
@@ -420,10 +484,10 @@ describe('sweepReviewDueReminders', () => {
 
     const r = await sweepReviewDueReminders();
 
-    expect(r.sent).toBe(0);
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(mintAndStore).not.toHaveBeenCalled();
-    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(r.created).toBe(1);
+    expectNoDirectSendOrClaim();
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(Date.parse(input.scheduledSendAt)).toBe(Date.parse(`${override}T23:59:59Z`) - 20 * DAY);
   });
 
   test('candidate query allowlists materials_sent/under_review and excludes both terminal values', async () => {
@@ -460,11 +524,11 @@ describe('sweepReviewDueReminders', () => {
     queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
     installReads({ request: reviewDueRequest() });
     const r = await sweepReviewDueReminders();
-    expect(r.sent).toBe(1);
-    const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.subject).toBe('Custom review due subject');
-    expect(email.body).toContain('Review due for Dr. Reviewer: the proposal “A Proposal” by');
-    expect(email.body).toContain('Dr. PD');
+    expect(r.created).toBe(1);
+    const input = createOrGetScheduledEmail.mock.calls[0][0];
+    expect(input.subject).toBe('Custom review due subject');
+    expect(input.bodyText).toContain('Review due for Dr. Reviewer: the proposal “A Proposal” by');
+    expect(input.bodyText).toContain('Dr. PD');
   });
 
   test('blank review-due default skips before claim and alerts admins', async () => {

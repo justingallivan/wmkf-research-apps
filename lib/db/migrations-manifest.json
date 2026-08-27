@@ -35,6 +35,7 @@
     "034_pre_site_distribution_attempts.sql",
     "035_site_visit_logistics.sql",
     "036_scheduled_email_messages.sql",
-    "037_reviewer_vip_flags.sql"
+    "037_reviewer_vip_flags.sql",
+    "038_reviewer_reminder_ledger_workflows.sql"
   ]
 }

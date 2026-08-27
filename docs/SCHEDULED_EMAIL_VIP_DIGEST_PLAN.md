@@ -238,7 +238,14 @@ noFallback coverage) was compiled 2026-08-26 and should seed that plan.
 
 ### Reviewer cron-reminders slice — owner decisions (2026-08-27, S463)
 
-Scope and shape settled with the owner; build not started:
+Scope and shape settled with the owner; **SOURCE-BUILT same day on branch
+`feature/reviewer-cron-reminders-ledger` (unmerged; migration 038 not
+applied)** — sweeps create/reconcile ledger rows at first sight of
+eligibility (maximum inbox visibility; send timing preserved as
+deadline − lead), the shared due-send worker delivers through per-workflow
+strategies (`reviewer-reminder-workflows.js`), and the reviewer cron also
+runs the digest/due/finalize pipeline so same-morning rows reach PDs.
+Decisions and build notes:
 
 1. **Both cron reminder types** (respond-by and review-due,
    `reviewer-reminder-sweep.js`) route through the ledger + digest decision
@@ -260,12 +267,23 @@ Scope and shape settled with the owner; build not started:
 5. Requires a migration extending the ledger `workflow_type` CHECK
    (036 locks it to `grantee_abstract_reminder`) and a reviewer-shaped
    source reference (suggestion id as `source_record_id`).
-6. Manual "send reminder now" coexists: it stamps the same markers; a queued
-   ledger row must observe a manual send (cancel/reschedule, no double
-   nudge) — design detail for build time.
+6. Manual "send reminder now" coexists: on success it cancels its queued
+   ledger copy (`cancelScheduledEmailBySource`, refuses in-flight rows);
+   the marker it stamps also stops the queued row at delivery time
+   (belt-and-suspenders, no double nudge). Built.
 7. Timing: ships during the between-cycles quiet period so it governs the
    NEXT cycle's reminders from first invitation; current-cycle reminders
-   continue on the direct path.
+   continue on the direct path. **The branch must NOT merge mid-cycle**
+   (main auto-deploys): current-cycle backlog rows would be created due
+   immediately under un-onboarded PDs.
+8. Row lifecycle beyond creation (built S463): stopped never-transported
+   rows REVIVE when the source is eligible again (re-invite after token
+   expiry, config re-enable); untouched drafts re-freeze on due-date/config
+   drift; delivery DEFERS to a recomputed future send time (PD send-now
+   overrides timing only, never hard eligibility). Accepted residual: a
+   suggestion whose automated nudge already SENT gets no second automated
+   nudge after a re-invite — the (workflow, source) uniqueness is
+   deliberate; the manual path covers that rare case.
 
 ## Rollout checklist (procedural guarantees)
 

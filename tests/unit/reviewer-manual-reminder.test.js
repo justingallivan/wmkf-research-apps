@@ -32,6 +32,11 @@ jest.mock('../../lib/services/notification-service', () => ({
   default: { notify: (...a) => notify(...a) },
 }));
 
+const cancelScheduledEmailBySource = jest.fn(async () => null);
+jest.mock('../../lib/services/scheduled-email-store', () => ({
+  cancelScheduledEmailBySource: (...a) => cancelScheduledEmailBySource(...a),
+}));
+
 jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => ({ signature: 'Dr. PD\nW. M. Keck Foundation' })),
 }));
@@ -408,6 +413,36 @@ describe('sendManualRespondReminder', () => {
       subject: RESPOND_SUBJECT,
       to: 'rev@example.org',
     }));
+  });
+
+  test('a successful manual send cancels the queued scheduled copy (supersession), and a cancel failure stays non-fatal', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() }))
+      .resolves.toEqual({ ok: true });
+    expect(cancelScheduledEmailBySource).toHaveBeenCalledWith('reviewer_respond_reminder', SUG);
+
+    // Cancel failure must not fail the manual send — the stamped marker stops
+    // the queued row at delivery time anyway.
+    jest.clearAllMocks();
+    installReads({ suggestion: pendingInvitation() });
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === RESPOND_SUBJECT_KEY) return { found: true, value: RESPOND_SUBJECT };
+      if (key === RESPOND_BODY_KEY) return { found: true, value: RESPOND_BODY };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
+    createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
+    cancelScheduledEmailBySource.mockRejectedValueOnce(new Error('pg down'));
+    await expect(sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() }))
+      .resolves.toEqual({ ok: true });
+  });
+
+  test('a failed manual send does NOT cancel the queued scheduled copy', async () => {
+    installReads({ suggestion: pendingInvitation() });
+    createAndSendEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+    const result = await sendManualRespondReminder({ requestId: REQ, suggestionId: SUG, reviewed: reviewed() });
+    expect(result.ok).toBe(false);
+    expect(cancelScheduledEmailBySource).not.toHaveBeenCalled();
   });
 
   test('sent copy carries the automation notice like its cron twin (2026-08-26 inventory divergence)', async () => {

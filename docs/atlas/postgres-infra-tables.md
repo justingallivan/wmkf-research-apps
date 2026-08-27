@@ -229,17 +229,23 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
-### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE IN PRODUCTION (merge `4a743d63`); MIGRATION 038 SOURCE-BUILT, NOT APPLIED
 
 **Source of truth:** Postgres coordination and audit ledger for personalized
 scheduled email; Dataverse remains workflow authority and Dynamics remains
 email-activity/transport authority. Migration
-`036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
-**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the branch code that writes it is not yet deployed, so the table is empty in production.]**
+`036_scheduled_email_messages.sql` is mirrored in the fresh-install setup;
+`038_reviewer_reminder_ledger_workflows.sql` (branch
+`feature/reviewer-cron-reminders-ledger`, NOT yet applied to the shared
+database) extends the workflow CHECK and relaxes `deliverable_id` to
+nullable under a per-workflow shape constraint.
+**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe). The decision-layer code merged to production 2026-08-26/27 (`4a743d63`); with all solicited abstracts received, no Invited deliverable exists, so no grantee rows accrue this cycle.]**
 
-The first allowlisted workflow is `grantee_abstract_reminder`. One source
-deliverable can own one row, created on the cron's first sight of an Invited
-deliverable. The row freezes the exact server-derived PD, recipients,
+Allowlisted workflows: `grantee_abstract_reminder` (source = the Invited
+deliverable, `deliverable_id` NOT NULL) and — once migration 038 applies —
+`reviewer_respond_reminder` / `reviewer_reviewdue_reminder` (source = the
+`wmkf_appreviewersuggestion`, `deliverable_id` NULL). One source record owns
+one row per workflow, created on the cron's first sight of eligibility. The row freezes the exact server-derived PD, recipients,
 recipient contact GUIDs, subject/body/signature, established day-12 send
 time, and `approval_required` (computed once at creation from the PD's
 review-all override plus VIP flags). It records optimistic versions and PD
@@ -258,11 +264,24 @@ are never client-editable; PATCH actions can edit bounded subject/body (which
 clears any prior approval), approve, stop, or send now under exact PD
 ownership and a version fence. The store's due-send claim refuses an
 `approval_required` row without `approved_at`; the PD's version-fenced
-send-now is the only bypass. A due send freshly rechecks that the deliverable
-is still Invited, persists/reconciles one correlation-keyed Dynamics
-activity, records transport acceptance, and only then finalizes
-`wmkf_granteedeliverable`. A separate pass repairs sent but unfinalized rows
-without re-sending. The per-PD daily digest is the only notification surface;
+send-now is the only bypass. A due send dispatches a per-workflow
+strategy (`strategyFor` in `scheduled-email-service.js`): eligibility is
+freshly rechecked (grantee: deliverable still Invited; reviewer: the shared
+refusal predicates in `reviewer-reminder-eligibility.js`, live config, and a
+marker-without-transport guard) and may STOP the row, DEFER it to a
+recomputed send time (`deferScheduledEmailSend` — due-date extension or
+offset/lead drift; `force`/PD send-now overrides timing only), or proceed:
+persist/reconcile one correlation-keyed Dynamics activity (reviewer
+workflows fuse the Dataverse marker + fresh-token claim into activity
+creation via one If-Match `mintAndStore` PATCH — claim-before-send), record
+transport acceptance, then finalize (grantee: `wmkf_granteedeliverable`
+status; reviewer: no-op — the marker landed pre-send). A separate pass
+repairs sent but unfinalized rows without re-sending. Reviewer sweeps also
+reconcile existing rows: revive stopped never-transported rows when the
+source is eligible again (`reviveStoppedScheduledEmail`), re-freeze
+untouched drafts on drift (`refreshUntouchedScheduledEmail`), and a manual
+staff nudge cancels its queued cron copy
+(`cancelScheduledEmailBySource`, which refuses in-flight rows). The per-PD daily digest is the only notification surface;
 its concurrency claim and FYI membership live in
 `scheduled_email_digest_runs` (below). PD handoff: when the request's lead PD
 no longer matches an unsent row, the cron rebuilds the row in place under the
@@ -286,7 +305,7 @@ as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
 
-### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE IN PRODUCTION (merge `4a743d63`)
 
 **Source of truth:** Postgres. Per-(PD, contact) VIP review flags
 (`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
@@ -297,9 +316,9 @@ Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
 reminders cron to freeze `approval_required` at ledger-row creation; any
 flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
-`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database; the writing code merged to production 2026-08-26/27.]**
 
-### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE IN PRODUCTION (merge `4a743d63`)
 
 **Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
 2026-08-26 after the branch adversarial review. The primary key
@@ -316,7 +335,7 @@ consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
 unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
 materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
-tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database; the writing code merged to production 2026-08-26/27.]**
 
 ### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 APPLIED
 
@@ -331,8 +350,10 @@ review-manager/reviewers staff may curate on the lead PD's behalf; the PD
 resolves server-side from the request row). Consumed synchronously by the
 Invite Reviewers send flow — a flagged person's invitation drafts render as
 full editable preview cards in `InviteEmailModal`, others collapse to a
-batch summary. **No ledger workflow reads these flags and no send path is
-gated by them.** **Retention:** deliberately unbounded (≤6 PDs × curated
+batch summary — and (branch `feature/reviewer-cron-reminders-ledger`) by the
+reviewer reminder sweeps via `filterVipFlaggedReviewers` to freeze
+`approval_required` at ledger-row creation. On main, no ledger workflow
+reads these flags yet. **Retention:** deliberately unbounded (≤6 PDs × curated
 handfuls of people). **[VERIFIED 2026-08-26 via migration 037,
 scheduled-email-store.js, and the reviewer-vip-flags route/panel/modal
 suites; APPLIED to the shared Neon database 2026-08-26 (owner-run

@@ -377,3 +377,169 @@ test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', ()
   expect(section).toContain('potential_reviewer_id');
   expect(section).not.toContain('contact_id');
 });
+
+/* ------------------- reviewer workflow dispatch (ledger slice) ------------------- */
+
+jest.mock('../../lib/services/reviewer-reminder-workflows', () => ({
+  REVIEWER_REMINDER_STRATEGIES: {
+    reviewer_respond_reminder: {
+      checkEligibility: jest.fn(),
+      buildActivityInput: jest.fn(),
+      finalize: jest.fn(async () => null),
+      previewHtml: jest.fn(() => '<p>reviewer preview</p>'),
+      noticeText: jest.fn(() => 'reviewer notice'),
+    },
+  },
+}));
+
+describe('reviewer workflow dispatch', () => {
+  const { REVIEWER_REMINDER_STRATEGIES } = require('../../lib/services/reviewer-reminder-workflows');
+  const strategy = REVIEWER_REMINDER_STRATEGIES.reviewer_respond_reminder;
+
+  function reviewerMessage(overrides = {}) {
+    return message({
+      workflow_type: 'reviewer_respond_reminder',
+      deliverable_id: null,
+      ...overrides,
+    });
+  }
+
+  function reviewerDeps(base) {
+    const deps = dependencies(base);
+    deps.claimSend = jest.fn(async () => ({ ...base, status: 'sending' }));
+    deps.deferSend = jest.fn(async (msg, at) => ({ ...msg, status: 'scheduled', scheduled_send_at: at }));
+    return deps;
+  }
+
+  beforeEach(() => {
+    strategy.checkEligibility.mockReset();
+    strategy.buildActivityInput.mockReset();
+    strategy.finalize.mockReset().mockResolvedValue(null);
+    strategy.previewHtml.mockClear();
+    strategy.noticeText.mockClear();
+  });
+
+  test('a defer verdict releases the claim to the recomputed time — no activity, no send', async () => {
+    const base = reviewerMessage();
+    const deps = reviewerDeps(base);
+    const newAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    strategy.checkEligibility.mockResolvedValue({ defer: newAt });
+
+    const result = await deliverScheduledEmail(base.id, {}, deps);
+
+    expect(result.deferred).toBe(true);
+    expect(deps.deferSend).toHaveBeenCalledWith(expect.objectContaining({ id: base.id }), newAt);
+    expect(strategy.buildActivityInput).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+  });
+
+  test('a stop verdict cancels the row — no activity, no send', async () => {
+    const base = reviewerMessage();
+    const deps = reviewerDeps(base);
+    deps.cancelForSource = jest.fn(async () => ({ ...base, status: 'stopped', stopped_at: 'now' }));
+    strategy.checkEligibility.mockResolvedValue({ stop: true, reason: 'already_reminded' });
+
+    const result = await deliverScheduledEmail(base.id, {}, deps);
+
+    expect(result.stopped).toBe(true);
+    expect(deps.cancelForSource).toHaveBeenCalledWith(base.id);
+    expect(strategy.buildActivityInput).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an eligible verdict runs the full skeleton with the strategy payload; grantee finalize never touches Dataverse', async () => {
+    const base = reviewerMessage();
+    const deps = reviewerDeps(base);
+    const ctx = { row: { _etag: 'W/"9"' }, request: {} };
+    strategy.checkEligibility.mockResolvedValue({ eligible: true, ctx });
+    strategy.buildActivityInput.mockResolvedValue({
+      subject: base.subject, body: '<p>html-with-token</p>', from: base.pd_email,
+      to: ['rev@example.org'], cc: [], regardingId: base.request_id,
+      regardingType: 'akoya_request', actingUserSystemId: base.pd_systemuser_id, noFallback: true,
+    });
+
+    const result = await deliverScheduledEmail(base.id, {}, deps);
+
+    expect(result.sent).toBe(true);
+    expect(strategy.buildActivityInput).toHaveBeenCalledWith(
+      expect.objectContaining({ id: base.id }), ctx,
+    );
+    expect(deps.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
+      body: '<p>html-with-token</p>',
+      noFallback: true,
+      correlationKey: expect.stringContaining(base.id),
+    }));
+    expect(strategy.finalize).toHaveBeenCalled();
+    expect(deps.recordFinalized).toHaveBeenCalled();
+    // The grantee finalize path (deliverable status write) must NOT run.
+    expect(deps.getDeliverable).not.toHaveBeenCalled();
+    expect(deps.updateDeliverable).not.toHaveBeenCalled();
+  });
+});
+
+/* -------------------- new store helper guards (SQL structure) -------------------- */
+
+test('cancelScheduledEmailBySource refuses in-flight rows and held leases', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function cancelScheduledEmailBySource'),
+    store.indexOf('export async function deferScheduledEmailSend'),
+  );
+  expect(section).toContain("status IN ('scheduled', 'failed')");
+  expect(section).not.toContain("'sending'");
+  expect(section).toContain('(locked_until IS NULL OR locked_until < NOW())');
+});
+
+test('deferScheduledEmailSend is lease-guarded and refuses transport-started rows', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function deferScheduledEmailSend'),
+    store.indexOf('export async function claimScheduledEmailSend'),
+  );
+  expect(section).toContain('lease_token = ${message.lease_token}');
+  expect(section).toContain("status = 'sending'");
+  expect(section).toContain('dynamics_email_id IS NULL');
+  expect(section).toContain("status = 'scheduled'");
+});
+
+test('reviveStoppedScheduledEmail only resurrects stopped, never-transported, unleased rows', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function reviveStoppedScheduledEmail'),
+    store.indexOf('export async function refreshUntouchedScheduledEmail'),
+  );
+  expect(section).toContain("status = 'stopped'");
+  expect(section).toContain('dynamics_email_id IS NULL');
+  expect(section).toContain('send_requested_at IS NULL');
+  expect(section).toContain('(locked_until IS NULL OR locked_until < NOW())');
+  expect(section).toContain('approved_at = NULL');
+  expect(section).toContain('version = version + 1');
+});
+
+test('refreshUntouchedScheduledEmail defers to any PD touch and never refreshes posture', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function refreshUntouchedScheduledEmail'),
+    store.indexOf('export async function cancelScheduledEmailBySource'),
+  );
+  expect(section).toContain('edited_at IS NULL');
+  expect(section).toContain('approved_at IS NULL');
+  expect(section).toContain('dynamics_email_id IS NULL');
+  expect(section).toContain('pd_systemuser_id = ${input.pdSystemUserId}');
+  // Posture freezes at creation/revive/reassign — a refresh must not touch it.
+  expect(section).not.toContain('approval_required =');
+});

@@ -881,15 +881,21 @@ const v40Statements = [
 
 // V41: approval and send-recovery ledger for personalized automated email,
 // plus per-PD VIP recipient flags (docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md).
-// Existing databases use migration 036_scheduled_email_messages.sql.
+// Existing databases use migration 036_scheduled_email_messages.sql; the
+// reviewer reminder workflows + nullable deliverable_id arrived in
+// 038_reviewer_reminder_ledger_workflows.sql.
 const v41Statements = [
   `CREATE TABLE IF NOT EXISTS scheduled_email_messages (
     id UUID PRIMARY KEY,
     workflow_type TEXT NOT NULL CONSTRAINT scheduled_email_workflow_check
-      CHECK (workflow_type IN ('grantee_abstract_reminder')),
+      CHECK (workflow_type IN (
+        'grantee_abstract_reminder',
+        'reviewer_respond_reminder',
+        'reviewer_reviewdue_reminder'
+      )),
     source_record_id UUID NOT NULL,
     request_id UUID NOT NULL,
-    deliverable_id UUID NOT NULL,
+    deliverable_id UUID,
     pd_systemuser_id UUID NOT NULL,
     pd_name TEXT NOT NULL,
     pd_email TEXT NOT NULL,
@@ -939,6 +945,9 @@ const v41Statements = [
       OR status <> 'sent'),
     CONSTRAINT scheduled_email_stopped_shape CHECK (
       (status = 'stopped' AND stopped_at IS NOT NULL) OR status <> 'stopped'),
+    CONSTRAINT scheduled_email_deliverable_shape CHECK (
+      (workflow_type = 'grantee_abstract_reminder' AND deliverable_id IS NOT NULL)
+      OR (workflow_type <> 'grantee_abstract_reminder' AND deliverable_id IS NULL)),
     CONSTRAINT scheduled_email_source_unique UNIQUE (workflow_type, source_record_id)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_scheduled_email_pd_history
