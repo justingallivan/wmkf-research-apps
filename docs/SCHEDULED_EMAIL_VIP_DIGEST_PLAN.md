@@ -292,8 +292,9 @@ Scope and shape settled with the owner; build not started:
 - The review-all override (Decision 6) is set from a toggle on the
   `/scheduled-emails` inbox page through the authenticated
   `/api/email-automation-preferences` route, value shape
-  `{ reviewAll: boolean }` (redefined freely — no old-shape values were ever
-  deployed).
+  `{ reviewAll: boolean }` (no old-shape values existed pre-rollout; as of
+  the 2026-08-27 PD onboarding, stored `{ reviewAll }` values exist — the
+  matrix slice's tolerant normalize below is the compatibility story).
 
 ## Preference-matrix slice — draft plan (2026-08-27, S464) [PLANNED — awaiting owner sign-off]
 
