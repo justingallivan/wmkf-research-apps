@@ -104,7 +104,10 @@ sequence.
   trailing-dot typos, an `ab@ab.com` test contact on `1001931`, the
   1002788 test byline trio spread across five requests, one
   corrupted-email duplicate pair, and 18/8 cross-store drift rows).
-  Full record: `outputs/phantom-copi-incident-2026-08-12.md`.
+  Full record: `outputs/phantom-copi-incident-2026-08-12.md` — **local-only
+  since 2026-08-27** (untracked from the public repo because it names real
+  people with personal emails; its 2026-08-12–2026-08-27 tracked history is
+  queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
 

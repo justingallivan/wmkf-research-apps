@@ -164,6 +164,24 @@ reviewer-email documentation revisions identified by the privacy audit, then be
 regenerated from a fresh mirror after all approved work is integrated and the
 repository is frozen.
 
+**Added to the pending removal scope 2026-08-27 (S464):**
+
+- `outputs/phantom-copi-incident-2026-08-12.md` — tracked and public from
+  2026-08-12 (`f9defa6d`) through 2026-08-27 (`7851e913`); names real
+  people with personal email addresses (the phantom co-PI incident's
+  duplicate-contact table). Untracked from the current tree 2026-08-27
+  (`git rm --cached`; the file remains local-only under the gitignored
+  `outputs/`). Its historical blobs across those revisions must join the
+  removal set when the final specification is regenerated.
+- Candidate, owner decision pending:
+  `outputs/reviewer-workflow-stabilization-fable-assessment.md` (still
+  tracked — referenced by the memory router and
+  `docs/REVIEWER_HOLISTIC_REVIEW_FABLE_PROMPT.md`) contains one real
+  personal email address alongside a placeholder example. Options: redact
+  the address in place (keeps the reference graph intact) or untrack like
+  the incident record; either way its prior revisions join the historical
+  scope.
+
 ## Options
 
 ### A. Targeted rewrite — recommended
