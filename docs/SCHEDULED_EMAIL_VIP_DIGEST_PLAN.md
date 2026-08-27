@@ -250,9 +250,8 @@ Decisions and build notes:
 1. **Both cron reminder types** (respond-by and review-due,
    `reviewer-reminder-sweep.js`) route through the ledger + digest decision
    layer. **Thank-yous stay on the direct send path** — post-submission,
-   low-stakes. [RECHECKED after lib/services/reviewer-reminder-sweep.js
-   change: both sweep loops call `ensureReminderRow`; thank-you flow
-   untouched by this slice]
+   low-stakes.
+   [RECHECKED after lib/services/reviewer-reminder-sweep.js change: both sweep loops call `ensureReminderRow`; thank-you flow untouched by this slice]
 2. **Per-message approval unit.** The recorded batch-unit decision (Broader
    effort decision 2 context) applies to solicitation only; each cron
    reminder has its own deadline, so ledger rows are per reminder.
@@ -267,10 +266,8 @@ Decisions and build notes:
    `reviewer-reminder-eligibility.js` and imported by
    `reviewer-manual-reminder.js` so manual and cron sends share one
    definition of "refused"); token minting stays at delivery time
-   (expiry windows + revocation), never at row creation. [RECHECKED after
-   lib/services/reviewer-manual-reminder.js change: predicates now
-   imported from reviewer-reminder-eligibility.js; manual success path
-   additionally cancels the queued ledger copy]
+   (expiry windows + revocation), never at row creation.
+   [RECHECKED after lib/services/reviewer-manual-reminder.js change: predicates now imported from reviewer-reminder-eligibility.js; manual success path additionally cancels the queued ledger copy]
 5. Requires a migration extending the ledger `workflow_type` CHECK
    (036 locks it to `grantee_abstract_reminder`) and a reviewer-shaped
    source reference (suggestion id as `source_record_id`).
