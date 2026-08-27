@@ -230,8 +230,8 @@ they want each handled. Owner decisions recorded so far for the next slices:
    [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
-   the single interface. Draft plan below ("Preference-matrix slice",
-   2026-08-27) — awaiting owner sign-off.
+   the single interface. Plan below ("Preference-matrix slice",
+   2026-08-27) — owner-settled design, build not started.
 
 The full outbound-email inventory (18 types; triggers, sender identities,
 controls, notice and noFallback coverage) was compiled 2026-08-26 and seeds
@@ -296,7 +296,7 @@ Scope and shape settled with the owner; build not started:
   the 2026-08-27 PD onboarding, stored `{ reviewAll }` values exist — the
   matrix slice's tolerant normalize below is the compatibility story).
 
-## Preference-matrix slice — draft plan (2026-08-27, S464) [PLANNED — awaiting owner sign-off]
+## Preference-matrix slice — plan (2026-08-27, S464) [PLANNED — owner-settled design; build not started]
 
 Generalizes Broader-effort decision 3 (per-PD, per-email-type preferences)
 into a concrete design. Storage was UNBLOCKED S463: `wmkf_preferencevalue`
@@ -394,13 +394,12 @@ preference route. No new surfaces; the digest remains the single interface
 - Rollout checklist items 1–3 apply unchanged; the admin walkthrough now
   covers per-type choices.
 
-### Owner questions (open — do not build past these silently)
+### Owner decisions (2026-08-27, S464)
 
-1. **Two-state per type** (review-all vs VIP-only, as designed above) or a
-   third "always auto, even for VIPs" level? Recommendation: two-state —
-   no PD has asked to suppress VIP review, and a third state weakens
-   Decision 3's review-by-exception principle.
-2. **Launch type list**: the three ledgered types above, or hold the two
-   reviewer types out of the UI until their first supervised cycle?
-3. **UI labels** for the per-type rows (plain-language names for the three
-   workflow types).
+1. **Two-state per type** (review-all vs VIP-only, as designed above). No
+   third "always auto, even for VIPs" level — Decision 3's
+   review-by-exception principle stands per type.
+2. **All three ledgered types in the UI at launch** — no supervised-cycle
+   holdout for the reviewer types.
+3. **UI label wording deferred to build time** — ask the owner for the
+   per-type row labels before shipping the UI; do not invent them.
