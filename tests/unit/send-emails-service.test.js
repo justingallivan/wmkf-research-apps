@@ -369,6 +369,7 @@ describe('send-emails-service — invitation body-integrity gate', () => {
     expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       from: 'pd@wmkeck.org',
       actingUserSystemId: 'pd-1',
+      noFallback: true,
       body: expect.stringContaining('?action=accept'),
     }));
     const html = createAndSendEmail.mock.calls[0][0].body;
@@ -403,7 +404,24 @@ describe('send-emails-service — invitation body-integrity gate', () => {
     expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       from: 'staff@wmkeck.org',
       actingUserSystemId: 'u-1',
+      noFallback: false,
     }));
+  });
+
+  test('an invitation impersonation-disabled guard failure lands in failed[] (provably never dispatched), not unconfirmed[]', async () => {
+    createAndSendEmail.mockImplementationOnce(async () => {
+      const err = new Error('Dynamics impersonation is disabled; noFallback requested');
+      err.code = 'impersonation_disabled';
+      throw err;
+    });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(names(emitted)).not.toContain('email_unconfirmed');
+    expect(names(emitted)).toContain('email_failed');
+    const r = resultOf(emitted);
+    expect(r.unconfirmed).toEqual([]);
+    expect(r.failed).toHaveLength(1);
+    expect(r.failed[0].error).toContain('was not sent');
   });
 
   test('an invitation with no secure link is skipped missing_secure_link and never sent', async () => {

@@ -72,3 +72,27 @@ only by `reviewer-reminder-email.js` and `grantee-invite-email.js`.
 - Full per-type control detail (fire-once markers, ETag claims, preview
   contracts, dry-runs) lives in the compiling session's report; re-derive
   from source when planning each slice.
+
+## Update 2026-08-27 — hygiene items closed
+
+Three of the cross-cutting findings above were fixed (S463); the table rows
+reflect the 2026-08-26 snapshot and are superseded on these points:
+
+- **#1 reviewer invitation:** now `noFallback: true` (invitations only; the
+  shared payload keeps fallback for #2–4, which send as the acting staff
+  member). A pre-dispatch impersonation-guard failure is tagged
+  (`err.code = 'impersonation_disabled'` in `lib/services/dynamics/email.js`)
+  and lands in plain `failed[]` with staff-readable copy — not in the
+  "possibly sent — verify before retry" bucket, which is reserved for throws
+  that may have dispatched.
+- **#10 acceptance confirmation:** now `noFallback: true`. Harmless on the
+  NOTIFICATION_EMAIL_FROM fallback branch (no acting user there); the drain
+  records a throw as a non-fatal failed step, at-most-once.
+- **#7 manual respond-by reminder:** now renders the automation notice,
+  matching cron twin #5 (notice threaded through
+  `renderRespondReminderFromBodyText`; server-side chrome, not part of the
+  staff-editable preview text).
+
+The remaining cross-cutting finding — PD-attributed mail triggered by other
+staff (#1, #7, #8, #11, #12) — is a design axis for the reviewer slice of the
+VIP/digest plan, not a hygiene fix, and stays open.
