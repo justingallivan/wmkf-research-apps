@@ -101,13 +101,16 @@ test('the ★ VIP badge marks only VIP full cards, not other full cards', async 
   expect(screen.getAllByText('★ VIP')).toHaveLength(1);
 });
 
-test('no ★ VIP badge under vipUnknown — every card is full, but nobody is known-VIP', async () => {
+test('no ★ VIP badge under vipUnknown — even for a snapshotted vip:true (an optimistic save may have rolled back)', async () => {
   mockRender([draft('S1', 'VIP Person'), draft('S2', 'Standard One'), draft('S3', 'Standard Two')]);
-  const unknownCandidates = CANDIDATES.map((c) => ({ ...c, vip: false }));
+  // S1 arrives vip:true in the snapshot; under vipUnknown that value may be an
+  // optimistic star whose PUT failed and rolled back after the modal opened, so
+  // the badge must not assert it. Every card still renders full (fail closed).
   render(
-    <InviteEmailModal requestId="req-1" candidates={unknownCandidates} vipUnknown onClose={() => {}} onSent={() => {}} />,
+    <InviteEmailModal requestId="req-1" candidates={CANDIDATES} vipUnknown onClose={() => {}} onSent={() => {}} />,
   );
   await waitFor(() => expect(screen.getByDisplayValue('Invitation for Standard Two')).toBeTruthy());
+  expect(screen.getByDisplayValue('Invitation for VIP Person')).toBeTruthy();
   expect(screen.queryByText('★ VIP')).toBeNull();
 });
 

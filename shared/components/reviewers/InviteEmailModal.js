@@ -961,8 +961,12 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                         <span className="text-sm font-medium text-gray-900">
                           {d.candidateName || '(unnamed)'}
                           {/* Why this card is full: VIP flag only — quick-check,
-                              skipped, and edited cards carry their own markers. */}
-                          {vipBySuggestionId.get(d.suggestionId) === true && (
+                              skipped, and edited cards carry their own markers.
+                              Suppressed under vipUnknown: the snapshot may hold an
+                              optimistic value whose PUT later rolled back, so the
+                              flag isn't trustworthy enough to assert as a label
+                              (every card is already full in that state). */}
+                          {!vipUnknown && vipBySuggestionId.get(d.suggestionId) === true && (
                             <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 align-middle">
                               ★ VIP
                             </span>
