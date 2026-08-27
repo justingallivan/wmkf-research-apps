@@ -88,22 +88,23 @@ sequence.
   automation, and genuine external-reviewer use remain probe-required. The
   repository-wide material-claim audit is partial reconciliation, not a clean
   bill of health.
-- **Phantom co-PI on seven requests — NOT REMEDIATED (S422, 2026-08-12).** One
-  duplicate contact carrying the placeholder email `_@_._`
-  (`2a67a272-9eb5-f011-bbd3-6045bd0510d4`) sits in a co-PI slot on requests
-  `1002132`, `1002262`, `1002363`, `1002367`, `1002865`, `1002880`, `1003053`,
-  and in the matching `wmkf_apprequestperson` junction rows. **Nothing has been
-  executed** — `scripts/remediate-placeholder-copi.js` has only ever been run
-  `--dry-run`; all 14 rows are still live in production. No application code is
-  at fault. Only `1002132` reached an awardee (grantee portal, 2026-08-12); the
-  owner reports the other six were not awarded, so no further abstract requests
-  are expected and the exposure risk is contained but the CRM data stays wrong.
-  Root cause is the akoyaGO import and is **Connor's to fix** — until then new
-  requests keep acquiring the phantom. **Seven is a floor, not a ceiling**
-  `[VERIFIED for email exactly `_@_._`; other placeholder shapes UNTESTED]` — the
-  sweep matched that one literal, so `x@x.com`/blank/`noemail@…` variants would
-  not have appeared. Widen the pattern before anyone calls this cleanup complete.
-  Full record with slot/junction ids: `outputs/phantom-copi-incident-2026-08-12.md`.
+- **Phantom co-PI — LINKS GONE (verified 2026-08-27, S464); importer fix
+  still Connor's.** The full read-only co-PI census
+  (`scripts/probe-placeholder-copi-census.js`, owner-run; 1,084 slot links +
+  1,073 junction rows, 1,049 distinct contacts, pagination verified
+  complete) found **0 remaining links** for the phantom contact
+  `2a67a272-9eb5-f011-bbd3-6045bd0510d4` — all 14 recorded rows are gone,
+  remediated CRM-side outside this repo (by whom is not recorded; the repo
+  script was never `--execute`d). The former "floor, not a ceiling" caveat
+  is CLOSED: zero other punctuation-placeholder contacts are linked as
+  co-PI. Remaining (all CRM-side, none app-code): **Connor's akoyaGO
+  importer fix** (recurrence prevention), the duplicate contact's fate
+  (unprobed — census reads links only), and small residuals recorded in the
+  incident record's 2026-08-27 update (8 empty-email contacts, 2
+  trailing-dot typos, an `ab@ab.com` test contact on `1001931`, the
+  1002788 test byline trio spread across five requests, one
+  corrupted-email duplicate pair, and 18/8 cross-store drift rows).
+  Full record: `outputs/phantom-copi-incident-2026-08-12.md`.
 
 ## Completed in this execution
 
