@@ -80,11 +80,23 @@ their full verification loops:
 
 ### Verified Open
 
-1. **PD onboarding / posture seeding for the abstract-reminder digest.**
+1. **PD onboarding / posture seeding for the abstract-reminder digest —
+   before the NEXT solicitation cycle, no current deadline.**
    Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist
    (procedural guarantee: onboard every active PD and seed override/VIP state
-   before meaningful sends). Abstract Invited rows were fresh 2026-08-26, so
-   day-12 sends begin ~2026-09-07 — onboarding must land before then.
+   before meaningful sends). Owner-corrected S463: the abstract requests went
+   out weeks before 2026-08-26 and ALL solicited abstracts have been
+   received, so no deliverable is in Invited status — the cron's filter
+   matches nothing, and any stale ledger row self-cancels at send time via
+   the `sourceStillEligible` recheck (`lib/services/scheduled-email-service.js:239`,
+   `stoppedNoLongerEligible`). Nothing is queued and nothing will send this
+   cycle. The binding sequencing constraint for next cycle:
+   `approval_required` is frozen ONCE at ledger-row creation
+   (`grantee-deliverable-reminders-service.js:270`), so PD posture must be
+   seeded BEFORE the next batch of abstracts is stamped Invited — seeding
+   after invitation does not protect that batch. Onboarding + the tutorial
+   refresh (Owner Decision Needed below) should complete before the next
+   solicitation.
 2. **VIP badge on full cards (small UX polish, owner-noted during smoke).**
    Evidence: plan doc smoke paragraph — a full card doesn't show WHY it's
    full (VIP vs quick-check indistinguishable). Add a "★ VIP" badge to the
