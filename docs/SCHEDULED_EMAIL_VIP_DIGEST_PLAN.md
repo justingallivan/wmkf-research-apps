@@ -215,7 +215,16 @@ they want each handled. Owner decisions recorded so far for the next slices:
    sends always resolve the current PD server-side, so the worst case is a
    stale collapse decision, not a wrong write. Migration 037 APPLIED to the
    shared Neon database 2026-08-26 (owner-run apply-migrations; live-probed:
-   tracker row + three columns + 0 rows); branch unmerged.
+   tracker row + three columns + 0 rows). **Owner-run local smoke PASSED
+   2026-08-27** (capture mode + same-day prod-write ack + local-only
+   `EXTERNAL_LINK_SECRET`, three throwaway candidates): fail-closed Retry
+   notice on a blocked flags GET, star toggle round-trip + persistence
+   across reload, VIP and quick-check drafts full while the standard draft
+   collapsed, and a send that captured all three — including the
+   still-collapsed draft — proving collapse is view-state only. One UX
+   polish noted, not built: the full card doesn't show WHY it's full (a VIP
+   badge on the card header would distinguish VIP from quick-check).
+   Branch unmerged.
    [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
