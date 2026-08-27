@@ -293,3 +293,112 @@ Scope and shape settled with the owner; build not started:
   `/api/email-automation-preferences` route, value shape
   `{ reviewAll: boolean }` (redefined freely — no old-shape values were ever
   deployed).
+
+## Preference-matrix slice — draft plan (2026-08-27, S464) [PLANNED — awaiting owner sign-off]
+
+Generalizes Broader-effort decision 3 (per-PD, per-email-type preferences)
+into a concrete design. Storage was UNBLOCKED S463: `wmkf_preferencevalue`
+is Memo/100,000 [VERIFIED via owner-authorized read-only probe, recorded in
+SESSION_PROMPT.md "Probe Results" 2026-08-27, commit `991209f0`],
+so the richer JSON fits in the column the `email_automation` preference
+already uses. No code exists for this slice; everything below is design.
+
+### Shape: additive per-type overrides, no data migration
+
+The stored preference grows one optional key:
+
+```json
+{ "reviewAll": false, "perType": { "reviewer_respond_reminder": true } }
+```
+
+- **Effective posture for a type** = `perType[workflowType] ?? reviewAll`.
+  `true` means every message of that type waits for approval; `false` means
+  VIP-flag review only. The VIP layer beneath is untouched (Decision 3), and
+  PD send-now remains the only bypass of an unapproved approval-required row.
+- **Absence semantics unchanged**: a missing preference row still returns
+  `null` → system default (VIP-only review); onboarding remains a rollout
+  precondition, never a runtime compatibility state (Decision 9).
+- **Backward compatible by construction**: every deployed `{ reviewAll }`
+  value and the current toggle's PUT body remain valid. `normalize` accepts
+  `perType` when present (each key a known workflow type, each value
+  boolean; unknown keys reject — fail closed, matching the reader's
+  malformed-state throw in `lib/services/email-automation-preferences.js`).
+  `serialize` canonicalizes (omits an empty `perType`). No stored-value
+  migration and no Dataverse schema work.
+
+### Type axis = ledger `workflow_type`, not the 18-type inventory
+
+Only ledgered types consult approval at all, so matrix keys are exactly the
+`workflow_type` CHECK values. At launch (post-merge of the parked slice):
+`grantee_abstract_reminder`, `reviewer_respond_reminder`,
+`reviewer_reviewdue_reminder` (migration 038's CHECK on the parked branch).
+Excluded by standing owner decisions: thank-yous stay on the direct path
+(cron-reminders decision 1); staff-triggered sent-as-me mail (inventory
+#1/#7/#8/#11/#12) is the separate open "async PD approval" Broader-effort
+item — when such a type is later ledgered, it joins the matrix by gaining a
+`workflow_type`, with no contract change.
+
+A parity test must hold the three lists together: the shared type list in
+`shared/config/emailAutomation.js`, the migration CHECK, and `strategyFor`
+dispatch in `scheduled-email-service.js` (`check:status-enum-parity` is the
+existing gate family for exactly this producer↔consumer drift).
+
+### Consultation sites and the freeze-at-creation carry-over
+
+Both `approval_required` computation sites replace their coarse check with a
+shared helper `effectiveReviewAll(preference, workflowType)` exported from
+`shared/config/emailAutomation.js`:
+
+- `lib/services/cron/grantee-deliverable-reminders-service.js` (`:281` on
+  main) [VERIFIED via source 2026-08-27]
+- `lib/services/reviewer-reminder-sweep.js` (`:122` on the parked branch)
+  [VERIFIED via branch grep 2026-08-27 — these two are the ONLY callers of
+  `getEmailAutomationPreferenceForSystemUser` besides its definition;
+  `reviewer-reminder-workflows.js` never reads posture — its send-time
+  recompute covers timing/config, not approval]
+
+Freeze-at-creation semantics carry over unchanged: the matrix is consulted
+ONCE at ledger-row creation; editing the preference affects future rows
+only, and revive/reassign remain the only recompute paths. Posture reads
+stay fail-closed (read failure skips the row, never weakens posture).
+
+### Hard ordering invariant (do not ship mid-park)
+
+**The contract change lands only AFTER the parked cron-reminders branch
+merges and both consumers adopt `effectiveReviewAll`.** The branch's live
+check is `override?.reviewAll === true`: if `perType` shipped first, a PD
+with `{ reviewAll: false, perType: { reviewer_respond_reminder: true } }`
+would have reviewer reminders auto-send — a silent posture weakening, the
+exact class this system fails closed against. The same hazard applies to
+any old-normalize code path reading a new-shape value (the current
+`normalizeEmailAutomationPreference` strips unknown keys rather than
+rejecting them). This is an ordering constraint, not a preference.
+
+### UI
+
+The single "review everything" toggle on `/scheduled-emails` becomes a
+short per-type list (one row per launch type, plus the default row that is
+today's toggle). Same route, same self-service auth
+(`requireAuthWithProfile`), same reserved-key protection on the generic
+preference route. No new surfaces; the digest remains the single interface
+(Decision 7).
+
+### Rollout
+
+- Ships in the between-cycles quiet period AFTER the parked slice promotes
+  (steps (a)–(e) of its promotion sequence), so PD onboarding seeds the
+  matrix shape once — the posture-seeding open item and this slice share
+  one onboarding pass.
+- Rollout checklist items 1–3 apply unchanged; the admin walkthrough now
+  covers per-type choices.
+
+### Owner questions (open — do not build past these silently)
+
+1. **Two-state per type** (review-all vs VIP-only, as designed above) or a
+   third "always auto, even for VIPs" level? Recommendation: two-state —
+   no PD has asked to suppress VIP review, and a third state weakens
+   Decision 3's review-by-exception principle.
+2. **Launch type list**: the three ledgered types above, or hold the two
+   reviewer types out of the UI until their first supervised cycle?
+3. **UI labels** for the per-type rows (plain-language names for the three
+   workflow types).
