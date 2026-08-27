@@ -449,6 +449,29 @@ describe('reviewer workflow dispatch', () => {
     expect(deps.sendEmail).not.toHaveBeenCalled();
   });
 
+  test('a REFUSED defer (transport already started) completes the existing send — no re-mint, no stranded lease', async () => {
+    const base = reviewerMessage({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    const deps = reviewerDeps(base);
+    deps.claimSend = jest.fn(async () => ({ ...base, status: 'sending' }));
+    deps.deferSend = jest.fn(async () => null); // store refuses: activity exists
+    strategy.checkEligibility.mockResolvedValue({ defer: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) });
+
+    const result = await deliverScheduledEmail(base.id, {}, deps);
+
+    expect(result.sent).toBe(true);
+    // The started activity is completed as-is; a re-mint would invalidate its token.
+    expect(strategy.buildActivityInput).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.recordSent).toHaveBeenCalled();
+  });
+
+  test('an unknown workflow_type records a retryable failure instead of stranding the claimed lease', async () => {
+    const base = reviewerMessage({ workflow_type: 'workflow_nobody_knows' });
+    const deps = reviewerDeps(base);
+    await expect(deliverScheduledEmail(base.id, {}, deps)).rejects.toThrow('Unknown scheduled-email workflow');
+    expect(deps.recordFailure).toHaveBeenCalled();
+  });
+
   test('an eligible verdict runs the full skeleton with the strategy payload; grantee finalize never touches Dataverse', async () => {
     const base = reviewerMessage();
     const deps = reviewerDeps(base);
