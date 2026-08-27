@@ -230,11 +230,12 @@ they want each handled. Owner decisions recorded so far for the next slices:
    [RECHECKED after lib/services/scheduled-email-store.js change: reviewer VIP flag helpers added 2026-08-26, contact-flag and ledger functions untouched]
 3. **Per-PD, per-email-type preferences** are the working direction (the
    single `{ reviewAll }` override generalizes), with the digest remaining
-   the single interface.
+   the single interface. Draft plan below ("Preference-matrix slice",
+   2026-08-27) — awaiting owner sign-off.
 
-Detailed planning for these slices has not started; the full outbound-email
-inventory (18 types; triggers, sender identities, controls, notice and
-noFallback coverage) was compiled 2026-08-26 and should seed that plan.
+The full outbound-email inventory (18 types; triggers, sender identities,
+controls, notice and noFallback coverage) was compiled 2026-08-26 and seeds
+these plans.
 
 ### Reviewer cron-reminders slice — owner decisions (2026-08-27, S463)
 
