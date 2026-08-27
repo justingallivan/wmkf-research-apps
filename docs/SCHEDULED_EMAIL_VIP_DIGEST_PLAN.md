@@ -288,6 +288,25 @@ Decisions and build notes:
    suggestion whose automated nudge already SENT gets no second automated
    nudge after a re-invite — the (workflow, source) uniqueness is
    deliberate; the manual path covers that rare case.
+9. Crash-retry protocol (2026-08-27, from the Codex adversarial review's two
+   high findings): `claim_committed_at` (migration 038) is stamped
+   lease-guarded in Postgres BEFORE the marker/token PATCH, so a retry after
+   a post-claim crash recognizes the Dataverse marker as its own and resumes
+   (correlation recovery, then safe re-mint — no activity exists) instead of
+   permanently stopping with a false "reminded" record and a dead link;
+   revive clears the claim because a re-invite severs ownership. The defer
+   refusal boundary moved from `dynamics_email_id` to `send_requested_at`:
+   an unsent draft activity still honors a later due-date extension. Two
+   accepted residuals: (a) a deferred-then-resumed draft is sent with its
+   originally rendered body, so a due date shown in the text can be stale
+   for that crash × config-drift window (the embedded token stays live —
+   TTL is due+grace or now+90; no Dynamics draft-update helper exists and
+   building one is not warranted for this window); (b) after a post-claim
+   crash, a manual nudge racing the retry can double-send — narrowed to the
+   pre-existing manual/cron race by `cancelScheduledEmailBySource`.
+   [RECHECKED after lib/services/reviewer-reminder-workflows.js change: marker-without-claim + owned-resume expiry skip 2026-08-27]
+   [RECHECKED after lib/services/scheduled-email-store.js change: recordScheduledEmailClaim added; deferSend boundary → send_requested_at; revive clears claim 2026-08-27]
+   [RECHECKED after lib/services/scheduled-email-service.js change: recordClaim stamped before buildActivityInput 2026-08-27]
 
 ## Rollout checklist (procedural guarantees)
 

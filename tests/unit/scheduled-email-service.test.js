@@ -57,6 +57,7 @@ function dependencies(base = message()) {
     })),
     mintForRequest: jest.fn(async () => ({ url: 'https://grantees.example.org/live-token' })),
     createEmailActivity: jest.fn(async () => withActivity.dynamics_email_id),
+    recordClaim: jest.fn(async (m) => ({ ...m, claim_committed_at: '2026-08-25T00:00:00.000Z' })),
     recordEmailActivity: jest.fn(async () => withActivity),
     recordSendRequested: jest.fn(async () => requested),
     sendEmail: jest.fn(async () => undefined),
@@ -449,11 +450,14 @@ describe('reviewer workflow dispatch', () => {
     expect(deps.sendEmail).not.toHaveBeenCalled();
   });
 
-  test('a REFUSED defer (transport already started) completes the existing send — no re-mint, no stranded lease', async () => {
-    const base = reviewerMessage({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+  test('a REFUSED defer (send actually requested) completes the existing send — no re-mint, no stranded lease', async () => {
+    const base = reviewerMessage({
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
     const deps = reviewerDeps(base);
     deps.claimSend = jest.fn(async () => ({ ...base, status: 'sending' }));
-    deps.deferSend = jest.fn(async () => null); // store refuses: activity exists
+    deps.deferSend = jest.fn(async () => null); // store refuses: send was requested
     strategy.checkEligibility.mockResolvedValue({ defer: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) });
 
     const result = await deliverScheduledEmail(base.id, {}, deps);
@@ -463,6 +467,21 @@ describe('reviewer workflow dispatch', () => {
     expect(strategy.buildActivityInput).not.toHaveBeenCalled();
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
     expect(deps.recordSent).toHaveBeenCalled();
+  });
+
+  test('a draft-only row (activity exists, send never requested) still honors a future defer', async () => {
+    const base = reviewerMessage({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    const deps = reviewerDeps(base);
+    deps.claimSend = jest.fn(async () => ({ ...base, status: 'sending' }));
+    const newAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    strategy.checkEligibility.mockResolvedValue({ defer: newAt });
+
+    const result = await deliverScheduledEmail(base.id, {}, deps);
+
+    expect(result.deferred).toBe(true);
+    expect(deps.deferSend).toHaveBeenCalledWith(expect.objectContaining({ id: base.id }), newAt);
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(deps.recordSendRequested).not.toHaveBeenCalled();
   });
 
   test('an unknown workflow_type records a retryable failure instead of stranding the claimed lease', async () => {
@@ -486,8 +505,10 @@ describe('reviewer workflow dispatch', () => {
     const result = await deliverScheduledEmail(base.id, {}, deps);
 
     expect(result.sent).toBe(true);
+    // Ownership is persisted BEFORE the strategy's external claim PATCH.
+    expect(deps.recordClaim).toHaveBeenCalledWith(expect.objectContaining({ id: base.id }));
     expect(strategy.buildActivityInput).toHaveBeenCalledWith(
-      expect.objectContaining({ id: base.id }), ctx,
+      expect.objectContaining({ id: base.id, claim_committed_at: expect.any(String) }), ctx,
     );
     expect(deps.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
       body: '<p>html-with-token</p>',
@@ -518,19 +539,37 @@ test('cancelScheduledEmailBySource refuses in-flight rows and held leases', () =
   expect(section).toContain('(locked_until IS NULL OR locked_until < NOW())');
 });
 
-test('deferScheduledEmailSend is lease-guarded and refuses transport-started rows', () => {
+test('deferScheduledEmailSend is lease-guarded and refuses only send-requested rows (a draft activity still defers)', () => {
   const store = fs.readFileSync(
     path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
     'utf8',
   );
   const section = store.slice(
     store.indexOf('export async function deferScheduledEmailSend'),
-    store.indexOf('export async function claimScheduledEmailSend'),
+    store.indexOf('export async function recordScheduledEmailClaim'),
   );
   expect(section).toContain('lease_token = ${message.lease_token}');
   expect(section).toContain("status = 'sending'");
-  expect(section).toContain('dynamics_email_id IS NULL');
+  // The transport boundary is the actual send request, NOT the draft
+  // activity: a row that crashed after creating its draft must still honor a
+  // later due-date extension instead of sending immediately on retry.
+  expect(section).toContain('send_requested_at IS NULL');
+  expect(section).not.toContain('dynamics_email_id IS NULL');
   expect(section).toContain("status = 'scheduled'");
+});
+
+test('recordScheduledEmailClaim is lease-guarded and keeps the first stamp', () => {
+  const store = fs.readFileSync(
+    path.join(process.cwd(), 'lib/services/scheduled-email-store.js'),
+    'utf8',
+  );
+  const section = store.slice(
+    store.indexOf('export async function recordScheduledEmailClaim'),
+    store.indexOf('export async function claimScheduledEmailSend'),
+  );
+  expect(section).toContain('claim_committed_at = COALESCE(claim_committed_at, NOW())');
+  expect(section).toContain('lease_token = ${message.lease_token}');
+  expect(section).toContain("status = 'sending'");
 });
 
 test('reviveStoppedScheduledEmail only resurrects stopped, never-transported, unleased rows', () => {
@@ -548,6 +587,9 @@ test('reviveStoppedScheduledEmail only resurrects stopped, never-transported, un
   expect(section).toContain('(locked_until IS NULL OR locked_until < NOW())');
   expect(section).toContain('approved_at = NULL');
   expect(section).toContain('version = version + 1');
+  // A re-invite resets the marker/token, severing the old claim's ownership —
+  // a revived row must not treat a later MANUAL marker as its own claim.
+  expect(section).toContain('claim_committed_at = NULL');
 });
 
 test('refreshUntouchedScheduledEmail defers to any PD touch and never refreshes posture', () => {

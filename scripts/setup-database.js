@@ -921,6 +921,7 @@ const v41Statements = [
     dynamics_statecode INTEGER,
     dynamics_statuscode INTEGER,
     dynamics_senton TIMESTAMPTZ,
+    claim_committed_at TIMESTAMPTZ,
     send_requested_at TIMESTAMPTZ,
     sent_at TIMESTAMPTZ,
     finalized_at TIMESTAMPTZ,

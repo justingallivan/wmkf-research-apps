@@ -237,8 +237,10 @@ email-activity/transport authority. Migration
 `036_scheduled_email_messages.sql` is mirrored in the fresh-install setup;
 `038_reviewer_reminder_ledger_workflows.sql` (branch
 `feature/reviewer-cron-reminders-ledger`, NOT yet applied to the shared
-database) extends the workflow CHECK and relaxes `deliverable_id` to
-nullable under a per-workflow shape constraint.
+database) extends the workflow CHECK, relaxes `deliverable_id` to
+nullable under a per-workflow shape constraint, and adds
+`claim_committed_at` (row-scoped claim ownership, stamped lease-guarded just
+before the reviewer marker/token PATCH; cleared on revive).
 **[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe). The decision-layer code merged to production 2026-08-26/27 (`4a743d63`); with all solicited abstracts received, no Invited deliverable exists, so no grantee rows accrue this cycle.]**
 
 Allowlisted workflows: `grantee_abstract_reminder` (source = the Invited
@@ -268,11 +270,16 @@ send-now is the only bypass. A due send dispatches a per-workflow
 strategy (`strategyFor` in `scheduled-email-service.js`): eligibility is
 freshly rechecked (grantee: deliverable still Invited; reviewer: the shared
 refusal predicates in `reviewer-reminder-eligibility.js`, live config, and a
-marker-without-transport guard) and may STOP the row, DEFER it to a
-recomputed send time (`deferScheduledEmailSend` — due-date extension or
-offset/lead drift; `force`/PD send-now overrides timing only), or proceed:
+marker-without-CLAIM guard: a Dataverse reminded-marker stops the row only
+when the row itself never stamped `claim_committed_at` — an owned marker
+means resume, not a manual sender's supersession) and may STOP the row,
+DEFER it to a recomputed send time (`deferScheduledEmailSend` — refusal
+boundary is `send_requested_at`, so an unsent draft activity still defers;
+due-date extension or offset/lead drift; `force`/PD send-now overrides
+timing only), or proceed:
 persist/reconcile one correlation-keyed Dynamics activity (reviewer
-workflows fuse the Dataverse marker + fresh-token claim into activity
+workflows persist `claim_committed_at`, then fuse the Dataverse marker +
+fresh-token claim into activity
 creation via one If-Match `mintAndStore` PATCH — claim-before-send), record
 transport acceptance, then finalize (grantee: `wmkf_granteedeliverable`
 status; reviewer: no-op — the marker landed pre-send). A separate pass

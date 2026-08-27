@@ -138,6 +138,40 @@ describe('checkEligibility (respond)', () => {
     expect(verdict.eligible).toBe(true);
   });
 
+  test('a marker on a row that CLAIMED (crash after the claim PATCH) resumes — the marker is our own, not a stop', async () => {
+    getSuggestionByIdWithSelect.mockResolvedValue(
+      suggestionRow({ wmkf_respondremindersentat: isoDaysAgo(1) }),
+    );
+    const verdict = await respond.checkEligibility(
+      message({ claim_committed_at: isoDaysAgo(1) }),
+    );
+    expect(verdict.eligible).toBe(true);
+  });
+
+  test('an owned claim resuming with an EXPIRED token still proceeds — the token is our own rotation and will be re-minted', async () => {
+    getSuggestionByIdWithSelect.mockResolvedValue(
+      suggestionRow({
+        wmkf_respondremindersentat: isoDaysAgo(1),
+        wmkf_externaltokenexpires: isoDaysAgo(1),
+      }),
+    );
+    const verdict = await respond.checkEligibility(
+      message({ claim_committed_at: isoDaysAgo(1) }),
+    );
+    expect(verdict.eligible).toBe(true);
+  });
+
+  test('an owned claim never overrides hard refusals — a declined reviewer stays stopped', async () => {
+    getSuggestionByIdWithSelect.mockResolvedValue(
+      suggestionRow({ wmkf_respondremindersentat: isoDaysAgo(1), wmkf_declined: true }),
+    );
+    const verdict = await respond.checkEligibility(
+      message({ claim_committed_at: isoDaysAgo(1) }),
+    );
+    expect(verdict.stop).toBe(true);
+    expect(verdict.reason).toBe('ineligible');
+  });
+
   test('reminder config off stops the row (the sweep revives it on re-enable)', async () => {
     getRequestById.mockResolvedValue(requestRow({ wmkf_respondreminderenabled: false }));
     const verdict = await respond.checkEligibility(message());

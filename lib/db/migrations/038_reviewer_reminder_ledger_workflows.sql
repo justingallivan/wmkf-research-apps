@@ -18,6 +18,13 @@ ALTER TABLE scheduled_email_messages
       'reviewer_reviewdue_reminder'
     ));
 
+-- Claim ownership: stamped (lease-guarded) just before the reviewer
+-- reminded-marker + token-rotation PATCH, so a retry after a post-claim crash
+-- can tell its own marker from a manual sender's instead of falsely stopping
+-- with 'already_reminded'. Cleared on revive (a re-invite resets the marker).
+ALTER TABLE scheduled_email_messages
+  ADD COLUMN claim_committed_at TIMESTAMPTZ;
+
 -- Grantee rows keep their deliverable; reviewer rows must not carry one.
 ALTER TABLE scheduled_email_messages
   ADD CONSTRAINT scheduled_email_deliverable_shape
