@@ -272,7 +272,11 @@ freshly rechecked (grantee: deliverable still Invited; reviewer: the shared
 refusal predicates in `reviewer-reminder-eligibility.js`, live config, and a
 marker-without-CLAIM guard: a Dataverse reminded-marker stops the row only
 when the row itself never stamped `claim_committed_at` — an owned marker
-means resume, not a manual sender's supersession) and may STOP the row,
+means resume, not a manual sender's supersession; the respond expiry
+exemption additionally requires the fresh marker as proof the claim PATCH
+landed; and before minting, the frozen recipient is revalidated against the
+reviewer's current email — mismatch fails closed to stop
+`recipient_changed`, healed by sweep revive) and may STOP the row,
 DEFER it to a recomputed send time (`deferScheduledEmailSend` — refusal
 boundary is `send_requested_at`, so an unsent draft activity still defers;
 due-date extension or offset/lead drift; `force`/PD send-now overrides

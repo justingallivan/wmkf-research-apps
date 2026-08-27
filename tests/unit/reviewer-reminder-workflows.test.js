@@ -19,6 +19,11 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   isExcluded: (row) => row.wmkf_applicantdisposition === 100000001,
 }));
 
+const getReviewerByIdWithSelect = jest.fn();
+jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
+  getByIdWithSelect: (...a) => getReviewerByIdWithSelect(...a),
+}));
+
 const {
   REVIEWER_REMINDER_STRATEGIES,
   REVIEWER_RESPOND_WORKFLOW,
@@ -103,6 +108,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   mintAndStore.mockResolvedValue({ url: 'https://reviews.example/external/review/jwt' });
   getSuggestionByIdWithSelect.mockResolvedValue(suggestionRow());
+  getReviewerByIdWithSelect.mockResolvedValue({
+    wmkf_potentialreviewersid: 'person-1',
+    wmkf_name: 'Dr. Reviewer',
+    wmkf_emailaddress: 'rev@example.org',
+  });
   getRequestById.mockResolvedValue(requestRow());
 });
 
@@ -148,7 +158,25 @@ describe('checkEligibility (respond)', () => {
     expect(verdict.eligible).toBe(true);
   });
 
-  test('an owned claim resuming with an EXPIRED token still proceeds — the token is our own rotation and will be re-minted', async () => {
+  test('a failed mint claim without a fresh marker does not arm the expired-token exemption', async () => {
+    getSuggestionByIdWithSelect.mockResolvedValue(
+      suggestionRow({ wmkf_externaltokenexpires: isoDaysAgo(1) }),
+    );
+    const verdict = await respond.checkEligibility(
+      message({ claim_committed_at: isoDaysAgo(1) }),
+    );
+    expect(verdict).toEqual({ stop: true, reason: 'token_expired' });
+  });
+
+  test('an expired-token claim resumes only when the fresh marker proves the rotation is ours', async () => {
+    getSuggestionByIdWithSelect.mockResolvedValue(
+      suggestionRow({ wmkf_externaltokenexpires: isoDaysAgo(1) }),
+    );
+    const unproved = await respond.checkEligibility(
+      message({ claim_committed_at: isoDaysAgo(1) }),
+    );
+    expect(unproved).toEqual({ stop: true, reason: 'token_expired' });
+
     getSuggestionByIdWithSelect.mockResolvedValue(
       suggestionRow({
         wmkf_respondremindersentat: isoDaysAgo(1),
@@ -159,6 +187,60 @@ describe('checkEligibility (respond)', () => {
       message({ claim_committed_at: isoDaysAgo(1) }),
     );
     expect(verdict.eligible).toBe(true);
+  });
+
+  test('a queued row stops when the reviewer current email differs from its frozen recipient', async () => {
+    getReviewerByIdWithSelect.mockResolvedValue({
+      wmkf_potentialreviewersid: 'person-1',
+      wmkf_emailaddress: 'corrected@example.org',
+    });
+    const verdict = await respond.checkEligibility(message());
+    expect(verdict).toEqual({ stop: true, reason: 'recipient_changed' });
+  });
+
+  test('recipient revalidation matches the frozen address case-insensitively', async () => {
+    getReviewerByIdWithSelect.mockResolvedValue({
+      wmkf_potentialreviewersid: 'person-1',
+      wmkf_emailaddress: 'REV@EXAMPLE.ORG',
+    });
+    const unchanged = await respond.checkEligibility(message());
+    expect(unchanged.eligible).toBe(true);
+    expect(getReviewerByIdWithSelect).toHaveBeenCalledWith('person-1', {
+      select: 'wmkf_potentialreviewersid,wmkf_name,wmkf_emailaddress',
+    });
+
+    const extraRecipient = await respond.checkEligibility(message({
+      to_recipients: ['rev@example.org', 'unexpected@example.org'],
+    }));
+    expect(extraRecipient).toEqual({ stop: true, reason: 'recipient_changed' });
+
+    getReviewerByIdWithSelect.mockResolvedValue({
+      wmkf_potentialreviewersid: 'person-1',
+      wmkf_emailaddress: 'different@example.org',
+    });
+    const changedControl = await respond.checkEligibility(message());
+    expect(changedControl).toEqual({ stop: true, reason: 'recipient_changed' });
+  });
+
+  test('a queued row fails closed when the reviewer current email is unresolvable', async () => {
+    getReviewerByIdWithSelect.mockResolvedValue(null);
+    const verdict = await respond.checkEligibility(message());
+    expect(verdict).toEqual({ stop: true, reason: 'recipient_changed' });
+  });
+
+  test('an existing Dynamics activity bypasses recipient revalidation without weakening the queued-row gate', async () => {
+    getReviewerByIdWithSelect.mockResolvedValue({
+      wmkf_potentialreviewersid: 'person-1',
+      wmkf_emailaddress: 'corrected@example.org',
+    });
+    const queued = await respond.checkEligibility(message());
+    expect(queued).toEqual({ stop: true, reason: 'recipient_changed' });
+
+    const existingActivity = await respond.checkEligibility(
+      message({ dynamics_email_id: 'act-1' }),
+    );
+    expect(existingActivity.eligible).toBe(true);
+    expect(getReviewerByIdWithSelect).toHaveBeenCalledTimes(1);
   });
 
   test('an owned claim never overrides hard refusals — a declined reviewer stays stopped', async () => {

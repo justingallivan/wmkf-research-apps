@@ -304,7 +304,21 @@ Decisions and build notes:
    building one is not warranted for this window); (b) after a post-claim
    crash, a manual nudge racing the retry can double-send — narrowed to the
    pre-existing manual/cron race by `cancelScheduledEmailBySource`.
-   [RECHECKED after lib/services/reviewer-reminder-workflows.js change: marker-without-claim + owned-resume expiry skip 2026-08-27]
+10. Send-time guards (2026-08-27, from the Codex re-review's two highs;
+    implemented by Codex rescue, reviewed by Claude): the respond
+    expiry exemption requires the fresh Dataverse marker as well as
+    `claim_committed_at` (marker + claim + no activity = the token is
+    provably our own rotation; a claim whose PATCH failed leaves the
+    original token governing). Before minting, delivery revalidates the
+    frozen recipient against the reviewer's current email
+    (`loadReminderReviewer`, shared with the sweeps) and fails closed to
+    stop reason `recipient_changed` — never substituting an address at
+    send time; the next sweep revives the stopped row with freshly
+    frozen recipients. Rows whose Dynamics activity already exists are
+    exempt (their recipients/content are fixed in the activity).
+   [RECHECKED after lib/services/reviewer-reminder-workflows.js change: marker-gated expiry exemption + recipient revalidation 2026-08-27]
+   [RECHECKED after lib/services/reviewer-reminder-eligibility.js change: loadReminderReviewer extracted from the sweep 2026-08-27]
+   [RECHECKED after lib/services/reviewer-reminder-sweep.js change: re-exports the shared resolver; sweep behavior unchanged 2026-08-27]
    [RECHECKED after lib/services/scheduled-email-store.js change: recordScheduledEmailClaim added; deferSend boundary → send_requested_at; revive clears claim 2026-08-27]
    [RECHECKED after lib/services/scheduled-email-service.js change: recordClaim stamped before buildActivityInput 2026-08-27]
 
