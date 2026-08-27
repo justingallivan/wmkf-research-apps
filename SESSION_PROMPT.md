@@ -115,12 +115,10 @@ build), `17333c78` (discriminating tests + catalog), `f138f0f2`/`4b971473`
 
 ### Verify Before Acting
 
-1. **Remove the three throwaway smoke candidates** (Test Homer, Francesco
-   Cisco, Justin Test2) from the owner's test request — they are stamped
-   Invited with locally-minted (prod-invalid) tokens. Preflight: confirm the
-   request with the owner and that no real workflow references those rows;
-   removal is a prod Dataverse write (works from the deployed app; local
-   needs a fresh same-day ack).
+(none — the throwaway smoke-candidate cleanup (Test Homer, Francesco Cisco,
+Justin Test2 on Request `1002788`) is owner-held as of 2026-08-27 S464: the
+owner will remove them personally via the app's "Remove entirely" flow; do
+not track or resurface.)
 
 ### Do Not Reopen Without New Decision
 
