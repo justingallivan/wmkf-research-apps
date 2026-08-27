@@ -101,8 +101,9 @@ their full verification loops:
    twice (stage-aware dispatch fix), merged to main `7bba2f8f`.
 3. **Later slices (owner-recorded direction, not yet planned).**
    Evidence: plan doc "Broader effort" section — per-PD per-email-type
-   preference matrix (blocked on the `wmkf_preferencevalue` MaxLength live
-   probe); async PD approval for staff-triggered "sent as me" mail.
+   preference matrix (UNBLOCKED S463: `wmkf_preferencevalue` is
+   Memo/100,000 — probe results below); async PD approval for
+   staff-triggered "sent as me" mail.
    Thank-yous stay on the direct path (owner decision S463). The cron
    reviewer-reminders slice itself is BUILT and PARKED (below).
 
@@ -147,9 +148,13 @@ their full verification loops:
    request with the owner and that no real workflow references those rows;
    removal is a prod Dataverse write (works from the deployed app; local
    needs a fresh same-day ack).
-2. **Open live probes** (both read-only): `wmkf_contact` population across
-   the 4,474 person rows; `wmkf_preferencevalue` MaxLength (blocks the
-   preference-matrix slice).
+2. **DONE S463 (2026-08-27, owner-authorized read-only probes):**
+   - `wmkf_potentialreviewerses`: 4,526 total rows (4,516 active); only
+     **183** have the `wmkf_contact` lookup set (all 183 on active rows) —
+     ~4% linkage, consistent with contact-on-acceptance-only.
+   - `wmkf_appuserpreference.wmkf_preferencevalue` is a **Memo, MaxLength
+     100,000** — the preference-matrix slice is UNBLOCKED (a per-email-type
+     JSON matrix fits with huge margin).
 
 ### Do Not Reopen Without New Decision
 
