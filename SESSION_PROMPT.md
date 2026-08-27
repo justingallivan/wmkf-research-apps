@@ -83,10 +83,8 @@ handoff commit.
 
 ### Owner Decision Needed
 
-1. **Who removed the phantom co-PI links?** (curiosity/record-keeping
-   only). Evidence: census 2026-08-27 found 0+0; no execution recorded
-   in-repo. If the owner knows (them or Connor), add one line to the
-   local incident record.
+(None. S465: the owner doesn't know who removed the phantom co-PI links;
+attribution closed as unknown in the local incident record.)
 
 ### Parked
 
