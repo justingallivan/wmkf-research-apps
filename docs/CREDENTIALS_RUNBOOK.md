@@ -104,7 +104,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DYNAMICS_CLIENT_ID` | CRM app registration ID | Azure Portal → separate app registration |
 | `DYNAMICS_CLIENT_SECRET` | CRM app secret | Azure Portal → same app → Certificates & secrets |
 | `DYNAMICS_SANDBOX_URL` | Sandbox CRM instance. ⚠️ NOT probe-only: four runtime services (`dataverse-settings-service`, `dataverse-identity-map`, `dataverse-app-access-service`, `grant-cycles-dataverse`) resolve `DYNAMICS_SANDBOX_URL \|\| DYNAMICS_URL`, so setting it repoints them | `https://orgd9e66399.crm.dynamics.com` (verified via Global Discovery probe S355 — the only sandbox instance visible to the app registration; the previously documented `wmkfsandbox.crm.dynamics.com` is not among them and is unrecognized by the interlock target registry) |
-| `DYNAMICS_IMPERSONATION_ENABLED` | Send `MSCRMCallerID` on user-driven Dynamics writes | Manual (`true` to enable) — off by default; see `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` |
+| `DYNAMICS_IMPERSONATION_ENABLED` | Send `MSCRMCallerID` on user-driven Dynamics writes | Manual — `true` in Production (verified S271; re-verified S466); unset/other values disable. See `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` |
 | `SHAREPOINT_SITE_URL` | SharePoint Graph base | e.g., `https://appriver3651007194.sharepoint.com/sites/akoyaGO` |
 
 ### Dataverse target/write interlock (enforced; see `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`)

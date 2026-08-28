@@ -68,6 +68,17 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   **Prod flipped 2026-07-04 (S330):** `DATAVERSE_DAL_ENFORCEMENT=on` set as an explicit
   Vercel production env var and redeployed (aliased `reviews.wmkeck.org`) — enforcement is
   live in ALL environments; initial runtime-log scan clean.
+- Write attribution: `DYNAMICS_IMPERSONATION_ENABLED=true` in Production
+  (verified S271; re-verified S466 by owner env pull), so user-driven writes
+  send `MSCRMCallerID` and land as the staff member — but only where the
+  staff security role has privileges: an impersonated write that 403s is
+  silently retried as the service principal
+  (`lib/services/dynamics/write-core.js` `_writeFetch`). S466 owner-run
+  census (`scripts/probe-write-attribution-census.js`): `wmkf_ai_run` rows
+  attribute to staff; `wmkf_requestdocument` rows all fell back — inferred
+  missing role privilege on that post-audit table (open item in
+  `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status). Don't read
+  service-principal `createdby` as "the app had no acting user."
   **This flag fails OPEN in production — the interlock does not (S414).** Only the
   literal `'on'` enables it; any *other* value (a stray quote, `'on\n'` from an
   `echo`-piped write) is neither `'on'` nor `'off'`, so it falls through to
