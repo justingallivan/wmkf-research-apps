@@ -233,6 +233,17 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
+- **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
+  Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
+  (`shared/components/workbench/StaffDeliberationsTab.js`, rail
+  Draft → Share → Wrap Up; legacy `pre-site-visit`/`site-visit` tab keys
+  alias in). Wrap Up derives from the server's per-source-document
+  `currentSourceEverSent`; the in-app logistics editor and calendar UI were
+  removed by owner decision (headless `useSiteVisitContext` +
+  ActivityParty fallback keep the composer fed). The production-proof
+  entries below describe the pre-merge two-tab UI; their document-lifecycle
+  guarantees are unchanged. Design record: the Site Visit Workspace
+  proposal artifact (link in `SESSION_PROMPT.md`).
 - **Production-proved Site Visit handoff (2026-08-21):** after exact owner
   approval, signed-in Request `1002379` moved the current Pre-Site Word
   workspace Draft→Review, kept the same SharePoint Edit/Download identity,

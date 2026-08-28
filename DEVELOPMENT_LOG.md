@@ -10,6 +10,26 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Staff Deliberations workspace ships; write-attribution state resolved (Session 466)
+
+**Milestone:** The Workbench's Pre Site Visit Writeup + Site Visit tabs were
+merged into one owner-designed, stage-aware **Staff Deliberations** tab
+(rail Draft → Share → Wrap Up) across six production releases in one day;
+the two-tab UI and the in-app logistics editor/calendar UI are retired
+(legacy tab keys alias in; document-lifecycle contracts unchanged).
+**Sessions:** 466 (design proposal → build → Codex reviews → prod).
+**Ship state:** merged tab + display labels + plain-language send history
+live; Wrap Up derives from a per-source-document server flag; Executor
+gained `timeoutMsOverride` (pre-site 240s) after a production timeout.
+**Why it matters:** also resolved a standing doc/state contradiction —
+`DYNAMICS_IMPERSONATION_ENABLED` has been `true` in prod since ~S271 and
+works, but `wmkf_requestdocument` writes fall back to the service principal
+(missing role privilege, inferred); the one remaining fix is a CRM grant
+(brief prepared for Connor, back ~09-10).
+**Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md` merge note;
+`docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status; commits
+`6a26b560`, `1e477d54`, `65e11975`, `db7be718`.
+
 ## August 2026 — Pre-Site generation resilience production-proved by signed-in smoke (Session 465)
 
 **Milestone:** The Pre-Site writeup resilience contract (deployed 08-18,

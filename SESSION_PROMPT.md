@@ -1,167 +1,161 @@
-# Session 466 Prompt: Writeup-Slice Smoke Closed; Quiet-Period Queue Continues
+# Session 467 Prompt: Staff Deliberations Workspace Live; UI/UX Follow-ups Queued
 
-## Session 465 Summary
+## Session 466 Summary
 
-Session 465 (2026-08-27) closed the top queue commitment — the writeup-slice
-signed-in generation smoke — and two small record-keeping items:
+Session 466 (2026-08-27→28) rebuilt the Workbench's site-visit UI end to end
+(six production releases), resolved the write-attribution question
+empirically, and fixed a production generation timeout.
 
-1. **Writeup-slice signed-in generation smoke PASSED** (owner-approved,
-   Request `1002852`, signed-in production Workbench via Claude-in-Chrome):
-   - **Ready-with-warning generation proven live**: a fresh governed
-     generation returned Ready with both durable editorial warnings
-     (`section_over_target` 720/700 chars; `long_form_over_target` 715/600
-     words) and a valid SharePoint Word file with full lineage.
-   - **Exact no-duplicate retry proven**: an owner-affirmed second unchanged
-     Regenerate left the durable state bit-identical (same
-     artifact/run/file/timestamp/version/eTag, no pending row).
-   - **Bonus — lost-POST recovery proven live**: the generation POST returned
-     a gateway 503 while completing durably; the Workbench recovered Ready
-     via bounded status polling without repeating POST.
-   - **Hard-failure case SKIPPED by owner decision** (writes a failed AI-run
-     row against a real request); remains proven by negative
-     service/route tests.
-   - Two surprises found and recorded: an **unrecorded owner-run 08-18 v4
-     generation** on 1002852, and an **unattributed prompt v5** (sole-current;
-     content-identical to the tracked contract per the runtime exact-match
-     preflight; owner does not recall publishing it).
-   - Evidence + all IDs: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md`
-     §Status. Reconciled across 12 files (queue row 2, lifecycle plan, schema
-     design, file model, near-term execution plan, service catalog, Atlas
-     prompt page, strategy-roadmap wiki, project memory).
-2. **Phantom co-PI attribution closed as unknown** — owner doesn't know who
-   removed the links; recorded in the local incident record; the Owner
-   Decision Needed queue is empty.
-3. **Process note (for honesty of the record):** the retry proof was briefly
-   asserted before the second click actually happened; caught via the tab's
-   network log (one POST only), corrected, and the real click + readback
-   landed before final docs. Evidence wording in the plan §Status reflects
-   exactly what was observed.
+### What Was Completed
+
+1. **Staff Deliberations workspace (owner-approved design → production).**
+   The Pre Site Visit Writeup + Site Visit tabs are merged into one
+   stage-aware tab (`shared/components/workbench/StaffDeliberationsTab.js`,
+   rail Draft → Share → Wrap Up; legacy tab keys alias in). Design settled in
+   the proposal artifact
+   (https://claude.ai/code/artifact/23f6be12-6362-460a-9c05-ca48d333d10b):
+   Share = existing guarded lock; Wrap Up = first accepted materials send
+   (server-derived `currentSourceEverSent`, scoped per source document);
+   "Move to Final Writeup" deliberately NOT built (open question 4b).
+   Shipped increments: history language split (Sent/Superseded/Failed +
+   "Send outcome unconfirmed" for ambiguous stale sends — Codex P2), GUID
+   and SharePoint-filename Details/tooltip disclosures everywhere, "Site
+   Visit materials" naming, logistics editor REMOVED (headless
+   `useSiteVisitContext` keeps composer suggestions; ActivityParty read
+   fallback covers Dynamics-scheduled visits — Codex P1), email history +
+   post-send composer collapsed, calendar (.ics) UI removed (server contract
+   intact), slim Wrap Up note, document display labels.
+2. **Write attribution resolved empirically.** Prod
+   `DYNAMICS_IMPERSONATION_ENABLED=true` since ~S271 (docs said deferred —
+   reconciled); owner-run census probe showed impersonation works
+   (`wmkf_ai_run` 22 staff-attributed) but ALL `wmkf_requestdocument` rows
+   fall back to the service principal — privilege-intersection signature on
+   the post-audit table. Fix = CRM role grant; brief for Connor prepared
+   (https://claude.ai/code/artifact/f8877f90-8559-482f-8fbc-ce00e239f947).
+   Access census: 8 staff hold `reviewers` (can trigger writes); superuser =
+   Justin + Connor only; all real staff have linked systemusers.
+3. **Executor timeout budget.** Production run `88f7c877` (Request 1002788)
+   hit the 120s LLM default; `executePrompt` gained server-owned
+   `timeoutMsOverride` (EXECUTOR_CONTRACT.md updated) and the pre-site
+   writeup caller uses 240s. Retry succeeded same day.
+4. **Record-keeping:** S465 optional-probe item closed (owner: don't
+   pursue); pilot observation row added for this session.
 
 ### Commits
 
-- `fe2801d9` — Close phantom co-PI attribution question (owner doesn't know)
-- `b1e89edc` — Record writeup-slice smoke PASSED; reconcile 12 files
-- `85bfa403` — Refine smoke evidence: retry proof basis + 503 lost-POST
-  recovery proof
+Main line (each feature branch Codex-reviewed where noted):
+- `5eb3a58c` skip optional Dataverse probe (owner decision)
+- `65e11975`/`ff84ff12` impersonation-state reconciliation + census probe
+- `bba3c015` access & identity census probe
+- `a9e3206b` Connor brief filed as waiting item
+- `a6b7746b` distribution language fixes S2/S3/S5 + Codex P2 guard
+- `6a26b560` Staff Deliberations merge (Phase 1) + Codex fixes
+- `1e477d54` declutter (logistics removed, history collapsed, party fallback)
+- `30cb5d90` composer trim (calendar UI out, material labels)
+- `7b66e9a8` Wrap Up composer collapse · `23138eb2` slim Wrap Up note
+- `db7be718` pre-site 240s LLM budget · `d5b5342f` document display labels
 
 ## Next Items
 
 ### Verified Open
 
-1. **PD onboarding / posture seeding — before the NEXT solicitation cycle,
-   no current deadline.** Evidence:
-   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist;
-   `approval_required` freezes once at row creation
-   (`grantee-deliverable-reminders-service.js`). If the preference matrix
-   ships first, one onboarding pass seeds both (plan §Rollout).
-2. **Async PD approval for staff-triggered "sent as me" mail** — the
-   remaining unplanned Broader-effort item (inventory #1/#7/#8/#11/#12
-   consent axis). Evidence: plan doc Broader effort;
-   `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` cross-cutting finding.
-   Plannable; forward-compatible with the matrix.
-3. **WAITING on Connor (out until ~2026-09-10): `wmkf_requestdocument`
-   staff-role privilege grant** so Workbench document writes attribute to
-   the acting staff member instead of the service principal. Brief prepared
-   for him (ask + evidence + admin-center steps):
-   https://claude.ai/code/artifact/f8877f90-8559-482f-8fbc-ce00e239f947 —
-   owner shares it on his return. After the grant, owner re-runs
-   `scripts/probe-write-attribution-census.js` (read-only) to confirm new
-   rows carry staff names. Context:
-   `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status (S466 census:
-   impersonation live in prod, this table is the gap).
+1. **UI/UX follow-ups on Staff Deliberations — owner says more to do
+   (S466 close).** Known queued items from the proposal artifact:
+   (a) limited add-addressees control for the composer (owner: "not every
+   board member"; shape to discuss — open question 5), (b) test-send
+   tagging in email history (Q2), (c) Phase 2 history grouping/day headers.
+   Owner will bring more; start by asking what they saw.
+2. **WAITING on Connor (out until ~2026-09-10): `wmkf_requestdocument`
+   staff-role privilege grant.** Brief ready to share (artifact link above);
+   after the grant, owner re-runs
+   `scripts/probe-write-attribution-census.js` to confirm staff attribution.
+   Context: `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status.
+3. **PD onboarding / posture seeding — before the NEXT solicitation cycle.**
+   Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist.
+4. **Async PD approval for staff-triggered "sent as me" mail.** Evidence:
+   plan doc Broader effort; `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`.
 
 ### Owner Decision Needed
 
-(None.)
+1. **Wrap Up → Final Writeup hand-off mechanics (proposal Q4b).** The
+   "Move to Final Writeup" action needs its receiving end defined (state/
+   milestone + how the Final Writeup tab consumes the doc) before it ships.
+2. **Share→Wrap Up no-send fallback (proposal Q4a):** manual "Move to
+   wrap-up" for visits whose materials go out off-app, or rail stays Share.
 
 ### Parked
 
 1. **Reviewer cron-reminders ledger slice — BUILT, HELD on
    `feature/reviewer-cron-reminders-ledger` until the review cycle ends.**
-   Commits `7c29fac7`..`059e51f9`; migration 038 UNAPPLIED everywhere.
-   Promotion sequence: (a) owner applies 038, (b) seed PD posture
-   (review-all on for all PDs is the safe default), (c) capture-mode local
-   smoke, (d) merge, (e) PD onboarding + tutorial. Mid-cycle merge without
-   (a) = reminder OUTAGE; without (b) = backlog freezes
-   `approval_required=false`. NOTE (S464): the apply→merge window no longer
-   emails drift alerts (warning-only), so don't rely on the alert as a
-   promotion reminder. Details: SESSION_PROMPT history +
-   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10 (branch copy).
-2. **Preference-matrix slice BUILD — owner-settled design, blocked by
-   ordering invariant.** Evidence: plan doc "Preference-matrix slice"
-   section (owner decisions 2026-08-27). Build only after Parked 1 merges;
-   both consumers must adopt `effectiveReviewAll` in the same change. Ask
-   the owner for UI label wording at build time.
-3. **PD tutorial refresh + distribution** — wait until the reminder slice is
-   finished/promoted (owner decision S463). Re-open trigger: promotion step
-   (e) of Parked 1. Artifact: "Email Autopilot for PDs"
-   (https://claude.ai/code/artifact/11586fac-9e0f-4784-833c-58bb4d0e118f).
-4. **Post-cycle invitation-link strictness (tighten vs ratify).** Evidence:
-   `docs/CURRENT_WORK_QUEUE.md` Audit follow-ups;
-   `project-invitation-link-strictness-open-decision.md`. Re-open trigger:
-   cycle end. Do not tighten or ratify silently.
+   Migration 038 UNAPPLIED everywhere. Promotion sequence in
+   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10 (branch copy);
+   apply→merge drift alerts are warning-only (S464).
+2. **Preference-matrix slice BUILD** — after Parked 1 merges; both consumers
+   adopt `effectiveReviewAll` together; ask owner for UI label wording.
+3. **PD tutorial refresh + distribution** — re-open at Parked 1 step (e).
+4. **Post-cycle invitation-link strictness (tighten vs ratify).** Trigger:
+   cycle end. `project-invitation-link-strictness-open-decision.md`.
 5. **Public git history rewrite** — owner-gated destructive step
-   (`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`); pending scope includes
-   the phantom incident record's 08-12→08-27 revisions and the stabilization
-   assessment's pre-redaction revisions (added S464). Content remains
-   visible in public history until executed.
+   (`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
+6. **Tier 2 send-path reorder** (recorded in `94012253` commit message):
+   reconcile prior transport outcome before the stale asserts in
+   `sendPreSiteDistribution` — fixes the ambiguity server-side that the
+   "Send outcome unconfirmed" UI now flags.
 
 ### Verify Before Acting
 
-1. **Phantom co-PI residuals (CRM-side cleanups)**: the `ab@ab.com` test
-   contact on request `1001931`, the corrupted-email duplicate contact pair,
-   the 1002788 test-byline trio across five requests, and 18/8 cross-store
-   drift rows. Evidence: local `outputs/phantom-copi-incident-2026-08-12.md`
-   §Update 2026-08-27. All are prod Dataverse writes — owner confirmation +
-   preflight re-probe first; Connor's importer fix remains the only
-   recurrence prevention.
+1. **Phantom co-PI residuals (CRM-side cleanups)**: `ab@ab.com` contact on
+   `1001931`, corrupted-email duplicate pair, 1002788 test-byline trio,
+   18/8 cross-store drift rows. Evidence: local
+   `outputs/phantom-copi-incident-2026-08-12.md` §Update 2026-08-27. Prod
+   Dataverse writes — owner confirmation + preflight re-probe first.
+2. **Logistics PATCH route has no in-app UI caller since S466** (editor
+   removed; `[VERIFIED via grep]`, Atlas wmkf_sitevisit page). If a future
+   session wants to retire the write route, re-grep callers first — the
+   service + validation are intentionally kept live.
 
 ### Do Not Reopen Without New Decision
 
-1. **Blanket per-PD review of all automated mail.** Plan doc owner
-   decision 10.
-2. **Reviewer flags keyed on contact.** S389 + Atlas; person-keying is
-   deliberate.
-3. **Write-permission asymmetry between flag stores.** Owner decision
-   2026-08-26 (route header + plan doc).
-4. **Merging the parked slice mid-cycle.** Owner decision S463; hazards in
-   Parked 1.
-5. **Throwaway smoke-candidate cleanup (Test Homer, Francesco Cisco, Justin
-   Test2 on Request `1002788`)** — owner-held S464: the owner removes them
-   personally via the app's "Remove entirely" flow. Do not track or
-   resurface.
-6. **A third "always auto, even for VIPs" preference level.** Owner decision
-   S464 (plan doc): two-state per type.
-7. **Re-running the 1002852 hard-failure smoke.** Owner decision S465: skip;
-   it stays proven by negative service/route tests. Reopen only if the owner
-   asks or the failure contract changes.
-8. **Optional owner-run Dataverse probe for the two smoke soft spots** (v5
-   publish attribution via `wmkf_ai_prompt` modifiedby/createdon; raw
-   envelope-v3 readback beyond the app-level status projection). Owner
-   decision S466 (2026-08-27): don't pursue. The resilience plan §Status
-   caveats remain accurate as recorded; reopen only if attribution ever
-   matters or the owner asks.
+1. **Blanket per-PD review of all automated mail.** Plan doc decision 10.
+2. **Reviewer flags keyed on contact.** S389 + Atlas; deliberate.
+3. **Write-permission asymmetry between flag stores.** Owner 2026-08-26.
+4. **Merging the parked reminders slice mid-cycle.** Owner S463.
+5. **Throwaway smoke-candidate cleanup on `1002788`** (Test Homer, Francesco
+   Cisco, Justin Test2) — owner removes personally.
+6. **Third "always auto" preference level.** Owner S464: two-state.
+7. **Re-running the 1002852 hard-failure smoke.** Owner S465.
+8. **Optional Dataverse probe for S465 smoke soft spots.** Owner S466:
+   don't pursue; reopen only if v5 attribution ever matters.
+9. **Separate Pre Site Visit / Site Visit tabs.** Owner-approved merge
+   shipped S466; legacy keys alias. Don't split back without a new decision.
+10. **Calendar (.ics) attachment UI.** Owner S466: unused, removed;
+    server contract intact if wanted again.
+11. **In-app Site Visit logistics editor.** Owner S466: scheduling is
+    handled by others in Dynamics; Workbench reads headlessly
+    (`useSiteVisitContext` + ActivityParty fallback).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` | Canonical smoke evidence (§Status: IDs, v5 discovery, 503 recovery proof, caveats) |
-| `docs/CURRENT_WORK_QUEUE.md` | Queue row 2 updated: smoke PASSED; partial-failure recovery + Editor Dashboard remain later |
-| `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` | Prompt v4→v5 history, smoke run IDs |
-| `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` | Canonical reminder/preference-matrix plan |
-| `outputs/phantom-copi-incident-2026-08-12.md` | LOCAL-ONLY incident record; attribution closed as unknown S465 |
-| `lib/services/pre-site-visit/artifact-service.js` | Generation dedup key + runtime prompt exact-match preflight (smoke's verification anchors) |
+| `shared/components/workbench/StaffDeliberationsTab.js` | Merged workspace: stage rail, generation, share modal, admin/reopen |
+| `shared/components/workbench/PreSiteDistributionPanel.js` | Materials composer + collapsed history; `collapsed` + `onHistory` props |
+| `shared/components/workbench/useSiteVisitContext.js` | Headless wmkf_sitevisit read feeding composer suggestions |
+| `lib/services/pre-site-visit/distribution-service.js` | `currentSourceEverSent` flag; `lastErrorCode` projection |
+| `lib/services/site-visit/logistics-service.js` | `refsFromParties` read fallback for Dynamics-scheduled visits |
+| `lib/services/execute-prompt.js` | `timeoutMsOverride` (EXECUTOR_CONTRACT.md table) |
+| `scripts/probe-write-attribution-census.js` | Owner-run createdby census (re-run after Connor's grant) |
+| `scripts/probe-access-and-identity-census.js` | Owner-run app-access + linked-identity census |
+| `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` | §Status: impersonation live; requestdocument grant remaining |
 
 ## Testing
 
 ```bash
-# Parked-slice suites (run on the branch):
-npx jest tests/unit/reviewer-reminder-workflows.test.js \
-  tests/unit/reviewer-reminder-sweep.test.js \
-  tests/unit/reviewer-manual-reminder.test.js \
-  tests/unit/scheduled-email-service.test.js \
-  tests/unit/scheduled-email-schema-parity.test.js
-# Migration-drift severity split:
-npx jest tests/unit/migration-drift.test.js
+npx jest tests/unit/staff-deliberations-tab.test.js \
+  tests/unit/pre-site-distribution-panel.test.js \
+  tests/unit/pre-site-distribution-service.test.js \
+  tests/unit/use-site-visit-context.test.js \
+  tests/unit/site-visit-logistics-service.test.js \
+  tests/unit/execute-prompt-payload-boundary.test.js
+npm run lint   # the merged-suite mock is lint-sensitive (react-hooks)
 ```
