@@ -57,6 +57,16 @@ test('recency prefers the decision date, falls back to the meeting date, and fai
   // a server-side `akoya_decisiondate desc` would have returned `older`; code-side recency does not
   expect(selectMostRecentProgramGrant([older, newestUndecided])).toBe(newestUndecided);
   expect(selectMostRecentProgramGrant([])).toBeNull();
+
+  // tie on the date: stable winner regardless of row order
+  const tieA = { akoya_requestnum: '1002001', akoya_requestid: 'aaaa', akoya_decisiondate: '2026-06-11' };
+  const tieB = { akoya_requestnum: '1002002', akoya_requestid: 'bbbb', akoya_decisiondate: '2026-06-11' };
+  expect(selectMostRecentProgramGrant([tieA, tieB])).toBe(tieB);
+  expect(selectMostRecentProgramGrant([tieB, tieA])).toBe(tieB);
+  const noNumA = { akoya_requestid: 'aaaa', akoya_decisiondate: '2026-06-11' };
+  const noNumB = { akoya_requestid: 'bbbb', akoya_decisiondate: '2026-06-11' };
+  expect(selectMostRecentProgramGrant([noNumA, noNumB])).toBe(noNumB);
+  expect(selectMostRecentProgramGrant([noNumB, noNumA])).toBe(noNumB);
   expect(() => selectMostRecentProgramGrant([older, { akoya_requestnum: '3' }])).toThrow(/1001|3.*ambiguous|ambiguous/);
 });
 
