@@ -430,6 +430,11 @@ route, and stable Word-link consumer. Request `1002379` then created Ready row
 `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the current request pointer. Exact
 Ready retry reused the same identities.
 
+[RECHECKED after lib/services/pre-site-visit/proposal-core-service.js change:
+S466 (2026-08-28) added a 240s `timeoutMsOverride` transport budget to this
+producer's Claude call; the verified posture claims below are otherwise
+unchanged.]
+
 The two named prompt surfaces do not currently have the same runtime posture:
 
 - **[VERIFIED via

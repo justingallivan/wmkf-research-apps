@@ -21,6 +21,13 @@ related:
 
 # Pre-Site Visit Generation Resilience Plan
 
+> [RECHECKED after lib/services/pre-site-visit/proposal-core-service.js
+> change: S466 (2026-08-28) raised this caller's Claude transport budget to
+> 240s (`timeoutMsOverride`, see `docs/EXECUTOR_CONTRACT.md`) after
+> production run `88f7c877` hit the 120s default on Request `1002788`; the
+> timeout landed in the durable failure contract exactly as this plan
+> specifies, and the attempt was retryable.]
+
 ## Status
 
 **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE

@@ -94,7 +94,7 @@ Add a "Reconcile now" button in the admin app that calls the same endpoint on de
 Direct API → DynamicsService writes plumb `actingUserSystemId` from `session.user.dynamicsSystemuserId`:
 - `lib/services/dynamics-service.js` — write helpers accept the option, conditionally adds `MSCRMCallerID`. Reads never carry it.
 - NextAuth: JWT/session loads `dynamics_systemuser_id` so `session.user.dynamicsSystemuserId` is available everywhere.
-- API endpoints wired: `phase-i-dynamics/summarize`, `phase-i-dynamics/summarize-v2`, `grant-reporting/extract`, `review-manager/send-emails`, `review-manager/mark-received-no-file`, `review-manager/upload-review`, `test-email`. Executor (`lib/services/execute-prompt.js`) accepts the kwarg.
+- API endpoints wired: `phase-i-dynamics/summarize`, `phase-i-dynamics/summarize-v2`, `grant-reporting/extract`, `review-manager/send-emails`, `review-manager/mark-received-no-file`, `review-manager/upload-review`, `test-email`. Executor (`lib/services/execute-prompt.js`) accepts the kwarg. [RECHECKED after lib/services/execute-prompt.js change: S466 added an unrelated optional timeoutMsOverride; the impersonation kwarg contract here is unchanged]
 - Intentionally null (unattended): `pages/api/cron/spend-check.js`, `pages/api/external/review/[token]/*`, `lib/external/token-lifecycle.js`, all PowerAutomate triggers.
 
 **Privilege-intersection safety (added Session 128 after Codex review):**
