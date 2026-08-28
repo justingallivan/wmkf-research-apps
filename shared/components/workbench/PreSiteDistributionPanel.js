@@ -105,7 +105,10 @@ export default function PreSiteDistributionPanel({
     if (sequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setHistoryError(null);
-    onHistory?.(body.attempts || []);
+    onHistory?.({
+      attempts: body.attempts || [],
+      currentSourceEverSent: body.currentSourceEverSent === true,
+    });
   }, [requestId, onHistory]);
 
   useEffect(() => {

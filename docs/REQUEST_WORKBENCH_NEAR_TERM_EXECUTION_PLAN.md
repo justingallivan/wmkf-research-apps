@@ -18,6 +18,15 @@ related:
 
 # Request Workbench — near-term execution plan
 
+> **UI merge (S466, 2026-08-28):** the former Pre Site Visit Writeup and Site
+> Visit tabs are now one **Staff Deliberations** tab
+> (`shared/components/workbench/StaffDeliberationsTab.js`, stage rail
+> Draft → Share → Wrap Up; old tab keys alias in). Mentions of the two
+> separate tabs below — including the Site Visit tab as dossier home —
+> describe the pre-merge UI; the dossier concerns (logistics, materials,
+> distribution) now live as sections of the merged tab. Document-lifecycle
+> decisions and route contracts in this plan are unchanged.
+
 ## Outcome
 
 Over the next few weeks, turn the Workbench from a mixture of mature reviewer

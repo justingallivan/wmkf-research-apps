@@ -15,16 +15,16 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 
 let distributionHistoryFeed = null;
-jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => ({
-  __esModule: true,
-  default: (props) => {
-    const { useEffect } = require('react');
+jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
+  const { useEffect } = require('react');
+  function MockDistributionPanel(props) {
     useEffect(() => {
       if (distributionHistoryFeed) props.onHistory?.(distributionHistoryFeed);
     }, [props]);
     return <div>Frozen distribution panel</div>;
-  },
-}));
+  }
+  return { __esModule: true, default: MockDistributionPanel };
+});
 jest.mock('../../shared/components/workbench/SiteVisitLogisticsPanel', () => ({
   __esModule: true,
   default: () => <div>Site Visit logistics panel</div>,
@@ -398,11 +398,11 @@ test('a shared document shows the working workspace with logistics and distribut
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
 });
 
-test('a transport-accepted send promotes the rail to Wrap Up with the final-writeup note', async () => {
-  distributionHistoryFeed = [
-    { operationId: 'op-1', transportAccepted: true },
-    { operationId: 'op-2', transportAccepted: false },
-  ];
+test('a transport-accepted send for the current document promotes the rail to Wrap Up', async () => {
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-1', transportAccepted: true }],
+    currentSourceEverSent: true,
+  };
   global.fetch.mockResolvedValueOnce(statusResponse({
     currentArtifact: readyArtifact(100000001),
   }));
@@ -414,6 +414,23 @@ test('a transport-accepted send promotes the rail to Wrap Up with the final-writ
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Wrap Up');
   // The hand-off into Final Writeup is deliberately not built yet (open question 4b).
   expect(screen.queryByRole('button', { name: /Move to Final Writeup/ })).not.toBeInTheDocument();
+});
+
+test('sends for a superseded source document do not promote the current document to Wrap Up', async () => {
+  // Server flag is authoritative: attempts exist (from the pre-reopen document)
+  // but none belong to the CURRENT source, so the rail stays in Share.
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-old', transportAccepted: true }],
+    currentSourceEverSent: false,
+  };
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: readyArtifact(100000001),
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
+
+  await screen.findByText('Working document:');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
+  expect(screen.queryByRole('heading', { name: 'Wrap Up' })).not.toBeInTheDocument();
 });
 
 // ── Fail-closed states (ported) ──────────────────────────────────────────────

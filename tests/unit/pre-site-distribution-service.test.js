@@ -602,8 +602,42 @@ test('history marks a retained distribution changed when the working Word versio
       wmkf_sharepointitemid: 'working-word',
     }] })),
     getFileMetadataById: jest.fn(async () => ({ versionId: '2.0' })),
+    hasSentAttemptForSource: jest.fn(async () => false),
   });
   expect(result.attempts[0].sourceFreshness).toBe('changed');
+  expect(result.currentSourceEverSent).toBe(false);
+});
+
+test('history derives currentSourceEverSent from the uncapped store check scoped to the current document', async () => {
+  const attempt = attemptFixture({ source_version_id: '1.0' });
+  const hasSentAttemptForSource = jest.fn(async () => true);
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => [attempt]),
+    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: attempt.source_document_id })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [{
+      wmkf_requestdocumentid: attempt.source_document_id,
+      wmkf_sharepointdriveid: 'drive',
+      wmkf_sharepointitemid: 'working-word',
+    }] })),
+    getFileMetadataById: jest.fn(async () => ({ versionId: '1.0' })),
+    hasSentAttemptForSource,
+  });
+  expect(hasSentAttemptForSource).toHaveBeenCalledWith(REQUEST_ID, attempt.source_document_id);
+  expect(result.currentSourceEverSent).toBe(true);
+});
+
+test('history reports currentSourceEverSent=false when no current document resolves', async () => {
+  const attempt = attemptFixture({ source_version_id: '1.0' });
+  const hasSentAttemptForSource = jest.fn(async () => true);
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => [attempt]),
+    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
+    getFileMetadataById: jest.fn(async () => null),
+    hasSentAttemptForSource,
+  });
+  expect(hasSentAttemptForSource).not.toHaveBeenCalled();
+  expect(result.currentSourceEverSent).toBe(false);
 });
 
 test('send accepts an unchanged linked material after PostgreSQL JSONB reorders its object keys', async () => {

@@ -139,7 +139,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const [reopenForm, setReopenForm] = useState(null);
   const [reopenError, setReopenError] = useState(null);
   const [logisticsContext, setLogisticsContext] = useState(null);
-  const [sendHistory, setSendHistory] = useState(EMPTY_LIST);
+  const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const generationSequence = useRef(0);
   const activeController = useRef(null);
   const cancelDialogButtonRef = useRef(null);
@@ -162,7 +162,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     setReopenForm(null);
     setReopenError(null);
     setLogisticsContext(null);
-    setSendHistory(EMPTY_LIST);
+    setCurrentSourceEverSent(false);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
@@ -365,7 +365,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const shared = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const draftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const beyondDeliberations = Boolean(artifact) && !draftReady && !shared;
-  const everSent = sendHistory.some((attempt) => attempt.transportAccepted);
+  // Server-derived (uncapped EXISTS, scoped to the current source document) so
+  // a superseded document's sends never promote its reopen successor and the
+  // display cap cannot regress the stage (Codex S466).
+  const everSent = currentSourceEverSent;
   const stage = shared
     ? (everSent ? 'wrap-up' : 'share')
     : readyFile && draftReady
@@ -374,8 +377,8 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const downloadUrl = downloadUrlFor(readyFile);
   const workingControlsAvailable = readyFile && (draftReady || shared);
 
-  const onDistributionHistory = useCallback((attempts) => {
-    setSendHistory(Array.isArray(attempts) ? attempts : EMPTY_LIST);
+  const onDistributionHistory = useCallback((historyInfo) => {
+    setCurrentSourceEverSent(historyInfo?.currentSourceEverSent === true);
   }, []);
 
   const startShare = async () => {
