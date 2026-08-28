@@ -407,7 +407,9 @@ test('a transport-accepted send for the current document promotes the rail to Wr
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
 
-  expect(await screen.findByRole('heading', { name: 'Wrap Up' })).toBeInTheDocument();
+  // Slim note, not a banner: a small chip + guidance under the working document.
+  expect(await screen.findByText('Materials sent')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Wrap Up' })).not.toBeInTheDocument();
   expect(screen.getByText(/starting draft for the final writeup/i)).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Share');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Wrap Up');
@@ -431,7 +433,7 @@ test('sends for a superseded source document do not promote the current document
 
   await screen.findByText('Working document:');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
-  expect(screen.queryByRole('heading', { name: 'Wrap Up' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Materials sent')).not.toBeInTheDocument();
 });
 
 // ── Fail-closed states (ported) ──────────────────────────────────────────────

@@ -721,14 +721,14 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                 </div>
               )}
               {everSent && (
-                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                  <h3 className="font-semibold text-green-900">Wrap Up</h3>
-                  <p className="mt-1 text-sm text-green-950">
-                    Materials have been sent. Fill in the site-visit sections (recommendation, referee
-                    comments, presentation, funding history) in the working document — it is the
-                    starting draft for the final writeup.
-                  </p>
-                </div>
+                <p className="mt-3 text-sm text-gray-700">
+                  <span className="mr-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    Materials sent
+                  </span>
+                  Fill in the site-visit sections (recommendation, referee comments, presentation,
+                  funding history) in the working document — it is the starting draft for the
+                  final writeup.
+                </p>
               )}
             </div>
           )}
