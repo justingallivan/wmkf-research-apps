@@ -293,7 +293,10 @@ export default function PreSiteDistributionPanel({
             </span>
           </label>
           {!siteVisit?.activityId && (
-            <p className="mt-1 text-xs text-amber-700">Complete and save Visit logistics above to include the calendar.</p>
+            <p className="mt-1 text-xs text-amber-700">
+              No scheduled Site Visit is on file for this request, so a calendar file can’t be
+              attached. Visits are scheduled in Dynamics.
+            </p>
           )}
           {materials.length > 0 && (
             <div className="mt-3 space-y-2">
@@ -457,7 +460,10 @@ export default function PreSiteDistributionPanel({
       </Card>
 
       <Card hover={false}>
-        <h3 className="text-base font-semibold text-gray-900">Email history</h3>
+        <details>
+          <summary className="cursor-pointer select-none text-base font-semibold text-gray-900">
+            Email history{history.length > 0 ? ` (${history.length})` : ''}
+          </summary>
         {historyError && <p className="mt-2 text-sm text-red-700">{historyError}</p>}
         {!historyError && history.length === 0 && (
           <p className="mt-2 text-sm text-gray-600">No email previews have been created for this request.</p>
@@ -516,6 +522,7 @@ export default function PreSiteDistributionPanel({
             })}
           </ul>
         )}
+        </details>
       </Card>
     </>
   );

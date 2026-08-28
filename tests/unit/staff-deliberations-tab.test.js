@@ -25,9 +25,10 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   }
   return { __esModule: true, default: MockDistributionPanel };
 });
-jest.mock('../../shared/components/workbench/SiteVisitLogisticsPanel', () => ({
+let siteVisitContextFeed = null;
+jest.mock('../../shared/components/workbench/useSiteVisitContext', () => ({
   __esModule: true,
-  default: () => <div>Site Visit logistics panel</div>,
+  default: () => siteVisitContextFeed,
 }));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -318,7 +319,6 @@ test('confirms the displayed artifact through the guarded route and enters the S
   ));
   expect(await screen.findByText('Working document:')).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
-  expect(screen.getByText('Site Visit logistics panel')).toBeInTheDocument();
   expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
@@ -393,7 +393,6 @@ test('a shared document shows the working workspace with logistics and distribut
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Draft');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
-  expect(screen.getByText('Site Visit logistics panel')).toBeInTheDocument();
   expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
 });
@@ -469,7 +468,7 @@ test('a shared artifact without a current Word URL fails closed with an explanat
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Generate Word Draft' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Site Visit logistics panel')).not.toBeInTheDocument();
+  expect(screen.queryByText('Frozen distribution panel')).not.toBeInTheDocument();
 });
 
 // ── Guarded reopen (ported from site-visit-tab; now in the admin section) ────

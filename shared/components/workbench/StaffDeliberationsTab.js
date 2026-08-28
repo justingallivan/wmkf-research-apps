@@ -14,8 +14,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
-import SiteVisitLogisticsPanel from './SiteVisitLogisticsPanel';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
+import useSiteVisitContext from './useSiteVisitContext';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -138,7 +138,6 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const [reopeningRequestId, setReopeningRequestId] = useState(null);
   const [reopenForm, setReopenForm] = useState(null);
   const [reopenError, setReopenError] = useState(null);
-  const [logisticsContext, setLogisticsContext] = useState(null);
   const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const generationSequence = useRef(0);
   const activeController = useRef(null);
@@ -161,7 +160,6 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     setShareError(null);
     setReopenForm(null);
     setReopenError(null);
-    setLogisticsContext(null);
     setCurrentSourceEverSent(false);
     const id = requestId;
     if (id) {
@@ -380,6 +378,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const onDistributionHistory = useCallback((historyInfo) => {
     setCurrentSourceEverSent(historyInfo?.currentSourceEverSent === true);
   }, []);
+
+  // Headless read of the wmkf_sitevisit Activity (maintained outside this
+  // workspace) feeding the composer's calendar/materials/suggestions.
+  const siteVisitContext = useSiteVisitContext(shared && readyFile ? requestId : null);
 
   const startShare = async () => {
     if (!requestId || !readyFile || !draftReady || startingShare) return;
@@ -757,24 +759,15 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
       </Card>
 
       {shared && readyFile && (
-        <SiteVisitLogisticsPanel
-          key={`logistics-${requestId}`}
-          requestId={requestId}
-          requestNumber={requestNumber}
-          onContext={setLogisticsContext}
-        />
-      )}
-
-      {shared && readyFile && (
         <PreSiteDistributionPanel
           key={`distribution-${requestId}`}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={artifact}
-          siteVisit={logisticsContext?.siteVisit || null}
-          materials={logisticsContext?.materials || EMPTY_LIST}
-          suggestedTo={logisticsContext?.suggestedTo || EMPTY_LIST}
-          suggestedCc={logisticsContext?.suggestedCc || EMPTY_LIST}
+          siteVisit={siteVisitContext?.siteVisit || null}
+          materials={siteVisitContext?.materials || EMPTY_LIST}
+          suggestedTo={siteVisitContext?.suggestedTo || EMPTY_LIST}
+          suggestedCc={siteVisitContext?.suggestedCc || EMPTY_LIST}
           onHistory={onDistributionHistory}
         />
       )}

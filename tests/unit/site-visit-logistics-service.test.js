@@ -195,6 +195,45 @@ test('returns only eligible ready non-superseded material links for the request'
   expect(result.siteVisit.startLocal).toBe('2026-09-15T09:00');
 });
 
+test('projects a Dynamics-scheduled visit without the app map via ActivityParty fallback', async () => {
+  // Scheduled directly in Dynamics (S466): no wmkf_attendeerefsjson, real parties.
+  const row = savedRow({
+    wmkf_attendeerefsjson: null,
+    wmkf_SiteVisit_activity_parties: [
+      { activitypartyid: 'p1', participationtypemask: 7, addressused: 'Organizer@wmkeck.org' },
+      { activitypartyid: 'p2', participationtypemask: 5, addressused: 'required@wmkeck.org' },
+      { activitypartyid: 'p3', participationtypemask: 6, addressused: 'optional@example.org' },
+      { activitypartyid: 'p4', participationtypemask: 5, addressused: null },
+    ],
+  });
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    findActiveByRequest: jest.fn(async () => ({ records: [row] })),
+  }));
+
+  expect(result.siteVisit.organizer).toEqual({ kind: 'manual', email: 'organizer@wmkeck.org' });
+  expect(result.siteVisit.requiredAttendees).toEqual([{ kind: 'manual', email: 'required@wmkeck.org' }]);
+  expect(result.siteVisit.optionalAttendees).toEqual([{ kind: 'manual', email: 'optional@example.org' }]);
+});
+
+test('still fails closed when neither the app map nor usable parties exist', async () => {
+  await expect(getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    findActiveByRequest: jest.fn(async () => ({ records: [savedRow({
+      wmkf_attendeerefsjson: null,
+      wmkf_SiteVisit_activity_parties: [],
+    })] })),
+  }))).rejects.toMatchObject({ code: 'site_visit_attendee_map_invalid' });
+
+  // A PRESENT-but-corrupt map keeps the strict contract even with parties.
+  await expect(getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    findActiveByRequest: jest.fn(async () => ({ records: [savedRow({
+      wmkf_attendeerefsjson: '{"version":99}',
+      wmkf_SiteVisit_activity_parties: [
+        { activitypartyid: 'p1', participationtypemask: 7, addressused: 'organizer@wmkeck.org' },
+      ],
+    })] })),
+  }))).rejects.toMatchObject({ code: 'site_visit_attendee_map_invalid' });
+});
+
 test('requires an active stage, mapped actor, and non-duplicated recipient emails', async () => {
   await expect(saveSiteVisitLogistics(input, { actingUserSystemId: null }, dependencies()))
     .rejects.toMatchObject({ code: 'site_visit_actor_required' });
