@@ -249,6 +249,16 @@ test('history renders superseded previews quietly, real failures red, and GUIDs 
         lastError: 'The persisted Dynamics email activity could not be found.',
         lastErrorCode: 'distribution_email_missing',
       },
+      {
+        // Stale code BUT a Dynamics activity exists: the earlier send may have
+        // transported before its outcome was lost — must NOT read as never-sent.
+        ...base,
+        operationId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        createdAt: '2026-08-25T09:00:00Z',
+        lastError: 'A linked Site Visit material changed after preview. Prepare a new exact preview.',
+        lastErrorCode: 'distribution_material_stale',
+        dynamicsEmailId: '33ce6346-d89f-f111-b8db-6045bd07a06d',
+      },
     ],
   }));
 
@@ -267,6 +277,12 @@ test('history renders superseded previews quietly, real failures red, and GUIDs 
   // The stale preview shows the quiet explanation, not the imperative error.
   expect(screen.getByText(/went stale before it was sent/)).toBeInTheDocument();
   expect(screen.queryByText(/Prepare a new exact preview/)).not.toBeInTheDocument();
+
+  // A stale attempt WITH a Dynamics activity is ambiguous, never "Superseded":
+  // the original email may have transported before its outcome was lost.
+  expect(screen.getByText('Send outcome unconfirmed')).toBeInTheDocument();
+  expect(screen.getByText(/original email may have gone out/)).toBeInTheDocument();
+  expect(screen.getAllByText('Superseded')).toHaveLength(1);
   // The genuine failure keeps its message.
   expect(screen.getByText(/could not be found/)).toBeInTheDocument();
 

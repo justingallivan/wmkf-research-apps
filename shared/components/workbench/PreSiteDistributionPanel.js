@@ -36,24 +36,32 @@ function downloadUrl(webUrl) {
 // Presentation split (S466): a preview whose send was refused because the
 // underlying source/materials/schedule changed is a dead draft, not a failure
 // demanding action — it renders as quiet "Superseded". Red is reserved for
-// sends that actually failed.
+// sends that actually failed. One guard (Codex S466): the email activity is
+// created only AFTER the staleness checks, so a stale-coded attempt WITHOUT a
+// Dynamics activity provably never reached Dynamics — but one WITH an activity
+// may have transported before its outcome was lost, and a later stale failure
+// overwrites that error code. Those render as "Send outcome unconfirmed" so
+// staff verify the activity before sending a new copy (duplicate-send risk).
 function attemptPresentation(attempt) {
   if (attempt.transportAccepted) {
-    return { label: 'Sent', pillClass: 'bg-green-100 text-green-800', superseded: false };
+    return { label: 'Sent', pillClass: 'bg-green-100 text-green-800', superseded: false, unconfirmed: false };
   }
   if (attempt.lastError) {
     if (STALE_PREVIEW_CODES.has(attempt.lastErrorCode)) {
-      return { label: 'Superseded', pillClass: 'bg-gray-100 text-gray-600', superseded: true };
+      if (attempt.dynamicsEmailId) {
+        return { label: 'Send outcome unconfirmed', pillClass: 'bg-amber-100 text-amber-800', superseded: false, unconfirmed: true };
+      }
+      return { label: 'Superseded', pillClass: 'bg-gray-100 text-gray-600', superseded: true, unconfirmed: false };
     }
-    return { label: 'Failed', pillClass: 'bg-red-100 text-red-800', superseded: false };
+    return { label: 'Failed', pillClass: 'bg-red-100 text-red-800', superseded: false, unconfirmed: false };
   }
   if (attempt.state === 'prepared') {
-    return { label: 'Preview ready — not sent', pillClass: 'bg-gray-100 text-gray-700', superseded: false };
+    return { label: 'Preview ready — not sent', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
   }
   if (attempt.state === 'preparing') {
-    return { label: 'Preparing', pillClass: 'bg-gray-100 text-gray-700', superseded: false };
+    return { label: 'Preparing', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
   }
-  return { label: 'Sending', pillClass: 'bg-gray-100 text-gray-700', superseded: false };
+  return { label: 'Sending', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
 }
 
 export default function PreSiteDistributionPanel({
@@ -480,7 +488,14 @@ export default function PreSiteDistributionPanel({
                       This preview went stale before it was sent — the visit details or materials changed.
                     </p>
                   )}
-                  {attempt.lastError && !presentation.superseded && (
+                  {presentation.unconfirmed && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      A send was started for this preview but its outcome was never confirmed, and the
+                      preview has since gone stale. Check the Dynamics activity under Details before
+                      sending a new copy — the original email may have gone out.
+                    </p>
+                  )}
+                  {attempt.lastError && !presentation.superseded && !presentation.unconfirmed && (
                     <p className="mt-1 text-red-700">{attempt.lastError}</p>
                   )}
                   {(attempt.dynamicsEmailId || attempt.sourceVersionId) && (
