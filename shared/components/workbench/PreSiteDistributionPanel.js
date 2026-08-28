@@ -9,6 +9,42 @@ const STALE_PREVIEW_CODES = new Set([
   'distribution_site_visit_stale',
   'distribution_preview_changed',
 ]);
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function localDayOrdinal(date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MILLISECONDS_PER_DAY;
+}
+
+function groupHistoryByDay(attempts) {
+  const groups = new Map();
+  attempts.forEach((attempt) => {
+    const date = new Date(attempt.createdAt);
+    const dayOrdinal = localDayOrdinal(date);
+    if (!groups.has(dayOrdinal)) {
+      groups.set(dayOrdinal, {
+        dayOrdinal,
+        date,
+        attempts: [],
+      });
+    }
+    groups.get(dayOrdinal).attempts.push(attempt);
+  });
+  return Array.from(groups.values()).sort((left, right) => right.dayOrdinal - left.dayOrdinal);
+}
+
+function historyDayLabel(date) {
+  const difference = localDayOrdinal(new Date()) - localDayOrdinal(date);
+  if (difference === 0) return 'Today';
+  if (difference === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function isTestSend(attempt) {
+  const from = attempt.from?.toLowerCase();
+  return Boolean(from && [...attempt.to, ...attempt.cc].every((address) => (
+    address.toLowerCase() === from
+  )));
+}
 
 function newOperationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -475,58 +511,74 @@ export default function PreSiteDistributionPanel({
           <p className="mt-2 text-sm text-gray-600">No email previews have been created for this request.</p>
         )}
         {history.length > 0 && (
-          <ul className="mt-3 space-y-3">
-            {history.map((attempt) => {
-              const presentation = attemptPresentation(attempt);
-              return (
-                <li key={attempt.operationId} className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-gray-900">{attempt.subject}</p>
-                      <p className="mt-1">To: {attempt.to.join(', ')}</p>
-                      {attempt.cc.length > 0 && <p>Cc: {attempt.cc.join(', ')}</p>}
-                    </div>
-                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${presentation.pillClass}`}>
-                      {presentation.label}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    {new Date(attempt.createdAt).toLocaleString()}
-                    {attempt.attachments.length > 0 ? ` · ${attempt.attachments.map((file) => file.kind.toUpperCase()).join(' + ')}` : ''}
-                    {attempt.materialLinks?.length > 0 ? ` · ${attempt.materialLinks.length} material link${attempt.materialLinks.length === 1 ? '' : 's'}` : ''}
-                  </p>
-                  {attempt.sourceFreshness === 'changed' && !presentation.superseded && (
-                    <p className="mt-1 text-xs font-medium text-amber-700">
-                      The working Word document has changed since this frozen preview.
-                    </p>
-                  )}
-                  {presentation.superseded && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      This preview went stale before it was sent — the visit details or materials changed.
-                    </p>
-                  )}
-                  {presentation.unconfirmed && (
-                    <p className="mt-1 text-xs font-medium text-amber-700">
-                      A send was started for this preview but its outcome was never confirmed, and the
-                      preview has since gone stale. Check the Dynamics activity under Details before
-                      sending a new copy — the original email may have gone out.
-                    </p>
-                  )}
-                  {attempt.lastError && !presentation.superseded && !presentation.unconfirmed && (
-                    <p className="mt-1 text-red-700">{attempt.lastError}</p>
-                  )}
-                  {(attempt.dynamicsEmailId || attempt.sourceVersionId) && (
-                    <details className="mt-1 text-xs text-gray-500">
-                      <summary className="cursor-pointer select-none">Details</summary>
-                      {attempt.dynamicsEmailId && <p className="mt-1">Dynamics activity: {attempt.dynamicsEmailId}</p>}
-                      {attempt.sourceVersionId && <p>Word version: {attempt.sourceVersionId}</p>}
-                      <p>Operation: {attempt.operationId}</p>
-                    </details>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mt-3 space-y-4">
+            {groupHistoryByDay(history).map((group) => (
+              <section key={group.dayOrdinal}>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {historyDayLabel(group.date)}
+                </h4>
+                <ul className="mt-2 space-y-3">
+                  {group.attempts.map((attempt) => {
+                    const presentation = attemptPresentation(attempt);
+                    return (
+                      <li key={attempt.operationId} className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-gray-900">{attempt.subject}</p>
+                            <p className="mt-1">To: {attempt.to.join(', ')}</p>
+                            {attempt.cc.length > 0 && <p>Cc: {attempt.cc.join(', ')}</p>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`rounded-full px-2 py-1 text-xs font-medium ${presentation.pillClass}`}>
+                              {presentation.label}
+                            </span>
+                            {isTestSend(attempt) && (
+                              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                                Test send
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          {new Date(attempt.createdAt).toLocaleString()}
+                          {attempt.attachments.length > 0 ? ` · ${attempt.attachments.map((file) => file.kind.toUpperCase()).join(' + ')}` : ''}
+                          {attempt.materialLinks?.length > 0 ? ` · ${attempt.materialLinks.length} material link${attempt.materialLinks.length === 1 ? '' : 's'}` : ''}
+                        </p>
+                        {attempt.sourceFreshness === 'changed' && !presentation.superseded && (
+                          <p className="mt-1 text-xs font-medium text-amber-700">
+                            The working Word document has changed since this frozen preview.
+                          </p>
+                        )}
+                        {presentation.superseded && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            This preview went stale before it was sent — the visit details or materials changed.
+                          </p>
+                        )}
+                        {presentation.unconfirmed && (
+                          <p className="mt-1 text-xs font-medium text-amber-700">
+                            A send was started for this preview but its outcome was never confirmed, and the
+                            preview has since gone stale. Check the Dynamics activity under Details before
+                            sending a new copy — the original email may have gone out.
+                          </p>
+                        )}
+                        {attempt.lastError && !presentation.superseded && !presentation.unconfirmed && (
+                          <p className="mt-1 text-red-700">{attempt.lastError}</p>
+                        )}
+                        {(attempt.dynamicsEmailId || attempt.sourceVersionId) && (
+                          <details className="mt-1 text-xs text-gray-500">
+                            <summary className="cursor-pointer select-none">Details</summary>
+                            {attempt.dynamicsEmailId && <p className="mt-1">Dynamics activity: {attempt.dynamicsEmailId}</p>}
+                            {attempt.sourceVersionId && <p>Word version: {attempt.sourceVersionId}</p>}
+                            <p>Operation: {attempt.operationId}</p>
+                          </details>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
         </details>
       </Card>
