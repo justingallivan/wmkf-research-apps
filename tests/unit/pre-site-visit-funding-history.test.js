@@ -43,6 +43,7 @@ test('reconcileProgramGrantRollups accepts agreement and rejects count or sum dr
   expect(reconcileProgramGrantRollups({ records, rollupCount: null, rollupSum: null })).toMatchObject({ ok: false });
   expect(reconcileProgramGrantRollups({ records: [], rollupCount: 0, rollupSum: 0 })).toEqual({ ok: true });
   expect(reconcileProgramGrantRollups({ records: [], rollupCount: null, rollupSum: null })).toEqual({ ok: true });
+  expect(reconcileProgramGrantRollups({ records: [], rollupCount: 0, rollupSum: 250000 })).toMatchObject({ ok: false, reason: expect.stringContaining('zero live rows') });
 });
 
 test('recency prefers the decision date, falls back to the meeting date, and fails on neither', () => {
