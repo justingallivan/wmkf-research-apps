@@ -58,11 +58,14 @@ fallback.
 
 ## Consumers
 
-- `SiteVisitLogisticsPanel` renders and saves separate local date/time controls,
-  a curated IANA-zone dropdown (US Pacific for a new visit), format,
-  location/link, organizer, attendees, and notes. The daylight-saving panel is
-  hidden; the UI consistently selects the earlier occurrence of a repeated
-  wall time while the server still rejects nonexistent local times.
+- `useSiteVisitContext` (`shared/components/workbench/useSiteVisitContext.js`)
+  is the Workbench's READ-ONLY consumer since S466: the logistics editor
+  (`SiteVisitLogisticsPanel`) was removed 2026-08-28 by owner decision —
+  visits are scheduled outside the Workbench, directly on this Activity. The
+  hook reads logistics + the recipient directory headlessly and derives the
+  composer's calendar/materials/suggested-recipient context. The write
+  routes (`/api/workbench/site-visit/logistics` POST) and their server-side
+  local-time validation remain live but currently have no in-app UI caller.
 - `recipient-directory-service.js` joins active WMKF profiles to enabled
   `systemusers` and reads Board/Consultant suggestions by immutable
   `expertise_roster.id` plus maintained `preferred_email`.

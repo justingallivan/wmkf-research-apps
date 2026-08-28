@@ -84,7 +84,7 @@ test('explains calendar and material-link choices in plain language', async () =
   expect(screen.getByLabelText(/Attach an add-to-calendar file \(.ics\)/i)).toBeDisabled();
   expect(screen.getByText(/saved organizer is included in To automatically.*does not request an RSVP/i))
     .toBeInTheDocument();
-  expect(screen.getByText('Complete and save Visit logistics above to include the calendar.'))
+  expect(screen.getByText(/No scheduled Site Visit is on file for this request/))
     .toBeInTheDocument();
   expect(screen.getByText('Include links to materials')).toBeInTheDocument();
 });
