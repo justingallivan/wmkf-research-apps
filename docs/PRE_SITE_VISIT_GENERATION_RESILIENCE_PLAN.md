@@ -57,9 +57,18 @@ via signed-in Workbench UI + authenticated status-API readback]`:
   `long_form_over_target` (715/600 words), valid SharePoint Word file
   (38,757 bytes, full siteId/driveId/itemId/versionId/eTag lineage),
   UI banner + Word link rendered.
-- **Exact no-duplicate retry (step 7 tail): PASSED.** A second unchanged
-  owner-click returned the identical artifact/run/file with no new model
-  call, no new file, unchanged SharePoint timestamp/version/eTag.
+- **Exact no-duplicate retry (step 7 tail): PASSED.** After the owner
+  affirmed performing a second unchanged Regenerate click, authenticated
+  readback showed the durable state bit-identical — same artifact/run/file,
+  unchanged SharePoint timestamp/version/eTag, no pending row — so the retry
+  created no new model call, file, or row. (Evidence is owner-affirmed action
+  + unchanged durable readback; the second click ran in the owner's own
+  browser tab, so its POST was not separately observed.)
+- **Bonus: lost-POST recovery path proven live.** The first regeneration's
+  POST returned a gateway 503 while the generation completed durably; the
+  Workbench recovered the Ready state through its bounded read-only status
+  polling without repeating POST — the exact behavior this plan's failure
+  contract specifies for handled failures after a claimed row exists.
 - **Hard source/template failure (step 6): SKIPPED by owner decision
   2026-08-27** — it writes a failed AI-run row against a real request and
   the owner chose not to spend one; it remains proven by the negative
