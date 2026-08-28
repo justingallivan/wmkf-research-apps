@@ -193,6 +193,9 @@ test('calls the governed prompt with ordered personnel and fail-closed safeguard
     runSource: 'Vercel Test',
     assertSystemIncludes: REQUIRED_SYSTEM_ASSERTIONS,
     requireNoPersistence: true,
+    // Extended transport budget for the suite's longest Claude call (S466,
+    // after production run 88f7c877 hit the 120s default).
+    timeoutMsOverride: 240_000,
   });
   const promptContext = JSON.parse(call.overrideVariables.request_context_json);
   expect(promptContext.personnel.map((person) => person.name)).toEqual([

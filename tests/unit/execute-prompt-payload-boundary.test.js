@@ -444,6 +444,28 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
     expect(runRow?.payload?.wmkf_ai_notes).toContain('unreviewed Claude model');
   });
 
+  test('timeoutMsOverride bounds the Claude transport for known-long callers (S466)', async () => {
+    const standardFetch = global.fetch;
+    // A fetch that never resolves on its own but honors the abort signal —
+    // only the LLMClient timeout can end this call.
+    global.fetch = jest.fn((url, init) => new Promise((resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(init.signal.reason || new Error('aborted'));
+      });
+    }));
+    try {
+      PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        timeoutMsOverride: 50,
+      })).rejects.toThrow(/timeout after 50ms/);
+    } finally {
+      global.fetch = standardFetch;
+    }
+  });
+
   test('cache-hit detection fires when the API reports cache_read tokens (re-shape preserved)', async () => {
     const standardFetch = global.fetch;
     global.fetch = jest.fn(async (url, init) => {
