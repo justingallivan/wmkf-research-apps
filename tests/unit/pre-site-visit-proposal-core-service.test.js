@@ -31,6 +31,22 @@ function requestFixture(overrides = {}) {
   };
 }
 
+// Eight program grants summing to the $9,150,000 rollup in the applicant fixture.
+function programGrantRows() {
+  const amounts = [1000000, 1000000, 1250000, 1000000, 1200000, 1500000, 1000000, 1200000];
+  return amounts.map((amount, index) => ({
+    akoya_requestid: `5555555${index}-5555-4555-8555-555555555555`,
+    akoya_requestnum: `100${1990 + index}`,
+    akoya_grant: amount,
+    akoya_decisiondate: index === 7 ? '2026-06-11T00:00:00Z' : `20${10 + index}-06-11T00:00:00Z`,
+    wmkf_meetingdate: index === 7 ? '2026-06-01' : `20${10 + index}-06-01`,
+    akoya_fiscalyear: index === 7 ? 'June 2026' : `June 20${10 + index}`,
+    wmkf_wmkfprojectdescription: index === 7
+      ? 'To develop chemical tools to restore the function of defective proteins.'
+      : `To do project ${index}.`,
+  }));
+}
+
 function dependencies(overrides = {}) {
   const proposalCore = {
     executiveSummary: 'Executive summary.',
@@ -52,13 +68,7 @@ function dependencies(overrides = {}) {
       wmkf_countofprogramgrants: 8,
       wmkf_sumofprogramgrants: 9150000,
     }),
-    getMostRecentProgramGrant: jest.fn().mockResolvedValue({
-      akoya_requestid: '55555555-5555-4555-8555-555555555555',
-      akoya_requestnum: '1001999',
-      akoya_fiscalyear: 'June 2026',
-      akoya_decisiondate: '2026-06-11T00:00:00Z',
-      wmkf_wmkfprojectdescription: 'To develop chemical tools to restore the function of defective proteins.',
-    }),
+    getProgramGrants: jest.fn().mockResolvedValue({ records: programGrantRows(), capped: false }),
     getCoPIs: jest.fn().mockResolvedValue(['Dr. First Co-PI', 'Dr. Second Co-PI']),
     getProposalNarrative: jest.fn().mockResolvedValue({
       filename: 'ProposalNarrative_1002379.pdf',
@@ -114,7 +124,7 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
       institutionalFundingHistory: 'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
     },
   });
-  expect(deps.getMostRecentProgramGrant).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
+  expect(deps.getProgramGrants).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
 });
 
 test('institutional funding history is excluded from the prompt context', () => {
@@ -169,7 +179,7 @@ test('fails closed when the applicant account read fails (funding history cannot
 test('fails closed when the program-grant query fails', async () => {
   const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   const deps = dependencies({
-    getMostRecentProgramGrant: jest.fn().mockRejectedValue(new Error('dataverse 503')),
+    getProgramGrants: jest.fn().mockRejectedValue(new Error('dataverse 503')),
   });
 
   await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
@@ -186,22 +196,69 @@ test('fails closed when the request has no applicant account', async () => {
     .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
 });
 
-test.each([0, null, undefined])(
-  'fails closed when the rollup count is %p but the live query finds a program grant',
-  async (count) => {
-    const deps = dependencies({
-      getApplicant: jest.fn().mockResolvedValue({
-        akoya_aka: 'Applicant U',
-        name: 'Applicant University',
-        wmkf_countofprogramgrants: count,
-        wmkf_sumofprogramgrants: 0,
-      }),
-    });
+function applicantWithRollups(count, sum) {
+  return jest.fn().mockResolvedValue({
+    akoya_aka: 'Applicant U',
+    name: 'Applicant University',
+    wmkf_countofprogramgrants: count,
+    wmkf_sumofprogramgrants: sum,
+  });
+}
 
-    await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
-      .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
-  },
-);
+test.each([
+  ['rollup count 0 / null while live rows exist', 0, 0],
+  ['rollup count null while live rows exist', null, null],
+  ['rollup count lags by one (stale but positive)', 7, 7950000],
+  ['rollup sum lags the live sum', 8, 8150000],
+])('fails closed when %s', async (_label, count, sum) => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const deps = dependencies({ getApplicant: applicantWithRollups(count, sum) });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
+
+test('fails closed when the program-grant query was capped', async () => {
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: programGrantRows(), capped: true }),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+});
+
+test('fails closed when a program grant has neither a decision date nor a meeting date', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const rows = programGrantRows();
+  rows[3] = { ...rows[3], akoya_decisiondate: null, wmkf_meetingdate: null };
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
+
+test('picks the newest grant by meeting date when its decision date is missing', async () => {
+  const rows = programGrantRows();
+  rows[7] = {
+    ...rows[7],
+    akoya_decisiondate: null,
+    akoya_fiscalyear: null,
+    wmkf_meetingdate: '2026-06-01',
+  };
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: rows.reverse(), capped: false }),
+  });
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.documentFields.institutionalFundingHistory).toBe(
+    'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+  );
+});
 
 test('renders the no-prior-award sentence when the account has no program grants', async () => {
   const deps = dependencies({
@@ -213,7 +270,7 @@ test('renders the no-prior-award sentence when the account has no program grants
       wmkf_countofprogramgrants: 0,
       wmkf_sumofprogramgrants: 0,
     }),
-    getMostRecentProgramGrant: jest.fn().mockResolvedValue(null),
+    getProgramGrants: jest.fn().mockResolvedValue({ records: [], capped: false }),
   });
 
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);

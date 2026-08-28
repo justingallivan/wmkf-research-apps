@@ -1,8 +1,11 @@
 import {
-  findMostRecentProgramGrant,
   formatAwardTotal,
   formatInstitutionalFundingHistory,
+  loadProgramGrants,
   programGrantFilter,
+  programGrantRecencyDate,
+  reconcileProgramGrantRollups,
+  selectMostRecentProgramGrant,
 } from '../../lib/services/pre-site-visit/funding-history';
 
 const APPLICANT_ID = '22222222-2222-4222-8222-222222222222';
@@ -14,20 +17,47 @@ test('program-grant filter mirrors the account rollup predicate', () => {
   expect(() => programGrantFilter('not-a-guid')).toThrow(/GUID/);
 });
 
-test('findMostRecentProgramGrant queries newest-by-decision-date and returns the first row or null', async () => {
-  const row = { akoya_requestid: 'x', akoya_fiscalyear: 'June 2026' };
-  const queryRequests = jest.fn().mockResolvedValue({ records: [row] });
-  await expect(findMostRecentProgramGrant(APPLICANT_ID, { queryRequests })).resolves.toBe(row);
-  expect(queryRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_wmkfprojectdescription',
+test('loadProgramGrants fetches every matching row with the rollup predicate and surfaces the cap', async () => {
+  const rows = [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }];
+  const queryAllRequests = jest.fn().mockResolvedValue({ records: rows, capped: false });
+  await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toEqual({ records: rows, capped: false });
+  expect(queryAllRequests).toHaveBeenCalledWith({
+    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,wmkf_wmkfprojectdescription',
     filter: programGrantFilter(APPLICANT_ID),
-    orderby: 'akoya_decisiondate desc',
-    top: 1,
   });
-  queryRequests.mockResolvedValue({ records: [] });
-  await expect(findMostRecentProgramGrant(APPLICANT_ID, { queryRequests })).resolves.toBeNull();
-  queryRequests.mockRejectedValue(new Error('503'));
-  await expect(findMostRecentProgramGrant(APPLICANT_ID, { queryRequests })).rejects.toThrow('503');
+  queryAllRequests.mockResolvedValue({ records: rows, capped: true });
+  await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toMatchObject({ capped: true });
+  queryAllRequests.mockRejectedValue(new Error('503'));
+  await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).rejects.toThrow('503');
+});
+
+test('reconcileProgramGrantRollups accepts agreement and rejects count or sum drift', () => {
+  const records = [{ akoya_grant: 1000000 }, { akoya_grant: 750000.5 }];
+  expect(reconcileProgramGrantRollups({ records, rollupCount: 2, rollupSum: 1750000.5 })).toEqual({ ok: true });
+  expect(reconcileProgramGrantRollups({ records, rollupCount: '2', rollupSum: '1750000.50' })).toEqual({ ok: true });
+  // stale-but-positive rollup (7 while live has 8): the Codex P1 case
+  expect(reconcileProgramGrantRollups({ records, rollupCount: 1, rollupSum: 1000000 })).toMatchObject({ ok: false, reason: expect.stringContaining('count') });
+  expect(reconcileProgramGrantRollups({ records, rollupCount: 2, rollupSum: 1000000 })).toMatchObject({ ok: false, reason: expect.stringContaining('sum') });
+  expect(reconcileProgramGrantRollups({ records, rollupCount: 2, rollupSum: null })).toMatchObject({ ok: false });
+  // zero rollup vs live rows, and the clean zero case
+  expect(reconcileProgramGrantRollups({ records, rollupCount: null, rollupSum: null })).toMatchObject({ ok: false });
+  expect(reconcileProgramGrantRollups({ records: [], rollupCount: 0, rollupSum: 0 })).toEqual({ ok: true });
+  expect(reconcileProgramGrantRollups({ records: [], rollupCount: null, rollupSum: null })).toEqual({ ok: true });
+});
+
+test('recency prefers the decision date, falls back to the meeting date, and fails on neither', () => {
+  expect(programGrantRecencyDate({ akoya_decisiondate: '2026-06-11T00:00:00Z', wmkf_meetingdate: '2020-01-01' }))
+    .toBe(Date.parse('2026-06-11T00:00:00Z'));
+  expect(programGrantRecencyDate({ akoya_decisiondate: null, wmkf_meetingdate: '2020-12-01' })).toBe(Date.parse('2020-12-01'));
+  expect(programGrantRecencyDate({ akoya_decisiondate: 'garbage', wmkf_meetingdate: null })).toBeNull();
+  expect(programGrantRecencyDate({})).toBeNull();
+
+  const older = { akoya_requestnum: '1', akoya_decisiondate: '2019-06-01' };
+  const newestUndecided = { akoya_requestnum: '2', akoya_decisiondate: null, wmkf_meetingdate: '2026-06-01' };
+  // a server-side `akoya_decisiondate desc` would have returned `older`; code-side recency does not
+  expect(selectMostRecentProgramGrant([older, newestUndecided])).toBe(newestUndecided);
+  expect(selectMostRecentProgramGrant([])).toBeNull();
+  expect(() => selectMostRecentProgramGrant([older, { akoya_requestnum: '3' }])).toThrow(/1001|3.*ambiguous|ambiguous/);
 });
 
 test.each([
