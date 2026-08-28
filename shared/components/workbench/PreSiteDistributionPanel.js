@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 
-const DEFAULT_BODY = 'Please find the Pre-Site Visit materials attached.';
+const DEFAULT_BODY = 'Please find the Site Visit materials attached.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -33,12 +33,35 @@ function downloadUrl(webUrl) {
   }
 }
 
-function stateLabel(attempt) {
-  if (attempt.transportAccepted) return 'Accepted by Dynamics';
-  if (attempt.lastError) return 'Needs retry';
-  if (attempt.state === 'prepared') return 'Prepared';
-  if (attempt.state === 'preparing') return 'Preparing';
-  return 'Sending';
+// Presentation split (S466): a preview whose send was refused because the
+// underlying source/materials/schedule changed is a dead draft, not a failure
+// demanding action — it renders as quiet "Superseded". Red is reserved for
+// sends that actually failed. One guard (Codex S466): the email activity is
+// created only AFTER the staleness checks, so a stale-coded attempt WITHOUT a
+// Dynamics activity provably never reached Dynamics — but one WITH an activity
+// may have transported before its outcome was lost, and a later stale failure
+// overwrites that error code. Those render as "Send outcome unconfirmed" so
+// staff verify the activity before sending a new copy (duplicate-send risk).
+function attemptPresentation(attempt) {
+  if (attempt.transportAccepted) {
+    return { label: 'Sent', pillClass: 'bg-green-100 text-green-800', superseded: false, unconfirmed: false };
+  }
+  if (attempt.lastError) {
+    if (STALE_PREVIEW_CODES.has(attempt.lastErrorCode)) {
+      if (attempt.dynamicsEmailId) {
+        return { label: 'Send outcome unconfirmed', pillClass: 'bg-amber-100 text-amber-800', superseded: false, unconfirmed: true };
+      }
+      return { label: 'Superseded', pillClass: 'bg-gray-100 text-gray-600', superseded: true, unconfirmed: false };
+    }
+    return { label: 'Failed', pillClass: 'bg-red-100 text-red-800', superseded: false, unconfirmed: false };
+  }
+  if (attempt.state === 'prepared') {
+    return { label: 'Preview ready — not sent', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
+  }
+  if (attempt.state === 'preparing') {
+    return { label: 'Preparing', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
+  }
+  return { label: 'Sending', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
 }
 
 export default function PreSiteDistributionPanel({
@@ -54,7 +77,7 @@ export default function PreSiteDistributionPanel({
     attachmentMode: 'pdf',
     to: '',
     cc: '',
-    subject: `Pre-Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
+    subject: `Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
     bodyText: DEFAULT_BODY,
     includeCalendar: false,
     siteVisitId: null,
@@ -214,7 +237,7 @@ export default function PreSiteDistributionPanel({
   return (
     <>
       <Card hover={false}>
-        <h3 className="text-base font-semibold text-gray-900">Send visit materials</h3>
+        <h3 className="text-base font-semibold text-gray-900">Send Site Visit materials</h3>
         <p className="mt-1 text-sm text-gray-600">
           Create a fixed preview, review the recipients and attachments, then send through Dynamics.
         </p>
@@ -283,7 +306,7 @@ export default function PreSiteDistributionPanel({
                     disabled={preparing || sending}
                     className="mt-0.5"
                   />
-                  <span>{material.filename} <span className="text-gray-500">— {material.artifactTypeLabel}</span></span>
+                  <span>{material.artifactTypeLabel} <span className="text-gray-500">— {material.filename}</span></span>
                 </label>
               ))}
             </div>
@@ -400,7 +423,7 @@ export default function PreSiteDistributionPanel({
             </dl>
             {preview.transportAccepted ? (
               <p className="mt-4 text-sm font-medium text-green-800">
-                Dynamics accepted this exact email for transport. This receipt does not assert inbox delivery.
+                Sent — Dynamics accepted this exact email for transport. This receipt does not assert inbox delivery.
               </p>
             ) : (
               <>
@@ -436,32 +459,56 @@ export default function PreSiteDistributionPanel({
         )}
         {history.length > 0 && (
           <ul className="mt-3 space-y-3">
-            {history.map((attempt) => (
-              <li key={attempt.operationId} className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-gray-900">{attempt.subject}</p>
-                    <p className="mt-1">To: {attempt.to.join(', ')}</p>
-                    {attempt.cc.length > 0 && <p>Cc: {attempt.cc.join(', ')}</p>}
+            {history.map((attempt) => {
+              const presentation = attemptPresentation(attempt);
+              return (
+                <li key={attempt.operationId} className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-gray-900">{attempt.subject}</p>
+                      <p className="mt-1">To: {attempt.to.join(', ')}</p>
+                      {attempt.cc.length > 0 && <p>Cc: {attempt.cc.join(', ')}</p>}
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${presentation.pillClass}`}>
+                      {presentation.label}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${attempt.transportAccepted ? 'bg-green-100 text-green-800' : attempt.lastError ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700'}`}>
-                    {stateLabel(attempt)}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  {new Date(attempt.createdAt).toLocaleString()}
-                  {attempt.attachments.length > 0 ? ` · ${attempt.attachments.map((file) => file.kind.toUpperCase()).join(' + ')}` : ''}
-                  {attempt.materialLinks?.length > 0 ? ` · ${attempt.materialLinks.length} material link${attempt.materialLinks.length === 1 ? '' : 's'}` : ''}
-                  {attempt.dynamicsEmailId ? ` · Dynamics ${attempt.dynamicsEmailId}` : ''}
-                </p>
-                {attempt.sourceFreshness === 'changed' && (
-                  <p className="mt-1 text-xs font-medium text-amber-700">
-                    The working Word document has changed since this frozen preview.
+                  <p className="mt-2 text-xs text-gray-500">
+                    {new Date(attempt.createdAt).toLocaleString()}
+                    {attempt.attachments.length > 0 ? ` · ${attempt.attachments.map((file) => file.kind.toUpperCase()).join(' + ')}` : ''}
+                    {attempt.materialLinks?.length > 0 ? ` · ${attempt.materialLinks.length} material link${attempt.materialLinks.length === 1 ? '' : 's'}` : ''}
                   </p>
-                )}
-                {attempt.lastError && <p className="mt-1 text-red-700">{attempt.lastError}</p>}
-              </li>
-            ))}
+                  {attempt.sourceFreshness === 'changed' && !presentation.superseded && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      The working Word document has changed since this frozen preview.
+                    </p>
+                  )}
+                  {presentation.superseded && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      This preview went stale before it was sent — the visit details or materials changed.
+                    </p>
+                  )}
+                  {presentation.unconfirmed && (
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                      A send was started for this preview but its outcome was never confirmed, and the
+                      preview has since gone stale. Check the Dynamics activity under Details before
+                      sending a new copy — the original email may have gone out.
+                    </p>
+                  )}
+                  {attempt.lastError && !presentation.superseded && !presentation.unconfirmed && (
+                    <p className="mt-1 text-red-700">{attempt.lastError}</p>
+                  )}
+                  {(attempt.dynamicsEmailId || attempt.sourceVersionId) && (
+                    <details className="mt-1 text-xs text-gray-500">
+                      <summary className="cursor-pointer select-none">Details</summary>
+                      {attempt.dynamicsEmailId && <p className="mt-1">Dynamics activity: {attempt.dynamicsEmailId}</p>}
+                      {attempt.sourceVersionId && <p>Word version: {attempt.sourceVersionId}</p>}
+                      <p>Operation: {attempt.operationId}</p>
+                    </details>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>

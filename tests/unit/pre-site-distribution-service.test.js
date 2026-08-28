@@ -581,6 +581,16 @@ test('projects only the selected attachment mode', () => {
   expect(projected.attachments.map((file) => file.kind)).toEqual(['pdf']);
 });
 
+test('projects the stored failure code so the UI can classify stale previews', () => {
+  const projected = projectDistributionAttempt(attemptFixture({
+    last_error_code: 'distribution_material_stale',
+    last_error_message: 'A linked Site Visit material changed after preview. Prepare a new exact preview.',
+  }));
+  expect(projected.lastErrorCode).toBe('distribution_material_stale');
+  expect(projected.lastError).toMatch(/changed after preview/);
+  expect(projectDistributionAttempt(attemptFixture()).lastErrorCode).toBeNull();
+});
+
 test('history marks a retained distribution changed when the working Word version advances', async () => {
   const attempt = attemptFixture({ source_version_id: '1.0' });
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
