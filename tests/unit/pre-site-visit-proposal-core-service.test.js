@@ -145,6 +145,8 @@ test.each(['  ', 'N/A', 'unknown'])(
         name: 'Applicant University',
         address1_city: 'Atlanta',
         address1_stateorprovince: 'Georgia',
+        wmkf_countofprogramgrants: 8,
+        wmkf_sumofprogramgrants: 9150000,
       }),
     });
     const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
@@ -184,6 +186,23 @@ test('fails closed when the request has no applicant account', async () => {
     .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
 });
 
+test.each([0, null, undefined])(
+  'fails closed when the rollup count is %p but the live query finds a program grant',
+  async (count) => {
+    const deps = dependencies({
+      getApplicant: jest.fn().mockResolvedValue({
+        akoya_aka: 'Applicant U',
+        name: 'Applicant University',
+        wmkf_countofprogramgrants: count,
+        wmkf_sumofprogramgrants: 0,
+      }),
+    });
+
+    await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+      .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+  },
+);
+
 test('renders the no-prior-award sentence when the account has no program grants', async () => {
   const deps = dependencies({
     getApplicant: jest.fn().mockResolvedValue({
@@ -210,6 +229,8 @@ test('fails closed when account and formatted applicant names are unusable even 
       name: 'unknown',
       address1_city: 'Atlanta',
       address1_stateorprovince: 'Georgia',
+      wmkf_countofprogramgrants: 8,
+      wmkf_sumofprogramgrants: 9150000,
     }),
     getRequest: jest.fn().mockResolvedValue(requestFixture({
       _akoya_applicantid_value_formatted: 'N/A',

@@ -53,7 +53,7 @@ test('matches the Power Automate template sentence', () => {
       description: 'To develop chemical tools to restore the function of defective proteins.',
     },
   })).toBe(
-    'Emory University has received 8 awards totaling $9.15 million from WMFK. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.'.replace('WMFK', 'WMKF'),
+    'Emory University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   );
 });
 
@@ -71,8 +71,14 @@ test('leaves acronym-led descriptions capitalized and omits missing parts', () =
     institutionName: 'Tech U',
     programGrantCount: 2,
     programGrantSum: 2000000,
-    mostRecentGrant: { awardedIn: null, description: 'NMR-guided design of enzymes' },
-  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF. The most recent grant was awarded NMR-guided design of enzymes.');
+    mostRecentGrant: { awardedIn: 'June 2021', description: 'NMR-guided design of enzymes' },
+  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF. The most recent grant was awarded in June 2021 NMR-guided design of enzymes.');
+  expect(formatInstitutionalFundingHistory({
+    institutionName: 'Tech U',
+    programGrantCount: 2,
+    programGrantSum: 2000000,
+    mostRecentGrant: { awardedIn: null, description: 'To build a telescope' },
+  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF.');
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Tech U',
     programGrantCount: 2,
