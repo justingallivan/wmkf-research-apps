@@ -314,6 +314,23 @@ test('reports loaded history and the server-derived sent flag through onHistory'
   }));
 });
 
+test('collapsed mode folds the composer behind a Send-materials-again disclosure', async () => {
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      collapsed
+    />,
+  );
+
+  expect(await screen.findByText('Send materials again')).toBeInTheDocument();
+  expect(screen.getByText(/already been sent/)).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Send Site Visit materials' })).not.toBeInTheDocument();
+  // The composer remains reachable inside the disclosure.
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
+});
+
 test('keeps non-stale send failures as errors', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

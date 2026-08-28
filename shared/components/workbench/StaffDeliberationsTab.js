@@ -769,6 +769,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
           suggestedTo={siteVisitContext?.suggestedTo || EMPTY_LIST}
           suggestedCc={siteVisitContext?.suggestedCc || EMPTY_LIST}
           onHistory={onDistributionHistory}
+          collapsed={everSent}
         />
       )}
 
