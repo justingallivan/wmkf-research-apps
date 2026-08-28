@@ -60,7 +60,7 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
     />,
   );
   expect(await screen.findByLabelText('Word document')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Send visit materials' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
   expect(screen.getByLabelText('PDF')).toBeChecked();
   expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
 });
@@ -219,6 +219,62 @@ test('turns a stale material response into a recoverable notice and requires a f
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
+});
+
+test('history renders superseded previews quietly, real failures red, and GUIDs behind Details', async () => {
+  const base = preparedAttempt('pdf');
+  const dynamicsId = '5b5018bc-9ca0-f111-b8dc-70a8a59cded0';
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [
+      {
+        ...base,
+        operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        state: 'sent',
+        transportAccepted: true,
+        createdAt: '2026-08-25T12:00:00Z',
+        dynamicsEmailId: dynamicsId,
+      },
+      {
+        ...base,
+        operationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        createdAt: '2026-08-25T11:00:00Z',
+        lastError: 'A linked Site Visit material changed after preview. Prepare a new exact preview.',
+        lastErrorCode: 'distribution_material_stale',
+      },
+      {
+        ...base,
+        operationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        createdAt: '2026-08-25T10:00:00Z',
+        lastError: 'The persisted Dynamics email activity could not be found.',
+        lastErrorCode: 'distribution_email_missing',
+      },
+    ],
+  }));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  expect(await screen.findByText('Sent')).toBeInTheDocument();
+  expect(screen.getByText('Superseded')).toBeInTheDocument();
+  expect(screen.getByText('Failed')).toBeInTheDocument();
+
+  // The stale preview shows the quiet explanation, not the imperative error.
+  expect(screen.getByText(/went stale before it was sent/)).toBeInTheDocument();
+  expect(screen.queryByText(/Prepare a new exact preview/)).not.toBeInTheDocument();
+  // The genuine failure keeps its message.
+  expect(screen.getByText(/could not be found/)).toBeInTheDocument();
+
+  // The Dynamics GUID appears only inside the Details disclosure.
+  const sentItem = screen.getByText('Sent').closest('li');
+  const details = sentItem.querySelector('details');
+  expect(details.textContent).toContain(dynamicsId);
+  expect(sentItem.textContent.replace(details.textContent, '')).not.toContain(dynamicsId);
 });
 
 test('keeps non-stale send failures as errors', async () => {
