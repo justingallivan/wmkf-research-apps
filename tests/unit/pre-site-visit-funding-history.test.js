@@ -5,6 +5,7 @@ import {
   programGrantFilter,
   programGrantRecencyDate,
   reconcileProgramGrantRollups,
+  researchProgramGrants,
   selectMostRecentProgramGrant,
 } from '../../lib/services/pre-site-visit/funding-history';
 
@@ -22,7 +23,7 @@ test('loadProgramGrants fetches every matching row with the rollup predicate and
   const queryAllRequests = jest.fn().mockResolvedValue({ records: rows, capped: false });
   await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toEqual({ records: rows, capped: false });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,wmkf_wmkfprojectdescription',
+    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
     filter: programGrantFilter(APPLICANT_ID),
   });
   queryAllRequests.mockResolvedValue({ records: rows, capped: true });
@@ -151,4 +152,24 @@ test('zero or missing count renders the no-prior-award sentence', () => {
 test('requires an institution name', () => {
   expect(() => formatInstitutionalFundingHistory({ institutionName: ' ', programGrantCount: 1, programGrantSum: 1 }))
     .toThrow(/institution name/);
+});
+
+test('researchProgramGrants keeps only Research-program rows by formatted label', () => {
+  const research = { akoya_requestnum: '1', _wmkf_grantprogram_value_formatted: 'Research' };
+  const socal = { akoya_requestnum: '2', _wmkf_grantprogram_value_formatted: 'Southern California' };
+  const unlabeled = { akoya_requestnum: '3' };
+  expect(researchProgramGrants([research, socal, unlabeled])).toEqual([research]);
+  expect(researchProgramGrants([])).toEqual([]);
+});
+
+test('qualifier wording marks a research grant that is not the newest program grant overall', () => {
+  const base = { institutionName: 'UCLA', programGrantCount: 31, programGrantSum: 25764182 };
+  expect(formatInstitutionalFundingHistory({
+    ...base,
+    mostRecentGrant: { awardedIn: 'June 2022', description: 'To image the brain', qualifier: 'research' },
+  })).toBe('UCLA has received 31 awards totaling $25.76 million from WMKF. The most recent research grant was awarded in June 2022 to image the brain.');
+  expect(formatInstitutionalFundingHistory({
+    ...base,
+    mostRecentGrant: { awardedIn: 'June 2022', description: 'To image the brain', qualifier: null },
+  })).toBe('UCLA has received 31 awards totaling $25.76 million from WMKF. The most recent grant was awarded in June 2022 to image the brain.');
 });

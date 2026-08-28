@@ -12,8 +12,8 @@
  * a mutating smoke on a real request.
  *
  * For each target account it prints: rollups vs live count/sum, the most
- * recent program grant (decision date, else meeting date; ambiguous if a row
- * has neither), and the exact sentence the writeup would render.
+ * recent RESEARCH program grant (decision date, else meeting date; ambiguous if
+ * any program grant has neither), and the exact sentence the writeup would render.
  *
  * Targets: CLI args may be request numbers (resolved to the applicant account)
  * or account AKA/names. With no args: Request 1002379's applicant, "Emory
@@ -44,7 +44,9 @@ if (fs.existsSync(envPath)) {
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACCOUNT_SELECT = 'accountid,name,akoya_aka,wmkf_countofprogramgrants,wmkf_sumofprogramgrants,wmkf_countofprogramgrants_date,wmkf_sumofprogramgrants_date,akoya_mostrecentgrant,akoya_countofawards,akoya_countofrequests';
-const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,wmkf_wmkfprojectdescription';
+const REQUEST_SELECT = 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,wmkf_meetingdate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription';
+const RESEARCH_LABEL = 'Research';
+const isResearch = (r) => String(r['_wmkf_grantprogram_value@OData.Community.Display.V1.FormattedValue'] || '').trim() === RESEARCH_LABEL;
 
 async function getToken() {
   const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
@@ -143,7 +145,8 @@ function sentence({ institutionName, programGrantCount, programGrantSum, mostRec
   const awardedIn = clean(mostRecentGrant?.awardedIn);
   if (!awardedIn) return first;
   const d = inlineDescription(mostRecentGrant?.description);
-  return `${first} The most recent grant was awarded in ${awardedIn}${d ? ` ${d}` : ''}.`;
+  const q = clean(mostRecentGrant?.qualifier);
+  return `${first} The most recent ${q ? `${q} ` : ''}grant was awarded in ${awardedIn}${d ? ` ${d}` : ''}.`;
 }
 // ── end replicated logic ──
 
@@ -196,7 +199,9 @@ async function resolveTargets(token, args) {
     console.log(`  live    : count=${rec.liveCount}  sum=${rec.liveSum}  (@odata.count=${live['@odata.count'] ?? '?'}; nextLink=${live['@odata.nextLink'] ? 'YES — paginated' : 'no'})`);
     console.log(`  other   : akoya_countofawards=${acct.akoya_countofawards ?? 'null'}  akoya_mostrecentgrant=${acct.akoya_mostrecentgrant || 'null'}`);
 
-    const { best, undated } = mostRecent(rows);
+    const { best: newestOverall, undated } = mostRecent(rows);
+    const { best } = mostRecent(rows.filter(isResearch));
+    const qualifier = best && newestOverall && best.akoya_requestid !== newestOverall.akoya_requestid ? 'research' : null;
     if (rec.ok) summary.agree += 1; else summary.disagree += 1;
     if (undated.length) summary.ambiguous += 1;
 
@@ -207,7 +212,7 @@ async function resolveTargets(token, args) {
       }
     }
     if (best) {
-      console.log(`  newest  : ${best.akoya_requestnum}  decision=${best.akoya_decisiondate || '-'}  meeting=${best.wmkf_meetingdate || '-'}  fy=${best.akoya_fiscalyear || '-'}  desc=${best.wmkf_wmkfprojectdescription ? `"${String(best.wmkf_wmkfprojectdescription).slice(0, 90)}"` : 'null'}`);
+      console.log(`  newest  : ${best.akoya_requestnum} (research${qualifier ? `; newest program grant overall is ${newestOverall.akoya_requestnum}` : ''})  decision=${best.akoya_decisiondate || '-'}  meeting=${best.wmkf_meetingdate || '-'}  fy=${best.akoya_fiscalyear || '-'}  desc=${best.wmkf_wmkfprojectdescription ? `"${String(best.wmkf_wmkfprojectdescription).slice(0, 90)}"` : 'null'}`);
     }
     const text = sentence({
       institutionName: name,
@@ -216,6 +221,7 @@ async function resolveTargets(token, args) {
       mostRecentGrant: best ? {
         awardedIn: clean(best.akoya_fiscalyear) || monthYear(best.akoya_decisiondate || best.wmkf_meetingdate),
         description: best.wmkf_wmkfprojectdescription,
+        qualifier,
       } : null,
     });
     const wouldRender = rec.ok && !undated.length && !live['@odata.nextLink'];

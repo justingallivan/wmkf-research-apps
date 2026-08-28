@@ -38,6 +38,8 @@ function programGrantRows() {
     akoya_requestid: `5555555${index}-5555-4555-8555-555555555555`,
     akoya_requestnum: `100${1990 + index}`,
     akoya_grant: amount,
+    _wmkf_grantprogram_value: 'c247b11a-0000-4000-8000-000000000000',
+    _wmkf_grantprogram_value_formatted: 'Research',
     akoya_decisiondate: index === 7 ? '2026-06-11T00:00:00Z' : `20${10 + index}-06-11T00:00:00Z`,
     wmkf_meetingdate: index === 7 ? '2026-06-01' : `20${10 + index}-06-01`,
     akoya_fiscalyear: index === 7 ? 'June 2026' : `June 20${10 + index}`,
@@ -239,6 +241,37 @@ test('fails closed when a program grant has neither a decision date nor a meetin
   await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
     .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
   warnSpy.mockRestore();
+});
+
+test('cites the newest research grant, qualified, when a newer non-research program grant exists', async () => {
+  const rows = programGrantRows();
+  rows[7] = {
+    ...rows[7],
+    _wmkf_grantprogram_value_formatted: 'Southern California',
+    wmkf_wmkfprojectdescription: 'To strengthen low-income families.',
+  };
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
+  });
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  // count/sum still cover all 8 program grants; the cited award is the newest Research one (row 6)
+  expect(result.context.documentFields.institutionalFundingHistory).toBe(
+    'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent research grant was awarded in June 2016 to do project 6.',
+  );
+});
+
+test('omits the second sentence when the institution has program grants but none in Research', async () => {
+  const rows = programGrantRows().map((row) => ({ ...row, _wmkf_grantprogram_value_formatted: 'Undergraduate Education' }));
+  const deps = dependencies({
+    getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
+  });
+
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.documentFields.institutionalFundingHistory)
+    .toBe('Applicant U has received 8 awards totaling $9.15 million from WMKF.');
 });
 
 test('picks the newest grant by meeting date when its decision date is missing', async () => {
