@@ -135,8 +135,10 @@ export default function PreSiteDistributionPanel({
       ...current,
       to: current.to.trim() ? current.to : suggestedTo.join(', '),
       cc: current.cc.trim() ? current.cc : suggestedCc.join(', '),
+      // Calendar attachments have no UI since S466 (owner: unused); the form
+      // pins the calendar off while the server contract stays intact.
       siteVisitId: siteVisit?.activityId || null,
-      includeCalendar: siteVisit?.activityId ? current.includeCalendar : false,
+      includeCalendar: false,
       selectedMaterialIds: current.selectedMaterialIds.filter((id) => (
         materials.some((material) => material.artifactId === id)
       )),
@@ -276,31 +278,10 @@ export default function PreSiteDistributionPanel({
           </div>
         </fieldset>
 
-        <fieldset className="mt-4">
-          <legend className="text-sm font-medium text-gray-800">Calendar and material links</legend>
-          <label className="mt-2 flex items-start gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={form.includeCalendar}
-              onChange={(event) => edit({ includeCalendar: event.target.checked })}
-              disabled={preparing || sending || !siteVisit?.activityId}
-              className="mt-0.5"
-            />
-            <span>
-              Attach an add-to-calendar file (.ics). Recipients can add the event to their calendars.
-              The saved organizer is included in To automatically. It does not request an RSVP,
-              and later changes will not update it automatically.
-            </span>
-          </label>
-          {!siteVisit?.activityId && (
-            <p className="mt-1 text-xs text-amber-700">
-              No scheduled Site Visit is on file for this request, so a calendar file can’t be
-              attached. Visits are scheduled in Dynamics.
-            </p>
-          )}
-          {materials.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium text-gray-800">Include links to materials</p>
+        {materials.length > 0 && (
+          <fieldset className="mt-4">
+            <legend className="text-sm font-medium text-gray-800">Include links to materials</legend>
+            <div className="mt-2 space-y-2">
               {materials.map((material) => (
                 <label key={material.artifactId} className="flex items-start gap-2 text-sm text-gray-700">
                   <input
@@ -314,12 +295,12 @@ export default function PreSiteDistributionPanel({
                     disabled={preparing || sending}
                     className="mt-0.5"
                   />
-                  <span>{material.artifactTypeLabel} <span className="text-gray-500">— {material.filename}</span></span>
+                  <span title={material.filename}>{material.artifactTypeLabel}</span>
                 </label>
               ))}
             </div>
-          )}
-        </fieldset>
+          </fieldset>
+        )}
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -422,7 +403,7 @@ export default function PreSiteDistributionPanel({
                   <dd className="mt-1">
                     <ul className="list-disc pl-5">
                       {preview.materialLinks.map((material) => (
-                        <li key={material.artifactId}>{material.filename} — {material.artifactTypeLabel}</li>
+                        <li key={material.artifactId} title={material.filename}>{material.artifactTypeLabel}</li>
                       ))}
                     </ul>
                   </dd>

@@ -65,7 +65,7 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
   expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
 });
 
-test('explains calendar and material-link choices in plain language', async () => {
+test('offers material links by display label with no calendar controls', async () => {
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -80,13 +80,14 @@ test('explains calendar and material-link choices in plain language', async () =
   );
 
   expect(await screen.findByRole('group', { name: 'Document attachment' })).toBeInTheDocument();
-  expect(screen.getByRole('group', { name: 'Calendar and material links' })).toBeInTheDocument();
-  expect(screen.getByLabelText(/Attach an add-to-calendar file \(.ics\)/i)).toBeDisabled();
-  expect(screen.getByText(/saved organizer is included in To automatically.*does not request an RSVP/i))
-    .toBeInTheDocument();
-  expect(screen.getByText(/No scheduled Site Visit is on file for this request/))
-    .toBeInTheDocument();
-  expect(screen.getByText('Include links to materials')).toBeInTheDocument();
+  // Calendar attachments have no UI (owner decision S466: unused).
+  expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Calendar and material links/)).not.toBeInTheDocument();
+  // Materials show the display label; the SharePoint filename stays in a tooltip.
+  expect(screen.getByRole('group', { name: 'Include links to materials' })).toBeInTheDocument();
+  const materialLabel = screen.getByText('Applicant Slides');
+  expect(materialLabel).toHaveAttribute('title', 'Applicant Slides.pdf');
+  expect(screen.queryByText(/Applicant Slides\.pdf/)).not.toBeInTheDocument();
 });
 
 test('binds the chosen mode into prepare and requires exact-preview confirmation before send', async () => {
