@@ -59,11 +59,6 @@ signed-in generation smoke — and two small record-keeping items:
    consent axis). Evidence: plan doc Broader effort;
    `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` cross-cutting finding.
    Plannable; forward-compatible with the matrix.
-3. **Optional owner-run Dataverse probe (S465 candidate, not committed):**
-   one read-only probe closes both smoke soft spots — v5 publish attribution
-   (`wmkf_ai_prompt` modifiedby/createdon) and raw envelope-v3 readback
-   (step 7 was verified at the app-readback level). Evidence: resilience
-   plan §Status caveats. Owner said neither yes nor no; ask before building.
 
 ### Owner Decision Needed
 
@@ -130,6 +125,12 @@ signed-in generation smoke — and two small record-keeping items:
 7. **Re-running the 1002852 hard-failure smoke.** Owner decision S465: skip;
    it stays proven by negative service/route tests. Reopen only if the owner
    asks or the failure contract changes.
+8. **Optional owner-run Dataverse probe for the two smoke soft spots** (v5
+   publish attribution via `wmkf_ai_prompt` modifiedby/createdon; raw
+   envelope-v3 readback beyond the app-level status projection). Owner
+   decision S466 (2026-08-27): don't pursue. The resilience plan §Status
+   caveats remain accurate as recorded; reopen only if attribution ever
+   matters or the owner asks.
 
 ## Key Files Reference
 
