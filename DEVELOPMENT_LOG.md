@@ -10,6 +10,23 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Pre-Site generation resilience production-proved by signed-in smoke (Session 465)
+
+**Milestone:** The Pre-Site writeup resilience contract (deployed 08-18,
+commit `46903bc4`) passed its owner-approved signed-in Production smoke on
+Request `1002852`: over-target narrative now ships as Ready with durable
+editorial warnings instead of hard-failing, an unchanged retry is exactly
+deduplicated, and a gateway-503 lost POST recovered durably via status
+polling.
+**Sessions:** 465 (deploy + prompt v4: pre-464 sessions).
+**Ship state:** generation + no-duplicate + lost-POST recovery proven live;
+hard-failure smoke skipped by owner decision (test-proven); prompt now
+sole-current v5 (unattributed content-identical republish, runtime-verified).
+**Why it matters:** closes the 08-16 Request 1002852 incident class — layout
+targets are editorial guidance, not availability gates.
+**Pointers:** `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status;
+commits `b1e89edc`, `85bfa403`.
+
 ## August 2026 — Personalized scheduled email + reviewer invitation VIP preview reached Production (Session 462)
 
 **Milestone:** Automated grantee abstract reminders now send automatically
