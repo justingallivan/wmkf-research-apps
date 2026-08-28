@@ -25,6 +25,7 @@ function documentFieldsFixture() {
     programDirector: 'Pat Director',
     invitedAmount: '$1,000,000',
     totalProjectBudget: '$3,500,000',
+    institutionalFundingHistory: 'Applicant University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   };
 }
 
@@ -91,10 +92,20 @@ test('fills split-run Dataverse and AI placeholders while retaining the template
   expect(xml).toContain('Applicant University');
   expect(xml).toContain('Atlanta, GA');
   expect(xml).toContain('executiveSummary test content.');
-  expect(xml).not.toMatch(/\[\[(?:DV|AI):(?!InstitutionalFundingHistory)/);
+  expect(xml).not.toMatch(/\[\[(?:DV|AI):/);
   expect(xml).toContain('[[STAFF:GraphicalAbstractImage]]');
   expect(xml).toContain('[[STAFF:GraphicalAbstractCaption]]');
-  expect(xml).toContain('[[AI:InstitutionalFundingHistory]]');
+  expect(xml).toContain('Institutional Funding History:Applicant University has received 8 awards totaling $9.15 million from WMKF.');
+});
+
+test('refuses to render without an institutional funding history sentence', async () => {
+  const fields = documentFieldsFixture();
+  delete fields.institutionalFundingHistory;
+  await expect(renderPreSiteVisitDocx({
+    documentFields: fields,
+    proposalCore: proposalCoreFixture(),
+    personnelNames: personnelNamesFixture(),
+  })).rejects.toThrow(/Institutional funding history is required/);
 });
 
 test('produces byte-identical DOCX output for identical inputs', async () => {

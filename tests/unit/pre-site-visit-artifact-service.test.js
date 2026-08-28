@@ -61,6 +61,7 @@ function inputFixture(overrides = {}) {
         programDirector: 'Pat Director',
         invitedAmount: '$1,000,000',
         totalProjectBudget: '$3,500,000',
+        institutionalFundingHistory: 'Applicant University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
       },
       ...overrides.context,
     },
@@ -625,6 +626,25 @@ test('schema-v2 proposal cores remain readable and derive available warnings', a
   ]));
   expect(status.currentArtifact.warnings)
     .not.toEqual(expect.arrayContaining([expect.objectContaining({ code: 'proposal_input_truncated' })]));
+});
+
+test('snapshot-v2 Ready documents surface the manual funding-history task; v3 documents do not', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+  const fresh = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(fresh.currentArtifact.warnings.map((warning) => warning.code)).not.toContain('funding_history_manual');
+
+  const snapshot = JSON.parse(harness.row.wmkf_presiteinputsnapshotjson);
+  delete snapshot.request.institutionalFundingHistory;
+  harness.row.wmkf_presiteinputsnapshotjson = JSON.stringify({ ...snapshot, schemaVersion: 2 });
+
+  const legacy = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(legacy.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'funding_history_manual',
+      message: expect.stringContaining('not filled automatically'),
+    }),
+  ]));
 });
 
 test('schema-v3 warnings project consistently on completion and Ready reuse', async () => {

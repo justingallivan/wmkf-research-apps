@@ -117,7 +117,7 @@ Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 | Canonical normalized proposal core, content-free diagnostics, and bounded input snapshot | Pre-Site `wmkf_requestdocument` JSON snapshot fields | Write-once render/audit evidence; raw provider output remains on the governed AI run |
 | Reviewer roster and review narrative | Submitted-review roster plus current `wmkf_reviewsynthesisjson` | Deterministically rendered at the selected evidence timestamp; no duplicate Pre-Site review store initially |
 | Graphical abstract image/caption and staff recommendation | The Word document | Manually pasted or entered by the PD |
-| Institutional funding history | Future governed AI result in Dataverse | Requires an approved Dataverse field and producer before automatic insertion |
+| Institutional funding history | Dataverse, rendered deterministically at generation (S467: account `wmkf_countofprogramgrants`/`wmkf_sumofprogramgrants` rollups + newest program-grant request; `lib/services/pre-site-visit/funding-history.js`) | Stored only in the v3 input snapshot and the rendered Word bytes, like the other DV fields; no LLM and no new Dataverse column |
 | Site Visit observations and later editorial prose | The current Word document | Direct staff edits; SharePoint native versions are authoritative |
 | Site Visit logistics | Dataverse | Separate bounded schema/adapter decision; do not hide these inside the Word file |
 | Slides, other applicant materials, recording, transcript, transcript summary | SharePoint bytes plus one `wmkf_requestdocument` row per file | Governed upload/registration and normal SharePoint version/recycle behavior |
@@ -181,8 +181,8 @@ version/hash captured when the action runs.
   recording, continued Word editing, and the regeneration lock before calling
   the shared guarded transition.
 - Identify manual Word tasks: graphical abstract image/caption and staff
-  recommendation. Institutional funding history remains visibly unavailable
-  until its governed Dataverse producer exists.
+  recommendation. Institutional funding history is filled at generation from
+  Dataverse (S467); it is no longer a manual placeholder.
 - If review evidence is included, show its as-of timestamp and submitted-review
   coverage so staff can choose a deliberate refresh rather than silently
   overwriting an edited document.
@@ -538,8 +538,12 @@ non-superseded lifecycle.
    reference map to the existing `wmkf_sitevisit` Activity. Sandbox and
    Production preflights report all four exact; no new relationship or status
    field was added.
-2. Define the Institutional Funding History result field, its governed prompt,
-   refresh semantics, and how it is incorporated into a new Pre-Site version.
+2. ~~Define the Institutional Funding History result field, its governed prompt,
+   refresh semantics, and how it is incorporated into a new Pre-Site version.~~
+   **Resolved S467 (2026-08-28) without a new field or prompt:** the sentence is
+   derived deterministically from Dataverse at generation time and travels in
+   the v3 input snapshot (so it participates in the generation key — a changed
+   award history yields a new draft on the next generation, never a silent edit).
 3. Decide whether Final needs any additional generated/structured fields. The
    minimum design copies Word and lineage only.
 4. Define Editor Dashboard Reviewed acknowledgements separately. They are not
