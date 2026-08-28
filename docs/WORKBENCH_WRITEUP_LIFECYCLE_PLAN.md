@@ -73,13 +73,17 @@ Ready retry reused those same identities. The 2026-08-23 post-reopen inventory
 is 10 Request Documents: three Initial Assessments and seven Pre Site Visits;
 nine are Ready, one Failed, six Draft, and four Superseded.
 
-**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]** The Pre-Site producer
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE
+SMOKES PASSED 2026-08-27.]** The Pre-Site producer
 now distinguishes editorial deviations from integrity failures: usable drafts
 reach Ready with durable edit-check warnings, while malformed, empty,
 placeholder-bearing, unreconciled, or authority/lineage-invalid content remains
-blocking. It preserves v2 reads and is paired with sole-current governed prompt
-v4; exact prompt readback and Ready deployment were verified without generating
-or changing a request artifact.
+blocking. It preserves v2 reads. The 2026-08-27 owner-approved smoke on
+Request `1002852` proved Ready-with-warning generation under sole-current
+prompt v5 (an unattributed content-identical republish of v4, verified by the
+runtime exact-match preflight) and the exact no-duplicate unchanged retry;
+the hard-failure smoke was skipped by owner decision and remains test-proven.
+Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 
 ## Evidence boundary
 

@@ -62,12 +62,13 @@ handoff commit.
 
 ### Verified Open
 
-1. **Queue item 2 — writeup-slice signed-in generation smoke** (top
-   commitment in `docs/CURRENT_WORK_QUEUE.md` Current sequence).
-   Evidence: queue row 2; deployment and prompt v4 verified there. Needs
-   explicit owner approval + a browser session: one Ready-with-warning
-   generation, one hard-failure case, then Dataverse
-   envelope/run/item/pointer + no-duplicate-retry verification.
+1. **DONE S465 (2026-08-27): writeup-slice signed-in generation smoke
+   PASSED.** Owner-approved, Request `1002852`: Ready-with-warning generation
+   under sole-current prompt v5 (unattributed content-identical republish of
+   v4 discovered during the smoke) + exact no-duplicate retry; hard-failure
+   case skipped by owner decision (stays test-proven). The smoke also
+   surfaced an unrecorded owner-run 08-18 v4 generation. Evidence:
+   `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 2. **PD onboarding / posture seeding — before the NEXT solicitation
    cycle, no current deadline.** Evidence:
    `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist;

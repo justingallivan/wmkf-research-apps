@@ -452,10 +452,13 @@ The two named prompt surfaces do not currently have the same runtime posture:
   Download, and confirmation-guarded Regenerate actions, while detailed
   workflow guidance is behind help. The current Admin-published prompt row owns the
   Claude model; callers cannot override it. **[DEPLOYED TO PRODUCTION 2026-08-18;
-  SIGNED-IN GENERATION SMOKE OPEN]** Dataverse sole-current prompt v4
-  `74409f95-509b-f111-b8db-6045bd008868` uses reviewed
-  `claude-sonnet-4-6` and exact-readback matches the tracked resilience
-  contract paired with Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4`.
+  SIGNED-IN GENERATION + NO-DUPLICATE SMOKES PASSED 2026-08-27]** Prompt v4
+  `74409f95-509b-f111-b8db-6045bd008868` (reviewed `claude-sonnet-4-6`,
+  exact-readback verified 2026-08-18) was later re-published as sole-current
+  v5 (unattributed, content-identical per the runtime exact-match preflight);
+  the 2026-08-27 Request `1002852` smoke proved Ready-with-warning generation
+  and exact no-duplicate retry on Ready deployment
+  `dpl_HGogbJnprevoYKLaxevamxdajtC4`.
   The first controlled v1 run completed but failed the
   document acceptance gate because summary overflow displaced the intended
   page starts. Version-preserving publication of tighter overview limits

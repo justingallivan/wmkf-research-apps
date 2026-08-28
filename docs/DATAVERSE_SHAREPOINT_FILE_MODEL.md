@@ -339,10 +339,13 @@ current Ready row. The route returns a registry DTO. Draft-state Pre-Site UI
 exposes its stable Word link; Production-deployed receipt hardening removes that
 link after Review and routes work through Site Visit instead. Request `1002379` exact Ready retry reused the same
 row/run/item without another model call or upload. **[DEPLOYED TO PRODUCTION
-2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]** sole-current prompt v4
-`74409f95-509b-f111-b8db-6045bd008868` on `claude-sonnet-4-6` exact-readback
-matches the tracked resilience contract paired with Ready deployment
-`dpl_HGogbJnprevoYKLaxevamxdajtC4`.
+2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE SMOKES PASSED 2026-08-27]**
+prompt v4 `74409f95-509b-f111-b8db-6045bd008868` was exact-readback verified
+2026-08-18 and later re-published as sole-current v5 (unattributed,
+content-identical per the runtime exact-match preflight); the 2026-08-27
+Request `1002852` smoke proved Ready-with-warning generation and exact
+no-duplicate retry on Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4`
+(see `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status).
 **[DEPLOYED TO PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the Workbench loads
 read-only current/pending status and uses bounded GET polling after a lost POST
 response without repeating POST. Production template v2 added

@@ -3,10 +3,10 @@ title: Pre-Site Visit Generation Resilience Plan
 domain: request-workbench
 kind: plan
 status: active
-summary: "Production-deployed Pre-Site resilience change with durable editorial warnings and preserved integrity gates; controlled generation smoke remains open."
+summary: "Production-deployed Pre-Site resilience change with durable warnings and preserved integrity gates; generation + no-duplicate smokes passed 2026-08-27."
 canonical: false
 cataloged: 2026-08-18
-last_verified: 2026-08-18
+last_verified: 2026-08-27
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -23,14 +23,48 @@ related:
 
 ## Status
 
-**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]**
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE
+SMOKES PASSED 2026-08-27.]**
 Application commit `46903bc4` is Ready in deployment
 `dpl_HGogbJnprevoYKLaxevamxdajtC4`. The audited Admin publisher created
 sole-current governed prompt v4 row
-`74409f95-509b-f111-b8db-6045bd008868`; exact readback matched the tracked
-body, system prompt, variables, complete output schema, model, temperature,
-and token budget with zero mismatches. No request generation or SharePoint
-write was performed during release verification.
+`74409f95-509b-f111-b8db-6045bd008868` on 2026-08-18; exact readback matched
+the tracked body, system prompt, variables, complete output schema, model,
+temperature, and token budget with zero mismatches. No request generation or
+SharePoint write was performed during release verification.
+
+**Smoke results (2026-08-27, owner-approved, Request `1002852`)** `[VERIFIED
+via signed-in Workbench UI + authenticated status-API readback]`:
+
+- The owner had already run one successful signed-in generation on
+  2026-08-18T23:36Z under prompt v4 (artifact
+  `ba0f767f-5d9b-f111-b8db-6045bd008868`, run
+  `ea2f6d9c-5d9b-f111-b8db-70a8a5ae4225`) — Ready with the two expected
+  durable warnings; it was never recorded until this smoke found it.
+- **Prompt v5 exists**: sometime after 2026-08-18T23:36Z the prompt was
+  re-published as sole-current v5. The republish is **unattributed** (the
+  owner does not recall doing it; check the Admin publisher audit trail if
+  attribution ever matters). Content is verified identical to the tracked
+  contract by the runtime exact-match preflight
+  (`artifact-service.js::validateNarrativePrompt`), which gated the
+  successful 2026-08-27 generation.
+- **Ready-with-warning generation (step 5): PASSED.** A signed-in owner-click
+  regeneration produced a fresh governed generation under prompt v5 (the
+  version bump legitimately changed the generation key; input fingerprint
+  unchanged `d2ca2726…`): artifact `c0a211b1-77a2-f111-b8db-70a8a5b16486`,
+  run `c3143de2-77a2-f111-b8db-6045bd0a1ac2`, template v7, warnings
+  `section_over_target` (executiveSummary 720/700 chars) and
+  `long_form_over_target` (715/600 words), valid SharePoint Word file
+  (38,757 bytes, full siteId/driveId/itemId/versionId/eTag lineage),
+  UI banner + Word link rendered.
+- **Exact no-duplicate retry (step 7 tail): PASSED.** A second unchanged
+  owner-click returned the identical artifact/run/file with no new model
+  call, no new file, unchanged SharePoint timestamp/version/eTag.
+- **Hard source/template failure (step 6): SKIPPED by owner decision
+  2026-08-27** — it writes a failed AI-run row against a real request and
+  the owner chose not to spend one; it remains proven by the negative
+  service/route tests in the verification matrix.
+- The historical 2026-08-16 failed row was not mutated.
 
 ## Owner decision and product boundary
 
@@ -272,9 +306,9 @@ Repeating the same prompt without new information is prohibited.
 
 ## Implementation sequence
 
-**Production status 2026-08-18:** Phases 0–5 are deployed and exact prompt-v4
-readback is verified. Phase 6 steps 1–4 are complete; controlled signed-in
-generation, hard-failure, and durable artifact readback smokes remain pending.
+**Production status 2026-08-27:** Phases 0–5 are deployed. Phase 6 steps 1–4
+completed 2026-08-18; steps 5 and 7 passed 2026-08-27 (see Status); step 6
+(hard-failure smoke) was skipped by owner decision and remains test-proven.
 
 ### Phase 0 — Pin the failure matrix
 
@@ -401,11 +435,17 @@ coordinated release window with no active Pre-Site generation:
    audited Admin publisher;
 4. **Completed 2026-08-18:** verify exact sole-current prompt state, schema
    equality, and Ready deployment identity;
-5. run a signed-in controlled request that intentionally exceeds one soft
-   target and confirm Ready-with-warning plus a valid Word link;
-6. confirm a hard source/template failure still returns no Ready artifact;
-7. verify Dataverse row, schema-version-3 envelope, AI run, SharePoint item,
-   current pointer, warnings, and no duplicate retry; and
+5. **Passed 2026-08-27:** run a signed-in controlled request that
+   intentionally exceeds one soft target and confirm Ready-with-warning plus
+   a valid Word link (Request `1002852`; see Status for artifact/run IDs);
+6. **Skipped by owner decision 2026-08-27** (remains proven by negative
+   service/route tests): confirm a hard source/template failure still
+   returns no Ready artifact;
+7. **Passed 2026-08-27 at the app-readback level:** current pointer, run
+   provenance, warnings, SharePoint lineage, and exact no-duplicate retry
+   verified via the authenticated status API; raw Dataverse row/envelope-v3
+   inspection was not separately performed (the app's status projection is
+   itself a server-side Dataverse read); and
 8. stop generation immediately if any red gate fails.
 
 Application and prompt rollback are a paired operational action, never
@@ -419,7 +459,8 @@ failed row.
 
 Do not use an invitation-bound request for destructive or repeated testing.
 Request `1002852` may be retried only after the new prompt and render identities
-are confirmed, and only with owner approval.
+are confirmed, and only with owner approval. (Exercised with owner approval
+2026-08-18 and 2026-08-27; see Status.)
 
 ## Verification matrix
 

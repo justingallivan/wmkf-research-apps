@@ -93,11 +93,14 @@ Signed-in Request `1002379` created Ready/Draft row
 `ba0f42b9-849a-f111-b8db-6045bd008868`, the then-current request pointer, and stable Word
 item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`. Its input manifest contains only
 the Proposal Narrative; exact Ready retry reused the same identities.
-**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN]**
-Application commit `46903bc4` is paired with sole-current prompt v4
-`74409f95-509b-f111-b8db-6045bd008868`; exact readback matched the tracked
-body, system prompt, variables, output schema, model, temperature, and token
-budget. Release verification generated no request artifact. The first long client request displayed
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE
+SMOKES PASSED 2026-08-27]**
+Application commit `46903bc4` shipped with prompt v4
+`74409f95-509b-f111-b8db-6045bd008868` (exact readback verified 2026-08-18);
+the prompt was later re-published as sole-current v5 (unattributed,
+content-identical per the runtime exact-match preflight). The 2026-08-27
+Request `1002852` smoke proved Ready-with-warning generation and exact
+no-duplicate retry; hard-failure smoke skipped by owner decision. The first long client request displayed
 `Failed to fetch` after durable completion. **[DEPLOYED TO PRODUCTION
 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the route exposes read-only
 current/pending status, and the

@@ -1,7 +1,11 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-08-18 for the Production-live admin publish/model/schema
-contract, sole-current `pre-site-visit.proposal-core.generate` v4 exact readback, completed
+**Last verified:** 2026-08-27 for sole-current
+`pre-site-visit.proposal-core.generate` v5 (unattributed content-identical
+republish of v4; runtime exact-match preflight passed during the governed
+Request `1002852` smoke generation, run
+`c3143de2-77a2-f111-b8db-6045bd0a1ac2`); 2026-08-18 for the Production-live admin publish/model/schema
+contract, then-sole-current `pre-site-visit.proposal-core.generate` v4 exact readback, completed
 governed Request `1002379` v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`,
 the earlier governed runs/direct QA, and 24 prompt rows;
 2026-07-30 for governed `initial-assessment.generate` v1 production
@@ -122,7 +126,19 @@ Migration plans touching either entity must preserve these foreign keys.
   row and matched the tracked body, system prompt, variables, complete output
   schema, `claude-sonnet-4-6`, temperature `0.3`, and token budget `16384` with
   zero mismatches. No request generation or SharePoint write was used for this
-  release verification; the controlled signed-in generation smoke remains open.
+  release verification.
+  **[VERIFIED IN PRODUCTION 2026-08-27]** The prompt was later re-published as
+  sole-current **v5** — unattributed (the owner does not recall doing it;
+  Admin publisher audit trail unchecked), content-identical to the tracked
+  contract per the runtime exact-match preflight. The owner-approved signed-in
+  smoke on Request `1002852` closed the generation proof: an 08-18 owner-run
+  v4 generation (run `ea2f6d9c-5d9b-f111-b8db-70a8a5ae4225`) plus a fresh
+  2026-08-27 v5 generation (artifact `c0a211b1-77a2-f111-b8db-70a8a5b16486`,
+  run `c3143de2-77a2-f111-b8db-6045bd0a1ac2`) both reached Ready with the two
+  durable editorial warnings, and an unchanged second retry returned the
+  identical artifact/run/file (exact no-duplicate). The prompt-version bump
+  correctly changed the generation key (fresh generation rather than reuse of
+  the 08-18 row).
 - **Two-tier prompt/preference model (S269):** *Tier 1* — shared **system/core** prompts here in `wmkf_ai_prompts`, versioned. *Tier 2* — **per-user** overrides that LAYER over a Tier-1 base: the S222 reviewer-finder override (`pages/api/reviewer-finder/prompt-override.js`, the `PREFERENCE_KEYS` user-preference store), default sourced from the Tier-1 base, `staleOverride` when the base version advances. A new prompt goes in Tier 1 if system/superuser-run; Tier 2 if per-user (e.g. email text).
 - **`initial-assessment.generate` production bootstrap (2026-07-30):**
   create-only seed published version 1

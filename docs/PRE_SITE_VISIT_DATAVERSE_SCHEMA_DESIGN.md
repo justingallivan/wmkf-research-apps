@@ -38,15 +38,20 @@ Pre-Site business row and SharePoint Word item. The 2026-08-23 post-reopen
 inventory is 10 Request Documents: three Initial Assessments and seven Pre Site
 Visits; nine are Ready, one Failed, six Draft, and four Superseded.
 
-**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION SMOKE OPEN.]**
+**[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE
+SMOKES PASSED 2026-08-27.]**
 The Production runtime normalizes valid provider output,
 stores content-free editorial diagnostics in proposal-core envelope v3, and
 returns those diagnostics as non-blocking Workbench warnings. It retains v2
 read compatibility and the deployed v4 DOCX bytes while advancing the render
 contract identity to v5. Ready deployment
-`dpl_HGogbJnprevoYKLaxevamxdajtC4` is paired with sole-current prompt v4 row
-`74409f95-509b-f111-b8db-6045bd008868`; exact prompt readback had zero
-mismatches. No request or SharePoint write was used for release verification.
+`dpl_HGogbJnprevoYKLaxevamxdajtC4` shipped paired with prompt v4 row
+`74409f95-509b-f111-b8db-6045bd008868` (exact readback, zero mismatches);
+the prompt was later re-published as sole-current v5 (unattributed,
+content-identical per the runtime exact-match preflight). The 2026-08-27
+Request `1002852` smoke proved Ready-with-warning generation under v5 and
+the exact no-duplicate retry (see
+`docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status).
 
 Reuse the existing `wmkf_requestdocument` registry. Do not create a separate
 Pre-Site Draft entity. Each generated Pre-Site Word version is one Request
@@ -113,7 +118,8 @@ akoya_request
 |---|---|---|
 | `wmkf_requestdocument` already represents request-owned, versioned governed artifacts and includes a Pre Site Visit artifact option | Production metadata preflight on 2026-08-17 plus Wave 16 schema and adapter | VERIFIED |
 | The 2026-08-17 Production snapshot had four Request Document rows: three Initial Assessments and one Ready/Draft Pre Site Visit | Read-only production inventory after Request `1002379` generation on 2026-08-17; current count requires re-probe | VERIFIED HISTORICAL SNAPSHOT |
-| Prompt `pre-site-visit.proposal-core.generate` v4 is sole-current on `claude-sonnet-4-6` and exactly matches the tracked resilience contract | Audited Admin publication plus exact Production readback on 2026-08-18 | VERIFIED LIVE |
+| Prompt `pre-site-visit.proposal-core.generate` v4 was sole-current on `claude-sonnet-4-6` and exactly matched the tracked resilience contract on 2026-08-18 | Audited Admin publication plus exact Production readback on 2026-08-18 | VERIFIED HISTORICAL — superseded by v5 |
+| Prompt `pre-site-visit.proposal-core.generate` v5 is sole-current and content-identical to the tracked resilience contract; the v4→v5 republish is unattributed | 2026-08-27 governed generation on Request `1002852` passed the runtime exact-match preflight (`artifact-service.js::validateNarrativePrompt`) and recorded promptVersion 5 in provenance | VERIFIED LIVE 2026-08-27 |
 | `wmkf_sitevisit` could store the draft | Production metadata shows an empty activity table with no suitable custom content fields; no repository caller was found | VERIFIED (not suitable) |
 | `akoya_request.wmkf_researchwriteuptype` could store the draft | Production metadata and row distribution show a Phase I/Phase II classification choice, not content or version persistence | VERIFIED (not suitable) |
 | The Workbench Pre-Site route persists a business draft | Request `1002379` created Ready row `aeb223a2-849a-f111-b8db-70a8a59cded0`, governed v3 run `ba0f42b9-849a-f111-b8db-6045bd008868`, stable Word item `01G4GVMS3Q5BJ65S7DDZDKFTSQLIQAIPER`, and the then-current request pointer | VERIFIED HISTORICAL GENERATION PROOF |
@@ -430,12 +436,14 @@ governed hash, and milestone time to match.
 7. **Completed 2026-08-17 for normal generation and exact Ready retry:** verify
    the exact row, governed run, Word item/version, current pointer, and
    no-duplicate retry. A controlled partial-failure recovery remains unproved.
-8. **Deployed to Production 2026-08-18; signed-in generation smoke open:** resilience policy,
+8. **Deployed to Production 2026-08-18; signed-in generation + no-duplicate
+   smokes passed 2026-08-27:** resilience policy,
    envelope v3 with v2 reads, warning projection, guarded unchanged retry,
    typed failure responses, prompt publication readback, and render contract
-   v5 over the unchanged v4 DOCX bytes. Sole-current prompt v4 and Ready
+   v5 over the unchanged v4 DOCX bytes. Then-sole-current prompt v4 and Ready
    application deployment were exact-readback verified without generating a
-   request artifact.
+   request artifact; the 2026-08-27 smoke later proved live generation and
+   no-duplicate retry under sole-current v5.
 
 The first long Production request completed durably but the browser displayed
 `Failed to fetch`. Read-only state verification followed by an exact retry
