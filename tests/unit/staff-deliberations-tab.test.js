@@ -113,8 +113,12 @@ test('shows compact actions and keeps generation details behind help', async () 
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
   expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeEnabled();
   expect(screen.getByText('Latest draft:')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' }))
-    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  // Display label, not the raw SharePoint filename; identity in tooltip + details.
+  const draftLink = screen.getByRole('link', { name: 'Word draft' });
+  expect(draftLink).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(draftLink).toHaveAttribute('title', '1002379 Pre-Site Visit.docx');
+  expect(screen.getByText('File details')).toBeInTheDocument();
+  expect(screen.getByText(/1002379 Pre-Site Visit\.docx/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Start sharing' })).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft ready');
 });
@@ -386,7 +390,8 @@ test('a shared document shows the working workspace with logistics and distribut
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.getByRole('link', { name: 'Download' }))
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
-  expect(screen.getByRole('link', { name: '1002379 Pre-Site Visit.docx' })).toBeInTheDocument();
+  const docLink = screen.getByRole('link', { name: 'Word document' });
+  expect(docLink).toHaveAttribute('title', '1002379 Pre-Site Visit.docx');
   expect(screen.getByText(/Sharing began/)).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Working document needs a quick edit check' }))
     .toBeInTheDocument();
