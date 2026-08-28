@@ -4,6 +4,7 @@ import {
   generatePreSiteVisitProposalCore,
   loadPreSiteVisitInputs,
   prepareGeneratedCore,
+  promptContext,
 } from '../../lib/services/pre-site-visit/proposal-core-service';
 import { REQUIRED_SYSTEM_ASSERTIONS } from '../../shared/config/prompts/pre-site-visit-proposal-core';
 
@@ -48,6 +49,15 @@ function dependencies(overrides = {}) {
       name: 'Applicant University',
       address1_city: 'Atlanta',
       address1_stateorprovince: 'Georgia',
+      wmkf_countofprogramgrants: 8,
+      wmkf_sumofprogramgrants: 9150000,
+    }),
+    getMostRecentProgramGrant: jest.fn().mockResolvedValue({
+      akoya_requestid: '55555555-5555-4555-8555-555555555555',
+      akoya_requestnum: '1001999',
+      akoya_fiscalyear: 'June 2026',
+      akoya_decisiondate: '2026-06-11T00:00:00Z',
+      wmkf_wmkfprojectdescription: 'To develop chemical tools to restore the function of defective proteins.',
     }),
     getCoPIs: jest.fn().mockResolvedValue(['Dr. First Co-PI', 'Dr. Second Co-PI']),
     getProposalNarrative: jest.fn().mockResolvedValue({
@@ -101,8 +111,21 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
       requestedAmount: '$900,000',
       invitedAmount: '$1,000,000',
       totalProjectBudget: '$3,500,000',
+      institutionalFundingHistory: 'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
     },
   });
+  expect(deps.getMostRecentProgramGrant).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
+});
+
+test('institutional funding history is excluded from the prompt context', () => {
+  expect(Object.keys(promptContext({
+    requestNumber: '1002379',
+    projectTitle: 't',
+    applicantInstitution: 'a',
+    projectPeriod: null,
+    personnel: [],
+    documentFields: { institutionalFundingHistory: 'secret' },
+  }))).not.toContain('documentFields');
 });
 
 test('uses account AKA for DV:InstitutionName when AKA and account name differ', async () => {
@@ -130,21 +153,54 @@ test.each(['  ', 'N/A', 'unknown'])(
   },
 );
 
-test('uses the formatted applicant lookup when the account read fails, never the Request Bill.com field', async () => {
+test('fails closed when the applicant account read fails (funding history cannot be derived)', async () => {
   const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   const deps = dependencies({
     getApplicant: jest.fn().mockRejectedValue(new Error('account unavailable')),
-    getRequest: jest.fn().mockResolvedValue(requestFixture({
-      _akoya_applicantid_value_formatted: 'Formatted University',
-      wmkf_organizationname: 'Bill.com Placeholder University',
-    })),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
+
+test('fails closed when the program-grant query fails', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const deps = dependencies({
+    getMostRecentProgramGrant: jest.fn().mockRejectedValue(new Error('dataverse 503')),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
+
+test('fails closed when the request has no applicant account', async () => {
+  const deps = dependencies({
+    getRequest: jest.fn().mockResolvedValue(requestFixture({ _akoya_applicantid_value: null })),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable', httpStatus: 409 });
+});
+
+test('renders the no-prior-award sentence when the account has no program grants', async () => {
+  const deps = dependencies({
+    getApplicant: jest.fn().mockResolvedValue({
+      akoya_aka: 'New U',
+      name: 'New University',
+      address1_city: 'Atlanta',
+      address1_stateorprovince: 'Georgia',
+      wmkf_countofprogramgrants: 0,
+      wmkf_sumofprogramgrants: 0,
+    }),
+    getMostRecentProgramGrant: jest.fn().mockResolvedValue(null),
   });
 
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
 
-  expect(result.context.documentFields.institutionName).toBe('Formatted University');
-  expect(result.context.documentFields.institutionName).not.toBe('Bill.com Placeholder University');
-  warnSpy.mockRestore();
+  expect(result.context.documentFields.institutionalFundingHistory)
+    .toBe('New U has not previously received a program grant from WMKF.');
 });
 
 test('fails closed when account and formatted applicant names are unusable even if the Request Bill.com field is populated', async () => {

@@ -594,8 +594,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                     {' '}file, authoritative Dataverse fields, and the current published Admin prompt.
                   </p>
                   <p className="mt-2">
-                    The graphical abstract, caption, recommendation, referee comments, scientific
-                    presentation, and institutional funding history remain marked for staff completion.
+                    The graphical abstract, caption, recommendation, referee comments, and scientific
+                    presentation remain marked for staff completion. Institutional funding history is
+                    filled from the AkoyaGO award history.
+
                   </p>
                   <p className="mt-2">
                     Generated sections and the input snapshot are registered in Dataverse. The Word file
@@ -748,9 +750,8 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   <span className="mr-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                     Materials sent
                   </span>
-                  Fill in the site-visit sections (recommendation, referee comments, presentation,
-                  funding history) in the working document — it is the starting draft for the
-                  final writeup.
+                  Fill in the site-visit sections (recommendation, referee comments, presentation)
+                  in the working document — it is the starting draft for the final writeup.
                 </p>
               )}
             </div>

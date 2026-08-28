@@ -499,8 +499,9 @@ other target; Production also completed the durable mutation proof:
   design.
 - Site Visit logistics is now a separate Production-deployed Wave 21 contract
   on the existing `wmkf_sitevisit` Activity; it was not folded into Wave 19.
-  The Institutional Funding History result field remains a later bounded
-  schema decision.
+  Institutional Funding History needed no result field: since S467
+  (2026-08-28) it is derived deterministically from Dataverse at generation
+  and stored only in the v3 input snapshot (`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`).
 
 The cross-tab lifecycle, Site Visit file paths, and Final copy transaction are
 specified in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.

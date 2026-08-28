@@ -8,8 +8,9 @@
  * The prompt creates only the proposal-derived narrative sections of the Word
  * writeup. Administrative fields are rendered directly from Dataverse, and the
  * graphical abstract, recommendation, referee section, and scientific
- * presentation remain staff-owned. Institutional funding history is a separate
- * future AI operation with a different source contract.
+ * presentation remain staff-owned. Institutional funding history is rendered
+ * deterministically from Dataverse (lib/services/pre-site-visit/funding-history.js),
+ * not by this prompt.
  *
  * Runtime model selection does not belong in this file. The current governed
  * Dataverse prompt version owns `wmkf_ai_model`; executePrompt resolves that

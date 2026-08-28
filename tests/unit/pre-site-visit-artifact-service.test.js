@@ -61,6 +61,7 @@ function inputFixture(overrides = {}) {
         programDirector: 'Pat Director',
         invitedAmount: '$1,000,000',
         totalProjectBudget: '$3,500,000',
+        institutionalFundingHistory: 'Applicant University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
       },
       ...overrides.context,
     },
