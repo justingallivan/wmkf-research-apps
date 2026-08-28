@@ -123,6 +123,23 @@ function StageRail({ stage, reopened }) {
   );
 }
 
+// The SharePoint filename carries idempotency hex staff shouldn't have to
+// read; links show a display label and the real identity lives one click
+// away here (Download still saves under the real filename).
+function FileDetails({ file }) {
+  if (!file?.name) return null;
+  return (
+    <details className="mt-1 text-xs text-gray-500">
+      <summary className="cursor-pointer select-none">File details</summary>
+      <p className="mt-1">
+        {file.name}
+        {Number(file.size) > 0 ? ` · ${Math.max(1, Math.round(file.size / 1024))} KB` : ''}
+        {file.versionId ? ` · SharePoint version ${file.versionId}` : ''}
+      </p>
+    </details>
+  );
+}
+
 export default function StaffDeliberationsTab({ requestId, requestNumber = '', isSuperuser = false }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -651,11 +668,15 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   href={readyFile.webUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  title={readyFile.name || undefined}
                   className="font-medium text-green-800 underline"
                 >
-                  {readyFile.name || 'Open Word draft'}
+                  {readyFile.lastModified
+                    ? `Word draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
+                    : 'Word draft'}
                 </a>
               </p>
+              <FileDetails file={readyFile} />
               {warnings.length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
                   <h3 className="font-semibold">Draft needs a quick edit check</h3>
@@ -693,9 +714,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   href={readyFile.webUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  title={readyFile.name || undefined}
                   className="font-medium underline"
                 >
-                  {readyFile.name || 'Open Word document'}
+                  Word document
                 </a>
                 {' '}
                 <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
@@ -708,6 +730,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   version is recorded and regeneration is off.
                 </p>
               )}
+              <FileDetails file={readyFile} />
               {warnings.length > 0 && (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
                   <h4 className="font-semibold">Working document needs a quick edit check</h4>
