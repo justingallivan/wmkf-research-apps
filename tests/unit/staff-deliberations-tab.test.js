@@ -21,7 +21,7 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
     useEffect(() => {
       if (distributionHistoryFeed) props.onHistory?.(distributionHistoryFeed);
     }, [props]);
-    return <div>Frozen distribution panel</div>;
+    return <div>{props.collapsed ? 'Frozen distribution panel (collapsed)' : 'Frozen distribution panel'}</div>;
   }
   return { __esModule: true, default: MockDistributionPanel };
 });
@@ -413,6 +413,8 @@ test('a transport-accepted send for the current document promotes the rail to Wr
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Wrap Up');
   // The hand-off into Final Writeup is deliberately not built yet (open question 4b).
   expect(screen.queryByRole('button', { name: /Move to Final Writeup/ })).not.toBeInTheDocument();
+  // After a send, composing another send is secondary: the composer collapses.
+  expect(screen.getByText('Frozen distribution panel (collapsed)')).toBeInTheDocument();
 });
 
 test('sends for a superseded source document do not promote the current document to Wrap Up', async () => {

@@ -73,6 +73,10 @@ export default function PreSiteDistributionPanel({
   suggestedTo = EMPTY_LIST,
   suggestedCc = EMPTY_LIST,
   onHistory = null,
+  // Once the current document's materials have gone out, composing another
+  // send is a secondary action: the composer folds behind a closed disclosure
+  // instead of presenting as the stage's main job (owner, S466).
+  collapsed = false,
 }) {
   const [form, setForm] = useState({
     attachmentMode: 'pdf',
@@ -241,13 +245,8 @@ export default function PreSiteDistributionPanel({
     }
   };
 
-  return (
+  const composerBody = (
     <>
-      <Card hover={false}>
-        <h3 className="text-base font-semibold text-gray-900">Send Site Visit materials</h3>
-        <p className="mt-1 text-sm text-gray-600">
-          Create a fixed preview, review the recipients and attachments, then send through Dynamics.
-        </p>
 
         {error && (
           <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -437,6 +436,32 @@ export default function PreSiteDistributionPanel({
               </>
             )}
           </div>
+        )}
+    </>
+  );
+
+  return (
+    <>
+      <Card hover={false}>
+        {collapsed ? (
+          <details>
+            <summary className="cursor-pointer select-none text-base font-semibold text-gray-900">
+              Send materials again
+            </summary>
+            <p className="mt-1 text-sm text-gray-600">
+              Materials for this document have already been sent — see Email history below.
+              Sending again creates a new fixed preview and a separate email.
+            </p>
+            <div className="mt-2">{composerBody}</div>
+          </details>
+        ) : (
+          <>
+            <h3 className="text-base font-semibold text-gray-900">Send Site Visit materials</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Create a fixed preview, review the recipients and attachments, then send through Dynamics.
+            </p>
+            {composerBody}
+          </>
         )}
       </Card>
 
