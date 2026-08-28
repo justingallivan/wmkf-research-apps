@@ -596,8 +596,8 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   <p className="mt-2">
                     The graphical abstract, caption, recommendation, referee comments, and scientific
                     presentation remain marked for staff completion. Institutional funding history is
-                    filled from the AkoyaGO award history.
-
+                    filled from the AkoyaGO award history; a document generated before that fill shows
+                    an edit-check warning until it is completed in Word or regenerated.
                   </p>
                   <p className="mt-2">
                     Generated sections and the input snapshot are registered in Dataverse. The Word file
