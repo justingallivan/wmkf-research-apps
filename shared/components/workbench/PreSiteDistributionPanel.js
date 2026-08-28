@@ -72,6 +72,7 @@ export default function PreSiteDistributionPanel({
   materials = EMPTY_LIST,
   suggestedTo = EMPTY_LIST,
   suggestedCc = EMPTY_LIST,
+  onHistory = null,
 }) {
   const [form, setForm] = useState({
     attachmentMode: 'pdf',
@@ -104,7 +105,11 @@ export default function PreSiteDistributionPanel({
     if (sequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
     setHistoryError(null);
-  }, [requestId]);
+    onHistory?.({
+      attempts: body.attempts || [],
+      currentSourceEverSent: body.currentSourceEverSent === true,
+    });
+  }, [requestId, onHistory]);
 
   useEffect(() => {
     const currentSequence = ++sequence.current;

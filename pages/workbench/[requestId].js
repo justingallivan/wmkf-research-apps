@@ -8,11 +8,12 @@
  * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
  * (per-request command center) + Status (read-only akoya_requeststatus
  * reflection), Awardee (grantee-deliverables workflow), and Initial Assessment
- * (governed DOCX producer/read model), and Pre Site Visit Writeup (durable
- * Dataverse/SharePoint Word producer), and Site Visit (guarded promotion of
- * the same Word item into the staff workspace). Final Writeup remains the one
- * placeholder. The default landing is Overview. Tab + sub-tab selection is
- * query-string driven (?tab=reviewers&sub=track) for deep-links.
+ * (governed DOCX producer/read model), and Staff Deliberations (S466 merge of
+ * the former Pre Site Visit Writeup + Site Visit tabs: durable Word producer,
+ * guarded share hand-off, logistics, materials distribution, guarded reopen —
+ * old tab keys alias in). Final Writeup remains the one placeholder. The
+ * default landing is Overview. Tab + sub-tab selection is query-string driven
+ * (?tab=reviewers&sub=track) for deep-links.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -31,26 +32,29 @@ import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
-import PreSiteVisitTab from '../../shared/components/workbench/PreSiteVisitTab';
-import SiteVisitTab from '../../shared/components/workbench/SiteVisitTab';
+import StaffDeliberationsTab from '../../shared/components/workbench/StaffDeliberationsTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
-// Pre Site Visit Writeup, Site Visit, Status, and Awardee. Final Writeup remains
-// the one placeholder in the full request lifecycle.
+// Staff Deliberations (the merged site-visit writeup workspace, S466), Status,
+// and Awardee. Final Writeup remains the one placeholder in the lifecycle.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
   { key: 'initial-writeup', label: 'Initial Assessment' },
   { key: 'reviewers', label: 'Reviewers' },
   { key: 'reviews', label: 'Reviews' },
-  { key: 'pre-site-visit', label: 'Pre Site Visit Writeup' },
-  { key: 'site-visit', label: 'Site Visit' },
+  { key: 'staff-deliberations', label: 'Staff Deliberations' },
   { key: 'final-writeup', label: 'Final Writeup' },
   { key: 'status', label: 'Status' },
   { key: 'awardee', label: 'Awardee' },
 ];
 const TAB_KEYS = new Set(TABS.map((t) => t.key));
+// Deep links and onSelectTab callers from before the S466 merge keep working.
+const LEGACY_TAB_ALIASES = {
+  'pre-site-visit': 'staff-deliberations',
+  'site-visit': 'staff-deliberations',
+};
 
 function WorkbenchRequest() {
   const router = useRouter();
@@ -59,7 +63,8 @@ function WorkbenchRequest() {
   const { preferences } = useProfile();
   const { requestId } = router.query;
 
-  const tabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
+  const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
+  const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
   const activeTab = tabParam && TAB_KEYS.has(tabParam) ? tabParam : 'overview';
 
   const [ctx, setCtx] = useState(null);
@@ -173,19 +178,12 @@ function WorkbenchRequest() {
         />
       ) : activeTab === 'reviews' ? (
         <ReviewsTab requestId={typeof requestId === 'string' ? requestId : ''} />
-      ) : activeTab === 'pre-site-visit' ? (
-        <PreSiteVisitTab
-          key={typeof requestId === 'string' ? requestId : ''}
-          requestId={typeof requestId === 'string' ? requestId : ''}
-          onSelectTab={selectTab}
-        />
-      ) : activeTab === 'site-visit' ? (
-        <SiteVisitTab
+      ) : activeTab === 'staff-deliberations' ? (
+        <StaffDeliberationsTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           requestNumber={ctx?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
-          onSelectTab={selectTab}
         />
       ) : activeTab === 'status' ? (
         <StatusTab context={ctx} />

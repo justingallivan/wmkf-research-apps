@@ -23,11 +23,20 @@ related:
 
 ## Decision and current status
 
+**UI merge (S466, 2026-08-28):** the former Pre Site Visit Writeup and Site
+Visit tabs are now ONE Workbench tab, **Staff Deliberations**
+(`shared/components/workbench/StaffDeliberationsTab.js`), with a stage rail
+Draft → Share → Wrap Up; the old tab keys alias in. This is a
+presentation-layer merge only — every document-lifecycle contract, route, and
+guarantee below is unchanged, and references to the two separate tabs in this
+plan describe the pre-merge UI accurately as history.
+
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
 2026-08-23; SITE VISIT LOGISTICS/CALENDAR PRODUCTION-PROVED 2026-08-25; FINAL
 PLANNED.]** The three Workbench
-tabs form one document lifecycle, not three independent data-entry systems:
+tabs (as originally built; see the merge note above) form one document
+lifecycle, not three independent data-entry systems:
 
 1. **Pre-Site Visit Writeup** creates a governed Word document from Dataverse
    data and governed AI output persisted in Dataverse. Once created, that Word

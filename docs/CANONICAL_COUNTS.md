@@ -44,7 +44,7 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## workbench-tab-count
 
-- **Live value:** 10
+- **Live value:** 9
 - **Description:** Request Workbench top-level tabs
 - **Derive:** `pages/workbench/[requestId].js` → `TABS.length`
 
@@ -56,6 +56,6 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## workbench-live-tab-count
 
-- **Live value:** 9
+- **Live value:** 8
 - **Description:** implemented Request Workbench top-level tabs
 - **Derive:** `pages/workbench/[requestId].js` → distinct literal `activeTab === <TABS key>` implementation branches

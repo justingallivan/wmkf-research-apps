@@ -16,7 +16,7 @@ related:
   - lib/services/pre-site-visit/proposal-core-service.js
   - lib/services/pre-site-visit/artifact-service.js
   - lib/services/pre-site-visit/docx-renderer.js
-  - shared/components/workbench/PreSiteVisitTab.js
+  - shared/components/workbench/StaffDeliberationsTab.js
 ---
 
 # Pre-Site Visit Generation Resilience Plan

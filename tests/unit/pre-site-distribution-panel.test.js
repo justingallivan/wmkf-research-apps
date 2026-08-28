@@ -293,6 +293,26 @@ test('history renders superseded previews quietly, real failures red, and GUIDs 
   expect(sentItem.textContent.replace(details.textContent, '')).not.toContain(dynamicsId);
 });
 
+test('reports loaded history and the server-derived sent flag through onHistory', async () => {
+  const attempts = [{ ...preparedAttempt('pdf'), state: 'sent', transportAccepted: true, createdAt: '2026-08-25T12:00:00Z' }];
+  global.fetch.mockResolvedValueOnce(response({ success: true, attempts, currentSourceEverSent: true }));
+  const onHistory = jest.fn();
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      onHistory={onHistory}
+    />,
+  );
+
+  await waitFor(() => expect(onHistory).toHaveBeenCalledWith({
+    attempts,
+    currentSourceEverSent: true,
+  }));
+});
+
 test('keeps non-stale send failures as errors', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
