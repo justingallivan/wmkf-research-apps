@@ -59,6 +59,16 @@ signed-in generation smoke — and two small record-keeping items:
    consent axis). Evidence: plan doc Broader effort;
    `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` cross-cutting finding.
    Plannable; forward-compatible with the matrix.
+3. **WAITING on Connor (out until ~2026-09-10): `wmkf_requestdocument`
+   staff-role privilege grant** so Workbench document writes attribute to
+   the acting staff member instead of the service principal. Brief prepared
+   for him (ask + evidence + admin-center steps):
+   https://claude.ai/code/artifact/f8877f90-8559-482f-8fbc-ce00e239f947 —
+   owner shares it on his return. After the grant, owner re-runs
+   `scripts/probe-write-attribution-census.js` (read-only) to confirm new
+   rows carry staff names. Context:
+   `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status (S466 census:
+   impersonation live in prod, this table is the gap).
 
 ### Owner Decision Needed
 
