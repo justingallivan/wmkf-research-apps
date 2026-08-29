@@ -78,6 +78,7 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   fireEvent.change(screen.getByLabelText('Find a Dataverse Contact'), { target: { value: 'Casey' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Add as Consultant' }));
+  expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Save recipients' }));
 
   await screen.findByText('Recipient directory saved.');
@@ -122,7 +123,8 @@ test('shows a stale saved Contact and lets the admin remove it before saving', a
 
   render(<SiteVisitRecipientsSection />);
   expect(await screen.findByText(/no valid primary email/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  expect(screen.getByText('Saved but unavailable')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove from directory' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save recipients' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/admin/site-visit-recipients',

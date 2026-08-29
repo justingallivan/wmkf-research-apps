@@ -199,7 +199,8 @@ export default function SiteVisitRecipientsSection() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-600">
-        Choose which active staff and Dataverse Contacts appear in the Site Visit materials recipient menu.
+        Choose who is available in the Site Visit materials recipient menu. This does not add anyone
+        to an email draft automatically; the sender chooses recipients from the menu for each email.
         Names and email addresses remain owned by their source records and are resolved live.
       </p>
 
@@ -209,7 +210,10 @@ export default function SiteVisitRecipientsSection() {
 
       <section>
         <h3 className="text-sm font-semibold text-gray-900">Staff</h3>
-        <p className="mt-1 text-xs text-gray-500">Only active app profiles linked exactly to an enabled Dataverse user are eligible.</p>
+        <p className="mt-1 text-xs text-gray-500">
+          Checked staff are included in the recipient menu. Only active app profiles linked exactly
+          to an enabled Dataverse user are eligible.
+        </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {staff.map((person) => (
             <label key={person.key} className="flex items-start gap-2 rounded border border-gray-200 p-3 text-sm">
@@ -252,7 +256,8 @@ export default function SiteVisitRecipientsSection() {
       <section>
         <h3 className="text-sm font-semibold text-gray-900">Consultants and Board</h3>
         <p className="mt-1 text-xs text-gray-500">
-          Create or edit people in Dataverse first, then search here to add an existing Contact.
+          Available people listed below are included in the recipient menu. A highlighted unavailable
+          Contact remains saved for correction or removal but does not appear in the menu.
         </p>
         <div className="mt-3 space-y-2">
           {externalEntries.map((person) => (
@@ -260,18 +265,25 @@ export default function SiteVisitRecipientsSection() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">{person.name || 'Unavailable Contact'}</p>
                 <p className="text-xs text-gray-500">{person.email || person.detail}</p>
-                <p className="mt-1 text-xs font-medium capitalize text-gray-600">{person.category}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium">
+                  <span className="capitalize text-gray-600">{person.category}</span>
+                  <span className={`rounded-full px-2 py-0.5 ${person.available ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {person.available ? 'Included in recipient menu' : 'Saved but unavailable'}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => removeEntry(person)}
                 className="text-sm text-red-700 hover:text-red-900"
               >
-                Remove
+                Remove from directory
               </button>
             </div>
           ))}
-          {externalEntries.length === 0 && <p className="text-sm text-gray-500">No external recipients selected.</p>}
+          {externalEntries.length === 0 && (
+            <p className="text-sm text-gray-500">No consultants or board members are included in the directory.</p>
+          )}
         </div>
 
         <form onSubmit={searchContacts} className="mt-4 rounded border border-gray-200 bg-gray-50 p-3">
