@@ -35,6 +35,8 @@ Ground truth: `lib/utils/sharepoint-buckets.js`, `pages/api/dynamics-explorer/ch
 
 `searchDocuments()` fans out 4× per request-scoped search (one parallel KQL call per bucket) and merges/dedupes by file id or webUrl. Unscoped searches are unchanged.
 
+**S468 (2026-08-29) — throttle handling.** `GraphService.searchFiles` retries 429/502/503/504 (3 attempts, Retry-After-aware, 5 s cap) because Graph `/search/query` is tenant-throttled and the fan-out bursts. `searchDocuments()` no longer reports a FAILED scope as "No documents found": all scopes failed → `error` + `incomplete: true`; partial → hits + `warning` + `incomplete: true`. The old false negative made the model re-run the search and produced the 86-row 429 storm on the Operational Events card (2026-08-27). Tests: `tests/unit/graph-service-search-retry.test.js`, `tests/unit/dynamics-explorer-search-documents.test.js`.
+
 ## Verified
 
 - `993879` (Carter/UNC-CH, multi-library): returns 63 files across `akoya_request` (10) + `RequestArchive3` (53). Used to return only 10.
