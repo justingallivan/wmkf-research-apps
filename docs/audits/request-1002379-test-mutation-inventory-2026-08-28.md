@@ -3,7 +3,7 @@ title: Request 1002379 test-mutation inventory (2026-08-28)
 domain: request-workbench
 kind: audit
 status: active
-summary: Read-only production inventory of everything testing left on smoke-vehicle Request 1002379 since 2026-08-01 (Dataverse, Postgres, SharePoint folder tree), as the confirmable input to an owner-gated cleanup.
+summary: Production inventory of everything testing left on smoke-vehicle Request 1002379 since 2026-08-01, the owner-approved cleanup executed 2026-08-29 UTC (pointer, 7 registry rows, 7 files + 3 folders, 10 Postgres rows), and the 7 activities the service principal cannot delete.
 owner: product-engineering
 related:
   - scripts/probe-request-1002379-test-inventory.js
@@ -19,8 +19,8 @@ vehicle for the Pre-Site Visit writeup, guarded reopen, Site Visit handoff, and
 frozen distribution since 2026-08-17. Owner: "We'll have to clean up our mess
 when we're done testing." This is the read-only inventory (probe run
 2026-08-29 00:57Z by `scripts/probe-request-1002379-test-inventory.js` plus
-three ad-hoc read-only queries recorded below). **No deletes have been made.**
-Cleanup is a separate owner-confirmed step.
+three ad-hoc read-only queries recorded below). Cleanup was executed after
+owner approval — see §6.
 
 Baseline before 2026-08-17 `[VERIFIED via Atlas 2026-08-17 inventory]`: the
 registry held no Pre-Site rows for any request; `1002379` had no writeup
@@ -143,3 +143,42 @@ Execution note: the app has no delete path for registry rows, activities, or
 SharePoint artifacts; cleanup would be a one-off owner-run script under the
 Dataverse target/write interlock, or manual deletion in AkoyaGO/SharePoint.
 Whichever is chosen, re-run the probe afterwards for a zero-residue readback.
+
+## 6. Cleanup executed — 2026-08-29 01:44–01:5x UTC (owner-run script, then reconcile)
+
+Owner decisions (2026-08-28): keep the unregistered SharePoint files (`AI
+Materials/`, `Application Cover Page - Copy.docx`, `Reviewer_*`); the
+August-generated draft Word/PDF files need not be retained; keep all AI-run
+rows; use an **untracked** one-off script (scratchpad, not in the repo). The
+script dry-ran clean, then the owner executed it with
+`DATAVERSE_PROD_WRITE_ACK="request-1002379-test-cleanup 2026-08-29"` and the
+exact confirm token; every target was re-preflighted before the first write.
+
+**Completed `[VERIFIED via read-only probe readback after execution]`:**
+
+1. `akoya_request.wmkf_CurrentPreSiteVisit` cleared (`$ref` DELETE).
+2. All 7 `wmkf_requestdocument` rows deleted (#7 → #1). Readback: 0 rows for
+   the request; all three writeup pointers empty.
+3. All 7 generated files deleted via Graph (first-stage recycle bin), then the
+   empty `Distribution Snapshots/`, `Pre-Site Visit/`, and `Artifacts/`
+   folders. Readback: request folder holds only pre-existing items plus the
+   kept `AI Materials/` and `Application Cover Page - Copy.docx`.
+6. All 10 `pre_site_distribution_attempts` rows deleted by explicit
+   `operation_id` list (reconcile step after the abort below); 0 remain.
+7. 12 `wmkf_ai_run` rows retained, per decision.
+
+**Not completed — service-principal privilege:**
+
+4./5. Deleting email `33ce6346…` failed **403 `DeleteAccess`** on
+`activitypointer` (owner = Justin Gallivan; caller = the app service principal,
+which holds no Activity delete privilege; the impersonated attempt and the
+service-principal fallback both failed). The script aborted there by design,
+so the 6 email activities (`33ce6346`, `26bc7b59`, `3f5e3616`, `80340d48`,
+`5b5018bc`, `4ab30fd1`) and the `wmkf_sitevisit` "Test Site Visit"
+(`11b41d73-02a0-f111-b8dc-6045bd018a07`) remain and must be deleted by their
+owner in AkoyaGO (or by an administrator). A privilege grant for Activity
+delete to the app principal was **not** requested — the application has no
+runtime need to delete activities.
+
+Evidence JSON (steps, ids, timestamps) was written to the session scratchpad
+and is not tracked; this section is its durable record.
