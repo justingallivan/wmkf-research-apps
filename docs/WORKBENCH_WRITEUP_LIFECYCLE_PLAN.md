@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-25
+last_verified: 2026-08-29
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -381,7 +381,8 @@ edited by this panel. **[VERIFIED 2026-08-24 in tracked sandbox
 replacement passed, direct ActivityParty create failed with expected Dataverse
 code `0x80040800`, and the exact sentinel was deleted/read back absent.
 
-Recipient suggestions have two authoritative sources:
+The Site Visit attendee-reference compatibility directory has two authoritative
+sources:
 
 - WMKF staff: active `user_profiles` reconciled to enabled Dataverse
   `systemusers`; the stable system-user ID is retained for ActivityParty binding.
@@ -394,6 +395,15 @@ Staff may type an additional address for one send, but manual values are shown
 in exact preview and are not silently persisted into either directory. The
 server normalizes and deduplicates all addresses and rejects a To/CC or
 required/optional conflict as an all-or-nothing validation failure.
+
+**[VERIFIED IN SOURCE 2026-08-29.]** The distribution composer now has a
+separate Admin-curated picker. Its Dataverse app-setting value stores only
+active app-profile IDs, Contact GUIDs, and consultant/board category. Staff
+identity resolves through enabled `systemusers`; external identity resolves
+live from active Dataverse Contacts. Admin search is read-only toward Contacts,
+and Contact creation/editing remains outside this app. Unavailable configured
+identities stay visible to Admin for removal but are omitted from Workbench;
+picker failure leaves manual To/Cc entry and preview creation available.
 
 **[VERIFIED IN SOURCE 2026-08-24.]** For every calendar-enabled preview, the
 server-resolved Site Visit organizer is a mandatory `To` recipient. Preparation
@@ -437,15 +447,17 @@ preview and operation. Transport acceptance is not inbox-delivery proof.
 | Schedule round-trips without losing the entered zone or DST meaning | Wave 21 Site Visit fields; adapter/service; UI | exact metadata preflight; ambiguous/nonexistent DST tests; UTC/local round-trip tests |
 | A stale save cannot create or overwrite another Site Visit | route; service; Dataverse adapter | GUID + same-Request check; ETag-fenced `PATCH` or atomic same-ID replacement; 404/412 and wrong-ID tests; reversible sandbox proof |
 | Multiple open Site Visits fail closed | adapter/service/route/UI | two-row fixture returns reconciliation error and no write |
-| Suggested recipients retain stable authority | `user_profiles`/`systemusers`; `expertise_roster.id` + preferred email | disabled/unreconciled staff excluded; roster rename preserves email mapping |
+| Suggested recipients retain stable authority | attendee compatibility: `user_profiles`/`systemusers` + `expertise_roster.id`; distribution picker: reference-only app setting + live `systemusers`/Contacts | disabled/unreconciled staff excluded; inactive/email-less Contacts omitted; names/emails never copied into the curated setting |
 | A calendar-enabled send always includes the saved organizer | Site Visit ActivityParty snapshot; preview service; Postgres ledger | omitted organizer is inserted into `To`; a matching `Cc` entry moves to `To`; hashes and persisted recipients use the enforced set |
 | Exact preview binds every recipient, event field, link identity, and calendar bytes | preview service; Postgres ledger | any changed input changes preview hash and disables prior confirmation |
 | Partial email failure resumes one Dynamics activity | extended distribution store/service; email adapter | activity-created and calendar-attachment failure tests; exact retry returns same email ID |
 | PUBLISH is never presented as RSVP/update/cancel scheduling | calendar builder; UI copy; docs | ICS contract tests and component copy assertions |
 | Sandbox proof cannot contact external recipients | smoke script/runbook | internal-recipient allowlist and explicit target assertion before every send |
 
-The bounded route surface is one authenticated logistics GET/PATCH endpoint and
-one read-only recipient-directory endpoint. The existing frozen-distribution
+The bounded route surface is one authenticated logistics GET/PATCH endpoint,
+the legacy read-only attendee-reference directory, one reviewers-only curated
+distribution-options endpoint, and one superuser Admin read/search/full-save
+endpoint. The existing frozen-distribution
 prepare/send/history routes gain the calendar and material-link contract; they
 retain the proven confirmation and recovery pattern. Every route establishes
 `withDalContext`, resolves the Request independently, and never accepts actor or

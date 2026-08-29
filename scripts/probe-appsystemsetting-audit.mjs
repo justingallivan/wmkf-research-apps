@@ -9,7 +9,7 @@
  * Checks, all GET:
  *   1. Org-level isauditenabled (master switch).
  *   2. Entity-level IsAuditEnabled for wmkf_appsystemsetting.
- *   3. Attribute-level IsAuditEnabled for wmkf_settingvalue (the value column).
+ *   3. Attribute-level audit/type/capacity metadata for wmkf_settingvalue.
  *   4. Whether audit rows actually exist for the table (proof history is captured).
  */
 
@@ -73,9 +73,18 @@ console.log('\n=== 2. Entity wmkf_appsystemsetting ===');
 console.log(ent.ok ? `  IsAuditEnabled = ${JSON.stringify(ent.json?.IsAuditEnabled)}` : `  ERROR ${ent.status}: ${ent.text.slice(0, 200)}`);
 
 // 3. Attribute-level (the value column)
-const attr = await get(`/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes(LogicalName='wmkf_settingvalue')?$select=LogicalName,IsAuditEnabled`);
+const attr = await get(`/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes(LogicalName='wmkf_settingvalue')?$select=LogicalName,IsAuditEnabled,AttributeType`);
+const concreteType = attr.json?.AttributeType === 'Memo'
+  ? 'MemoAttributeMetadata'
+  : 'StringAttributeMetadata';
+const capacity = attr.ok
+  ? await get(`/EntityDefinitions(LogicalName='wmkf_appsystemsetting')/Attributes/Microsoft.Dynamics.CRM.${concreteType}?$select=LogicalName,MaxLength&$filter=${encodeURIComponent("LogicalName eq 'wmkf_settingvalue'")}`)
+  : null;
+const capacityRow = capacity?.json?.value?.[0];
 console.log('\n=== 3. Attribute wmkf_settingvalue ===');
-console.log(attr.ok ? `  IsAuditEnabled = ${JSON.stringify(attr.json?.IsAuditEnabled)}` : `  ERROR ${attr.status}: ${attr.text.slice(0, 200)}`);
+console.log(attr.ok
+  ? `  IsAuditEnabled = ${JSON.stringify(attr.json?.IsAuditEnabled)}; AttributeType = ${attr.json?.AttributeType}; MaxLength = ${capacityRow?.MaxLength ?? `ERROR ${capacity?.status}`}`
+  : `  ERROR ${attr.status}: ${attr.text.slice(0, 200)}`);
 
 // 4. Do audit rows actually exist for this table?
 const aud = await get(`/audits?$filter=${encodeURIComponent("objecttypecode eq 'wmkf_appsystemsetting'")}&$select=createdon,action,operation,_userid_value&$top=5&$orderby=createdon desc`);

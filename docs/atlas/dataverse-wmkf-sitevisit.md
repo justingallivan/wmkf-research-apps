@@ -4,12 +4,13 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-08-25
+last_verified: 2026-08-29
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
   - lib/dataverse/adapters/site-visit.js
   - lib/services/site-visit/logistics-service.js
+  - lib/services/site-visit/curated-recipient-service.js
   - lib/dataverse/schema/wave21-site-visit-logistics/wmkf_sitevisit_logistics.json
 ---
 
@@ -73,7 +74,15 @@ fallback.
   (`logistics-service.js::refsFromParties`, S466) instead of failing closed.
 - `recipient-directory-service.js` joins active WMKF profiles to enabled
   `systemusers` and reads Board/Consultant suggestions by immutable
-  `expertise_roster.id` plus maintained `preferred_email`.
+  `expertise_roster.id` plus maintained `preferred_email`. This directory is
+  retained for interpreting existing Site Visit attendee-reference maps; it is
+  not the new distribution-composer picker.
+- `curated-recipient-service.js` powers the distribution-composer picker from
+  the versioned `site_visit.distribution_recipient_directory` Dataverse setting.
+  The setting stores only profile IDs, Contact GUIDs, and external category;
+  active staff/systemusers and active Contacts supply current display names and
+  primary email addresses. Admin can search existing Contacts but cannot create
+  or edit them. Unavailable configured identities are omitted from Workbench.
 - `pre-site-visit/distribution-service.js` can bind the Activity ID/ETag and a
   bounded event snapshot into an informational `METHOD:PUBLISH` calendar
   attachment. For a calendar-enabled preview it requires the ActivityParty

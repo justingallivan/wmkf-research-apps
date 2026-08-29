@@ -8,7 +8,7 @@
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
-  findByEmail, getById, getByIdWithSelect, queryUsers,
+  findByEmail, getById, getByIdWithSelect, queryAllUsers, queryUsers,
 } from '../../lib/dataverse/adapters/system-user.js';
 
 afterEach(() => jest.restoreAllMocks());
@@ -72,6 +72,27 @@ describe('system-user.queryUsers', () => {
     };
     const out = await queryUsers(options);
     expect(out).toEqual({ records: [] });
+    expect(query).toHaveBeenCalledWith('systemusers', options);
+  });
+});
+
+describe('system-user.queryAllUsers', () => {
+  test('forwards options to the paginated DynamicsService query', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [{ systemuserid: 'su-1' }],
+      totalCount: 1,
+      capped: false,
+    });
+    const options = {
+      select: 'systemuserid,fullname,internalemailaddress,isdisabled',
+      filter: 'isdisabled eq false',
+      orderby: 'systemuserid asc',
+    };
+    await expect(queryAllUsers(options)).resolves.toEqual({
+      records: [{ systemuserid: 'su-1' }],
+      totalCount: 1,
+      capped: false,
+    });
     expect(query).toHaveBeenCalledWith('systemusers', options);
   });
 });
