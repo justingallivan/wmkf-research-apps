@@ -1,161 +1,218 @@
-# Session 467 Prompt: Staff Deliberations Workspace Live; UI/UX Follow-ups Queued
+# Session 468 Prompt: Funding History Live; Codex Branch Awaiting Merge Decision
 
-## Session 466 Summary
+## Session 467 Summary
 
-Session 466 (2026-08-27→28) rebuilt the Workbench's site-visit UI end to end
-(six production releases), resolved the write-attribution question
-empirically, and fixed a production generation timeout.
+Session 467 (2026-08-28) shipped the deterministic Institutional Funding
+History fill for the Pre-Site writeup, fixed a production max_tokens
+failure, surfaced Executor output budgets in the Admin panel, and executed
+the owner-approved cleanup of the 1002379 smoke vehicle. In parallel, a
+Codex worktree delivered the Staff Deliberations history UX follow-ups on
+`codex/staff-deliberations-history-ux` (unmerged — owner decision).
 
 ### What Was Completed
 
-1. **Staff Deliberations workspace (owner-approved design → production).**
-   The Pre Site Visit Writeup + Site Visit tabs are merged into one
-   stage-aware tab (`shared/components/workbench/StaffDeliberationsTab.js`,
-   rail Draft → Share → Wrap Up; legacy tab keys alias in). Design settled in
-   the proposal artifact
-   (https://claude.ai/code/artifact/23f6be12-6362-460a-9c05-ca48d333d10b):
-   Share = existing guarded lock; Wrap Up = first accepted materials send
-   (server-derived `currentSourceEverSent`, scoped per source document);
-   "Move to Final Writeup" deliberately NOT built (open question 4b).
-   Shipped increments: history language split (Sent/Superseded/Failed +
-   "Send outcome unconfirmed" for ambiguous stale sends — Codex P2), GUID
-   and SharePoint-filename Details/tooltip disclosures everywhere, "Site
-   Visit materials" naming, logistics editor REMOVED (headless
-   `useSiteVisitContext` keeps composer suggestions; ActivityParty read
-   fallback covers Dynamics-scheduled visits — Codex P1), email history +
-   post-send composer collapsed, calendar (.ics) UI removed (server contract
-   intact), slim Wrap Up note, document display labels.
-2. **Write attribution resolved empirically.** Prod
-   `DYNAMICS_IMPERSONATION_ENABLED=true` since ~S271 (docs said deferred —
-   reconciled); owner-run census probe showed impersonation works
-   (`wmkf_ai_run` 22 staff-attributed) but ALL `wmkf_requestdocument` rows
-   fall back to the service principal — privilege-intersection signature on
-   the post-audit table. Fix = CRM role grant; brief for Connor prepared
-   (https://claude.ai/code/artifact/f8877f90-8559-482f-8fbc-ce00e239f947).
-   Access census: 8 staff hold `reviewers` (can trigger writes); superuser =
-   Justin + Connor only; all real staff have linked systemusers.
-3. **Executor timeout budget.** Production run `88f7c877` (Request 1002788)
-   hit the 120s LLM default; `executePrompt` gained server-owned
-   `timeoutMsOverride` (EXECUTOR_CONTRACT.md updated) and the pre-site
-   writeup caller uses 240s. Retry succeeded same day.
-4. **Record-keeping:** S465 optional-probe item closed (owner: don't
-   pursue); pilot observation row added for this session.
+1. **Institutional Funding History filled from Dataverse (no LLM).**
+   `lib/services/pre-site-visit/funding-history.js` renders the Power
+   Automate sentence ("<AKA> has received N awards totaling $X million from
+   WMKF. The most recent [research] grant was awarded in <FY> <description>.")
+   from the account rollups `wmkf_countofprogramgrants` /
+   `wmkf_sumofprogramgrants`, cross-checked fail-closed against the live
+   `akoya_request` rows matching the rollups' own predicate
+   (`wmkf_typeforrollup eq 'Program' and akoya_grant gt 0`). **Owner
+   decision:** count/sum stay all-program; the cited award is the newest
+   **Research**-program grant (`_wmkf_grantprogram_value_formatted ===
+   'Research'`; recency `akoya_decisiondate ?? wmkf_meetingdate`; "research"
+   qualifier inserted when it is not the newest overall). Snapshot
+   schemaVersion 3; pre-S467 Ready docs carry a durable
+   `funding_history_manual` edit-check warning. Two Codex review rounds
+   fixed all findings. Production-proven on 1002379 (zero program grants →
+   "…has not previously received a program grant from WMKF."). Read-only
+   probe `scripts/probe-funding-history-rollups.js` validated 7/7 accounts.
+2. **Pre-site output budget.** Run `f8bb1326` hit `max_tokens (16384)` —
+   Sonnet 5 adaptive thinking counts against the prompt row's budget and the
+   Admin editor does not expose `wmkf_ai_maxtokens`. Caller now sends
+   `maxTokensOverride: 32 768` (retry succeeded).
+3. **Admin "Output budget" line** on every Prompt templates card: effective
+   max_tokens, prompt-row value, server override (with since/reason),
+   resolved model, reviewed ceiling (red if exceeded), thinking mode, and an
+   "Anthropic model docs ↗" link with the registry `reviewedAt`. Budgets
+   live in `shared/config/executorBudgets.js`, imported by BOTH callers
+   (pre-site standing; review-synthesis retry floor/ceiling) and the panel —
+   display equals use by construction; `tests/unit/executor-budgets.test.js`
+   pins the literals. **Owner directive:** "we can't be setting mutable
+   parameters in code" → queued (see Verified Open 1).
+4. **1002379 cleanup executed (owner-run script, untracked).** Inventory
+   back to 2026-08-01 across Dataverse, Postgres, and the SharePoint tree;
+   deleted the pointer, 7 registry rows, 7 generated files + 3 folders, 10
+   distribution rows; kept AI-run rows, `AI Materials/`, cover-page copy,
+   `Reviewer_*`. The 6 test emails + "Test Site Visit" stay (owner: unrelated
+   to the proposal; cleanup is for future data mining). Record:
+   `docs/audits/request-1002379-test-mutation-inventory-2026-08-28.md` §6.
+5. **Guarded reopen note minimum (10 chars)** explained to owner; inline
+   validation copy offered, not built.
 
-### Commits
+### Commits (main, all deployed Ready)
 
-Main line (each feature branch Codex-reviewed where noted):
-- `5eb3a58c` skip optional Dataverse probe (owner decision)
-- `65e11975`/`ff84ff12` impersonation-state reconciliation + census probe
-- `bba3c015` access & identity census probe
-- `a9e3206b` Connor brief filed as waiting item
-- `a6b7746b` distribution language fixes S2/S3/S5 + Codex P2 guard
-- `6a26b560` Staff Deliberations merge (Phase 1) + Codex fixes
-- `1e477d54` declutter (logistics removed, history collapsed, party fallback)
-- `30cb5d90` composer trim (calendar UI out, material labels)
-- `7b66e9a8` Wrap Up composer collapse · `23138eb2` slim Wrap Up note
-- `db7be718` pre-site 240s LLM budget · `d5b5342f` document display labels
+- `a7eb79be` merge funding history (`e40ad309`, `618b54f4`, `748b429e`,
+  `4913705e`, `db19fb13`, `58ad5281`, `2fd361fc`)
+- `730958d1` rollup probe · `c99d1fd8` research-recency merge
+- `6313db3b` 32 768 budget · `6915c2c6` admin output-budget merge
+  (`a42994ee`, `31a6f0da`)
+- `ca0d6f26` mutable-parameters action item + memory
+- `5fcdb899` / `a6058165` inventory probe + audit · `9b189271` / `aa548ed9`
+  cleanup record + data-mining rationale memory
+
+## Codex workstream handoff — branch `codex/staff-deliberations-history-ux` (ownership returned to owner 2026-08-28 evening)
+
+**Branch state `[VERIFIED read-only at S467 close]`:** worktree
+`../WMKF_Apps-codex` clean; HEAD `ef36a801` = origin (0 ahead / 0 behind);
+11 files vs `main`, no shared primitives, routes, schema, or services touched.
+- `1fde64f9` — Group distribution history and tag test sends
+  (`shared/components/workbench/PreSiteDistributionPanel.js`,
+  `tests/unit/pre-site-distribution-panel.test.js`): neutral "Test send" pill
+  when every To/Cc equals From (case-insensitive); calendar-day grouping with
+  Today/Yesterday/short-date headers, newest day first, API order within a
+  day. 12/12 focused tests; ESLint 0 errors (one pre-existing
+  `react-hooks/set-state-in-effect` warning outside the diff). **No build
+  run. Not merged, not deployed.**
+- `ef36a801` — closeout: `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`,
+  `docs/audits/final-writeup-review-fable-review-2026-08-28.md`,
+  `outputs/final-writeup-review-2026-08-28/` (brief + 4 HTML mockups), and
+  the branch copy of SESSION_PROMPT.md (its handoff section is superseded by
+  this one — resolve in favour of `main` at merge).
+
+**Merge path (owner's go, from the main checkout):** `git merge --no-ff
+codex/staff-deliberations-history-ux` → `npm run lint` + `npm run build` on
+the merged tree → push → `vercel inspect` → park the worktree
+(`git -C ../WMKF_Apps-codex checkout -B codex/parked origin/main`).
+
+**Final Writeup Review — PLAN ONLY, do not implement without owner's go.**
+Claude Fable review: READY WITH NAMED PREREQUISITES (no P0; findings folded
+in). Accepted architecture: one editable SharePoint document; keep
+`wmkf_CurrentPreSiteVisit`; source row → lifecycle `FINAL`; a separate Final
+lineage row pointing to the same item; explicit review acknowledgements.
+Prerequisites: (1) owner approves the expanded file surface (services,
+routes, schema, pages — the two-file authorization does not cover it);
+(2) explicit transition actor/time storage before Slice 1 (do not rely on
+Dataverse `modifiedby` — S466 attribution finding); (3) owner-authorized
+read-only `systemuser` coverage probe before the Slice 2 acknowledgement
+schema; (4) explicit PC/leadership persona contract before Slice 4;
+(5) Slice 0 `/sweep` of the obsolete "copy to a new Final file" direction.
+This resolves S466 Owner Decision 1 (Q4b) at design level, pending the go.
 
 ## Next Items
 
 ### Verified Open
 
-1. **UI/UX follow-ups on Staff Deliberations — owner says more to do
-   (S466 close).** Known queued items from the proposal artifact:
-   (a) limited add-addressees control for the composer (owner: "not every
-   board member"; shape to discuss — open question 5), (b) test-send
-   tagging in email history (Q2), (c) Phase 2 history grouping/day headers.
-   Owner will bring more; start by asking what they saw.
-2. **WAITING on Connor (out until ~2026-09-10): `wmkf_requestdocument`
-   staff-role privilege grant.** Brief ready to share (artifact link above);
-   after the grant, owner re-runs
-   `scripts/probe-write-attribution-census.js` to confirm staff attribution.
-   Context: `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status.
-3. **PD onboarding / posture seeding — before the NEXT solicitation cycle.**
+1. **Persist Executor output budgets as admin-editable settings (owner
+   directive S467).** Evidence: `docs/CURRENT_WORK_QUEUE.md` audit
+   follow-ups; `feedback-mutable-parameters-not-in-code`. Target: Prompt
+   templates panel edits budget/timeout; Executor reads durable state
+   (`wmkf_appsystemsettings` pattern behind `/api/admin/models`, or the
+   prompt row); registry becomes seed/fallback; keep the server-side ceiling
+   bound and superuser-only writes. Tier 1 — feature branch.
+2. **Merge decision on `codex/staff-deliberations-history-ux`** (section
+   above). Owner's call; Tier 1 UI.
+3. **Positive-path funding history has no production exercise yet.**
+   Evidence: 1002379 hit the zero-count branch; positive path proven only by
+   probe (Emory, UCLA…) and unit tests. First real institution with program
+   grants will exercise it — check the sentence in that document.
+4. **WAITING on Connor (~2026-09-10): `wmkf_requestdocument` staff-role
+   privilege grant.** After the grant, owner re-runs
+   `scripts/probe-write-attribution-census.js`.
+   `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` §Status.
+5. **PD onboarding / posture seeding — before the NEXT solicitation cycle.**
    Evidence: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` rollout checklist.
-4. **Async PD approval for staff-triggered "sent as me" mail.** Evidence:
+6. **Async PD approval for staff-triggered "sent as me" mail.** Evidence:
    plan doc Broader effort; `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`.
+7. **Limited add-addressees control for the materials composer** (S466
+   proposal Q5; owner: "not every board member"). Shape to discuss.
 
 ### Owner Decision Needed
 
-1. **Wrap Up → Final Writeup hand-off mechanics (proposal Q4b).** The
-   "Move to Final Writeup" action needs its receiving end defined (state/
-   milestone + how the Final Writeup tab consumes the doc) before it ships.
+1. **Final Writeup Review plan — go / file-surface approval** (prerequisite
+   1 above). Until then the S466 Q4b item stays design-resolved only.
 2. **Share→Wrap Up no-send fallback (proposal Q4a):** manual "Move to
    wrap-up" for visits whose materials go out off-app, or rail stays Share.
+3. **Zero-program-grant wording:** currently "…has not previously received a
+   program grant from WMKF." Discretionary history (St. Jude: 18 awards) is
+   not mentioned; a variant is a small change in
+   `formatInstitutionalFundingHistory` if wanted.
 
 ### Parked
 
 1. **Reviewer cron-reminders ledger slice — BUILT, HELD on
    `feature/reviewer-cron-reminders-ledger` until the review cycle ends.**
    Migration 038 UNAPPLIED everywhere. Promotion sequence in
-   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10 (branch copy);
-   apply→merge drift alerts are warning-only (S464).
-2. **Preference-matrix slice BUILD** — after Parked 1 merges; both consumers
-   adopt `effectiveReviewAll` together; ask owner for UI label wording.
+   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10 (branch copy).
+2. **Preference-matrix slice BUILD** — after Parked 1 merges.
 3. **PD tutorial refresh + distribution** — re-open at Parked 1 step (e).
-4. **Post-cycle invitation-link strictness (tighten vs ratify).** Trigger:
-   cycle end. `project-invitation-link-strictness-open-decision.md`.
-5. **Public git history rewrite** — owner-gated destructive step
+4. **Post-cycle invitation-link strictness.**
+   `project-invitation-link-strictness-open-decision.md`.
+5. **Public git history rewrite** — owner-gated
    (`docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
-6. **Tier 2 send-path reorder** (recorded in `94012253` commit message):
-   reconcile prior transport outcome before the stale asserts in
-   `sendPreSiteDistribution` — fixes the ambiguity server-side that the
-   "Send outcome unconfirmed" UI now flags.
+6. **Tier 2 send-path reorder** (`94012253` commit message).
+7. **Effort override for the pre-site call.** Only if the 240s timeout is hit
+   again now that the budget is 32 768; needs a product nod.
 
 ### Verify Before Acting
 
-1. **Phantom co-PI residuals (CRM-side cleanups)**: `ab@ab.com` contact on
-   `1001931`, corrupted-email duplicate pair, 1002788 test-byline trio,
-   18/8 cross-store drift rows. Evidence: local
+1. **Phantom co-PI residuals (CRM-side cleanups)**: local
    `outputs/phantom-copi-incident-2026-08-12.md` §Update 2026-08-27. Prod
-   Dataverse writes — owner confirmation + preflight re-probe first.
-2. **Logistics PATCH route has no in-app UI caller since S466** (editor
-   removed; `[VERIFIED via grep]`, Atlas wmkf_sitevisit page). If a future
-   session wants to retire the write route, re-grep callers first — the
-   service + validation are intentionally kept live.
+   writes — owner confirmation + preflight re-probe first.
+2. **Logistics PATCH route has no in-app UI caller since S466.** Re-grep
+   callers before any retirement; service + validation intentionally live.
+3. **1002379 as a future smoke vehicle:** it now has NO writeup state
+   (pointer empty, 0 registry rows) but `AI Materials/ProposalNarrative_1002379.pdf`
+   is still in place. Re-run `scripts/probe-request-1002379-test-inventory.js`
+   before and after any new test; the app principal cannot delete Activity
+   records (403 DeleteAccess) — by design, do not request the grant.
 
 ### Do Not Reopen Without New Decision
 
-1. **Blanket per-PD review of all automated mail.** Plan doc decision 10.
-2. **Reviewer flags keyed on contact.** S389 + Atlas; deliberate.
-3. **Write-permission asymmetry between flag stores.** Owner 2026-08-26.
-4. **Merging the parked reminders slice mid-cycle.** Owner S463.
-5. **Throwaway smoke-candidate cleanup on `1002788`** (Test Homer, Francesco
-   Cisco, Justin Test2) — owner removes personally.
-6. **Third "always auto" preference level.** Owner S464: two-state.
-7. **Re-running the 1002852 hard-failure smoke.** Owner S465.
-8. **Optional Dataverse probe for S465 smoke soft spots.** Owner S466:
-   don't pursue; reopen only if v5 attribution ever matters.
-9. **Separate Pre Site Visit / Site Visit tabs.** Owner-approved merge
-   shipped S466; legacy keys alias. Don't split back without a new decision.
-10. **Calendar (.ics) attachment UI.** Owner S466: unused, removed;
-    server contract intact if wanted again.
-11. **In-app Site Visit logistics editor.** Owner S466: scheduling is
-    handled by others in Dynamics; Workbench reads headlessly
-    (`useSiteVisitContext` + ActivityParty fallback).
+1. **Most-recent grant = newest Research program grant** (owner S467); count/
+   sum remain all-program rollups matching the AkoyaGO Award History panel.
+2. **Registry budgets as the long-term home** — owner S467: mutable
+   parameters must not live in code (Verified Open 1 is the replacement).
+3. **1002379 test emails / "Test Site Visit" activity** — owner S467: leave
+   them; `wmkf_ai_run` rows retained; unregistered SharePoint files kept.
+4. **Blanket per-PD review of all automated mail.** Plan doc decision 10.
+5. **Reviewer flags keyed on contact.** S389 + Atlas.
+6. **Write-permission asymmetry between flag stores.** Owner 2026-08-26.
+7. **Merging the parked reminders slice mid-cycle.** Owner S463.
+8. **Throwaway smoke-candidate cleanup on `1002788`** — owner removes.
+9. **Third "always auto" preference level.** Owner S464.
+10. **Re-running the 1002852 hard-failure smoke.** Owner S465.
+11. **Optional Dataverse probe for S465 smoke soft spots.** Owner S466.
+12. **Separate Pre Site Visit / Site Visit tabs; calendar (.ics) UI; in-app
+    logistics editor.** Owner S466 removals/merge; legacy keys alias.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/workbench/StaffDeliberationsTab.js` | Merged workspace: stage rail, generation, share modal, admin/reopen |
-| `shared/components/workbench/PreSiteDistributionPanel.js` | Materials composer + collapsed history; `collapsed` + `onHistory` props |
-| `shared/components/workbench/useSiteVisitContext.js` | Headless wmkf_sitevisit read feeding composer suggestions |
-| `lib/services/pre-site-visit/distribution-service.js` | `currentSourceEverSent` flag; `lastErrorCode` projection |
-| `lib/services/site-visit/logistics-service.js` | `refsFromParties` read fallback for Dynamics-scheduled visits |
-| `lib/services/execute-prompt.js` | `timeoutMsOverride` (EXECUTOR_CONTRACT.md table) |
-| `scripts/probe-write-attribution-census.js` | Owner-run createdby census (re-run after Connor's grant) |
-| `scripts/probe-access-and-identity-census.js` | Owner-run app-access + linked-identity census |
-| `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md` | §Status: impersonation live; requestdocument grant remaining |
+| `lib/services/pre-site-visit/funding-history.js` | Rollup predicate, fail-closed reconcile, research recency, sentence formatter |
+| `lib/services/pre-site-visit/proposal-core-service.js` | Loader: account rollups + program grants; `PRE_SITE_BUDGET` overrides |
+| `shared/config/executorBudgets.js` | Server-owned Executor budgets (pre-site standing; synthesis retry) — shown in Admin |
+| `shared/components/admin/PromptTemplatesSection.js` | `OutputBudgetLine` (budget · model · ceiling · Anthropic docs link) |
+| `lib/services/model-capabilities.js` | Reviewed per-model ceilings, `thinkingMode`, `source`, `reviewedAt` |
+| `scripts/probe-funding-history-rollups.js` | Read-only rollup/recency validation across accounts |
+| `scripts/probe-request-1002379-test-inventory.js` | Read-only test-residue inventory (registry, runs, pointers, SharePoint refs) |
+| `docs/audits/request-1002379-test-mutation-inventory-2026-08-28.md` | Inventory + executed cleanup record |
+| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` (Codex branch) | Final Writeup Review plan — prerequisites gated |
+| `docs/EXECUTOR_CONTRACT.md` | `maxTokensOverride` / `timeoutMsOverride` rows → registry |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/staff-deliberations-tab.test.js \
-  tests/unit/pre-site-distribution-panel.test.js \
-  tests/unit/pre-site-distribution-service.test.js \
-  tests/unit/use-site-visit-context.test.js \
-  tests/unit/site-visit-logistics-service.test.js \
-  tests/unit/execute-prompt-payload-boundary.test.js
-npm run lint   # the merged-suite mock is lint-sensitive (react-hooks)
+npx jest tests/unit/pre-site-visit-funding-history.test.js \
+  tests/unit/pre-site-visit-proposal-core-service.test.js \
+  tests/unit/pre-site-visit-artifact-service.test.js \
+  tests/unit/pre-site-visit-docx-renderer.test.js \
+  tests/unit/executor-budgets.test.js \
+  tests/unit/synthesize-reviews-service.test.js \
+  tests/unit/admin-models.test.js
+npm run lint   # PromptTemplatesSection is in the react-hooks-sensitive zone
+node scripts/probe-funding-history-rollups.js            # read-only, owner-authorized
+node scripts/probe-request-1002379-test-inventory.js     # read-only, owner-authorized
 ```

@@ -244,6 +244,18 @@ document inventory, and individual implementation plans do not establish priorit
   entries below describe the pre-merge two-tab UI; their document-lifecycle
   guarantees are unchanged. Design record: the Site Visit Workspace
   proposal artifact (link in `SESSION_PROMPT.md`).
+- **Institutional Funding History filled from Dataverse (S467, 2026-08-28,
+  production):** `lib/services/pre-site-visit/funding-history.js` renders the
+  `AI:InstitutionalFundingHistory` placeholder sentence from the account rollups
+  `wmkf_countofprogramgrants`/`wmkf_sumofprogramgrants`, fail-closed against
+  the live rows matching the rollups' predicate (`wmkf_typeforrollup eq
+  'Program' and akoya_grant gt 0`); the cited award is the newest
+  **Research**-program grant by `akoya_decisiondate ?? wmkf_meetingdate`
+  (owner decision). Snapshot schemaVersion 3; pre-S467 Ready rows carry a
+  `funding_history_manual` warning. Proven on `1002379` (zero-count branch);
+  the positive branch is probe/test-proven only. Hazard: `akoya_mostrecentgrant`
+  is NOT type-filtered — never cite it. Request `1002379`'s writeup state was
+  then fully cleaned (2026-08-29 UTC; `docs/audits/request-1002379-test-mutation-inventory-2026-08-28.md`).
 - **Production-proved Site Visit handoff (2026-08-21):** after exact owner
   approval, signed-in Request `1002379` moved the current Pre-Site Word
   workspace Draft→Review, kept the same SharePoint Edit/Download identity,

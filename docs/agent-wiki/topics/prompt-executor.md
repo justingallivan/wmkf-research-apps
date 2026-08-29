@@ -71,6 +71,17 @@ reviewer-finder prompt migration.
   post-parse write boundary. The Executor does not semantically retry; review
   synthesis is the current caller-owned exception, re-invoking once only for
   typed `claude_output_truncated`, with a separate AI-run audit attempt.
+- **Server-owned output budgets (S467, 2026-08-28):** `maxTokensOverride` /
+  `timeoutMsOverride` values live in `shared/config/executorBudgets.js`, keyed
+  by prompt name and imported by BOTH callers (pre-site writeup standing
+  32 768 / 240 s; review-synthesis retry floor 16 000 / ceiling 32 000) and by
+  the Admin Prompt templates "Output budget" line — so what the panel shows is
+  what the Executor sends. Sonnet 5 adaptive thinking counts against
+  `max_tokens` (production run `f8bb1326` exhausted the row's 16 384), and the
+  Admin editor does not expose `wmkf_ai_maxtokens`. Hazard: this is an
+  interim home — owner directive S467 says mutable parameters must not live
+  in code; the queued replacement is a persisted admin-editable setting
+  (`docs/CURRENT_WORK_QUEUE.md`).
 
 ## Durable Memory
 

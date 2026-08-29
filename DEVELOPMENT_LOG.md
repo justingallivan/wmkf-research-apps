@@ -10,6 +10,27 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Institutional Funding History filled from Dataverse; Executor budgets made visible (Session 467)
+
+**Milestone:** The Pre-Site writeup's `[[AI:InstitutionalFundingHistory]]`
+section is now filled deterministically from the AkoyaGO account rollups
+(count/sum, cross-checked fail-closed against live program-grant rows) with
+the newest **Research** grant cited — replacing the Power Automate template
+and the manual Word step. **Sessions:** 467 (two Codex review rounds; owner
+recency decision; production-proven on 1002379).
+**Ship state:** funding history live (schemaVersion 3; older docs carry a
+durable edit-check warning); pre-site call runs with a 32 768 output budget
+after Sonnet 5 adaptive thinking exhausted 16 384; Admin Prompt templates
+show each prompt's effective budget, model ceiling, and Anthropic docs link
+from a single tracked registry both callers import.
+**Why it matters:** the last hand-filled section of the first draft is gone,
+and budget drift against Anthropic's per-model limits is now visible rather
+than silent. Owner directive recorded: mutable parameters must move out of
+code into admin-editable settings (queued).
+**Pointers:** `lib/services/pre-site-visit/funding-history.js`;
+`shared/config/executorBudgets.js`; `docs/EXECUTOR_CONTRACT.md`; commits
+`a7eb79be`, `c99d1fd8`, `6313db3b`, `6915c2c6`.
+
 ## August 2026 — Staff Deliberations workspace ships; write-attribution state resolved (Session 466)
 
 **Milestone:** The Workbench's Pre Site Visit Writeup + Site Visit tabs were
