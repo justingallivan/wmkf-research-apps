@@ -30,14 +30,14 @@ export const EXECUTOR_BUDGETS = Object.freeze({
     kind: 'standing',
     maxTokensOverride: 32_768,
     timeoutMsOverride: 240_000,
-    since: 'S467 (2026-08-28)',
+    since: 'budget S467, timeout S466 (2026-08-28)',
     reason: 'Eight governed sections over a full proposal; Sonnet 5 adaptive thinking exhausted the prompt row\'s 16 384 (production run f8bb1326).',
   }),
   'review-synthesis.generate': Object.freeze({
     kind: 'retry',
     floor: 16_000,
     ceiling: 32_000,
-    since: 'S432',
+    since: '2026-07-27 (commit 0afea876)',
     reason: 'One bounded recovery attempt after a provider-confirmed max_tokens truncation of the first synthesis pass.',
   }),
 });
