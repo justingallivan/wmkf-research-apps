@@ -152,4 +152,39 @@ describe('contact candidate helpers', () => {
     const out = await contact.searchByName('Ada Lovelace', { top: 5 });
     expect(out.map((r) => r.contactid)).toEqual(['active', 'inactive']);
   });
+
+  test('searchDirectoryByName supports surname prefixes in one bounded query', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: [
+        { contactid: 'active', firstname: 'Ada', lastname: 'Lovelace', fullname: 'Ada Lovelace', statecode: 0 },
+      ],
+    });
+
+    await expect(contact.searchDirectoryByName('Love', { top: 50 })).resolves.toEqual([
+      expect.objectContaining({ contactid: 'active' }),
+    ]);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith('contacts', expect.objectContaining({
+      filter: "(startswith(lastname,'Love') or startswith(firstname,'Love'))",
+      orderby: 'statecode asc,lastname asc,firstname asc',
+      top: 10,
+    }));
+  });
+
+  test('searchDirectoryByName supports partial full names and escapes filter literals', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await expect(contact.searchDirectoryByName("Ada O'Ne", { top: 5 })).resolves.toEqual([]);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][1]).toMatchObject({
+      filter: "(startswith(fullname,'Ada O''Ne') or (startswith(firstname,'Ada') and startswith(lastname,'O''Ne')))",
+      top: 5,
+    });
+  });
+
+  test('searchDirectoryByName skips blank input without a Dataverse request', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords');
+    await expect(contact.searchDirectoryByName('   ')).resolves.toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
 });
