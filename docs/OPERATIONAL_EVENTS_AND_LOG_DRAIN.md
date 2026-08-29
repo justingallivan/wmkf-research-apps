@@ -138,8 +138,13 @@ stay `open` until staff resolve them — that absence is explicit, not implied.
 `/admin` → **Operational Events** (superuser-only API
 `/api/admin/operational-events`): status/severity/source filters, free-text
 search over request number / entity refs / correlation id / summary,
-expandable sanitized metadata, occurrence counts, transient badges, and
-Resolve/Reopen actions.
+expandable sanitized metadata, occurrence counts, transient badges,
+Resolve/Reopen actions, and **Resolve all N shown** (S468): one PATCH with
+`events[]` (≤500, the list cap) where every row carries its own
+`expectedStatus`/`expectedLastOccurredAt` precondition — rows that changed
+since the list rendered are skipped and counted as `stale`, never
+blind-closed; the response reports `updated/stale/notFound/invalid` and the
+card refetches.
 
 ### Retention
 

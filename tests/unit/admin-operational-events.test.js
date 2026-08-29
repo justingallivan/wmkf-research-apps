@@ -15,6 +15,7 @@ jest.mock('../../lib/services/operational-event-service', () => ({
   queryEvents: jest.fn(),
   getEventSummary: jest.fn(),
   setEventStatus: jest.fn(),
+  setEventStatuses: jest.fn(),
 }));
 
 import handler from '../../pages/api/admin/operational-events.js';
@@ -113,4 +114,35 @@ test('PATCH unknown id → 404', async () => {
   const res = mkRes();
   await handler({ method: 'PATCH', body: { id: 999, action: 'resolve' } }, res);
   expect(res.statusCode).toBe(404);
+});
+
+test('PATCH with an events[] batch resolves each row with its own precondition and returns counts', async () => {
+  OperationalEventService.setEventStatuses.mockResolvedValue({
+    updated: [5, 6], stale: [7], notFound: [], invalid: [],
+  });
+  const res = mkRes();
+  const events = [
+    { id: 5, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z' },
+    { id: 6, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:01.000Z' },
+    { id: 7, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:02.000Z' },
+  ];
+  await handler({ method: 'PATCH', body: { action: 'resolve', events, note: 'S468 throttle storm' } }, res);
+  expect(OperationalEventService.setEventStatuses).toHaveBeenCalledWith(events, 'resolve', {
+    profileId: 9,
+    note: 'S468 throttle storm',
+  });
+  expect(OperationalEventService.setEventStatus).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    ok: true, action: 'resolve', requested: 3, updated: 2, stale: 1, notFound: 0, invalid: 0,
+  });
+});
+
+test('PATCH batch over the cap → 400', async () => {
+  const err = new Error('too many events in one batch (max 500)');
+  err.code = 'batch_too_large';
+  OperationalEventService.setEventStatuses.mockRejectedValue(err);
+  const res = mkRes();
+  await handler({ method: 'PATCH', body: { action: 'resolve', events: new Array(501).fill({ id: 1 }) } }, res);
+  expect(res.statusCode).toBe(400);
 });

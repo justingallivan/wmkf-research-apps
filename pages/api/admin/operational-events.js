@@ -40,7 +40,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, action, note, expectedStatus, expectedLastOccurredAt } = req.body || {};
+    const { id, action, note, expectedStatus, expectedLastOccurredAt, events } = req.body || {};
+
+    // Bulk form ("Resolve all shown"): every row carries its own freshness
+    // precondition; per-row outcomes come back as counts and the client
+    // refetches. A stale row is skipped, never blind-closed.
+    if (Array.isArray(events)) {
+      const outcome = await OperationalEventService.setEventStatuses(events, action, {
+        profileId: gate.profileId,
+        note: note || null,
+      });
+      return res.json({
+        ok: true,
+        action,
+        requested: events.length,
+        updated: outcome.updated.length,
+        stale: outcome.stale.length,
+        notFound: outcome.notFound.length,
+        invalid: outcome.invalid.length,
+      });
+    }
+
     const updated = await OperationalEventService.setEventStatus(id, action, {
       profileId: gate.profileId,
       note: note || null,
@@ -52,7 +72,7 @@ export default async function handler(req, res) {
     }
     return res.json({ ok: true, id: updated.id, status: updated.status });
   } catch (error) {
-    if (error?.code === 'invalid_id' || error?.code === 'invalid_action') {
+    if (error?.code === 'invalid_id' || error?.code === 'invalid_action' || error?.code === 'batch_too_large') {
       return res.status(400).json({ error: error.message });
     }
     if (error?.code === 'stale_state') {

@@ -437,6 +437,39 @@ function SystemAlertsSection() {
     setActionInProgress(null);
   };
 
+  // "Resolve all shown": every row in the CURRENT list, each with its own
+  // freshness precondition, in one request. Rows that changed since the list
+  // rendered are skipped and reported, never blind-closed.
+  const resolvableShown = events.filter(e => e.status === 'open');
+  const handleResolveAllShown = async () => {
+    if (!resolvableShown.length || bulkInProgress) return;
+    if (!confirm(`Resolve all ${resolvableShown.length} open event(s) currently shown?`)) return;
+    setBulkInProgress(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch('/api/admin/operational-events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve',
+          events: resolvableShown.map(e => ({
+            id: e.id,
+            expectedStatus: e.status,
+            expectedLastOccurredAt: e.last_occurred_at,
+          })),
+        }),
+      });
+      const data = res.ok ? await res.json() : null;
+      setBulkResult(data
+        ? `Resolved ${data.updated} of ${data.requested}${data.stale ? ` · ${data.stale} changed since load (left open)` : ''}${data.notFound ? ` · ${data.notFound} not found` : ''}`
+        : 'Bulk resolve failed');
+    } catch {
+      setBulkResult('Bulk resolve failed');
+    }
+    setBulkInProgress(false);
+    fetchEvents();
+  };
+
   const severityColors = {
     critical: 'bg-red-100 text-red-800 border-red-200',
     error: 'bg-red-50 text-red-700 border-red-200',
@@ -555,6 +588,8 @@ function OperationalEventsSection() {
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [bulkInProgress, setBulkInProgress] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('open');
   const [severityFilter, setSeverityFilter] = useState('');
@@ -610,6 +645,39 @@ function OperationalEventsSection() {
       if (res.ok || res.status === 409) fetchEvents();
     } catch {}
     setActionInProgress(null);
+  };
+
+  // "Resolve all shown": every row in the CURRENT list, each with its own
+  // freshness precondition, in one request. Rows that changed since the list
+  // rendered are skipped and reported, never blind-closed.
+  const resolvableShown = events.filter(e => e.status === 'open');
+  const handleResolveAllShown = async () => {
+    if (!resolvableShown.length || bulkInProgress) return;
+    if (!confirm(`Resolve all ${resolvableShown.length} open event(s) currently shown?`)) return;
+    setBulkInProgress(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch('/api/admin/operational-events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve',
+          events: resolvableShown.map(e => ({
+            id: e.id,
+            expectedStatus: e.status,
+            expectedLastOccurredAt: e.last_occurred_at,
+          })),
+        }),
+      });
+      const data = res.ok ? await res.json() : null;
+      setBulkResult(data
+        ? `Resolved ${data.updated} of ${data.requested}${data.stale ? ` · ${data.stale} changed since load (left open)` : ''}${data.notFound ? ` · ${data.notFound} not found` : ''}`
+        : 'Bulk resolve failed');
+    } catch {
+      setBulkResult('Bulk resolve failed');
+    }
+    setBulkInProgress(false);
+    fetchEvents();
   };
 
   const severityColors = {
@@ -698,7 +766,21 @@ function OperationalEventsSection() {
             </button>
           )}
         </form>
+        {!loading && resolvableShown.length > 0 && (
+          <button
+            type="button"
+            onClick={handleResolveAllShown}
+            disabled={bulkInProgress}
+            className="ml-auto px-2 py-1 text-xs bg-white hover:bg-gray-50 rounded border border-gray-300 text-gray-700 disabled:opacity-50"
+            title="Resolve every open event in the current list (filters and search apply)"
+          >
+            {bulkInProgress ? 'Resolving…' : `Resolve all ${resolvableShown.length} shown`}
+          </button>
+        )}
       </div>
+      {bulkResult && (
+        <p className="text-xs text-gray-600 mb-3" role="status">{bulkResult}</p>
+      )}
 
       {loading ? (
         <div className="text-gray-500 text-sm">Loading events...</div>

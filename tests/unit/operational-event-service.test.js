@@ -353,3 +353,40 @@ describe('queryEvents', () => {
     expect(sqlMock.query.mock.calls[0][1]).toHaveLength(2);
   });
 });
+
+describe('setEventStatuses (bulk)', () => {
+  test('applies each row with its own precondition and buckets the outcomes', async () => {
+    // Row 5: updated. Row 6: precondition miss → current row exists → stale.
+    // Row 7: no such row → notFound. Row 'x': invalid id (never queried).
+    sqlMock
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] }) // UPDATE 5
+      .mockResolvedValueOnce({ rows: [] })                               // UPDATE 6 (miss)
+      .mockResolvedValueOnce({ rows: [{ id: 6, status: 'open', last_occurred_at: 'later', occurrence_count: 2 }] }) // SELECT 6
+      .mockResolvedValueOnce({ rows: [] })                               // UPDATE 7 (miss)
+      .mockResolvedValueOnce({ rows: [] });                              // SELECT 7 (gone)
+    const outcome = await OperationalEventService.setEventStatuses([
+      { id: 5, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z' },
+      { id: 6, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:01.000Z' },
+      { id: 7, expectedStatus: 'open' },
+      { id: 'x' },
+    ], 'resolve', { profileId: 9, note: 'bulk' });
+    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [NaN] });
+    expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  test('rejects an invalid action before touching the database', async () => {
+    await expect(OperationalEventService.setEventStatuses([{ id: 1 }], 'nuke')).rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects a batch over the admin list cap', async () => {
+    await expect(OperationalEventService.setEventStatuses(new Array(501).fill({ id: 1 }), 'resolve'))
+      .rejects.toMatchObject({ code: 'batch_too_large' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('an unexpected database error still propagates (not swallowed into a bucket)', async () => {
+    sqlMock.mockRejectedValueOnce(new Error('connection reset'));
+    await expect(OperationalEventService.setEventStatuses([{ id: 1 }], 'resolve')).rejects.toThrow('connection reset');
+  });
+});
