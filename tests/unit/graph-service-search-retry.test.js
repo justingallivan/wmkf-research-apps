@@ -131,6 +131,45 @@ describe('GraphService.searchFiles throttle handling', () => {
     expect(console.error.mock.calls[0][0]).toContain('searchFiles failed (429) after 3 attempt(s)');
   });
 
+  test('a Retry-After longer than the retry budget is NOT retried; the wait is surfaced', async () => {
+    const calls = routeFetch([throttled(30)]);
+    let caught;
+    try {
+      await runWithTimers(GraphService.searchFiles('budget'));
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(calls).toHaveLength(1); // never shortened to fit the budget
+    expect(caught).toMatchObject({ status: 429, isTransient: true, attempts: 1, retryAfterMs: 30_000 });
+  });
+
+  test('four concurrent scoped searches under a long tenant Retry-After make four calls, not twelve', async () => {
+    const calls = routeFetch([throttled(60), throttled(60), throttled(60), throttled(60)]);
+    const scopes = ['akoya_request', 'RequestArchive1', 'RequestArchive2', 'RequestArchive3'];
+    const settled = await runWithTimers(Promise.allSettled(
+      scopes.map(libraryName => GraphService.searchFiles('budget', { libraryName, folderPath: '1001_ABC' })),
+    ), 120_000, 1_000);
+    expect(settled.every(r => r.status === 'rejected')).toBe(true);
+    expect(calls).toHaveLength(4);
+    expect(settled.map(r => r.reason.retryAfterMs)).toEqual([60_000, 60_000, 60_000, 60_000]);
+  });
+
+  test('fallback backoff without Retry-After is jittered, never a synchronized burst', async () => {
+    const calls = routeFetch([throttled(), throttled(), throttled(), throttled(), searchOk(), searchOk(), searchOk(), searchOk()]);
+    // 250ms is the shortest possible first backoff (0.5 × 500ms); 200ms in,
+    // nobody may have retried yet, and at 800ms (1.5 × 500ms) everyone has.
+    const promise = Promise.all([1, 2, 3, 4].map(() => GraphService.searchFiles('budget')));
+    promise.catch(() => {});
+    await jest.advanceTimersByTimeAsync(0);
+    expect(calls).toHaveLength(4);
+    await jest.advanceTimersByTimeAsync(200);
+    expect(calls).toHaveLength(4);
+    await jest.advanceTimersByTimeAsync(600);
+    expect(calls).toHaveLength(8);
+    await expect(promise).resolves.toHaveLength(4);
+  });
+
   test('a transient 503 is retried like a 429', async () => {
     const calls = routeFetch([response(503, { error: 'busy' }), searchOk()]);
     await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);

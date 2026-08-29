@@ -206,6 +206,13 @@ export default async function handler(req, res) {
     // ─── Agentic loop ───
     let round = 0;
     let currentMessages = [...claudeMessages];
+    // Per-request tool context. `searchThrottle` is a server-side circuit
+    // breaker: once a document search hits a transient Graph failure
+    // (tenant throttle / 5xx / no response), every later search_documents call
+    // in THIS request short-circuits without touching Graph. Tool-result text
+    // is untrusted content to the model by design (A7), so it cannot be the
+    // control that stops a retry loop — this is (Codex adversarial S468).
+    const toolContext = { searchThrottle: null };
     const model = getModelForApp('dynamics-explorer');
     const fallbackModel = getFallbackModelForApp('dynamics-explorer');
     lastModel = model;
@@ -290,7 +297,7 @@ export default async function handler(req, res) {
         const startTime = Date.now();
         let result;
         try {
-          result = await executeTool(name, input, sendEvent, userProfileId, restrictions);
+          result = await executeTool(name, input, sendEvent, userProfileId, restrictions, toolContext);
         } catch (err) {
           const errMsg = err.message || 'Unknown error';
           console.log(`[DynExp] Round ${round} ${name} ERROR:`, errMsg.substring(0, 200));
@@ -660,7 +667,7 @@ function isOperationalLogTable(tableName) {
   return OPERATIONAL_LOG_TABLES.has(String(tableName || '').trim().toLowerCase());
 }
 
-async function executeTool(name, input, sendEvent, userProfileId, restrictions = []) {
+async function executeTool(name, input, sendEvent, userProfileId, restrictions = [], toolContext = {}) {
   switch (name) {
     case 'search':
       return await searchRecords(input);
@@ -751,7 +758,7 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
     }
 
     case 'search_documents': {
-      const searchResult = await searchDocuments(input);
+      const searchResult = await searchDocuments(input, toolContext);
       if (searchResult._files?.length > 0) {
         sendEvent('document_links', { files: searchResult._files });
         delete searchResult._files;
@@ -2043,28 +2050,47 @@ async function listDocuments({ request_number, request_id }) {
 // ─── search_documents ───
 
 /**
- * Describe scoped-search failures for the model. Throttling is the common case
- * and is self-limiting only if the model does not immediately retry.
+ * Describe scoped-search failures for the model — factually. The text is
+ * delivered inside the untrusted-content boundary, so it must not rely on
+ * being obeyed; the per-request circuit breaker (`toolContext.searchThrottle`)
+ * is what actually stops a retry loop. Transient (throttle / timeout) and
+ * permanent (bad request) failures get distinct wording so the model does not
+ * tell the user to "try again in a minute" for a 400.
  */
 function buildSearchFailureWarning(failedScopes, totalScopes) {
-  const throttled = failedScopes.every(sr => sr.transient);
+  const transient = failedScopes.some(sr => sr.transient);
   const detail = failedScopes
     .map(sr => `${sr.label}: ${String(sr.error || '').substring(0, 120)}`)
     .join('; ');
-  const cause = throttled
-    ? 'The SharePoint search service throttled or timed out'
-    : 'The SharePoint search service returned an error';
-  return `${cause} for ${failedScopes.length} of ${totalScopes} search scope(s) (${detail}). `
-    + 'Results are incomplete: this is NOT evidence that no matching documents exist. '
-    + 'Tell the user the document search was throttled and to try again in a minute; '
-    + 'do not retry the search within this response.';
+  const scopes = `${failedScopes.length} of ${totalScopes} search scope(s)`;
+  if (transient) {
+    return `The SharePoint search service throttled or timed out for ${scopes} (${detail}). `
+      + 'Results are incomplete, not a confirmed "no documents". Document search is paused for the '
+      + 'rest of this request; the user can ask again in a minute.';
+  }
+  return `The SharePoint search service returned an error for ${scopes} (${detail}). `
+    + 'Results are incomplete, not a confirmed "no documents". This is not a throttle; '
+    + 'the search request itself was rejected.';
+}
+
+/** Short-circuit result while the per-request search circuit breaker is open. */
+function searchPausedResult(query, scopeLabel, throttle) {
+  return {
+    searchCount: 0,
+    query,
+    scope: scopeLabel,
+    incomplete: true,
+    error: 'Document search is paused for the rest of this request because the SharePoint '
+      + `search service throttled or timed out earlier (${throttle.reason}). No search was run. `
+      + 'The user can ask again in a minute.',
+  };
 }
 
 /**
  * Search within SharePoint document contents for keywords or phrases.
  * Optionally scoped to a specific library or request folder.
  */
-export async function searchDocuments({ query, library, request_number }) {
+export async function searchDocuments({ query, library, request_number }, toolContext = {}) {
   if (!query) {
     return { error: 'A search query is required.' };
   }
@@ -2103,6 +2129,10 @@ export async function searchDocuments({ query, library, request_number }) {
   } else {
     scopes = [{ libraryName: library || null, folderPath: null, label: library || 'all libraries' }];
     scopeLabel = library || 'all libraries';
+  }
+
+  if (toolContext.searchThrottle) {
+    return searchPausedResult(query, scopeLabel, toolContext.searchThrottle);
   }
 
   try {
@@ -2149,6 +2179,15 @@ export async function searchDocuments({ query, library, request_number }) {
     const searchWarning = failedScopes.length
       ? buildSearchFailureWarning(failedScopes, scopeResults.length)
       : null;
+    const transientFailure = failedScopes.find(sr => sr.transient);
+    if (transientFailure && toolContext && typeof toolContext === 'object') {
+      // Trip the per-request breaker: later search_documents calls in this
+      // request return searchPausedResult without touching Graph.
+      toolContext.searchThrottle = {
+        at: Date.now(),
+        reason: String(transientFailure.error || 'transient failure').substring(0, 120),
+      };
+    }
 
     if (!merged.length) {
       if (searchWarning) {

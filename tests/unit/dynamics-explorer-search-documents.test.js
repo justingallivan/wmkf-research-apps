@@ -80,8 +80,39 @@ describe('searchDocuments scope failures', () => {
     expect(result.incomplete).toBe(true);
     expect(result.message).toBeUndefined();
     expect(result.error).toMatch(/throttled or timed out for 4 of 4 search scope/);
-    expect(result.error).toMatch(/NOT evidence that no matching documents exist/);
-    expect(result.error).toMatch(/do not retry the search within this response/);
+    expect(result.error).toMatch(/not a confirmed "no documents"/);
+    expect(result.error).toMatch(/paused for the rest of this request/);
+  });
+
+  test('a transient failure trips the per-request breaker: the next search never reaches Graph', async () => {
+    GraphService.searchFiles.mockRejectedValue(throttledError());
+    const toolContext = { searchThrottle: null };
+    await searchDocuments({ query: 'budget', request_number: REQUEST_ID }, toolContext);
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4);
+    expect(toolContext.searchThrottle).toMatchObject({ reason: expect.stringContaining('429') });
+
+    GraphService.searchFiles.mockResolvedValue([file('Budget.pdf')]); // Graph would now succeed…
+    const second = await searchDocuments({ query: 'narrative', library: 'akoya_request' }, toolContext);
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4); // …but it is never asked
+    expect(second).toMatchObject({ searchCount: 0, incomplete: true });
+    expect(second.error).toMatch(/paused for the rest of this request/);
+    expect(second.error).toMatch(/No search was run/);
+  });
+
+  test('a permanent (400) failure does NOT trip the breaker', async () => {
+    const bad = new Error('SharePoint search failed (400): bad KQL');
+    bad.status = 400;
+    bad.isTransient = false;
+    GraphService.searchFiles.mockRejectedValue(bad);
+    const toolContext = { searchThrottle: null };
+    await searchDocuments({ query: 'budget', library: 'akoya_request' }, toolContext);
+    expect(toolContext.searchThrottle).toBeNull();
+  });
+
+  test('breaker state is per request: a fresh context searches normally', async () => {
+    GraphService.searchFiles.mockResolvedValue([file('Budget.pdf')]);
+    const result = await searchDocuments({ query: 'budget', library: 'akoya_request' }, { searchThrottle: null });
+    expect(result.searchCount).toBe(1);
   });
 
   test('partial throttle → hits from the healthy scope plus an incomplete warning', async () => {
@@ -105,6 +136,8 @@ describe('searchDocuments scope failures', () => {
     GraphService.searchFiles.mockRejectedValue(bad);
     const result = await searchDocuments({ query: 'budget', request_number: REQUEST_ID });
     expect(result.error).toMatch(/^The SharePoint search service returned an error/);
+    expect(result.error).toMatch(/This is not a throttle/);
+    expect(result.error).not.toMatch(/try again in a minute/);
     expect(result.incomplete).toBe(true);
   });
 
