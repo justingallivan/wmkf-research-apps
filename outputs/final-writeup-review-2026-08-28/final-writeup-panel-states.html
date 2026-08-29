@@ -1,0 +1,429 @@
+<div id="wmkf-final-writeup-mockup">
+  <style>
+    #wmkf-final-writeup-mockup {
+      --wmkf-page: light-dark(#f7f8fa, #11151d);
+      --wmkf-panel: light-dark(#ffffff, #181e28);
+      --wmkf-text: light-dark(#111827, #f4f6fa);
+      --wmkf-muted: light-dark(#667085, #aab4c3);
+      --wmkf-faint: light-dark(#98a2b3, #7c8797);
+      --wmkf-border: light-dark(#d9dee7, #354052);
+      --wmkf-rule: light-dark(#e6e9ef, #2c3544);
+      --wmkf-button: light-dark(#111827, #f1f4f8);
+      --wmkf-button-text: light-dark(#ffffff, #111827);
+      --wmkf-accent: light-dark(#176b3a, #70d493);
+      --wmkf-accent-soft: light-dark(#eaf6ee, #153b28);
+      --wmkf-attention: light-dark(#8a5200, #f0bf67);
+      --wmkf-attention-soft: light-dark(#fff7e8, #392a13);
+      color-scheme: light dark;
+      color: var(--wmkf-text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 100%;
+    }
+
+    #wmkf-final-writeup-mockup * {
+      box-sizing: border-box;
+    }
+
+    #wmkf-final-writeup-mockup button {
+      font: inherit;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-state-picker {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-picker-label {
+      color: var(--wmkf-muted);
+      font-size: 13px;
+      margin-right: 2px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-state-button {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--wmkf-border);
+      border-radius: 8px;
+      background: var(--wmkf-panel);
+      color: var(--wmkf-text);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-state-button[aria-pressed="true"] {
+      background: var(--wmkf-button);
+      border-color: var(--wmkf-button);
+      color: var(--wmkf-button-text);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-window {
+      overflow: hidden;
+      width: 100%;
+      border: 1px solid var(--wmkf-border);
+      border-radius: 14px;
+      background: var(--wmkf-page);
+      box-shadow: 0 8px 28px light-dark(rgba(16, 24, 40, 0.08), rgba(0, 0, 0, 0.22));
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-page-header {
+      padding: 24px 26px 0;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-request-number {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 36px);
+      line-height: 1.15;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-request-title {
+      margin: 9px 0 0;
+      color: var(--wmkf-text);
+      font-size: 18px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-request-meta {
+      margin: 6px 0 0;
+      color: var(--wmkf-muted);
+      font-size: 14px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 22px;
+      border-bottom: 1px solid var(--wmkf-rule);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-tab {
+      padding: 11px 2px 10px;
+      border-bottom: 3px solid transparent;
+      color: var(--wmkf-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-tab-active {
+      border-bottom-color: var(--wmkf-text);
+      color: var(--wmkf-text);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-content {
+      padding: 22px 26px 28px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-document-panel {
+      border: 1px solid var(--wmkf-border);
+      border-radius: 12px;
+      background: var(--wmkf-panel);
+      box-shadow: 0 2px 8px light-dark(rgba(16, 24, 40, 0.04), rgba(0, 0, 0, 0.14));
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-document-main {
+      padding: 24px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 22px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-title-copy {
+      min-width: 0;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-panel-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 500;
+      letter-spacing: -0.015em;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-status-line {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 11px;
+      color: var(--wmkf-accent);
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-status-dot {
+      width: 10px;
+      height: 10px;
+      flex: 0 0 10px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-description {
+      max-width: 620px;
+      margin: 17px 0 0;
+      color: var(--wmkf-muted);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-primary-action,
+    #wmkf-final-writeup-mockup .wmkf-secondary-action {
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-primary-action {
+      border: 1px solid var(--wmkf-button);
+      background: var(--wmkf-button);
+      color: var(--wmkf-button-text);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-secondary-action {
+      border: 1px solid var(--wmkf-border);
+      background: var(--wmkf-panel);
+      color: var(--wmkf-text);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-document-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 17px;
+      color: var(--wmkf-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+      padding: 20px 24px;
+      border-top: 1px solid var(--wmkf-rule);
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-section-copy {
+      min-width: 0;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-section-heading {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-section-text {
+      margin: 5px 0 0;
+      color: var(--wmkf-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-review-summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-reviewed-label {
+      color: var(--wmkf-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-avatars {
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin-left: -6px;
+      border: 2px solid var(--wmkf-panel);
+      border-radius: 999px;
+      background: var(--wmkf-accent-soft);
+      color: var(--wmkf-accent);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-mockup .wmkf-avatar:focus-visible {
+      outline: 2px solid var(--wmkf-text);
+      outline-offset: 2px;
+    }
+
+    #wmkf-final-writeup-mockup [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 620px) {
+      #wmkf-final-writeup-mockup .wmkf-page-header,
+      #wmkf-final-writeup-mockup .wmkf-content {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      #wmkf-final-writeup-mockup .wmkf-title-row,
+      #wmkf-final-writeup-mockup .wmkf-section {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      #wmkf-final-writeup-mockup .wmkf-primary-action,
+      #wmkf-final-writeup-mockup .wmkf-secondary-action {
+        width: 100%;
+      }
+
+      #wmkf-final-writeup-mockup .wmkf-tabs {
+        gap: 14px;
+      }
+    }
+  </style>
+
+  <div class="wmkf-state-picker" aria-label="Choose a panel state">
+    <span class="wmkf-picker-label">Responsible PD view · Panel state</span>
+    <button class="wmkf-state-button" type="button" data-state-target="before" aria-pressed="false">Before group review</button>
+    <button class="wmkf-state-button" type="button" data-state-target="group" aria-pressed="true">Group review</button>
+    <button class="wmkf-state-button" type="button" data-state-target="leadership" aria-pressed="false">Leadership review</button>
+  </div>
+
+  <div class="wmkf-window">
+    <header class="wmkf-page-header">
+      <h1 class="wmkf-request-number">Request #1002788</h1>
+      <p class="wmkf-request-title">To Explore the Universe</p>
+      <p class="wmkf-request-meta">December 2026 · Research · W. M. Keck Foundation</p>
+
+      <nav class="wmkf-tabs" aria-label="Request sections">
+        <span class="wmkf-tab">Overview</span>
+        <span class="wmkf-tab" data-staff-tab>Staff Deliberations</span>
+        <span class="wmkf-tab wmkf-tab-active" data-final-tab>Final Writeup</span>
+        <span class="wmkf-tab">Status</span>
+      </nav>
+    </header>
+
+    <main class="wmkf-content" aria-live="polite">
+      <section class="wmkf-document-panel" data-state-panel="before" hidden>
+        <div class="wmkf-document-main">
+          <div class="wmkf-title-row">
+            <div class="wmkf-title-copy">
+              <h2 class="wmkf-panel-title">Site Visit Writeup</h2>
+              <div class="wmkf-status-line"><span class="wmkf-status-dot" aria-hidden="true"></span>In progress</div>
+              <p class="wmkf-description">Add what was learned during the site visit and make any final changes.</p>
+            </div>
+            <button class="wmkf-primary-action" type="button">Edit writeup</button>
+          </div>
+          <div class="wmkf-document-meta">
+            <span>Last updated today</span>
+            <span>Shared document</span>
+          </div>
+        </div>
+        <div class="wmkf-section">
+          <div class="wmkf-section-copy">
+            <h3 class="wmkf-section-heading">Next step</h3>
+            <p class="wmkf-section-text">When the writeup is ready for colleagues, make it available for group review.</p>
+          </div>
+          <button class="wmkf-secondary-action" type="button">Ready for group review</button>
+        </div>
+      </section>
+
+      <section class="wmkf-document-panel" data-state-panel="group">
+        <div class="wmkf-document-main">
+          <div class="wmkf-title-row">
+            <div class="wmkf-title-copy">
+              <h2 class="wmkf-panel-title">Final Writeup</h2>
+              <div class="wmkf-status-line"><span class="wmkf-status-dot" aria-hidden="true"></span>Group review</div>
+              <p class="wmkf-description">Review and edit the writeup with colleagues.</p>
+            </div>
+            <button class="wmkf-primary-action" type="button">Edit writeup</button>
+          </div>
+          <div class="wmkf-document-meta">
+            <span>Last updated today by Aisha Kumar</span>
+            <span>Shared document</span>
+          </div>
+          <div class="wmkf-review-summary">
+            <span class="wmkf-reviewed-label">Reviewed by</span>
+            <div class="wmkf-avatars" aria-label="Reviewed by Jordan Smith and Morgan Reyes">
+              <button class="wmkf-avatar" type="button" aria-label="Jordan Smith reviewed August 25">JS</button>
+              <button class="wmkf-avatar" type="button" aria-label="Morgan Reyes reviewed August 27">MR</button>
+            </div>
+          </div>
+        </div>
+        <div class="wmkf-section">
+          <div class="wmkf-section-copy">
+            <h3 class="wmkf-section-heading">Next step</h3>
+            <p class="wmkf-section-text">When the writeup is ready, make it available to leadership.</p>
+          </div>
+          <button class="wmkf-secondary-action" type="button">Ready for leadership review</button>
+        </div>
+      </section>
+
+      <section class="wmkf-document-panel" data-state-panel="leadership" hidden>
+        <div class="wmkf-document-main">
+          <div class="wmkf-title-row">
+            <div class="wmkf-title-copy">
+              <h2 class="wmkf-panel-title">Final Writeup</h2>
+              <div class="wmkf-status-line"><span class="wmkf-status-dot" aria-hidden="true"></span>Leadership review</div>
+              <p class="wmkf-description">The writeup is available for leadership review and remains editable.</p>
+            </div>
+            <button class="wmkf-primary-action" type="button">Edit writeup</button>
+          </div>
+          <div class="wmkf-document-meta">
+            <span>Last updated today by Jordan Smith</span>
+            <span>Shared document</span>
+          </div>
+          <div class="wmkf-review-summary">
+            <span class="wmkf-reviewed-label">Reviewed by</span>
+            <div class="wmkf-avatars" aria-label="Reviewed by Jordan Smith, Morgan Reyes, and Lee Daniels">
+              <button class="wmkf-avatar" type="button" aria-label="Jordan Smith reviewed August 25">JS</button>
+              <button class="wmkf-avatar" type="button" aria-label="Morgan Reyes reviewed August 27">MR</button>
+              <button class="wmkf-avatar" type="button" aria-label="Lee Daniels reviewed August 28">LD</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('wmkf-final-writeup-mockup');
+      const controls = Array.from(root.querySelectorAll('[data-state-target]'));
+      const panels = Array.from(root.querySelectorAll('[data-state-panel]'));
+      const staffTab = root.querySelector('[data-staff-tab]');
+      const finalTab = root.querySelector('[data-final-tab]');
+
+      function showState(state) {
+        controls.forEach((control) => {
+          control.setAttribute('aria-pressed', String(control.dataset.stateTarget === state));
+        });
+        panels.forEach((panel) => {
+          panel.hidden = panel.dataset.statePanel !== state;
+        });
+        const isBefore = state === 'before';
+        staffTab.classList.toggle('wmkf-tab-active', isBefore);
+        finalTab.classList.toggle('wmkf-tab-active', !isBefore);
+      }
+
+      controls.forEach((control) => {
+        control.addEventListener('click', () => showState(control.dataset.stateTarget));
+      });
+    })();
+  </script>
+</div>

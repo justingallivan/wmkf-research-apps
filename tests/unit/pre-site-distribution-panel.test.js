@@ -294,6 +294,100 @@ test('history renders superseded previews quietly, real failures red, and GUIDs 
   expect(sentItem.textContent.replace(details.textContent, '')).not.toContain(dynamicsId);
 });
 
+test('history labels only attempts whose To and Cc addresses all equal From as test sends', async () => {
+  const base = preparedAttempt('pdf');
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [
+      {
+        ...base,
+        operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        subject: 'Internal test distribution',
+        from: 'sender@example.org',
+        to: ['Sender@Example.org'],
+        cc: ['SENDER@example.org'],
+        state: 'sent',
+        transportAccepted: true,
+        createdAt: '2026-08-25T12:00:00Z',
+      },
+      {
+        ...base,
+        operationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        subject: 'Real distribution',
+        from: 'sender@example.org',
+        to: ['board@example.org'],
+        cc: [],
+        state: 'sent',
+        transportAccepted: true,
+        createdAt: '2026-08-25T11:00:00Z',
+      },
+    ],
+  }));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  const testRow = (await screen.findByText('Internal test distribution')).closest('li');
+  const realRow = screen.getByText('Real distribution').closest('li');
+  expect(testRow).toHaveTextContent('Test send');
+  expect(realRow).not.toHaveTextContent('Test send');
+  expect(screen.getAllByText('Test send')).toHaveLength(1);
+});
+
+test('groups history under local calendar-day headers with the newest day first', async () => {
+  const base = preparedAttempt('pdf');
+  const olderCreatedAt = new Date(2020, 0, 2, 12).toISOString();
+  const newerCreatedAt = new Date(2020, 0, 3, 12).toISOString();
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [
+      {
+        ...base,
+        operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        subject: 'Older distribution',
+        createdAt: olderCreatedAt,
+      },
+      {
+        ...base,
+        operationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        subject: 'First newer distribution',
+        createdAt: newerCreatedAt,
+      },
+      {
+        ...base,
+        operationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        subject: 'Second newer distribution',
+        createdAt: new Date(2020, 0, 3, 10).toISOString(),
+      },
+    ],
+  }));
+
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+
+  await screen.findByText('Older distribution');
+  const headers = screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent);
+  expect(headers).toEqual([
+    new Date(newerCreatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+    new Date(olderCreatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+  ]);
+  const newestDaySubjects = Array.from(
+    screen.getAllByRole('heading', { level: 4 })[0].closest('section').querySelectorAll('li'),
+    (row) => row.querySelector('p').textContent,
+  );
+  expect(newestDaySubjects).toEqual(['First newer distribution', 'Second newer distribution']);
+});
+
 test('reports loaded history and the server-derived sent flag through onHistory', async () => {
   const attempts = [{ ...preparedAttempt('pdf'), state: 'sent', transportAccepted: true, createdAt: '2026-08-25T12:00:00Z' }];
   global.fetch.mockResolvedValueOnce(response({ success: true, attempts, currentSourceEverSent: true }));

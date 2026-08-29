@@ -1,0 +1,479 @@
+<div id="wmkf-review-page-mockup">
+  <style>
+    #wmkf-review-page-mockup {
+      --wmkf-review-page: light-dark(#f7f8fa, #11151d);
+      --wmkf-review-panel: light-dark(#ffffff, #181e28);
+      --wmkf-review-text: light-dark(#111827, #f4f6fa);
+      --wmkf-review-muted: light-dark(#667085, #abb5c4);
+      --wmkf-review-border: light-dark(#d8dee8, #354052);
+      --wmkf-review-rule: light-dark(#e8ebf0, #2c3544);
+      --wmkf-review-button: light-dark(#111827, #f1f4f8);
+      --wmkf-review-button-text: light-dark(#ffffff, #111827);
+      --wmkf-review-green: light-dark(#176b3a, #70d493);
+      --wmkf-review-green-soft: light-dark(#eaf6ee, #153b28);
+      --wmkf-review-amber: light-dark(#8a5200, #f0bf67);
+      --wmkf-review-amber-soft: light-dark(#fff7e8, #392a13);
+      --wmkf-review-link: light-dark(#285ea8, #8db9f3);
+      color-scheme: light dark;
+      width: 100%;
+      color: var(--wmkf-review-text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #wmkf-review-page-mockup * {
+      box-sizing: border-box;
+    }
+
+    #wmkf-review-page-mockup button {
+      font: inherit;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-state-picker {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-picker-label {
+      margin-right: 2px;
+      color: var(--wmkf-review-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-state-button {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--wmkf-review-border);
+      border-radius: 8px;
+      background: var(--wmkf-review-panel);
+      color: var(--wmkf-review-text);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-state-button[aria-pressed="true"] {
+      border-color: var(--wmkf-review-button);
+      background: var(--wmkf-review-button);
+      color: var(--wmkf-review-button-text);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-window {
+      overflow: hidden;
+      width: 100%;
+      border: 1px solid var(--wmkf-review-border);
+      border-radius: 14px;
+      background: var(--wmkf-review-page);
+      box-shadow: 0 8px 28px light-dark(rgba(16, 24, 40, 0.08), rgba(0, 0, 0, 0.22));
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-app-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--wmkf-review-border);
+      background: var(--wmkf-review-panel);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-back,
+    #wmkf-review-page-mockup .wmkf-review-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--wmkf-review-link);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-back {
+      font-size: 14px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-app-name {
+      color: var(--wmkf-review-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-content {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-heading {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 34px);
+      line-height: 1.15;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-request-title {
+      margin: 9px 0 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-request-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 14px;
+      margin-top: 7px;
+      color: var(--wmkf-review-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-document {
+      margin-top: 24px;
+      border: 1px solid var(--wmkf-review-border);
+      border-radius: 12px;
+      background: var(--wmkf-review-panel);
+      box-shadow: 0 2px 8px light-dark(rgba(16, 24, 40, 0.04), rgba(0, 0, 0, 0.14));
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-document-main {
+      padding: 22px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 22px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-document-title {
+      margin: 0;
+      font-size: 23px;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-stage {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--wmkf-review-green);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-stage-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 9px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-document-copy {
+      margin: 16px 0 0;
+      color: var(--wmkf-review-muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-primary,
+    #wmkf-review-page-mockup .wmkf-review-secondary {
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-primary {
+      border: 1px solid var(--wmkf-review-button);
+      background: var(--wmkf-review-button);
+      color: var(--wmkf-review-button-text);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-secondary {
+      border: 1px solid var(--wmkf-review-border);
+      background: var(--wmkf-review-panel);
+      color: var(--wmkf-review-text);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-document-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 16px;
+      margin-top: 16px;
+      color: var(--wmkf-review-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-people {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-people-label {
+      color: var(--wmkf-review-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-avatars {
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin-left: -6px;
+      border: 2px solid var(--wmkf-review-panel);
+      border-radius: 999px;
+      background: var(--wmkf-review-green-soft);
+      color: var(--wmkf-review-green);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-personal {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+      padding: 20px 22px;
+      border-top: 1px solid var(--wmkf-review-rule);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-personal-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-personal-text {
+      margin: 5px 0 0;
+      color: var(--wmkf-review-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-update-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 7px;
+      padding: 6px 9px;
+      border-radius: 6px;
+      background: var(--wmkf-review-amber-soft);
+      color: var(--wmkf-review-amber);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-materials {
+      margin-top: 18px;
+      border-top: 1px solid var(--wmkf-review-border);
+      border-bottom: 1px solid var(--wmkf-review-border);
+      background: var(--wmkf-review-panel);
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-materials summary {
+      padding: 17px 2px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-material-list {
+      display: grid;
+      gap: 0;
+      margin: 0;
+      padding: 0 0 12px;
+      list-style: none;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-material-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 12px 2px;
+      border-top: 1px solid var(--wmkf-review-rule);
+      color: var(--wmkf-review-link);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-material-type {
+      color: var(--wmkf-review-muted);
+      font-size: 12px;
+      font-weight: 400;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    #wmkf-review-page-mockup .wmkf-review-footer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #wmkf-review-page-mockup [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 600px) {
+      #wmkf-review-page-mockup .wmkf-review-content {
+        padding: 22px 16px 26px;
+      }
+
+      #wmkf-review-page-mockup .wmkf-review-title-row,
+      #wmkf-review-page-mockup .wmkf-review-personal {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      #wmkf-review-page-mockup .wmkf-review-primary,
+      #wmkf-review-page-mockup .wmkf-review-secondary {
+        width: 100%;
+      }
+
+      #wmkf-review-page-mockup .wmkf-review-footer,
+      #wmkf-review-page-mockup .wmkf-review-footer-actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      #wmkf-review-page-mockup .wmkf-review-link {
+        min-height: 44px;
+        text-align: left;
+      }
+    }
+  </style>
+
+  <div class="wmkf-review-state-picker" aria-label="Choose a personal review state">
+    <span class="wmkf-review-picker-label">Personal state</span>
+    <button class="wmkf-review-state-button" type="button" data-review-state="needs" aria-pressed="true">Needs review</button>
+    <button class="wmkf-review-state-button" type="button" data-review-state="updated" aria-pressed="false">Updated since review</button>
+    <button class="wmkf-review-state-button" type="button" data-review-state="reviewed" aria-pressed="false">Reviewed</button>
+  </div>
+
+  <div class="wmkf-review-window">
+    <header class="wmkf-review-app-bar">
+      <button class="wmkf-review-back" type="button">← Final writeups</button>
+      <span class="wmkf-review-app-name">Workbench</span>
+    </header>
+
+    <main class="wmkf-review-content">
+      <h1 class="wmkf-review-heading">Review final writeup</h1>
+      <p class="wmkf-review-request-title">Request #1002788 — To Explore the Universe</p>
+      <div class="wmkf-review-request-meta">
+        <span>W. M. Keck Foundation</span>
+        <span>Program Director: Aisha Kumar</span>
+      </div>
+
+      <section class="wmkf-review-document" aria-live="polite">
+        <div class="wmkf-review-document-main">
+          <div class="wmkf-review-title-row">
+            <div>
+              <h2 class="wmkf-review-document-title">Final Writeup</h2>
+              <div class="wmkf-review-stage"><span class="wmkf-review-stage-dot" aria-hidden="true"></span>Group review</div>
+              <p class="wmkf-review-document-copy">Read and edit the writeup, then return here to record that you reviewed it.</p>
+            </div>
+            <button class="wmkf-review-primary" type="button">Review writeup</button>
+          </div>
+          <div class="wmkf-review-document-meta">
+            <span>Last updated today by Aisha Kumar</span>
+            <span>Shared document</span>
+          </div>
+          <div class="wmkf-review-people">
+            <span class="wmkf-review-people-label">Reviewed by</span>
+            <div class="wmkf-review-avatars" aria-label="Reviewed by Jordan Smith and Morgan Reyes">
+              <span class="wmkf-review-avatar" aria-label="Jordan Smith reviewed August 25">JS</span>
+              <span class="wmkf-review-avatar" aria-label="Morgan Reyes reviewed August 27">MR</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wmkf-review-personal">
+          <div>
+            <h3 class="wmkf-review-personal-title">Your review</h3>
+            <p class="wmkf-review-personal-text" data-personal-copy>You have not marked this writeup reviewed.</p>
+            <div class="wmkf-review-update-note" data-update-note hidden><span aria-hidden="true">↻</span>Updated since your review</div>
+          </div>
+          <button class="wmkf-review-secondary" type="button" data-mark-reviewed>Mark reviewed</button>
+        </div>
+      </section>
+
+      <details class="wmkf-review-materials">
+        <summary>Supporting materials</summary>
+        <ul class="wmkf-review-material-list">
+          <li><a class="wmkf-review-material-link" href="#proposal"><span>Proposal</span><span class="wmkf-review-material-type">PDF</span></a></li>
+          <li><a class="wmkf-review-material-link" href="#assessment"><span>Initial assessment</span><span class="wmkf-review-material-type">Workbench</span></a></li>
+          <li><a class="wmkf-review-material-link" href="#reviews"><span>Reviews</span><span class="wmkf-review-material-type">Workbench</span></a></li>
+        </ul>
+      </details>
+
+      <footer class="wmkf-review-footer">
+        <button class="wmkf-review-link" type="button">View full request</button>
+        <div class="wmkf-review-footer-actions">
+          <button class="wmkf-review-link" type="button">Back to final writeups</button>
+          <button class="wmkf-review-secondary" type="button">Next writeup</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('wmkf-review-page-mockup');
+      const stateButtons = Array.from(root.querySelectorAll('[data-review-state]'));
+      const personalCopy = root.querySelector('[data-personal-copy]');
+      const updateNote = root.querySelector('[data-update-note]');
+      const markButton = root.querySelector('[data-mark-reviewed]');
+      let currentState = 'needs';
+
+      function showState(state) {
+        currentState = state;
+        stateButtons.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.reviewState === state));
+        });
+        updateNote.hidden = state !== 'updated';
+        if (state === 'needs') {
+          personalCopy.textContent = 'You have not marked this writeup reviewed.';
+          markButton.textContent = 'Mark reviewed';
+          markButton.hidden = false;
+        } else if (state === 'updated') {
+          personalCopy.textContent = 'Reviewed August 26.';
+          markButton.textContent = 'Mark latest version reviewed';
+          markButton.hidden = false;
+        } else {
+          personalCopy.textContent = 'Reviewed today.';
+          markButton.hidden = true;
+        }
+      }
+
+      stateButtons.forEach((button) => {
+        button.addEventListener('click', () => showState(button.dataset.reviewState));
+      });
+      markButton.addEventListener('click', () => showState('reviewed'));
+      showState(currentState);
+    })();
+  </script>
+</div>

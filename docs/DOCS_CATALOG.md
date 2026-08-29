@@ -445,5 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Plan only, not started: same-document Final Writeup handoff, group/leadership review, acknowledgements, dashboard; Fable READY WITH PREREQUISITES. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage. | 2026-08-17 |
 

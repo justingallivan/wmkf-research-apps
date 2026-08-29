@@ -1,0 +1,541 @@
+<div id="wmkf-final-writeup-dashboard">
+  <style>
+    #wmkf-final-writeup-dashboard {
+      --wmkf-dashboard-page: light-dark(#f7f8fa, #11151d);
+      --wmkf-dashboard-panel: light-dark(#ffffff, #181e28);
+      --wmkf-dashboard-text: light-dark(#111827, #f4f6fa);
+      --wmkf-dashboard-muted: light-dark(#667085, #abb5c4);
+      --wmkf-dashboard-border: light-dark(#d8dee8, #354052);
+      --wmkf-dashboard-rule: light-dark(#e8ebf0, #2c3544);
+      --wmkf-dashboard-button: light-dark(#111827, #f1f4f8);
+      --wmkf-dashboard-button-text: light-dark(#ffffff, #111827);
+      --wmkf-dashboard-green: light-dark(#176b3a, #70d493);
+      --wmkf-dashboard-green-soft: light-dark(#eaf6ee, #153b28);
+      --wmkf-dashboard-amber: light-dark(#8a5200, #f0bf67);
+      --wmkf-dashboard-amber-soft: light-dark(#fff7e8, #392a13);
+      --wmkf-dashboard-blue: light-dark(#285ea8, #8db9f3);
+      --wmkf-dashboard-blue-soft: light-dark(#edf4ff, #172b49);
+      color-scheme: light dark;
+      width: 100%;
+      color: var(--wmkf-dashboard-text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #wmkf-final-writeup-dashboard * {
+      box-sizing: border-box;
+    }
+
+    #wmkf-final-writeup-dashboard button,
+    #wmkf-final-writeup-dashboard input {
+      font: inherit;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-view-picker {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-view-label {
+      margin-right: 2px;
+      color: var(--wmkf-dashboard-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-view-button {
+      min-height: 38px;
+      padding: 8px 13px;
+      border: 1px solid var(--wmkf-dashboard-border);
+      border-radius: 8px;
+      background: var(--wmkf-dashboard-panel);
+      color: var(--wmkf-dashboard-text);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-view-button[aria-pressed="true"] {
+      border-color: var(--wmkf-dashboard-button);
+      background: var(--wmkf-dashboard-button);
+      color: var(--wmkf-dashboard-button-text);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-dashboard-window {
+      overflow: hidden;
+      width: 100%;
+      border: 1px solid var(--wmkf-dashboard-border);
+      border-radius: 14px;
+      background: var(--wmkf-dashboard-page);
+      box-shadow: 0 8px 28px light-dark(rgba(16, 24, 40, 0.08), rgba(0, 0, 0, 0.22));
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-app-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--wmkf-dashboard-border);
+      background: var(--wmkf-dashboard-panel);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-app-name {
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-app-context {
+      color: var(--wmkf-dashboard-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-dashboard-content {
+      padding: 28px 28px 32px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-page-heading-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-page-heading {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 34px);
+      line-height: 1.15;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-page-description {
+      margin: 8px 0 0;
+      color: var(--wmkf-dashboard-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-search-wrap {
+      position: relative;
+      width: min(310px, 100%);
+      flex: 0 0 auto;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-search-icon {
+      position: absolute;
+      top: 50%;
+      left: 13px;
+      width: 16px;
+      height: 16px;
+      transform: translateY(-50%);
+      color: var(--wmkf-dashboard-muted);
+      pointer-events: none;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-search {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 13px 10px 38px;
+      border: 1px solid var(--wmkf-dashboard-border);
+      border-radius: 9px;
+      background: var(--wmkf-dashboard-panel);
+      color: var(--wmkf-dashboard-text);
+      font-size: 16px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-list-section {
+      margin-top: 28px;
+      border: 1px solid var(--wmkf-dashboard-border);
+      border-radius: 12px;
+      background: var(--wmkf-dashboard-panel);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-list-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--wmkf-dashboard-rule);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-list-heading {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-list-description {
+      margin: 5px 0 0;
+      color: var(--wmkf-dashboard-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-writeup-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-writeup-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 0.44fr) auto;
+      align-items: center;
+      gap: 20px;
+      padding: 19px 20px;
+      border-bottom: 1px solid var(--wmkf-dashboard-rule);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-writeup-row:last-child {
+      border-bottom: 0;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-request-link {
+      display: inline;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--wmkf-dashboard-text);
+      cursor: pointer;
+      text-align: left;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-request-context {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 13px;
+      margin-top: 6px;
+      color: var(--wmkf-dashboard-muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-row-state {
+      min-width: 0;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-stage {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--wmkf-dashboard-blue);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-stage-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-personal-state {
+      margin-top: 6px;
+      color: var(--wmkf-dashboard-muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-personal-state-updated {
+      color: var(--wmkf-dashboard-amber);
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-open-word {
+      min-height: 42px;
+      padding: 9px 14px;
+      border: 1px solid var(--wmkf-dashboard-button);
+      border-radius: 8px;
+      background: var(--wmkf-dashboard-button);
+      color: var(--wmkf-dashboard-button-text);
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-list-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--wmkf-dashboard-rule);
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-footer-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--wmkf-dashboard-blue);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #wmkf-final-writeup-dashboard .wmkf-empty-search {
+      padding: 34px 20px;
+      color: var(--wmkf-dashboard-muted);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    #wmkf-final-writeup-dashboard [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      #wmkf-final-writeup-dashboard .wmkf-dashboard-content {
+        padding: 22px 16px 26px;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-page-heading-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-search-wrap {
+        width: 100%;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-writeup-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-row-state {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-open-word {
+        grid-column: 2;
+        grid-row: 1;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #wmkf-final-writeup-dashboard .wmkf-app-bar {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-writeup-row {
+        display: flex;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      #wmkf-final-writeup-dashboard .wmkf-open-word {
+        width: 100%;
+      }
+    }
+  </style>
+
+  <div class="wmkf-view-picker" aria-label="Choose a dashboard perspective">
+    <span class="wmkf-view-label">Dashboard view</span>
+    <button class="wmkf-view-button" type="button" data-view-target="pd" aria-pressed="true">Program Director</button>
+    <button class="wmkf-view-button" type="button" data-view-target="pc" aria-pressed="false">Program Coordinator</button>
+  </div>
+
+  <div class="wmkf-dashboard-window">
+    <header class="wmkf-app-bar">
+      <span class="wmkf-app-name">Workbench</span>
+      <span class="wmkf-app-context" data-role-context>Program Director view</span>
+    </header>
+
+    <main class="wmkf-dashboard-content">
+      <div class="wmkf-page-heading-row">
+        <div>
+          <h1 class="wmkf-page-heading">Final writeups</h1>
+          <p class="wmkf-page-description" data-page-description>Writeups currently open for your review.</p>
+        </div>
+        <label class="wmkf-search-wrap">
+          <i class="wmkf-search-icon" data-lucide="search" aria-hidden="true"></i>
+          <span class="wmkf-visually-hidden">Search final writeups</span>
+          <input class="wmkf-search" type="search" placeholder="Search final writeups" data-search-input>
+        </label>
+      </div>
+
+      <section class="wmkf-list-section" aria-live="polite">
+        <div class="wmkf-list-header">
+          <h2 class="wmkf-list-heading" data-list-heading>Open for review</h2>
+          <p class="wmkf-list-description" data-list-description>These writeups remain available while group review is active.</p>
+        </div>
+
+        <ul class="wmkf-writeup-list" data-list="pd">
+          <li class="wmkf-writeup-row" data-search-text="1002788 explore universe keck aisha kumar">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002788 — To Explore the Universe</button>
+              <div class="wmkf-request-context">
+                <span>W. M. Keck Foundation</span>
+                <span>Program Director: Aisha Kumar</span>
+                <span>Updated today</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Group review</div>
+              <div class="wmkf-personal-state">You have not marked this reviewed</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-writeup-row" data-search-text="1002814 cellular repair northwestern jordan smith">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002814 — Mapping Cellular Repair</button>
+              <div class="wmkf-request-context">
+                <span>Northwestern University</span>
+                <span>Program Director: Jordan Smith</span>
+                <span>Updated yesterday</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Group review</div>
+              <div class="wmkf-personal-state wmkf-personal-state-updated">Updated since your review</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-writeup-row" data-search-text="1002861 quantum materials caltech morgan reyes">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002861 — New Quantum Materials</button>
+              <div class="wmkf-request-context">
+                <span>California Institute of Technology</span>
+                <span>Program Director: Morgan Reyes</span>
+                <span>Updated August 24</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Group review</div>
+              <div class="wmkf-personal-state">You have not marked this reviewed</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+        </ul>
+
+        <ul class="wmkf-writeup-list" data-list="pc" hidden>
+          <li class="wmkf-writeup-row" data-search-text="1002788 explore universe keck aisha kumar group review">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002788 — To Explore the Universe</button>
+              <div class="wmkf-request-context">
+                <span>W. M. Keck Foundation</span>
+                <span>Program Director: Aisha Kumar</span>
+                <span>Updated today</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Group review</div>
+              <div class="wmkf-personal-state">Your review: Not marked reviewed</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-writeup-row" data-search-text="1002799 neural circuits university washington jordan smith leadership review">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002799 — Neural Circuits and Recovery</button>
+              <div class="wmkf-request-context">
+                <span>University of Washington</span>
+                <span>Program Director: Jordan Smith</span>
+                <span>Updated yesterday</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-personal-state">Your review: Reviewed August 26</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-writeup-row" data-search-text="1002861 quantum materials caltech morgan reyes group review">
+            <div>
+              <button class="wmkf-request-link" type="button">Request #1002861 — New Quantum Materials</button>
+              <div class="wmkf-request-context">
+                <span>California Institute of Technology</span>
+                <span>Program Director: Morgan Reyes</span>
+                <span>Updated August 24</span>
+              </div>
+            </div>
+            <div class="wmkf-row-state">
+              <div class="wmkf-stage"><span class="wmkf-stage-dot" aria-hidden="true"></span>Group review</div>
+              <div class="wmkf-personal-state wmkf-personal-state-updated">Updated since your review</div>
+            </div>
+            <button class="wmkf-open-word" type="button">Review writeup</button>
+          </li>
+        </ul>
+
+        <div class="wmkf-empty-search" data-empty-search hidden>No matching final writeups.</div>
+
+        <div class="wmkf-list-footer">
+          <button class="wmkf-footer-link" type="button" data-footer-link>View reviewed writeups</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('wmkf-final-writeup-dashboard');
+      const roleButtons = Array.from(root.querySelectorAll('[data-view-target]'));
+      const lists = Array.from(root.querySelectorAll('[data-list]'));
+      const roleContext = root.querySelector('[data-role-context]');
+      const pageDescription = root.querySelector('[data-page-description]');
+      const listHeading = root.querySelector('[data-list-heading]');
+      const listDescription = root.querySelector('[data-list-description]');
+      const footerLink = root.querySelector('[data-footer-link]');
+      const searchInput = root.querySelector('[data-search-input]');
+      const emptySearch = root.querySelector('[data-empty-search]');
+      let currentRole = 'pd';
+
+      function applySearch() {
+        const query = searchInput.value.trim().toLowerCase();
+        const activeList = root.querySelector(`[data-list="${currentRole}"]`);
+        const rows = Array.from(activeList.querySelectorAll('[data-search-text]'));
+        let visibleCount = 0;
+        rows.forEach((row) => {
+          const matches = !query || row.dataset.searchText.includes(query);
+          row.hidden = !matches;
+          if (matches) visibleCount += 1;
+        });
+        emptySearch.hidden = visibleCount !== 0;
+      }
+
+      function showRole(role) {
+        currentRole = role;
+        roleButtons.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.viewTarget === role));
+        });
+        lists.forEach((list) => {
+          list.hidden = list.dataset.list !== role;
+        });
+        const isPd = role === 'pd';
+        roleContext.textContent = isPd ? 'Program Director view' : 'Program Coordinator view';
+        pageDescription.textContent = isPd
+          ? 'Writeups currently open for your review.'
+          : 'All active writeups across group and leadership review.';
+        listHeading.textContent = isPd ? 'Open for review' : 'All active writeups';
+        listDescription.textContent = isPd
+          ? 'These writeups remain available while group review is active.'
+          : 'Open any writeup to review, edit, or check its current stage.';
+        footerLink.textContent = isPd ? 'View reviewed writeups' : 'View past writeups';
+        searchInput.value = '';
+        applySearch();
+      }
+
+      roleButtons.forEach((button) => {
+        button.addEventListener('click', () => showRole(button.dataset.viewTarget));
+      });
+      searchInput.addEventListener('input', applySearch);
+    })();
+  </script>
+</div>
