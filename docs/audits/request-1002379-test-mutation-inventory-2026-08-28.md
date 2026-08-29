@@ -3,7 +3,7 @@ title: Request 1002379 test-mutation inventory (2026-08-28)
 domain: request-workbench
 kind: audit
 status: active
-summary: Read-only production inventory of everything the writeup pipeline left on smoke-vehicle Request 1002379 since 2026-08-17, as the confirmable input to an owner-gated cleanup.
+summary: Read-only production inventory of everything testing left on smoke-vehicle Request 1002379 since 2026-08-01 (Dataverse, Postgres, SharePoint folder tree), as the confirmable input to an owner-gated cleanup.
 owner: product-engineering
 related:
   - scripts/probe-request-1002379-test-inventory.js
@@ -88,6 +88,32 @@ rows.
   "Test Site Visit", created 08-24 21:26 by Justin Gallivan, scheduled
   2026-08-28 14:15Z. The only site-visit activity on the request (all time).
 
+## 4a. Window widened to 2026-08-01 (owner request, same day)
+
+Re-ran the probe with `--since=2026-08-01` and re-queried all activity types,
+notes, SharePoint document locations, every Postgres table with a request
+column, and the full Graph folder tree under
+`akoya_request/1002379_54E2B88B04B9F011BBD36045BD02B4CC/`.
+
+Dataverse and Postgres: **nothing additional** between 08-01 and 08-16 (the
+seven registry rows, seven activities, and ten distribution rows above are the
+complete app-created set since 08-01; the only other Postgres hit is one
+`reviewer_acceptance_jobs` row from 2026-07-13, outside the window).
+
+SharePoint folder tree — three items not referenced by any registry row:
+
+| item | created | by | assessment |
+|---|---|---|---|
+| `AI Materials/ProposalNarrative_1002379.pdf` (`01G4GVMSZ5O3RW77Y7HVBKBXXAECEMTXTN`, 1 350 835 B) | 08-17 00:26Z | Justin Gallivan | Staff-placed pilot input; byte-size-identical to `Phase II/Project Narrative.pdf`, i.e. a copy made so the exact-input contract had a source. Test setup, not applicant data. |
+| `AI Materials/ProposalBibliography_1002379.pdf` (`01G4GVMS3YD3RW5CXZLRCYF4FXSHGRDSMD`, 126 176 B) | 08-17 18:44Z | Justin Gallivan | Same; bibliography is excluded from the current contract, so unused. |
+| `Application Cover Page - Copy.docx` (`01G4GVMSZSXMG3TVRKARGIYZCO3MWZI54W`, folder root) | 08-11 02:57Z | Justin Gallivan | Manual copy of the 2025-11-05 cover page — the 2026-08-10 SharePoint version/recovery probe residue `[ASSUMED from date and author; owner to confirm]`. |
+
+The `AI Materials/` folder itself (08-17, Justin Gallivan) would be empty after
+those two deletes. Older, pre-window residue seen in the same tree, listed for
+completeness only: `Reviewer_Downloads/` (2026-05-01) and
+`Reviewer_Uploads/GallivanTest_6ad328b4/` (2026-05-02, a reviewer-form PDF) —
+May reviewer-finder smoke residue, plus the six 2026-05 AI-run rows in §3.
+
 ## 5. Proposed cleanup list (owner confirms each line before any delete)
 
 Order matters because of lookups: clear the pointer first, then delete
@@ -105,6 +131,10 @@ descendants before sources.
    (`request_id = '54e2b88b-04b9-f011-bbd3-6045bd02b4cc'`).
 7. AI-run rows: **keep** (recommended); owner decision on the two 2026-05
    `impersonation-resmoke` rows.
+8. SharePoint, unregistered (from §4a): delete `AI Materials/` with its two
+   PDFs, and `Application Cover Page - Copy.docx`.
+9. Pre-window May residue, owner decision: `Reviewer_Downloads/`,
+   `Reviewer_Uploads/GallivanTest_6ad328b4/`.
 
 Not in scope: anything the app did not create (the request itself, its
 applicant, Phase II classification, proposal files under `AI Materials/`).
