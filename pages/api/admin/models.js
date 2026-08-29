@@ -165,6 +165,8 @@ export function buildModelRegistryStatus(modelId) {
       supportsEffort: capabilities.supportsEffort === true,
       supportsStructuredOutput: capabilities.supportsStructuredOutput === true,
       maxOutputTokens: capabilities.maxOutputTokens ?? null,
+      thinkingMode: capabilities.thinkingMode || null,
+      defaultEffort: capabilities.defaultEffort || null,
       refusalSemantics: capabilities.refusalSemantics || null,
       dataRetentionClass: capabilities.dataRetentionClass || null,
       source: capabilities.source || null,
