@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, action, note, expectedStatus, expectedLastOccurredAt, events } = req.body || {};
+    const { id, action, note, expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt, events } = req.body || {};
 
     // Bulk form ("Resolve all shown"): every row carries its own freshness
     // precondition; per-row outcomes come back as counts and the client
@@ -66,6 +66,8 @@ export default async function handler(req, res) {
       note: note || null,
       expectedStatus: expectedStatus || null,
       expectedLastOccurredAt: expectedLastOccurredAt || null,
+      // Only asserted when the client sent the key (older clients omit it).
+      ...(expectedStatusChangedAt !== undefined ? { expectedStatusChangedAt } : {}),
     });
     if (!updated) {
       return res.status(404).json({ error: 'Event not found or not resolvable' });

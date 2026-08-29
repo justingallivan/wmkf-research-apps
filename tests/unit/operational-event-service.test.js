@@ -355,23 +355,51 @@ describe('queryEvents', () => {
 });
 
 describe('setEventStatuses (bulk)', () => {
+  const full = (id, at, changed = null) => ({ id, expectedStatus: 'open', expectedLastOccurredAt: at, expectedStatusChangedAt: changed });
+
   test('applies each row with its own precondition and buckets the outcomes', async () => {
     // Row 5: updated. Row 6: precondition miss → current row exists → stale.
-    // Row 7: no such row → notFound. Row 'x': invalid id (never queried).
+    // Row 7: no such row → notFound. Row 8: incomplete triple → invalid, never queried.
+    // Row 'x': invalid id → invalid, never queried.
     sqlMock
       .mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] }) // UPDATE 5
       .mockResolvedValueOnce({ rows: [] })                               // UPDATE 6 (miss)
-      .mockResolvedValueOnce({ rows: [{ id: 6, status: 'open', last_occurred_at: 'later', occurrence_count: 2 }] }) // SELECT 6
+      .mockResolvedValueOnce({ rows: [{ id: 6, status: 'open', last_occurred_at: 'later', status_changed_at: null, occurrence_count: 2 }] }) // SELECT 6
       .mockResolvedValueOnce({ rows: [] })                               // UPDATE 7 (miss)
       .mockResolvedValueOnce({ rows: [] });                              // SELECT 7 (gone)
     const outcome = await OperationalEventService.setEventStatuses([
-      { id: 5, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z' },
-      { id: 6, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:01.000Z' },
-      { id: 7, expectedStatus: 'open' },
-      { id: 'x' },
+      full(5, '2026-08-27T19:00:00.000Z'),
+      full(6, '2026-08-27T19:00:01.000Z'),
+      full(7, '2026-08-27T19:00:02.000Z'),
+      { id: 8, expectedStatus: 'open' },
+      full('x', '2026-08-27T19:00:03.000Z'),
     ], 'resolve', { profileId: 9, note: 'bulk' });
-    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [NaN] });
+    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [8, NaN] });
     expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  test('every batch item asserts status_changed_at, which closes the open→resolved→open (ABA) hole', async () => {
+    // The UPDATE misses because status_changed_at moved; the row still exists and is open → stale.
+    sqlMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'open', last_occurred_at: '2026-08-27T19:00:00.000Z', status_changed_at: '2026-08-28T10:00:00.000Z', occurrence_count: 1 }] });
+    const outcome = await OperationalEventService.setEventStatuses(
+      [full(5, '2026-08-27T19:00:00.000Z', null)], 'resolve', { profileId: 9 },
+    );
+    expect(outcome).toEqual({ updated: [], stale: [5], notFound: [], invalid: [] });
+    const [strings, ...values] = sqlMock.mock.calls[0];
+    expect(strings.join(' ')).toMatch(/status_changed_at IS NOT DISTINCT FROM/);
+    expect(values).toContain(true); // the assertStatusChanged flag is ON for batch items
+  });
+
+  test('a batch item missing any precondition is refused without a query, not applied unguarded', async () => {
+    const outcome = await OperationalEventService.setEventStatuses([
+      { id: 1, expectedLastOccurredAt: 'x', expectedStatusChangedAt: null },   // no expectedStatus
+      { id: 2, expectedStatus: 'open', expectedStatusChangedAt: null },         // no expectedLastOccurredAt
+      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z' }, // key absent
+    ], 'resolve');
+    expect(outcome).toEqual({ updated: [], stale: [], notFound: [], invalid: [1, 2, 3] });
+    expect(sqlMock).not.toHaveBeenCalled();
   });
 
   test('rejects an invalid action before touching the database', async () => {
@@ -387,6 +415,21 @@ describe('setEventStatuses (bulk)', () => {
 
   test('an unexpected database error still propagates (not swallowed into a bucket)', async () => {
     sqlMock.mockRejectedValueOnce(new Error('connection reset'));
-    await expect(OperationalEventService.setEventStatuses([{ id: 1 }], 'resolve')).rejects.toThrow('connection reset');
+    await expect(OperationalEventService.setEventStatuses([full(1, '2026-08-27T19:00:00.000Z')], 'resolve')).rejects.toThrow('connection reset');
+  });
+});
+
+describe('setEventStatus status_changed_at precondition', () => {
+  test('is not asserted when the caller omits it (older single-row clients)', async () => {
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] });
+    await OperationalEventService.setEventStatus(5, 'resolve', { expectedStatus: 'open' });
+    const [, ...values] = sqlMock.mock.calls[0];
+    expect(values).toContain(false); // assertStatusChanged flag OFF
+  });
+
+  test('a malformed expectedStatusChangedAt is a 400-class caller error', async () => {
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', { expectedStatusChangedAt: 'not-a-date' }))
+      .rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
   });
 });

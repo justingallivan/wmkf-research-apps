@@ -15,32 +15,40 @@
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const LONG_HEX_RE = /\b[0-9a-f]{8,}\b/gi;
-const DIGITS_RE = /\d+/g;
+// HTTP statuses are CAUSAL, not incidental — a 403 and a 500 from the same
+// log line must not fold. Keep `(429)`, `status=500`, `status 503`,
+// `httpCode":429` shaped tokens before the generic digit strip.
+const HTTP_STATUS_RE = /(\(|status[=: ]|statusCode[=: ]|httpCode"?:)\s?([1-5]\d\d)(\)?)/g;
+const DIGITS_OR_TOKEN_RE = /<http:\d{3}>|\d+/g;
 const WS_RE = /\s+/g;
 const SIGNATURE_SUMMARY_CHARS = 160;
 
 /**
  * Normalize a summary so rows that differ only in ids, counters, durations,
- * or trace ids share a signature. Deliberately coarse: grouping is a reading
- * aid, and every row is still resolved with its own precondition.
+ * or trace ids share a signature — while HTTP status codes survive.
+ * Deliberately coarse otherwise: grouping is a reading aid, every row is
+ * still resolved with its own precondition, and the card requires a group
+ * to be expanded before it can be resolved.
  */
 export function normalizeSummary(summary) {
   return String(summary || '')
     .replace(UUID_RE, '<uuid>')
     .replace(LONG_HEX_RE, '<hex>')
-    .replace(DIGITS_RE, '#')
+    .replace(HTTP_STATUS_RE, (_m, lead, code, close) => `${lead}<http:${code}>${close}`)
+    .replace(DIGITS_OR_TOKEN_RE, m => (m.startsWith('<http:') ? m : '#'))
     .replace(WS_RE, ' ')
     .trim()
     .slice(0, SIGNATURE_SUMMARY_CHARS);
 }
 
-/** Signature: same source, environment, type, subsystem, and normalized summary. */
+/** Signature: same source, environment, type, subsystem, stage, and normalized summary. */
 export function eventSignature(event) {
   return [
     event?.source || '',
     event?.environment || '',
     event?.event_type || '',
     event?.subsystem || '',
+    event?.stage || '',
     normalizeSummary(event?.summary),
   ].join('|');
 }

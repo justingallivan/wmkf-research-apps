@@ -146,3 +146,14 @@ test('PATCH batch over the cap → 400', async () => {
   await handler({ method: 'PATCH', body: { action: 'resolve', events: new Array(501).fill({ id: 1 }) } }, res);
   expect(res.statusCode).toBe(400);
 });
+
+test('PATCH single forwards expectedStatusChangedAt only when the client sent the key', async () => {
+  OperationalEventService.setEventStatus.mockResolvedValue({ id: 5, status: 'resolved' });
+  const res = mkRes();
+  await handler({
+    method: 'PATCH',
+    body: { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null },
+  }, res);
+  expect(OperationalEventService.setEventStatus).toHaveBeenCalledWith(5, 'resolve', expect.objectContaining({ expectedStatusChangedAt: null }));
+  expect(OperationalEventService.setEventStatus.mock.calls[0][2]).toHaveProperty('expectedStatusChangedAt');
+});

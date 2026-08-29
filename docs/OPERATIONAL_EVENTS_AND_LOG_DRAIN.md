@@ -140,16 +140,23 @@ stay `open` until staff resolve them — that absence is explicit, not implied.
 search over request number / entity refs / correlation id / summary,
 expandable sanitized metadata, occurrence counts, transient badges,
 Resolve/Reopen actions, and **Resolve all N shown** (S468): one PATCH with
-`events[]` (≤500, the list cap) where every row carries its own
-`expectedStatus`/`expectedLastOccurredAt` precondition — rows that changed
-since the list rendered are skipped and counted as `stale`, never
-blind-closed; the response reports `updated/stale/notFound/invalid` and the
-card refetches. Rows sharing a signature (source, environment, event type,
+`events[]` (≤500, the list cap) where every row MUST carry its full freshness
+triple — `expectedStatus`, `expectedLastOccurredAt`, `expectedStatusChangedAt`
+(`status_changed_at` closes the open→resolved→open ABA hole the first two
+cannot see). Rows that changed since the list rendered are skipped and counted
+as `stale`; rows missing any precondition are counted `invalid` and never
+applied; the response reports `updated/stale/notFound/invalid` and the card
+refetches. The single-row PATCH asserts `status_changed_at` only when the
+client sends the key (older clients omit it). The section lives in
+`shared/components/admin/OperationalEventsSection.js` with a render/action
+test (`tests/unit/operational-events-section.test.js`). Rows sharing a signature (source, environment, event type,
 subsystem, summary with ids/numbers/hex normalized —
 `shared/utils/operational-event-grouping.js`) are **folded in the view** as
-"message × N" with a per-group Resolve; storage is untouched, so the
-`vercel:<log id>` idempotency contract above is unchanged (a stored fold
-would over-count on redelivery).
+"message × N"; the group must be expanded before **Resolve group** is
+offered, so an operator sees what a coarse signature folded. HTTP status
+codes and `stage` stay in the signature (a 403 and a 500 never fold).
+Storage is untouched, so the `vercel:<log id>` idempotency contract above is
+unchanged (a stored fold would over-count on redelivery).
 
 ### Retention
 

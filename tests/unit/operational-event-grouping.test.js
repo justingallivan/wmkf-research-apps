@@ -77,3 +77,18 @@ test('a single row is a group of one', () => {
   const [g] = groupOperationalEvents([throttle(1, 'x', 't')]);
   expect(g.events).toHaveLength(1);
 });
+
+test('HTTP status codes are causal and survive normalization: a 403 and a 500 from the same line do not fold', () => {
+  const base = { source: 'vercel-drain', environment: 'production', event_type: 'runtime_log_error', subsystem: '/api/user-preferences', status: 'open', last_occurred_at: 't' };
+  const a = { ...base, id: 1, summary: '[dataverse-prefs] setUserPreference error: dataverse failed (403): {"error":{"code":"0x80040299"}}' };
+  const b = { ...base, id: 2, summary: '[dataverse-prefs] setUserPreference error: dataverse failed (500): {"error":{"code":"0x80040299"}}' };
+  expect(groupOperationalEvents([a, b])).toHaveLength(2);
+  expect(normalizeSummary('status=500 after 30405 ms')).toBe('status=<http:500> after # ms');
+  expect(normalizeSummary('"httpCode":429')).toContain('<http:429>');
+});
+
+test('stage is part of the signature', () => {
+  const a = { ...throttle(1, 'aaaaaaaa', 't'), stage: 'virus_scan' };
+  const b = { ...throttle(2, 'bbbbbbbb', 't'), stage: 'sharepoint_upload' };
+  expect(groupOperationalEvents([a, b])).toHaveLength(2);
+});
