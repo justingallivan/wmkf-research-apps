@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
+import CuratedRecipientPicker from './CuratedRecipientPicker';
 
 const DEFAULT_BODY = 'Please find the Site Visit materials attached.';
 const EMPTY_LIST = Object.freeze([]);
@@ -132,6 +133,7 @@ export default function PreSiteDistributionPanel({
   const [notice, setNotice] = useState(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [recipientPickerTarget, setRecipientPickerTarget] = useState(null);
   const sequence = useRef(0);
   const controllerRef = useRef(null);
 
@@ -191,6 +193,20 @@ export default function PreSiteDistributionPanel({
     setConfirmed(false);
     setError(null);
     setNotice(null);
+  };
+
+  const addDirectoryRecipients = (target, emails) => {
+    const existing = new Set(String(form[target] || '').split(/[;,\n]/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean));
+    const otherTarget = target === 'to' ? 'cc' : 'to';
+    const other = new Set(String(form[otherTarget] || '').split(/[;,\n]/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean));
+    const additions = emails.filter((email) => !existing.has(email) && !other.has(email));
+    if (additions.length === 0) return;
+    const current = form[target].trim();
+    edit({ [target]: current ? current + ', ' + additions.join(', ') : additions.join(', ') });
   };
 
   const prepare = async () => {
@@ -339,7 +355,17 @@ export default function PreSiteDistributionPanel({
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="distribution-to" className="block text-sm font-medium text-gray-800">To</label>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="distribution-to" className="block text-sm font-medium text-gray-800">To</label>
+              <button
+                type="button"
+                onClick={() => setRecipientPickerTarget('to')}
+                disabled={preparing || sending}
+                className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
+              >
+                Add from directory
+              </button>
+            </div>
             <textarea
               id="distribution-to"
               rows={2}
@@ -351,7 +377,17 @@ export default function PreSiteDistributionPanel({
             />
           </div>
           <div>
-            <label htmlFor="distribution-cc" className="block text-sm font-medium text-gray-800">Cc</label>
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="distribution-cc" className="block text-sm font-medium text-gray-800">Cc</label>
+              <button
+                type="button"
+                onClick={() => setRecipientPickerTarget('cc')}
+                disabled={preparing || sending}
+                className="text-xs font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50"
+              >
+                Add from directory
+              </button>
+            </div>
             <textarea
               id="distribution-cc"
               rows={2}
@@ -478,6 +514,14 @@ export default function PreSiteDistributionPanel({
 
   return (
     <>
+      <CuratedRecipientPicker
+        open={recipientPickerTarget !== null}
+        target={recipientPickerTarget || 'to'}
+        toValue={form.to}
+        ccValue={form.cc}
+        onAdd={addDirectoryRecipients}
+        onClose={() => setRecipientPickerTarget(null)}
+      />
       <Card hover={false}>
         {collapsed ? (
           <details>

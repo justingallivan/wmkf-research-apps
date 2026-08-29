@@ -165,6 +165,64 @@ test('changing attachment selection invalidates a prepared preview', async () =>
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
 });
 
+test('adds curated recipients without replacing manual addresses or creating To/Cc conflicts', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/history')) return response({ success: true, attempts: [] });
+    if (String(url).includes('/recipient-options')) {
+      return response({
+        success: true,
+        recipients: [
+          { key: 'staff:7', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
+          { key: 'contact:1', category: 'consultant', name: 'Casey Consultant', email: 'casey@example.org' },
+        ],
+      });
+    }
+    throw new Error('Unexpected fetch: ' + url);
+  });
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'manual@example.org' } });
+  fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'casey@example.org' } });
+
+  fireEvent.click(screen.getAllByRole('button', { name: 'Add from directory' })[0]);
+  const alice = await screen.findByRole('checkbox', { name: /Alice Staff/ });
+  const casey = screen.getByRole('checkbox', { name: /Casey Consultant/ });
+  expect(casey).toBeDisabled();
+  expect(screen.getByText('Already in Cc')).toBeInTheDocument();
+  fireEvent.click(alice);
+  fireEvent.click(screen.getByRole('button', { name: 'Add 1 recipient' }));
+
+  expect(screen.getByLabelText('To')).toHaveValue('manual@example.org, alice@example.org');
+  expect(screen.getByLabelText('Cc')).toHaveValue('casey@example.org');
+});
+
+test('directory failure leaves manual recipient entry available', async () => {
+  global.fetch = jest.fn(async (url) => (
+    String(url).includes('/history')
+      ? response({ success: true, attempts: [] })
+      : response({ error: 'Directory unavailable' }, 503)
+  ));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Add from directory' })[0]);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Directory unavailable');
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'manual@example.org' } });
+  expect(screen.getByLabelText('To')).toHaveValue('manual@example.org');
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
+});
+
 test('surfaces an in-progress prepare response instead of accepting it as a preview', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))

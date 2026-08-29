@@ -4,6 +4,7 @@ import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
+import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DataverseFieldInfoButton, {
   appSystemSettingField,
@@ -70,6 +71,14 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
     'Per-category recipient JSON',
     'alertRecipientsByCategory',
     'The active-superuser fallback roster is Postgres-backed, not Dataverse.',
+  ),
+];
+
+const SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Curated recipient identity references',
+    'site_visit.distribution_recipient_directory',
+    'Stores only active staff profile IDs and Dataverse Contact GUIDs; names and emails are resolved live.',
   ),
 ];
 
@@ -3206,6 +3215,13 @@ export default function AdminDashboard() {
           dataverseFields={ALERT_RECIPIENT_DATAVERSE_FIELDS}
         >
           <AlertRecipientsSection />
+        </CollapsibleCard>
+        <CollapsibleCard
+          title="Site Visit Recipients"
+          subtitle="Choose the staff, consultants, and Board members offered by the materials-email recipient menu"
+          dataverseFields={SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS}
+        >
+          <SiteVisitRecipientsSection />
         </CollapsibleCard>
         <UsageSection />
         <CollapsibleCard title="Model Configuration" dataverseFields={MODEL_CONFIG_DATAVERSE_FIELDS}>
