@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
+import { lookupExecutorBudget } from '../../config/executorBudgets';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 
 const STATUS_COPY = {
@@ -123,6 +124,7 @@ function PromptPanel({ prompt, modelCatalog, onPublished }) {
             published {fmtTs(prompt.publishedAt || prompt.createdOn)} · last touched {fmtTs(prompt.modifiedOn)}
             {prompt.modifiedByName ? <> by {prompt.modifiedByName}</> : null}
           </div>
+          <OutputBudgetLine prompt={prompt} modelCatalog={modelCatalog} />
         </div>
         <div className="flex items-center gap-2">
           <DataverseFieldInfoButton items={dataverseFields} />
@@ -253,6 +255,71 @@ function validateOutputSchemaText(value) {
     return { valid: false, issue: 'Output schema must be blank or a valid JSON object.' };
   }
   return { valid: true, issue: null };
+}
+
+// Mirrors execute-prompt.js: the prompt row's model (a tier key or a model id),
+// else the platform default; tier keys resolve through the catalog.
+function resolvePromptModel(prompt, modelCatalog) {
+  const raw = String(prompt.model || '').trim();
+  const tier = raw && (modelCatalog?.tiers || []).find((t) => t.key === raw);
+  if (tier) return { label: `${raw} tier → ${tier.resolvedId || '?'}`, id: tier.resolvedId || null };
+  if (raw) return { label: raw, id: raw };
+  const id = modelCatalog?.defaultModelResolved || modelCatalog?.defaultModel || null;
+  return { label: id ? `default → ${id}` : 'default', id };
+}
+
+const ROW_DEFAULT_MAX_TOKENS = 16384; // BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS, applied by execute-prompt.js
+const fmtInt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-US') : '—');
+
+/**
+ * The max_tokens budget this prompt actually runs with, next to the model's
+ * reviewed output ceiling and the Anthropic page that ceiling was read from.
+ * Server-owned overrides come from shared/config/executorBudgets.js — the same
+ * object the callers use — so the panel cannot drift from the code.
+ */
+function OutputBudgetLine({ prompt, modelCatalog }) {
+  const budget = lookupExecutorBudget(prompt.name);
+  const rowMax = Number.isInteger(prompt.maxTokens) && prompt.maxTokens > 0 ? prompt.maxTokens : null;
+  const base = rowMax ?? ROW_DEFAULT_MAX_TOKENS;
+  const effective = budget?.kind === 'standing' ? budget.maxTokensOverride : base;
+  const model = resolvePromptModel(prompt, modelCatalog);
+  const capability = model.id ? modelCatalog?.modelStatuses?.[model.id]?.capability : null;
+  const ceiling = capability?.maxOutputTokens ?? null;
+  const overCeiling = Number.isFinite(ceiling) && effective > ceiling;
+  const tone = overCeiling ? 'text-red-700' : budget ? 'text-gray-600' : 'text-gray-400';
+  return (
+    <div className={`text-[11px] mt-0.5 ${tone}`} data-testid="output-budget">
+      <span className="font-medium">Output budget</span>{' '}
+      <span title="max_tokens the Executor sends on this prompt's calls">{fmtInt(effective)} tokens</span>
+      {budget?.kind === 'standing' ? (
+        <> (server override, {budget.since}; prompt row {rowMax ? fmtInt(rowMax) : `default ${fmtInt(ROW_DEFAULT_MAX_TOKENS)}`}
+          {budget.timeoutMsOverride ? <>; timeout {Math.round(budget.timeoutMsOverride / 1000)}s</> : null})</>
+      ) : budget?.kind === 'retry' ? (
+        <> (prompt row{rowMax ? '' : ' default'}; retried once at {fmtInt(budget.floor)}–{fmtInt(budget.ceiling)} on max_tokens truncation, {budget.since})</>
+      ) : (
+        <> (prompt row{rowMax ? '' : ' default'})</>
+      )}
+      {' · '}model {model.label}
+      {capability?.status === 'reviewed' ? (
+        <>
+          {' · '}ceiling {fmtInt(ceiling)}{overCeiling ? ' — OVER CEILING; the Executor will reject this call' : ''}
+          {capability.thinkingMode ? <> · thinking {capability.thinkingMode.replace(/_/g, ' ')}{capability.defaultEffort ? ` (effort ${capability.defaultEffort})` : ''}, counted inside the budget</> : null}
+          {capability.source ? (
+            <>
+              {' · '}
+              <a href={capability.source} target="_blank" rel="noreferrer" className="underline hover:text-gray-900">
+                Anthropic model docs ↗
+              </a>
+              {capability.reviewedAt ? <> (registry reviewed {capability.reviewedAt})</> : null}
+            </>
+          ) : null}
+        </>
+      ) : model.id ? (
+        <span className="text-amber-700"> · model not in the capability registry — ceiling unknown</span>
+      ) : null}
+      {budget?.reason ? <div className="text-gray-400">{budget.reason}</div> : null}
+    </div>
+  );
 }
 
 function buildModelOptions(prompt, modelCatalog) {
