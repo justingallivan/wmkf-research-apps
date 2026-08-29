@@ -3,7 +3,7 @@ title: Request 1002379 test-mutation inventory (2026-08-28)
 domain: request-workbench
 kind: audit
 status: active
-summary: Production inventory of everything testing left on smoke-vehicle Request 1002379 since 2026-08-01, the owner-approved cleanup executed 2026-08-29 UTC (pointer, 7 registry rows, 7 files + 3 folders, 10 Postgres rows), and the 7 activities the service principal cannot delete.
+summary: Production inventory of everything testing left on smoke-vehicle Request 1002379 since 2026-08-01, the owner-approved cleanup executed 2026-08-29 UTC (pointer, 7 registry rows, 7 files + 3 folders, 10 Postgres rows), with the 7 test activities left in place by owner decision.
 owner: product-engineering
 related:
   - scripts/probe-request-1002379-test-inventory.js
@@ -175,10 +175,13 @@ which holds no Activity delete privilege; the impersonated attempt and the
 service-principal fallback both failed). The script aborted there by design,
 so the 6 email activities (`33ce6346`, `26bc7b59`, `3f5e3616`, `80340d48`,
 `5b5018bc`, `4ab30fd1`) and the `wmkf_sitevisit` "Test Site Visit"
-(`11b41d73-02a0-f111-b8dc-6045bd018a07`) remain and must be deleted by their
-owner in AkoyaGO (or by an administrator). A privilege grant for Activity
-delete to the app principal was **not** requested — the application has no
-runtime need to delete activities.
+(`11b41d73-02a0-f111-b8dc-6045bd018a07`) remain. **Owner decision
+2026-08-28: leave them.** The emails are plainly unrelated to the proposal and
+are not revisited; the purpose of this cleanup was the structured writeup state
+(registry rows, pointers, distribution rows) that future data mining would
+otherwise read as real. A privilege grant for Activity delete to the app
+principal was **not** requested — the application has no runtime need to
+delete activities. Cleanup is therefore **closed**.
 
 Evidence JSON (steps, ids, timestamps) was written to the session scratchpad
 and is not tracked; this section is its durable record.

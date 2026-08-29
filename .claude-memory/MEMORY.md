@@ -20,6 +20,7 @@
 - Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md
 - Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; feedback-no-vercel-cli-update-reminders.md; reference-vercel-sensitive-env-unreadable.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
+- Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
