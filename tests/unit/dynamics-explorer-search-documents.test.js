@@ -194,3 +194,40 @@ describe('searchDocuments scope ordering', () => {
     expect(result.incomplete).toBeUndefined();
   });
 });
+
+describe('same-round concurrency and Retry-After propagation', () => {
+  test('two concurrent search_documents calls in one request are serialized: the second never reaches Graph after the first throttles', async () => {
+    const err = throttledError();
+    err.retryAfterMs = 45_000;
+    GraphService.searchFiles.mockRejectedValue(err);
+    const toolContext = { searchThrottle: null };
+    const [first, second] = await Promise.all([
+      searchDocuments({ query: 'budget', library: 'akoya_request' }, toolContext),
+      searchDocuments({ query: 'narrative', library: 'akoya_request' }, toolContext),
+    ]);
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(1);
+    expect(first.error).toMatch(/throttled or timed out/);
+    expect(second.error).toMatch(/paused for the rest of this request/);
+    expect(second.error).toMatch(/No search was run/);
+  });
+
+  test('retry guidance is derived from the longest Retry-After the tenant sent, not a fixed minute', async () => {
+    const err = throttledError();
+    err.retryAfterMs = 150_000;
+    GraphService.searchFiles.mockRejectedValue(err);
+    const toolContext = { searchThrottle: null };
+    const result = await searchDocuments({ query: 'budget', library: 'akoya_request' }, toolContext);
+    expect(result.retryAfterMs).toBe(150_000);
+    expect(result.error).toMatch(/ask again in about 3 minutes/);
+    expect(toolContext.searchThrottle.retryAfterMs).toBe(150_000);
+    const paused = await searchDocuments({ query: 'x', library: 'akoya_request' }, toolContext);
+    expect(paused.error).toMatch(/about 3 minutes/);
+  });
+
+  test('without a Retry-After the guidance floors at about a minute', async () => {
+    GraphService.searchFiles.mockRejectedValue(throttledError());
+    const result = await searchDocuments({ query: 'budget', library: 'akoya_request' }, { searchThrottle: null });
+    expect(result.retryAfterMs).toBeNull();
+    expect(result.error).toMatch(/about a minute/);
+  });
+});

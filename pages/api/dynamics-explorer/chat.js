@@ -2057,7 +2057,7 @@ async function listDocuments({ request_number, request_id }) {
  * permanent (bad request) failures get distinct wording so the model does not
  * tell the user to "try again in a minute" for a 400.
  */
-function buildSearchFailureWarning(failedScopes, totalScopes) {
+function buildSearchFailureWarning(failedScopes, totalScopes, retryAfterMs = null) {
   const transient = failedScopes.some(sr => sr.transient);
   const detail = failedScopes
     .map(sr => `${sr.label}: ${String(sr.error || '').substring(0, 120)}`)
@@ -2066,11 +2066,18 @@ function buildSearchFailureWarning(failedScopes, totalScopes) {
   if (transient) {
     return `The SharePoint search service throttled or timed out for ${scopes} (${detail}). `
       + 'Results are incomplete, not a confirmed "no documents". Document search is paused for the '
-      + 'rest of this request; the user can ask again in a minute.';
+      + `rest of this request; the user can ask again in ${describeRetryWait(retryAfterMs)}.`;
   }
   return `The SharePoint search service returned an error for ${scopes} (${detail}). `
     + 'Results are incomplete, not a confirmed "no documents". This is not a throttle; '
     + 'the search request itself was rejected.';
+}
+
+/** Human wait for retry guidance: never shorter than a minute, rounded up. */
+function describeRetryWait(retryAfterMs) {
+  const ms = Math.max(Number(retryAfterMs) || 0, 60_000);
+  const minutes = Math.ceil(ms / 60_000);
+  return minutes <= 1 ? 'about a minute' : `about ${minutes} minutes`;
 }
 
 /** Short-circuit result while the per-request search circuit breaker is open. */
@@ -2080,20 +2087,39 @@ function searchPausedResult(query, scopeLabel, throttle) {
     query,
     scope: scopeLabel,
     incomplete: true,
+    retryAfterMs: throttle.retryAfterMs ?? null,
     error: 'Document search is paused for the rest of this request because the SharePoint '
       + `search service throttled or timed out earlier (${throttle.reason}). No search was run. `
-      + 'The user can ask again in a minute.',
+      + `The user can ask again in ${describeRetryWait(throttle.retryAfterMs)}.`,
   };
+}
+
+/**
+ * Same-round tool calls start concurrently, so two search_documents blocks
+ * would both read the breaker as closed before either could trip it. Serialize
+ * document searches per request: the second waits for the first and then sees
+ * the tripped breaker (Codex adversarial S468, re-review).
+ */
+function enqueueSearch(toolContext, run) {
+  if (!toolContext || typeof toolContext !== 'object') return run();
+  const previous = toolContext.searchQueue || Promise.resolve();
+  const next = previous.then(run, run);
+  toolContext.searchQueue = next.catch(() => {});
+  return next;
 }
 
 /**
  * Search within SharePoint document contents for keywords or phrases.
  * Optionally scoped to a specific library or request folder.
  */
-export async function searchDocuments({ query, library, request_number }, toolContext = {}) {
-  if (!query) {
-    return { error: 'A search query is required.' };
+export function searchDocuments(input, toolContext = {}) {
+  if (!input?.query) {
+    return Promise.resolve({ error: 'A search query is required.' });
   }
+  return enqueueSearch(toolContext, () => searchDocumentsSerialized(input, toolContext));
+}
+
+async function searchDocumentsSerialized({ query, library, request_number }, toolContext) {
 
   // ── Resolve the search scope ─────────────────────────────────────────────
   // When a request_number is supplied, we can't trust a single (library,
@@ -2150,6 +2176,7 @@ export async function searchDocuments({ query, library, request_number }, toolCo
           found: [],
           error: err.message,
           transient: err.isTransient === true || err.noResponse === true,
+          retryAfterMs: Number.isFinite(err.retryAfterMs) ? err.retryAfterMs : null,
         };
       }
     };
@@ -2195,22 +2222,29 @@ export async function searchDocuments({ query, library, request_number }, toolCo
     // 2026-08-27 throttle storm on the Operational Events card. Name the
     // failure instead, and tell the model not to loop on it.
     const failedScopes = scopeResults.filter(sr => sr.error);
-    const searchWarning = failedScopes.length
-      ? buildSearchFailureWarning(failedScopes, scopeResults.length)
-      : null;
     const transientFailure = failedScopes.find(sr => sr.transient);
+    // The tenant's requested wait is the LONGEST Retry-After any scope saw;
+    // retry guidance is derived from it rather than a fixed "a minute".
+    const retryAfterMs = failedScopes.reduce(
+      (max, sr) => (sr.retryAfterMs != null && sr.retryAfterMs > max ? sr.retryAfterMs : max),
+      0,
+    ) || null;
+    const searchWarning = failedScopes.length
+      ? buildSearchFailureWarning(failedScopes, scopeResults.length, retryAfterMs)
+      : null;
     if (transientFailure && toolContext && typeof toolContext === 'object') {
       // Trip the per-request breaker: later search_documents calls in this
       // request return searchPausedResult without touching Graph.
       toolContext.searchThrottle = {
         at: Date.now(),
         reason: String(transientFailure.error || 'transient failure').substring(0, 120),
+        retryAfterMs,
       };
     }
 
     if (!merged.length) {
       if (searchWarning) {
-        return { searchCount: 0, query, scope: scopeLabel, incomplete: true, error: searchWarning };
+        return { searchCount: 0, query, scope: scopeLabel, incomplete: true, retryAfterMs, error: searchWarning };
       }
       return {
         searchCount: 0,
@@ -2233,7 +2267,7 @@ export async function searchDocuments({ query, library, request_number }, toolCo
       searchCount: merged.length,
       query,
       scope: scopeLabel,
-      ...(searchWarning ? { incomplete: true, warning: searchWarning } : {}),
+      ...(searchWarning ? { incomplete: true, retryAfterMs, warning: searchWarning } : {}),
       header: 'Filename | Size | Modified | Location',
       documents: lines.join('\n'),
       // Structured file data for frontend download links (not sent to Claude)

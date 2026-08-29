@@ -190,3 +190,36 @@ describe('GraphService.searchFiles throttle handling', () => {
     expect(console.error).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('process-level search cooldown', () => {
+  test('after a long Retry-After, later searches in this process fail fast with the remaining wait and no fetch', async () => {
+    const calls = routeFetch([throttled(60)]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toMatchObject({ retryAfterMs: 60_000 });
+    expect(calls).toHaveLength(1);
+
+    await jest.advanceTimersByTimeAsync(20_000);
+    let caught;
+    try {
+      await GraphService.searchFiles('narrative');
+    } catch (err) {
+      caught = err;
+    }
+    expect(calls).toHaveLength(1); // no fetch at all
+    expect(caught).toMatchObject({ status: 429, isTransient: true, cooldown: true, attempts: 0 });
+    expect(caught.retryAfterMs).toBeGreaterThan(35_000);
+    expect(caught.retryAfterMs).toBeLessThanOrEqual(40_000);
+
+    await jest.advanceTimersByTimeAsync(45_000); // cooldown elapsed
+    routeFetch([searchOk()]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
+  });
+
+  test('clearCaches resets the cooldown', async () => {
+    routeFetch([throttled(60)]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toBeDefined();
+    GraphService.clearCaches();
+    const calls = routeFetch([searchOk()]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
+    expect(calls).toHaveLength(1);
+  });
+});
