@@ -1,0 +1,460 @@
+<div id="wmkf-president-dashboard">
+  <style>
+    #wmkf-president-dashboard {
+      --wmkf-president-page: light-dark(#f7f8fa, #11151d);
+      --wmkf-president-panel: light-dark(#ffffff, #181e28);
+      --wmkf-president-text: light-dark(#111827, #f4f6fa);
+      --wmkf-president-muted: light-dark(#667085, #abb5c4);
+      --wmkf-president-border: light-dark(#d8dee8, #354052);
+      --wmkf-president-rule: light-dark(#e8ebf0, #2c3544);
+      --wmkf-president-button: light-dark(#111827, #f1f4f8);
+      --wmkf-president-button-text: light-dark(#ffffff, #111827);
+      --wmkf-president-blue: light-dark(#285ea8, #8db9f3);
+      --wmkf-president-amber: light-dark(#8a5200, #f0bf67);
+      color-scheme: light dark;
+      width: 100%;
+      color: var(--wmkf-president-text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #wmkf-president-dashboard * {
+      box-sizing: border-box;
+    }
+
+    #wmkf-president-dashboard button,
+    #wmkf-president-dashboard input {
+      font: inherit;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-window {
+      overflow: hidden;
+      width: 100%;
+      border: 1px solid var(--wmkf-president-border);
+      border-radius: 14px;
+      background: var(--wmkf-president-page);
+      box-shadow: 0 8px 28px light-dark(rgba(16, 24, 40, 0.08), rgba(0, 0, 0, 0.22));
+    }
+
+    #wmkf-president-dashboard .wmkf-president-app-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--wmkf-president-border);
+      background: var(--wmkf-president-panel);
+    }
+
+    #wmkf-president-dashboard .wmkf-president-app-name {
+      font-size: 17px;
+      font-weight: 500;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-person {
+      color: var(--wmkf-president-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-content {
+      padding: 28px 28px 32px;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-heading-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-heading {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 34px);
+      line-height: 1.15;
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-description {
+      margin: 8px 0 0;
+      color: var(--wmkf-president-muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-search-wrap {
+      position: relative;
+      width: min(310px, 100%);
+      flex: 0 0 auto;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-search-icon {
+      position: absolute;
+      top: 50%;
+      left: 13px;
+      width: 16px;
+      height: 16px;
+      transform: translateY(-50%);
+      color: var(--wmkf-president-muted);
+      pointer-events: none;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-search {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 13px 10px 38px;
+      border: 1px solid var(--wmkf-president-border);
+      border-radius: 9px;
+      background: var(--wmkf-president-panel);
+      color: var(--wmkf-president-text);
+      font-size: 16px;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-hidden-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-section {
+      margin-top: 28px;
+      border: 1px solid var(--wmkf-president-border);
+      border-radius: 12px;
+      background: var(--wmkf-president-panel);
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--wmkf-president-rule);
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-heading {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-description {
+      margin: 5px 0 0;
+      color: var(--wmkf-president-muted);
+      font-size: 13px;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(160px, 0.42fr) auto;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+      border-bottom: 1px solid var(--wmkf-president-rule);
+    }
+
+    #wmkf-president-dashboard .wmkf-president-row:last-child {
+      border-bottom: 0;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-request {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-request-context {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 13px;
+      margin-top: 6px;
+      color: var(--wmkf-president-muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-row-state {
+      min-width: 0;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-stage {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--wmkf-president-blue);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-stage-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-personal-state {
+      margin-top: 6px;
+      color: var(--wmkf-president-muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-personal-updated {
+      color: var(--wmkf-president-amber);
+      font-weight: 500;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-action {
+      min-height: 42px;
+      padding: 9px 14px;
+      border: 1px solid var(--wmkf-president-button);
+      border-radius: 8px;
+      background: var(--wmkf-president-button);
+      color: var(--wmkf-president-button-text);
+      cursor: pointer;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--wmkf-president-rule);
+    }
+
+    #wmkf-president-dashboard .wmkf-president-list-toggle {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--wmkf-president-blue);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #wmkf-president-dashboard .wmkf-president-empty {
+      padding: 34px 20px;
+      color: var(--wmkf-president-muted);
+      text-align: center;
+      font-size: 14px;
+    }
+
+    #wmkf-president-dashboard [hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 720px) {
+      #wmkf-president-dashboard .wmkf-president-content {
+        padding: 22px 16px 26px;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-heading-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-search-wrap {
+        width: 100%;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-row-state {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-action {
+        grid-column: 2;
+        grid-row: 1;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #wmkf-president-dashboard .wmkf-president-row {
+        display: flex;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      #wmkf-president-dashboard .wmkf-president-action {
+        width: 100%;
+      }
+    }
+  </style>
+
+  <div class="wmkf-president-window">
+    <header class="wmkf-president-app-bar">
+      <span class="wmkf-president-app-name">Workbench</span>
+      <span class="wmkf-president-person">President</span>
+    </header>
+
+    <main class="wmkf-president-content">
+      <div class="wmkf-president-heading-row">
+        <div>
+          <h1 class="wmkf-president-heading">Final writeups</h1>
+          <p class="wmkf-president-description">Writeups shared for leadership review.</p>
+        </div>
+        <label class="wmkf-president-search-wrap">
+          <i class="wmkf-president-search-icon" data-lucide="search" aria-hidden="true"></i>
+          <span class="wmkf-president-hidden-label">Search final writeups</span>
+          <input class="wmkf-president-search" type="search" placeholder="Search final writeups" data-president-search>
+        </label>
+      </div>
+
+      <section class="wmkf-president-list-section" aria-live="polite">
+        <div class="wmkf-president-list-header">
+          <h2 class="wmkf-president-list-heading" data-president-list-heading>Open for review</h2>
+          <p class="wmkf-president-list-description" data-president-list-description>These writeups are ready for your review.</p>
+        </div>
+
+        <ul class="wmkf-president-list" data-president-list="open">
+          <li class="wmkf-president-row" data-president-search-text="1002788 explore universe keck aisha kumar">
+            <div>
+              <p class="wmkf-president-request">Request #1002788 — To Explore the Universe</p>
+              <div class="wmkf-president-request-context">
+                <span>W. M. Keck Foundation</span>
+                <span>Program Director: Aisha Kumar</span>
+                <span>Shared today</span>
+              </div>
+            </div>
+            <div class="wmkf-president-row-state">
+              <div class="wmkf-president-stage"><span class="wmkf-president-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-president-personal-state">Not yet reviewed</div>
+            </div>
+            <button class="wmkf-president-action" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-president-row" data-president-search-text="1002799 neural circuits recovery university washington jordan smith">
+            <div>
+              <p class="wmkf-president-request">Request #1002799 — Neural Circuits and Recovery</p>
+              <div class="wmkf-president-request-context">
+                <span>University of Washington</span>
+                <span>Program Director: Jordan Smith</span>
+                <span>Shared August 27</span>
+              </div>
+            </div>
+            <div class="wmkf-president-row-state">
+              <div class="wmkf-president-stage"><span class="wmkf-president-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-president-personal-state">Not yet reviewed</div>
+            </div>
+            <button class="wmkf-president-action" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-president-row" data-president-search-text="1002842 sustainable chemistry stanford morgan reyes">
+            <div>
+              <p class="wmkf-president-request">Request #1002842 — Sustainable Chemistry at Scale</p>
+              <div class="wmkf-president-request-context">
+                <span>Stanford University</span>
+                <span>Program Director: Morgan Reyes</span>
+                <span>Shared August 25</span>
+              </div>
+            </div>
+            <div class="wmkf-president-row-state">
+              <div class="wmkf-president-stage"><span class="wmkf-president-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-president-personal-state">Not yet reviewed</div>
+            </div>
+            <button class="wmkf-president-action" type="button">Review writeup</button>
+          </li>
+        </ul>
+
+        <ul class="wmkf-president-list" data-president-list="reviewed" hidden>
+          <li class="wmkf-president-row" data-president-search-text="1002814 cellular repair northwestern jordan smith">
+            <div>
+              <p class="wmkf-president-request">Request #1002814 — Mapping Cellular Repair</p>
+              <div class="wmkf-president-request-context">
+                <span>Northwestern University</span>
+                <span>Program Director: Jordan Smith</span>
+                <span>Reviewed August 26</span>
+              </div>
+            </div>
+            <div class="wmkf-president-row-state">
+              <div class="wmkf-president-stage"><span class="wmkf-president-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-president-personal-state wmkf-president-personal-updated">Updated since your review</div>
+            </div>
+            <button class="wmkf-president-action" type="button">Review writeup</button>
+          </li>
+
+          <li class="wmkf-president-row" data-president-search-text="1002861 quantum materials caltech morgan reyes">
+            <div>
+              <p class="wmkf-president-request">Request #1002861 — New Quantum Materials</p>
+              <div class="wmkf-president-request-context">
+                <span>California Institute of Technology</span>
+                <span>Program Director: Morgan Reyes</span>
+                <span>Reviewed August 24</span>
+              </div>
+            </div>
+            <div class="wmkf-president-row-state">
+              <div class="wmkf-president-stage"><span class="wmkf-president-stage-dot" aria-hidden="true"></span>Leadership review</div>
+              <div class="wmkf-president-personal-state">Reviewed</div>
+            </div>
+            <button class="wmkf-president-action" type="button">Review writeup</button>
+          </li>
+        </ul>
+
+        <div class="wmkf-president-empty" data-president-empty hidden>No matching final writeups.</div>
+
+        <div class="wmkf-president-list-footer">
+          <button class="wmkf-president-list-toggle" type="button" data-president-toggle>View reviewed writeups</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('wmkf-president-dashboard');
+      const lists = Array.from(root.querySelectorAll('[data-president-list]'));
+      const heading = root.querySelector('[data-president-list-heading]');
+      const description = root.querySelector('[data-president-list-description]');
+      const toggle = root.querySelector('[data-president-toggle]');
+      const search = root.querySelector('[data-president-search]');
+      const empty = root.querySelector('[data-president-empty]');
+      let currentList = 'open';
+
+      function applySearch() {
+        const query = search.value.trim().toLowerCase();
+        const activeList = root.querySelector(`[data-president-list="${currentList}"]`);
+        const rows = Array.from(activeList.querySelectorAll('[data-president-search-text]'));
+        let visibleCount = 0;
+        rows.forEach((row) => {
+          const matches = !query || row.dataset.presidentSearchText.includes(query);
+          row.hidden = !matches;
+          if (matches) visibleCount += 1;
+        });
+        empty.hidden = visibleCount !== 0;
+      }
+
+      function showList(listName) {
+        currentList = listName;
+        lists.forEach((list) => {
+          list.hidden = list.dataset.presidentList !== listName;
+        });
+        const isOpen = listName === 'open';
+        heading.textContent = isOpen ? 'Open for review' : 'Reviewed';
+        description.textContent = isOpen
+          ? 'These writeups are ready for your review.'
+          : 'Writeups you have already reviewed.';
+        toggle.textContent = isOpen ? 'View reviewed writeups' : 'Back to open for review';
+        search.value = '';
+        applySearch();
+      }
+
+      toggle.addEventListener('click', () => showList(currentList === 'open' ? 'reviewed' : 'open'));
+      search.addEventListener('input', applySearch);
+    })();
+  </script>
+</div>

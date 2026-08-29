@@ -63,8 +63,10 @@ Main line (each feature branch Codex-reviewed where noted):
    (S466 close).** Known queued items from the proposal artifact:
    (a) limited add-addressees control for the composer (owner: "not every
    board member"; shape to discuss — open question 5), (b) test-send
-   tagging in email history (Q2), (c) Phase 2 history grouping/day headers.
-   Owner will bring more; start by asking what they saw.
+   tagging in email history (Q2) — **DONE on branch (Codex `1fde64f9`)**,
+   (c) Phase 2 history grouping/day headers — **DONE on branch (same
+   commit)**. See "Codex workstream handoff" below. Owner will bring more;
+   start by asking what they saw.
 2. **WAITING on Connor (out until ~2026-09-10): `wmkf_requestdocument`
    staff-role privilege grant.** Brief ready to share (artifact link above);
    after the grant, owner re-runs
@@ -133,6 +135,52 @@ Main line (each feature branch Codex-reviewed where noted):
 11. **In-app Site Visit logistics editor.** Owner S466: scheduling is
     handled by others in Dynamics; Workbench reads headlessly
     (`useSiteVisitContext` + ActivityParty fallback).
+
+## Codex workstream handoff — branch `codex/staff-deliberations-history-ux` (closed out 2026-08-28 by Claude, ownership transferred back by owner)
+
+**Branch state:** clean, HEAD `1fde64f9` = `origin/codex/staff-deliberations-history-ux`;
+one runtime commit ahead of `main` ("Group distribution history and tag test
+sends": `shared/components/workbench/PreSiteDistributionPanel.js` +104/−52,
+`tests/unit/pre-site-distribution-panel.test.js` +94). **Not merged; nothing
+pushed to `main`.** Closeout commit adds docs/outputs only.
+
+**Read-only review of `1fde64f9` (Claude, closeout):** in scope (the two
+authorized files only; no shared primitives, no routes, no identifiers
+invented — `from`/`to`/`cc`/`createdAt` are the existing panel props).
+History grouped by local day with Today/Yesterday/date headers; a "Test send"
+pill when every To/Cc address equals the From address. 12/12 focused tests
+pass. ESLint reports one `react-hooks/set-state-in-effect` warning at lines
+176–177 (composer suggestion effect) — that region is untouched by the diff
+(hunks are 9–44 and 475+), so treat it as pre-existing, not a merge blocker.
+`npm run build` was NOT run at closeout.
+
+**Merge path (next session, from the main checkout, owner's go):**
+`git merge --no-ff codex/staff-deliberations-history-ux` → push → `vercel
+inspect`; then park the worktree (`git -C ../WMKF_Apps-codex checkout -B
+codex/parked origin/main`). Tier 1 UI change; a fresh full `npm run lint` +
+`npm run build` on the merged tree is the remaining verification.
+
+**Final Writeup Review — plan only, DO NOT IMPLEMENT without owner's go:**
+Codex produced the design brief + mockups and an implementation plan; a
+read-only Claude Fable review returned **READY WITH NAMED PREREQUISITES**
+(no P0; P1-1..P1-4 + eight P2 corrections, all incorporated). Durable copies
+committed on this branch: `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`,
+`docs/audits/final-writeup-review-fable-review-2026-08-28.md`,
+`outputs/final-writeup-review-2026-08-28/` (brief + 4 HTML mockups). The
+Codex originals live in the untracked
+`~/.codex/visualizations/2026/08/28/01a04a67-…/` on this Mac only.
+Prerequisites before any slice: (1) owner approves the expanded file surface
+(the plan spans services, routes, schema, pages, docs — the original two-file
+authorization does not cover it); (2) before Slice 1, an explicit actor/time
+contract per transition (Dataverse `modifiedby` is not reliable — see the
+S466 attribution finding); (3) before Slice 2, an owner-authorized read-only
+`systemuser` coverage probe for every PD/PC/CSO/President; (4) before Slice
+4, a positive PC/leadership persona contract. Slice 0 is a `/sweep` of the
+obsolete "copy Final Writeup into a new file" direction across the lifecycle
+plan, Atlas, schema design, wiki, and memory. This resolves the S466 "Owner
+Decision Needed" item 1 (Q4b hand-off mechanics) at the design level —
+same document, source Pre-Site row → `FINAL`, pointer retained — pending the
+owner's go on the plan.
 
 ## Key Files Reference
 
