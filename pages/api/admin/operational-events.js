@@ -6,7 +6,12 @@
  *   (hours max 2160 = 90 days; limit max 500 — bounds enforced in the service)
  *
  * PATCH — Staff resolution
- *   Body: { id, action: 'resolve' | 'reopen', note? }
+ *   Body: { id, action: 'resolve' | 'reopen', note?,
+ *           expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt }
+ *   or    { action, events: [{ id, expectedStatus, expectedLastOccurredAt,
+ *           expectedStatusChangedAt }], note? }   (≤500, "Resolve all shown")
+ *   The freshness triple is REQUIRED on every mutation (400 when absent): a
+ *   status write is only ever applied against the row state the client saw.
  *
  * Superuser only.
  */
@@ -61,13 +66,23 @@ export default async function handler(req, res) {
       });
     }
 
+    // Fail loud rather than blind-write: a payload without the full freshness
+    // triple (a pre-deployment admin bundle, or a hand-built call) could close
+    // an open→resolved→open row whose recurrence it never saw. Version skew is
+    // a 400 the operator sees, not a silent unguarded update.
+    if (typeof expectedStatus !== 'string' || expectedLastOccurredAt == null
+        || !Object.prototype.hasOwnProperty.call(req.body || {}, 'expectedStatusChangedAt')) {
+      return res.status(400).json({
+        error: 'expectedStatus, expectedLastOccurredAt and expectedStatusChangedAt are required — reload the admin page and retry',
+      });
+    }
+
     const updated = await OperationalEventService.setEventStatus(id, action, {
       profileId: gate.profileId,
       note: note || null,
-      expectedStatus: expectedStatus || null,
-      expectedLastOccurredAt: expectedLastOccurredAt || null,
-      // Only asserted when the client sent the key (older clients omit it).
-      ...(expectedStatusChangedAt !== undefined ? { expectedStatusChangedAt } : {}),
+      expectedStatus,
+      expectedLastOccurredAt,
+      expectedStatusChangedAt,
     });
     if (!updated) {
       return res.status(404).json({ error: 'Event not found or not resolvable' });

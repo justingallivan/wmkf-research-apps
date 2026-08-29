@@ -74,7 +74,7 @@ test('PATCH resolve attributes the acting profile and forwards freshness expecta
     method: 'PATCH',
     body: {
       id: 5, action: 'resolve', note: 'checked',
-      expectedStatus: 'open', expectedLastOccurredAt: '2026-08-19T00:00:00.000Z',
+      expectedStatus: 'open', expectedLastOccurredAt: '2026-08-19T00:00:00.000Z', expectedStatusChangedAt: null,
     },
   }, res);
   expect(OperationalEventService.setEventStatus).toHaveBeenCalledWith(5, 'resolve', {
@@ -82,6 +82,7 @@ test('PATCH resolve attributes the acting profile and forwards freshness expecta
     note: 'checked',
     expectedStatus: 'open',
     expectedLastOccurredAt: '2026-08-19T00:00:00.000Z',
+    expectedStatusChangedAt: null,
   });
   expect(res.body).toEqual({ ok: true, id: 5, status: 'resolved' });
 });
@@ -94,7 +95,7 @@ test('PATCH against a row that changed since render → 409 with current state',
   const res = mkRes();
   await handler({
     method: 'PATCH',
-    body: { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x' },
+    body: { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null },
   }, res);
   expect(res.statusCode).toBe(409);
   expect(res.body.current).toMatchObject({ occurrence_count: 3 });
@@ -112,7 +113,7 @@ test('PATCH invalid action → 400', async () => {
 test('PATCH unknown id → 404', async () => {
   OperationalEventService.setEventStatus.mockResolvedValue(null);
   const res = mkRes();
-  await handler({ method: 'PATCH', body: { id: 999, action: 'resolve' } }, res);
+  await handler({ method: 'PATCH', body: { id: 999, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null } }, res);
   expect(res.statusCode).toBe(404);
 });
 
@@ -147,13 +148,29 @@ test('PATCH batch over the cap → 400', async () => {
   expect(res.statusCode).toBe(400);
 });
 
-test('PATCH single forwards expectedStatusChangedAt only when the client sent the key', async () => {
+test('PATCH single forwards the full freshness triple (null status_changed_at is a legitimate assertion)', async () => {
   OperationalEventService.setEventStatus.mockResolvedValue({ id: 5, status: 'resolved' });
   const res = mkRes();
   await handler({
     method: 'PATCH',
     body: { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null },
   }, res);
-  expect(OperationalEventService.setEventStatus).toHaveBeenCalledWith(5, 'resolve', expect.objectContaining({ expectedStatusChangedAt: null }));
+  expect(res.statusCode).toBe(200);
+  expect(OperationalEventService.setEventStatus).toHaveBeenCalledWith(5, 'resolve', expect.objectContaining({
+    expectedStatus: 'open', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null,
+  }));
   expect(OperationalEventService.setEventStatus.mock.calls[0][2]).toHaveProperty('expectedStatusChangedAt');
+});
+
+test.each([
+  ['no expectedStatusChangedAt key (pre-deployment bundle)', { id: 5, action: 'resolve', expectedStatus: 'open', expectedLastOccurredAt: 'x' }],
+  ['no expectedLastOccurredAt', { id: 5, action: 'resolve', expectedStatus: 'open', expectedStatusChangedAt: null }],
+  ['no expectedStatus', { id: 5, action: 'resolve', expectedLastOccurredAt: 'x', expectedStatusChangedAt: null }],
+  ['legacy body with only id + action', { id: 5, action: 'resolve' }],
+])('PATCH single without the full freshness triple is refused (400), never blind-written — %s (Codex confirm-pass)', async (_label, body) => {
+  const res = mkRes();
+  await handler({ method: 'PATCH', body }, res);
+  expect(res.statusCode).toBe(400);
+  expect(res.body.error).toMatch(/expectedStatusChangedAt/);
+  expect(OperationalEventService.setEventStatus).not.toHaveBeenCalled();
 });

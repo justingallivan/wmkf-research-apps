@@ -146,8 +146,12 @@ triple — `expectedStatus`, `expectedLastOccurredAt`, `expectedStatusChangedAt`
 cannot see). Rows that changed since the list rendered are skipped and counted
 as `stale`; rows missing any precondition are counted `invalid` and never
 applied; the response reports `updated/stale/notFound/invalid` and the card
-refetches. The single-row PATCH asserts `status_changed_at` only when the
-client sends the key (older clients omit it). The section lives in
+refetches. The single-row PATCH requires the same triple and answers 400 when
+any part is missing (a stale pre-deployment bundle is a visible version-skew
+error, never a blind write). Both timestamp predicates compare the column
+truncated to milliseconds: `status_changed_at = NOW()` stores microseconds but
+the row reaches the client through JSON with millisecond precision, so exact
+equality would mark every unchanged row stale. The section lives in
 `shared/components/admin/OperationalEventsSection.js` with a render/action
 test (`tests/unit/operational-events-section.test.js`). Rows sharing a signature (source, environment, event type,
 subsystem, summary with ids/numbers/hex normalized —

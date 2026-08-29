@@ -388,7 +388,7 @@ describe('setEventStatuses (bulk)', () => {
     );
     expect(outcome).toEqual({ updated: [], stale: [5], notFound: [], invalid: [] });
     const [strings, ...values] = sqlMock.mock.calls[0];
-    expect(strings.join(' ')).toMatch(/status_changed_at IS NOT DISTINCT FROM/);
+    expect(strings.join(' ')).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
     expect(values).toContain(true); // the assertStatusChanged flag is ON for batch items
   });
 
@@ -420,7 +420,31 @@ describe('setEventStatuses (bulk)', () => {
 });
 
 describe('setEventStatus status_changed_at precondition', () => {
-  test('is not asserted when the caller omits it (older single-row clients)', async () => {
+  test('both freshness predicates compare at millisecond precision: NOW() stores microseconds, the client only ever sees milliseconds (Codex confirm-pass)', async () => {
+    // What the client holds: the GET row's Date serialized by res.json → ms only.
+    const rowFromDb = { last_occurred_at: new Date('2026-08-28T10:00:00.123Z'), status_changed_at: new Date('2026-08-28T11:00:00.456Z') };
+    const asSeenByClient = JSON.parse(JSON.stringify(rowFromDb));
+    expect(asSeenByClient.status_changed_at).toBe('2026-08-28T11:00:00.456Z'); // .456789 in the column is unrepresentable here
+
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] });
+    await OperationalEventService.setEventStatus(5, 'resolve', {
+      expectedStatus: 'open',
+      expectedLastOccurredAt: asSeenByClient.last_occurred_at,
+      expectedStatusChangedAt: asSeenByClient.status_changed_at,
+    });
+    const text = lastQueryText();
+    // Exact equality against a microsecond column would make every unchanged
+    // row look stale; the column must be truncated to what the client can echo.
+    expect(text).toMatch(/date_trunc\('milliseconds', last_occurred_at\) = /);
+    expect(text).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
+    expect(text).not.toMatch(/\blast_occurred_at = /);
+    expect(text).not.toMatch(/\bstatus_changed_at IS NOT DISTINCT FROM/);
+    const [, ...values] = sqlMock.mock.calls[0];
+    expect(values).toContain('2026-08-28T10:00:00.123Z');
+    expect(values).toContain('2026-08-28T11:00:00.456Z');
+  });
+
+  test('is not asserted when an in-process caller omits it (the admin route itself requires it)', async () => {
     sqlMock.mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] });
     await OperationalEventService.setEventStatus(5, 'resolve', { expectedStatus: 'open' });
     const [, ...values] = sqlMock.mock.calls[0];
