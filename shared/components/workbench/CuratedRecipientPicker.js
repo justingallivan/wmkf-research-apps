@@ -25,6 +25,8 @@ export default function CuratedRecipientPicker({
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState(() => new Set());
   const loadSequence = useRef(0);
+  const dialogRef = useRef(null);
+  const filterInputRef = useRef(null);
 
   const close = useCallback(() => {
     setFilter('');
@@ -50,12 +52,48 @@ export default function CuratedRecipientPicker({
           if (loadSequence.current === sequence) setError(loadError.message);
         });
     }
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') close();
+    return undefined;
+  }, [error, open, recipients]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const previouslyFocused = document.activeElement;
+    filterInputRef.current?.focus();
+
+    const handleDialogKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusable = Array.from(dialogRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) || []);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [close, error, open, recipients]);
+
+    window.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleDialogKeyDown);
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
+    };
+  }, [close, open]);
 
   useEffect(() => () => {
     loadSequence.current += 1;
@@ -99,6 +137,7 @@ export default function CuratedRecipientPicker({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="curated-recipient-picker-title"
@@ -117,6 +156,7 @@ export default function CuratedRecipientPicker({
         <div className="p-4">
           <label htmlFor="curated-recipient-filter" className="sr-only">Filter recipients</label>
           <input
+            ref={filterInputRef}
             id="curated-recipient-filter"
             type="search"
             value={filter}

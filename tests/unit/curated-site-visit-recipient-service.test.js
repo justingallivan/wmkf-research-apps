@@ -25,12 +25,12 @@ function dependencies(overrides = {}) {
       email: 'alice@example.org',
       systemUserId: 'system-user-7',
     }]),
-    getContactById: jest.fn(async (id) => ({
+    getContactsByIds: jest.fn(async (ids) => ids.map((id) => ({
       contactid: id,
       fullname: id === CONTACT_ID ? 'Casey Consultant' : 'Bailey Board',
       emailaddress1: id === CONTACT_ID ? 'casey@example.org' : 'bailey@example.org',
       statecode: 0,
-    })),
+    }))),
     searchContactsByName: jest.fn(async () => [{
       contactid: CONTACT_ID,
       fullname: 'Casey Consultant',
@@ -109,22 +109,25 @@ test('resolves eligible staff and Contacts live, sorted by category and name', a
     })),
   });
   expect(await getCuratedRecipientOptions(deps)).toEqual([
-    { key: 'staff:7', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
-    { key: 'contact:' + CONTACT_ID, category: 'consultant', name: 'Casey Consultant', email: 'casey@example.org' },
-    { key: 'contact:' + OTHER_CONTACT_ID, category: 'board', name: 'Bailey Board', email: 'bailey@example.org' },
+    { key: 'recipient-option-0', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
+    { key: 'recipient-option-1', category: 'consultant', name: 'Casey Consultant', email: 'casey@example.org' },
+    { key: 'recipient-option-2', category: 'board', name: 'Bailey Board', email: 'bailey@example.org' },
   ]);
+  expect(deps.getContactsByIds).toHaveBeenCalledTimes(1);
+  expect(deps.getContactsByIds).toHaveBeenCalledWith([OTHER_CONTACT_ID, CONTACT_ID]);
+  expect(JSON.stringify(await getCuratedRecipientOptions(deps))).not.toContain(CONTACT_ID);
 });
 
 test('unavailable identities remain visible to Admin but never enter Workbench options', async () => {
   const deps = dependencies({
     getSettingStrict: jest.fn(async () => ({ found: true, value: JSON.stringify(validConfig) })),
     getActiveStaff: jest.fn(async () => []),
-    getContactById: jest.fn(async () => ({
+    getContactsByIds: jest.fn(async () => [{
       contactid: CONTACT_ID,
       fullname: 'Casey Consultant',
       emailaddress1: null,
       statecode: 0,
-    })),
+    }]),
   });
   expect(await getCuratedRecipientOptions(deps)).toEqual([]);
   const admin = await getCuratedRecipientAdminState(deps);
@@ -132,6 +135,29 @@ test('unavailable identities remain visible to Admin but never enter Workbench o
     expect.objectContaining({ key: 'staff:7', available: false, reason: 'staff_unavailable' }),
     expect.objectContaining({ key: 'contact:' + CONTACT_ID, available: false, reason: 'contact_email_missing' }),
   ]));
+});
+
+test('a Contact omitted by the bounded query is stale while query failures remain operational errors', async () => {
+  const missing = dependencies({
+    getSettingStrict: jest.fn(async () => ({
+      found: true,
+      value: JSON.stringify({
+        version: 1,
+        entries: [{ kind: 'contact', contactId: CONTACT_ID, category: 'consultant' }],
+      }),
+    })),
+    getContactsByIds: jest.fn(async () => []),
+  });
+  const admin = await getCuratedRecipientAdminState(missing);
+  expect(admin.entries).toEqual([
+    expect.objectContaining({ contactId: CONTACT_ID, available: false, reason: 'contact_missing' }),
+  ]);
+
+  const failed = dependencies({
+    getSettingStrict: missing.getSettingStrict,
+    getContactsByIds: jest.fn(async () => { throw new Error('Dataverse timed out'); }),
+  });
+  await expect(getCuratedRecipientOptions(failed)).rejects.toThrow('Dataverse timed out');
 });
 
 test('write verifies every reference and stores no resolved names or emails', async () => {

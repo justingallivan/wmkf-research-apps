@@ -172,8 +172,8 @@ test('adds curated recipients without replacing manual addresses or creating To/
       return response({
         success: true,
         recipients: [
-          { key: 'staff:7', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
-          { key: 'contact:1', category: 'consultant', name: 'Casey Consultant', email: 'casey@example.org' },
+          { key: 'recipient-option-0', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
+          { key: 'recipient-option-1', category: 'consultant', name: 'Casey Consultant', email: 'casey@example.org' },
         ],
       });
     }
@@ -200,6 +200,49 @@ test('adds curated recipients without replacing manual addresses or creating To/
 
   expect(screen.getByLabelText('To')).toHaveValue('manual@example.org, alice@example.org');
   expect(screen.getByLabelText('Cc')).toHaveValue('casey@example.org');
+});
+
+test('recipient picker traps focus, closes with Escape, and restores the directory trigger', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/history')) return response({ success: true, attempts: [] });
+    if (String(url).includes('/recipient-options')) {
+      return response({
+        success: true,
+        recipients: [{
+          key: 'recipient-option-0',
+          category: 'staff',
+          name: 'Alice Staff',
+          email: 'alice@example.org',
+        }],
+      });
+    }
+    throw new Error('Unexpected fetch: ' + url);
+  });
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  const trigger = screen.getAllByRole('button', { name: 'Add from directory' })[0];
+  trigger.focus();
+  fireEvent.click(trigger);
+
+  const filter = await screen.findByLabelText('Filter recipients');
+  expect(filter).toHaveFocus();
+  const closeButton = screen.getByRole('button', { name: 'Close' });
+  const cancel = screen.getByRole('button', { name: 'Cancel' });
+  cancel.focus();
+  fireEvent.keyDown(window, { key: 'Tab' });
+  expect(closeButton).toHaveFocus();
+  fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+  expect(cancel).toHaveFocus();
+
+  fireEvent.keyDown(window, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(trigger).toHaveFocus();
 });
 
 test('directory failure leaves manual recipient entry available', async () => {

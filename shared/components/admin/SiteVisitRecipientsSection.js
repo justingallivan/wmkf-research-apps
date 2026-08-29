@@ -97,8 +97,8 @@ export default function SiteVisitRecipientsSection() {
     setNotice(null);
   };
 
-  const removeContact = (contactId) => {
-    const key = `contact:${String(contactId).toLowerCase()}`;
+  const removeEntry = (entry) => {
+    const key = entryKey(entry);
     setDraftEntries((current) => current.filter((entry) => entryKey(entry) !== key));
     setResolvedEntries((current) => current.filter((entry) => entryKey(entry) !== key));
     setNotice(null);
@@ -168,6 +168,7 @@ export default function SiteVisitRecipientsSection() {
     }
   };
 
+  const unavailableStaff = resolvedEntries.filter((entry) => entry.kind === 'staff' && !entry.available);
   const externalEntries = resolvedEntries.filter((entry) => entry.kind === 'contact');
 
   if (loading) return <p className="text-sm text-gray-500">Loading recipient directory…</p>;
@@ -210,6 +211,25 @@ export default function SiteVisitRecipientsSection() {
           ))}
           {staff.length === 0 && <p className="text-sm text-gray-500">No eligible staff users found.</p>}
         </div>
+        {unavailableStaff.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {unavailableStaff.map((person) => (
+              <div key={person.key} className="flex items-start justify-between gap-3 rounded border border-amber-300 bg-amber-50 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">Unavailable staff profile</p>
+                  <p className="text-xs text-gray-600">{person.detail}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeEntry(person)}
+                  className="text-sm text-red-700 hover:text-red-900"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section>
@@ -227,7 +247,7 @@ export default function SiteVisitRecipientsSection() {
               </div>
               <button
                 type="button"
-                onClick={() => removeContact(person.contactId)}
+                onClick={() => removeEntry(person)}
                 className="text-sm text-red-700 hover:text-red-900"
               >
                 Remove
@@ -248,7 +268,9 @@ export default function SiteVisitRecipientsSection() {
               required
               value={search}
               onChange={(event) => {
+                searchSequence.current += 1;
                 setSearch(event.target.value);
+                setSearching(false);
                 setSearchResults([]);
                 setSearchPerformed(false);
               }}

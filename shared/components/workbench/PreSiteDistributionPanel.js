@@ -209,6 +209,10 @@ export default function PreSiteDistributionPanel({
     edit({ [target]: current ? current + ', ' + additions.join(', ') : additions.join(', ') });
   };
 
+  const closeRecipientPicker = useCallback(() => {
+    setRecipientPickerTarget(null);
+  }, []);
+
   const prepare = async () => {
     if (!requestId || !sourceArtifact?.artifactId || preparing || sending) return;
     const id = requestId;
@@ -520,7 +524,7 @@ export default function PreSiteDistributionPanel({
         toValue={form.to}
         ccValue={form.cc}
         onAdd={addDirectoryRecipients}
-        onClose={() => setRecipientPickerTarget(null)}
+        onClose={closeRecipientPicker}
       />
       <Card hover={false}>
         {collapsed ? (
