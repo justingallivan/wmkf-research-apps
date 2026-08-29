@@ -43,6 +43,7 @@ beforeEach(() => {
   getCuratedRecipientAdminState.mockResolvedValue({
     config: { version: 1, entries: [] },
     entries: [],
+    maxEntries: 50,
     staff: [],
   });
   getCuratedRecipientOptions.mockResolvedValue([]);
@@ -59,6 +60,7 @@ test('Admin GET is superuser-gated and runs inside DAL context', async () => {
     success: true,
     config: { version: 1, entries: [] },
     entries: [],
+    maxEntries: 50,
     staff: [],
   });
 });

@@ -68,3 +68,12 @@ test('legacy Site Visit directory still includes the Expertise Finder roster', a
     affiliation: 'Example University',
   }]);
 });
+
+test('staff enumeration fails loud instead of accepting a capped Dataverse result', async () => {
+  await expect(getActiveStaffRecipientDirectory(dependencies({
+    listSystemUsers: jest.fn(async () => ({ records: [], capped: true })),
+  }))).rejects.toMatchObject({
+    httpStatus: 503,
+    code: 'site_visit_staff_directory_capped',
+  });
+});

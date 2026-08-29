@@ -207,3 +207,30 @@ test('editing a Contact search invalidates its in-flight response and clears sea
   expect(screen.queryByText('Casey Consultant')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled();
 });
+
+test('disables new selections when the server-provided directory cap is reached', async () => {
+  const entries = Array.from({ length: 3 }, (_, index) => ({
+    kind: 'staff',
+    profileId: index + 1,
+  }));
+  global.fetch = jest.fn(async () => response({
+    success: true,
+    config: { version: 1, entries },
+    entries: [],
+    maxEntries: 3,
+    staff: [{
+      kind: 'staff',
+      profileId: 99,
+      key: 'staff:99',
+      category: 'staff',
+      name: 'Not Yet Selected',
+      email: 'new@example.org',
+      available: true,
+    }],
+  }));
+
+  render(<SiteVisitRecipientsSection />);
+  const checkbox = await screen.findByRole('checkbox', { name: /Not Yet Selected/ });
+  expect(checkbox).toBeDisabled();
+  expect(screen.getByText('3 of 3 selected recipients')).toBeInTheDocument();
+});

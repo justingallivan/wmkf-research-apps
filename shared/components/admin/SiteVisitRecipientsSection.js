@@ -33,6 +33,8 @@ export default function SiteVisitRecipientsSection() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [contactCategory, setContactCategory] = useState('consultant');
+  const [maxEntries, setMaxEntries] = useState(50);
+  const [limitNotice, setLimitNotice] = useState(null);
   const loadSequence = useRef(0);
   const searchSequence = useRef(0);
 
@@ -42,6 +44,7 @@ export default function SiteVisitRecipientsSection() {
     setResolvedEntries(data.entries || []);
     setDraftEntries(nextConfig.entries || []);
     setBaseline(JSON.stringify(configFromEntries(nextConfig.entries || [])));
+    if (Number.isInteger(data.maxEntries) && data.maxEntries > 0) setMaxEntries(data.maxEntries);
   };
 
   const load = async () => {
@@ -86,14 +89,20 @@ export default function SiteVisitRecipientsSection() {
 
   const selectedKeys = useMemo(() => new Set(draftEntries.map(entryKey)), [draftEntries]);
   const changed = baseline !== JSON.stringify(configFromEntries(draftEntries));
+  const atCapacity = draftEntries.length >= maxEntries;
 
   const toggleStaff = (profileId) => {
     const key = `staff:${profileId}`;
+    if (!selectedKeys.has(key) && atCapacity) {
+      setLimitNotice(`The directory supports at most ${maxEntries} recipients.`);
+      return;
+    }
     setDraftEntries((current) => (
       current.some((entry) => entryKey(entry) === key)
         ? current.filter((entry) => entryKey(entry) !== key)
         : [...current, { kind: 'staff', profileId }]
     ));
+    setLimitNotice(null);
     setNotice(null);
   };
 
@@ -101,12 +110,17 @@ export default function SiteVisitRecipientsSection() {
     const key = entryKey(entry);
     setDraftEntries((current) => current.filter((entry) => entryKey(entry) !== key));
     setResolvedEntries((current) => current.filter((entry) => entryKey(entry) !== key));
+    setLimitNotice(null);
     setNotice(null);
   };
 
   const addContact = (contact) => {
     const key = `contact:${contact.contactId}`;
     if (selectedKeys.has(key) || !contact.available) return;
+    if (atCapacity) {
+      setLimitNotice(`The directory supports at most ${maxEntries} recipients.`);
+      return;
+    }
     setDraftEntries((current) => [...current, {
       kind: 'contact',
       contactId: contact.contactId,
@@ -121,6 +135,7 @@ export default function SiteVisitRecipientsSection() {
       email: contact.email,
       available: true,
     }]);
+    setLimitNotice(null);
     setNotice(null);
   };
 
@@ -190,6 +205,7 @@ export default function SiteVisitRecipientsSection() {
 
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
       {notice && <p className="text-sm text-green-700" role="status">{notice}</p>}
+      {limitNotice && <p className="text-sm text-amber-700" role="status">{limitNotice}</p>}
 
       <section>
         <h3 className="text-sm font-semibold text-gray-900">Staff</h3>
@@ -200,6 +216,7 @@ export default function SiteVisitRecipientsSection() {
               <input
                 type="checkbox"
                 checked={selectedKeys.has(person.key)}
+                disabled={!selectedKeys.has(person.key) && atCapacity}
                 onChange={() => toggleStaff(person.profileId)}
                 className="mt-0.5"
               />
@@ -306,11 +323,17 @@ export default function SiteVisitRecipientsSection() {
                     </span>
                     <button
                       type="button"
-                      disabled={!contact.available || selected}
+                      disabled={!contact.available || selected || atCapacity}
                       onClick={() => addContact(contact)}
                       className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
                     >
-                      {selected ? 'Added' : contact.available ? `Add as ${contactCategory === 'board' ? 'Board' : 'Consultant'}` : 'Unavailable'}
+                      {selected
+                        ? 'Added'
+                        : !contact.available
+                          ? 'Unavailable'
+                          : atCapacity
+                            ? 'Directory full'
+                            : `Add as ${contactCategory === 'board' ? 'Board' : 'Consultant'}`}
                     </button>
                   </li>
                 );
@@ -324,7 +347,9 @@ export default function SiteVisitRecipientsSection() {
       </section>
 
       <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
-        <p className="text-xs text-gray-500">{draftEntries.length} selected recipient{draftEntries.length === 1 ? '' : 's'}</p>
+        <p className="text-xs text-gray-500">
+          {draftEntries.length} of {maxEntries} selected recipient{draftEntries.length === 1 ? '' : 's'}
+        </p>
         <button
           type="button"
           onClick={save}

@@ -239,6 +239,10 @@ test('recipient picker traps focus, closes with Escape, and restores the directo
   expect(closeButton).toHaveFocus();
   fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
   expect(cancel).toHaveFocus();
+  cancel.blur();
+  expect(document.body).toHaveFocus();
+  fireEvent.keyDown(window, { key: 'Tab' });
+  expect(closeButton).toHaveFocus();
 
   fireEvent.keyDown(window, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

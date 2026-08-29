@@ -10,6 +10,7 @@ import {
   validateCuratedRecipientConfig,
   writeCuratedRecipientConfig,
 } from '../../lib/services/site-visit/curated-recipient-service';
+import { CONTACT_BATCH_MAX_IDS } from '../../lib/dataverse/adapters/contact';
 
 const CONTACT_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_CONTACT_ID = '22222222-2222-4222-8222-222222222222';
@@ -57,6 +58,10 @@ const validConfig = {
     { kind: 'contact', contactId: CONTACT_ID, category: 'consultant' },
   ],
 };
+
+test('the directory entry cap is the Contact batch-query cap', () => {
+  expect(CURATED_RECIPIENT_MAX_ENTRIES).toBe(CONTACT_BATCH_MAX_IDS);
+});
 
 test('validates a reference-only config and canonicalizes Contact GUID casing', () => {
   expect(validateCuratedRecipientConfig({
@@ -135,6 +140,21 @@ test('unavailable identities remain visible to Admin but never enter Workbench o
     expect.objectContaining({ key: 'staff:7', available: false, reason: 'staff_unavailable' }),
     expect.objectContaining({ key: 'contact:' + CONTACT_ID, available: false, reason: 'contact_email_missing' }),
   ]));
+});
+
+test('Workbench deduplicates a repeated resolved email after category sorting', async () => {
+  const deps = dependencies({
+    getSettingStrict: jest.fn(async () => ({ found: true, value: JSON.stringify(validConfig) })),
+    getContactsByIds: jest.fn(async () => [{
+      contactid: CONTACT_ID,
+      fullname: 'Alice Staff Contact',
+      emailaddress1: 'ALICE@example.org',
+      statecode: 0,
+    }]),
+  });
+  expect(await getCuratedRecipientOptions(deps)).toEqual([
+    { key: 'recipient-option-0', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' },
+  ]);
 });
 
 test('a Contact omitted by the bounded query is stale while query failures remain operational errors', async () => {
