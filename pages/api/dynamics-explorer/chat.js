@@ -2126,9 +2126,9 @@ async function searchDocumentsSerialized({ query, library, request_number }, too
   // folder) pair — older grants migrated from the previous grants management
   // system have files in `RequestArchive1/2/3` libraries on top of (or instead
   // of) the active `akoya_request` library. We discover every plausible bucket
-  // up front and run the KQL search once per bucket in parallel, then merge
-  // results. This fans out 4× per request-scoped search but is bounded and
-  // parallel, and request-scoped searches are rare relative to broad ones.
+  // up front, search the tracked folder wave first, then probe archives
+  // serially, and finally merge the results. This keeps archive recall without
+  // recreating the former 4× tenant-throttling burst.
   // The simpler alternative — one unscoped search post-filtered by webUrl —
   // loses too much KQL precision when scoring across the whole site.
   let scopes = []; // Array<{ libraryName: string|null, folderPath: string|null, label: string }>
