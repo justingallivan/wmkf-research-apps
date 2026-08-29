@@ -144,7 +144,12 @@ Resolve/Reopen actions, and **Resolve all N shown** (S468): one PATCH with
 `expectedStatus`/`expectedLastOccurredAt` precondition — rows that changed
 since the list rendered are skipped and counted as `stale`, never
 blind-closed; the response reports `updated/stale/notFound/invalid` and the
-card refetches.
+card refetches. Rows sharing a signature (source, environment, event type,
+subsystem, summary with ids/numbers/hex normalized —
+`shared/utils/operational-event-grouping.js`) are **folded in the view** as
+"message × N" with a per-group Resolve; storage is untouched, so the
+`vercel:<log id>` idempotency contract above is unchanged (a stored fold
+would over-count on redelivery).
 
 ### Retention
 
