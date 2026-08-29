@@ -2124,10 +2124,11 @@ export async function searchDocuments({ query, library, request_number }, toolCo
       libraryName: b.library,
       folderPath: b.folder,
       label: `${b.library}/${b.folder}`,
+      source: b.source,
     }));
     scopeLabel = `request ${requestNum} (${buckets.length} folder${buckets.length !== 1 ? 's' : ''})`;
   } else {
-    scopes = [{ libraryName: library || null, folderPath: null, label: library || 'all libraries' }];
+    scopes = [{ libraryName: library || null, folderPath: null, label: library || 'all libraries', source: 'dynamics' }];
     scopeLabel = library || 'all libraries';
   }
 
@@ -2136,26 +2137,44 @@ export async function searchDocuments({ query, library, request_number }, toolCo
   }
 
   try {
-    // Run all scopes in parallel; tolerate per-scope failures (archive probes
-    // 404 for non-migrated grants, which is expected).
-    const scopeResults = await Promise.all(
-      scopes.map(async s => {
-        try {
-          const found = await GraphService.searchFiles(query, {
-            libraryName: s.libraryName,
-            folderPath: s.folderPath,
-          });
-          return { ...s, found, error: null };
-        } catch (err) {
-          return {
-            ...s,
-            found: [],
-            error: err.message,
-            transient: err.isTransient === true || err.noResponse === true,
-          };
-        }
-      }),
-    );
+    const runScope = async s => {
+      try {
+        const found = await GraphService.searchFiles(query, {
+          libraryName: s.libraryName,
+          folderPath: s.folderPath,
+        });
+        return { ...s, found, error: null };
+      } catch (err) {
+        return {
+          ...s,
+          found: [],
+          error: err.message,
+          transient: err.isTransient === true || err.noResponse === true,
+        };
+      }
+    };
+
+    // Two waves, not one burst. Graph search is throttled per TENANT, so
+    // firing the Dynamics-tracked folder and all three speculative archive
+    // probes at once (4 simultaneous calls per question, more with parallel
+    // tool calls) is what tripped the 2026-08-27 storm. Wave 1: the tracked
+    // folder(s) in parallel (normally one). Wave 2: archive probes one at a
+    // time — they are still searched (migrated grants keep files there, so
+    // recall is unchanged) but stop at the first transient failure and are
+    // skipped entirely if wave 1 already hit one.
+    const primaryScopes = scopes.filter(s => s.source !== 'archive');
+    const archiveScopes = scopes.filter(s => s.source === 'archive');
+    const scopeResults = await Promise.all(primaryScopes.map(runScope));
+    let paused = scopeResults.some(sr => sr.transient);
+    for (const s of archiveScopes) {
+      if (paused) {
+        scopeResults.push({ ...s, found: [], error: 'skipped after a transient search failure', transient: true, skipped: true });
+        continue;
+      }
+      const result = await runScope(s);
+      scopeResults.push(result);
+      if (result.transient) paused = true;
+    }
 
     // De-dupe by file id / webUrl / (library + folder + name)
     const seen = new Set();

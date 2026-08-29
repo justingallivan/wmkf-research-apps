@@ -75,11 +75,13 @@ describe('searchDocuments scope failures', () => {
   test('every scope throttled → an error, never "No documents found"', async () => {
     GraphService.searchFiles.mockRejectedValue(throttledError());
     const result = await searchDocuments({ query: 'budget', request_number: REQUEST_ID });
-    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4);
+    // Wave 1 (tracked folder) throttled → the three archive probes are never sent.
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(1);
     expect(result.searchCount).toBe(0);
     expect(result.incomplete).toBe(true);
     expect(result.message).toBeUndefined();
     expect(result.error).toMatch(/throttled or timed out for 4 of 4 search scope/);
+    expect(result.error).toMatch(/skipped after a transient search failure/);
     expect(result.error).toMatch(/not a confirmed "no documents"/);
     expect(result.error).toMatch(/paused for the rest of this request/);
   });
@@ -88,12 +90,12 @@ describe('searchDocuments scope failures', () => {
     GraphService.searchFiles.mockRejectedValue(throttledError());
     const toolContext = { searchThrottle: null };
     await searchDocuments({ query: 'budget', request_number: REQUEST_ID }, toolContext);
-    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4);
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(1);
     expect(toolContext.searchThrottle).toMatchObject({ reason: expect.stringContaining('429') });
 
     GraphService.searchFiles.mockResolvedValue([file('Budget.pdf')]); // Graph would now succeed…
     const second = await searchDocuments({ query: 'narrative', library: 'akoya_request' }, toolContext);
-    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4); // …but it is never asked
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(1); // …but it is never asked
     expect(second).toMatchObject({ searchCount: 0, incomplete: true });
     expect(second.error).toMatch(/paused for the rest of this request/);
     expect(second.error).toMatch(/No search was run/);
@@ -121,6 +123,8 @@ describe('searchDocuments scope failures', () => {
       throw throttledError();
     });
     const result = await searchDocuments({ query: 'budget', request_number: REQUEST_ID });
+    // Tracked folder + first archive probe; the probe throttled, so the other two are skipped.
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(2);
     expect(result.searchCount).toBe(1);
     expect(result.documents).toContain('Budget.pdf');
     expect(result.incomplete).toBe(true);
@@ -158,5 +162,35 @@ describe('searchDocuments scope failures', () => {
     expect(result.searchCount).toBe(1);
     expect(result.incomplete).toBeUndefined();
     expect(result.warning).toBeUndefined();
+  });
+});
+
+describe('searchDocuments scope ordering', () => {
+  test('tracked folder first, then archive probes one at a time — never a 4-wide burst', async () => {
+    const order = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    GraphService.searchFiles.mockImplementation(async (_query, { libraryName }) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      order.push(libraryName);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return [];
+    });
+    const result = await searchDocuments({ query: 'budget', request_number: REQUEST_ID });
+    expect(order).toEqual(['akoya_request', 'RequestArchive1', 'RequestArchive2', 'RequestArchive3']);
+    expect(maxInFlight).toBe(1);
+    expect(result.message).toBe('No documents found matching the search query.');
+  });
+
+  test('recall is unchanged: a hit that only exists in an archive library is still found', async () => {
+    GraphService.searchFiles.mockImplementation(async (_query, { libraryName }) =>
+      (libraryName === 'RequestArchive3' ? [file('OldBudget.pdf', 'RequestArchive3')] : []));
+    const result = await searchDocuments({ query: 'budget', request_number: REQUEST_ID });
+    expect(GraphService.searchFiles).toHaveBeenCalledTimes(4);
+    expect(result.searchCount).toBe(1);
+    expect(result.documents).toContain('OldBudget.pdf');
+    expect(result.incomplete).toBeUndefined();
   });
 });
