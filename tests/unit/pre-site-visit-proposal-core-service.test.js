@@ -363,6 +363,9 @@ test('calls the governed prompt with ordered personnel and fail-closed safeguard
     // Extended transport budget for the suite's longest Claude call (S466,
     // after production run 88f7c877 hit the 120s default).
     timeoutMsOverride: 240_000,
+    // Output budget above the prompt row's 16 384 (production run f8bb1326
+    // hit max_tokens on Sonnet 5 adaptive thinking, 2026-08-28).
+    maxTokensOverride: 32_768,
   });
   const promptContext = JSON.parse(call.overrideVariables.request_context_json);
   expect(promptContext.personnel.map((person) => person.name)).toEqual([
