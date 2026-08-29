@@ -2043,10 +2043,28 @@ async function listDocuments({ request_number, request_id }) {
 // ─── search_documents ───
 
 /**
+ * Describe scoped-search failures for the model. Throttling is the common case
+ * and is self-limiting only if the model does not immediately retry.
+ */
+function buildSearchFailureWarning(failedScopes, totalScopes) {
+  const throttled = failedScopes.every(sr => sr.transient);
+  const detail = failedScopes
+    .map(sr => `${sr.label}: ${String(sr.error || '').substring(0, 120)}`)
+    .join('; ');
+  const cause = throttled
+    ? 'The SharePoint search service throttled or timed out'
+    : 'The SharePoint search service returned an error';
+  return `${cause} for ${failedScopes.length} of ${totalScopes} search scope(s) (${detail}). `
+    + 'Results are incomplete: this is NOT evidence that no matching documents exist. '
+    + 'Tell the user the document search was throttled and to try again in a minute; '
+    + 'do not retry the search within this response.';
+}
+
+/**
  * Search within SharePoint document contents for keywords or phrases.
  * Optionally scoped to a specific library or request folder.
  */
-async function searchDocuments({ query, library, request_number }) {
+export async function searchDocuments({ query, library, request_number }) {
   if (!query) {
     return { error: 'A search query is required.' };
   }
@@ -2099,7 +2117,12 @@ async function searchDocuments({ query, library, request_number }) {
           });
           return { ...s, found, error: null };
         } catch (err) {
-          return { ...s, found: [], error: err.message };
+          return {
+            ...s,
+            found: [],
+            error: err.message,
+            transient: err.isTransient === true || err.noResponse === true,
+          };
         }
       }),
     );
@@ -2116,7 +2139,21 @@ async function searchDocuments({ query, library, request_number }) {
       }
     }
 
+    // A scope that FAILED (Graph throttled us, or the search service errored)
+    // is not a scope that returned zero hits. Reporting the two the same way
+    // ("No documents found") is a false negative the model then retries,
+    // which — with the per-request fan-out — is exactly what produced the
+    // 2026-08-27 throttle storm on the Operational Events card. Name the
+    // failure instead, and tell the model not to loop on it.
+    const failedScopes = scopeResults.filter(sr => sr.error);
+    const searchWarning = failedScopes.length
+      ? buildSearchFailureWarning(failedScopes, scopeResults.length)
+      : null;
+
     if (!merged.length) {
+      if (searchWarning) {
+        return { searchCount: 0, query, scope: scopeLabel, incomplete: true, error: searchWarning };
+      }
       return {
         searchCount: 0,
         query,
@@ -2138,6 +2175,7 @@ async function searchDocuments({ query, library, request_number }) {
       searchCount: merged.length,
       query,
       scope: scopeLabel,
+      ...(searchWarning ? { incomplete: true, warning: searchWarning } : {}),
       header: 'Filename | Size | Modified | Location',
       documents: lines.join('\n'),
       // Structured file data for frontend download links (not sent to Claude)
