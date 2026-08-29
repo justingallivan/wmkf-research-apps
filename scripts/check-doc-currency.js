@@ -153,6 +153,9 @@ const DRIFT_PATTERNS = [
       'EXTERNAL_REVIEWER_INTAKE_PLAN.md',
       'INTAKE_PORTAL_DESIGN.md',
       'memory-wiki-audit-2026-06-23.md',
+      // Dated production inventory records the literal legacy folders retained
+      // on Request 1002379 and explicitly distinguishes them from the live contract.
+      'request-1002379-test-mutation-inventory-2026-08-28.md',
     ],
   },
 ];

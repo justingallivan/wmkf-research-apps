@@ -113,6 +113,8 @@ those two deletes. Older, pre-window residue seen in the same tree, listed for
 completeness only: `Reviewer_Downloads/` (2026-05-01) and
 `Reviewer_Uploads/GallivanTest_6ad328b4/` (2026-05-02, a reviewer-form PDF) —
 May reviewer-finder smoke residue, plus the six 2026-05 AI-run rows in §3.
+These are literal legacy folder names preserved as inventory evidence, not the
+current outbound contract (`Reviewer Materials/Proposal_{Request#}.pdf`).
 
 ## 5. Proposed cleanup list (owner confirms each line before any delete)
 
@@ -133,7 +135,8 @@ descendants before sources.
    `impersonation-resmoke` rows.
 8. SharePoint, unregistered (from §4a): delete `AI Materials/` with its two
    PDFs, and `Application Cover Page - Copy.docx`.
-9. Pre-window May residue, owner decision: `Reviewer_Downloads/`,
+9. Pre-window May legacy residue (literal historical SharePoint names, not the
+   current outbound contract), owner decision: `Reviewer_Downloads/`,
    `Reviewer_Uploads/GallivanTest_6ad328b4/`.
 
 Not in scope: anything the app did not create (the request itself, its
