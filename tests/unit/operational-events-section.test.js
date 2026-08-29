@@ -146,3 +146,38 @@ test('the single-row Resolve button asserts status_changed_at too', async () => 
     action: 'resolve', id: 50, expectedStatus: 'open', expectedLastOccurredAt: prefs.last_occurred_at, expectedStatusChangedAt: '2026-08-28T00:00:00.000Z',
   });
 });
+
+test('a batch completion refetches the current filters, not the filters captured when the PATCH began', async () => {
+  let finishPatch;
+  global.fetch = jest.fn((url, init) => {
+    if (init?.method === 'PATCH') {
+      return new Promise(resolve => {
+        finishPatch = () => resolve(response({
+          ok: true, action: 'resolve', requested: 4, updated: 4, stale: 0, notFound: 0, invalid: 0,
+        }));
+      });
+    }
+    return Promise.resolve(response(listBody));
+  });
+
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Status filter' }), {
+    target: { value: 'resolved' },
+  });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining('status=resolved'),
+  ));
+
+  finishPatch();
+  await screen.findByText('Resolved 4 of 4');
+  await waitFor(() => {
+    const getUrls = global.fetch.mock.calls
+      .filter(([, init]) => init?.method !== 'PATCH')
+      .map(([url]) => url);
+    expect(getUrls).toHaveLength(3);
+    expect(getUrls.at(-1)).toContain('status=resolved');
+  });
+});

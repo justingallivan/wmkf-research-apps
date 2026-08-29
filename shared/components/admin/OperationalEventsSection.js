@@ -44,6 +44,10 @@ export default function OperationalEventsSection() {
   const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState('');
   const [searchDraft, setSearchDraft] = useState('');
+  // Async action handlers can outlive the render that launched them. Keep the
+  // latest filters in a ref so their completion refetch cannot restore an old
+  // filter snapshot and win the generation race against the current request.
+  const filtersRef = useRef({ statusFilter, severityFilter, sourceFilter, search });
   // Generation guard: rapid filter changes issue overlapping fetches, and a
   // slow older response must not overwrite a newer filter's results.
   const fetchGenRef = useRef(0);
@@ -51,11 +55,12 @@ export default function OperationalEventsSection() {
   const fetchEvents = () => {
     const gen = ++fetchGenRef.current;
     setLoading(true);
+    const filters = filtersRef.current;
     const params = new URLSearchParams();
-    if (statusFilter) params.set('status', statusFilter);
-    if (severityFilter) params.set('severity', severityFilter);
-    if (sourceFilter) params.set('source', sourceFilter);
-    if (search) params.set('search', search);
+    if (filters.statusFilter) params.set('status', filters.statusFilter);
+    if (filters.severityFilter) params.set('severity', filters.severityFilter);
+    if (filters.sourceFilter) params.set('source', filters.sourceFilter);
+    if (filters.search) params.set('search', filters.search);
     fetch(`/api/admin/operational-events?${params.toString()}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -259,7 +264,10 @@ export default function OperationalEventsSection() {
       </div>
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectClass} aria-label="Status filter">
+        <select value={statusFilter} onChange={e => {
+          filtersRef.current.statusFilter = e.target.value;
+          setStatusFilter(e.target.value);
+        }} className={selectClass} aria-label="Status filter">
           <option value="open">Open</option>
           <option value="recovered">Recovered</option>
           <option value="resolved">Resolved</option>
@@ -267,20 +275,31 @@ export default function OperationalEventsSection() {
           <option value="info">Info</option>
           <option value="">All statuses</option>
         </select>
-        <select value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className={selectClass} aria-label="Severity filter">
+        <select value={severityFilter} onChange={e => {
+          filtersRef.current.severityFilter = e.target.value;
+          setSeverityFilter(e.target.value);
+        }} className={selectClass} aria-label="Severity filter">
           <option value="">All severities</option>
           <option value="critical">Critical</option>
           <option value="error">Error</option>
           <option value="warning">Warning</option>
           <option value="info">Info</option>
         </select>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className={selectClass} aria-label="Source filter">
+        <select value={sourceFilter} onChange={e => {
+          filtersRef.current.sourceFilter = e.target.value;
+          setSourceFilter(e.target.value);
+        }} className={selectClass} aria-label="Source filter">
           <option value="">All sources</option>
           <option value="app">Application</option>
           <option value="vercel-drain">Vercel drain</option>
         </select>
         <form
-          onSubmit={e => { e.preventDefault(); setSearch(searchDraft.trim()); }}
+          onSubmit={e => {
+            e.preventDefault();
+            const nextSearch = searchDraft.trim();
+            filtersRef.current.search = nextSearch;
+            setSearch(nextSearch);
+          }}
           className="flex items-center gap-1"
         >
           <input
@@ -297,7 +316,11 @@ export default function OperationalEventsSection() {
           {search && (
             <button
               type="button"
-              onClick={() => { setSearch(''); setSearchDraft(''); }}
+              onClick={() => {
+                filtersRef.current.search = '';
+                setSearch('');
+                setSearchDraft('');
+              }}
               className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
             >
               Clear
