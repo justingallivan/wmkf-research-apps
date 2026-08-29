@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-21
+last_verified: 2026-08-28
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -39,6 +39,22 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 
+- **Move Executor output budgets out of code into persisted, admin-editable
+  settings.** **[OWNER DIRECTIVE 2026-08-28 (S467): "we can't be setting
+  mutable parameters in code."]** The S467 admin surface made the budgets
+  visible, but `maxTokensOverride` / `timeoutMsOverride` still live in the
+  tracked registry `shared/config/executorBudgets.js`, and the prompt row's
+  `wmkf_ai_maxtokens` is not exposed by the Admin publish form. Target: the
+  Prompt templates panel edits the per-prompt output budget and timeout, the
+  Executor reads them from durable state (the existing
+  `wmkf_appsystemsettings` pattern behind `/api/admin/models`, or the prompt
+  row itself), and the registry shrinks to a fallback/seed. Guards to keep:
+  server-side bound against the resolved model's reviewed `maxOutputTokens`
+  (the Executor already rejects over-ceiling budgets), superuser-only writes,
+  and the same audit trail the model-override setting has. Model capability
+  facts (`lib/services/model-capabilities.js`: ceilings, `reviewedAt`, docs
+  URL) are a reviewed snapshot of Anthropic's published limits and stay in
+  code; the panel's "registry reviewed" date is the freshness signal.
 - **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
   **[OWNER-PARKED 2026-08-27 — merge only after the current reviewer cycle
   ends.]** Built and held on `feature/reviewer-cron-reminders-ledger`
