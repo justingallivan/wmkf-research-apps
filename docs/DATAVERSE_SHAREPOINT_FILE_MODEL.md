@@ -1147,12 +1147,17 @@ The remaining controls are deliberately not collapsed into that pass:
   to the exact canonical source row/version/governed hash. It uses create-only
   path conflict behavior, uploads the exact selected source buffer, and verifies
   normalized governed Word content after SharePoint ingestion so legitimate
-  package repacking does not appear as content drift. It never moves
-  `wmkf_CurrentInitialAssessment` and excludes the exact snapshot
+  package repacking does not appear as content drift. Publication version/eTag
+  metadata comes only from stable-ID Graph reads before and after that download;
+  upload/path `cTag` values are never treated as versions. Exact Ready reuse may
+  ETag-reconcile benign metadata drift only after the stable read proves the
+  same governed content; changed content or unstable metadata fails closed. It
+  never moves `wmkf_CurrentInitialAssessment` and excludes the exact snapshot
   producer from editable Ready cardinality, supersession, and cycle discovery.
   Failed/interrupted attempts retain a reclaimable row; only items uploaded by
-  the attempt can be recorded for orphan cleanup. Unknown/lookalike producers
-  remain ordinary fail-closed rows.
+  the attempt can be recorded for orphan cleanup. Successful recovery removes
+  the published drive/item from both cleanup queues while preserving unrelated
+  cleanup work. Unknown/lookalike producers remain ordinary fail-closed rows.
 
   **Record the reasoning honestly, because the legs kept changing after the
   choice was made.** Pointer-only durability rested on three things. The

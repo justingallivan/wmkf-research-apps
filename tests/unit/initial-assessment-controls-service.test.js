@@ -54,6 +54,17 @@ function metadata(overrides = {}) {
   };
 }
 
+function retainedMetadata(overrides = {}) {
+  return metadata({
+    id: 'snapshot-item',
+    name: '1000001 Initial Assessment Board v2.0.docx',
+    webUrl: 'https://sharepoint.test/snapshot',
+    eTag: 'snapshot-graph-etag',
+    versionId: '1.0',
+    ...overrides,
+  });
+}
+
 function harness() {
   let source = sourceRow();
   let snapshot = null;
@@ -90,7 +101,9 @@ function harness() {
         throw new Error(`unexpected row ${id}`);
       }
     }),
-    getFileMetadataById: jest.fn(),
+    getFileMetadataById: jest.fn(async (_driveId, itemId) => (
+      itemId === 'source-item' ? metadata() : retainedMetadata({ id: itemId })
+    )),
     getFileMetadataByPath: jest.fn(),
     getFileVersionMetadata: jest.fn(),
     downloadFile: jest.fn(),
@@ -258,24 +271,19 @@ it('reconciles an already-applied restore without restoring the same version twi
   expect(h.getSource().wmkf_contenthash).toBe('hash:old-version');
 });
 
-it('creates a distinct retained Board snapshot when SharePoint repackages equivalent content', async () => {
+it('creates a distinct retained Board snapshot and ignores the upload response cTag as a version', async () => {
   const h = harness();
   h.dependencies.hashDocx.mockImplementation(async (buffer) => (
     ['source-bytes', 'sharepoint-packaged-bytes'].includes(buffer.toString())
       ? 'hash:governed-source'
       : `hash:${buffer.toString()}`
   ));
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
-  h.dependencies.uploadFile.mockResolvedValue(metadata({
-    id: 'snapshot-item',
-    name: '1000001 Initial Assessment Board v2.0.docx',
-    webUrl: 'https://sharepoint.test/snapshot',
-    versionId: '1.0',
-    eTag: 'snapshot-graph-etag',
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata({
+    versionId: '"content-tag-not-a-version"',
   }));
 
   const result = await createInitialAssessmentBoardSnapshot({
@@ -298,6 +306,7 @@ it('creates a distinct retained Board snapshot when SharePoint repackages equiva
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
     wmkf_sharepointitemid: 'snapshot-item',
+    wmkf_sharepointversionid: '1.0',
     wmkf_contenthash: 'hash:governed-source',
   });
   expect(h.getSnapshot().wmkf_sharepointitemid).not.toBe(h.getSource().wmkf_sharepointitemid);
@@ -331,11 +340,10 @@ it('rejects a Board snapshot when the source changes during byte capture', async
 
 it('does not claim a pre-existing path collision as an orphan owned by the snapshot attempt', async () => {
   const h = harness();
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('someone-elses-bytes') });
-  h.dependencies.getFileMetadataByPath.mockResolvedValue(metadata({ id: 'pre-existing-item' }));
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(retainedMetadata({ id: 'pre-existing-item' }));
 
   await expect(createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
@@ -354,12 +362,11 @@ it('does not claim a pre-existing path collision as an orphan owned by the snaps
 
 it('retains exact cleanup identity when an owned upload has different governed content', async () => {
   const h = harness();
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('corrupt-upload') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
-  h.dependencies.uploadFile.mockResolvedValue(metadata({ id: 'snapshot-item', versionId: '1.0' }));
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
 
   await expect(createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
@@ -376,13 +383,17 @@ it('retains exact cleanup identity when an owned upload has different governed c
 
 it('retains uploaded cleanup identity when the source changes before snapshot publication', async () => {
   const h = harness();
-  h.dependencies.getFileMetadataById
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata({ versionId: '3.0', eTag: 'source-changed' }));
+  let sourceRead = 0;
+  h.dependencies.getFileMetadataById.mockImplementation(async (_driveId, itemId) => {
+    if (itemId !== 'source-item') return retainedMetadata({ id: itemId });
+    sourceRead += 1;
+    return sourceRead === 3
+      ? metadata({ versionId: '3.0', eTag: 'source-changed' })
+      : metadata();
+  });
   h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
-  h.dependencies.uploadFile.mockResolvedValue(metadata({ id: 'snapshot-item', versionId: '1.0' }));
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
 
   await expect(createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
@@ -407,14 +418,10 @@ it('recovers a failed attempt from a repackaged equivalent deterministic file', 
       ? 'hash:governed-source'
       : `hash:${buffer.toString()}`
   ));
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValue({ buffer: Buffer.from('sharepoint-packaged-bytes') });
-  h.dependencies.getFileMetadataByPath.mockResolvedValue(metadata({
-    id: 'snapshot-item',
-    versionId: '1.0',
-  }));
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(retainedMetadata());
 
   await expect(createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
@@ -432,6 +439,103 @@ it('recovers a failed attempt from a repackaged equivalent deterministic file', 
   });
 });
 
+it('removes the recovered live item from cleanup while preserving unrelated cleanup work', async () => {
+  const h = harness();
+  let sourceRead = 0;
+  h.dependencies.newClaimToken
+    .mockReturnValueOnce('55555555-5555-4555-8555-555555555555')
+    .mockReturnValueOnce('66666666-6666-4666-8666-666666666666');
+  h.dependencies.hashDocx.mockResolvedValue('hash:governed-source');
+  h.dependencies.getFileMetadataById.mockImplementation(async (_driveId, itemId) => {
+    if (itemId !== 'source-item') return retainedMetadata({ id: itemId });
+    sourceRead += 1;
+    return sourceRead === 3
+      ? metadata({ versionId: '3.0', eTag: 'source-changed' })
+      : metadata();
+  });
+  h.dependencies.downloadFile.mockImplementation(async (_driveId, itemId) => ({
+    buffer: Buffer.from(itemId === 'source-item' ? 'source-bytes' : 'sharepoint-packaged-bytes'),
+  }));
+  h.dependencies.getFileMetadataByPath
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(retainedMetadata());
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toMatchObject({
+    body: expect.objectContaining({ code: 'initial_assessment_snapshot_stale' }),
+  });
+  const failed = h.getSnapshot();
+  const selfCleanup = JSON.parse(failed.wmkf_orphancleanupjson)[0];
+  const unrelatedCleanup = {
+    driveId: 'other-drive',
+    itemId: 'other-item',
+    reason: 'unrelated_cleanup',
+  };
+  const unrelatedOverflowCleanup = {
+    driveId: 'overflow-drive',
+    itemId: 'overflow-item',
+    reason: 'unrelated_overflow_cleanup',
+  };
+  h.setSnapshot({
+    ...failed,
+    _etag: 'snapshot-etag-failed',
+    wmkf_orphancleanupjson: JSON.stringify([selfCleanup, unrelatedCleanup]),
+    wmkf_orphancleanupoverflowjson: JSON.stringify([
+      selfCleanup,
+      unrelatedOverflowCleanup,
+    ]),
+  });
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).resolves.toMatchObject({
+    reused: false,
+    recovered: true,
+  });
+
+  expect(h.getSnapshot()).toMatchObject({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointitemid: 'snapshot-item',
+  });
+  expect(JSON.parse(h.getSnapshot().wmkf_orphancleanupjson)).toEqual([unrelatedCleanup]);
+  expect(JSON.parse(h.getSnapshot().wmkf_orphancleanupoverflowjson))
+    .toEqual([unrelatedOverflowCleanup]);
+});
+
+it('maps a contested snapshot claim to a retryable conflict', async () => {
+  const h = harness();
+  h.setSnapshot({
+    wmkf_requestdocumentid: SNAPSHOT_ID,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+    wmkf_generationkey: 'existing-generation-key',
+    wmkf_claimtoken: null,
+    wmkf_attemptcount: 1,
+    modifiedon: '2026-08-30T18:00:00Z',
+    _etag: 'snapshot-etag-stale',
+  });
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.updateDocument.mockRejectedValueOnce(Object.assign(
+    new Error('Precondition Failed'),
+    { status: 412 },
+  ));
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toMatchObject({
+    httpStatus: 409,
+    body: expect.objectContaining({ code: 'initial_assessment_snapshot_in_progress' }),
+  });
+  expect(h.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
 it('reuses a governed-equivalent Ready Board snapshot without uploading a duplicate item', async () => {
   const h = harness();
   h.dependencies.hashDocx.mockImplementation(async (buffer) => (
@@ -439,14 +543,9 @@ it('reuses a governed-equivalent Ready Board snapshot without uploading a duplic
       ? 'hash:governed-source'
       : `hash:${buffer.toString()}`
   ));
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
-  h.dependencies.uploadFile.mockResolvedValue(metadata({
-    id: 'snapshot-item',
-    versionId: '1.0',
-    eTag: 'snapshot-etag',
-  }));
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
   await createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
     expectedArtifactId: SOURCE_ID,
@@ -458,8 +557,6 @@ it('reuses a governed-equivalent Ready Board snapshot without uploading a duplic
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
-  h.dependencies.getFileMetadataById.mockResolvedValueOnce(metadata()).mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata({ id: 'snapshot-item', versionId: '1.0' }));
 
   const result = await createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,
@@ -472,6 +569,105 @@ it('reuses a governed-equivalent Ready Board snapshot without uploading a duplic
   expect(h.dependencies.uploadFile).not.toHaveBeenCalled();
 });
 
+it('reconciles Ready snapshot metadata drift only after stable governed-content verification', async () => {
+  const h = harness();
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
+  await createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+  h.dependencies.updateDocument.mockClear();
+  h.dependencies.getFileMetadataById.mockImplementation(async (_driveId, itemId) => (
+    itemId === 'source-item'
+      ? metadata()
+      : retainedMetadata({ versionId: '2.0', eTag: 'snapshot-etag-2' })
+  ));
+
+  const result = await createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { actingUserSystemId: ACTOR_ID, dependencies: h.dependencies });
+
+  expect(result).toMatchObject({
+    reused: true,
+    snapshot: { file: { versionId: '2.0', eTag: 'snapshot-etag-2' } },
+  });
+  expect(h.dependencies.updateDocument).toHaveBeenCalledWith(
+    SNAPSHOT_ID,
+    expect.objectContaining({
+      wmkf_sharepointversionid: '2.0',
+      wmkf_sharepointetag: 'snapshot-etag-2',
+    }),
+    expect.objectContaining({ actingUserSystemId: ACTOR_ID }),
+  );
+});
+
+it('does not reconcile Ready snapshot metadata when governed content changed', async () => {
+  const h = harness();
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
+  await createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+  h.dependencies.updateDocument.mockClear();
+  h.dependencies.getFileMetadataById.mockImplementation(async (_driveId, itemId) => (
+    itemId === 'source-item'
+      ? metadata()
+      : retainedMetadata({ versionId: '2.0', eTag: 'snapshot-etag-2' })
+  ));
+  h.dependencies.downloadFile.mockImplementation(async (_driveId, itemId) => ({
+    buffer: Buffer.from(itemId === 'source-item' ? 'source-bytes' : 'changed-retained-bytes'),
+  }));
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toMatchObject({
+    body: expect.objectContaining({ code: 'initial_assessment_snapshot_file_invalid' }),
+  });
+  expect(h.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(h.getSnapshot().wmkf_sharepointversionid).toBe('1.0');
+});
+
+it('fails closed when retained metadata changes during Ready verification', async () => {
+  const h = harness();
+  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
+  await createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies });
+  h.dependencies.updateDocument.mockClear();
+  let retainedRead = 0;
+  h.dependencies.getFileMetadataById.mockImplementation(async (_driveId, itemId) => {
+    if (itemId === 'source-item') return metadata();
+    retainedRead += 1;
+    return retainedMetadata({
+      versionId: retainedRead === 1 ? '2.0' : '3.0',
+      eTag: retainedRead === 1 ? 'snapshot-etag-2' : 'snapshot-etag-3',
+    });
+  });
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toMatchObject({
+    body: expect.objectContaining({ code: 'initial_assessment_snapshot_file_invalid' }),
+  });
+  expect(h.dependencies.updateDocument).not.toHaveBeenCalled();
+});
+
 it('accepts repackaged governed-equivalent content when a concurrent creator wins', async () => {
   const h = harness();
   h.dependencies.hashDocx.mockImplementation(async (buffer) => (
@@ -479,10 +675,6 @@ it('accepts repackaged governed-equivalent content when a concurrent creator win
       ? 'hash:governed-source'
       : `hash:${buffer.toString()}`
   ));
-  h.dependencies.getFileMetadataById
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata({ id: 'snapshot-item', versionId: '1.0' }));
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
@@ -520,10 +712,6 @@ it('accepts repackaged governed-equivalent content when a concurrent creator win
 
 it('rechecks retained governed content when a concurrent creator wins the snapshot row race', async () => {
   const h = harness();
-  h.dependencies.getFileMetadataById
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata())
-    .mockResolvedValueOnce(metadata({ id: 'snapshot-item', versionId: '1.0' }));
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('different-retained-bytes') });
@@ -564,12 +752,11 @@ it('fails closed and records cleanup when an owned upload readback is not a vali
     if (buffer.toString() === 'source-bytes') return 'hash:governed-source';
     throw new Error('Initial Assessment producer returned an invalid DOCX package.');
   });
-  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
     .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
     .mockResolvedValueOnce({ buffer: Buffer.from('invalid-docx') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
-  h.dependencies.uploadFile.mockResolvedValue(metadata({ id: 'snapshot-item', versionId: '1.0' }));
+  h.dependencies.uploadFile.mockResolvedValue(retainedMetadata());
 
   await expect(createInitialAssessmentBoardSnapshot({
     requestId: REQUEST_ID,

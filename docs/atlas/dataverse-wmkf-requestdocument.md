@@ -368,10 +368,17 @@ The source-built Board-freeze writer uses a deterministic generation key and
 Graph upload of the exact selected source buffer. Post-ingestion readback uses
 the normalized governed-DOCX hash instead of ZIP-container byte equality, so
 SharePoint repackaging is accepted while changed or invalid Word content fails
-closed. Exact Ready retry returns the same row/item; an interrupted upload is
-recovered only when the deterministic file has governed content equivalent to
-the selected source. Only an item uploaded by the owned attempt can be recorded
-as orphan cleanup; a pre-existing path collision is never claimed as owned.
+closed. Publication version/eTag metadata comes from stable-ID Graph reads
+before and after the retained-file download, never an upload/path `cTag`.
+Exact Ready retry returns the same row/item and may ETag-reconcile benign
+metadata drift only after stable governed-content verification; changed content
+or metadata that changes during verification fails closed. An interrupted
+upload is recovered only when the deterministic file has governed content
+equivalent to the selected source. Successful publication removes that live
+drive/item from both cleanup queues while preserving unrelated cleanup work.
+Only an item uploaded by the owned attempt can be recorded as orphan cleanup;
+a pre-existing path collision is never claimed as owned, and an ETag-contested
+claim is surfaced as a retryable conflict.
 The restore writer narrows stale edits with two current-metadata
 reads and verifies the post-restore governed content. Native Graph restore has
 no conditional-write header, so the final-call interval remains a disclosed
