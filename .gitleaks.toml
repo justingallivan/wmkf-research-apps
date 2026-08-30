@@ -1,0 +1,16 @@
+title = "WMKF Apps Gitleaks configuration"
+minVersion = "8.25.0"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public Executor budget Dataverse revision keys in focused unit fixtures."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexes = ['''^executor\.budgets\.v[0-9]{6}$''']
+paths = [
+  '''^tests/unit/dataverse-settings-service-odata-escape\.test\.js$''',
+  '''^tests/unit/executor-budget-service\.test\.js$''',
+  '''^tests/unit/prompt-templates-executor-budgets\.test\.js$''',
+]
