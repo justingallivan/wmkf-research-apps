@@ -6,7 +6,7 @@ status: canonical
 summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-07-27
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - lib/services/execute-prompt.js
@@ -22,7 +22,7 @@ related:
 and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
 second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-07-27 (review-synthesis response-completeness and native-schema reliability)
+**Last status update:** 2026-08-30 (durable budget recovery, provenance, and concurrent-draft handling)
 **Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -88,7 +88,9 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 `GET/PUT /api/admin/executor-budgets` is superuser-only and publishes one
 complete budget document as a new `wmkf_appsystemsettings` row named
 `executor.budgets.vNNNNNN`. Existing revision rows are never updated. PUT
-requires the editor's `expectedVersion` plus a UUID `requestId`; stale editors
+requires the editor's `expectedVersion` plus a UUID `requestId`; this expected
+value is the highest reserved numeric revision, which normally equals the
+current valid version but can be higher when a damaged row was skipped. Stale editors
 and payload-changing request-id reuse fail with 409. Request ids are
 canonicalized, prefix reads follow all Dataverse pages, and a create race is
 reread so a matching replay succeeds while a different winner returns the new
@@ -106,9 +108,16 @@ the current durable budget. Because these are separate Dataverse publications,
 the final Executor call seam also caps a server-owned override to the resolved
 model ceiling; this closes the concurrent-publication interleaving without
 weakening the fail-closed check for an invalid prompt-row budget. Runtime consumers
-perform a lenient read and use the reviewed code fallback when Dataverse is
-unavailable or malformed; Admin reads fail closed so an outage or corrupt row
-cannot appear editable or successfully published. The fallback preserves the
+perform a lenient read and use the highest valid publication. A malformed row is
+skipped with a bounded `storageWarnings` entry and its well-formed numeric key
+still reserves that revision, so the next repair publication cannot reuse the
+key. Admin shows the warning; if a draft is stale, publishing remains disabled
+until the administrator resets or explicitly reapplies only locally changed
+fields over the current server revision. An unknown future `schemaVersion`
+remains a typed 409 publication blocker so older code cannot overwrite a format
+it cannot understand. Admin reads fail closed on a Dataverse outage; runtime
+reads use the reviewed code fallback on an outage or when no valid publication
+exists. The fallback preserves the
 S466/S467 values (32 768 tokens / 240 seconds; 16 000–32 000 retry range) but is
 not the normal mutable source of truth. Runtime routes accept no budget fields.
 

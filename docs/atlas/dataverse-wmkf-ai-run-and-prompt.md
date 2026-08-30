@@ -1,6 +1,8 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-08-27 for sole-current
+**Last verified:** 2026-08-30 in source/tests for Executor-budget damaged-row
+recovery, reserved-revision concurrency, Dataverse paging/provenance, and Admin
+draft reconciliation (no production budget revision claimed); 2026-08-27 for sole-current
 `pre-site-visit.proposal-core.generate` v5 (unattributed content-identical
 republish of v4; runtime exact-match preflight passed during the governed
 Request `1002852` smoke generation, run
@@ -226,7 +228,7 @@ Migration plans touching either entity must preserve these foreign keys.
   highest valid append-only `wmkf_appsystemsettings` row keyed
   `executor.budgets.vNNNNNN`. The superuser-only
   `/api/admin/executor-budgets` publisher accepts one complete closed schema,
-  requires `expectedVersion` plus a UUID request id, checks code-owned numeric
+  requires the highest reserved numeric revision as `expectedVersion` plus a UUID request id, checks code-owned numeric
   bounds and both current prompts' resolved model output ceilings, creates the
   next alternate-key row, and verifies that exact row before success. Prefix
   reads page to completion; alternate-key create races reread current state;
@@ -237,9 +239,17 @@ Migration plans touching either entity must preserve these foreign keys.
   seam caps server-owned overrides to the resolved model ceiling, covering the
   remaining concurrent-publication interleaving; review synthesis additionally
   requires the final capped retry budget to exceed its first attempt before the
-  provider call. Existing revisions are immutable. Runtime
-  reads are server-owned and fall back to the reviewed S466/S467 code values on
-  a settings outage or malformed revision; strict Admin reads fail closed.
+  provider call. Existing revisions are immutable. A malformed row is reported
+  in `storageWarnings`, excluded from the valid-publication set, and still
+  reserves its well-formed numeric key; repair therefore publishes at the next
+  unused revision without losing idempotency checks over every parseable row.
+  Unknown future schema versions block publication with a typed 409. The Admin
+  keeps a conflicting local draft separate from current server state and
+  requires an explicit field-level reapply or reset before another publish.
+  Runtime reads are server-owned and use the highest valid revision, falling
+  back to the reviewed S466/S467 code values on a settings outage or when no
+  valid revision exists; strict Admin reads fail closed only on the backend
+  read failure.
   `pre-site-visit/proposal-core-service.js` reads the standing pair before its
   Executor call, and `review-manager/synthesize-reviews-service.js` reads the
   retry pair only after a typed `claude_output_truncated` first attempt. No

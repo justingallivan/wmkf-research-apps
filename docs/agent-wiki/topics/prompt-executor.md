@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 stale_after_days: 90
 owner: ai-platform
 source_files:
@@ -92,8 +92,14 @@ reviewer-finder prompt migration.
   `shared/config/executorBudgets.js` now owns only the closed
   schema, code safety bounds, descriptions, and S466/S467 outage fallback
   (32 768 / 240 s and 16 000–32 000). Runtime request bodies never carry
-  budget authority. Admin reads fail closed; runtime reads use the bounded
-  fallback when settings are absent, unavailable, or malformed.
+  budget authority. A malformed row is skipped with an Admin-visible warning
+  while its numeric revision remains reserved; the next publication uses the
+  highest reserved revision rather than reusing a key, and idempotency still
+  scans every parseable row. Unknown future schemas block the older publisher.
+  Conflicting Admin drafts are retained but cannot publish until explicitly
+  field-level reapplied or reset. Admin reads fail closed on backend failure;
+  runtime reads use the highest valid revision, or the bounded fallback when
+  settings are absent/unavailable or no valid revision remains.
 
 ## Durable Memory
 

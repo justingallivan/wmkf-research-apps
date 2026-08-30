@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - lib/services/
@@ -32,7 +32,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`model-capabilities.js`** — Reviewed Anthropic model capability registry for request shaping (`temperature`, `output_config.effort`) and response semantics (refusals, retention class, max tokens). Unknown runtime ids fail closed for optional params; configured ids are guarded by `check:model-registry`.
 - **`model-review-validation.js`** — Shared write-time validator for tier keys and concrete Claude model ids. Admin model overrides and prompt publishes use it to reject unreviewed concrete Claude ids unless both capability and pricing entries exist.
 - **`execute-prompt.js`** — Live prompt-execution Executor implementing `docs/EXECUTOR_CONTRACT.md`. Reads current prompt rows from Dataverse entity set `wmkf_ai_prompts`, rejects unreviewed concrete Claude model ids before execution, caps server-owned token overrides to the resolved model ceiling (while invalid prompt-row budgets fail closed), enforces optional final retry lower bounds, and attempts append-only audit rows in `wmkf_ai_runs`. Production consumers include Phase-I Dynamics summary, grantee title/abstract, field primer, peer-review summary, and review synthesis flows; inspect current callers before changing the contract.
-- **`executor-budget-service.js`** — Strict schema and append-only publication/read contract for server-owned Executor standing/retry budgets in Dataverse `wmkf_appsystemsettings` (`executor.budgets.vNNNNNN`). Superuser publication uses optimistic versioning, canonical UUID idempotency, reviewed model ceilings, paged reads, create-race reconciliation, and exact-row post-create verification; governed prompt-model publications cross-check the current budget, while runtime reads fall back to bounded reviewed code defaults on settings failure.
+- **`executor-budget-service.js`** — Strict schema and append-only publication/read contract for server-owned Executor standing/retry budgets in Dataverse `wmkf_appsystemsettings` (`executor.budgets.vNNNNNN`). Superuser publication uses reserved-revision optimistic concurrency, canonical UUID idempotency across every parseable row, reviewed model ceilings, paged reads, create-race reconciliation, and exact-row post-create verification. Malformed rows are skipped with Admin-visible warnings while their numeric keys remain reserved; unknown future schemas block older publishers. Governed prompt-model publications cross-check the current budget, while runtime reads fall back to bounded reviewed code defaults only on settings failure or when no valid revision exists.
 - **`prompt-resolver.js`** — Legacy Session 103 holdover. Reads prompts from a scratch row on `wmkf_ai_runs`, 5-min cache, `{{var}}` interpolation, bundled `.js` fallback. `PROMPT_RESOLVER_STRICT=true` disables fallback. Currently used only by scripts; no live API route depends on it.
 - **`model-resolver.js`** / **`model-override-loader.js`** — Per-app model overrides for `baseConfig.js`. Resolver computes effective model per app at call time and exposes `resolveModelWithCapabilities()` for coupled concrete-id + reviewed-capability lookup; loader caches DB-backed overrides.
 - **`claude-reviewer-service.js`** — Live, legacy-named Reviewer
@@ -52,7 +52,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Wave 1 dispatch (Dataverse-default since 2026-05-12)
 
-- **`settings-service.js`** / **`dataverse-settings-service.js`** — Dataverse `wmkf_appsystemsettings`. Legacy Postgres `system_settings` was dropped 2026-05-12 (Migrates / Replaced); dispatch retained as fail-loud opt-out. Exposes throwing metadata-prefix reads and create-only writes for immutable versioned settings in addition to the legacy fail-soft/upsert surface.
+- **`settings-service.js`** / **`dataverse-settings-service.js`** — Dataverse `wmkf_appsystemsettings`. Legacy Postgres `system_settings` was dropped 2026-05-12 (Migrates / Replaced); dispatch retained as fail-loud opt-out. Exposes throwing metadata-prefix reads with `odata.maxpagesize`/`@odata.nextLink` paging and formatted lookup provenance, plus create-only writes for immutable versioned settings, in addition to the legacy fail-soft/upsert surface.
 - **`app-access-service.js`** / **`dataverse-app-access-service.js`** — Dataverse `wmkf_appuserappaccesses`. Legacy Postgres `user_app_access` was dropped 2026-05-12 (Migrates / Replaced).
 - **`dataverse-prefs-service.js`** — Dataverse `wmkf_appuserpreferences`
   adapter. Postgres `user_preferences` was dropped 2026-05-12 and its old

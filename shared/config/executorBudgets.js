@@ -51,8 +51,3 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
 export const EXECUTOR_BUDGET_PROMPT_NAMES = Object.freeze(
   Object.keys(EXECUTOR_BUDGET_DEFAULTS),
 );
-
-/** Lookup from an already server-resolved budget map. */
-export function lookupExecutorBudget(promptName, budgets = EXECUTOR_BUDGET_DEFAULTS) {
-  return budgets?.[String(promptName || '').trim()] || null;
-}

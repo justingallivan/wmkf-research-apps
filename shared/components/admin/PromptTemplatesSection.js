@@ -34,6 +34,10 @@ const TONE = {
   red:   'bg-red-50   text-red-800   border-red-200',
   gray:  'bg-gray-50  text-gray-800  border-gray-200',
 };
+const EXECUTOR_BUDGET_EDITABLE_FIELDS = {
+  'pre-site-visit.proposal-core.generate': ['maxTokensOverride', 'timeoutMsOverride'],
+  'review-synthesis.generate': ['floor', 'ceiling'],
+};
 
 function newRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -50,10 +54,27 @@ function fmtTs(ts) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
+function configRevision(config) {
+  return config?.latestRevision ?? config?.version ?? 0;
+}
+
+function reapplyExecutorBudgetDraft(baseBudgets, draftBudgets, currentBudgets) {
+  const merged = JSON.parse(JSON.stringify(currentBudgets));
+  for (const [promptName, fields] of Object.entries(EXECUTOR_BUDGET_EDITABLE_FIELDS)) {
+    for (const field of fields) {
+      if (draftBudgets?.[promptName]?.[field] !== baseBudgets?.[promptName]?.[field]) {
+        merged[promptName][field] = draftBudgets[promptName][field];
+      }
+    }
+  }
+  return merged;
+}
+
 export default function PromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
   const [modelCatalog, setModelCatalog] = useState(null);
   const [executorBudgetConfig, setExecutorBudgetConfig] = useState(null);
+  const [executorBudgetError, setExecutorBudgetError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const loadGeneration = useRef(0);
@@ -62,31 +83,42 @@ export default function PromptTemplatesSection() {
     const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
+    setExecutorBudgetError(null);
     Promise.all([
       fetch('/api/admin/prompts'),
       fetch('/api/admin/models'),
-      fetch('/api/admin/executor-budgets'),
     ])
-      .then(async ([promptResponse, modelResponse, budgetResponse]) => {
-        if ([promptResponse, modelResponse, budgetResponse].some((response) => response.status === 403)) {
+      .then(async ([promptResponse, modelResponse]) => {
+        if ([promptResponse, modelResponse].some((response) => response.status === 403)) {
           throw new Error('Admin access required');
         }
         if (!promptResponse.ok) throw new Error('Failed to load prompts');
         if (!modelResponse.ok) throw new Error('Failed to load the reviewed model catalog');
-        if (!budgetResponse.ok) throw new Error('Failed to load Executor budgets');
-        return Promise.all([promptResponse.json(), modelResponse.json(), budgetResponse.json()]);
+        return Promise.all([promptResponse.json(), modelResponse.json()]);
       })
-      .then(([promptData, modelData, budgetData]) => {
+      .then(([promptData, modelData]) => {
         if (generation !== loadGeneration.current) return;
         setPrompts(promptData.prompts || []);
         setModelCatalog(modelData);
-        setExecutorBudgetConfig(budgetData);
       })
       .catch((err) => {
         if (generation === loadGeneration.current) setError(err.message);
       })
       .finally(() => {
         if (generation === loadGeneration.current) setLoading(false);
+      });
+    fetch('/api/admin/executor-budgets')
+      .then(async (response) => {
+        if (response.status === 403) throw new Error('Admin access required for Executor budgets');
+        if (!response.ok) throw new Error('Failed to load Executor budgets');
+        return response.json();
+      })
+      .then((budgetData) => {
+        if (generation !== loadGeneration.current) return;
+        setExecutorBudgetConfig(budgetData);
+      })
+      .catch((err) => {
+        if (generation === loadGeneration.current) setExecutorBudgetError(err.message);
       });
   };
   useEffect(() => { load(); }, []);
@@ -101,6 +133,11 @@ export default function PromptTemplatesSection() {
         Edit and publish a new version of a stored prompt. Publishing creates a new immutable version and makes it current. Reviewer-finder prompts are validated against their output parse contract before save.
       </p>
       <div className="space-y-6">
+        {executorBudgetError && (
+          <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+            {executorBudgetError}. Prompt editing remains available.
+          </div>
+        )}
         <ExecutorBudgetEditor
           config={executorBudgetConfig}
           onPublished={setExecutorBudgetConfig}
@@ -363,12 +400,16 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
   const retryName = 'review-synthesis.generate';
   const [values, setValues] = useState(() => config?.budgets || {});
   const [baseBudgets, setBaseBudgets] = useState(() => config?.budgets || {});
-  const [baseVersion, setBaseVersion] = useState(() => config?.version || 0);
+  const [baseRevision, setBaseRevision] = useState(() => configRevision(config));
+  const [conflictConfig, setConflictConfig] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const requestRef = useRef({ payloadKey: null, requestId: null });
 
   if (!config?.budgets) return null;
+  const currentConfig = configRevision(config) >= configRevision(conflictConfig)
+    ? config
+    : conflictConfig;
   const standing = values[standingName] || {};
   const retry = values[retryName] || {};
   const limits = config.limits || {};
@@ -387,6 +428,9 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
     && within(retry.ceiling, limits[retryName]?.ceiling)
     && retry.floor <= retry.ceiling;
   const unchanged = JSON.stringify(values) === JSON.stringify(baseBudgets);
+  const unsupportedSchema = (currentConfig.storageWarnings || []).some(
+    warning => warning.code === 'unsupported_executor_budget_schema',
+  );
 
   const setBudgetValue = (promptName, field, rawValue) => {
     const nextValue = rawValue === '' ? null : Number(rawValue);
@@ -400,7 +444,7 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
     setSubmitting(true);
     setOutcome(null);
     try {
-    const payloadKey = JSON.stringify({ budgets: values, expectedVersion: baseVersion });
+      const payloadKey = JSON.stringify({ budgets: values, expectedVersion: baseRevision });
       if (requestRef.current.payloadKey !== payloadKey) {
         requestRef.current = { payloadKey, requestId: newRequestId() };
       }
@@ -409,24 +453,28 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           budgets: values,
-          expectedVersion: baseVersion,
+          expectedVersion: baseRevision,
           requestId: requestRef.current.requestId,
         }),
       });
       const data = await response.json();
       if (!response.ok) {
-        if (response.status === 409 && data.current?.budgets) {
-          setValues(data.current.budgets);
-          setBaseBudgets(data.current.budgets);
-          setBaseVersion(data.current.version);
+        if (response.status === 409 && data.code === 'version_conflict' && data.current?.budgets) {
+          setConflictConfig(data.current);
           requestRef.current = { payloadKey: null, requestId: null };
           onPublished(data.current);
+          setOutcome({
+            tone: 'amber',
+            text: `${data.error || 'Executor budgets changed.'} Your draft was retained; reapply its changed fields or reset to the current revision.`,
+          });
+          return;
         }
         throw new Error(data.error || 'Executor budget publication failed.');
       }
       setValues(data.config.budgets);
       setBaseBudgets(data.config.budgets);
-      setBaseVersion(data.config.version);
+      setBaseRevision(configRevision(data.config));
+      setConflictConfig(data.config);
       requestRef.current = { payloadKey: null, requestId: null };
       const publishedVersion = data.publishedConfig?.version ?? data.config.version;
       const advanced = data.config.version !== publishedVersion
@@ -443,25 +491,33 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
     }
   };
 
-  const settingRow = config.settingKey
-    ? `wmkf_settingkey = "${config.settingKey}"`
+  const settingRow = currentConfig.settingKey
+    ? `wmkf_settingkey = "${currentConfig.settingKey}"`
     : `wmkf_settingkey starts with "executor.budgets.v"`;
   const reset = () => {
-    setValues(config.budgets);
-    setBaseBudgets(config.budgets);
-    setBaseVersion(config.version);
+    setValues(currentConfig.budgets);
+    setBaseBudgets(currentConfig.budgets);
+    setBaseRevision(configRevision(currentConfig));
     requestRef.current = { payloadKey: null, requestId: null };
     setOutcome(null);
   };
-  const staleDraft = baseVersion !== config.version;
+  const reapplyDraft = () => {
+    const reapplied = reapplyExecutorBudgetDraft(baseBudgets, values, currentConfig.budgets);
+    setValues(reapplied);
+    setBaseBudgets(currentConfig.budgets);
+    setBaseRevision(configRevision(currentConfig));
+    requestRef.current = { payloadKey: null, requestId: null };
+    setOutcome(null);
+  };
+  const staleDraft = baseRevision !== configRevision(currentConfig);
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden">
       <div className="p-4 bg-gray-50 border-b flex items-start justify-between gap-3">
         <div>
           <div className="font-medium text-gray-900">Executor output budgets</div>
           <div className="text-xs text-gray-500 mt-0.5">
-            {config.source === 'dataverse'
-              ? <>Current immutable revision <strong>v{config.version}</strong> · published {fmtTs(config.publishedAt)}{config.updatedByName ? <> by {config.updatedByName}</> : null}</>
+            {currentConfig.source === 'dataverse'
+              ? <>Current immutable revision <strong>v{currentConfig.version}</strong> · published {fmtTs(currentConfig.publishedAt)}{currentConfig.updatedByName ? <> by {currentConfig.updatedByName}</> : null}</>
               : <>No published revision · using reviewed code fallback</>}
           </div>
         </div>
@@ -514,15 +570,35 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
             Use whole numbers inside each displayed safety range; the retry floor cannot exceed its ceiling.
           </div>
         )}
+        {(currentConfig.storageWarnings || []).map((warning) => (
+          <div
+            key={warning.settingKey}
+            className={`text-xs px-3 py-2 rounded border ${TONE[
+              warning.code === 'unsupported_executor_budget_schema' ? 'red' : 'amber'
+            ]}`}
+          >
+            Stored budget row <code>{warning.settingKey}</code> was skipped: {warning.message}
+          </div>
+        ))}
         {staleDraft && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE.amber}`}>
-            Executor budgets changed after this draft was loaded. Publishing will still use the draft's original revision check; reset to adopt the current values.
+            Executor budgets changed after this draft was loaded. Publishing is paused until you reset to the current values or explicitly reapply only this draft's changed fields.
           </div>
         )}
         {outcome && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE[outcome.tone]}`}>{outcome.text}</div>
         )}
         <div className="flex justify-end gap-3">
+          {staleDraft && !unchanged && (
+            <button
+              type="button"
+              onClick={reapplyDraft}
+              disabled={submitting}
+              className="text-xs text-amber-700 hover:text-amber-900 disabled:opacity-40"
+            >
+              Reapply my changes to v{configRevision(currentConfig)}
+            </button>
+          )}
           <button
             type="button"
             onClick={reset}
@@ -534,10 +610,10 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
           <button
             type="button"
             onClick={submit}
-            disabled={submitting || unchanged || !valid}
+            disabled={submitting || staleDraft || unsupportedSchema || unchanged || !valid}
             className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Publishing…' : `Publish v${baseVersion + 1}`}
+            {submitting ? 'Publishing…' : `Publish v${baseRevision + 1}`}
           </button>
         </div>
       </div>

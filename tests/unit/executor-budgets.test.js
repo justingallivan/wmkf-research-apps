@@ -1,7 +1,6 @@
 import {
   EXECUTOR_BUDGET_DEFAULTS,
   EXECUTOR_BUDGET_DESCRIPTIONS,
-  lookupExecutorBudget,
 } from '../../shared/config/executorBudgets.js';
 import { PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
 import { lookupModelCapabilities } from '../../lib/services/model-capabilities.js';
@@ -14,18 +13,16 @@ import { resolveMaxTokensForCall } from '../../lib/services/execute-prompt.js';
 // output ceiling.
 
 test('registry keys are the prompt names the callers use', () => {
-  expect(lookupExecutorBudget(PRE_SITE_VISIT_CONTRACT.promptName)).toMatchObject({
+  expect(EXECUTOR_BUDGET_DEFAULTS[PRE_SITE_VISIT_CONTRACT.promptName]).toMatchObject({
     kind: 'standing',
     maxTokensOverride: 32_768,
     timeoutMsOverride: 240_000,
   });
-  expect(lookupExecutorBudget('review-synthesis.generate')).toMatchObject({
+  expect(EXECUTOR_BUDGET_DEFAULTS['review-synthesis.generate']).toMatchObject({
     kind: 'retry',
     floor: 16_000,
     ceiling: 32_000,
   });
-  expect(lookupExecutorBudget('no-such-prompt')).toBeNull();
-  expect(lookupExecutorBudget(null)).toBeNull();
 });
 
 test('every budget fits inside the default model\'s reviewed output ceiling', () => {

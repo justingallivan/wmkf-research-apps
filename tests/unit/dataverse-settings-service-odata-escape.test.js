@@ -41,6 +41,28 @@ test("listSettings doubles single quotes in the startswith prefix", async () => 
   expect(get.mock.calls[0][0]).toContain("'pre''fix')");
 });
 
+test('listSettings follows every Dataverse page', async () => {
+  get
+    .mockResolvedValueOnce({
+      ok: true,
+      body: {
+        value: [{ wmkf_settingkey: 'feature.one', wmkf_settingvalue: 'enabled' }],
+        '@odata.nextLink': 'https://example.crm.dynamics.com/api/data/v9.2/next-page',
+      },
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      body: { value: [{ wmkf_settingkey: 'feature.two', wmkf_settingvalue: 'disabled' }] },
+    });
+
+  await expect(listSettings('feature.')).resolves.toEqual({
+    'feature.one': 'enabled',
+    'feature.two': 'disabled',
+  });
+  expect(get.mock.calls[1][0]).toBe('https://example.crm.dynamics.com/api/data/v9.2/next-page');
+  expect(get.mock.calls[1][1]).toEqual(get.mock.calls[0][1]);
+});
+
 test("listSettingsWithMeta doubles single quotes in the startswith prefix", async () => {
   await listSettingsWithMeta("pre'fix");
   expect(get.mock.calls[0][0]).toContain("'pre''fix')");
@@ -56,7 +78,7 @@ test('strict metadata reads preserve immutable revision provenance', async () =>
       createdon: '2026-08-29T00:00:00Z',
       modifiedon: '2026-08-29T00:00:00Z',
       _wmkf_updatedby_value: 'actor-1',
-      _wmkf_updatedby_value_formatted: 'Admin User',
+      '_wmkf_updatedby_value@OData.Community.Display.V1.FormattedValue': 'Admin User',
     }] },
   });
   await expect(listSettingsWithMetaStrict('executor.budgets.v')).resolves.toEqual({
@@ -87,6 +109,11 @@ test('strict metadata reads follow every Dataverse page', async () => {
     'executor.budgets.v000002': expect.objectContaining({ value: '{}' }),
   });
   expect(get.mock.calls[1][0]).toBe('https://example.crm.dynamics.com/api/data/v9.2/next-page');
+  expect(get.mock.calls[0][0]).not.toContain('$top=5000');
+  expect(get.mock.calls[0][1]).toEqual({
+    Prefer: 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
+  });
+  expect(get.mock.calls[1][1]).toEqual(get.mock.calls[0][1]);
 });
 
 test('createSettingStrict is create-only and surfaces alternate-key conflicts', async () => {

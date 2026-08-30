@@ -10,6 +10,7 @@ import { EXECUTOR_BUDGET_DEFAULTS } from '../../shared/config/executorBudgets.js
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SECOND_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
+const THIRD_REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 
 function budgets(overrides = {}) {
   return {
@@ -75,6 +76,8 @@ test('absent durable settings use the bounded reviewed fallback', async () => {
   await expect(getExecutorBudgetConfig({}, deps)).resolves.toMatchObject({
     source: 'code_fallback',
     version: 0,
+    latestRevision: 0,
+    storageWarnings: [],
     budgets: EXECUTOR_BUDGET_DEFAULTS,
   });
   await expect(getExecutorBudget('review-synthesis.generate', {}, deps)).resolves.toEqual({
@@ -92,21 +95,69 @@ test('highest immutable revision is authoritative and carries row metadata', () 
   expect(parsed).toMatchObject({
     source: 'dataverse',
     version: 2,
+    latestRevision: 2,
     requestId: SECOND_REQUEST_ID,
     updatedByName: 'Admin User',
     budgets: { 'review-synthesis.generate': { ceiling: 48000 } },
   });
 });
 
-test('a malformed durable revision fails strict reads and falls back for runtime reads', async () => {
+test('a malformed durable revision is skipped, reported, and still reserves its revision', async () => {
   const deps = dependencies({
-    'executor.budgets.v000001': { value: '{not-json' },
+    ...storedRevision(1),
+    'executor.budgets.v000002': { value: '{not-json' },
+    'executor.budgets.vnot-a-revision': { value: '{}' },
   });
-  await expect(getExecutorBudgetConfig({ strict: true }, deps)).rejects.toThrow('invalid JSON');
-  await expect(getExecutorBudgetConfig({}, deps)).resolves.toMatchObject({
+  await expect(getExecutorBudgetConfig({ strict: true }, deps)).resolves.toMatchObject({
+    source: 'dataverse',
+    version: 1,
+    latestRevision: 2,
+    storageWarnings: [
+      expect.objectContaining({ settingKey: 'executor.budgets.v000002', version: 2 }),
+      expect.objectContaining({ settingKey: 'executor.budgets.vnot-a-revision', version: null }),
+    ],
+  });
+
+  const result = await publishExecutorBudgetConfig({
+    budgets: budgets({ retry: { ceiling: 48000 } }),
+    expectedVersion: 2,
+    requestId: THIRD_REQUEST_ID,
+  }, deps);
+  expect(result).toMatchObject({
+    status: 'completed',
+    config: { version: 3, latestRevision: 3 },
+  });
+  expect(deps.createSettingStrict).toHaveBeenCalledWith(
+    'executor.budgets.v000003',
+    expect.any(String),
+    null,
+  );
+});
+
+test('an unknown future schema is visible on reads and blocks an older publisher', async () => {
+  const future = storedRevision(1);
+  const key = 'executor.budgets.v000001';
+  future[key].value = JSON.stringify({
+    ...JSON.parse(future[key].value),
+    schemaVersion: 2,
+    futureField: true,
+  });
+  const deps = dependencies(future);
+  await expect(getExecutorBudgetConfig({ strict: true }, deps)).resolves.toMatchObject({
     source: 'code_fallback',
     version: 0,
+    latestRevision: 1,
+    storageWarnings: [expect.objectContaining({ code: 'unsupported_executor_budget_schema' })],
   });
+  await expect(publishExecutorBudgetConfig({
+    budgets: budgets(),
+    expectedVersion: 1,
+    requestId: SECOND_REQUEST_ID,
+  }, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'unsupported_executor_budget_schema',
+  });
+  expect(deps.createSettingStrict).not.toHaveBeenCalled();
 });
 
 test.each([
@@ -160,6 +211,7 @@ test('requestId replay is idempotent only for the same normalized payload', asyn
   const deps = dependencies({
     ...storedRevision(1, REQUEST_ID.toUpperCase()),
     ...storedRevision(2, SECOND_REQUEST_ID, budgets({ retry: { ceiling: 48000 } })),
+    'executor.budgets.v000003': { value: '{corrupt-but-revision-reserved' },
   });
   await expect(publishExecutorBudgetConfig({
     budgets: budgets(),
@@ -167,7 +219,7 @@ test('requestId replay is idempotent only for the same normalized payload', asyn
     requestId: `  ${REQUEST_ID}  `,
   }, deps)).resolves.toMatchObject({
     status: 'already_published',
-    config: { version: 2 },
+    config: { version: 2, latestRevision: 3 },
     publishedConfig: { version: 1 },
   });
   await expect(publishExecutorBudgetConfig({
@@ -189,6 +241,22 @@ test('model ceiling rejects a publication before persistence', async () => {
     expectedVersion: 0,
     requestId: REQUEST_ID,
   }, deps)).rejects.toMatchObject({ httpStatus: 409, code: 'model_ceiling_exceeded' });
+  expect(deps.createSettingStrict).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['PROMPT_NOT_FOUND', 'executor_prompt_not_found'],
+  ['PROMPT_DUPLICATE_CURRENT', 'executor_prompt_duplicate_current'],
+])('known prompt-store state %s is returned as a typed conflict', async (promptCode, serviceCode) => {
+  const deps = dependencies();
+  deps.fetchCurrentPrompt.mockRejectedValue(Object.assign(new Error(`prompt state: ${promptCode}`), {
+    code: promptCode,
+  }));
+  await expect(publishExecutorBudgetConfig({
+    budgets: budgets(),
+    expectedVersion: 0,
+    requestId: REQUEST_ID,
+  }, deps)).rejects.toMatchObject({ httpStatus: 409, code: serviceCode });
   expect(deps.createSettingStrict).not.toHaveBeenCalled();
 });
 

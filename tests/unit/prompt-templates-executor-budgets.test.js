@@ -26,6 +26,7 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
   return {
     schemaVersion: 1,
     version,
+    latestRevision: version,
     source: version ? 'dataverse' : 'code_fallback',
     publishedAt: version ? '2026-08-29T12:00:00.000Z' : null,
     settingKey: version ? `executor.budgets.v${String(version).padStart(6, '0')}` : null,
@@ -48,6 +49,7 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
     descriptions: {
       'pre-site-visit.proposal-core.generate': { reason: 'Long proposal.' },
     },
+    storageWarnings: [],
   };
 }
 
@@ -106,16 +108,49 @@ test('Admin edits and atomically publishes the complete Executor budget revision
   expect(screen.getByTestId('output-budget')).toHaveTextContent('published revision 1');
 });
 
-test('a dirty budget draft keeps its original base revision after a concurrent reload', async () => {
+test('a budget-load failure leaves unrelated prompt editing available', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') {
+      return response({
+        defaultModel: 'sonnet',
+        defaultModelResolved: 'claude-sonnet-5',
+        tiers: [],
+        availableModels: [],
+        modelStatuses: {},
+      });
+    }
+    if (url === '/api/admin/executor-budgets') {
+      return response({ error: 'unavailable' }, false, 503);
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+
+  expect(await screen.findByText('pre-site-visit.proposal-core.generate')).toBeInTheDocument();
+  expect(await screen.findByText(/Failed to load Executor budgets/)).toHaveTextContent(
+    'Prompt editing remains available',
+  );
+  expect(screen.getByRole('button', { name: 'Edit & publish' })).toBeEnabled();
+});
+
+test('a dirty budget draft must be field-level reapplied after a concurrent reload', async () => {
   const onPublished = jest.fn();
   const { rerender } = render(
     <ExecutorBudgetEditor config={budgetConfig(1, 32768)} onPublished={onPublished} />,
   );
   fireEvent.change(screen.getByLabelText(/Maximum output tokens/), { target: { value: '40000' } });
 
-  rerender(<ExecutorBudgetEditor config={budgetConfig(2, 50000)} onPublished={onPublished} />);
+  const current = budgetConfig(2, 50000);
+  current.budgets['pre-site-visit.proposal-core.generate'].timeoutMsOverride = 180000;
+  rerender(<ExecutorBudgetEditor config={current} onPublished={onPublished} />);
   expect(screen.getByText(/changed after this draft was loaded/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Publish v2' }));
+  expect(screen.getByRole('button', { name: 'Publish v2' })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reapply my changes to v2' }));
+  expect(screen.getByLabelText(/Maximum output tokens/)).toHaveValue(40000);
+  expect(screen.getByLabelText(/Timeout/)).toHaveValue(180000);
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v3' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/admin/executor-budgets',
@@ -123,12 +158,17 @@ test('a dirty budget draft keeps its original base revision after a concurrent r
   ));
   const put = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
   expect(JSON.parse(put[1].body)).toMatchObject({
-    expectedVersion: 1,
-    budgets: { 'pre-site-visit.proposal-core.generate': { maxTokensOverride: 40000 } },
+    expectedVersion: 2,
+    budgets: {
+      'pre-site-visit.proposal-core.generate': {
+        maxTokensOverride: 40000,
+        timeoutMsOverride: 180000,
+      },
+    },
   });
 });
 
-test('a version conflict adopts the server current revision without a page reload', async () => {
+test('a version conflict retains the draft and pauses publishing until explicit reapply', async () => {
   const current = budgetConfig(2, 50000);
   global.fetch.mockResolvedValueOnce(response({
     error: 'Executor budgets changed after this editor was loaded.',
@@ -142,7 +182,28 @@ test('a version conflict adopts the server current revision without a page reloa
 
   expect(await screen.findByText(/changed after this editor was loaded/)).toBeInTheDocument();
   expect(onPublished).toHaveBeenCalledWith(current);
-  expect(screen.getByLabelText(/Maximum output tokens/)).toHaveValue(50000);
+  expect(screen.getByLabelText(/Maximum output tokens/)).toHaveValue(40000);
+  expect(screen.getByRole('button', { name: 'Publish v2' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Reapply my changes to v2' })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reapply my changes to v2' }));
+  expect(screen.getByLabelText(/Maximum output tokens/)).toHaveValue(40000);
+  expect(screen.getByRole('button', { name: 'Publish v3' })).toBeEnabled();
+});
+
+test('an unknown future storage schema is visible and disables publication', () => {
+  const current = budgetConfig(1, 32768);
+  current.storageWarnings = [{
+    settingKey: 'executor.budgets.v000002',
+    version: 2,
+    code: 'unsupported_executor_budget_schema',
+    message: 'revision 2 uses schemaVersion 2',
+  }];
+  current.latestRevision = 2;
+  render(<ExecutorBudgetEditor config={current} onPublished={jest.fn()} />);
+
+  expect(screen.getByText(/schemaVersion 2/)).toHaveClass('text-red-800');
+  fireEvent.change(screen.getByLabelText(/Maximum output tokens/), { target: { value: '40000' } });
   expect(screen.getByRole('button', { name: 'Publish v3' })).toBeDisabled();
 });
 
