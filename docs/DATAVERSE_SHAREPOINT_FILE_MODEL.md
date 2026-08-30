@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-24
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -73,8 +73,11 @@ hood.
 > policy (major-only, keep 500, no age limit), and second-stage recycle
 > presence (bin confirmed populated 2026-08-20) are verified, while Purview
 > retention and the Edit level's exact Delete flags remain open
-> (owner-accepted-open 2026-08-20 absent a pressing need) and Workbench
-> history/restore and milestone snapshots remain unbuilt.
+> (owner-accepted-open 2026-08-20 absent a pressing need). Workbench history
+> is Production-live. Administrator restore and the owner-decided byte-copy
+> Board snapshot are source-built 2026-08-30 on
+> `codex/initial-assessment-controls`; promotion and owner-authorized
+> Production write proof remain open.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -1112,11 +1115,18 @@ The remaining controls are deliberately not collapsed into that pass:
   flip, and add ambient-access staff as real members first). No change was
   requested on 2026-08-20; the intentional-vs-default question is posed to IT
   in `docs/SHAREPOINT_SITE_PUBLIC_ACCESS_MEMO_2026-08-20.md`.
-- **[PARTIAL] Workbench recovery UI.** Current version and last-modified
-  metadata are live. Version-history navigation and an administrator-only
-  restore action are not implemented.
-- **[PARTIAL 2026-08-17] Site Visit handoff built; Board milestone freeze
-  planned.** The existing fields (`wmkf_milestoneversionid`,
+- **[SOURCE-BUILT 2026-08-30; NOT PRODUCTION-CLAIMED] Workbench recovery
+  UI.** Current version/last-modified metadata and read-only version history
+  are Production-live. The superuser restore control resolves the canonical
+  row from `akoya_request.wmkf_CurrentInitialAssessment`, uses client artifact
+  and current-version IDs only as freshness fences, invokes native Graph
+  restore, verifies the selected governed content after readback, and updates
+  registry metadata under its Dataverse ETag. Graph's restore endpoint has no
+  conditional-write header: a stable metadata reread narrows but cannot remove
+  the final-call race; any concurrent edit is retained in version history and
+  the selected version then becomes a new current version.
+- **[SOURCE-BUILT 2026-08-30; NOT PRODUCTION-CLAIMED] Site Visit handoff
+  built; Initial Assessment Board milestone freeze implemented.** The existing fields (`wmkf_milestoneversionid`,
   `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`) now have one
   source-verified writer: the Pre-Site→Site Visit transition records the exact
   working-document handoff version/hash/time before lifecycle becomes Review.
@@ -1131,6 +1141,16 @@ The remaining controls are deliberately not collapsed into that pass:
   copy is also what roadmap requirement 5 above already asked for ("retained
   DOCX and/or PDF snapshot"); the fields were provisioned ahead of the decision,
   not as the decision.
+
+  The Initial Assessment implementation creates/reuses a deterministic,
+  distinct Ready/Board Ready Request Document row and SharePoint item linked
+  to the exact canonical source row/version/governed hash. It uses create-only
+  path conflict behavior, verifies downloaded retained bytes byte-for-byte,
+  never moves `wmkf_CurrentInitialAssessment`, and excludes the exact snapshot
+  producer from editable Ready cardinality, supersession, and cycle discovery.
+  Failed/interrupted attempts retain a reclaimable row; only items uploaded by
+  the attempt can be recorded for orphan cleanup. Unknown/lookalike producers
+  remain ordinary fail-closed rows.
 
   **Record the reasoning honestly, because the legs kept changing after the
   choice was made.** Pointer-only durability rested on three things. The

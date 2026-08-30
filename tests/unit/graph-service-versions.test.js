@@ -89,6 +89,72 @@ it('downloads an exact historical version through a pre-authenticated redirect w
   expect(global.fetch.mock.calls[1][1].headers).toBeUndefined();
 });
 
+it('reads one exact version identity from Graph', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(200, {
+    id: '2.0',
+    size: 123,
+    lastModifiedDateTime: '2026-08-02T00:00:00Z',
+    lastModifiedBy: { user: { displayName: 'Editor' } },
+  }));
+
+  await expect(GraphService.getFileVersionMetadata('drive/id', 'item/id', '2.0')).resolves.toEqual({
+    versionId: '2.0',
+    size: 123,
+    lastModified: '2026-08-02T00:00:00Z',
+    lastModifiedBy: 'Editor',
+  });
+  expect(global.fetch.mock.calls[0][0]).toContain('/drives/drive%2Fid/items/item%2Fid/versions/2.0');
+});
+
+it('restores a historical version through the v1.0 restoreVersion endpoint', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(204));
+
+  await expect(GraphService.restoreFileVersion('drive/id', 'item/id', '2.0')).resolves.toBeUndefined();
+  expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining('/drives/drive%2Fid/items/item%2Fid/versions/2.0/restoreVersion'),
+    expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+    }),
+  );
+});
+
+it('fails closed when Graph returns an undocumented success shape for version restore', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(200));
+
+  await expect(GraphService.restoreFileVersion('drive', 'item', '2.0'))
+    .rejects.toMatchObject({ code: 'graph_restore_unexpected_status' });
+});
+
+it('can make a path upload create-only instead of replacing an existing file', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(201, {
+    id: 'new-item',
+    name: 'snapshot.docx',
+    size: 5,
+    webUrl: 'https://sharepoint.test/snapshot',
+    eTag: 'etag',
+    cTag: 'ctag',
+    lastModifiedDateTime: '2026-08-30T20:00:00Z',
+  }));
+
+  await GraphService.uploadFile(
+    'akoya_request',
+    'Request/Board Milestones',
+    'snapshot.docx',
+    Buffer.from('bytes'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    { conflictBehavior: 'fail' },
+  );
+
+  expect(global.fetch.mock.calls[0][0]).toContain('@microsoft.graph.conflictBehavior=fail');
+});
+
 it('downloads Graph PDF conversion bytes from the frozen Word item', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   const bytes = Buffer.from('%PDF-test');

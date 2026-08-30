@@ -40,9 +40,11 @@ jest.mock('../../lib/services/initial-assessment/template.js', () => ({
 }));
 
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import { listInitialAssessmentArtifactVersions } from '../../lib/services/initial-assessment/artifact-service.js';
 import {
+  REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
@@ -55,6 +57,8 @@ function readyRow(overrides = {}) {
   return {
     wmkf_requestdocumentid: '44444444-4444-4444-4444-444444444444',
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT,
+    wmkf_producer: 'request-workbench',
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
     wmkf_sharepointsiteid: 'site-from-registry',
     wmkf_sharepointdriveid: 'drive-from-registry',
@@ -66,6 +70,10 @@ function readyRow(overrides = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  grantRequestAdapter.getById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    _wmkf_currentinitialassessment_value: ARTIFACT_ID,
+  });
   requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [readyRow()] });
   GraphService.listFileVersions.mockResolvedValue({
     versions: [
@@ -100,6 +108,10 @@ it('rejects a non-GUID requestId before any adapter call', async () => {
 });
 
 it('409s when the displayed artifact was replaced within the same request', async () => {
+  grantRequestAdapter.getById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    _wmkf_currentinitialassessment_value: REPLACEMENT_ARTIFACT_ID,
+  });
   requestDocumentAdapter.findByRequest.mockResolvedValue({
     records: [
       readyRow({
@@ -125,6 +137,10 @@ it('409s when the displayed artifact was replaced within the same request', asyn
 });
 
 it('404s when the request has no Ready artifact', async () => {
+  grantRequestAdapter.getById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    _wmkf_currentinitialassessment_value: null,
+  });
   requestDocumentAdapter.findByRequest.mockResolvedValue({
     records: [readyRow({ wmkf_operationstatus: 100000000 })],
   });
@@ -135,6 +151,10 @@ it('404s when the request has no Ready artifact', async () => {
 });
 
 it('ignores a superseded row rather than reading its history', async () => {
+  grantRequestAdapter.getById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    _wmkf_currentinitialassessment_value: null,
+  });
   requestDocumentAdapter.findByRequest.mockResolvedValue({
     records: [readyRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED })],
   });
@@ -143,6 +163,31 @@ it('ignores a superseded row rather than reading its history', async () => {
     listInitialAssessmentArtifactVersions({ requestId: REQUEST_ID }),
   ).rejects.toMatchObject({ httpStatus: 404 });
   expect(GraphService.listFileVersions).not.toHaveBeenCalled();
+});
+
+it('ignores retained Board snapshot rows when resolving the editable pointer', async () => {
+  requestDocumentAdapter.findByRequest.mockResolvedValue({
+    records: [
+      readyRow(),
+      readyRow({
+        wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+        wmkf_producer: 'request-workbench-board-snapshot',
+        wmkf_sharepointitemid: 'snapshot-item',
+      }),
+    ],
+  });
+
+  await listInitialAssessmentArtifactVersions({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+  });
+
+  expect(GraphService.listFileVersions).toHaveBeenCalledWith(
+    'drive-from-registry',
+    'item-from-registry',
+    expect.any(Object),
+  );
 });
 
 it('preserves Graph authoritative current markers instead of assigning by array position', async () => {

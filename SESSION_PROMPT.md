@@ -1,4 +1,4 @@
-# Session 469 Prompt: Persist Executor Budgets as Admin-Editable Settings
+# Session 469 Prompt: Initial Assessment Restore and Board Snapshots
 
 ## Session 468 Summary
 
@@ -68,9 +68,26 @@ cutoff to a one-request, explicitly bounded 50-result flow.
 
 ### Verified Open
 
-1. **Review, gate, and deliberately promote durable Executor budgets.**
-   **[SOURCE-BUILT 2026-08-29 on `codex/executor-budget-settings`; production
-   deployment/publication not claimed.]**
+1. **Review, gate, and deliberately promote Initial Assessment controls.**
+   **[SOURCE-BUILT 2026-08-30 on `codex/initial-assessment-controls`; Production
+   deployment/write proof not claimed.]**
+   Superusers can restore an exact historical SharePoint version as a new
+   current version and create a distinct retained Ready/Board Ready Request
+   Document row/item from the exact current bytes. The request pointer and
+   Graph identity remain server-owned; client IDs are stale-view fences. Board
+   snapshots are excluded from editable-artifact activation, supersession, and
+   cycle discovery and follow the 2026-08-10 owner decision to copy bytes.
+
+   The relevant gates/self-tests, full 9,198-test suite, and webpack production
+   build passed 2026-08-30. Remaining: branch commit, fresh adversarial review,
+   and deliberate Tier 1 promotion. Any Production restore or first
+   snapshot write requires explicit owner authorization. Graph's native restore
+   API has no conditional-write header; the implementation rechecks metadata
+   immediately before restore and preserves all versions, but the final-call
+   race must remain disclosed.
+
+2. **Durable Executor budgets — deployed read proof closed; publication open.**
+   **[PRODUCTION-DEPLOYED AND OWNER-VIEWED 2026-08-30.]**
    The selected contract is append-only `wmkf_appsystemsettings` revisions
    (`executor.budgets.vNNNNNN`). `/api/admin/executor-budgets` is
    superuser-only; publication requires the complete closed schema,
@@ -81,17 +98,10 @@ cutoff to a one-request, explicitly bounded 50-result flow.
    `shared/config/executorBudgets.js` now owns only strict bounds, descriptions,
    and the reviewed outage fallback. No runtime request accepts budget values.
 
-   Remaining: fresh-agent adversarial review, relevant gates/self-tests, branch
-   commit, and deliberate Tier 1 promotion. After deployment, verify the Admin
-   read surface. The first production budget publication is an explicit owner
-   action; absence safely preserves S466/S467 behavior through fallback.
-
-2. **Initial Assessment library/history controls.**
-   `docs/CURRENT_WORK_QUEUE.md` retains Workbench administrator restore and
-   milestone snapshots as the next older approved product-control slice.
-   Version limits, second-stage recovery, and substantive editing are proved;
-   Purview retention and the Edit level's exact Delete flags remain
-   owner-accepted-open absent a pressing need.
+   The owner-provided Production screenshot showed **No published revision ·
+   using reviewed code fallback** with the editor loaded. The first Production
+   budget publication remains an explicit owner action; absence safely
+   preserves S466/S467 behavior through fallback.
 
 3. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -180,6 +190,9 @@ cutoff to a one-request, explicitly bounded 50-result flow.
 | `pages/api/admin/executor-budgets.js` | Superuser-only budget read/publication route |
 | `shared/components/admin/PromptTemplatesSection.js` | Atomic budget editor plus prompt publication UI |
 | `lib/services/execute-prompt.js` | Enforces runtime token/timeout overrides and model ceilings |
+| `lib/services/initial-assessment/controls-service.js` | Superuser restore and exact byte-copy Board snapshot orchestration |
+| `pages/api/workbench/initial-assessment/restore-version.js` | Superuser-only native version restore route |
+| `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser-only retained Board snapshot route |
 | `lib/services/site-visit/curated-recipient-service.js` | Curated directory validation, Contact search cap/truncation, and live resolution |
 | `shared/components/admin/SiteVisitRecipientsSection.js` | Admin draft/save/search UX |
 | `pages/api/admin/site-visit-recipients.js` | Superuser directory state/search/write route |

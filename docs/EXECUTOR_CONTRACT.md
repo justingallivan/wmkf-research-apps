@@ -84,7 +84,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 ### Durable Executor-budget publication
 
-**[SOURCE-VERIFIED 2026-08-29; production publication not yet claimed.]**
+**[PRODUCTION-DEPLOYED / OWNER-VIEWED 2026-08-30; first publication remains open.]**
 `GET/PUT /api/admin/executor-budgets` is superuser-only and publishes one
 complete budget document as a new `wmkf_appsystemsettings` row named
 `executor.budgets.vNNNNNN`. Existing revision rows are never updated. PUT
@@ -120,6 +120,11 @@ reads use the reviewed code fallback on an outage or when no valid publication
 exists. The fallback preserves the
 S466/S467 values (32 768 tokens / 240 seconds; 16 000–32 000 retry range) but is
 not the normal mutable source of truth. Runtime routes accept no budget fields.
+
+The owner-viewed Production Admin panel reported **No published revision · using
+reviewed code fallback**, which verifies the deployed read/fallback presentation
+without claiming a Production write. Publishing revision 1 remains an explicit
+administrator action.
 
 **Deferred (Phase 1+):** `overridePromptBody: { system?: string, body?: string }` — body-level override for per-session prompt editing (PROMPT_STORAGE_DESIGN §17). Not needed for May 1.
 

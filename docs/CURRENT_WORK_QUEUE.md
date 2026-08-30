@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -34,8 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Promote and verify durable Executor output budgets | **[SOURCE-BUILT 2026-08-29 on `codex/executor-budget-settings`; not yet Production-claimed.]** The superuser Admin editor publishes append-only `executor.budgets.vNNNNNN` Dataverse rows with optimistic versioning, UUID idempotency, model-ceiling checks, and reread verification. Pre-Site and review synthesis resolve the latest valid revision server-side; tracked values are bounds/fallback only. | Fresh adversarial review and all relevant gates pass; deliberately promote the Tier 1 branch; verify the Admin read surface after deployment. The first production publication is an explicit owner action, not required to prove fallback-safe deployment. |
-| 2 | Close the remaining Initial Assessment pilot controls | **[VERIFIED IN SOURCE 2026-08-29]** Canonical artifact mechanics, exact-input reuse, interrupted-finalization recovery, substantive attributed editing, Graph-current metadata, native version restore, first-stage recovery, version limits, and second-stage recovery are proved. Purview retention and the Edit level's exact Delete flags remain owner-accepted-open absent a pressing need. Workbench administrator restore and milestone snapshots remain unbuilt. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`. | Workbench administrator restore and milestone snapshot controls are implemented and verified against the existing stable-item/version contract. |
+| 1 | Review, promote, and production-verify the Initial Assessment controls | **[SOURCE-BUILT 2026-08-30 on `codex/initial-assessment-controls`; not Production-claimed.]** Superusers can restore one historical native SharePoint version as a new current version and retain the exact current bytes as a distinct Ready/Board Ready Request Document row/item. Both writes resolve the request pointer and stable Graph identity server-side, use exact stale-view fences, reread their durable state, and preserve snapshot rows outside editable-artifact cardinality/supersession. The Board contract follows the already-settled 2026-08-10 owner decision to copy bytes. Purview retention and the Edit level's exact Delete flags remain owner-accepted-open absent a pressing need. | Fresh adversarial review and all relevant gates pass; deliberately promote the Tier 1 branch; verify the read surface after deployment. Any Production restore or first Board-snapshot write remains an explicit owner action. Native Graph restore has no conditional-write header, so promotion must retain the documented residual race posture: the service rechecks current metadata immediately before restore and preserves every concurrent version, but cannot prevent an edit in the final API-call interval from becoming an intermediate retained version. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
@@ -110,15 +109,17 @@ sequence.
 
 ## Completed in this execution
 
-- Durable Executor-budget implementation: **[SOURCE-BUILT 2026-08-29;
-  PROMOTION OPEN]** the former tracked-literal ownership is replaced by an
+- Durable Executor-budget implementation: **[PRODUCTION-DEPLOYED AND
+  OWNER-VIEWED 2026-08-30]** the former tracked-literal ownership is replaced by an
   append-only Dataverse `wmkf_appsystemsettings` publication contract and a
   superuser editor. The two runtime callers read the same resolved revision;
   code retains strict schema/ranges and the reviewed outage fallback. Focused
   service, route, caller, persistence, and UI tests cover invalid schemas,
   stale editors, idempotency, duplicate-key races, model ceilings, and both
-  consumer behaviors. Production deployment and the first Admin-published
-  revision are deliberately not claimed from source evidence.
+  consumer behaviors. The owner-provided Production Admin screenshot showed
+  the editor loading successfully with **No published revision · using reviewed
+  code fallback**, so deployment/read-path proof is closed while the first
+  Admin-published revision remains an explicit later owner action.
 
 - Curated Site Visit materials-recipient directory: **[PRODUCTION-LIVE AND
   OWNER-VERIFIED 2026-08-29]** superusers curate a maximum of 50 active staff
@@ -191,8 +192,10 @@ sequence.
   passed in the production Request library. Library limit (500 majors, no age
   limit) and second-stage recycle presence are now closed via administrator
   evidence (2026-08-10 / 2026-08-20); retention and the Edit level's Delete
-  flags stay owner-accepted-open, while Workbench history/admin-restore and
-  milestone controls remain in the open library/readback gate.
+  flags stay owner-accepted-open. Workbench history is Production-live;
+  administrator restore and exact byte-copy Board snapshots are source-built
+  on `codex/initial-assessment-controls` and await review, promotion, and an
+  explicitly authorized Production write proof.
 
 - Initial Assessment interrupted-finalization recovery: Request `1003109`
   was staged as Failed after its SharePoint upload and retried through the

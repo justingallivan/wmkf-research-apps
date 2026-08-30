@@ -67,6 +67,18 @@ export const INITIAL_ASSESSMENT_CONTRACT = Object.freeze({
   producer: 'request-workbench',
 });
 
+export const INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT = Object.freeze({
+  producer: 'request-workbench-board-snapshot',
+  templateId: 'initial-assessment-board-snapshot',
+  templateVersion: '1',
+  relativeFolder: 'Board Milestones',
+});
+
+export function isInitialAssessmentBoardSnapshot(row) {
+  return row?.wmkf_artifacttype === REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT
+    && row?.wmkf_producer === INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer;
+}
+
 export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
   promptName: 'pre-site-visit.proposal-core.generate',

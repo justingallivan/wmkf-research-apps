@@ -62,6 +62,7 @@ import {
   projectArtifact,
 } from '../../lib/services/initial-assessment/artifact-service.js';
 import {
+  INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
@@ -1058,8 +1059,19 @@ it('supersedes an older Ready artifact only after the replacement reaches Ready'
     modifiedon: '2026-07-28T12:00:00Z',
     _etag: 'W/"prior-1"',
   });
+  const boardSnapshot = registryRow({
+    wmkf_requestdocumentid: '77777777-7777-4777-8777-777777777777',
+    wmkf_generationkey: '7'.repeat(64),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: 'request-workbench-board-snapshot',
+    wmkf_sharepointitemid: 'board-snapshot-item',
+    createdon: '2026-07-28T13:00:00Z',
+    modifiedon: '2026-07-28T13:00:00Z',
+    _etag: 'W/"snapshot-1"',
+  });
   requestDocumentAdapter.findByRequest.mockImplementation(async () => ({
-    records: currentRegistryRow ? [currentRegistryRow, prior] : [prior],
+    records: currentRegistryRow ? [currentRegistryRow, prior, boardSnapshot] : [prior, boardSnapshot],
   }));
   requestDocumentAdapter.update.mockImplementation(async (id, patch, options) => {
     if (id === prior.wmkf_requestdocumentid) {
@@ -1078,6 +1090,7 @@ it('supersedes an older Ready artifact only after the replacement reaches Ready'
 
   expect(result.artifact.operationStatus).toBe(REQUEST_DOCUMENT_OPERATION_STATUS.READY);
   expect(prior.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
+  expect(boardSnapshot.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY);
   expect(runChangeset).toHaveBeenCalledWith(
     expect.arrayContaining([
       expect.objectContaining({
@@ -1099,6 +1112,9 @@ it('supersedes an older Ready artifact only after the replacement reaches Ready'
   );
   expect(GraphService.uploadFile.mock.invocationCallOrder[0])
     .toBeLessThan(runChangeset.mock.invocationCallOrder[0]);
+  expect(runChangeset.mock.calls[0][0]).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ key: boardSnapshot.wmkf_requestdocumentid }),
+  ]));
 });
 
 it('uses the shared request pointer ETag to serialize concurrent first-time Ready activations', async () => {
@@ -1448,6 +1464,52 @@ it('fails closed when more than one non-superseded Ready row is active', async (
     .rejects.toThrow('invalid request-level canonical pointer');
 });
 
+it('returns Board snapshots separately without treating them as duplicate editable rows', async () => {
+  const pointed = registryRow({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'pointed-item',
+  });
+  const snapshot = registryRow({
+    wmkf_requestdocumentid: '99999999-9999-4999-8999-999999999999',
+    wmkf_generationkey: '9'.repeat(64),
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+    wmkf_producer: 'request-workbench-board-snapshot',
+    wmkf_sharepointdriveid: 'drive',
+    wmkf_sharepointitemid: 'snapshot-item',
+    wmkf_sourceversionid: '2.0',
+    _wmkf_sourcedocument_value: pointed.wmkf_requestdocumentid,
+  });
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [pointed, snapshot] });
+  request._wmkf_currentinitialassessment_value = pointed.wmkf_requestdocumentid;
+  GraphService.getFileMetadataById.mockImplementation(async (_drive, itemId) => ({
+    siteId: 'site',
+    driveId: 'drive',
+    id: itemId,
+    name: `${itemId}.docx`,
+    size: 10,
+    webUrl: `https://example.sharepoint.com/${itemId}`,
+    eTag: `"${itemId}"`,
+    versionId: itemId === 'snapshot-item' ? '1.0' : '2.0',
+    lastModified: '2026-08-30T20:00:00Z',
+  }));
+
+  const result = await listInitialAssessmentArtifacts({ requestId: REQUEST_ID });
+
+  expect(result.artifacts).toHaveLength(1);
+  expect(result.artifacts[0].artifactId).toBe(pointed.wmkf_requestdocumentid);
+  expect(result.milestones).toHaveLength(1);
+  expect(result.milestones[0]).toMatchObject({
+    artifactId: snapshot.wmkf_requestdocumentid,
+    isBoardSnapshot: true,
+    provenance: expect.objectContaining({
+      sourceDocumentId: pointed.wmkf_requestdocumentid,
+      sourceVersionId: '2.0',
+    }),
+  });
+});
+
 it('fails closed when the request pointer targets a superseded Ready row', async () => {
   const supersededReady = registryRow({
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
@@ -1609,6 +1671,12 @@ it('derives staff-wide dashboard cycles from the artifact registry, not PD-scope
       { wmkf_cyclecode: 'J27', createdon: '2026-07-29T12:00:00Z' },
       { wmkf_cyclecode: 'J27', createdon: '2026-07-29T11:00:00Z' },
       { wmkf_cyclecode: 'D26', createdon: '2026-07-28T12:00:00Z' },
+      {
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT,
+        wmkf_cyclecode: 'X99',
+        wmkf_producer: INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer,
+        createdon: '2026-08-30T12:00:00Z',
+      },
     ],
   });
 

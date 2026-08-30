@@ -3,16 +3,17 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; core flow, native version restore, and first-stage recovery pass while administrative controls remain.
+summary: Governed request-artifact registry; Initial Assessment restore and exact byte-copy Board controls are source-built and await promotion/write proof.
 canonical: false
 owner: product-engineering
-last_verified: 2026-08-23
+last_verified: 2026-08-30
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
+  - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
   - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -120,9 +121,14 @@ limit); Purview retention and the Edit level's Delete flags remain
 owner-accepted-open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
-from the Ready registry row and never from the caller. **Administrator restore and
-immutable Board snapshot copies remain open**, restore because it depends on the
-permission evidence above. The Site Visit handoff milestone is a distinct
+from the request pointer's exact canonical Ready registry row and never from
+the caller. **[SOURCE-BUILT 2026-08-30 on
+`codex/initial-assessment-controls`; not Production-proved]** administrator
+restore promotes one selected native version, verifies the selected governed
+content, and ETag-refreshes registry metadata. Board freeze creates or reuses
+one distinct Ready/Board Ready row/item linked to the exact canonical source
+row/version/hash. Snapshot rows never move the request pointer or participate
+in editable Ready cardinality/supersession. The Site Visit handoff milestone is a distinct
 source-verified writer described below; it records version/hash/time on the
 working Pre-Site row but does not retain Board-distribution bytes.
 
@@ -213,6 +219,13 @@ Production Request Document row was created by this release smoke.
   prompt/run/input/template/content provenance.
 - `akoya_request.wmkf_CurrentInitialAssessment` is the request-level canonical
   pointer and shared concurrency fence for Initial Assessment activation.
+- Initial Assessment Board snapshot rows use the exact
+  `request-workbench-board-snapshot` producer, Ready operation state, Board
+  Ready lifecycle, and existing source row/version/hash plus stable Graph
+  identity fields. They never become `wmkf_CurrentInitialAssessment`, never
+  supersede or are superseded by editable Initial Assessment generations, and
+  are returned as retained milestones rather than working artifacts. A
+  missing/lookalike producer does not receive these exclusions.
 - `akoya_request.wmkf_CurrentPreSiteVisit` is a live optional lookup and the
   Production writer/transition use it as the current-pointer/fence. Request
   `1002379` now resolves through that pointer to Ready/Draft guarded-reopen
@@ -350,6 +363,18 @@ best-effort library fallback. The route never returns success until a registry
 read-back confirms `Ready`, stable drive/item IDs, and the atomic lineage
 transition.
 
+The source-built Board-freeze writer uses a deterministic generation key and
+`Board Milestones` path, a 15-minute ETag-fenced claim lease, create-only Graph
+upload, and byte-for-byte retained readback. Exact Ready retry returns the same
+row/item; an interrupted upload is recovered only when the deterministic file
+matches the exact source bytes. Only an item uploaded by the owned attempt can
+be recorded as orphan cleanup; a pre-existing path collision is never claimed
+as owned. The restore writer narrows stale edits with two current-metadata
+reads and verifies the post-restore governed content. Native Graph restore has
+no conditional-write header, so the final-call interval remains a disclosed
+race; all versions, including any concurrent intermediate edit, remain
+preserved.
+
 ## Deployment/probe sequence
 
 1. **Completed 2026-07-30:** name Production as the schema/prompt target.
@@ -375,8 +400,9 @@ transition.
    deployed and live-verified on Request `1003109` via deployment
    `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native version restore and first-stage
    recycle recovery also pass. Workbench version-history display shipped S413
-   (2026-08-10, read-only). Administrator policy/access evidence, administrator
-   restore, and retained Board snapshot copies remain open. The separate
+   (2026-08-10, read-only). Administrator restore and retained Board snapshot
+   copies are source-built 2026-08-30; promotion and explicit Production write
+   proof remain open. The separate
    Pre-Site→Site Visit lifecycle milestone writer is deployed and the first
    controlled signed-in Draft→Review transition passed on Request `1002379`.
    The same exact SharePoint Edit/Download identity remained current, a fresh

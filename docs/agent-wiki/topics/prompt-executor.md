@@ -73,8 +73,8 @@ reviewer-finder prompt migration.
   post-parse write boundary. The Executor does not semantically retry; review
   synthesis is the current caller-owned exception, re-invoking once only for
   typed `claude_output_truncated`, with a separate AI-run audit attempt.
-- **Server-owned output budgets (source-built S469, 2026-08-29; production
-  publication open):** `lib/services/executor-budget-service.js` resolves the
+- **Server-owned output budgets (Production-deployed and owner-viewed S469,
+  2026-08-30; first publication open):** `lib/services/executor-budget-service.js` resolves the
   latest append-only Dataverse `wmkf_appsystemsettings` revision named
   `executor.budgets.vNNNNNN`. The Pre-Site caller reads its standing token /
   timeout pair; review synthesis reads its retry floor/ceiling only after a
@@ -99,7 +99,9 @@ reviewer-finder prompt migration.
   Conflicting Admin drafts are retained but cannot publish until explicitly
   field-level reapplied or reset. Admin reads fail closed on backend failure;
   runtime reads use the highest valid revision, or the bounded fallback when
-  settings are absent/unavailable or no valid revision remains.
+  settings are absent/unavailable or no valid revision remains. The owner
+  verified the Production Admin read surface in that safe no-revision/fallback
+  state; publishing revision 1 remains an explicit later action.
 
 ## Durable Memory
 

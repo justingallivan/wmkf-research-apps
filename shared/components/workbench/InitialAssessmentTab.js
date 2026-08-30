@@ -4,14 +4,21 @@ import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../config/requestDocument'
 import ArtifactFileMetadata from './ArtifactFileMetadata';
 import ArtifactVersionHistory from './ArtifactVersionHistory';
 
-export default function InitialAssessmentTab({ requestId }) {
+function sameId(left, right) {
+  return Boolean(left && right && String(left).toLowerCase() === String(right).toLowerCase());
+}
+
+export default function InitialAssessmentTab({ requestId, isSuperuser = false }) {
   const [artifact, setArtifact] = useState(null);
   const [latestAttempt, setLatestAttempt] = useState(null);
+  const [milestones, setMilestones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [snapshotting, setSnapshotting] = useState(false);
   const [error, setError] = useState(null);
   const loadSequence = useRef(0);
   const generationSequence = useRef(0);
+  const snapshotSequence = useRef(0);
   const monitoredStatus = (latestAttempt || artifact)?.operationStatus;
 
   useEffect(() => {
@@ -28,6 +35,7 @@ export default function InitialAssessmentTab({ requestId }) {
         if (!response.ok) throw new Error(body.error || `Failed to load artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
+        setMilestones(body.milestones || []);
       } catch (loadError) {
         if (loadSequence.current === sequence) setError(loadError.message);
       } finally {
@@ -37,6 +45,7 @@ export default function InitialAssessmentTab({ requestId }) {
     return () => {
       loadSequence.current += 1;
       generationSequence.current += 1;
+      snapshotSequence.current += 1;
     };
   }, [requestId]);
 
@@ -57,6 +66,7 @@ export default function InitialAssessmentTab({ requestId }) {
         if (!response.ok) throw new Error(body.error || `Failed to refresh artifact (${response.status})`);
         setArtifact(body.artifacts?.[0] || null);
         setLatestAttempt(body.latestAttempts?.[0] || null);
+        setMilestones(body.milestones || []);
         setError(null);
       } catch (pollError) {
         if (loadSequence.current === sequence) setError(pollError.message);
@@ -97,6 +107,43 @@ export default function InitialAssessmentTab({ requestId }) {
     }
   };
 
+  const createBoardSnapshot = async () => {
+    const id = requestId;
+    const expectedArtifactId = artifact?.artifactId;
+    const expectedCurrentVersionId = artifact?.file?.versionId;
+    if (!isSuperuser || !id || !expectedArtifactId || !expectedCurrentVersionId) return;
+    if (!window.confirm(
+      `Create a retained Board snapshot from Initial Assessment version ${expectedCurrentVersionId}?`,
+    )) return;
+    const sequence = ++snapshotSequence.current;
+    setSnapshotting(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/workbench/initial-assessment/board-snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: id,
+          expectedArtifactId,
+          expectedCurrentVersionId,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (snapshotSequence.current !== sequence || id !== requestId) return;
+      if (!response.ok) throw new Error(body.error || `Board snapshot failed (${response.status})`);
+      if (body.snapshot) {
+        setMilestones((current) => [
+          body.snapshot,
+          ...current.filter((item) => !sameId(item.artifactId, body.snapshot.artifactId)),
+        ]);
+      }
+    } catch (snapshotError) {
+      if (snapshotSequence.current === sequence) setError(snapshotError.message);
+    } finally {
+      if (snapshotSequence.current === sequence) setSnapshotting(false);
+    }
+  };
+
   if (loading) {
     return <Card hover={false}><p className="text-sm text-gray-500">Loading Initial Assessment…</p></Card>;
   }
@@ -105,6 +152,11 @@ export default function InitialAssessmentTab({ requestId }) {
   const attempt = latestAttempt || (ready ? null : artifact);
   const inProgress = attempt?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
   const retryable = attempt?.retryable === true;
+  const fileMetadataCurrent = artifact?.file?.metadataStatus === 'current';
+  const currentSnapshot = milestones.find((milestone) => (
+    sameId(milestone.provenance?.sourceDocumentId, artifact?.artifactId)
+    && milestone.provenance?.sourceVersionId === artifact?.file?.versionId
+  ));
 
   return (
     <div className="space-y-4">
@@ -162,7 +214,32 @@ export default function InitialAssessmentTab({ requestId }) {
                 <ArtifactVersionHistory
                   requestId={requestId}
                   expectedArtifactId={artifact.artifactId}
+                  isSuperuser={isSuperuser}
+                  onRestored={(restored) => {
+                    if (sameId(restored?.artifactId, artifact.artifactId)) setArtifact(restored);
+                  }}
                 />
+                {isSuperuser && (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={createBoardSnapshot}
+                      disabled={snapshotting || !fileMetadataCurrent || Boolean(currentSnapshot)}
+                      className="px-3 py-1.5 rounded-md bg-gray-900 text-white text-xs font-medium disabled:opacity-50"
+                    >
+                      {currentSnapshot
+                        ? `Board snapshot created from v${artifact.file.versionId}`
+                        : snapshotting
+                          ? 'Creating Board snapshot…'
+                          : 'Create Board snapshot'}
+                    </button>
+                    {!fileMetadataCurrent && (
+                      <p className="mt-2 text-xs text-amber-800">
+                        Refresh when current SharePoint metadata is available before creating a snapshot.
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             )}
             {artifact.lastError && (
@@ -204,6 +281,39 @@ export default function InitialAssessmentTab({ requestId }) {
                 file{latestAttempt.cleanupRequired.length === 1 ? '' : 's'}.
               </p>
             )}
+          </div>
+        )}
+        {milestones.length > 0 && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+            <p className="font-medium text-emerald-900">Retained Board snapshots</p>
+            <ul className="mt-2 space-y-2">
+              {milestones.map((milestone) => (
+                <li key={milestone.artifactId}>
+                  {milestone.file?.webUrl ? (
+                    <a
+                      href={milestone.file.webUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-800 hover:underline"
+                    >
+                      Source version {milestone.provenance?.sourceVersionId || 'unknown'}
+                      {' · '}{milestone.file?.name || 'Board snapshot'}
+                    </a>
+                  ) : (
+                    <span className="text-amber-800">
+                      Source version {milestone.provenance?.sourceVersionId || 'unknown'}
+                      {' · '}Snapshot link unavailable
+                    </span>
+                  )}
+                  {(milestone.provenance?.createdBy || milestone.createdAt) && (
+                    <span className="ml-2 text-xs text-emerald-700">
+                      {milestone.provenance?.createdBy || 'Administrator'}
+                      {milestone.createdAt ? ` · ${new Date(milestone.createdAt).toLocaleString()}` : ''}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Card>

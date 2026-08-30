@@ -3,10 +3,10 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment core flow, native version restore, and first-stage recovery are proven; administrative and milestone controls remain."
+summary: "Initial Assessment core flow is proven; administrator restore and byte-copy Board controls are source-built and await promotion/write proof."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-24
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -110,8 +110,10 @@ first-stage recycle recovery in the production Request library. Administrator
 evidence later closed the configured version limit (2026-08-10: major-only,
 keep 500, no age limit) and second-stage recycle presence (2026-08-20: bin
 exists and held both audit probes); Purview retention and the Members Edit
-level's exact Delete flags remain owner-accepted-open, and Workbench
-history/admin restore and milestone snapshots remain unbuilt. See
+level's exact Delete flags remain owner-accepted-open. Workbench history is
+Production-live; administrator restore and the owner-decided byte-copy Board
+snapshot are source-built 2026-08-30 on `codex/initial-assessment-controls`
+and await promotion plus owner-authorized Production write proof. See
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 Passing this draft-functional gate is not a broad production-readiness claim
 and never required the later Pre-Site, Site Visit, or Final slices to be built
@@ -194,8 +196,9 @@ and second-stage recovery (2026-08-20: bin present, both probes visible);
 Members hold the built-in Edit level on a Public M365 group site, so ordinary
 editors presumptively can delete. Retention and the Edit level's Delete flags
 remain owner-accepted-open (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`). The
-Workbench current-metadata portion is live; its version-history
-link/admin restore and the Board milestone freeze remain planned.
+Workbench current-metadata and version-history portions are live. Administrator
+restore and the Board milestone freeze are source-built as of 2026-08-30 and
+await review, deliberate promotion, and owner-authorized Production write proof.
 
 ### Cycle-wide editing
 
@@ -924,8 +927,9 @@ Explicit non-goals during design freeze:
 > inspection/restore and signed-in first-stage recycle recovery. Administrator
 > evidence has closed version limits and second-stage recovery
 > (2026-08-10 / 2026-08-20); Purview retention and the Edit level's Delete
-> flags stay owner-accepted-open. The remaining pilot acceptance work is
-> Workbench history/admin restore and milestone snapshots.
+> flags stay owner-accepted-open. Workbench history is Production-live;
+> administrator restore and exact byte-copy Board snapshots are source-built
+> and require review, promotion, and owner-authorized Production write proof.
 
 The Initial-Assessment-first minimum (set for the August 10 buffer) changes the
 former default. Exercise the now-live
@@ -1134,7 +1138,8 @@ Owner-decided:
     deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native previous-version
     inspection/restore and first-stage recycle recovery subsequently passed
     in the production Request library; administrator policy/access checks and
-    product history/milestone controls remain open. The owner
+    product history/milestone controls were still open at that dated proof;
+    they are source-built as of 2026-08-30 but not Production-proved. The owner
     accepts service-principal attribution for system-generated Dataverse
     registry writes; SharePoint native version attribution remains the
     required human-edit audit surface; and
@@ -1170,8 +1175,9 @@ Still required:
    metadata read-through, consumer display, native version restore,
    first-stage recycle recovery, and production registry/pointer readback are
    complete;
-4. Workbench version-history navigation, administrator-only restore, and
-   immutable Board milestone snapshot behavior;
+4. adversarial review, deliberate promotion, and explicitly authorized
+   Production write/readback for the source-built administrator restore and
+   immutable byte-copy Board milestone snapshot behavior;
 5. exact Dataverse schema and dossier read model for the decided Site Visit
    metadata, material categories, and observations;
 6. Site Visit Materials Upload visible sender/reply-to and lead-PD copy

@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-21 via signed-in Request 1002379 Draft→Review handoff and post-release receipt→Site Visit same-item smoke
+  last_verified: 2026-08-30 via source-built Initial Assessment restore/byte-copy Board controls plus prior Production handoff evidence
 ---
 
 ## Recall Rule
@@ -71,8 +71,10 @@ SharePoint version `2.0`. A disposable production-library audit then proved
 native previous-version inspection/restore and signed-in first-stage recycle
 recovery. Administrator evidence closed version limits and second-stage
 recovery (2026-08-10 / 2026-08-20); retention and editor Delete flags stay
-owner-accepted-open, while Workbench history/admin restore and
-milestone snapshots remain open.
+owner-accepted-open. Workbench history is Production-live; administrator
+restore and the owner-decided exact byte-copy Board snapshots are source-built
+on `codex/initial-assessment-controls`, with review/promotion and explicitly
+authorized Production write proof still open.
 Use the near-term execution plan for current authority; the chronology below
 remains the rationale record.
 
