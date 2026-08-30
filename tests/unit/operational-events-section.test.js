@@ -148,8 +148,9 @@ test('the single-row Resolve button asserts status_changed_at too', async () => 
 });
 
 test('a rejected single-row action is visible instead of failing silently', async () => {
-  global.fetch = jest.fn(async (_url, init) => {
+  global.fetch = jest.fn(async (url, init) => {
     if (init?.method === 'PATCH') return response({ error: 'stale bundle' }, 400);
+    if (String(url).includes('status=resolved')) return response({ events: [], summary: [] });
     return response(listBody);
   });
   render(<OperationalEventsSection />);
@@ -157,6 +158,14 @@ test('a rejected single-row action is visible instead of failing silently', asyn
   const prefsCard = screen.getByText(prefs.summary).closest('div.rounded-lg');
   fireEvent.click(within(prefsCard).getByRole('button', { name: 'Resolve' }));
   await screen.findByText('Update failed (400). Reload the admin page and retry.');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
+  await screen.findByText('Bulk resolve failed');
+  expect(screen.queryByText('Update failed (400). Reload the admin page and retry.')).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Status filter' }), { target: { value: 'resolved' } });
+  expect(screen.queryByText('Bulk resolve failed')).not.toBeInTheDocument();
+  await screen.findByText('No matching operational events.');
 });
 
 test('a partially committed batch reports both the successful and failed row counts', async () => {

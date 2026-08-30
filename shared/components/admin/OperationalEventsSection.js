@@ -85,6 +85,7 @@ export default function OperationalEventsSection() {
   const handleAction = async (event, action) => {
     setActionInProgress(event.id);
     setActionResult(null);
+    setBulkResult(null);
     try {
       const res = await fetch('/api/admin/operational-events', {
         method: 'PATCH',
@@ -117,6 +118,7 @@ export default function OperationalEventsSection() {
     if (!confirm(confirmText)) return;
     setBulkInProgress(true);
     setBulkResult(null);
+    setActionResult(null);
     try {
       const res = await fetch('/api/admin/operational-events', {
         method: 'PATCH',
@@ -278,6 +280,7 @@ export default function OperationalEventsSection() {
         <select value={statusFilter} onChange={e => {
           filtersRef.current.statusFilter = e.target.value;
           setStatusFilter(e.target.value);
+          setActionResult(null); setBulkResult(null);
         }} className={selectClass} aria-label="Status filter">
           <option value="open">Open</option>
           <option value="recovered">Recovered</option>
@@ -289,6 +292,7 @@ export default function OperationalEventsSection() {
         <select value={severityFilter} onChange={e => {
           filtersRef.current.severityFilter = e.target.value;
           setSeverityFilter(e.target.value);
+          setActionResult(null); setBulkResult(null);
         }} className={selectClass} aria-label="Severity filter">
           <option value="">All severities</option>
           <option value="critical">Critical</option>
@@ -299,6 +303,7 @@ export default function OperationalEventsSection() {
         <select value={sourceFilter} onChange={e => {
           filtersRef.current.sourceFilter = e.target.value;
           setSourceFilter(e.target.value);
+          setActionResult(null); setBulkResult(null);
         }} className={selectClass} aria-label="Source filter">
           <option value="">All sources</option>
           <option value="app">Application</option>
@@ -310,6 +315,7 @@ export default function OperationalEventsSection() {
             const nextSearch = searchDraft.trim();
             filtersRef.current.search = nextSearch;
             setSearch(nextSearch);
+            setActionResult(null); setBulkResult(null);
           }}
           className="flex items-center gap-1"
         >
@@ -331,6 +337,7 @@ export default function OperationalEventsSection() {
                 filtersRef.current.search = '';
                 setSearch('');
                 setSearchDraft('');
+                setActionResult(null); setBulkResult(null);
               }}
               className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
             >
