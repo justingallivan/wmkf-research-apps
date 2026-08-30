@@ -167,8 +167,17 @@ describe('contact candidate helpers', () => {
     expect(query).toHaveBeenCalledWith('contacts', expect.objectContaining({
       filter: "(startswith(lastname,'Love') or startswith(firstname,'Love'))",
       orderby: 'statecode asc,lastname asc,firstname asc',
-      top: 10,
+      top: 50,
     }));
+  });
+
+  test('searchDirectoryByName caps one bounded query at 51 rows for truncation detection', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await contact.searchDirectoryByName('Harris', { top: 500 });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith('contacts', expect.objectContaining({ top: 51 }));
   });
 
   test('searchDirectoryByName supports partial full names and escapes filter literals', async () => {

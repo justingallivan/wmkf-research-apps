@@ -78,10 +78,13 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   fireEvent.change(screen.getByLabelText('Find a Dataverse Contact'), { target: { value: 'Casey' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Add as Consultant' }));
-  expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Save recipients' }));
+  expect(screen.getAllByText('Added — unsaved')).toHaveLength(2);
+  expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
-  await screen.findByText('Recipient directory saved.');
+  await screen.findByText('Recipient changes saved.');
+  expect(screen.getByText('All changes saved')).toBeInTheDocument();
+  expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
   const saveCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
   expect(JSON.parse(saveCall[1].body)).toEqual({
     config: {
@@ -95,6 +98,41 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   expect(saveCall[1].body).not.toContain('Alice');
   expect(saveCall[1].body).not.toContain('@');
   expect(global.fetch.mock.calls.every(([, options]) => !options?.method || ['GET', 'PUT'].includes(options.method))).toBe(true);
+});
+
+test('discloses the bounded 50-result Contact search and clears the warning when the query changes', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('?search=')) {
+      return response({
+        success: true,
+        contacts: [{
+          contactId: CONTACT_ID,
+          name: 'Casey Harris',
+          email: 'casey@example.org',
+          available: true,
+          reason: null,
+        }],
+        truncated: true,
+        limit: 50,
+      });
+    }
+    return response({
+      success: true,
+      config: { version: 1, entries: [] },
+      entries: [],
+      staff: [],
+      maxEntries: 50,
+    });
+  });
+
+  render(<SiteVisitRecipientsSection />);
+  const input = await screen.findByLabelText('Find a Dataverse Contact');
+  fireEvent.change(input, { target: { value: 'Harris' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(await screen.findByText('Showing the first 50 matches. Refine the search to see other Contacts.')).toBeInTheDocument();
+  fireEvent.change(input, { target: { value: 'Harrison' } });
+  expect(screen.queryByText(/Showing the first 50 matches/)).not.toBeInTheDocument();
 });
 
 test('shows a stale saved Contact and lets the admin remove it before saving', async () => {
@@ -125,7 +163,7 @@ test('shows a stale saved Contact and lets the admin remove it before saving', a
   expect(await screen.findByText(/no valid primary email/i)).toBeInTheDocument();
   expect(screen.getByText('Saved but unavailable')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Remove from directory' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save recipients' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/admin/site-visit-recipients',
     expect.objectContaining({
@@ -159,7 +197,7 @@ test('shows a stale saved staff profile and lets the admin remove it before savi
   expect(await screen.findByText('Unavailable staff profile')).toBeInTheDocument();
   expect(screen.getByText(/inactive or is not linked exactly/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save recipients' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/admin/site-visit-recipients',
     expect.objectContaining({

@@ -2,6 +2,7 @@
 
 import {
   CURATED_RECIPIENT_MAX_ENTRIES,
+  CURATED_RECIPIENT_SEARCH_LIMIT,
   CURATED_RECIPIENT_SETTING_KEY,
   getCuratedRecipientAdminState,
   getCuratedRecipientOptions,
@@ -203,10 +204,12 @@ test('write refuses unresolved entries and performs no partial save', async () =
 
 test('Contact search supports name and exact-email paths and marks unusable rows', async () => {
   const byName = dependencies();
-  expect(await searchCuratedRecipientContacts('Casey', byName)).toEqual([
-    expect.objectContaining({ contactId: CONTACT_ID, available: true }),
-  ]);
-  expect(byName.searchContactsByName).toHaveBeenCalledWith('Casey', { top: 10 });
+  expect(await searchCuratedRecipientContacts('Casey', byName)).toEqual({
+    contacts: [expect.objectContaining({ contactId: CONTACT_ID, available: true })],
+    truncated: false,
+    limit: CURATED_RECIPIENT_SEARCH_LIMIT,
+  });
+  expect(byName.searchContactsByName).toHaveBeenCalledWith('Casey', { top: 51 });
 
   const byEmail = dependencies({
     findContactsByEmail: jest.fn(async () => ({
@@ -219,10 +222,45 @@ test('Contact search supports name and exact-email paths and marks unusable rows
       }],
     })),
   });
-  expect(await searchCuratedRecipientContacts('casey@example.org', byEmail)).toEqual([
-    expect.objectContaining({ contactId: CONTACT_ID, available: false, reason: 'contact_email_missing' }),
-  ]);
+  expect(await searchCuratedRecipientContacts('casey@example.org', byEmail)).toEqual({
+    contacts: [expect.objectContaining({ contactId: CONTACT_ID, available: false, reason: 'contact_email_missing' })],
+    truncated: false,
+    limit: CURATED_RECIPIENT_SEARCH_LIMIT,
+  });
   expect(byEmail.searchContactsByName).not.toHaveBeenCalled();
+});
+
+test('Contact name search returns up to 50 rows and discloses additional matches from one bounded probe', async () => {
+  const rows = Array.from({ length: CURATED_RECIPIENT_SEARCH_LIMIT + 1 }, (_, index) => ({
+    contactid: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    fullname: `Harris ${index + 1}`,
+    emailaddress1: `harris${index + 1}@example.org`,
+    statecode: 0,
+  }));
+  const deps = dependencies({ searchContactsByName: jest.fn(async () => rows) });
+
+  const result = await searchCuratedRecipientContacts('Harris', deps);
+
+  expect(result.contacts).toHaveLength(CURATED_RECIPIENT_SEARCH_LIMIT);
+  expect(result).toMatchObject({ truncated: true, limit: CURATED_RECIPIENT_SEARCH_LIMIT });
+  expect(deps.searchContactsByName).toHaveBeenCalledTimes(1);
+  expect(deps.searchContactsByName).toHaveBeenCalledWith('Harris', { top: 51 });
+});
+
+test('Contact name search does not report truncation when exactly 50 rows match', async () => {
+  const rows = Array.from({ length: CURATED_RECIPIENT_SEARCH_LIMIT }, (_, index) => ({
+    contactid: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    fullname: `Harris ${index + 1}`,
+    emailaddress1: `harris${index + 1}@example.org`,
+    statecode: 0,
+  }));
+  const deps = dependencies({ searchContactsByName: jest.fn(async () => rows) });
+
+  const result = await searchCuratedRecipientContacts('Harris', deps);
+
+  expect(result.contacts).toHaveLength(CURATED_RECIPIENT_SEARCH_LIMIT);
+  expect(result).toMatchObject({ truncated: false, limit: CURATED_RECIPIENT_SEARCH_LIMIT });
+  expect(deps.searchContactsByName).toHaveBeenCalledTimes(1);
 });
 
 test('Contact search rejects unbounded or empty input before Dataverse reads', async () => {

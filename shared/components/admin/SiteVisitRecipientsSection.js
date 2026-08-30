@@ -23,6 +23,7 @@ export default function SiteVisitRecipientsSection() {
   const [staff, setStaff] = useState([]);
   const [resolvedEntries, setResolvedEntries] = useState([]);
   const [draftEntries, setDraftEntries] = useState([]);
+  const [savedKeys, setSavedKeys] = useState(() => new Set());
   const [baseline, setBaseline] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,8 @@ export default function SiteVisitRecipientsSection() {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searchPerformed, setSearchPerformed] = useState(false);
+  const [searchTruncated, setSearchTruncated] = useState(false);
+  const [searchLimit, setSearchLimit] = useState(50);
   const [contactCategory, setContactCategory] = useState('consultant');
   const [maxEntries, setMaxEntries] = useState(50);
   const [limitNotice, setLimitNotice] = useState(null);
@@ -43,6 +46,7 @@ export default function SiteVisitRecipientsSection() {
     setStaff(data.staff || []);
     setResolvedEntries(data.entries || []);
     setDraftEntries(nextConfig.entries || []);
+    setSavedKeys(new Set((nextConfig.entries || []).map(entryKey)));
     setBaseline(JSON.stringify(configFromEntries(nextConfig.entries || [])));
     if (Number.isInteger(data.maxEntries) && data.maxEntries > 0) setMaxEntries(data.maxEntries);
   };
@@ -146,12 +150,15 @@ export default function SiteVisitRecipientsSection() {
     setError(null);
     setSearchResults([]);
     setSearchPerformed(false);
+    setSearchTruncated(false);
     try {
       const response = await fetch(`/api/admin/site-visit-recipients?search=${encodeURIComponent(search.trim())}`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Contact search failed.');
       if (searchSequence.current !== sequence) return;
       setSearchResults(data.contacts || []);
+      setSearchTruncated(data.truncated === true);
+      if (Number.isInteger(data.limit) && data.limit > 0) setSearchLimit(data.limit);
       setSearchPerformed(true);
     } catch (searchError) {
       if (searchSequence.current === sequence) setError(searchError.message);
@@ -174,8 +181,9 @@ export default function SiteVisitRecipientsSection() {
       if (!response.ok) throw new Error(data.error || 'The recipient directory could not be saved.');
       setDraftEntries(data.config?.entries || []);
       setResolvedEntries(data.entries || []);
+      setSavedKeys(new Set((data.config?.entries || []).map(entryKey)));
       setBaseline(JSON.stringify(configFromEntries(data.config?.entries || [])));
-      setNotice('Recipient directory saved.');
+      setNotice('Recipient changes saved.');
     } catch (saveError) {
       setError(saveError.message);
     } finally {
@@ -201,7 +209,8 @@ export default function SiteVisitRecipientsSection() {
       <p className="text-sm text-gray-600">
         Choose who is available in the Site Visit materials recipient menu. This does not add anyone
         to an email draft automatically; the sender chooses recipients from the menu for each email.
-        Names and email addresses remain owned by their source records and are resolved live.
+        Checking, adding, or removing someone changes this draft only; choose Save changes to publish
+        the directory. Names and email addresses remain owned by their source records and are resolved live.
       </p>
 
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
@@ -268,7 +277,9 @@ export default function SiteVisitRecipientsSection() {
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium">
                   <span className="capitalize text-gray-600">{person.category}</span>
                   <span className={`rounded-full px-2 py-0.5 ${person.available ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {person.available ? 'Included in recipient menu' : 'Saved but unavailable'}
+                    {person.available
+                      ? savedKeys.has(person.key) ? 'Included in recipient menu' : 'Added — unsaved'
+                      : 'Saved but unavailable'}
                   </span>
                 </div>
               </div>
@@ -302,6 +313,7 @@ export default function SiteVisitRecipientsSection() {
                 setSearching(false);
                 setSearchResults([]);
                 setSearchPerformed(false);
+                setSearchTruncated(false);
               }}
               placeholder="Name or exact email"
               className="min-w-0 flex-1 rounded border border-gray-300 px-3 py-2 text-sm"
@@ -326,7 +338,9 @@ export default function SiteVisitRecipientsSection() {
           {searchResults.length > 0 && (
             <ul className="mt-3 space-y-2">
               {searchResults.map((contact) => {
-                const selected = selectedKeys.has(`contact:${contact.contactId}`);
+                const key = `contact:${String(contact.contactId || '').toLowerCase()}`;
+                const selected = selectedKeys.has(key);
+                const persisted = savedKeys.has(key);
                 return (
                   <li key={contact.contactId} className="flex items-center justify-between gap-3 rounded bg-white p-2 text-sm">
                     <span className="min-w-0">
@@ -340,7 +354,7 @@ export default function SiteVisitRecipientsSection() {
                       className="rounded border border-gray-300 px-2 py-1 text-xs disabled:opacity-50"
                     >
                       {selected
-                        ? 'Added'
+                        ? persisted ? 'Already saved' : 'Added — unsaved'
                         : !contact.available
                           ? 'Unavailable'
                           : atCapacity
@@ -352,6 +366,11 @@ export default function SiteVisitRecipientsSection() {
               })}
             </ul>
           )}
+          {!searching && searchPerformed && searchTruncated && (
+            <p className="mt-2 text-xs text-amber-700" role="status">
+              Showing the first {searchLimit} matches. Refine the search to see other Contacts.
+            </p>
+          )}
           {!searching && searchPerformed && searchResults.length === 0 && (
             <p className="mt-2 text-xs text-gray-500">No matching Contacts found.</p>
           )}
@@ -359,16 +378,21 @@ export default function SiteVisitRecipientsSection() {
       </section>
 
       <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-4">
-        <p className="text-xs text-gray-500">
-          {draftEntries.length} of {maxEntries} selected recipient{draftEntries.length === 1 ? '' : 's'}
-        </p>
+        <div>
+          <p className="text-xs text-gray-500">
+            {draftEntries.length} of {maxEntries} selected recipient{draftEntries.length === 1 ? '' : 's'}
+          </p>
+          <p className={`mt-1 text-xs font-medium ${changed ? 'text-amber-700' : 'text-green-700'}`} role="status">
+            {changed ? 'Unsaved changes' : 'All changes saved'}
+          </p>
+        </div>
         <button
           type="button"
           onClick={save}
           disabled={saving || !changed}
           className="rounded bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save recipients'}
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
       </div>
     </div>
