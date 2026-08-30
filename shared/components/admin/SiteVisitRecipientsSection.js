@@ -119,7 +119,7 @@ export default function SiteVisitRecipientsSection() {
   };
 
   const addContact = (contact) => {
-    const key = `contact:${contact.contactId}`;
+    const key = `contact:${String(contact.contactId || '').toLowerCase()}`;
     if (selectedKeys.has(key) || !contact.available) return;
     if (atCapacity) {
       setLimitNotice(`The directory supports at most ${maxEntries} recipients.`);
@@ -366,11 +366,11 @@ export default function SiteVisitRecipientsSection() {
               })}
             </ul>
           )}
-          {!searching && searchPerformed && searchTruncated && (
-            <p className="mt-2 text-xs text-amber-700" role="status">
-              Showing the first {searchLimit} matches. Refine the search to see other Contacts.
-            </p>
-          )}
+          <p className="mt-2 text-xs text-amber-700" role="status" aria-live="polite" aria-atomic="true">
+            {!searching && searchPerformed && searchTruncated
+              ? `Showing the first ${searchLimit} matches. Refine the search to see other Contacts.`
+              : ''}
+          </p>
           {!searching && searchPerformed && searchResults.length === 0 && (
             <p className="mt-2 text-xs text-gray-500">No matching Contacts found.</p>
           )}

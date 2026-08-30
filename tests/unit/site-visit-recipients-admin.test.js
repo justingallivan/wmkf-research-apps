@@ -85,6 +85,7 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   await screen.findByText('Recipient changes saved.');
   expect(screen.getByText('All changes saved')).toBeInTheDocument();
   expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Already saved' })).toBeDisabled();
   const saveCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
   expect(JSON.parse(saveCall[1].body)).toEqual({
     config: {
