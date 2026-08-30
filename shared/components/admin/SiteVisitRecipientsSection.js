@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 const VERSION = 1;
+const UNSAVED_CHANGES_WARNING = 'You have unsaved Site Visit recipient changes. Leave without saving?';
 
 function entryKey(entry) {
   if (entry?.kind === 'staff') return `staff:${entry.profileId}`;
@@ -92,8 +93,55 @@ export default function SiteVisitRecipientsSection() {
   }, []);
 
   const selectedKeys = useMemo(() => new Set(draftEntries.map(entryKey)), [draftEntries]);
-  const changed = baseline !== JSON.stringify(configFromEntries(draftEntries));
+  const changed = baseline !== '' && baseline !== JSON.stringify(configFromEntries(draftEntries));
   const atCapacity = draftEntries.length >= maxEntries;
+
+  useEffect(() => {
+    if (!changed) return undefined;
+
+    let confirmedLinkNavigation = false;
+    const handleBeforeUnload = (event) => {
+      if (confirmedLinkNavigation) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    const handleLinkClick = (event) => {
+      if (
+        event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey
+      ) return;
+
+      const link = event.target?.closest?.('a[href]');
+      if (!link || link.hasAttribute('download')) return;
+      const target = link.getAttribute('target');
+      const href = link.getAttribute('href');
+      if ((target && target !== '_self') || !href || href.startsWith('#')) return;
+
+      if (!window.confirm(UNSAVED_CHANGES_WARNING)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      // A full-page link would otherwise show the browser's native warning too.
+      // Reset immediately for client-side routes that keep this component mounted.
+      confirmedLinkNavigation = true;
+      window.setTimeout(() => {
+        confirmedLinkNavigation = false;
+      }, 0);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleLinkClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleLinkClick, true);
+    };
+  }, [changed]);
 
   const toggleStaff = (profileId) => {
     const key = `staff:${profileId}`;
@@ -276,7 +324,7 @@ export default function SiteVisitRecipientsSection() {
                 <p className="text-xs text-gray-500">{person.email || person.detail}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium">
                   <span className="capitalize text-gray-600">{person.category}</span>
-                  <span className={`rounded-full px-2 py-0.5 ${person.available ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                  <span className={`rounded-full px-2 py-0.5 ${person.available && savedKeys.has(person.key) ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
                     {person.available
                       ? savedKeys.has(person.key) ? 'Included in recipient menu' : 'Added — unsaved'
                       : 'Saved but unavailable'}

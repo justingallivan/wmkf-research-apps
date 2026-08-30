@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import Link from 'next/link';
 import SiteVisitRecipientsSection from '../../shared/components/admin/SiteVisitRecipientsSection';
 
 const CONTACT_ID = '11111111-1111-4111-8111-111111111111';
@@ -72,18 +73,40 @@ test('selects active staff, searches existing Contacts, and saves reference-only
     });
   });
 
-  render(<SiteVisitRecipientsSection />);
+  render(
+    <>
+      <Link href="/guide">Leave page</Link>
+      <SiteVisitRecipientsSection />
+    </>,
+  );
   const alice = await screen.findByRole('checkbox', { name: /Alice Staff/ });
   fireEvent.click(alice);
   fireEvent.change(screen.getByLabelText('Find a Dataverse Contact'), { target: { value: 'Casey' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Add as Consultant' }));
   expect(screen.getAllByText('Added — unsaved')).toHaveLength(2);
+  const unsavedPill = screen.getAllByText('Added — unsaved')
+    .find((element) => element.tagName === 'SPAN');
+  expect(unsavedPill).toHaveClass('bg-amber-100', 'text-amber-800');
+  expect(unsavedPill).not.toHaveClass('bg-green-100', 'text-green-800');
   expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  const linkClick = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+  expect(screen.getByRole('link', { name: 'Leave page' }).dispatchEvent(linkClick)).toBe(false);
+  expect(confirmSpy).toHaveBeenCalledWith('You have unsaved Site Visit recipient changes. Leave without saving?');
+
+  const dirtyUnload = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(dirtyUnload);
+  expect(dirtyUnload.defaultPrevented).toBe(true);
+
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
   await screen.findByText('Recipient changes saved.');
   expect(screen.getByText('All changes saved')).toBeInTheDocument();
+  const cleanUnload = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(cleanUnload);
+  expect(cleanUnload.defaultPrevented).toBe(false);
   expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Already saved' })).toBeDisabled();
   const saveCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
