@@ -1,7 +1,8 @@
 /**
  * API: POST /api/workbench/initial-assessment/board-snapshot
  *
- * Superuser-only byte-copy freeze of the exact current Initial Assessment.
+ * Superuser-only retained copy of the exact current Initial Assessment upload,
+ * verified by governed Word content after SharePoint ingestion.
  */
 
 import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth';

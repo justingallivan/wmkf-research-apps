@@ -1145,8 +1145,10 @@ The remaining controls are deliberately not collapsed into that pass:
   The Initial Assessment implementation creates/reuses a deterministic,
   distinct Ready/Board Ready Request Document row and SharePoint item linked
   to the exact canonical source row/version/governed hash. It uses create-only
-  path conflict behavior, verifies downloaded retained bytes byte-for-byte,
-  never moves `wmkf_CurrentInitialAssessment`, and excludes the exact snapshot
+  path conflict behavior, uploads the exact selected source buffer, and verifies
+  normalized governed Word content after SharePoint ingestion so legitimate
+  package repacking does not appear as content drift. It never moves
+  `wmkf_CurrentInitialAssessment` and excludes the exact snapshot
   producer from editable Ready cardinality, supersession, and cycle discovery.
   Failed/interrupted attempts retain a reclaimable row; only items uploaded by
   the attempt can be recorded for orphan cleanup. Unknown/lookalike producers

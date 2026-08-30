@@ -258,10 +258,17 @@ it('reconciles an already-applied restore without restoring the same version twi
   expect(h.getSource().wmkf_contenthash).toBe('hash:old-version');
 });
 
-it('creates a distinct retained Board snapshot row/item linked to exact source bytes', async () => {
+it('creates a distinct retained Board snapshot when SharePoint repackages equivalent content', async () => {
   const h = harness();
+  h.dependencies.hashDocx.mockImplementation(async (buffer) => (
+    ['source-bytes', 'sharepoint-packaged-bytes'].includes(buffer.toString())
+      ? 'hash:governed-source'
+      : `hash:${buffer.toString()}`
+  ));
   h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
-  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.downloadFile
+    .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
+    .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
   h.dependencies.uploadFile.mockResolvedValue(metadata({
     id: 'snapshot-item',
@@ -282,7 +289,7 @@ it('creates a distinct retained Board snapshot row/item linked to exact source b
     expect.objectContaining({
       'wmkf_SourceDocument@odata.bind': `/wmkf_requestdocuments(${SOURCE_ID})`,
       wmkf_sourceversionid: '2.0',
-      wmkf_sourcecontenthash: 'hash:source-bytes',
+      wmkf_sourcecontenthash: 'hash:governed-source',
       wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
     }),
     { actingUserSystemId: ACTOR_ID },
@@ -291,7 +298,7 @@ it('creates a distinct retained Board snapshot row/item linked to exact source b
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
     wmkf_sharepointitemid: 'snapshot-item',
-    wmkf_contenthash: 'hash:source-bytes',
+    wmkf_contenthash: 'hash:governed-source',
   });
   expect(h.getSnapshot().wmkf_sharepointitemid).not.toBe(h.getSource().wmkf_sharepointitemid);
   expect(h.dependencies.uploadFile).toHaveBeenCalledWith(
@@ -345,7 +352,7 @@ it('does not claim a pre-existing path collision as an orphan owned by the snaps
   expect(h.getSnapshot().wmkf_orphancleanupjson).toBeUndefined();
 });
 
-it('retains exact cleanup identity when this attempt uploads bytes that fail readback', async () => {
+it('retains exact cleanup identity when an owned upload has different governed content', async () => {
   const h = harness();
   h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile
@@ -393,10 +400,17 @@ it('retains uploaded cleanup identity when the source changes before snapshot pu
   ]);
 });
 
-it('recovers a failed attempt from an exact deterministic file without another upload', async () => {
+it('recovers a failed attempt from a repackaged equivalent deterministic file', async () => {
   const h = harness();
+  h.dependencies.hashDocx.mockImplementation(async (buffer) => (
+    ['source-bytes', 'sharepoint-packaged-bytes'].includes(buffer.toString())
+      ? 'hash:governed-source'
+      : `hash:${buffer.toString()}`
+  ));
   h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
-  h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
+  h.dependencies.downloadFile
+    .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
+    .mockResolvedValue({ buffer: Buffer.from('sharepoint-packaged-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(metadata({
     id: 'snapshot-item',
     versionId: '1.0',
@@ -418,8 +432,13 @@ it('recovers a failed attempt from an exact deterministic file without another u
   });
 });
 
-it('reuses the exact Ready Board snapshot without uploading a duplicate item', async () => {
+it('reuses a governed-equivalent Ready Board snapshot without uploading a duplicate item', async () => {
   const h = harness();
+  h.dependencies.hashDocx.mockImplementation(async (buffer) => (
+    ['source-bytes', 'sharepoint-packaged-bytes'].includes(buffer.toString())
+      ? 'hash:governed-source'
+      : `hash:${buffer.toString()}`
+  ));
   h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
   h.dependencies.downloadFile.mockResolvedValue({ buffer: Buffer.from('source-bytes') });
   h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
@@ -435,6 +454,10 @@ it('reuses the exact Ready Board snapshot without uploading a duplicate item', a
   }, { dependencies: h.dependencies });
   h.dependencies.createDocument.mockClear();
   h.dependencies.uploadFile.mockClear();
+  h.dependencies.downloadFile.mockReset();
+  h.dependencies.downloadFile
+    .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
+    .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
   h.dependencies.getFileMetadataById.mockResolvedValueOnce(metadata()).mockResolvedValueOnce(metadata())
     .mockResolvedValueOnce(metadata({ id: 'snapshot-item', versionId: '1.0' }));
 
@@ -449,7 +472,53 @@ it('reuses the exact Ready Board snapshot without uploading a duplicate item', a
   expect(h.dependencies.uploadFile).not.toHaveBeenCalled();
 });
 
-it('rechecks retained bytes when a concurrent creator wins the snapshot row race', async () => {
+it('accepts repackaged governed-equivalent content when a concurrent creator wins', async () => {
+  const h = harness();
+  h.dependencies.hashDocx.mockImplementation(async (buffer) => (
+    ['source-bytes', 'sharepoint-packaged-bytes'].includes(buffer.toString())
+      ? 'hash:governed-source'
+      : `hash:${buffer.toString()}`
+  ));
+  h.dependencies.getFileMetadataById
+    .mockResolvedValueOnce(metadata())
+    .mockResolvedValueOnce(metadata())
+    .mockResolvedValueOnce(metadata({ id: 'snapshot-item', versionId: '1.0' }));
+  h.dependencies.downloadFile
+    .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
+    .mockResolvedValueOnce({ buffer: Buffer.from('sharepoint-packaged-bytes') });
+  h.dependencies.createDocument.mockImplementation(async (payload) => {
+    h.setSnapshot({
+      ...payload,
+      wmkf_requestdocumentid: SNAPSHOT_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_sourcedocument_value: SOURCE_ID,
+      _etag: 'snapshot-etag-ready',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
+      wmkf_claimtoken: null,
+      wmkf_contenthash: 'hash:governed-source',
+      wmkf_sharepointsiteid: 'site',
+      wmkf_sharepointdriveid: 'drive',
+      wmkf_sharepointitemid: 'snapshot-item',
+      wmkf_sharepointversionid: '1.0',
+    });
+    const conflict = new Error('duplicate alternate key');
+    conflict.status = 409;
+    throw conflict;
+  });
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).resolves.toMatchObject({
+    reused: true,
+    recovered: false,
+  });
+  expect(h.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
+it('rechecks retained governed content when a concurrent creator wins the snapshot row race', async () => {
   const h = harness();
   h.dependencies.getFileMetadataById
     .mockResolvedValueOnce(metadata())
@@ -487,4 +556,31 @@ it('rechecks retained bytes when a concurrent creator wins the snapshot row race
     body: expect.objectContaining({ code: 'initial_assessment_snapshot_file_invalid' }),
   });
   expect(h.dependencies.uploadFile).not.toHaveBeenCalled();
+});
+
+it('fails closed and records cleanup when an owned upload readback is not a valid DOCX', async () => {
+  const h = harness();
+  h.dependencies.hashDocx.mockImplementation(async (buffer) => {
+    if (buffer.toString() === 'source-bytes') return 'hash:governed-source';
+    throw new Error('Initial Assessment producer returned an invalid DOCX package.');
+  });
+  h.dependencies.getFileMetadataById.mockResolvedValue(metadata());
+  h.dependencies.downloadFile
+    .mockResolvedValueOnce({ buffer: Buffer.from('source-bytes') })
+    .mockResolvedValueOnce({ buffer: Buffer.from('invalid-docx') });
+  h.dependencies.getFileMetadataByPath.mockResolvedValue(null);
+  h.dependencies.uploadFile.mockResolvedValue(metadata({ id: 'snapshot-item', versionId: '1.0' }));
+
+  await expect(createInitialAssessmentBoardSnapshot({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    expectedCurrentVersionId: '2.0',
+  }, { dependencies: h.dependencies })).rejects.toThrow('invalid DOCX package');
+
+  expect(h.getSnapshot()).toMatchObject({
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED,
+  });
+  expect(JSON.parse(h.getSnapshot().wmkf_orphancleanupjson)).toEqual([
+    expect.objectContaining({ driveId: 'drive', itemId: 'snapshot-item' }),
+  ]);
 });

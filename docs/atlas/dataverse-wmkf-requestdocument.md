@@ -364,12 +364,15 @@ read-back confirms `Ready`, stable drive/item IDs, and the atomic lineage
 transition.
 
 The source-built Board-freeze writer uses a deterministic generation key and
-`Board Milestones` path, a 15-minute ETag-fenced claim lease, create-only Graph
-upload, and byte-for-byte retained readback. Exact Ready retry returns the same
-row/item; an interrupted upload is recovered only when the deterministic file
-matches the exact source bytes. Only an item uploaded by the owned attempt can
-be recorded as orphan cleanup; a pre-existing path collision is never claimed
-as owned. The restore writer narrows stale edits with two current-metadata
+`Board Milestones` path, a 15-minute ETag-fenced claim lease, and create-only
+Graph upload of the exact selected source buffer. Post-ingestion readback uses
+the normalized governed-DOCX hash instead of ZIP-container byte equality, so
+SharePoint repackaging is accepted while changed or invalid Word content fails
+closed. Exact Ready retry returns the same row/item; an interrupted upload is
+recovered only when the deterministic file has governed content equivalent to
+the selected source. Only an item uploaded by the owned attempt can be recorded
+as orphan cleanup; a pre-existing path collision is never claimed as owned.
+The restore writer narrows stale edits with two current-metadata
 reads and verifies the post-restore governed content. Native Graph restore has
 no conditional-write header, so the final-call interval remains a disclosed
 race; all versions, including any concurrent intermediate edit, remain
