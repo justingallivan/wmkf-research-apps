@@ -6,7 +6,7 @@ status: active
 summary: "Built 8 KiB router early-warning notice across the checker, SessionStart/Stop hooks, and start/stop skills, with mutation-backed regression coverage."
 canonical: false
 cataloged: 2026-08-21
-last_verified: 2026-08-22
+last_verified: 2026-08-29
 owner: product-engineering
 related:
   - docs/MEMORY_HYGIENE_RUNBOOK.md
@@ -35,6 +35,13 @@ were implemented separately: the router gate now emits a unique-direct-leaf
 metric, and `weak-basis` accepts the paired harness `modified:` + dated
 in-body `[VERIFIED]` evidence shape with fail-closed complement tests. These
 follow-ons do not change this plan's thresholds or hook behavior.
+
+**Later owner-approved follow-on (2026-08-29):** both registered
+`check:memory-drift` names are now read-only aliases. The explicit
+`refresh:memory-drift` command owns live probes and tracked-report
+regeneration. Phase 0's 56-of-57 wording below remains the bounded 2026-08-21
+build record; it is not the current checker contract. No start/stop skill
+change was required.
 
 **Post-build review (fourth Codex review, of the built diff, 2026-08-21):
 two findings, both accepted and fixed in the commit carrying this note.**

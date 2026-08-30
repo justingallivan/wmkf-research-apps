@@ -30,7 +30,7 @@ const {
   probeEntitySetCount,
   writeAuthoritativeReport,
 } = require('../../scripts/reconcile-memory-claims.js');
-const { reportIsFresh } = require('../../scripts/check-memory-drift.js');
+const { checkMemoryDrift, reportIsFresh } = require('../../scripts/check-memory-drift.js');
 
 // Minimal Response-shaped stub. fetchWithTimeout returns a Response;
 // production code reads .status, .ok, .text(), and .json() on it.
@@ -200,7 +200,7 @@ describe('reconciliation report semantics', () => {
     expect(writeFile.mock.calls[0][1]).toContain('"probe_errors": 0');
   });
 
-  test('treats a recent failed or incomplete report as stale so the gate retries', () => {
+  test('treats a recent failed or incomplete report as not fresh', () => {
     const fs = require('fs');
     const os = require('os');
     const path = require('path');
@@ -226,6 +226,86 @@ describe('reconciliation report semantics', () => {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  test('fails closed without creating a missing report', () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-drift-missing-'));
+    const missingPath = path.join(tempDir, 'report.json');
+    const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
+
+    try {
+      expect(checkMemoryDrift(missingPath, { logger })).toBe(false);
+      expect(fs.existsSync(missingPath)).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('npm run refresh:memory-drift'));
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('fails closed on an incomplete committed report', () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-drift-incomplete-'));
+    const targetPath = path.join(tempDir, 'report.json');
+    const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
+
+    try {
+      fs.writeFileSync(targetPath, JSON.stringify({
+        generated: new Date().toISOString(),
+        summary: { live_drift_findings: 0, probe_errors: null },
+        probe_notes: completedProbeNotes,
+        drift_buckets: {},
+      }));
+
+      expect(checkMemoryDrift(targetPath, { logger })).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('incomplete or non-authoritative'));
+      expect(logger.log).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('evaluates a stale authoritative report without changing its bytes', () => {
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memory-drift-read-only-'));
+    const targetPath = path.join(tempDir, 'report.json');
+    const reportBytes = `${JSON.stringify({
+      generated: '2020-01-01T00:00:00.000Z',
+      summary: { live_drift_findings: 0, probe_errors: 0 },
+      probe_notes: completedProbeNotes,
+      drift_buckets: {},
+    }, null, 2)}\n`;
+    const logger = { error: jest.fn(), warn: jest.fn(), log: jest.fn() };
+
+    try {
+      fs.writeFileSync(targetPath, reportBytes);
+
+      expect(checkMemoryDrift(targetPath, { now: Date.parse('2026-08-29T00:00:00.000Z'), logger })).toBe(true);
+      expect(fs.readFileSync(targetPath, 'utf8')).toBe(reportBytes);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('read-only'));
+      expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('memory drift clean'));
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('keeps check commands read-only and exposes probing as an explicit refresh', () => {
+    const fs = require('fs');
+    const scripts = require('../../package.json').scripts;
+    const checkerSource = fs.readFileSync(require.resolve('../../scripts/check-memory-drift.js'), 'utf8');
+
+    expect(scripts['check:memory-drift']).not.toContain('reconcile-memory-claims');
+    expect(scripts['check:memory-drift:no-write']).not.toContain('reconcile-memory-claims');
+    expect(scripts['refresh:memory-drift']).toContain('reconcile-memory-claims.js');
+    expect(scripts['refresh:memory-drift']).toContain('check-memory-drift.js');
+    expect(checkerSource).not.toContain("require('child_process')");
+    expect(checkerSource).not.toContain('reconcile-memory-claims.js');
   });
 
   test('keeps historical classifications out of the current live summary', () => {

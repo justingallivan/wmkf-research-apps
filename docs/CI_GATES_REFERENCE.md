@@ -6,7 +6,7 @@ status: canonical
 summary: Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-22
+last_verified: 2026-08-29
 owner: product-engineering
 related:
   - docs/atlas/
@@ -29,7 +29,7 @@ hook, `/start`, or a manual release procedure.
 | GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/route-lifecycle, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
 | Blocking commit hooks | `check:docs-catalog` runs for catalog-relevant staged/command paths. `check:status-enum-parity` and `check:trust-boundary-guid` run on every recognized `git commit`. These hooks fail open on hook-internal errors, so `/start` remains their backstop. |
 | Session-stop changed-surface hook | `check:api-routes`, `check:atlas`, `check:migrations-manifest`, `check:prompt-injection-tagging`, `check:agent-wiki`, and `check:fact-consistency` are selected by changed paths. `CLAUDE_STOP_GATE_MODE` defaults to `advisory`; only an explicit `block` value makes failures blocking. |
-| Session start / manual | `.claude/skills/start/SKILL.md` owns the broader startup battery. Advisory checks such as `check:memory-drift:no-write` and `check:memory-health` do not become blocking merely because they have package scripts. |
+| Session start / manual | `.claude/skills/start/SKILL.md` owns the broader startup battery. Advisory checks such as the read-only `check:memory-drift` / `check:memory-drift:no-write` aliases and `check:memory-health` do not become blocking merely because they have package scripts. |
 
 Do not describe a check as “in CI,” “blocking,” or “session-stop enforced” from
 its name alone. Verify the applicable workflow or hook. The repository policy
@@ -261,14 +261,28 @@ that distinguishes direct leaves from duplicate and hub/doc references.
 
 ### `check:memory-drift` (advisory) — memory↔code drift
 
-Added S154. Runs `scripts/reconcile-memory-claims.js`. Fails on `spec_without_entity`, large `stale_row_count`, `doc_label_collision`, or any `probe_errors`.
+Added S154. Both `npm run check:memory-drift` and the compatibility alias
+`npm run check:memory-drift:no-write` evaluate the committed
+`docs/RECONCILIATION_REPORT.json` read-only. They never run live probes and
+never write the report. The check fails on a missing, invalid, or incomplete
+report, and on `spec_without_entity`, large `stale_row_count`,
+`doc_label_collision`, or any `probe_errors`. A stale authoritative report is
+evaluated with a warning; its age must be considered before citing it as
+current state.
+
+`npm run refresh:memory-drift` is the explicit live-probe and regeneration
+command. It runs `scripts/reconcile-memory-claims.js` and then the read-only
+checker. The generator replaces the tracked report only when both Dataverse
+and Postgres probes complete with zero probe errors, preserving the last
+authoritative report when a probe fails or is skipped. Run refresh only with
+the required live-probe authorization. Focused coverage:
+`npm test -- --runInBand tests/unit/reconcile-probe-entity-set-count.test.js`.
 
 The report's top-level `summary` describes current live drift only. The dated 2026-05-14 S154 classifications remain under `historical_claim_audit` for provenance and are explicitly excluded from the current summary and gate result.
 
-- Historical hazard: the Set D label collision that previously kept this gate red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E). Current state is whatever `npm run check:memory-drift` shows — verify before assuming.
+- Historical hazard: the Set D label collision that previously kept this gate red was resolved 2026-05-26 (Connor walkthrough — fit-assessment fields relabeled to Set E). Current state requires an authorized `npm run refresh:memory-drift`; a read-only check only evaluates the dated committed snapshot.
 - The Codex-flagged `incompatible_shape` drift bucket is a planned addition (not yet built).
 - Promotion to the P0 set above is reasonable once the bucket lands AND the gate has been green continuously for a stretch of sessions.
-- For routine memory audits that must not dirty the tracked report, use `npm run check:memory-drift:no-write` (read-only; never regenerates `docs/RECONCILIATION_REPORT.json`).
 
 ### `check:memory-health` (advisory) — active-memory hygiene worklist (S348)
 
