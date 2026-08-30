@@ -237,10 +237,12 @@ document inventory, and individual implementation plans do not establish priorit
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
   Initial Assessment superuser restore and exact byte-copy Board snapshots are
-  source-built on `codex/initial-assessment-controls`; the relevant gates, full
-  9,198-test suite, and webpack production build passed. Fresh adversarial
-  review, deliberate Tier 1 promotion, and owner-authorized Production write
-  proof remain. Final Writeup Review remains plan-only and owner-gated.
+  Production-deployed through PR #138 (`c519daf6`); the relevant gates, full
+  9,205-test suite, webpack build, and post-merge checks passed. Signed-in
+  Request `1003109` passed the artifact/control/version-history read smoke.
+  Restore and first-snapshot writes remain unexercised and require separate
+  explicit owner authorization. Final Writeup Review remains plan-only and
+  owner-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail
@@ -321,13 +323,14 @@ document inventory, and individual implementation plans do not establish priorit
   Administrator evidence closed version limits and second-stage recovery
   (2026-08-10 / 2026-08-20; Members hold Edit on a Public M365 group site);
   retention and the Edit level's Delete flags stay owner-accepted-open.
-  **[SOURCE-VERIFIED 2026-08-30; not yet Production-proved]** Workbench history,
-  superuser native-version restore, and immutable Board milestone snapshots are
-  now built on `codex/initial-assessment-controls`. Board snapshots copy the
+  **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; WRITES NOT
+  PRODUCTION-EXERCISED]** Workbench history, superuser native-version restore,
+  and immutable Board milestone snapshots are live through PR #138. Board snapshots copy the
   exact canonical version bytes into a distinct Request Document / SharePoint
   item and never move the request's editable pointer. Relevant gates,
-  adversarial review, deliberate promotion, and signed-in Production proof
-  remain open. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term
+  adversarial review, promotion, and signed-in read proof are complete.
+  Restore and first-snapshot write proof remain owner-gated. See
+  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term
   plan.
 - Pre-Site persistence schema (owner-approved and Production-live 2026-08-17):
   Wave 19 adds 12 `wmkf_requestdocument` fields and the optional

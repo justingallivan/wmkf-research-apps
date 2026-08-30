@@ -75,9 +75,10 @@ hood.
 > retention and the Edit level's exact Delete flags remain open
 > (owner-accepted-open 2026-08-20 absent a pressing need). Workbench history
 > is Production-live. Administrator restore and the owner-decided byte-copy
-> Board snapshot are source-built 2026-08-30 on
-> `codex/initial-assessment-controls`; promotion and owner-authorized
-> Production write proof remain open.
+> Board snapshot are Production-deployed through PR #138 (`c519daf6`).
+> Signed-in Request `1003109` passed the artifact/control/version-history read
+> smoke; restore and first-snapshot writes remain unexercised and require
+> separate explicit owner authorization.
 > **[VERIFIED via owner decisions 2026-07-28
 > and 2026-07-30, repository source,
 > production Dataverse/Graph probes, and signed-in consumer checks
@@ -1115,9 +1116,10 @@ The remaining controls are deliberately not collapsed into that pass:
   flip, and add ambient-access staff as real members first). No change was
   requested on 2026-08-20; the intentional-vs-default question is posed to IT
   in `docs/SHAREPOINT_SITE_PUBLIC_ACCESS_MEMO_2026-08-20.md`.
-- **[SOURCE-BUILT 2026-08-30; NOT PRODUCTION-CLAIMED] Workbench recovery
-  UI.** Current version/last-modified metadata and read-only version history
-  are Production-live. The superuser restore control resolves the canonical
+- **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; RESTORE POST NOT
+  PRODUCTION-EXERCISED] Workbench recovery UI.** Current
+  version/last-modified metadata and read-only version history are
+  Production-live. The superuser restore control resolves the canonical
   row from `akoya_request.wmkf_CurrentInitialAssessment`, uses client artifact
   and current-version IDs only as freshness fences, invokes native Graph
   restore, verifies the selected governed content after readback, and updates
@@ -1125,8 +1127,9 @@ The remaining controls are deliberately not collapsed into that pass:
   conditional-write header: a stable metadata reread narrows but cannot remove
   the final-call race; any concurrent edit is retained in version history and
   the selected version then becomes a new current version.
-- **[SOURCE-BUILT 2026-08-30; NOT PRODUCTION-CLAIMED] Site Visit handoff
-  built; Initial Assessment Board milestone freeze implemented.** The existing fields (`wmkf_milestoneversionid`,
+- **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; BOARD POST NOT
+  PRODUCTION-EXERCISED] Site Visit handoff built; Initial Assessment Board
+  milestone freeze implemented.** The existing fields (`wmkf_milestoneversionid`,
   `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`) now have one
   source-verified writer: the Pre-Site→Site Visit transition records the exact
   working-document handoff version/hash/time before lifecycle becomes Review.

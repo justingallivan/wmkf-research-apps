@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Initial Assessment restore and exact byte-copy Board controls are source-built and await promotion/write proof.
+summary: Governed request-artifact registry; Initial Assessment restore and exact byte-copy Board controls are Production-deployed/read-smoked, with write proof owner-gated.
 canonical: false
 owner: product-engineering
 last_verified: 2026-08-30
@@ -122,8 +122,8 @@ owner-accepted-open (see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`).
 **Workbench version-history DISPLAY is built as of S413 (2026-08-10)** —
 `GET /api/workbench/initial-assessment/versions`, read-only, resolving drive/item
 from the request pointer's exact canonical Ready registry row and never from
-the caller. **[SOURCE-BUILT 2026-08-30 on
-`codex/initial-assessment-controls`; not Production-proved]** administrator
+the caller. **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; WRITES
+NOT PRODUCTION-EXERCISED]** administrator
 restore promotes one selected native version, verifies the selected governed
 content, and ETag-refreshes registry metadata. Board freeze creates or reuses
 one distinct Ready/Board Ready row/item linked to the exact canonical source
@@ -363,7 +363,7 @@ best-effort library fallback. The route never returns success until a registry
 read-back confirms `Ready`, stable drive/item IDs, and the atomic lineage
 transition.
 
-The source-built Board-freeze writer uses a deterministic generation key and
+The Production-deployed Board-freeze writer uses a deterministic generation key and
 `Board Milestones` path, a 15-minute ETag-fenced claim lease, and create-only
 Graph upload of the exact selected source buffer. Post-ingestion readback uses
 the normalized governed-DOCX hash instead of ZIP-container byte equality, so
@@ -411,8 +411,10 @@ preserved.
    `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. Native version restore and first-stage
    recycle recovery also pass. Workbench version-history display shipped S413
    (2026-08-10, read-only). Administrator restore and retained Board snapshot
-   copies are source-built 2026-08-30; promotion and explicit Production write
-   proof remain open. The separate
+   copies are Production-deployed through PR #138 (`c519daf6`); signed-in
+   Request `1003109` passed the artifact/control/version-history read smoke.
+   Restore and first-snapshot writes remain unexercised and require separate
+   explicit owner authorization. The separate
    Pre-Site→Site Visit lifecycle milestone writer is deployed and the first
    controlled signed-in Draft→Review transition passed on Request `1002379`.
    The same exact SharePoint Edit/Download identity remained current, a fresh

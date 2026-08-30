@@ -138,10 +138,12 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
 owner has verified the Admin read surface in its safe no-revision/fallback
 state; the first durable Admin publication remains a separate explicit action.
 Initial Assessment administrator restore and exact byte-copy Board snapshots
-are source-built on the Tier 1 `codex/initial-assessment-controls` branch. The
-relevant gates, full 9,198-test suite, and webpack production build passed on
-2026-08-30. The immediate task is fresh adversarial review, deliberate
-promotion, and then owner-authorized Production write proof.
+are Production-deployed through PR #138 (`c519daf6`), and signed-in Request
+`1003109` passed the read-only artifact/control/version-history smoke. The
+relevant gates, full 9,205-test suite, webpack production build, and post-merge
+checks passed on 2026-08-30. Neither restore nor the first Board-snapshot write
+has been Production-exercised; either requires a separate explicit owner
+authorization and durable readback.
 
 The Final Writeup Review design is reviewed plan-only. Implementation requires a
 new owner go, expanded file-surface approval, explicit transition actor/time

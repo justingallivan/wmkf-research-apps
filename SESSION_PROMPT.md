@@ -68,9 +68,9 @@ cutoff to a one-request, explicitly bounded 50-result flow.
 
 ### Verified Open
 
-1. **Review, gate, and deliberately promote Initial Assessment controls.**
-   **[SOURCE-BUILT 2026-08-30 on `codex/initial-assessment-controls`; Production
-   deployment/write proof not claimed.]**
+1. **Owner-authorized Production write proof for Initial Assessment controls.**
+   **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; RESTORE AND
+   SNAPSHOT WRITES NOT PRODUCTION-EXERCISED.]**
    Superusers can restore an exact historical SharePoint version as a new
    current version and create a distinct retained Ready/Board Ready Request
    Document row/item from the exact current bytes. The request pointer and
@@ -78,10 +78,15 @@ cutoff to a one-request, explicitly bounded 50-result flow.
    snapshots are excluded from editable-artifact activation, supersession, and
    cycle discovery and follow the 2026-08-10 owner decision to copy bytes.
 
-   The relevant gates/self-tests, full 9,198-test suite, and webpack production
-   build passed 2026-08-30. Remaining: branch commit, fresh adversarial review,
-   and deliberate Tier 1 promotion. Any Production restore or first
-   snapshot write requires explicit owner authorization. Graph's native restore
+   Claude's adversarial findings were fixed, the relevant gates/self-tests,
+   full 9,205-test suite, and webpack production build passed, and PR #138
+   merged as `c519daf6`. Production deployment
+   `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` reached Ready. A signed-in read-only smoke
+   on Request `1003109` loaded the canonical artifact, Board-snapshot control,
+   and native versions `2.0` / `1.0` with no browser warnings or errors. No
+   restore, snapshot, refresh, or external-document action was invoked. Any
+   Production restore or first snapshot write requires separate explicit owner
+   authorization; this queue entry does not grant it. Graph's native restore
    API has no conditional-write header; the implementation rechecks metadata
    immediately before restore and preserves all versions, but the final-call
    race must remain disclosed.

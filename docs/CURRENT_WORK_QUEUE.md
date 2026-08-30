@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Review, promote, and production-verify the Initial Assessment controls | **[SOURCE-BUILT 2026-08-30 on `codex/initial-assessment-controls`; not Production-claimed.]** Superusers can restore one historical native SharePoint version as a new current version and submit the exact selected source buffer as a distinct Ready/Board Ready Request Document row/item. Post-ingestion verification uses normalized governed Word content, accepting SharePoint package repacking while rejecting changed or invalid content. Both writes resolve the request pointer and stable Graph identity server-side, use exact stale-view fences, reread their durable state, and preserve snapshot rows outside editable-artifact cardinality/supersession. The Board contract follows the already-settled 2026-08-10 owner decision to copy bytes. Purview retention and the Edit level's exact Delete flags remain owner-accepted-open absent a pressing need. | Fresh adversarial review and all relevant gates pass; deliberately promote the Tier 1 branch; verify the read surface after deployment. Any Production restore or first Board-snapshot write remains an explicit owner action. Native Graph restore has no conditional-write header, so promotion must retain the documented residual race posture: the service rechecks current metadata immediately before restore and preserves every concurrent version, but cannot prevent an edit in the final API-call interval from becoming an intermediate retained version. |
+| 1 | Decide and, only if explicitly authorized, run Production write proof for the Initial Assessment controls | **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; RESTORE AND SNAPSHOT WRITES NOT PRODUCTION-EXERCISED.]** PR #138 merged as `c519daf6`; Ready deployment `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` serves the controls. A signed-in read-only smoke on Request `1003109` loaded the canonical artifact, the Board-snapshot control, and native versions `2.0` / `1.0` with no browser warnings or errors. Superusers can restore one historical native SharePoint version as a new current version and submit the exact selected source buffer as a distinct Ready/Board Ready Request Document row/item. Both writes resolve server-owned identity, use stale-view fences, reread durable state, and keep snapshots outside editable-artifact cardinality/supersession. | **OWNER ACTION REQUIRED — this row does not authorize a Production mutation.** If the owner chooses to proceed, separately authorize an exact restore and/or first Board snapshot, capture post-write SharePoint/Dataverse readback, and verify no cleanup work. Native Graph restore has no conditional-write header: the service narrows the race with an immediate metadata recheck and preserves every concurrent version, but an edit in the final API-call interval can become an intermediate retained version. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
@@ -121,6 +121,16 @@ sequence.
   code fallback**, so deployment/read-path proof is closed while the first
   Admin-published revision remains an explicit later owner action.
 
+- Initial Assessment restore and Board-snapshot release:
+  **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30]** Claude's
+  adversarial findings were fixed; the relevant gates and 9,205-test suite
+  passed; PR #138 merged as `c519daf6`; and Production deployment
+  `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` reached Ready. Signed-in Request `1003109`
+  showed the canonical artifact, Board-snapshot control, and native versions
+  `2.0` / `1.0` without browser warnings/errors. The smoke invoked no write,
+  refresh, or external-document action. Restore and first-snapshot write proof
+  remain an explicit owner action, not an automatically queued task.
+
 - Curated Site Visit materials-recipient directory: **[PRODUCTION-LIVE AND
   OWNER-VERIFIED 2026-08-29]** superusers curate a maximum of 50 active staff
   and existing Dataverse Contact references (Consultant/Board) for the
@@ -192,10 +202,10 @@ sequence.
   passed in the production Request library. Library limit (500 majors, no age
   limit) and second-stage recycle presence are now closed via administrator
   evidence (2026-08-10 / 2026-08-20); retention and the Edit level's Delete
-  flags stay owner-accepted-open. Workbench history is Production-live;
-  administrator restore and exact byte-copy Board snapshots are source-built
-  on `codex/initial-assessment-controls` and await review, promotion, and an
-  explicitly authorized Production write proof.
+  flags stay owner-accepted-open. Workbench history, administrator restore,
+  and exact byte-copy Board snapshots are Production-deployed; the signed-in
+  read surface passed on Request `1003109`. Restore and first-snapshot writes
+  remain unexercised and require separate explicit owner authorization.
 
 - Initial Assessment interrupted-finalization recovery: Request `1003109`
   was staged as Failed after its SharePoint upload and retried through the

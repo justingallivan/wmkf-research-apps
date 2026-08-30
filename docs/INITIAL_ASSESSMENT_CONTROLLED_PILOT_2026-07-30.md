@@ -3,7 +3,7 @@ title: Initial Assessment Controlled Production Pilot — 2026-07-30
 domain: architecture
 kind: audit
 status: active
-summary: Request 1003109 proves the core pilot; administrator restore and exact byte-copy Board controls are source-built and await promotion/write proof.
+summary: Request 1003109 proves the core pilot; restore and Board controls are Production-deployed/read-smoked, with write proof owner-gated.
 canonical: false
 cataloged: 2026-07-30
 last_verified: 2026-08-30
@@ -131,11 +131,14 @@ IT administrator screenshot showed both probes sitting in the **second-stage
 recycle bin**, proving the bin exists and the full deletion cascade works.
 Purview retention and the Edit level's exact Delete flags remain open
 (owner-accepted-open 2026-08-20). Workbench history is Production-live.
-**[SOURCE-BUILT 2026-08-30 on `codex/initial-assessment-controls`; not
-Production-claimed]** superusers can restore a selected native SharePoint
+**[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; WRITES NOT
+PRODUCTION-EXERCISED]** superusers can restore a selected native SharePoint
 version as a new current version and create a distinct retained Ready/Board
-Ready Request Document row/item from the exact current bytes. Promotion and an
-explicitly authorized Production write proof remain open.
+Ready Request Document row/item from the exact current bytes. PR #138 merged as
+`c519daf6`; Ready deployment `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` served a
+signed-in Request `1003109` read smoke of the artifact, snapshot control, and
+native versions `2.0` / `1.0`. Restore and first-snapshot write proof remain a
+separate explicitly authorized owner action.
 
 ## Evidence matrix
 
@@ -152,7 +155,7 @@ explicitly authorized Production write proof remain open.
 | First-stage recycle recovery | Controlled probe was deleted after its version test | SharePoint first-stage bin retained the item and original Request-library location | Justin restored it through the signed-in SharePoint UI; Graph confirmed the same item and exact contents live | PASS — probe then deleted again and both probe artifacts removed from first-stage |
 | Administrative library controls | Direct policy/permission probes, signed-in administrator view, and Connor's 2026-08-10 replies | Item-level retention-label read returned no label fields; site-permission enumeration returned `403`; second-stage admin bin returned Access Denied | N/A until SharePoint/Purview administrator verification | PARTIAL — **version policy now fully ANSWERED** from the signed-in Versioning Settings page (2026-08-10): major versions only, **no time limit**, **keep 500 major versions**, drafts unchecked, check-out not required. **2026-08-20 (S448) IT screenshots closed most of the rest**: the second-stage recycle bin exists and holds both 2026-07-30 probe files (refuting the 2026-08-10 "no second-stage bin" report as an access artifact); Members' assigned level is **Edit** ("limited control" was the pane caption), so ordinary editors presumptively CAN delete files and versions — and the connected M365 group is **Public**, making the effective editor population the whole tenant. Purview retention and the Edit level's exact Delete flags remain open and owner-accepted-open absent a pressing need — see `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` for the full evidence and classifications |
 | Workbench version-history display | `View version history` disclosure on the Initial Assessment tab, lazy-fetched per staff click | Read-only. Lists native SharePoint versions for the exact displayed artifact via Graph; a replacement race returns 409 rather than another artifact's editors; no Dataverse write and no snapshot row | Workbench shows editor attribution per version, current-first, with honest truncation reporting | PASS — shipped S413 (2026-08-10) at merge `147d3e49` and **live-verified by signed-in smoke** on Request `1003109`. The tab rendered `Version 2.0 · current · Justin Gallivan · Jul 30, 2026 6:33 PM` over `Version 1.0 · SharePoint App · Jul 30, 2026 5:28 PM`, with no truncation note. Two independent cross-checks passed: those timestamps equal the direct-Graph probe's `2.0@2026-07-31T01:33:55Z` / `1.0@2026-07-31T00:28:08Z` converted to Pacific, so the route→service→Graph chain returns the same versions as a direct Graph call; and the `current` badge agrees with the tab header's `2.0`, which is a genuinely separate read — the header resolves `publication.versionId` through `currentMetadata` at page load [VERIFIED via `lib/services/graph-service.js:410`, `lib/services/initial-assessment/artifact-service.js:286`], while the history path issues its own item read on the disclosure click [VERIFIED via `lib/services/graph-service.js:491`], so this is two requests agreeing rather than one value rendered twice. This retires the mock-coverage gap — until this smoke, all three test files stubbed their outbound boundary [VERIFIED via `tests/unit/graph-service-versions.test.js:45`, `tests/unit/workbench-initial-assessment-versions-route.test.js:11`, `tests/unit/initial-assessment-artifact-versions.test.js:5`] and the chain had never executed end to end |
-| Workbench administrator restore and milestone freeze | Superuser Workbench controls call exact-body write routes; the server resolves the canonical request pointer and stable Graph identity | Restore promotes a selected native version to a new current version and rereads current bytes/registry metadata. Board freeze creates or reuses one distinct Ready/Board Ready Request Document row/item linked to the exact source row/version/hash; it never moves the canonical pointer or supersedes editable rows | Workbench refreshes native version history after restore and lists retained Board snapshots with source version and actor/time | SOURCE PASS 2026-08-30 on `codex/initial-assessment-controls`; adversarial review, promotion, and owner-authorized Production write proof remain open. The Board implementation follows the owner’s 2026-08-10 byte-copy decision, not a pointer-only design. Native Graph restore preserves all versions but offers no conditional-write header, so a final-call concurrent edit can become an intermediate retained version before the selected version becomes current. |
+| Workbench administrator restore and milestone freeze | Superuser Workbench controls call exact-body write routes; the server resolves the canonical request pointer and stable Graph identity | Restore promotes a selected native version to a new current version and rereads current bytes/registry metadata. Board freeze creates or reuses one distinct Ready/Board Ready Request Document row/item linked to the exact source row/version/hash; it never moves the canonical pointer or supersedes editable rows | Workbench refreshes native version history after restore and lists retained Board snapshots with source version and actor/time | PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30 through PR #138 (`c519daf6`) and Request `1003109`; restore and first-snapshot writes remain unexercised and owner-gated. The Board implementation follows the owner’s 2026-08-10 byte-copy decision, not a pointer-only design. Native Graph restore preserves all versions but offers no conditional-write header, so a final-call concurrent edit can become an intermediate retained version before the selected version becomes current. |
 | Post-upload recovery | Request `1003109` was staged as Failed after upload while retaining generation/run/file/hash identity, then retried through the signed-in Workbench | Same registry row, AI run, request pointer target, and SharePoint item; attempt count advanced `1 → 2`; no cleanup work | Same SharePoint version `1.0`, eTag, last-modified time, size, and governed hash; exactly one request AI run | PASS — no model call, upload, overwrite, or duplicate |
 | Approved canonical input follow-up | Signed-in Workbench generation read `Reviewer Materials/Proposal_1003109.pdf` (33,011 extracted characters; text SHA-256 `0fc490d0fc1c635878f36b35376f952e0e35ea8225441c4fe2644f0e3456f36e`) | Row `3cec63a4-768c-f111-ab0f-6045bd018a07`; input fingerprint `df23a4ebfa2661d89dce81ea4c6cbe2937fa9f4607fb3e2a50981a49b1851a1b`; generation key `4803841d396aa1d2563aa36d2135efe6b51cc527183755dfbeca37f1f85f582f` | Workbench showed `Ready · Draft` and the exact recomputation matched both stored identities | PASS |
 | New-run request lineage | `initial-assessment.generate` v1 under Request `1003109` | AI run `528b97af-768c-f111-ab0f-7ced8d3d15a6`; `_wmkf_ai_request_value=b2a683cb-ec6f-f111-ab0d-000d3a306d45`; SharePoint item `01G4GVMS3U3DHMJQ7GERBLB2QA3SYTLNHO` | Registry and request pointer both target `3cec63a4-768c-f111-ab0f-6045bd018a07` | PASS |
@@ -227,10 +230,11 @@ not an intervening staff edit. Version `2.0` later hashed to
      presumptively can edit and delete. The Edit level's exact Delete
      checkbox read-out remains owner-accepted-open.
 
-   Workbench version history is Production-live. Administrator restore and the
-   owner-decided byte-copy Board snapshot are source-built as of 2026-08-30;
-   finish adversarial review, deliberate promotion, and an explicitly
-   authorized Production write/readback before calling those controls live.
+   Workbench version history, administrator restore, and the owner-decided
+   byte-copy Board snapshot are Production-deployed as of 2026-08-30. Signed-in
+   Request `1003109` passed the artifact/control/version-history read smoke.
+   Restore and first-snapshot writes remain unexercised; require separate
+   explicit owner authorization and write/readback before claiming write proof.
    The pointer-vs-copy question is not open: the owner chose copy on
    2026-08-10 (`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Board milestone
    freeze).
