@@ -138,10 +138,12 @@ export default function PromptTemplatesSection() {
             {executorBudgetError}. Prompt editing remains available.
           </div>
         )}
-        <ExecutorBudgetEditor
-          config={executorBudgetConfig}
-          onPublished={setExecutorBudgetConfig}
-        />
+        {executorBudgetConfig ? (
+          <ExecutorBudgetEditor
+            config={executorBudgetConfig}
+            onPublished={setExecutorBudgetConfig}
+          />
+        ) : null}
         {prompts.map((p) => (
           <PromptPanel
             key={p.name}
@@ -468,6 +470,12 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
             text: `${data.error || 'Executor budgets changed.'} Your draft was retained; reapply its changed fields or reset to the current revision.`,
           });
           return;
+        }
+        if (response.status === 409
+            && data.code === 'unsupported_executor_budget_schema'
+            && data.current?.budgets) {
+          setConflictConfig(data.current);
+          onPublished(data.current);
         }
         throw new Error(data.error || 'Executor budget publication failed.');
       }

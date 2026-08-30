@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PromptTemplatesSection, {
   ExecutorBudgetEditor,
   OutputBudgetLine,
@@ -134,6 +134,37 @@ test('a budget-load failure leaves unrelated prompt editing available', async ()
   expect(screen.getByRole('button', { name: 'Edit & publish' })).toBeEnabled();
 });
 
+test('a successful budget response initializes the editor after prompt editing renders', async () => {
+  let resolveBudget;
+  const delayedBudget = new Promise((resolve) => { resolveBudget = resolve; });
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') {
+      return response({
+        defaultModel: 'sonnet',
+        defaultModelResolved: 'claude-sonnet-5',
+        tiers: [],
+        availableModels: [],
+        modelStatuses: {},
+      });
+    }
+    if (url === '/api/admin/executor-budgets') return delayedBudget;
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+
+  expect(await screen.findByText('pre-site-visit.proposal-core.generate')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Maximum output tokens/)).not.toBeInTheDocument();
+
+  await act(async () => {
+    resolveBudget(response(budgetConfig(2, 50000)));
+  });
+
+  expect(await screen.findByLabelText(/Maximum output tokens/)).toHaveValue(50000);
+  expect(screen.queryByText(/changed after this draft was loaded/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Publish v3' })).toBeDisabled();
+});
+
 test('a dirty budget draft must be field-level reapplied after a concurrent reload', async () => {
   const onPublished = jest.fn();
   const { rerender } = render(
@@ -205,6 +236,48 @@ test('an unknown future storage schema is visible and disables publication', () 
   expect(screen.getByText(/schemaVersion 2/)).toHaveClass('text-red-800');
   fireEvent.change(screen.getByLabelText(/Maximum output tokens/), { target: { value: '40000' } });
   expect(screen.getByRole('button', { name: 'Publish v3' })).toBeDisabled();
+});
+
+test('a future schema discovered during publish retains the draft and disables retry', async () => {
+  const current = budgetConfig(0, 32768);
+  current.latestRevision = 1;
+  current.storageWarnings = [{
+    settingKey: 'executor.budgets.v000001',
+    version: 1,
+    code: 'unsupported_executor_budget_schema',
+    message: 'revision 1 uses schemaVersion 2',
+  }];
+  global.fetch.mockImplementation(async (url, options = {}) => {
+    if (url === '/api/admin/prompts') return response({ prompts: [prompt] });
+    if (url === '/api/admin/models') {
+      return response({
+        defaultModel: 'sonnet',
+        defaultModelResolved: 'claude-sonnet-5',
+        tiers: [],
+        availableModels: [],
+        modelStatuses: {},
+      });
+    }
+    if (url === '/api/admin/executor-budgets' && options.method === 'PUT') {
+      return response({
+        error: 'A stored Executor budget revision uses a newer schema.',
+        code: 'unsupported_executor_budget_schema',
+        current,
+      }, false, 409);
+    }
+    if (url === '/api/admin/executor-budgets') return response(budgetConfig(1, 32768));
+    throw new Error(`Unexpected fetch ${url}`);
+  });
+  render(<PromptTemplatesSection />);
+
+  const maxTokens = await screen.findByLabelText(/Maximum output tokens/);
+  fireEvent.change(maxTokens, { target: { value: '40000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v2' }));
+
+  expect(await screen.findByText(/newer schema/)).toHaveClass('text-red-800');
+  expect(screen.getByText(/revision 1 uses schemaVersion 2/)).toHaveClass('text-red-800');
+  expect(screen.getByLabelText(/Maximum output tokens/)).toHaveValue(40000);
+  expect(screen.getByRole('button', { name: 'Publish v2' })).toBeDisabled();
 });
 
 test('budget display distinguishes a configured override from the final model-capped value', () => {
